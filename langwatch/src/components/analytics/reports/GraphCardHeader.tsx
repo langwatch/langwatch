@@ -127,11 +127,14 @@ export function GraphCardHeader({
            */}
           {trigger?.active ? (
             <Tooltip
-              content={`Alert configured (${trigger.alertType ?? "INFO"})`}
+              content="Edit alert"
               positioning={{ placement: "top" }}
               showArrow
             >
               <Box
+                role="button"
+                aria-label="Edit alert"
+                tabIndex={0}
                 padding={1}
                 cursor="pointer"
                 onClick={(e) => {

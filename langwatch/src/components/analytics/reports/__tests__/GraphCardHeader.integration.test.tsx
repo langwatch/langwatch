@@ -107,19 +107,13 @@ describe("GraphCardHeader", () => {
   describe("given an active trigger is configured for this graph", () => {
     describe("when the bell icon is clicked", () => {
       it("opens the automations drawer in edit mode for that trigger pre-filled with this graph and its first series", async () => {
-        const { container } = renderHeader({
+        renderHeader({
           trigger: { id: "trigger_abc", active: true, alertType: "WARNING" },
         });
 
-        // The active-alert variant renders a clickable Box wrapping a
-        // `<Bell>` icon (no role / aria-label is attached at this layer,
-        // so the lucide class is the most stable handle we have).
-        const bellSvg = container.querySelector("svg.lucide-bell");
-        expect(bellSvg).not.toBeNull();
-        const bellWrapper = bellSvg?.closest("div");
-        if (!bellWrapper) throw new Error("bell wrapper not found");
-
-        await userEvent.click(bellWrapper);
+        await userEvent.click(
+          screen.getByRole("button", { name: "Edit alert" }),
+        );
 
         expect(openDrawerMock).toHaveBeenCalledTimes(1);
         expect(openDrawerMock).toHaveBeenCalledWith("automation", {

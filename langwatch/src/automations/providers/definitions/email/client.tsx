@@ -185,10 +185,14 @@ function EmailConfigForm({
 
   return (
     <VStack align="stretch" gap={4}>
-      <InlineCadenceSelect
-        value={ctx.notificationCadence}
-        onChange={ctx.setNotificationCadence}
-      />
+      {/* Alerts always deliver immediately (cadence is pinned server-side),
+          so the cadence switch only renders for trace automations. */}
+      {!isGraphAlert ? (
+        <InlineCadenceSelect
+          value={ctx.notificationCadence}
+          onChange={ctx.setNotificationCadence}
+        />
+      ) : null}
       <Field.Root>
         <Field.Label>Recipients</Field.Label>
         <VStack align="stretch" gap={1}>

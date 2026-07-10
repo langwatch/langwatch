@@ -30,15 +30,16 @@ describe("TypePicker", () => {
   });
 
   describe("given the draft source is customGraph", () => {
-    it("disables the action-category cards", () => {
+    it("does not render the action-category cards at all", () => {
       renderPicker({ source: "customGraph" });
 
-      const dataset = screen.getByRole("button", { name: /add to dataset/i });
-      const annotation = screen.getByRole("button", {
-        name: /add to annotation queue/i,
-      });
-      expect(dataset).toHaveAttribute("aria-disabled", "true");
-      expect(annotation).toHaveAttribute("aria-disabled", "true");
+      expect(
+        screen.queryByRole("button", { name: /add to dataset/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /add to annotation queue/i }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Action$/)).not.toBeInTheDocument();
     });
 
     it("keeps the notify cards enabled", () => {
@@ -50,39 +51,6 @@ describe("TypePicker", () => {
       expect(
         screen.getByRole("button", { name: /slack/i }),
       ).not.toHaveAttribute("aria-disabled");
-    });
-
-    describe("when a disabled action card is clicked", () => {
-      it("does not call onChange", async () => {
-        const user = userEvent.setup();
-        const onChange = vi.fn();
-        renderPicker({ source: "customGraph", onChange });
-
-        await user.click(
-          screen.getByRole("button", { name: /add to dataset/i }),
-        );
-
-        expect(onChange).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when a disabled action card is hovered", () => {
-      it("explains that graph alerts only notify", async () => {
-        const user = userEvent.setup();
-        renderPicker({ source: "customGraph" });
-
-        await user.hover(
-          screen.getByRole("button", { name: /add to dataset/i }),
-        );
-
-        await waitFor(() => {
-          expect(
-            screen.getAllByText(
-              /graph alerts only support email and slack notifications/i,
-            ).length,
-          ).toBeGreaterThan(0);
-        });
-      });
     });
   });
 

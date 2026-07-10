@@ -113,7 +113,10 @@ export function MainSectionList({
         disabled={!draft.action}
         onClick={() => setSection("configuration")}
       />
-      {isNotifyAction ? (
+      {/* Alerts are incident-based — they fire once when the threshold is
+          breached and resolve on recovery, with the cadence pinned server-
+          side. The cadence stage only applies to trace automations. */}
+      {isNotifyAction && draft.source !== "customGraph" ? (
         <SectionRow
           title="Cadence"
           summary={

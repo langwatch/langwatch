@@ -72,7 +72,9 @@ export interface FiltersDrawerResult {
  * (trace data vs custom graph), then either configure trace filters
  * (visual + JSON code mode with a registered JSON Schema) or pick a
  * custom graph and define a threshold rule (series, operator, threshold,
- * time window, severity).
+ * time window). Severity lives next to the name on the main drawer; when
+ * an alert draft has none yet, Done seeds the Warning default so a fresh
+ * alert can save without a detour.
  */
 export function FiltersSecondaryDrawer({
   open,
@@ -120,9 +122,6 @@ export function FiltersSecondaryDrawer({
   const [thresholdText, setThresholdText] = useState(
     String(graphAlert.threshold),
   );
-  const [localAlertType, setLocalAlertType] = useState<AlertType>(
-    alertType ?? AlertType.WARNING,
-  );
   const [codeMode, setCodeMode] = useState(false);
   const [code, setCode] = useState(JSON.stringify(filters, null, 2));
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -135,11 +134,10 @@ export function FiltersSecondaryDrawer({
       setLocalCustomGraphId(customGraphId);
       setLocalGraphAlert(graphAlert);
       setThresholdText(String(graphAlert.threshold));
-      setLocalAlertType(alertType ?? AlertType.WARNING);
       setCode(JSON.stringify(filters, null, 2));
       setCodeError(null);
     }
-  }, [open, source, filters, customGraphId, graphAlert, alertType]);
+  }, [open, source, filters, customGraphId, graphAlert]);
 
   const graphs = api.graphs.getAll.useQuery(
     { projectId },
@@ -199,7 +197,9 @@ export function FiltersSecondaryDrawer({
         filters: {},
         customGraphId: localCustomGraphId,
         graphAlert: { ...localGraphAlert, threshold: parsedThreshold },
-        alertType: localAlertType,
+        // Severity is edited next to the name on the main drawer; alerts
+        // require one, so an unset draft is seeded with the default here.
+        alertType: alertType ?? AlertType.WARNING,
       });
       return;
     }
@@ -217,7 +217,7 @@ export function FiltersSecondaryDrawer({
           filters: sanitized as Partial<Record<FilterField, FilterParam>>,
           customGraphId: null,
           graphAlert: INITIAL_GRAPH_ALERT_DRAFT,
-          alertType: localAlertType,
+          alertType,
         });
       } catch {
         setCodeError("Invalid JSON syntax");
@@ -231,7 +231,7 @@ export function FiltersSecondaryDrawer({
         filters: sanitized as Partial<Record<FilterField, FilterParam>>,
         customGraphId: null,
         graphAlert: INITIAL_GRAPH_ALERT_DRAFT,
-        alertType: localAlertType,
+        alertType,
       });
     }
   };
@@ -393,47 +393,29 @@ export function FiltersSecondaryDrawer({
             </Field.Root>
           </HStack>
 
-          <HStack gap={3}>
-            <Field.Root flex="1">
-              <Field.Label>Time window</Field.Label>
-              <NativeSelect.Root>
-                <NativeSelect.Field
-                  value={localGraphAlert.timePeriod}
-                  onChange={(e) =>
-                    setLocalGraphAlert((prev) => ({
-                      ...prev,
-                      timePeriod: Number(
-                        e.target.value,
-                      ) as GraphAlertTimePeriod,
-                    }))
-                  }
-                >
-                  {GRAPH_ALERT_TIME_PERIODS.map((minutes) => (
-                    <option key={minutes} value={minutes}>
-                      {TIME_PERIOD_LABELS[minutes]}
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </Field.Root>
-            <Field.Root flex="1">
-              <Field.Label>Severity</Field.Label>
-              <NativeSelect.Root>
-                <NativeSelect.Field
-                  value={localAlertType}
-                  onChange={(e) =>
-                    setLocalAlertType(e.target.value as AlertType)
-                  }
-                >
-                  <option value={AlertType.INFO}>Info</option>
-                  <option value={AlertType.WARNING}>Warning</option>
-                  <option value={AlertType.CRITICAL}>Critical</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </Field.Root>
-          </HStack>
+          <Field.Root>
+            <Field.Label>Time window</Field.Label>
+            <NativeSelect.Root>
+              <NativeSelect.Field
+                value={localGraphAlert.timePeriod}
+                onChange={(e) =>
+                  setLocalGraphAlert((prev) => ({
+                    ...prev,
+                    timePeriod: Number(
+                      e.target.value,
+                    ) as GraphAlertTimePeriod,
+                  }))
+                }
+              >
+                {GRAPH_ALERT_TIME_PERIODS.map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {TIME_PERIOD_LABELS[minutes]}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </Field.Root>
 
           <Text textStyle="xs" color="fg.muted">
             Fires when{" "}

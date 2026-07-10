@@ -22,7 +22,7 @@
 {{ _history_lines }}
 {%- endcapture -%}
 {%- capture _links -%}
-<{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit automation>
+<{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>
 {%- endcapture -%}
 [
   { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | truncate: 140 | prepend: " " | prepend: _emoji | json }}, "emoji": true } },

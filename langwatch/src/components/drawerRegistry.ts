@@ -50,6 +50,10 @@ const AutomationDrawer = lazyDefault({
   factory: () => import("~/features/automations/AutomationDrawer"),
   key: "AutomationDrawer",
 });
+const ViewAutomationDrawer = lazyDefault({
+  factory: () => import("~/features/automations/ViewAutomationDrawer"),
+  key: "ViewAutomationDrawer",
+});
 const AgentHistoryDrawer = lazyDefault({
   factory: () => import("./agents/AgentHistoryDrawer"),
   key: "AgentHistoryDrawer",
@@ -222,6 +226,7 @@ export const drawers = {
   traceDetails: TraceDetailsDrawer,
   traceV2Details: TraceV2DrawerNoop,
   automation: AutomationDrawer,
+  viewAutomation: ViewAutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
   defaultModelOverride: DefaultModelOverrideDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,

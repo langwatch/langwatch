@@ -77,6 +77,10 @@ export interface SharedDef {
   readonly label: string;
   /** One-line marketing-ish description shown under the icon in the picker. */
   readonly description: string;
+  /** Alert-flavoured variant of `description`, shown when the draft is a
+   *  graph alert (which fires once when a metric crosses a threshold, not
+   *  per trace). Omit when the trace description reads fine for both. */
+  readonly alertDescription?: string;
   /** Zod schema for the `actionParams` JSON column. Used by the upsert
    *  route to validate input before persisting. */
   readonly actionParamsSchema: ZodTypeAny;

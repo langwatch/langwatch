@@ -2,7 +2,6 @@ import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type { TriggerAction } from "@prisma/client";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import type { ClientEntry } from "~/automations/providers/types";
-import { Tooltip } from "~/components/ui/tooltip";
 import type { ConditionSource } from "~/features/automations/logic/draftReducer";
 
 /**
@@ -17,9 +16,9 @@ import type { ConditionSource } from "~/features/automations/logic/draftReducer"
  * Notify group cleanly via the category filter.
  *
  * Graph alerts (source = customGraph) only support `notify`-category actions
- * — `action` cards are rendered disabled with a tooltip explaining why. The
- * router enforces the same rule server-side, but disabling at the UI layer
- * avoids users picking an option that errors at save time.
+ * — the `action` group is not rendered at all for alerts. The router
+ * enforces the same rule server-side; hiding at the UI layer keeps options
+ * that would error at save time out of sight entirely.
  */
 export function TypePicker({
   value,
@@ -33,10 +32,7 @@ export function TypePicker({
   const entries = Object.values(CLIENT_PROVIDERS);
   const notify = entries.filter((e) => e.shared.category === "notify");
   const action = entries.filter((e) => e.shared.category === "action");
-  const actionDisabledReason =
-    source === "customGraph"
-      ? "Graph alerts only support email and Slack notifications."
-      : undefined;
+  const isAlertKind = source === "customGraph";
 
   return (
     <Box padding={3} borderRadius="md" border="1px solid" borderColor="border">
@@ -51,16 +47,17 @@ export function TypePicker({
             entries={notify}
             value={value}
             onChange={onChange}
+            isAlertKind={isAlertKind}
           />
         ) : null}
-        {action.length > 0 ? (
+        {action.length > 0 && !isAlertKind ? (
           <TypeGroup
             label="Action"
             description="Do something to the matched trace."
             entries={action}
             value={value}
             onChange={onChange}
-            disabledReason={actionDisabledReason}
+            isAlertKind={isAlertKind}
           />
         ) : null}
       </VStack>
@@ -74,14 +71,14 @@ function TypeGroup({
   entries,
   value,
   onChange,
-  disabledReason,
+  isAlertKind,
 }: {
   label: string;
   description: string;
   entries: ClientEntry[];
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
-  disabledReason?: string;
+  isAlertKind: boolean;
 }) {
   return (
     <VStack align="stretch" gap={2}>
@@ -106,7 +103,7 @@ function TypeGroup({
             entry={entry}
             active={entry.shared.action === value}
             onClick={() => onChange(entry.shared.action)}
-            disabledReason={disabledReason}
+            isAlertKind={isAlertKind}
           />
         ))}
       </Box>
@@ -118,16 +115,15 @@ function TypeCard({
   entry,
   active,
   onClick,
-  disabledReason,
+  isAlertKind,
 }: {
   entry: ClientEntry;
   active: boolean;
   onClick: () => void;
-  disabledReason?: string;
+  isAlertKind: boolean;
 }) {
   const Icon = entry.client.Icon;
-  const disabled = Boolean(disabledReason);
-  const card = (
+  return (
     <chakra.button
       type="button"
       textAlign="left"
@@ -137,26 +133,20 @@ function TypeCard({
       // ui5015-001: semantic colorPalette tokens — mirrors SourceCard;
       // avoids raw scale + `_dark` gymnastics (memory feedback_no_hex_colours).
       colorPalette="orange"
-      borderColor={active && !disabled ? "colorPalette.emphasized" : "border"}
-      bg={active && !disabled ? "colorPalette.subtle" : "bg"}
-      opacity={disabled ? 0.4 : 1}
-      cursor={disabled ? "not-allowed" : "pointer"}
-      aria-disabled={disabled || undefined}
-      onClick={disabled ? undefined : onClick}
+      borderColor={active ? "colorPalette.emphasized" : "border"}
+      bg={active ? "colorPalette.subtle" : "bg"}
+      cursor="pointer"
+      onClick={onClick}
     >
       <HStack gap={2} mb={1}>
         <Icon size={18} />
         <Text fontWeight="semibold">{entry.shared.label}</Text>
       </HStack>
       <Text textStyle="xs" color="fg.muted">
-        {entry.shared.description}
+        {isAlertKind
+          ? (entry.shared.alertDescription ?? entry.shared.description)
+          : entry.shared.description}
       </Text>
     </chakra.button>
-  );
-  if (!disabledReason) return card;
-  return (
-    <Tooltip content={disabledReason} positioning={{ placement: "top" }}>
-      {card}
-    </Tooltip>
   );
 }

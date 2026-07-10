@@ -60,7 +60,7 @@ export function SlackBlockKitTemplatePicker({
     <Stack gap={2} align="stretch">
       <Text textStyle="xs" color="fg.muted">
         {kind === "graphAlert"
-          ? "Each time the alert fires it sends one message. Pick a starting layout — the thumbnail shows structure, not the final look."
+          ? "Each layout sends one message when the alert fires. The thumbnail shows structure, not the final look."
           : cadence === "digest"
             ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout — the thumbnail shows structure, not the final look."
             : "Each matching trace sends its own message. Pick a starting layout — the thumbnail shows structure, not the final look."}
@@ -84,7 +84,9 @@ export function SlackBlockKitTemplatePicker({
           );
         })}
       </SimpleGrid>
-      {otherOptions.length > 0 ? (
+      {/* Alerts have no cadence choice (they always fire immediately), so
+          the cross-cadence layouts section only applies to trace drafts. */}
+      {kind !== "graphAlert" && otherOptions.length > 0 ? (
         <Collapsible.Root
           open={otherOpen}
           onOpenChange={(d) => setOtherOpen(d.open)}

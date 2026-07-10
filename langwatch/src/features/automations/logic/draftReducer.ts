@@ -220,6 +220,50 @@ export function templatesFromDraft(draft: AutomationDraft) {
   return provider.client.templatesFromSlice(draft.slices[draft.action]);
 }
 
+/**
+ * Build the `automation.testFireTemplate` mutation input from a draft.
+ * Extracted from the drawer so the graph-alert discriminator is unit-testable:
+ * a `customGraph` draft MUST carry a non-null `graphAlert` or the server
+ * renders the alert template against the trace context, producing the blank
+ * "Metric / Condition / <|Open dashboard>" message (the field-5015 bug).
+ */
+export function buildTestFirePayload({
+  draft,
+  projectId,
+  channel,
+  webhook,
+  graphName,
+  seriesLabel,
+}: {
+  draft: AutomationDraft;
+  projectId: string;
+  channel: "email" | "slack";
+  webhook: string | null;
+  graphName?: string | null;
+  seriesLabel?: string | null;
+}) {
+  const isGraphAlert = draft.source === "customGraph";
+  return {
+    projectId,
+    channel,
+    trigger: {
+      name: draft.name || "Your automation",
+      alertType: draft.alertType,
+    },
+    draft: templatesFromDraft(draft),
+    webhook,
+    graphAlert: isGraphAlert
+      ? {
+          graphName: graphName ?? undefined,
+          metricLabel: seriesLabel ?? undefined,
+          operator: draft.graphAlert.operator,
+          threshold: draft.graphAlert.threshold,
+          timePeriodMinutes: draft.graphAlert.timePeriod,
+        }
+      : null,
+  };
+}
+
 export function actionParamsFromDraft(draft: AutomationDraft) {
   if (!draft.action) return {};
   const provider = CLIENT_PROVIDERS[draft.action];
@@ -249,8 +293,14 @@ export function conditionsAreSet(draft: AutomationDraft): boolean {
   return filtersAreSet(draft.filters);
 }
 
+/**
+ * Channel-setup completeness ONLY — deliberately excludes the name. A
+ * fully-configured Slack/email section goes green even while the name is
+ * empty; the missing name is surfaced on the name field itself and gates
+ * the Save button, not the section indicator.
+ */
 export function configIsComplete(draft: AutomationDraft): boolean {
-  if (!draft.action || draft.name.trim().length === 0) return false;
+  if (!draft.action) return false;
   const provider = CLIENT_PROVIDERS[draft.action];
   return provider.client.isComplete(draft.slices[draft.action]);
 }
@@ -289,6 +339,7 @@ export const OPERATOR_LABELS: Record<GraphAlertOperator, string> = {
 
 /** Time-period labels mirroring the dashboard "Time Period" select. */
 export const TIME_PERIOD_LABELS: Record<GraphAlertTimePeriod, string> = {
+  1: "1 minute",
   5: "5 minutes",
   15: "15 minutes",
   30: "30 minutes",

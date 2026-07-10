@@ -8,6 +8,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -137,8 +138,25 @@ const renderDrawer = (
     source?: string;
     prefilledGraphId?: string;
     prefilledSeriesName?: string;
+    initialSource?: string;
+    initialName?: string;
+    initialAction?: string;
+    initialFilters?: string;
   } = {},
 ) => render(<AutomationDrawer {...props} />, { wrapper: Wrapper });
+
+/** Locates a native select by one of its option labels — the Field labels
+ *  aren't programmatically wired to the NativeSelect fields. */
+function selectContainingOption(optionName: RegExp): HTMLSelectElement {
+  const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+  const match = selects.find((select) =>
+    within(select)
+      .queryAllByRole("option")
+      .some((option) => optionName.test(option.textContent ?? "")),
+  );
+  if (!match) throw new Error(`No select with option ${String(optionName)}`);
+  return match;
+}
 
 function savedRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -275,6 +293,119 @@ describe("AutomationDrawer", () => {
             screen.getByText(/1 condition: metadata\.labels/i),
           ).toBeInTheDocument();
         });
+      });
+    });
+  });
+
+  describe("given the drawer opens as a new alert from the page", () => {
+    describe("when it mounts with initialSource customGraph", () => {
+      it("opens a fresh alert draft with severity defaulted to warning", async () => {
+        renderDrawer({ initialSource: "customGraph" });
+
+        await waitFor(() => {
+          const draft = useAutomationStore.getState().draft;
+          expect(draft.source).toBe("customGraph");
+          expect(draft.alertType).toBe("WARNING");
+        });
+        // No graph is prefilled or locked — the user picks it.
+        expect(useAutomationStore.getState().draft.customGraphId).toBeNull();
+        expect(screen.getByText("New alert")).toBeInTheDocument();
+      });
+
+      it("keeps the graph select enabled so the user picks the graph", async () => {
+        renderDrawer({ initialSource: "customGraph" });
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.source).toBe(
+            "customGraph",
+          );
+        });
+        fireEvent.click(screen.getByText("When"));
+
+        await waitFor(() => {
+          expect(selectContainingOption(/select a graph/i)).toBeEnabled();
+        });
+      });
+    });
+  });
+
+  describe("given a use-case card prefill", () => {
+    describe("when the params seed an alert", () => {
+      it("seeds the name, source, action, and severity", async () => {
+        renderDrawer({
+          initialSource: "customGraph",
+          initialName: "Error spike alert",
+          initialAction: "SEND_SLACK_MESSAGE",
+        });
+
+        await waitFor(() => {
+          const draft = useAutomationStore.getState().draft;
+          expect(draft.source).toBe("customGraph");
+          expect(draft.name).toBe("Error spike alert");
+          expect(draft.action).toBe("SEND_SLACK_MESSAGE");
+          expect(draft.alertType).toBe("WARNING");
+        });
+      });
+    });
+
+    describe("when the params seed a trace automation", () => {
+      it("seeds the name, action, and filters without switching the source", async () => {
+        renderDrawer({
+          initialName: "Error dataset",
+          initialAction: "ADD_TO_DATASET",
+          initialFilters: JSON.stringify({ "traces.error": ["true"] }),
+        });
+
+        await waitFor(() => {
+          const draft = useAutomationStore.getState().draft;
+          expect(draft.name).toBe("Error dataset");
+          expect(draft.action).toBe("ADD_TO_DATASET");
+          expect(draft.filters).toEqual({ "traces.error": ["true"] });
+        });
+        expect(useAutomationStore.getState().draft.source).toBe("trace");
+        expect(useAutomationStore.getState().draft.alertType).toBeNull();
+      });
+    });
+
+    describe("when the filters param is malformed JSON", () => {
+      it("still seeds the rest and leaves the filters empty", async () => {
+        renderDrawer({
+          initialName: "Error dataset",
+          initialAction: "ADD_TO_DATASET",
+          initialFilters: "{not json",
+        });
+
+        await waitFor(() => {
+          const draft = useAutomationStore.getState().draft;
+          expect(draft.name).toBe("Error dataset");
+          expect(draft.action).toBe("ADD_TO_DATASET");
+        });
+        expect(useAutomationStore.getState().draft.filters).toEqual({});
+      });
+    });
+  });
+
+  describe("given severity lives next to the name for both kinds", () => {
+    describe("when the draft is an alert", () => {
+      it("shows the severity field without the optional hint", async () => {
+        renderDrawer({ initialSource: "customGraph" });
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.source).toBe(
+            "customGraph",
+          );
+        });
+        expect(screen.getByText(/Severity/)).toBeInTheDocument();
+        expect(screen.queryByText("(optional)")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the draft is a trace automation", () => {
+      it("shows the severity field with the optional hint", async () => {
+        renderDrawer();
+
+        expect(await screen.findByText(/Severity/)).toBeInTheDocument();
+        expect(screen.getByText("(optional)")).toBeInTheDocument();
       });
     });
   });

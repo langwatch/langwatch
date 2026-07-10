@@ -4,6 +4,7 @@ import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import type { EmailSlice } from "~/automations/providers/definitions/email/client";
 import {
   type AutomationDraft,
+  buildTestFirePayload,
   conditionsAreSet,
   configIsComplete,
   configurationSummary,
@@ -313,8 +314,8 @@ describe("extractGraphAlertFromTriggerRow", () => {
 });
 
 describe("configIsComplete delegates to the provider", () => {
-  it("is false without a name", () => {
-    expect(configIsComplete({ ...SAMPLE, name: "" })).toBe(false);
+  it("stays true without a name — the name gates Save, not the section indicator", () => {
+    expect(configIsComplete({ ...SAMPLE, name: "" })).toBe(true);
   });
   it("matches the provider's isComplete output", () => {
     expect(configIsComplete(SAMPLE)).toBe(true);
@@ -376,5 +377,54 @@ describe("notifyChannel + isNotifyAction", () => {
 describe("configurationSummary delegates to the provider", () => {
   it("uses the provider's summary for the active action", () => {
     expect(configurationSummary(SAMPLE)).toMatch(/email to 1 recipient/);
+  });
+});
+
+describe("buildTestFirePayload sends the graph-alert discriminator", () => {
+  describe("given a trace-automation draft", () => {
+    it("sets graphAlert to null so the server renders the trace context", () => {
+      const payload = buildTestFirePayload({
+        draft: SAMPLE,
+        projectId: "proj_1",
+        channel: "email",
+        webhook: "",
+      });
+      expect(payload.graphAlert).toBeNull();
+      expect(payload.channel).toBe("email");
+      expect(payload.trigger.name).toBe("High latency");
+    });
+  });
+
+  describe("given a graph-alert draft", () => {
+    it("carries a non-null graphAlert with the rule + resolved labels (field-5015 regression)", () => {
+      const alertDraft: AutomationDraft = {
+        ...SAMPLE,
+        source: "customGraph",
+        customGraphId: "graph_1",
+        graphAlert: {
+          ...INITIAL_GRAPH_ALERT_DRAFT,
+          seriesName: "0/trace_id/cardinality",
+          operator: "gt",
+          threshold: 10,
+          timePeriod: 30,
+        },
+      };
+      const payload = buildTestFirePayload({
+        draft: alertDraft,
+        projectId: "proj_1",
+        channel: "slack",
+        webhook: "https://hooks.slack.com/services/x",
+        graphName: "Traces count",
+        seriesLabel: "Traces count",
+      });
+      expect(payload.graphAlert).not.toBeNull();
+      expect(payload.graphAlert).toMatchObject({
+        graphName: "Traces count",
+        metricLabel: "Traces count",
+        operator: "gt",
+        threshold: 10,
+        timePeriodMinutes: 30,
+      });
+    });
   });
 });

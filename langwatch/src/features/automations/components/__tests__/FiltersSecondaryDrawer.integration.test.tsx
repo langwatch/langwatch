@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { INITIAL_GRAPH_ALERT_DRAFT } from "../../logic/draftReducer";
 import { FiltersSecondaryDrawer } from "../secondaries/FiltersSecondaryDrawer";
@@ -103,6 +109,59 @@ describe("FiltersSecondaryDrawer", () => {
         renderDrawer({ prefilledGraphId: "graph-1" });
 
         expect(screen.getByRole("button", { name: "Done" })).toBeDisabled();
+      });
+    });
+  });
+
+  describe("given severity lives next to the name on the main drawer", () => {
+    it("does not render a severity control", () => {
+      renderDrawer();
+
+      const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+      const severitySelect = selects.find((select) =>
+        within(select)
+          .queryAllByRole("option")
+          .some((option) => /warning/i.test(option.textContent ?? "")),
+      );
+      expect(severitySelect).toBeUndefined();
+    });
+
+    describe("when an alert saves without a previously chosen severity", () => {
+      it("seeds the warning default on Done", () => {
+        const onSave = vi.fn();
+        renderDrawer({
+          graphAlert: {
+            ...INITIAL_GRAPH_ALERT_DRAFT,
+            seriesName: "0/latency/p95",
+          },
+          onSave,
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({ alertType: "WARNING" }),
+        );
+      });
+    });
+
+    describe("when an alert saves with a severity already chosen", () => {
+      it("passes the chosen severity through unchanged", () => {
+        const onSave = vi.fn();
+        renderDrawer({
+          graphAlert: {
+            ...INITIAL_GRAPH_ALERT_DRAFT,
+            seriesName: "0/latency/p95",
+          },
+          alertType: "CRITICAL",
+          onSave,
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({ alertType: "CRITICAL" }),
+        );
       });
     });
   });
