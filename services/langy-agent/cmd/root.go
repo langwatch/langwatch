@@ -8,7 +8,6 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 	langyagent "github.com/langwatch/langwatch/services/langy-agent"
-	"github.com/langwatch/langwatch/services/langy-agent/adapters/egress"
 	"github.com/langwatch/langwatch/services/langy-agent/adapters/workerpool"
 	"github.com/langwatch/langwatch/services/langy-agent/app"
 )
@@ -32,10 +31,14 @@ func Root(ctx context.Context, _ []string) error {
 		return err
 	}
 
+	// The egress adapter (ADR-044 part 5): observe-only monitoring that flags
+	// suspicious worker egress and NEVER blocks. PR4's enforcement swaps in
+	// behind the same Manager seam (startEgressAdapter / Manager.egressAdapterConfig).
+	mgr := startEgressAdapter(cfg, deps.Telemetry)
+
 	// The worker pool is the driven adapter. It wipes SESSIONS_ROOT before
 	// accepting traffic and binds worker subprocesses to the pool-lifetime
-	// context. The egress guard is the ADR-047 stub seam (pass-through in PR1;
-	// PR4 slots real monitoring in without touching the pool).
+	// context. The egress guard is consulted around each worker's lifecycle.
 	pool, err := workerpool.New(ctx, workerpool.Options{
 		MaxWorkers:         cfg.MaxWorkers,
 		WorkerIdle:         cfg.WorkerIdle(),
@@ -45,7 +48,7 @@ func Root(ctx context.Context, _ []string) error {
 		OpenCodeBinaryPath: cfg.OpenCodeBinaryPath,
 		OTelPluginVersion:  cfg.OTelPluginVersion,
 		Telemetry:          deps.Telemetry,
-		Egress:             egress.NewPassThrough(),
+		Egress:             mgr.EgressGuard(),
 	})
 	if err != nil {
 		return err

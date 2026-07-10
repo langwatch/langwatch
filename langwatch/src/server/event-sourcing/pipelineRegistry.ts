@@ -97,6 +97,11 @@ import type { LangyConversationStateData } from "./pipelines/langy-conversation-
 import type { ClickHouseLangyMessageRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageStorage.mapProjection";
 import type { LangyConversationStateRepository } from "./pipelines/langy-conversation-processing/repositories/langyConversationState.repository";
 import { LANGY_CONVERSATION_PROJECTION_VERSIONS } from "./pipelines/langy-conversation-processing/schemas/constants";
+import type { SpawnAgentReactorHandle } from "./pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
+import { createSpawnAgentReactor } from "./pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
+import { createReconcileAgentTurnReactor } from "./pipelines/langy-conversation-processing/reactors/reconcileAgentTurn.reactor";
+import { createLangyTokenBuffer } from "../services/langy/streaming/langyTokenBuffer";
+import { createLangyTurnHandoffStore } from "../services/langy/streaming/langyTurnHandoff";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -294,7 +299,8 @@ export class PipelineRegistry {
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
     });
-    const langyConversationPipeline = this.registerLangyConversationPipeline();
+    const { pipeline: langyConversationPipeline, spawnAgentHandle } =
+      this.registerLangyConversationPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -309,15 +315,24 @@ export class PipelineRegistry {
       billing: mapCommands(billingPipeline.commands),
       /** Late-bind the execution pool for scenario execution reactor. */
       scenarioExecutionHandle,
+      /** Late-bind the worker pool for the langy spawnAgent reactor (ADR-044). */
+      spawnAgentHandle,
     };
   }
 
   /**
-   * ADR-046: Langy conversation pipeline. Aggregate `langy_conversation`
-   * (aggregateId = conversationId, TenantId = projectId). A fold projection
-   * writes the conversation spine to `langy_conversations`; a map projection
-   * writes per-message rows to `langy_messages`. No reactor in PR2 — the
-   * streaming worker + reconcile reactor land in PR3.
+   * ADR-046 / ADR-044: Langy conversation pipeline. Aggregate
+   * `langy_conversation` (aggregateId = conversationId, TenantId = projectId).
+   * A fold projection writes the conversation spine to `langy_conversations`; a
+   * map projection writes per-message rows to `langy_messages`.
+   *
+   * PR3 adds two reactors: `spawnAgent` (reacts to `agent_turn_started`,
+   * dispatches the turn to the worker pool — pool late-bound via the returned
+   * handle) and `reconcileAgentTurn` (a delayed per-turn liveness timer that
+   * terminalizes a stalled turn). The reconcile reactor needs to dispatch
+   * `failAgentTurn`, a command of THIS pipeline, so that dispatcher is resolved
+   * via a Deferred after the pipeline is built (the scenario `computeRunMetrics`
+   * self-reference pattern).
    */
   private registerLangyConversationPipeline() {
     const langyConversationStateFoldStore =
@@ -329,12 +344,48 @@ export class PipelineRegistry {
         "langy_conversations",
       );
 
-    return this.deps.eventSourcing.register(
+    const handoffStore = createLangyTurnHandoffStore({
+      redis: this.deps.redis,
+    });
+    const buffer = createLangyTokenBuffer({ redis: this.deps.redis });
+    const spawnAgentHandle = createSpawnAgentReactor({ handoffStore });
+
+    // Deferred: the reconcile reactor dispatches failAgentTurn, a command of the
+    // pipeline being built here. Resolve it once the pipeline exists.
+    const failTurn = new Deferred<
+      (args: {
+        projectId: string;
+        conversationId: string;
+        turnId: string;
+        error: string;
+      }) => Promise<void>
+    >("langyFailTurn");
+    const reconcileAgentTurnReactor = createReconcileAgentTurnReactor({
+      buffer,
+      conversations: { failTurn: (args) => failTurn.fn(args) },
+    });
+
+    const pipeline = this.deps.eventSourcing.register(
       createLangyConversationProcessingPipeline({
         langyConversationStateFoldStore,
         langyMessageAppendStore: this.deps.repositories.langyMessageStorage,
+        spawnAgentReactor: spawnAgentHandle.reactor,
+        reconcileAgentTurnReactor,
       }),
     );
+
+    const langyCommands = mapCommands(pipeline.commands);
+    failTurn.resolve((args) =>
+      langyCommands.failAgentTurn({
+        tenantId: args.projectId,
+        occurredAt: Date.now(),
+        conversationId: args.conversationId,
+        turnId: args.turnId,
+        error: args.error,
+      }),
+    );
+
+    return { pipeline, spawnAgentHandle };
   }
 
   private registerEvaluationPipeline({

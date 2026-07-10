@@ -5,10 +5,14 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "./schemas/constants";
 import {
+  langyAgentRespondedEventDataSchema,
+  langyAgentTurnFailedEventDataSchema,
   langyConversationArchivedEventDataSchema,
   langyConversationMetadataUpdatedEventDataSchema,
   langyAgentTurnStartedEventDataSchema,
   langyMessageSentEventDataSchema,
+  langyToolCallCompletedEventDataSchema,
+  langyToolCallStartedEventDataSchema,
   langyTurnFinalizedEventDataSchema,
 } from "./schemas/events";
 
@@ -56,6 +60,87 @@ export const StartAgentTurnCommand = defineCommand({
 // NOTE: status_reported / progress_reported are EPHEMERAL signals, not durable
 // commands — they are published to the Redis buffer via LangyEphemeralPublisher
 // (see ../ephemeral.ts), never dispatched through this pipeline (ADR-046).
+//
+// The commands below ARE durable: a meaningful result the agent produces during
+// a turn (a tool call it ran, an intermediate answer, a hard failure) is worth
+// persisting on the event log, unlike a transient "42% through" progress tick.
+
+/** RecordToolCallStarted → tool_call_started (a durable turn milestone). */
+export const RecordToolCallStartedCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TOOL_CALL_STARTED,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_STARTED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_STARTED,
+  aggregateType: "langy_conversation",
+  schema: langyToolCallStartedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:tool-start:${d.toolCallId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+    "payload.turn.id": d.turnId,
+    "payload.tool.name": d.toolName,
+  }),
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.conversationId}:tool-start:${d.toolCallId}`,
+});
+
+/** RecordToolCallCompleted → tool_call_completed (a durable turn milestone). */
+export const RecordToolCallCompletedCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TOOL_CALL_COMPLETED,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_COMPLETED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_COMPLETED,
+  aggregateType: "langy_conversation",
+  schema: langyToolCallCompletedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:tool-done:${d.toolCallId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+    "payload.turn.id": d.turnId,
+    "payload.tool.name": d.toolName,
+  }),
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.conversationId}:tool-done:${d.toolCallId}`,
+});
+
+/** RecordAgentResponded → agent_responded (an intermediate assistant response). */
+export const RecordAgentRespondedCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECORD_AGENT_RESPONDED,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+  aggregateType: "langy_conversation",
+  schema: langyAgentRespondedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:responded:${d.turnId}:${d.occurredAt}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+    "payload.turn.id": d.turnId,
+  }),
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.conversationId}:responded:${d.turnId}:${d.occurredAt}`,
+});
+
+/**
+ * FailAgentTurn → agent_turn_failed. The terminal a stalled/orphaned turn
+ * reaches when there is no answer to carry (reconcile + drain). Distinct from
+ * ReconcileAgentTurn/turn_finalized, which carries the completed answer.
+ */
+export const FailAgentTurnCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.FAIL_AGENT_TURN,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_FAILED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_FAILED,
+  aggregateType: "langy_conversation",
+  schema: langyAgentTurnFailedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:turn-failed:${d.turnId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+    "payload.turn.id": d.turnId,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.conversationId}:turn-failed:${d.turnId}`,
+});
 
 /** ReconcileAgentTurn → turn_finalized (the whole final answer, source of truth). */
 export const ReconcileAgentTurnCommand = defineCommand({
