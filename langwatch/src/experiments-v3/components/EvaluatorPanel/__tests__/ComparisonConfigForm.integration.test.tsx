@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
@@ -164,5 +164,59 @@ describe("ComparisonConfigForm", () => {
         screen.getByTestId("comparison-include-duration"),
       ).toBeInTheDocument();
     });
+  });
+
+  // Pins the copy to the code, per dev/docs/best_practices/copywriting.md:
+  // each setting's label stays short and the paragraph explaining it lives
+  // behind an (i). A regression that inlines the paragraph back next to the
+  // label, or drops the (i) entirely, fails here.
+  describe("the settings explanations", () => {
+    const infoTooltips = [
+      {
+        name: "has golden answer",
+        testId: "comparison-has-golden-answer-info",
+        opensWith: /compare each candidate against a reference answer/i,
+      },
+      {
+        name: "shuffle candidate order",
+        testId: "comparison-randomize-order-info",
+        opensWith: /favour whichever candidate they read first/i,
+      },
+      {
+        name: "include metrics",
+        testId: "comparison-include-metrics-info",
+        opensWith: /prefer the cheaper or faster variant/i,
+      },
+    ];
+
+    // The popover keeps its body mounted-but-hidden while closed, so these
+    // assert on VISIBILITY. Asserting on presence in the document would pass
+    // whether or not the (i) ever opens, which is no assertion at all.
+    describe("when the form is at rest", () => {
+      it("keeps every explanation hidden behind its (i), not inline", () => {
+        renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
+
+        for (const { testId, opensWith } of infoTooltips) {
+          expect(screen.getByTestId(testId)).toBeInTheDocument();
+          expect(screen.getByText(opensWith)).not.toBeVisible();
+        }
+      });
+    });
+
+    describe.each(infoTooltips)(
+      "when the $name (i) is clicked",
+      ({ testId, opensWith }) => {
+        it("reveals the explanation", async () => {
+          const user = userEvent.setup();
+          renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
+
+          await user.click(screen.getByTestId(testId));
+
+          await waitFor(() =>
+            expect(screen.getByText(opensWith)).toBeVisible(),
+          );
+        });
+      },
+    );
   });
 });

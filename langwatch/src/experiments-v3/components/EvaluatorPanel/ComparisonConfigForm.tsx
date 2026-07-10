@@ -11,6 +11,7 @@ import { ChevronDown, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 
@@ -349,16 +350,15 @@ function GoldenAnswerSection({
   return (
     <Box>
       <HStack justify="space-between" align="start">
-        <VStack align="start" gap={0}>
+        <HStack gap={0} align="center">
           <Text fontSize="13px" fontWeight="medium">
             Has golden answer
           </Text>
-          <Text fontSize="xs" color="fg.muted" maxWidth="480px">
-            Compare each candidate against a reference answer. Turn off to
-            let the judge compare the candidates directly on their own
-            merits, with no reference answer involved.
-          </Text>
-        </VStack>
+          <FieldInfoTooltip
+            testId="comparison-has-golden-answer-info"
+            description="Compare each candidate against a reference answer. Turn off to let the judge compare the candidates directly on their own merits, with no reference answer involved."
+          />
+        </HStack>
         <Switch
           checked={hasGoldenAnswer}
           onCheckedChange={({ checked }) => setHasGoldenAnswer(checked)}
@@ -480,16 +480,15 @@ function RandomizeOrderSection({
   return (
     <Box paddingTop={2}>
       <HStack justify="space-between" align="start">
-        <VStack align="start" gap={0}>
+        <HStack gap={0} align="center">
           <Text fontSize="13px" fontWeight="medium">
             Shuffle candidate order
           </Text>
-          <Text fontSize="xs" color="fg.muted" maxWidth="480px">
-            Judges tend to favour whichever candidate they read first. Shuffling
-            each row&apos;s candidates cancels that out. The same row always gets
-            the same order, so re-running gives you comparable verdicts.
-          </Text>
-        </VStack>
+          <FieldInfoTooltip
+            testId="comparison-randomize-order-info"
+            description="Judges tend to favour whichever candidate they read first. Shuffling each row's candidates cancels that out. The same row always gets the same order, so re-running gives you comparable verdicts."
+          />
+        </HStack>
         <Switch
           checked={randomizeOrder}
           onCheckedChange={({ checked }) => setRandomizeOrder(checked)}
@@ -539,16 +538,21 @@ function MetricsSection({
 
   return (
     <Box paddingTop={2}>
-      <Text
-        fontSize="11px"
-        fontWeight="bold"
-        textTransform="uppercase"
-        letterSpacing="wide"
-        color="fg.muted"
-        marginBottom={2}
-      >
-        Include metrics
-      </Text>
+      <HStack gap={0} align="center" marginBottom={2}>
+        <Text
+          fontSize="11px"
+          fontWeight="bold"
+          textTransform="uppercase"
+          letterSpacing="wide"
+          color="fg.muted"
+        >
+          Include metrics
+        </Text>
+        <FieldInfoTooltip
+          testId="comparison-include-metrics-info"
+          description="Inject per-candidate cost and latency into the judge prompt so it can prefer the cheaper or faster variant when quality is comparable."
+        />
+      </HStack>
       <VStack align="stretch" gap={2}>
         <HStack justify="space-between">
           <Text fontSize="13px">Include cost</Text>
@@ -567,10 +571,6 @@ function MetricsSection({
           />
         </HStack>
       </VStack>
-      <Text fontSize="xs" color="fg.muted" marginTop={2}>
-        Inject per-candidate cost / latency into the judge prompt so it can
-        prefer the cheaper / faster variant when quality is comparable.
-      </Text>
     </Box>
   );
 }

@@ -8,6 +8,8 @@ type FieldInfoTooltipProps = {
   description: string;
   docHref?: string;
   docLabel?: string;
+  /** Distinguishes one (i) from the next when a form has several. */
+  testId?: string;
 };
 
 /**
@@ -31,9 +33,14 @@ function resolveDocHref(href: string): string {
 }
 
 /**
- * (i) tooltip next to a Field.Label, per rchaves's dogfood feedback:
+ * (i) tooltip next to a field label, per rchaves's dogfood feedback:
  * 'every single item should have a little (i) icon with a tooltip
  * explanation, AND a link to read more docs in that tooltip'.
+ *
+ * Keeps a form scannable: the label says what the setting is, the tooltip
+ * carries the paragraph explaining why you'd want it. See
+ * `dev/docs/best_practices/copywriting.md` — descriptions stay short, the
+ * long form goes behind the (i).
  *
  * Uses Popover (click-triggered) rather than a hover Tooltip so the
  * doc link inside the popover is clickable without racing the close
@@ -44,6 +51,7 @@ export function FieldInfoTooltip({
   description,
   docHref,
   docLabel = "Read more",
+  testId,
 }: FieldInfoTooltipProps) {
   const resolvedHref = docHref ? resolveDocHref(docHref) : undefined;
   const isExternal = resolvedHref ? /^https?:\/\//i.test(resolvedHref) : false;
@@ -52,6 +60,7 @@ export function FieldInfoTooltip({
       <Popover.Trigger asChild>
         <IconButton
           aria-label="More info"
+          data-testid={testId}
           size="xs"
           variant="ghost"
           color="fg.muted"
