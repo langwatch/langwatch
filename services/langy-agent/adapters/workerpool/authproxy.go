@@ -1,4 +1,4 @@
-package langyagent
+package workerpool
 
 import (
 	"context"
@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/clog"
 )
 
 // generateBearerToken returns a random 32-byte token encoded as hex. Used as
@@ -29,30 +31,33 @@ func generateBearerToken() (string, error) {
 }
 
 // authProxy is a per-worker reverse proxy that fronts opencode's HTTP server.
-// It listens on 127.0.0.1:externalPort, requires a per-worker Bearer token,
-// and proxies validated requests to opencode at 127.0.0.1:internalPort.
+// It listens on 127.0.0.1:externalPort, requires a per-worker Bearer token, and
+// proxies validated requests to opencode at 127.0.0.1:internalPort.
 //
-// Threat model addressed: an attacker that controls a sibling worker
-// process (same pod, same network namespace) can no longer issue arbitrary
-// requests against another worker's opencode by guessing or scanning the
-// announced port — the request needs the per-worker bearer token, which
-// only the manager process holds.
+// Threat model addressed: an attacker that controls a sibling worker process
+// (same pod, same network namespace) can no longer issue arbitrary requests
+// against another worker's opencode by guessing or scanning the announced port
+// — the request needs the per-worker bearer token, which only the manager
+// process holds.
 //
 // The underlying opencode TCP listener on 127.0.0.1:internalPort is still
-// reachable from any process in the pod netns via /proc/net/tcp scanning —
-// that reachability is no longer the vulnerability. Every opencode is
-// started with its own random OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′),
-// and this proxy is the only holder of it: a sibling that connects directly
-// to internalPort has no credential and gets 401 from opencode itself.
+// reachable from any process in the pod netns via /proc/net/tcp scanning — that
+// reachability is no longer the vulnerability. Every opencode is started with
+// its own random OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′), and this proxy is
+// the only holder of it: a sibling that connects directly to internalPort has
+// no credential and gets 401 from opencode itself.
 type authProxy struct {
 	server *http.Server
 	listen net.Listener
 }
 
 // startAuthProxy binds 127.0.0.1:externalPort and reverse-proxies authorised
-// requests to 127.0.0.1:internalPort. The returned proxy is already serving
-// in a goroutine; the caller closes it via shutdown(ctx).
-func startAuthProxy(externalPort, internalPort int, bearerToken, openCodePassword string, log *zap.Logger) (*authProxy, error) {
+// requests to 127.0.0.1:internalPort. The returned proxy is already serving in
+// a goroutine; the caller closes it via shutdown(). The context carries the
+// logger (clog) used by the serve goroutine — the proxy outlives any single
+// request, so callers pass the pool-lifetime context, not a request context.
+func startAuthProxy(ctx context.Context, externalPort, internalPort int, bearerToken, openCodePassword string) (*authProxy, error) {
+	log := clog.Get(ctx)
 	target := &url.URL{
 		Scheme: "http",
 		Host:   fmt.Sprintf("127.0.0.1:%d", internalPort),
@@ -60,15 +65,15 @@ func startAuthProxy(externalPort, internalPort int, bearerToken, openCodePasswor
 	rev := httputil.NewSingleHostReverseProxy(target)
 
 	// Default ReverseProxy uses http.DefaultTransport — fine; it pools
-	// connections to the single backend. We DO want errors to come back
-	// as 502 rather than half-written headers polluting the SSE stream.
+	// connections to the single backend. We DO want errors to come back as 502
+	// rather than half-written headers polluting the SSE stream.
 	rev.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
 		log.Debug("authproxy upstream error", zap.Error(err))
 		http.Error(w, "bad gateway", http.StatusBadGateway)
 	}
 
-	// Constant-time compare on the credential to avoid leaking the token
-	// via response timing. Build the expected header once.
+	// Constant-time compare on the credential to avoid leaking the token via
+	// response timing. Build the expected header once.
 	expected := []byte("Bearer " + bearerToken)
 	// opencode requires HTTP Basic auth (user "opencode") when
 	// OPENCODE_SERVER_PASSWORD is set — see ADR-033 Fix A′. Precompute the
@@ -81,9 +86,9 @@ func startAuthProxy(externalPort, internalPort int, bearerToken, openCodePasswor
 			return
 		}
 		// Replace the caller's bearer credential with opencode's own Basic
-		// credential. This is the sibling-isolation guarantee itself: a
-		// sibling connecting straight to internalPort never has this
-		// header and gets 401 from opencode; only this proxy knows it.
+		// credential. This is the sibling-isolation guarantee itself: a sibling
+		// connecting straight to internalPort never has this header and gets
+		// 401 from opencode; only this proxy knows it.
 		r.Header.Set("Authorization", openCodeAuth)
 		rev.ServeHTTP(w, r)
 	})
@@ -110,9 +115,9 @@ func startAuthProxy(externalPort, internalPort int, bearerToken, openCodePasswor
 	return &authProxy{server: srv, listen: listener}, nil
 }
 
-// shutdown stops the proxy goroutine. Best-effort: a 1s deadline is enough
-// for in-flight HTTP turns to drain on a healthy worker; we drop anything
-// longer rather than block a worker recycle.
+// shutdown stops the proxy goroutine. Best-effort: a 1s deadline is enough for
+// in-flight HTTP turns to drain on a healthy worker; we drop anything longer
+// rather than block a worker recycle.
 func (p *authProxy) shutdown() {
 	if p == nil || p.server == nil {
 		return
