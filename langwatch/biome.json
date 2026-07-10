@@ -157,7 +157,11 @@
 			}
 		},
 		{
-			"includes": ["src/server/**/*.ts", "src/server/**/*.tsx"],
+			"includes": [
+				"src/server/**/*.ts",
+				"src/server/**/*.tsx",
+				"!src/server/evaluations/preconditions.ts"
+			],
 			"linter": {
 				"rules": {
 					"style": {
@@ -178,16 +182,6 @@
 								]
 							}
 						}
-					}
-				}
-			}
-		},
-		{
-			"includes": ["src/server/evaluations/preconditions.ts"],
-			"linter": {
-				"rules": {
-					"style": {
-						"noRestrictedImports": "off"
 					}
 				}
 			}
