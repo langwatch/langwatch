@@ -24,6 +24,8 @@ import {
 } from "~/server/datasets/dataset-normalize.job";
 import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
+import { getFeatureFlagStore } from "~/server/featureFlag";
+import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
@@ -33,6 +35,7 @@ import type { BroadcastService } from "../app-layer/broadcast/broadcast.service"
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
+import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-inputs-offload";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
@@ -96,6 +99,7 @@ import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processi
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
+import { resolveLogCommandShardCount } from "./pipelines/trace-processing/commands/logCommandGroupKey";
 import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
@@ -106,6 +110,7 @@ import type { TraceAnalyticsData } from "./pipelines/trace-processing/projection
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
+import { resolveClaudeTurnLogCap } from "~/server/app-layer/traces/claude-code-log-to-span";
 import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
@@ -313,6 +318,39 @@ export class PipelineRegistry {
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
+      // ADR-039: offload oversized evaluator inputs to durable object storage
+      // before the event is built. Flag-gated per project on
+      // release_evaluation_payload_offload (checked once per evaluation via the
+      // 5s-cached flag store) and FAIL-OPEN: any error from the flag store or
+      // the offload (S3 outage, storeFromBytes throws) is caught here and the
+      // inputs stay inline. The unconditional repository belt-and-braces cap
+      // keeps the ClickHouse row merge-safe in that case.
+      offloadInputs: async ({ projectId, evaluationId, inputs }) => {
+        try {
+          const enabled = await getFeatureFlagStore().get(
+            "release_evaluation_payload_offload",
+            { projectId },
+          );
+          if (enabled !== true) return inputs;
+          const { inputs: maybeOffloaded } = await offloadInputsIfOversized({
+            inputs,
+            projectId,
+            evaluationId,
+            storedObjects: createStoredObjectsService({ projectId }),
+          });
+          return maybeOffloaded;
+        } catch (error) {
+          createLogger("langwatch:evaluations:inputs-offload-fail-open").warn(
+            {
+              projectId,
+              evaluationId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Evaluation inputs offload gate failed; keeping inputs inline (fail-open)",
+          );
+          return inputs;
+        }
+      },
     });
 
     // ADR-035: the persist branch is now an outbox reactor that only
@@ -438,12 +476,20 @@ export class PipelineRegistry {
     });
 
     const claudeCodeSpanSyncReactor = createClaudeCodeSpanSyncReactor({
-      getMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs) =>
+      getMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs, limit) =>
         this.deps.repositories.logRecordStorage.getMarkedClaudeCodeLogsByTrace(
           tenantId,
           traceId,
           occurredAtMs,
+          limit,
         ),
+      // Per-turn conversion cap (env LANGWATCH_CLAUDE_TURN_LOG_CAP, default
+      // CLAUDE_TURN_LOG_CAP). Bounds how many of a pathological turn's marked
+      // logs the span-sync reactor folds in one pass so a runaway turn can't
+      // seize the worker; the root span is marked truncated when the cap bites.
+      turnLogCap: resolveClaudeTurnLogCap(
+        process.env.LANGWATCH_CLAUDE_TURN_LOG_CAP,
+      ),
       recordSpan: recordSpanDispatch.fn,
     });
 
@@ -543,6 +589,13 @@ export class PipelineRegistry {
         // parallel across `traceId:<shard>` GroupQueue groups; fold stays per-trace.
         spanCommandShardCount: resolveSpanCommandShardCount(
           process.env.TRACE_SPAN_PROCESSING_SHARDS,
+        ),
+        // Log-command sharding fan-out (env TRACE_LOG_PROCESSING_SHARDS,
+        // default 1 = disabled). Lets one Claude Code turn's recordLog commands
+        // drain in parallel across `traceId:<shard>` GroupQueue groups; the fold
+        // and the claude-span-sync reactor stay per-trace.
+        logCommandShardCount: resolveLogCommandShardCount(
+          process.env.TRACE_LOG_PROCESSING_SHARDS,
         ),
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,

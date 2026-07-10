@@ -5,6 +5,10 @@ import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipeline
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
+import {
+  capSerializedInputs,
+  capText,
+} from "../evaluation-column-caps";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { EvalSummary, EvaluationRunData } from "../types";
 import type { EvaluationRunRepository, GetByEvaluationIdParams } from "./evaluation-run.repository";
@@ -520,6 +524,37 @@ export class EvaluationRunClickHouseRepository
     version: string,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): ClickHouseEvaluationRunWriteRecord {
+    // Belt-and-braces write caps (ADR-039): unconditional, flag-independent,
+    // last line of defence that keeps the part merge-safe even if the offload
+    // path is off, failed open, or a different writer inserted a fat payload.
+    // With offload on, `Inputs` is already a small marker object so these are
+    // no-ops.
+    const cappedInputs = capSerializedInputs(
+      data.inputs ? JSON.stringify(data.inputs) : null,
+    );
+    const cappedDetails = capText(data.details);
+    const cappedError = capText(data.error);
+    const cappedErrorDetails = capText(data.errorDetails);
+    if (
+      cappedInputs.truncated ||
+      cappedDetails.truncated ||
+      cappedError.truncated ||
+      cappedErrorDetails.truncated
+    ) {
+      logger.warn(
+        {
+          tenantId,
+          evaluationId: data.evaluationId,
+          inputsOriginalBytes: cappedInputs.originalBytes,
+          inputsTruncated: cappedInputs.truncated,
+          detailsTruncated: cappedDetails.truncated,
+          errorTruncated: cappedError.truncated,
+          errorDetailsTruncated: cappedErrorDetails.truncated,
+        },
+        "evaluation_runs row exceeded a column cap and was truncated at write to stay merge-safe",
+      );
+    }
+
     return {
       ProjectionId: projectionId,
       TenantId: tenantId,
@@ -534,10 +569,10 @@ export class EvaluationRunClickHouseRepository
       Score: data.score,
       Passed: data.passed === null ? null : data.passed ? 1 : 0,
       Label: data.label,
-      Details: data.details,
-      Inputs: data.inputs ? JSON.stringify(data.inputs) : null,
-      Error: data.error,
-      ErrorDetails: data.errorDetails,
+      Details: cappedDetails.value,
+      Inputs: cappedInputs.value,
+      Error: cappedError.value,
+      ErrorDetails: cappedErrorDetails.value,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
