@@ -88,12 +88,17 @@ import { BoundaryMeasurementService } from "./billing/storage/boundaryMeasuremen
 import { GaugeSamplingService } from "./billing/storage/gaugeSampling.service";
 import { PrismaStorageAuditStateRepository } from "./billing/storage/repositories/storage-audit-state.prisma.repository";
 import { PrismaStorageBillableGaugeRepository } from "./billing/storage/repositories/storage-billable-gauge.prisma.repository";
+import { PrismaStorageBillingCheckpointRepository } from "./billing/storage/repositories/storage-billing-checkpoint.prisma.repository";
 import { PrismaStorageBoundaryEventRepository } from "./billing/storage/repositories/storage-boundary-event.prisma.repository";
 import { PrismaStorageSweepCursorRepository } from "./billing/storage/repositories/storage-sweep-cursor.prisma.repository";
 import { PrismaStorageUsageHourlyRepository } from "./billing/storage/repositories/storage-usage-hourly.prisma.repository";
 import { StorageAuditService } from "./billing/storage/storageAudit.service";
 import { StorageAuditTierService } from "./billing/storage/storageAuditTier.service";
 import { StorageCorrectionService } from "./billing/storage/storageCorrection.service";
+import {
+  STORAGE_METER_EVENT_NAME,
+  StorageReportingService,
+} from "./billing/storage/storageReporting.service";
 import { StorageSweepService } from "./billing/storage/storageSweep.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
@@ -666,6 +671,59 @@ export function initializeDefaultApp(options?: {
       });
     },
   });
+  const storageReporting = stripeClient
+    ? new StorageReportingService({
+        usageHourly: new PrismaStorageUsageHourlyRepository(prisma),
+        checkpoints: new PrismaStorageBillingCheckpointRepository(prisma),
+        isBillingEnabled: (organizationId) =>
+          featureFlagService.isEnabled("release_storage_boundary_billing", {
+            distinctId: organizationId,
+            defaultValue: false,
+          }),
+        getBillableOrg: (organizationId) =>
+          organizations.getOrganizationForBilling(organizationId),
+        sendMeterEvent: async ({
+          stripeCustomerId,
+          value,
+          identifier,
+          timestamp,
+        }) => {
+          try {
+            await stripeClient.billing.meterEvents.create({
+              event_name: STORAGE_METER_EVENT_NAME,
+              payload: {
+                stripe_customer_id: stripeCustomerId,
+                value: String(value),
+              },
+              identifier,
+              timestamp,
+            });
+          } catch (error) {
+            // The deterministic identifier is the idempotency key: Stripe
+            // already recorded this (org, hour) — a resend after a lost
+            // confirmation is success, not failure.
+            if (
+              error instanceof Error &&
+              "code" in error &&
+              (error as { code?: string }).code === "resource_already_exists"
+            ) {
+              return;
+            }
+            throw error;
+          }
+        },
+        onReportingAlert: ({ organizationId, kind, detail }) => {
+          void withScope(async (scope) => {
+            scope.setTag?.("handler", "storageReporting");
+            scope.setExtra?.("organizationId", organizationId);
+            scope.setExtra?.("kind", kind);
+            for (const [k, v] of Object.entries(detail)) scope.setExtra?.(k, v);
+            captureException(new Error(`storage reporting alert: ${kind}`));
+          });
+        },
+      })
+    : undefined;
+
   const storageSweep = new StorageSweepService({
     cursor: new PrismaStorageSweepCursorRepository(prisma),
     listBillableOrganizationIds: () =>
@@ -689,6 +747,7 @@ export function initializeDefaultApp(options?: {
     measurement: storageBoundaryMeasurement,
     exits: new BoundaryExitService({ events: storageBoundaryEvents }),
     audits: storageAudits,
+    reporting: storageReporting,
     sampling: new GaugeSamplingService({
       events: storageBoundaryEvents,
       gauge: storageGaugeRepo,

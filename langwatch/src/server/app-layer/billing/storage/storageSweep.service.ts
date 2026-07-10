@@ -30,6 +30,17 @@ export interface StorageSweepDeps {
     }) => Promise<void>;
   };
   /**
+   * The Stripe reporter (phase 4): drains unreported hourly rows after
+   * sampling, per sweep. Gated per org by release_storage_boundary_billing
+   * inside the service. Optional — absent in non-SaaS presets.
+   */
+  reporting?: {
+    reportForOrg: (params: {
+      organizationId: string;
+      at: Date;
+    }) => Promise<void>;
+  };
+  /**
    * The two-layer daily audit (phase 3): runs under the day claim, after
    * the org's measurement/exits/sampling, so it checks today's settled
    * state. Optional — absent in non-SaaS presets.
@@ -93,6 +104,9 @@ export class StorageSweepService {
           await this.deps.exits.emitExitsDue({ organizationId, at });
         }
         await this.deps.sampling.sampleHoursForOrg({ organizationId, at });
+        if (this.deps.reporting) {
+          await this.deps.reporting.reportForOrg({ organizationId, at });
+        }
         if (entryDay.claimed && this.deps.audits) {
           await this.deps.audits.runScheduledAudits({ organizationId, at });
         }

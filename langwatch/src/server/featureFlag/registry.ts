@@ -196,6 +196,16 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the ADR-039 storage boundary-measurement engine: sweep, entry/exit boundary events, gauge fold, and hourly sampling. OFF (default) makes storage metering fully inert (no ClickHouse, no Postgres rows). Per-organization. Stripe reporting is a separate later gate.",
   },
+  // ADR-039 phase 4. The MONEY gate, separate from metering: an org is only
+  // reported to Stripe after its gauge has been seeded and its audits ran
+  // clean. Flipping this on per org is the last step of the rollout.
+  {
+    key: "release_storage_boundary_billing",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Gates ADR-039 Stripe reporting of storage hourly usage. OFF (default) = hourly rows accumulate unreported; nothing reaches Stripe or invoices. Flip per organization only after seeding + a clean audit. Requires release_storage_boundary_metering.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [
