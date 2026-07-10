@@ -1,0 +1,26 @@
+{%- comment -%}
+  No-data heartbeat card keyed on `reason == "heartbeat-absence"`. Leads with a
+  🔇 "No data" framing so a silent metric reads as absence — not a breach — and
+  stops the :rotating_light: alarm firing when nothing was seen. The block
+  skeleton is FIXED (header, section, context, context); only the captured
+  content branches on reason, so the JSON stays well-formed for every reason.
+  Needs no new allowlist blocks.
+{%- endcomment -%}
+{%- capture _header -%}
+{% if reason == "heartbeat-absence" %}🔇 No data: {{ trigger.name }}{% elsif reason == "heartbeat-resolve" %}✅ Recovered: {{ trigger.name }}{% else %}🚨 {{ trigger.name }}{% endif %}
+{%- endcapture -%}
+{%- capture _lead -%}
+{% if reason == "heartbeat-absence" %}No qualifying data was seen for *{{ metric.label | mrkdwn_escape }}* in the {{ condition.timePeriodLabel }}.{% elsif reason == "heartbeat-resolve" %}*{{ metric.label | mrkdwn_escape }}* is reporting again and back within threshold.{% else %}*{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} {{ condition.threshold }} over the {{ condition.timePeriodLabel }}.{% endif %}
+{%- endcapture -%}
+{%- capture _detail -%}
+Expected *{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} {{ condition.threshold }} · checked {{ occurredAt | date: "%b %d, %H:%M" }}
+{%- endcapture -%}
+{%- capture _links -%}
+<{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>
+{%- endcapture -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ _header | truncate: 140 | json }}, "emoji": true } },
+  { "type": "section", "text": { "type": "mrkdwn", "text": {{ _lead | json }} } },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _detail | json }} }] },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _links | json }} }] }
+]

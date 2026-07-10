@@ -95,4 +95,144 @@ describe("filterBlockKit", () => {
       expect(filterBlockKit([null, 1, "x", { noType: true }])).toEqual([]);
     });
   });
+
+  describe("when a rich_text block is present (ADR-041)", () => {
+    it("keeps a rich_text block with quote/section sub-blocks of plain text", () => {
+      const blocks = filterBlockKit([
+        {
+          type: "rich_text",
+          elements: [
+            {
+              type: "rich_text_section",
+              elements: [{ type: "text", text: "Input", style: { bold: true } }],
+            },
+            {
+              type: "rich_text_quote",
+              elements: [{ type: "text", text: "what is the weather" }],
+            },
+          ],
+        },
+      ]);
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]?.type).toBe("rich_text");
+      expect(blocks[0]?.elements).toEqual([
+        {
+          type: "rich_text_section",
+          elements: [{ type: "text", text: "Input", style: { bold: true } }],
+        },
+        {
+          type: "rich_text_quote",
+          elements: [{ type: "text", text: "what is the weather" }],
+        },
+      ]);
+    });
+  });
+
+  describe("when a rich_text block carries mention elements", () => {
+    it("drops broadcast/user/usergroup/channel inline elements (notification-abuse vector)", () => {
+      const [block] = filterBlockKit([
+        {
+          type: "rich_text",
+          elements: [
+            {
+              type: "rich_text_section",
+              elements: [
+                { type: "text", text: "hi" },
+                { type: "broadcast", range: "channel" },
+                { type: "user", user_id: "U123" },
+                { type: "usergroup", usergroup_id: "S1" },
+                { type: "channel", channel_id: "C1" },
+              ],
+            },
+          ],
+        },
+      ]);
+      expect(block?.type).toBe("rich_text");
+      const section = (block?.elements as Record<string, unknown>[])[0];
+      expect(section?.elements).toEqual([{ type: "text", text: "hi" }]);
+    });
+  });
+
+  describe("when a rich_text link element has a non-http scheme", () => {
+    it("drops the unsafe link but keeps http(s) siblings (javascript:/data: stripped)", () => {
+      const [block] = filterBlockKit([
+        {
+          type: "rich_text",
+          elements: [
+            {
+              type: "rich_text_section",
+              elements: [
+                { type: "link", url: "javascript:alert(1)", text: "x" },
+                {
+                  type: "link",
+                  url: "https://app.langwatch.ai/acme/messages/t1",
+                  text: "ok",
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+      const section = (block?.elements as Record<string, unknown>[])[0];
+      expect(section?.elements).toEqual([
+        {
+          type: "link",
+          url: "https://app.langwatch.ai/acme/messages/t1",
+          text: "ok",
+        },
+      ]);
+    });
+  });
+
+  describe("when a rich_text block carries an unknown sub-block type", () => {
+    it("keeps only allowlisted rich_text sub-block types", () => {
+      const [block] = filterBlockKit([
+        {
+          type: "rich_text",
+          elements: [
+            {
+              type: "rich_text_quote",
+              elements: [{ type: "text", text: "q" }],
+            },
+            {
+              type: "rich_text_evil",
+              elements: [{ type: "text", text: "nope" }],
+            },
+          ],
+        },
+      ]);
+      const types = (block?.elements as Record<string, unknown>[]).map(
+        (e) => e.type,
+      );
+      expect(types).toEqual(["rich_text_quote"]);
+    });
+  });
+
+  describe("when a rich_text_list nests sections with mentions", () => {
+    it("recursively sanitizes each list item's inline elements", () => {
+      const [block] = filterBlockKit([
+        {
+          type: "rich_text",
+          elements: [
+            {
+              type: "rich_text_list",
+              style: "bullet",
+              elements: [
+                {
+                  type: "rich_text_section",
+                  elements: [
+                    { type: "text", text: "item" },
+                    { type: "channel", channel_id: "C1" },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+      const list = (block?.elements as Record<string, unknown>[])[0];
+      const item = (list?.elements as Record<string, unknown>[])[0];
+      expect(item?.elements).toEqual([{ type: "text", text: "item" }]);
+    });
+  });
 });

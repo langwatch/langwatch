@@ -48,7 +48,7 @@ describe("slack Block Kit template registry", () => {
   });
 
   describe("when filtering options for a graph-alert draft", () => {
-    it("returns only graph-alert templates", () => {
+    it("returns only graph-alert templates (excluding delivery-probe-gated ones)", () => {
       const options = templateOptionsFor({
         cadence: "immediate",
         kind: "graphAlert",
@@ -57,6 +57,8 @@ describe("slack Block Kit template registry", () => {
         "graph_alert_compact",
         "graph_alert_detailed",
         "graph_alert_one_liner",
+        "graph_alert_resolved",
+        "graph_alert_no_data",
       ]);
     });
 
@@ -66,6 +68,28 @@ describe("slack Block Kit template registry", () => {
         kind: "graphAlert",
       });
       expect(options).toEqual([]);
+    });
+  });
+
+  describe("given delivery-probe-gated templates (ADR-041 Phase 3)", () => {
+    it("registers the gated table templates but withholds them from every picker view", () => {
+      const gated = SLACK_BLOCK_KIT_TEMPLATES.filter((t) => t.deliveryProbe);
+      expect(gated.map((t) => t.id).sort()).toEqual([
+        "digest_table",
+        "graph_alert_history_table",
+      ]);
+
+      const surfaced = new Set(
+        [
+          ...templateOptionsFor({ cadence: "immediate", kind: "graphAlert" }),
+          ...templateOptionsFor({ cadence: "digest", kind: "graphAlert" }),
+          ...templateOptionsFor({ cadence: "immediate", kind: "trace" }),
+          ...templateOptionsFor({ cadence: "digest", kind: "trace" }),
+        ].map((o) => o.id),
+      );
+      for (const template of gated) {
+        expect(surfaced.has(template.id)).toBe(false);
+      }
     });
   });
 

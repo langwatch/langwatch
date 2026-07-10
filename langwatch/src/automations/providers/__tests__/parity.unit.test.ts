@@ -1,10 +1,12 @@
 import { AlertType, TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { filterBlockKit } from "~/shared/templating/blockKitAllowlist";
 import { renderLiquid } from "~/shared/templating/engine";
 import { EXAMPLE_MATCHES } from "~/shared/templating/exampleContext";
 import {
   buildExampleGraphAlertTemplateContext,
   buildTemplateContext,
+  type GraphAlertTemplateContext,
 } from "~/shared/templating/templateContext";
 import {
   ACTION_PROVIDERS,
@@ -98,10 +100,25 @@ describe("provider registry parity", () => {
         },
       }),
     } as const;
-    const graphAlertContext = buildExampleGraphAlertTemplateContext({
+    const graphAlertBase = buildExampleGraphAlertTemplateContext({
       baseHost: "https://app.langwatch.ai",
       project: { name: "Acme", slug: "acme" },
       trigger: { name: "High latency", alertType: "WARNING" },
+    });
+    // The reason-keyed lifecycle templates (ADR-041 Phase 1) branch on
+    // `reason`; render each against the reason it is built for so the primary
+    // branch is exercised. The others read the breach path (`real-time`).
+    const reasonForTemplate = (
+      id: string,
+    ): GraphAlertTemplateContext["reason"] =>
+      id === "graph_alert_resolved"
+        ? "heartbeat-resolve"
+        : id === "graph_alert_no_data"
+          ? "heartbeat-absence"
+          : "real-time";
+    const graphAlertContextFor = (id: string): GraphAlertTemplateContext => ({
+      ...graphAlertBase,
+      reason: reasonForTemplate(id),
     });
 
     describe("when each template renders against the example context for its kind and cadence", () => {
@@ -115,7 +132,7 @@ describe("provider registry parity", () => {
         for (const cadence of cadences) {
           const context =
             template.kind === "graphAlert"
-              ? graphAlertContext
+              ? graphAlertContextFor(template.id)
               : contextsByCadence[cadence];
           const { output } = await renderLiquid({
             template: template.source,
@@ -126,6 +143,98 @@ describe("provider registry parity", () => {
           expect((blocks as unknown[]).length).toBeGreaterThan(0);
         }
       });
+    });
+
+    // ADR-041 modern suite. A complete trace context (metadata model/cost/
+    // latency + a failing structured-output evaluation) so the rich cards
+    // reference nothing the example omits; digest cadence for the digest table.
+    const richTraceContext = buildTemplateContext({
+      trigger: {
+        id: "tr_rich",
+        name: "Eval failures",
+        alertType: AlertType.CRITICAL,
+      },
+      project: { name: "Acme", slug: "acme" },
+      baseHost: "https://app.langwatch.ai",
+      matches: [
+        {
+          traceId: "trace_rich",
+          input: "Summarize the Q3 earnings call.",
+          output: '{"summary":"Revenue up 12% year over year."}',
+          metadata: {
+            model: "gpt-5-mini",
+            duration_ms: 1830,
+            cost: 0.0021,
+            customer_id: "cust_9",
+          },
+          evaluation: {
+            score: 0.41,
+            passed: false,
+            label: "off-topic",
+            evaluatorName: "Answer Relevancy",
+          },
+        },
+      ],
+    });
+    const digestTraceContext = buildTemplateContext({
+      trigger: {
+        id: "tr_dig",
+        name: "Hourly digest",
+        alertType: AlertType.WARNING,
+      },
+      project: { name: "Acme", slug: "acme" },
+      baseHost: "https://app.langwatch.ai",
+      matches: EXAMPLE_MATCHES,
+      window: {
+        start: new Date("2026-01-01T10:00:00Z"),
+        end: new Date("2026-01-01T11:00:00Z"),
+      },
+    });
+    const modernExamples: Record<string, () => Record<string, unknown>> = {
+      graph_alert_resolved: () =>
+        graphAlertContextFor("graph_alert_resolved") as unknown as Record<
+          string,
+          unknown
+        >,
+      graph_alert_no_data: () =>
+        graphAlertContextFor("graph_alert_no_data") as unknown as Record<
+          string,
+          unknown
+        >,
+      graph_alert_history_table: () =>
+        graphAlertContextFor(
+          "graph_alert_history_table",
+        ) as unknown as Record<string, unknown>,
+      trace_card_rich: () =>
+        richTraceContext as unknown as Record<string, unknown>,
+      eval_failure_rich: () =>
+        richTraceContext as unknown as Record<string, unknown>,
+      digest_table: () =>
+        digestTraceContext as unknown as Record<string, unknown>,
+    };
+
+    describe("when a modern-suite template (ADR-041) renders against a complete example", () => {
+      it.each(Object.keys(modernExamples))(
+        "%s renders valid, allowlist-surviving Block Kit with no missing variables",
+        async (id) => {
+          const template = SLACK_BLOCK_KIT_TEMPLATES.find((t) => t.id === id);
+          expect(template).toBeDefined();
+          const { output, missingVariables } = await renderLiquid({
+            template: template!.source,
+            context: modernExamples[id]!(),
+          });
+          const blocks = JSON.parse(output) as unknown[];
+          expect(Array.isArray(blocks)).toBe(true);
+          expect(blocks.length).toBeGreaterThan(0);
+          // No dangling references — the author (or preview) sees a clean bill.
+          expect(missingVariables).toEqual([]);
+          // Every template survives the allowlist non-empty: rich_text passes
+          // through, and the gated table templates degrade to their
+          // surrounding header/section/context blocks.
+          const survivors = filterBlockKit(blocks);
+          expect(survivors.length).toBeGreaterThan(0);
+        },
+      );
     });
   });
 });

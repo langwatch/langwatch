@@ -1,0 +1,51 @@
+{%- comment -%}
+  Eval-failure detail (rich) — the rich_text upgrade of eval_failure_detailed.
+  Names the failing evaluator, then quotes Input and Output via native
+  rich_text_quote sub-blocks. When Output looks like a structured payload (its
+  first non-space character is { or [) it renders as rich_text_preformatted
+  (a code block) instead of a quote.
+
+  Escaping: rich_text `text` elements are plain strings, so `| json` alone is the
+  correct escaping and mrkdwn_escape is intentionally NOT applied to them. The
+  mrkdwn context/eval blocks keep mrkdwn_escape on user-controlled fields.
+{%- endcomment -%}
+{%- capture _header_text -%}
+{% if match.evaluation.passed == false %}🛑 {% else %}🔔 {% endif %}{{ trigger.name }}
+{%- endcapture -%}
+{%- capture _ctx_eval -%}
+{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" | mrkdwn_escape }}* `{{ match.evaluation.score | default: "—" }}`{% if match.evaluation.label %} · {{ match.evaluation.label | mrkdwn_escape }}{% endif %}{% if match.evaluation.passed == false %} · *failed*{% elsif match.evaluation.passed == true %} · *passed*{% endif %}{%- endif -%}
+{%- if match.evaluation and trigger.alertType %} · {% endif -%}
+{%- if trigger.alertType %}_{{ trigger.alertType }}_{%- endif -%}
+{%- endcapture -%}
+{%- capture _footer -%}
+`{{ match.trace.id | truncate: 12 }}` · <{{ match.trace.url }}|View trace ↗>
+{%- endcapture -%}
+{%- assign _input = match.trace.input | truncate: 1500 -%}
+{%- assign _output = match.trace.output | truncate: 1500 -%}
+{%- assign _out_first = match.trace.output | strip | slice: 0 -%}
+{%- capture _rt_body -%}
+{%- if _input != "" -%}
+{ "type": "rich_text_section", "elements": [{ "type": "text", "text": "Input", "style": { "bold": true } }] },
+{ "type": "rich_text_quote", "elements": [{ "type": "text", "text": {{ _input | json }} }] }
+{%- endif -%}
+{%- if _input != "" and _output != "" -%},{%- endif -%}
+{%- if _output != "" -%}
+{ "type": "rich_text_section", "elements": [{ "type": "text", "text": "Output", "style": { "bold": true } }] },
+{%- if _out_first == "{" or _out_first == "[" -%}
+{ "type": "rich_text_preformatted", "elements": [{ "type": "text", "text": {{ _output | json }} }] }
+{%- else -%}
+{ "type": "rich_text_quote", "elements": [{ "type": "text", "text": {{ _output | json }} }] }
+{%- endif -%}
+{%- endif -%}
+{%- endcapture -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ _header_text | truncate: 140 | json }}, "emoji": true } }
+  {%- if _ctx_eval != "" -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _ctx_eval | json }} }] }
+  {%- endif -%}
+  ,{ "type": "divider" }
+  {%- if _rt_body != "" -%}
+  ,{ "type": "rich_text", "elements": [ {{ _rt_body }} ] }
+  {%- endif -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _footer | json }} }] }
+]

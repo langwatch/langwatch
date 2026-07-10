@@ -1,0 +1,43 @@
+{%- comment -%}
+  Digest as a grid. Columns: Score | Evaluator | Input snippet | Link, one row
+  per matched trace — turning the cramped section-list of digest_compact into a
+  scannable table.
+
+  GATED (ADR-041 Phase 3): the `table` block's incoming-webhook delivery is
+  unverified, so `table` is intentionally NOT on the Block Kit allowlist yet.
+  Until a delivery probe passes, filterBlockKit strips the table and this
+  template degrades to a valid header + summary + link message. This template is
+  registered behind `deliveryProbe: "table"` so the picker withholds it until
+  then. `raw_text` cells are plain text (JSON-encoded only); the Link column is a
+  rich_text cell whose link URL is scheme-validated by the rich_text sanitiser.
+{%- endcomment -%}
+{%- capture _summary -%}
+{{ digest.count }} match{% if digest.count != 1 %}es{% endif %}{% if digest.windowStart %} · window {{ digest.windowStart | date: "%H:%M" }}–{{ digest.windowEnd | date: "%H:%M" }}{% endif %}
+{%- endcapture -%}
+{%- capture _seeall -%}
+<{{ project.url }}/messages|See all {{ digest.count }} in LangWatch ↗>
+{%- endcapture -%}
+{%- capture _rows -%}
+{%- for m in matches limit: 20 -%}
+,[
+  { "type": "raw_text", "text": {{ m.evaluation.score | default: "—" | append: "" | json }} },
+  { "type": "raw_text", "text": {{ m.evaluation.evaluatorName | default: "—" | append: "" | json }} },
+  { "type": "raw_text", "text": {{ m.trace.input | truncate: 80 | append: "" | json }} },
+  { "type": "rich_text", "elements": [{ "type": "rich_text_section", "elements": [{ "type": "link", "url": {{ m.trace.url | json }}, "text": "View" }] }] }
+]
+{%- endfor -%}
+{%- endcapture -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | truncate: 140 | json }}, "emoji": true } },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _summary | json }} }] },
+  { "type": "table", "rows": [
+    [
+      { "type": "raw_text", "text": "Score" },
+      { "type": "raw_text", "text": "Evaluator" },
+      { "type": "raw_text", "text": "Input" },
+      { "type": "raw_text", "text": "Link" }
+    ]
+    {{ _rows }}
+  ] },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _seeall | json }} }] }
+]

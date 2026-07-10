@@ -2,23 +2,35 @@ import type { ComponentType } from "react";
 import digestCompactSource from "./digest_compact.liquid?raw";
 import digestEvaluatorRollupSource from "./digest_evaluator_rollup.liquid?raw";
 import digestInlineRichSource from "./digest_inline_rich.liquid?raw";
+import digestTableSource from "./digest_table.liquid?raw";
 import evalFailureDetailedSource from "./eval_failure_detailed.liquid?raw";
+import evalFailureRichSource from "./eval_failure_rich.liquid?raw";
 import graphAlertCompactSource from "./graph_alert_compact.liquid?raw";
 import graphAlertDetailedSource from "./graph_alert_detailed.liquid?raw";
+import graphAlertHistoryTableSource from "./graph_alert_history_table.liquid?raw";
+import graphAlertNoDataSource from "./graph_alert_no_data.liquid?raw";
 import graphAlertOneLinerSource from "./graph_alert_one_liner.liquid?raw";
+import graphAlertResolvedSource from "./graph_alert_resolved.liquid?raw";
 import traceAlertCompactSource from "./trace_alert_compact.liquid?raw";
 import traceAlertOneLinerSource from "./trace_alert_one_liner.liquid?raw";
+import traceCardRichSource from "./trace_card_rich.liquid?raw";
 
 import {
   DigestCompactWireframe,
   DigestEvaluatorRollupWireframe,
   DigestInlineRichWireframe,
+  DigestTableWireframe,
   EvalFailureDetailedWireframe,
+  EvalFailureRichWireframe,
   GraphAlertCompactWireframe,
   GraphAlertDetailedWireframe,
+  GraphAlertHistoryTableWireframe,
+  GraphAlertNoDataWireframe,
   GraphAlertOneLinerWireframe,
+  GraphAlertResolvedWireframe,
   TraceAlertCompactWireframe,
   TraceAlertOneLinerWireframe,
+  TraceCardRichWireframe,
 } from "./wireframes";
 
 export type SlackBlockKitTemplateId =
@@ -30,7 +42,13 @@ export type SlackBlockKitTemplateId =
   | "digest_inline_rich"
   | "graph_alert_compact"
   | "graph_alert_detailed"
-  | "graph_alert_one_liner";
+  | "graph_alert_one_liner"
+  | "graph_alert_resolved"
+  | "graph_alert_no_data"
+  | "graph_alert_history_table"
+  | "trace_card_rich"
+  | "eval_failure_rich"
+  | "digest_table";
 
 export type SlackBlockKitTemplateCadenceFit = "immediate" | "digest" | "both";
 
@@ -52,6 +70,14 @@ export interface SlackBlockKitTemplateOption {
   cadenceFit: SlackBlockKitTemplateCadenceFit;
   kind: SlackBlockKitTemplateKind;
   recommendedForEvaluationFilter?: true;
+  /** When set, this template depends on a Block Kit block whose incoming-webhook
+   *  delivery is unverified (ADR-041 Phase 3 — `table`, `data_visualization`).
+   *  Gated templates are implemented and registered but withheld from the picker
+   *  (`templateOptionsFor` excludes them) until a delivery probe confirms the
+   *  channel renders the block. They degrade gracefully if ever rendered: the
+   *  gated block is not on the Block Kit allowlist, so `filterBlockKit` strips
+   *  it and the surrounding allowlisted blocks still deliver. */
+  deliveryProbe?: "table" | "data_visualization";
   source: string;
   Wireframe: ComponentType;
 }
@@ -165,6 +191,81 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     source: graphAlertOneLinerSource,
     Wireframe: GraphAlertOneLinerWireframe,
   },
+  {
+    id: "graph_alert_resolved",
+    displayName: "Recovered / resolved",
+    emoji: "✅",
+    tagline:
+      "Leads with a recovery framing when the metric is back within threshold, with a was → now value.",
+    deliveryNote: "1 message per alert",
+    cadenceFit: "immediate",
+    kind: "graphAlert",
+    source: graphAlertResolvedSource,
+    Wireframe: GraphAlertResolvedWireframe,
+  },
+  {
+    id: "graph_alert_no_data",
+    displayName: "No-data heartbeat",
+    emoji: "🔇",
+    tagline:
+      "For heartbeat monitors: frames a silent metric as missing data, not a breach.",
+    deliveryNote: "1 message per alert",
+    cadenceFit: "immediate",
+    kind: "graphAlert",
+    source: graphAlertNoDataSource,
+    Wireframe: GraphAlertNoDataWireframe,
+  },
+  {
+    id: "graph_alert_history_table",
+    displayName: "History table",
+    emoji: "🗓️",
+    tagline:
+      "The metric's recent values as a Time / Value grid instead of a sparkline.",
+    deliveryNote: "1 message per alert",
+    cadenceFit: "immediate",
+    kind: "graphAlert",
+    deliveryProbe: "table",
+    source: graphAlertHistoryTableSource,
+    Wireframe: GraphAlertHistoryTableWireframe,
+  },
+  {
+    id: "trace_card_rich",
+    displayName: "Rich trace card",
+    emoji: "🗂️",
+    tagline:
+      "Header and evaluation, then the trace's input and output as native quote blocks.",
+    deliveryNote: "1 message per trace",
+    cadenceFit: "immediate",
+    kind: "trace",
+    source: traceCardRichSource,
+    Wireframe: TraceCardRichWireframe,
+  },
+  {
+    id: "eval_failure_rich",
+    displayName: "Eval failure detail (rich)",
+    emoji: "🛑",
+    tagline:
+      "Names the failing evaluator, then quotes input and output — structured output as a code block.",
+    deliveryNote: "1 message per trace",
+    cadenceFit: "immediate",
+    kind: "trace",
+    recommendedForEvaluationFilter: true,
+    source: evalFailureRichSource,
+    Wireframe: EvalFailureRichWireframe,
+  },
+  {
+    id: "digest_table",
+    displayName: "Digest — table",
+    emoji: "🧮",
+    tagline:
+      "Every matched trace as a row in a scannable grid: score, evaluator, input, link.",
+    deliveryNote: "all matches, 1 message",
+    cadenceFit: "digest",
+    kind: "trace",
+    deliveryProbe: "table",
+    source: digestTableSource,
+    Wireframe: DigestTableWireframe,
+  },
 ];
 
 export type DraftCadence = "immediate" | "digest";
@@ -193,6 +294,10 @@ export function templateOptionsFor({
 }): SlackBlockKitTemplateOption[] {
   return SLACK_BLOCK_KIT_TEMPLATES.filter(
     (opt) =>
+      // Templates gated on an unverified delivery block (ADR-041 Phase 3) are
+      // withheld from the picker until the probe passes — they stay registered
+      // and renderable, but a non-engineer never picks one that may not deliver.
+      !opt.deliveryProbe &&
       opt.kind === kind &&
       (opt.cadenceFit === "both" || opt.cadenceFit === cadence),
   );

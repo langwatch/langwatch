@@ -8,7 +8,9 @@ type WireKind =
   | "bullet"
   | "divider"
   | "fields"
-  | "spark";
+  | "spark"
+  | "quote"
+  | "table";
 
 function Wire({ kind }: { kind: WireKind }) {
   switch (kind) {
@@ -62,6 +64,39 @@ function Wire({ kind }: { kind: WireKind }) {
             <Box key={i} w="1" h={h} bg="fg.muted" borderRadius="xs" />
           ))}
         </HStack>
+      );
+    case "quote":
+      // A rich_text_quote — a left rule with quoted text, the native primitive
+      // the rich trace cards use for Input / Output instead of the markdown hack.
+      return (
+        <Box
+          borderLeftWidth="2px"
+          borderLeftColor="border.emphasized"
+          pl="1.5"
+          w="full"
+        >
+          <Box h="3" bg="fg.muted" borderRadius="xs" w="85%" />
+        </Box>
+      );
+    case "table":
+      // A table block — a header row over body rows of cells, the grid the
+      // digest/history-table templates render (gated on the delivery probe).
+      return (
+        <Stack gap="0.5" w="full">
+          {[0, 1, 2].map((r) => (
+            <HStack key={r} gap="0.5" w="full">
+              {[0, 1, 2].map((c) => (
+                <Box
+                  key={c}
+                  h="1.5"
+                  flex="1"
+                  bg={r === 0 ? "fg.muted" : "border"}
+                  borderRadius="xs"
+                />
+              ))}
+            </HStack>
+          ))}
+        </Stack>
       );
     case "divider":
       return <Box h="px" bg="border" w="full" my="1" />;
@@ -164,4 +199,36 @@ export function DigestInlineRichWireframe() {
       ]}
     />
   );
+}
+
+export function GraphAlertResolvedWireframe() {
+  return (
+    <WireStack rows={["header", "section", "fields", "context", "context"]} />
+  );
+}
+
+export function GraphAlertNoDataWireframe() {
+  return <WireStack rows={["header", "section", "context", "context"]} />;
+}
+
+export function GraphAlertHistoryTableWireframe() {
+  return <WireStack rows={["header", "fields", "table", "context"]} />;
+}
+
+export function TraceCardRichWireframe() {
+  return (
+    <WireStack rows={["header", "context", "quote", "quote", "context"]} />
+  );
+}
+
+export function EvalFailureRichWireframe() {
+  return (
+    <WireStack
+      rows={["header", "context", "divider", "quote", "quote", "context"]}
+    />
+  );
+}
+
+export function DigestTableWireframe() {
+  return <WireStack rows={["header", "context", "table", "context"]} />;
 }
