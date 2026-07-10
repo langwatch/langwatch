@@ -24,11 +24,14 @@ import type {
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
+  SpanSummaryPageCursor,
   SpanSummaryRow,
 } from "./span-storage.repository";
 import {
   clampSpanReadLimit,
   LANGWATCH_SIGNAL_BUCKETS,
+  MAX_DERIVATION_SPANS,
+  MAX_LIGHT_SPAN_READ_ROWS,
 } from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
@@ -1066,6 +1069,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ${partition.sqlAnd}
               AND ${dedupInTuple(partition.sqlAndInner)}
             ORDER BY StartTimeMs ASC
+            LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
           `,
           query_params: { tenantId, traceId, ...partition.params },
           format: "JSONEachRow",
@@ -1250,6 +1254,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 Events_Name AS event_name,
                 Events_Attributes AS event_attrs
               ORDER BY event_timestamp ASC
+              LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             `,
             query_params: { tenantId, traceId, ...partition.params },
             format: "JSONEachRow",
@@ -1460,6 +1465,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ${partition.sqlAnd}
               AND ${dedupInTuple(partition.sqlAndInner)}
             ORDER BY StartTimeMs ASC
+            LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
           `,
           query_params: { tenantId, traceId, ...partition.params },
           format: "JSONEachRow",
@@ -1514,6 +1520,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 AND TraceId = {traceId:String}
                 ${partition.sqlAnd}
                 AND ${dedupInTuple(partition.sqlAndInner)}
+              LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             )
           `,
           query_params: { tenantId, traceId, ...partition.params },
@@ -1650,6 +1657,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           ${sinceFilter}
           AND ${dedupInTuple(sinceFilter)}
         ORDER BY StartTime ASC
+        LIMIT ${MAX_DERIVATION_SPANS}
       `,
       query_params: { tenantId, traceId, sinceStartTimeMs },
       format: "JSONEachRow",
@@ -1659,79 +1667,74 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
   }
 
-  async findSpanSummariesPaginated({
+  async findSpanSummariesPage({
     tenantId,
     traceId,
     limit,
-    offset,
+    cursor,
     occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
     limit: number;
-    offset: number;
-  } & OccurredAtHint): Promise<{ rows: SpanSummaryRow[]; total: number }> {
+    cursor?: SpanSummaryPageCursor;
+  } & OccurredAtHint): Promise<SpanSummaryRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
-      "SpanStorageClickHouseRepository.findSpanSummariesPaginated",
+      "SpanStorageClickHouseRepository.findSpanSummariesPage",
     );
 
-    return this.readTraceSpans<{ rows: SpanSummaryRow[]; total: number }>(
+    const effectiveLimit = Math.min(
+      Math.max(1, Math.trunc(limit)),
+      MAX_LIGHT_SPAN_READ_ROWS,
+    );
+
+    return this.readTraceSpans<SpanSummaryRow[]>(
       { tenantId, traceId, occurredAtMs },
-      (result) => result.rows.length === 0,
+      (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
         const client = await this.resolveClient(tenantId);
-        // Same two-step rationale as findSpansPaginated, except the page
-        // query is already light (summary columns only). Splitting still
-        // helps because count() OVER () forces the deduped row set to be
-        // materialized in full before the LIMIT — a wasted scan when the
-        // user is on page N and we just want a number.
-        const [pageResult, countResult] = await Promise.all([
-          client.query({
-            query: `
-              SELECT ${SUMMARY_SPAN_SELECT}
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
-              ORDER BY StartTime ASC
-              LIMIT {limit:UInt32}
-              OFFSET {offset:UInt32}
-            `,
-            query_params: {
-              tenantId,
-              traceId,
-              limit,
-              offset,
-              ...partition.params,
-            },
-            format: "JSONEachRow",
-          }),
-          client.query({
-            query: `
-              SELECT count(DISTINCT SpanId) AS Total
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-            `,
-            query_params: { tenantId, traceId, ...partition.params },
-            format: "JSONEachRow",
-          }),
-        ]);
+        // Keyed pagination over (StartTimeMs, SpanId): the tuple compare uses
+        // the same millisecond expression the rows are ordered (and returned)
+        // by, so page boundaries are exact even though StartTime itself has
+        // sub-ms precision. The cursor predicate stays OUT of the dedup
+        // subquery on purpose — dedup must pick the latest version per span
+        // across the whole trace; if the winning version sorts before the
+        // cursor, the span belongs to an earlier page and is correctly
+        // excluded by the outer filter rather than re-emitted stale.
+        const cursorFilter = cursor
+          ? `AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStartTimeMs:Int64}, {cursorSpanId:String})`
+          : "";
+        const result = await client.query({
+          query: `
+            SELECT ${SUMMARY_SPAN_SELECT}
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              ${partition.sqlAnd}
+              ${cursorFilter}
+              AND ${dedupInTuple(partition.sqlAndInner)}
+            ORDER BY StartTimeMs ASC, SpanId ASC
+            LIMIT {limit:UInt32}
+          `,
+          query_params: {
+            tenantId,
+            traceId,
+            limit: effectiveLimit,
+            ...(cursor
+              ? {
+                  cursorStartTimeMs: Math.trunc(cursor.startTimeMs),
+                  cursorSpanId: cursor.spanId,
+                }
+              : {}),
+            ...partition.params,
+          },
+          format: "JSONEachRow",
+        });
 
-        const pageRows = await pageResult.json<SpanSummaryQueryRow>();
-        const countRows = (await countResult.json()) as Array<{
-          Total: number | string;
-        }>;
-        const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
-
-        return {
-          rows: pageRows.map(mapSpanSummaryRow),
-          total,
-        };
+        const rows = await result.json<SpanSummaryQueryRow>();
+        return rows.map(mapSpanSummaryRow);
       },
     );
   }
@@ -1766,6 +1769,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           ${sinceFilter}
           AND ${dedupInTuple(sinceFilter)}
         ORDER BY StartTimeMs ASC
+        LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
       `,
       query_params: { tenantId, traceId, sinceStartTimeMs },
       format: "JSONEachRow",

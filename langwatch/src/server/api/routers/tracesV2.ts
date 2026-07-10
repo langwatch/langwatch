@@ -60,10 +60,12 @@ import type {
   ContentPrivacy,
   SpanDetail,
   SpanLangwatchSignals,
+  SpanTreeCursor,
   SpanTreeNode,
   TraceHeader,
   TraceResourceInfoDto,
 } from "./tracesV2.schemas";
+import { spanTreeCursorSchema } from "./tracesV2.schemas";
 
 // ---------------------------------------------------------------------------
 // Shared input fragments
@@ -1220,30 +1222,48 @@ export const tracesV2Router = createTRPCRouter({
       );
     }),
 
+  /**
+   * One page of the span tree in `(startTimeMs, spanId)` order. This is the
+   * only fetch path the frontend uses for span trees — traces can carry
+   * 20k–100k+ spans, so the client assembles the tree page by page (see
+   * `spanTreePagedQuery.ts`) instead of ever pulling it in one response.
+   * `nextCursor` is null on the final page.
+   */
   spanTreePaginated: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         traceId: z.string(),
         limit: z.number().int().min(1).max(1000).default(200),
-        offset: z.number().int().min(0).default(0),
+        cursor: spanTreeCursorSchema.optional(),
         ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
     .query(
-      async ({ input }): Promise<{ nodes: SpanTreeNode[]; total: number }> => {
+      async ({
+        input,
+      }): Promise<{
+        nodes: SpanTreeNode[];
+        nextCursor: SpanTreeCursor | null;
+      }> => {
         const app = getApp();
-        const result = await app.traces.spans.getSpanSummariesPaginated({
+        const rows = await app.traces.spans.getSpanSummariesPage({
           tenantId: input.projectId,
           traceId: input.traceId,
           limit: input.limit,
-          offset: input.offset,
+          cursor: input.cursor,
           ...occurredAtFromInput(input),
         });
+        // A short page means the trace is exhausted. A full page may be too
+        // (exact multiple of `limit`) — the follow-up fetch returns empty and
+        // closes the loop.
+        const last = rows.length === input.limit ? rows.at(-1) : undefined;
         return {
-          nodes: result.rows.map(mapSpanSummaryToTreeNode),
-          total: result.total,
+          nodes: rows.map(mapSpanSummaryToTreeNode),
+          nextCursor: last
+            ? { startTimeMs: last.startTimeMs, spanId: last.spanId }
+            : null,
         };
       },
     ),
@@ -1269,6 +1289,14 @@ export const tracesV2Router = createTRPCRouter({
       return rows.map(mapSpanSummaryToTreeNode);
     }),
 
+  /**
+   * Whole-tree read in one response. The frontend no longer fetches through
+   * this — `useSpanTree` pages via `spanTreePaginated` under the same React
+   * Query key, and this procedure remains as that cache entry's type/key
+   * anchor (preview seeding, SSE invalidation, cancel). The underlying read
+   * is bounded (`MAX_LIGHT_SPAN_READ_ROWS`) so a direct call can never
+   * materialize a 100k-span trace in one shot.
+   */
   spanTree: protectedProcedure
     .input(
       z.object({

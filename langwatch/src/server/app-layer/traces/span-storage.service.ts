@@ -15,6 +15,7 @@ import type {
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
+  SpanSummaryPageCursor,
   SpanSummaryRow,
 } from "./repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
@@ -202,10 +203,10 @@ export class SpanStorageService {
     );
   }
 
-  async getSpanSummariesPaginated(
-    params: Paginated,
-  ): Promise<{ rows: SpanSummaryRow[]; total: number }> {
-    return this.repository.findSpanSummariesPaginated(params);
+  async getSpanSummariesPage(
+    params: ByTraceId & { limit: number; cursor?: SpanSummaryPageCursor },
+  ): Promise<SpanSummaryRow[]> {
+    return this.repository.findSpanSummariesPage(params);
   }
 
   async getSpanSummariesSince(params: Since): Promise<SpanSummaryRow[]> {

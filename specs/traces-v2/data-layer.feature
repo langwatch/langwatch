@@ -262,8 +262,22 @@ Rule: Progressive drawer loading
 
   Scenario: Span tree returns lightweight skeleton only
     When `useSpanTree` fires
-    Then `tracesV2.spanTree` returns SpanTreeNode rows: spanId, parentSpanId, name, type, startTimeMs, endTimeMs, durationMs, status, model
+    Then the span tree is returned as SpanTreeNode rows: spanId, parentSpanId, name, type, startTimeMs, endTimeMs, durationMs, status, model
     And it does NOT return SpanAttributes, input/output, or Events (those live on `spanDetail`)
+
+  Scenario: Span tree is fetched in cursor pages, never as one response
+    Given a trace with more spans than one page
+    When `useSpanTree` fires
+    Then the client fetches the tree page by page via `tracesV2.spanTreePaginated`
+    And each page's `nextCursor` (startTimeMs, spanId) keys the next page, so concurrent ingestion cannot skip or duplicate spans
+    And already-fetched spans render in the waterfall while later pages are still loading
+    And no span endpoint returns every span of the trace in a single unbounded response
+
+  Scenario: A huge trace cannot exhaust server memory through per-trace span reads
+    Given a runaway trace with 100,000+ spans
+    When any per-trace read fires (span tree, signals, resource info, trace events, live deltas)
+    Then the read is bounded server-side and returns at most a fixed ceiling of rows
+    And the complete span tree remains reachable through the cursor-paged fetch
 
   Scenario: Clicking a span fetches full detail
     Given the drawer is open with a trace

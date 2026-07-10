@@ -171,6 +171,19 @@ const spanTreeNodeSchema = z.object({
 export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;
 
 /**
+ * Cursor for the paged span-tree read (`tracesV2.spanTreePaginated`): the
+ * next page starts strictly after `(startTimeMs, spanId)` in
+ * `(StartTimeMs ASC, SpanId ASC)` order. Keyed rather than offset-based so
+ * pages stay stable while spans are still being ingested.
+ */
+export const spanTreeCursorSchema = z.object({
+  startTimeMs: z.number(),
+  spanId: z.string(),
+});
+
+export type SpanTreeCursor = z.infer<typeof spanTreeCursorSchema>;
+
+/**
  * Per-span LangWatch instrumentation signals — fetched via
  * `tracesV2.spanLangwatchSignals` as a separate, secondary call so the
  * primary span tree query stays cheap. Keys correspond to attribute-prefix

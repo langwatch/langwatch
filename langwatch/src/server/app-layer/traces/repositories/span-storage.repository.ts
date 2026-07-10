@@ -29,6 +29,29 @@ export function clampSpanReadLimit(limit?: number): number {
   return Math.min(Math.max(1, Math.trunc(requested)), MAX_DERIVATION_SPANS);
 }
 
+/**
+ * Per-query safety ceiling for the light single-shot per-trace projections
+ * (span summaries, signal keys, resource info, trace events, summary deltas).
+ * These rows are slim — no SpanAttributes values, input/output, or Events
+ * payloads — so the ceiling is generous, but it exists because traces have
+ * been seen with 20k–100k+ spans and an unbounded read materializes every
+ * row in ClickHouse and Node at once. The complete view of huge traces is
+ * the cursor-paged span-tree read (`findSpanSummariesPage`), which never
+ * needs more than one page in memory.
+ */
+export const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
+
+/**
+ * Cursor for keyed span-summary pagination: the page starts strictly after
+ * `(startTimeMs, spanId)` in `(StartTimeMs ASC, SpanId ASC)` order. Keyed
+ * instead of offset-based so pages stay stable while spans are still being
+ * ingested, and so ClickHouse never scans-and-discards `offset` rows.
+ */
+export interface SpanSummaryPageCursor {
+  startTimeMs: number;
+  spanId: string;
+}
+
 export interface SpanSummaryRow {
   spanId: string;
   parentSpanId: string | null;
@@ -196,14 +219,19 @@ export interface SpanStorageRepository {
   findSpanResourcesByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanResourceInfo[]>;
-  findSpanSummariesPaginated(
+  /**
+   * One page of span summaries in `(StartTimeMs, SpanId)` order, starting
+   * strictly after `cursor` (or from the beginning when omitted). Callers
+   * derive the next cursor from the last row when a full page came back.
+   */
+  findSpanSummariesPage(
     params: {
       tenantId: string;
       traceId: string;
       limit: number;
-      offset: number;
+      cursor?: SpanSummaryPageCursor;
     } & OccurredAtHint,
-  ): Promise<{ rows: SpanSummaryRow[]; total: number }>;
+  ): Promise<SpanSummaryRow[]>;
   findSpanSummariesSince(
     params: {
       tenantId: string;
@@ -324,15 +352,15 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async findSpanSummariesPaginated(
+  async findSpanSummariesPage(
     _params: {
       tenantId: string;
       traceId: string;
       limit: number;
-      offset: number;
+      cursor?: SpanSummaryPageCursor;
     } & OccurredAtHint,
-  ): Promise<{ rows: SpanSummaryRow[]; total: number }> {
-    return { rows: [], total: 0 };
+  ): Promise<SpanSummaryRow[]> {
+    return [];
   }
 
   async findSpanSummariesSince(

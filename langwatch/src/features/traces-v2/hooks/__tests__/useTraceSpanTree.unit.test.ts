@@ -12,16 +12,20 @@ type SpanTreeInput = {
 
 const capturedInputs: SpanTreeInput[] = [];
 
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: () => ({ data: [], isLoading: false }),
+  useQueryClient: () => ({}),
+}));
+
 vi.mock("~/utils/api", () => ({
-  api: {
-    tracesV2: {
-      spanTree: {
-        useQuery: (input: SpanTreeInput) => {
-          capturedInputs.push(input);
-          return { data: [], isLoading: false };
-        },
-      },
-    },
+  api: { useUtils: () => ({}) },
+}));
+
+vi.mock("../spanTreePagedQuery", () => ({
+  spanTreeQueryKey: (input: SpanTreeInput) => ["spanTree", input],
+  spanTreeQueryFn: ({ input }: { input: SpanTreeInput }) => {
+    capturedInputs.push(input);
+    return () => Promise.resolve([]);
   },
 }));
 
