@@ -1,0 +1,188 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/langy-agent/domain"
+	"github.com/langwatch/langwatch/services/langy-agent/telemetry"
+)
+
+// App is the langy-agent application. It composes the worker pool and the
+// telemetry seam. All fields are injected via Options so tests can swap any
+// dependency.
+type App struct {
+	logger    *zap.Logger
+	pool      WorkerPool
+	telemetry *telemetry.Telemetry
+}
+
+// Option configures an App.
+type Option func(*App)
+
+// New constructs an App with the given options.
+func New(opts ...Option) *App {
+	a := &App{}
+	for _, o := range opts {
+		o(a)
+	}
+	return a
+}
+
+// WithLogger injects the logger.
+func WithLogger(l *zap.Logger) Option { return func(a *App) { a.logger = l } }
+
+// WithWorkerPool injects the worker pool.
+func WithWorkerPool(p WorkerPool) Option { return func(a *App) { a.pool = p } }
+
+// WithTelemetry injects the telemetry instruments.
+func WithTelemetry(t *telemetry.Telemetry) Option { return func(a *App) { a.telemetry = t } }
+
+// Pool returns the configured worker pool (used by serve.go for lifecycle and
+// by the health/status handler).
+func (a *App) Pool() WorkerPool { return a.pool }
+
+func (a *App) log() *zap.Logger {
+	if a.logger == nil {
+		return zap.NewNop()
+	}
+	return a.logger
+}
+
+// ChatRequest is the app-level view of a chat turn. The httpapi adapter builds
+// it after auth + validation.
+type ChatRequest struct {
+	ConversationID string
+	Prompt         string
+	System         string
+	Credentials    domain.Credentials
+}
+
+// Chat runs one chat turn: acquire the worker, claim it, post the prompt, and
+// stream the reply into sink. It mirrors the flat handler's control flow
+// exactly — the only behavioural change is that operational telemetry is
+// emitted around it.
+//
+// Outcome mapping (unchanged from the flat handler):
+//   - at capacity           → 200 stream carrying an "at-capacity" error event
+//   - other acquire failure → 200 stream carrying the error as an error event
+//   - conversation busy      → herr(ErrConversationBusy) returned to the caller
+//     (transport writes a 409) — no stream is begun
+//   - session vanished       → "session-not-found" error event; worker recycled
+//   - stream/post error      → the error surfaced as an error event
+//   - success                → the opencode ndjson event stream
+func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
+	ctx, span := a.startTurn(ctx, req.ConversationID)
+	defer span()
+	start := time.Now()
+
+	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.Credentials)
+	if err != nil {
+		if errors.Is(err, domain.ErrMaxWorkers) {
+			a.atCapacity(ctx)
+			sink.Begin()
+			sink.ErrorEvent("at-capacity")
+			a.turnObserved(ctx, start, "at-capacity")
+			return nil
+		}
+		a.log().Error("acquire worker failed",
+			zap.String("conversation", req.ConversationID),
+			zap.Error(err),
+		)
+		sink.Begin()
+		sink.ErrorEvent(err.Error())
+		a.turnObserved(ctx, start, "acquire-error")
+		return nil
+	}
+
+	// Per-conversation in-flight guard. The worker's OpenCode session is
+	// single-stream — two concurrent turns subscribing to /event from the same
+	// worker would each receive the other's deltas and could terminate on the
+	// other's terminal event, splicing replies. Return conversation-busy on
+	// overlap (transport → 409); the control plane shows a "still answering —
+	// wait" notice. This must happen BEFORE Begin() commits the 200.
+	if !worker.Claim() {
+		a.turnObserved(ctx, start, "busy")
+		return herr.New(ctx, domain.ErrConversationBusy, nil)
+	}
+	defer worker.Release()
+	worker.Touch()
+
+	sink.Begin()
+
+	// Inner ctx whose lifetime this turn owns: the SSE consumer is bound to it
+	// so a PostMessage failure can cancel the consumer immediately rather than
+	// wait for the outer request ctx to time out.
+	streamCtx, cancelStream := context.WithCancel(ctx)
+	defer cancelStream()
+
+	// Kick the SSE consumer first so we don't lose the first delta if opencode
+	// is fast to start producing.
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- worker.StreamEvents(streamCtx, sink)
+	}()
+
+	if err := worker.PostMessage(ctx, req.System, req.Prompt); err != nil {
+		// Cancel the SSE consumer so <-errCh unblocks immediately instead of
+		// waiting on the outer request ctx. Worker stays claimed until the
+		// deferred Release — keep that window small.
+		cancelStream()
+		if errors.Is(err, domain.ErrSessionNotFound) {
+			a.pool.KillSessionVanished(req.ConversationID)
+			sink.ErrorEvent("session-not-found")
+			<-errCh // let the stream consumer unwind.
+			a.turnObserved(ctx, start, "session-not-found")
+			return nil
+		}
+		a.log().Error("post message failed",
+			zap.String("conversation", req.ConversationID),
+			zap.Error(err),
+		)
+		sink.ErrorEvent(err.Error())
+		<-errCh
+		a.turnObserved(ctx, start, "post-error")
+		return nil
+	}
+
+	if err := <-errCh; err != nil {
+		a.log().Warn("stream events ended with error",
+			zap.String("conversation", req.ConversationID),
+			zap.Error(err),
+		)
+		sink.ErrorEvent(err.Error())
+		a.turnObserved(ctx, start, "stream-error")
+		return nil
+	}
+
+	a.turnObserved(ctx, start, "ok")
+	return nil
+}
+
+// --- telemetry helpers: nil-safe so the app unit-tests without instruments ---
+
+func (a *App) startTurn(ctx context.Context, conversationID string) (context.Context, func()) {
+	if a.telemetry == nil {
+		return ctx, func() {}
+	}
+	ctx, span := a.telemetry.StartTurn(ctx, conversationID)
+	return ctx, func() { span.End() }
+}
+
+func (a *App) turnObserved(ctx context.Context, start time.Time, outcome string) {
+	if a.telemetry == nil {
+		return
+	}
+	a.telemetry.TurnObserved(ctx, time.Since(start).Seconds(), outcome)
+}
+
+func (a *App) atCapacity(ctx context.Context) {
+	if a.telemetry == nil {
+		return
+	}
+	a.telemetry.AtCapacity(ctx)
+}

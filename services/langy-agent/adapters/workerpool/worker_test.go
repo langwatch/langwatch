@@ -1,14 +1,15 @@
-package langyagent
+package workerpool
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/langwatch/langwatch/services/langy-agent/domain"
 )
 
 func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
-	// Snapshot original env so we can restore after the test.
 	for k, v := range map[string]string{
 		"LANGY_INTERNAL_SECRET": "must-not-leak",
 		"GITHUB_LANGY_APP_ID":   "must-not-leak",
@@ -18,8 +19,7 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		"DATABASE_URL":          "must-not-leak",
 		"AWS_SECRET_ACCESS_KEY": "must-not-leak",
 		// Suffix patterns: any *_API_KEY / *_KEY / *_SECRET inherited from a
-		// local-dev .env must not reach the worker. The worker gets its own
-		// llmVirtualKey + langwatchApiKey injected via Credentials.* after.
+		// local-dev .env must not reach the worker.
 		"OPENAI_API_KEY":             "must-not-leak",
 		"ANTHROPIC_API_KEY":          "must-not-leak",
 		"GROQ_API_KEY":               "must-not-leak",
@@ -29,9 +29,9 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		"LW_GATEWAY_INTERNAL_SECRET": "must-not-leak",
 		"LW_GATEWAY_JWT_SECRET":      "must-not-leak",
 		"LW_VIRTUAL_KEY_PEPPER":      "must-not-leak",
-		// New suffix patterns: credential-bearing connection strings, DSNs,
-		// and the AWS_ACCESS_KEY_ID half of an AWS credential pair (ends in
-		// `_ID`, not `_KEY`, so the suffix block needs an explicit literal).
+		// Credential-bearing connection strings, DSNs, and the AWS_ACCESS_KEY_ID
+		// half (ends in _ID, not _KEY, so the suffix block needs an explicit
+		// literal).
 		"REDIS_URL":         "redis://user:secret@host:6379/0",
 		"POSTGRES_URL":      "postgres://user:secret@host:5432/db",
 		"CLICKHOUSE_URL":    "https://user:secret@host:8443/db",
@@ -41,14 +41,10 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		"GH_TOKEN":          "ghp_inherited_must_not_leak",
 		"GITHUB_TOKEN":      "ghp_ci_token_must_not_leak",
 		"POSTGRES_PASSWORD": "must-not-leak",
-		// PASS-THROUGH cases: only entries WITHOUT credentials and without a
-		// blocked suffix. The OPENCODE_* env values the worker actually needs
-		// (OPENCODE_OTLP_ENDPOINT etc.) are explicitly re-injected by
-		// spawnOpenCode AFTER this filter runs, so filtering the inherited
-		// variants is correct.
+		// PASS-THROUGH cases.
 		"LANGY_MAX_WORKERS":       "keep-me", // LANGY_ prefix but not the secret one
 		"HOME":                    "keep-me",
-		"LANGWATCH_API_KEY_OUTER": "keep-me", // worker injects its own LANGWATCH_API_KEY after; the _OUTER suffix is neither _KEY nor _SECRET
+		"LANGWATCH_API_KEY_OUTER": "keep-me", // worker injects its own after; _OUTER is neither _KEY nor _SECRET
 	} {
 		t.Setenv(k, v)
 	}
@@ -72,9 +68,6 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		"LW_GATEWAY_INTERNAL_SECRET=",
 		"LW_GATEWAY_JWT_SECRET=",
 		"LW_VIRTUAL_KEY_PEPPER=",
-		// New patterns — credential-bearing connection strings and the AWS
-		// access-key half. A prompt-injected worker could otherwise
-		// `env | grep -iE 'redis|postgres|sentry'` and exfiltrate.
 		"REDIS_URL=",
 		"POSTGRES_URL=",
 		"CLICKHOUSE_URL=",
@@ -110,18 +103,16 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		}
 	}
 
-	// Sanity: filterSensitiveEnv must never return an empty slice in
-	// realistic envs — PATH at minimum is always set.
 	if len(env) == 0 {
 		t.Fatalf("filterSensitiveEnv returned empty slice; PATH was %q", os.Getenv("PATH"))
 	}
 }
 
-// buildWorkerEnv must inject a distinct OPENCODE_SERVER_PASSWORD per worker.
-// A shared password would mean worker A's authProxy credential also
-// unlocks worker B's opencode — the exact hole Fix A′ (ADR-033) closes.
+// buildWorkerEnv must inject a distinct OPENCODE_SERVER_PASSWORD per worker. A
+// shared password would mean worker A's authProxy credential also unlocks
+// worker B's opencode — the exact hole Fix A′ (ADR-033) closes.
 func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
-	creds := Credentials{
+	creds := domain.Credentials{
 		LangwatchAPIKey:   "lw-key",
 		GatewayBaseURL:    "https://gateway.internal",
 		LangwatchEndpoint: "https://app.langwatch.ai",
@@ -150,6 +141,46 @@ func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
 	}
 }
 
+// buildWorkerEnv must inject the per-worker credentials + OTel wiring and, when
+// present, the GitHub token; and must NOT inject GH_TOKEN when the credential
+// bundle carries no GitHub token.
+func TestBuildWorkerEnv_InjectsCredentialsAndConditionalGithub(t *testing.T) {
+	creds := domain.Credentials{
+		LangwatchAPIKey:   "lw-key",
+		LLMVirtualKey:     "vk-secret",
+		GatewayBaseURL:    "https://gateway.internal/v1",
+		LangwatchEndpoint: "https://app.langwatch.ai",
+	}
+	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw")
+
+	wants := map[string]string{
+		"OPENAI_BASE_URL":        "https://gateway.internal/v1",
+		"OPENAI_API_KEY":         "vk-secret",
+		"LANGWATCH_API_KEY":      "lw-key",
+		"LANGWATCH_ENDPOINT":     "https://app.langwatch.ai",
+		"OPENCODE_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
+		"OPENCODE_OTLP_HEADERS":  "Authorization=Bearer lw-key",
+	}
+	for k, v := range wants {
+		if got := valueOfEnv(env, k); got != v {
+			t.Errorf("env[%s] = %q, want %q", k, got, v)
+		}
+	}
+	if valueOfEnv(env, "GH_TOKEN") != "" {
+		t.Errorf("GH_TOKEN must be absent when no GitHub token is provided")
+	}
+
+	creds.GithubToken = "ghp_real"
+	creds.GithubLogin = "alice"
+	withGH := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw")
+	if got := valueOfEnv(withGH, "GH_TOKEN"); got != "ghp_real" {
+		t.Errorf("GH_TOKEN = %q, want ghp_real", got)
+	}
+	if got := valueOfEnv(withGH, "GITHUB_LOGIN"); got != "alice" {
+		t.Errorf("GITHUB_LOGIN = %q, want alice", got)
+	}
+}
+
 func valueOfEnv(env []string, key string) string {
 	prefix := key + "="
 	for _, e := range env {
@@ -162,8 +193,6 @@ func valueOfEnv(env []string, key string) string {
 
 func TestOpenCodeSkillsDir_UnderOpenCodeConfig(t *testing.T) {
 	// opencode only discovers global skills under $HOME/.config/opencode/skills.
-	// If the spawn path ever links them anywhere else (the original bug linked
-	// $HOME/skills), opencode shows an empty skill menu. Lock the location.
 	home := "/home/worker-123"
 	got := openCodeSkillsDir(home)
 	want := filepath.Join(home, ".config", "opencode", "skills")
@@ -173,9 +202,6 @@ func TestOpenCodeSkillsDir_UnderOpenCodeConfig(t *testing.T) {
 }
 
 func TestSkillsSymlink_PointsAtSharedTemplateDir(t *testing.T) {
-	// Replicates the symlink setupWorkerHome creates, minus the root-only
-	// chowns: the link at opencode's skills dir must resolve to the shared,
-	// root-owned /workspace/skills tree so every worker reads the same skills.
 	home := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(home, ".config", "opencode"), 0o755); err != nil {
 		t.Fatalf("mkdir config: %v", err)
