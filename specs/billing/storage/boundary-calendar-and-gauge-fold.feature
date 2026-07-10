@@ -50,26 +50,26 @@ Feature: Storage billing boundary calendar and gauge fold
 
   # Event identity and deduplication
 
-  @unit @unimplemented
+  @unit
   Scenario: Recording the same entry slice twice stores one event
     Given an entry event for a partition day slice
     When the same slice is recorded again
     Then only one event exists for that slice
 
-  @unit @unimplemented
+  @unit
   Scenario: An exit event is never deduplicated against its matching entry
     Given a recorded entry event for a partition day slice
     When the mirroring exit event is recorded
     Then both events exist
     And the fold of the two nets to zero
 
-  @unit @unimplemented
+  @unit
   Scenario: Seed and entry events for the same slice collapse into one
     Given a seed event for a partition day slice
     When an entry event for the same slice is recorded
     Then only one event exists for that slice
 
-  @unit @unimplemented
+  @unit
   Scenario: Corrections from different causes are distinct events
     Given a retention change from 63 to 91 days emits correction events
     When a later change from 91 back to 63 days emits its own corrections
