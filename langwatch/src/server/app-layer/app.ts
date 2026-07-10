@@ -24,6 +24,7 @@ export class App {
   readonly simulations: AppDependencies["simulations"] &
     AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
+  readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
   readonly triggerTemplates: AppDependencies["triggerTemplates"];
@@ -80,6 +81,7 @@ export class App {
     this.dspySteps = deps.dspySteps;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
+    this.langy = deps.langy;
     this.ops = deps.ops;
     this.retentionPolicyCache = deps.retentionPolicyCache;
     this.dataRetention = deps.dataRetention;

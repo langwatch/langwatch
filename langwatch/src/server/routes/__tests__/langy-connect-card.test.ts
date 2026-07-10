@@ -47,12 +47,14 @@ const featureFlagIsEnabled = vi.fn();
 const getOrProvision = vi.fn();
 const getModelsAllowed = vi.fn();
 
-// Conversation + message + tokenizer are real-DB-backed in production; mock
-// them so the test never needs Postgres. We capture appended messages to
-// assert the persisted assistant body is non-error prose.
+// The conversation is event-sourced (ADR-043); the route reaches its writers
+// via getApp().langy. We mock those so the test never needs ClickHouse/Redis,
+// and capture the finalized turn to assert the persisted assistant body is
+// non-error prose.
 const ensureConversation = vi.fn();
-const touchConversation = vi.fn();
-const appendMessage = vi.fn();
+const recordUserMessage = vi.fn();
+const startTurn = vi.fn();
+const finalizeTurn = vi.fn();
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) => getServerAuthSession(...args),
@@ -107,30 +109,31 @@ vi.mock("~/server/services/langy/LangyCredentialService", () => ({
     }),
   },
 }));
-vi.mock("~/server/services/langy/LangyConversationService", () => ({
+vi.mock("~/server/app-layer/langy/langy-conversation.service", () => ({
   LangyConversationNotOwnedError: class extends Error {},
-  LangyConversationService: {
-    create: () => ({
-      ensureConversation: (...args: unknown[]) => ensureConversation(...args),
-      bumpActivity: (...args: unknown[]) => touchConversation(...args),
-    }),
-  },
 }));
-vi.mock("~/server/services/langy/LangyMessageService", async () => {
-  // Keep the real extractTextFromParts — the route uses it to build the
-  // forwarded prompt + conversation title from the user's parts.
+// Keep the real extractTextFromParts — the route uses it to build the forwarded
+// prompt + conversation title from the user's parts.
+vi.mock("~/server/app-layer/langy/langy-message.service", async () => {
   const actual = await vi.importActual<
-    typeof import("~/server/services/langy/LangyMessageService")
-  >("~/server/services/langy/LangyMessageService");
-  return {
-    ...actual,
-    LangyMessageService: {
-      create: () => ({
-        append: (...args: unknown[]) => appendMessage(...args),
-      }),
-    },
-  };
+    typeof import("~/server/app-layer/langy/langy-message.service")
+  >("~/server/app-layer/langy/langy-message.service");
+  return { ...actual };
 });
+// The route reaches the event-sourced conversation writers via getApp().langy.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    langy: {
+      conversations: {
+        ensureConversation: (...args: unknown[]) => ensureConversation(...args),
+        recordUserMessage: (...args: unknown[]) => recordUserMessage(...args),
+        startTurn: (...args: unknown[]) => startTurn(...args),
+        finalizeTurn: (...args: unknown[]) => finalizeTurn(...args),
+      },
+      messages: {},
+    },
+  }),
+}));
 
 /**
  * Build a mock agent /chat Response whose body streams a single OpenCode
@@ -211,8 +214,9 @@ describe("POST /api/langy/chat — unconnected user asks for a PR", () => {
     });
     releaseLangyGithubPrPermit.mockResolvedValue(undefined);
     ensureConversation.mockResolvedValue({ id: "conv-1" });
-    appendMessage.mockResolvedValue({ id: "msg-1" });
-    touchConversation.mockResolvedValue(undefined);
+    recordUserMessage.mockResolvedValue({ messageId: "msg-1" });
+    startTurn.mockResolvedValue({ turnId: "turn-1" });
+    finalizeTurn.mockResolvedValue({ messageId: "msg-2" });
 
     // The crux of "unconnected": credentials resolve fine for the LLM/MCP but
     // carry NO githubToken / githubLogin. This mirrors
@@ -281,11 +285,11 @@ describe("POST /api/langy/chat — unconnected user asks for a PR", () => {
     // stripped (history must not re-trigger the card on reload) — it is NOT an
     // error message. Persistence runs inside the stream's execute, so it has
     // resolved by the time drain() returns.
-    const assistantAppend = appendMessage.mock.calls
-      .map((c) => c[0] as { role: string; parts: { text?: string }[] })
-      .find((a) => a.role === "assistant");
-    expect(assistantAppend).toBeDefined();
-    const persistedText = assistantAppend!.parts
+    const finalizedTurn = finalizeTurn.mock.calls
+      .map((c) => c[0] as { parts: { text?: string }[] })
+      .find((a) => Array.isArray(a.parts));
+    expect(finalizedTurn).toBeDefined();
+    const persistedText = finalizedTurn!.parts
       .map((p) => p.text ?? "")
       .join("");
     expect(persistedText).not.toContain(CONNECT_GITHUB_SENTINEL);

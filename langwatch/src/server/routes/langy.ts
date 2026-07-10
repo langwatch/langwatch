@@ -30,6 +30,7 @@ import {
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 
 import { featureFlagService } from "~/server/featureFlag";
@@ -43,24 +44,33 @@ import {
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { extractOpenedPrLinks } from "~/server/services/langy/githubPrLinks";
+import type { DomainError } from "~/server/app-layer/domain-error";
 import {
+  LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
-  LangyConversationService,
-} from "~/server/services/langy/LangyConversationService";
+} from "~/server/app-layer/langy/errors";
 import {
   LangyCredentialResolutionError,
   LangyCredentialService,
 } from "~/server/services/langy/LangyCredentialService";
-import {
-  extractTextFromParts,
-  LangyMessageService,
-} from "~/server/services/langy/LangyMessageService";
+import { extractTextFromParts } from "~/server/app-layer/langy/langy-message.service";
 import { stripLangySentinels } from "~/server/services/langy/langySentinels";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
+
+/**
+ * Response body for a HANDLED domain error. Returns ONLY what the client, the
+ * UI, or an AI agent can act on — a safe `error` message, the serialisable
+ * `code` (`kind`) to render a tailored experience by, and the renderable
+ * `meta`. Internal detail (telemetry, reasons, stack, query internals) stays in
+ * server logs, never on the wire (ADR-043).
+ */
+function handledErrorBody(error: DomainError) {
+  return { error: error.message, code: error.kind, meta: error.meta };
+}
 
 // The Langy worker carries a service API key with WRITE on every resource
 // listed here (see LANGY_PERMISSION_SELECTIONS in services/langy/langyApiKey.ts).
@@ -119,31 +129,18 @@ const chatRequestSchema = z.object({
     .max(200)
     .optional(),
 });
-// Token counts live on the gateway-emitted OTel trace (see the per-worker
-// OPENCODE_OTLP_* env in services/langy-agent — the OpenCode OTel plugin
-// exports gen_ai.usage.{prompt,completion}_tokens for every LLM call). The
-// LangyMessage row is the text+role+parts of a chat turn; consumers that need
-// usage figures should fold the trace by langwatch.thread.id=conversationId,
-// not double-count with an in-process tokenizer here. Discussed on PR #4913.
-async function persistMessage(opts: {
-  conversationId: string;
-  projectId: string;
-  role: "user" | "assistant";
-  parts: unknown;
-}) {
-  const messageService = LangyMessageService.create();
-  await messageService.append({
-    conversationId: opts.conversationId,
-    projectId: opts.projectId,
-    role: opts.role,
-    parts: opts.parts ?? [],
-  });
-  const conversationService = LangyConversationService.create(prisma);
-  await conversationService.bumpActivity({
-    id: opts.conversationId,
-    projectId: opts.projectId,
-  });
-}
+// Persistence is now event-sourced (ADR-043): the user turn is a `SendMessage`
+// command and the assistant's final answer is a `ReconcileAgentTurn` command
+// (emitting `turn_finalized`). The conversation row and the langy_messages rows
+// are both projections of those events, so the old persistMessage + bumpActivity
+// dual write is gone — a single command per turn keeps the count/activity and
+// the stored message from ever drifting.
+//
+// Token counts still live on the gateway-emitted OTel trace (see the per-worker
+// OPENCODE_OTLP_* env in services/langy-agent — the OpenCode OTel plugin exports
+// gen_ai.usage.{prompt,completion}_tokens for every LLM call); consumers that
+// need usage figures fold the trace by langwatch.thread.id=conversationId, not
+// an in-process tokenizer here. Discussed on PR #4913.
 
 // Every Langy route does its own authentication in-handler: the app-level
 // guard below validates the session, and each handler additionally checks the
@@ -296,22 +293,20 @@ langyRoute().post("/langy/chat", async (c) => {
     );
   }
 
-  const conversationService = LangyConversationService.create(prisma);
+  const conversationService = getApp().langy.conversations;
 
+  // Resolve the conversation id (ownership-checked). No write happens here —
+  // the aggregate is created by the first SendMessage command below.
   let conversation;
   try {
     conversation = await conversationService.ensureConversation({
       projectId,
       userId: session.user.id,
       conversationId: requestedConversationId ?? null,
-      title: extractTextFromParts(messages[0]?.parts).slice(0, 80) || null,
     });
   } catch (error) {
     if (error instanceof LangyConversationNotOwnedError) {
-      return c.json(
-        { error: "Conversation belongs to another user." },
-        { status: 403 },
-      );
+      return c.json(handledErrorBody(error), { status: 403 });
     }
     throw error;
   }
@@ -333,11 +328,14 @@ langyRoute().post("/langy/chat", async (c) => {
   }
 
   if (lastUserMessage?.role === "user") {
-    await persistMessage({
-      conversationId: conversation.id,
+    // One command: the message_sent event feeds both the conversation fold
+    // (owner/title/count/activity) and the langy_messages map projection.
+    await conversationService.recordUserMessage({
       projectId,
-      role: "user",
+      conversationId: conversation.id,
+      userId: session.user.id,
       parts: lastUserMessage.parts,
+      title: extractTextFromParts(messages[0]?.parts).slice(0, 80) || null,
     });
   }
 
@@ -518,6 +516,13 @@ langyRoute().post("/langy/chat", async (c) => {
     return c.json({ error: "Agent request failed" }, { status: 502 });
   }
 
+  // Record the agent-turn boundary. turnId correlates the started/finalized
+  // events; PR3's streaming worker drives status/progress heartbeats against it.
+  const { turnId } = await conversationService.startTurn({
+    projectId,
+    conversationId: conversation.id,
+  });
+
   const textId = crypto.randomUUID();
   let fullText = "";
 
@@ -594,14 +599,18 @@ langyRoute().post("/langy/chat", async (c) => {
         // extraction below: PR URLs live in prose, not sentinels.
         const persistedText = stripLangySentinels(fullText);
         try {
-          await persistMessage({
-            conversationId: conversation.id,
+          // turn_finalized carries the WHOLE final answer as the source of
+          // truth (streamed tokens were never events). It feeds the assistant
+          // langy_messages row and the conversation fold's terminal state.
+          await conversationService.finalizeTurn({
             projectId,
-            role: "assistant",
+            conversationId: conversation.id,
+            turnId,
             parts: [{ type: "text", text: persistedText, role: "assistant" }],
+            outcome: "completed",
           });
         } catch (error) {
-          logger.error({ error }, "failed to persist langy assistant message");
+          logger.error({ error }, "failed to finalize langy agent turn");
         }
 
         // Audit each PR the assistant actually OPENED this turn — links are
@@ -723,7 +732,7 @@ langyRoute().get("/langy/conversations", async (c) => {
   const guard = await requireSessionAndPermission(c, projectId);
   if (guard.error) return guard.error;
   const limit = Number(c.req.query("limit") ?? "50");
-  const service = LangyConversationService.create(prisma);
+  const service = getApp().langy.conversations;
   const conversations = await service.getAll({
     projectId: projectId!,
     userId: guard.session!.user.id,
@@ -737,14 +746,17 @@ langyRoute().get("/langy/conversations/:id", async (c) => {
   const guard = await requireSessionAndPermission(c, projectId);
   if (guard.error) return guard.error;
   const id = c.req.param("id");
-  const convService = LangyConversationService.create(prisma);
+  const convService = getApp().langy.conversations;
   const conv = await convService.getById({
     id,
     projectId: projectId!,
     userId: guard.session!.user.id,
   });
-  if (!conv) return c.json({ error: "Not found" }, { status: 404 });
-  const msgService = LangyMessageService.create();
+  if (!conv)
+    return c.json(handledErrorBody(new LangyConversationNotFoundError(id)), {
+      status: 404,
+    });
+  const msgService = getApp().langy.messages;
   const messages = await msgService.getRecordsByConversation({
     conversationId: conv.id,
     projectId: projectId!,
@@ -774,7 +786,7 @@ langyRoute().patch("/langy/conversations/:id", async (c) => {
   const guard = await requireSessionAndPermission(c, body.projectId);
   if (guard.error) return guard.error;
   const id = c.req.param("id");
-  const service = LangyConversationService.create(prisma);
+  const service = getApp().langy.conversations;
   try {
     const updated = await service.updateById({
       id,
@@ -794,8 +806,15 @@ langyRoute().patch("/langy/conversations/:id", async (c) => {
       });
     }
     return c.json({ conversation: updated });
-  } catch {
-    return c.json({ error: "Not found or not owned" }, { status: 404 });
+  } catch (error) {
+    if (LangyConversationNotFoundError.is(error)) {
+      return c.json(handledErrorBody(error), { status: 404 });
+    }
+    logger.error({ error }, "failed to update langy conversation");
+    return c.json(
+      { error: "An unexpected error occurred.", code: "unknown" },
+      { status: 500 },
+    );
   }
 });
 
@@ -804,13 +823,16 @@ langyRoute().delete("/langy/conversations/:id", async (c) => {
   const guard = await requireSessionAndPermission(c, projectId);
   if (guard.error) return guard.error;
   const id = c.req.param("id");
-  const service = LangyConversationService.create(prisma);
+  const service = getApp().langy.conversations;
   const ok = await service.deleteById({
     id,
     projectId: projectId!,
     userId: guard.session!.user.id,
   });
-  if (!ok) return c.json({ error: "Not found or not owned" }, { status: 404 });
+  if (!ok)
+    return c.json(handledErrorBody(new LangyConversationNotFoundError(id)), {
+      status: 404,
+    });
   return c.json({ success: true });
 });
 
@@ -823,7 +845,7 @@ langyRoute().delete("/langy/memory", async (c) => {
   const guard = await requireSessionAndPermission(c, projectId);
   if (guard.error) return guard.error;
   const userId = guard.session!.user.id;
-  const convService = LangyConversationService.create(prisma);
+  const convService = getApp().langy.conversations;
   const result = await convService.clearAllForUser({
     projectId: projectId!,
     userId,
@@ -842,13 +864,13 @@ langyRoute().get("/langy/memory/export", async (c) => {
   const guard = await requireSessionAndPermission(c, projectId);
   if (guard.error) return guard.error;
   const userId = guard.session!.user.id;
-  const convService = LangyConversationService.create(prisma);
+  const convService = getApp().langy.conversations;
   const conversations = await convService.getAll({
     projectId: projectId!,
     userId,
     limit: 1000,
   });
-  const msgService = LangyMessageService.create();
+  const msgService = getApp().langy.messages;
   const conversationsWithMessages = await Promise.all(
     conversations
       .filter((c) => c.isOwn)
