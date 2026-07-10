@@ -527,7 +527,7 @@ describe("POST /api/scenario-events (ingest)", () => {
   });
 
   describe("when a MESSAGE_SNAPSHOT carries an AI-SDK image turn (multimodal-images docs shape)", () => {
-    /** @scenario "A simulated user message with an image attachment is accepted and the image is stored for the run conversation" */
+    /** @scenario "A simulated user message with an image attachment shows the image in the run conversation" */
     it("returns 201 (not 400) and externalizes the image bytes via storeFromBytes", async () => {
       const extractedId = `stored-${nanoid(8)}`;
       mockStoreFromBytes.mockResolvedValueOnce({
@@ -566,7 +566,7 @@ describe("POST /api/scenario-events (ingest)", () => {
   });
 
   describe("when a MESSAGE_SNAPSHOT carries an OpenAI file turn (multimodal-files docs shape)", () => {
-    /** @scenario "A simulated user message with a document attachment is accepted and keeps its filename" */
+    /** @scenario "A simulated user message with a document attachment stays available under its original filename" */
     it("returns 201 (not 400) and externalizes the file bytes via storeFromBytes", async () => {
       const extractedId = `stored-${nanoid(8)}`;
       mockStoreFromBytes.mockResolvedValueOnce({

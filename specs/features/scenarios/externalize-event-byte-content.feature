@@ -423,21 +423,18 @@ Feature: Externalize event byte content to stored_objects
   # zero conversation turns in the simulations UI.
 
   @integration
-  Scenario: A simulated user message with an image attachment is accepted and the image is stored for the run conversation
+  Scenario: A simulated user message with an image attachment shows the image in the run conversation
     Given a scenario run whose user turn attaches an inline image, as documented on the multimodal-images page
     When the SDK reports the conversation snapshot
-    Then the snapshot is accepted instead of being rejected by validation
-    And the image bytes are stored out-of-band
-    And the conversation references the stored image so the run can display it
+    Then the run conversation keeps the user turn with its image attachment
+    And the image is available for display in the run
 
   @integration
-  Scenario: A simulated user message with a document attachment is accepted and keeps its filename
+  Scenario: A simulated user message with a document attachment stays available under its original filename
     Given a scenario run whose user turn attaches an inline PDF document, as documented on the multimodal-files page
     When the SDK reports the conversation snapshot
-    Then the snapshot is accepted instead of being rejected by validation
-    And the document bytes are stored out-of-band
-    And the stored attachment keeps its original filename
-    And no inline bytes remain in the message
+    Then the run conversation keeps the user turn with its document attachment
+    And the document stays available under its original filename
 
   @unit
   Scenario: Documented image and file attachment shapes validate on the wire
@@ -775,8 +772,8 @@ Feature: Externalize event byte content to stored_objects
   #                                                                          -> Scenario: S3 client honors S3_REGION env for real AWS deployments instead of the R2/MinIO 'auto' default
   #                                                                          -> Scenario: S3 client defaults region to 'auto' for R2 and MinIO compatibility
   #                                                                          -> Scenario: S3 client falls back to default chain when credentials are partial — prevents misleading 'empty string credentials' bug
-  # AC41 "Documented image/file attachment shapes accepted and externalized" -> Scenario: A simulated user message with an image attachment is accepted and the image is stored for the run conversation
-  #                                                                          -> Scenario: A simulated user message with a document attachment is accepted and keeps its filename
+  # AC41 "Documented image/file attachment shapes accepted and externalized" -> Scenario: A simulated user message with an image attachment shows the image in the run conversation
+  #                                                                          -> Scenario: A simulated user message with a document attachment stays available under its original filename
   #                                                                          -> Scenario: Documented image and file attachment shapes validate on the wire
   #                                                                          -> Scenario: AI-SDK file parts with a document mediaType validate on the wire
   #                                                                          -> Scenario: AI-SDK image parts with http(s) URLs validate and pass through unchanged

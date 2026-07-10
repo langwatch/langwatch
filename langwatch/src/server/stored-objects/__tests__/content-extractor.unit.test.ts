@@ -857,7 +857,6 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an AI-SDK image part with a base64 data URI (typescript scenario SDK shape)", () => {
-    /** @scenario "A simulated user message with an image attachment is accepted and the image is stored for the run conversation" */
     it("extracts the bytes and rewrites image to /api/files/<projectId>/<id>", async () => {
       const base64Payload = makeBase64Payload("WEBP_BYTES");
       const storedId = "stored-image-id";
@@ -926,7 +925,6 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an OpenAI file part with a data URI file_data (multimodal-files docs shape)", () => {
-    /** @scenario "A simulated user message with a document attachment is accepted and keeps its filename" */
     it("extracts the bytes and rewrites the part to a binary reference preserving the filename", async () => {
       const base64Payload = makeBase64Payload("%PDF-1.4 fake pdf bytes");
       const storedId = "stored-openai-file-id";
