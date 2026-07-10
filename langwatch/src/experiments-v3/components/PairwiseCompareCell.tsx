@@ -204,9 +204,10 @@ function ResolvedVerdict({
   const setHighlightedVariantTargetId = useEvaluationsV3Store(
     (state) => state.setHighlightedVariantTargetId,
   );
-  const toggleHighlight = (targetId: string) => {
+  const toggleHighlight = (targetId: string, outcome: "won" | "lost") => {
     setHighlightedVariantTargetId(
       highlightedVariantTargetId === targetId ? undefined : targetId,
+      outcome,
     );
   };
   // The enclosing TableCell has its own onClick/onDoubleClick (cell
@@ -268,7 +269,7 @@ function ResolvedVerdict({
             _hover={{ textDecoration: "underline" }}
             onClick={(e) => {
               stopPropagation(e);
-              toggleHighlight(winnerTargetId);
+              toggleHighlight(winnerTargetId, "won");
             }}
             onDoubleClick={stopPropagation}
           >
@@ -282,7 +283,7 @@ function ResolvedVerdict({
             _hover={{ textDecoration: "underline" }}
             onClick={(e) => {
               stopPropagation(e);
-              toggleHighlight(loserTargetId);
+              toggleHighlight(loserTargetId, "lost");
             }}
             onDoubleClick={stopPropagation}
           >

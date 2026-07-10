@@ -1,4 +1,5 @@
-import { Box, HStack, Link, Text } from "@chakra-ui/react";
+import { Box, HStack, Icon, Link, Text } from "@chakra-ui/react";
+import { Trophy } from "lucide-react";
 import {
   type ColumnDef,
   type ColumnSizingState,
@@ -78,6 +79,7 @@ import { ColumnTypeIcon } from "./ColumnTypeIcon";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
 import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
 import { PairwiseCompareCell } from "./PairwiseCompareCell";
+import { SelectBestCompareCell } from "./SelectBestCompareCell";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxCellFromMeta,
@@ -115,6 +117,16 @@ export const isPairwiseConfigured = (e: EvaluatorConfig) =>
   !!e.pairwise?.variantB &&
   !!e.pairwise &&
   isGoldenFieldSatisfied(e.pairwise);
+
+// N-way select-best (#5101) sibling of isPairwiseConfigured. The verdict
+// column is only rendered once at least two variants are picked and the
+// golden-field requirement is satisfied — same shape as pairwise, just
+// with N candidates instead of 2.
+export const isSelectBestConfigured = (e: EvaluatorConfig) =>
+  e.evaluatorType === "langevals/select_best_compare" &&
+  !!e.selectBest &&
+  e.selectBest.variants.length >= 2 &&
+  isGoldenFieldSatisfied(e.selectBest);
 
 // ============================================================================
 // Main Component
@@ -1134,6 +1146,9 @@ export function EvaluationsV3Table({
   const highlightedVariantTargetId = useEvaluationsV3Store(
     (state) => state.ui.highlightedVariantTargetId,
   );
+  const highlightedVariantOutcome = useEvaluationsV3Store(
+    (state) => state.ui.highlightedVariantOutcome,
+  );
 
   // Build row data from active dataset records (works for both inline and saved)
   // Note: We include activeDataset in dependencies to ensure re-render when cell values change
@@ -1260,6 +1275,19 @@ export function EvaluationsV3Table({
     () => evaluators.filter(isPairwiseConfigured),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pairwiseEvaluatorsKey],
+  );
+
+  // Same shape as pairwiseEvaluatorsKey but for N-way — key on the ordered
+  // variants list so the column recreates when a variant is added, removed,
+  // or reordered.
+  const selectBestEvaluatorsKey = evaluators
+    .filter(isSelectBestConfigured)
+    .map((e) => `${e.id}:${e.selectBest?.variants.join(",")}`)
+    .join(";");
+  const stableSelectBestEvaluators = useMemo(
+    () => evaluators.filter(isSelectBestConfigured),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectBestEvaluatorsKey],
   );
 
   // Build table meta for passing dynamic data to headers/cells
@@ -1468,9 +1496,10 @@ export function EvaluationsV3Table({
               const meta = context.table.options.meta as TableMeta | undefined;
               const evaluator = meta?.evaluatorsMap.get(evaluatorId);
               return (
-                <HStack gap={1}>
+                <HStack gap={1.5}>
+                  <Icon as={Trophy} color="yellow.fg" boxSize="14px" />
                   <Text fontSize="13px" fontWeight="medium">
-                    🏆 {evaluator?.localEvaluatorConfig?.name ?? "Pairwise"}
+                    {evaluator?.localEvaluatorConfig?.name ?? "Pairwise"}
                   </Text>
                 </HStack>
               );
@@ -1501,6 +1530,56 @@ export function EvaluationsV3Table({
       );
     }
 
+    // N-way (#5101) result columns — one per fully-configured select-best
+    // evaluator, rendered after pairwise columns. Same pattern as pairwise:
+    // the orchestrator anchors Phase-2 results on the first variant's cell.
+    for (const sbEval of stableSelectBestEvaluators) {
+      const evaluatorId = sbEval.id;
+      const variantIds = sbEval.selectBest!.variants;
+      const anchorVariantId = variantIds[0]!;
+      cols.push(
+        columnHelper.accessor(
+          (row) => row.targets[anchorVariantId]?.evaluators[evaluatorId],
+          {
+            id: `selectBest.${evaluatorId}`,
+            header: (context) => {
+              const meta = context.table.options.meta as TableMeta | undefined;
+              const evaluator = meta?.evaluatorsMap.get(evaluatorId);
+              return (
+                <HStack gap={1.5}>
+                  <Icon as={Trophy} color="yellow.fg" boxSize="14px" />
+                  <Text fontSize="13px" fontWeight="medium">
+                    {evaluator?.localEvaluatorConfig?.name ?? "N-way Compare"}
+                  </Text>
+                </HStack>
+              );
+            },
+            cell: (info) => {
+              if (info.row.original.isEmpty) return null;
+              const meta = info.table.options.meta as TableMeta | undefined;
+              const variantTargets = variantIds.map((id) =>
+                meta?.targetsMap.get(id),
+              );
+              const rowData = info.row.original.targets[anchorVariantId];
+              return (
+                <SelectBestCompareCell
+                  result={info.getValue()}
+                  isLoading={rowData?.isLoading}
+                  variantTargets={variantTargets}
+                />
+              );
+            },
+            size: TARGET_COL_DEFAULT_PCT,
+            minSize: 10,
+            meta: {
+              columnType: "selectBest" as ColumnType,
+              columnId: `selectBest.${evaluatorId}`,
+            },
+          },
+        ) as ColumnDef<TableRowData>,
+      );
+    }
+
     return cols;
   }, [
     // ONLY structural dependencies - columns should almost never change
@@ -1508,6 +1587,7 @@ export function EvaluationsV3Table({
     targetIds,
     stableDatasetColumns,
     stablePairwiseEvaluators,
+    stableSelectBestEvaluators,
     columnHelper,
   ]);
 
@@ -1716,8 +1796,22 @@ export function EvaluationsV3Table({
       total += columnSizing[`pairwise.${pwEval.id}`] ?? TARGET_COL_DEFAULT_PCT;
     }
 
+    // Sum dedicated N-way (select-best) result column percentages — same
+    // reason as pairwise above: without this entry the column falls back to
+    // "auto" width and renders as a zero-width sliver.
+    for (const sbEval of stableSelectBestEvaluators) {
+      total +=
+        columnSizing[`selectBest.${sbEval.id}`] ?? TARGET_COL_DEFAULT_PCT;
+    }
+
     return total;
-  }, [datasetColumns, targets, stablePairwiseEvaluators, columnSizing]);
+  }, [
+    datasetColumns,
+    targets,
+    stablePairwiseEvaluators,
+    stableSelectBestEvaluators,
+    columnSizing,
+  ]);
 
   // Get column width as CSS string
   // Converts stored percentage values to CSS percentage strings
@@ -1741,6 +1835,9 @@ export function EvaluationsV3Table({
       // falling through to "auto" here left them competing with the
       // filler column for whatever sliver of space was left over.
       if (columnType === "pairwise") return `${TARGET_COL_DEFAULT_PCT}%`;
+      // Same fix as pairwise above — the dedicated N-way column must return
+      // a real percentage, not "auto", or its <th> collapses to 0 width.
+      if (columnType === "selectBest") return `${TARGET_COL_DEFAULT_PCT}%`;
       return "auto";
     },
     [columnSizing],
@@ -1864,6 +1961,10 @@ export function EvaluationsV3Table({
 
                 const isHighlightedColumn =
                   !!targetId && targetId === highlightedVariantTargetId;
+                // The winning column glows green so a verdict reads at a
+                // glance; tracing a loser (or a tie) keeps the neutral blue.
+                const highlightColor =
+                  highlightedVariantOutcome === "won" ? "green" : "blue";
 
                 return (
                   <th
@@ -1875,9 +1976,8 @@ export function EvaluationsV3Table({
                         isFixedWidth,
                       ),
                       ...(isHighlightedColumn && {
-                        boxShadow:
-                          "inset 0 0 0 2px var(--chakra-colors-blue-400)",
-                        background: "var(--chakra-colors-blue-subtle)",
+                        boxShadow: `inset 0 0 0 2px var(--chakra-colors-${highlightColor}-400)`,
+                        background: `var(--chakra-colors-${highlightColor}-subtle)`,
                       }),
                     }}
                     // Add data attribute for target columns to enable scroll-to behavior

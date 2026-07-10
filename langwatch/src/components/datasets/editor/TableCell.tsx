@@ -14,7 +14,12 @@ import { EditableCell } from "./EditableCell";
  * editable via EditableCell; "checkbox" toggles row selection; anything else
  * (e.g. the workbench's "target" columns) renders through flexRender.
  */
-export type ColumnType = "checkbox" | "dataset" | "target" | "pairwise";
+export type ColumnType =
+  | "checkbox"
+  | "dataset"
+  | "target"
+  | "pairwise"
+  | "selectBest";
 
 type ColumnMeta = {
   columnType: ColumnType;

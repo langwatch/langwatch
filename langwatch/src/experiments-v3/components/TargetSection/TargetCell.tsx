@@ -34,11 +34,9 @@ import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useCodeEvaluatorIds } from "../../hooks/useEvaluatorName";
 import { useOpenEvaluatorEditor } from "../../hooks/useOpenEvaluatorEditor";
 import { useTargetName } from "../../hooks/useTargetName";
+import { isComparisonEvaluator } from "../../types";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
-import {
-  formatLatency,
-  normalizePairwiseLabel,
-} from "../../utils/computeAggregates";
+import { formatLatency } from "../../utils/computeAggregates";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
 import { PairwiseVerdictRow } from "../PairwiseVerdictRow";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
@@ -352,14 +350,18 @@ export function TargetCellContent({
     return strips.length > 0 ? <>{strips}</> : null;
   };
 
-  // Render the evaluator chips section. Pairwise-typed evaluators route
-  // through PairwiseAwareEvaluatorChip so the chip-tint can resolve the
-  // winner-by-id label format against each variant's prompt handle (the
-  // resolution needs `useTargetName`, which is a hook and so cannot live
-  // in `evaluators.map`).
+  // Render the evaluator chips section. Comparison evaluators (pairwise
+  // #5100, N-way #5101) are excluded: they judge target columns against
+  // each other and render their own dedicated verdict column, so showing
+  // them as a chip on every target reads as N independent evaluations of
+  // a single comparison.
+  const chipEvaluators = evaluators.filter(
+    (evaluator: EvaluatorConfig) => !isComparisonEvaluator(evaluator),
+  );
+
   const renderEvaluatorChips = (inExpandedView: boolean) => (
     <HStack flexWrap="wrap" gap={1.5}>
-      {evaluators.map((evaluator: EvaluatorConfig) => {
+      {chipEvaluators.map((evaluator: EvaluatorConfig) => {
         const chipProps = {
           evaluator,
           result: evaluatorResults[evaluator.id],
@@ -383,17 +385,6 @@ export function TargetCellContent({
             ? () => onRunEvaluatorOnAllRows(evaluator.id)
             : undefined,
         };
-        if (evaluator.pairwise) {
-          return (
-            <PairwiseAwareEvaluatorChip
-              key={evaluator.id}
-              target={target}
-              targets={targets}
-              result={evaluatorResults[evaluator.id]}
-              chipProps={chipProps}
-            />
-          );
-        }
         return <EvaluatorChip key={evaluator.id} {...chipProps} />;
       })}
       <Button
@@ -409,15 +400,15 @@ export function TargetCellContent({
         data-testid={`add-evaluator-button-${target.id}`}
         // When evaluators exist, show on hover only (unless in expanded view)
         className={
-          evaluators.length > 0 && !inExpandedView
+          chipEvaluators.length > 0 && !inExpandedView
             ? "cell-action-btn"
             : undefined
         }
-        opacity={evaluators.length > 0 && !inExpandedView ? 0 : 1}
+        opacity={chipEvaluators.length > 0 && !inExpandedView ? 0 : 1}
         transition="opacity 0.15s"
       >
         <LuPlus />
-        {evaluators.length === 0 && <Text>Add evaluator</Text>}
+        {chipEvaluators.length === 0 && <Text>Add evaluator</Text>}
       </Button>
     </HStack>
   );
@@ -605,53 +596,3 @@ export function TargetCellContent({
   );
 }
 
-// Resolves the pairwise winner/loser/tie tint for a chip rendered against
-// `target`. Pulled out into its own component so the two `useTargetName`
-// calls (one per variant) run at this component's top level — calling them
-// inside `evaluators.map(...)` would violate React's rules-of-hooks.
-//
-// The stored label is the winner's candidate id, which for prompt-typed
-// variants is the prompt HANDLE (e.g. "say-hi"), not the variant's target
-// id. `normalizePairwiseLabel` collapses both label shapes (legacy
-// "A"/"B"/"tie" + new winner-id, by id or handle) to a slot letter that
-// can be compared against this chip's target.
-function PairwiseAwareEvaluatorChip({
-  target,
-  targets,
-  result,
-  chipProps,
-}: {
-  target: TargetConfig;
-  targets: TargetConfig[];
-  result: unknown;
-  chipProps: Omit<React.ComponentProps<typeof EvaluatorChip>, "pairwiseState">;
-}) {
-  const pw = chipProps.evaluator.pairwise;
-  const variantATarget = pw
-    ? (targets.find((t) => t.id === pw.variantA) ?? target)
-    : target;
-  const variantBTarget = pw
-    ? (targets.find((t) => t.id === pw.variantB) ?? target)
-    : target;
-  const variantAName = useTargetName(variantATarget);
-  const variantBName = useTargetName(variantBTarget);
-
-  const pairwiseState = useMemo((): "winner" | "loser" | "tie" | undefined => {
-    if (!pw) return undefined;
-    const parsed = parseEvaluationResult(result);
-    if (parsed.status !== "processed") return undefined;
-    const slot = normalizePairwiseLabel(
-      parsed.label,
-      pw.variantA,
-      pw.variantB,
-      variantAName || undefined,
-      variantBName || undefined,
-    );
-    if (!slot) return undefined;
-    if (slot === "tie") return "tie";
-    if (slot === "A") return target.id === pw.variantA ? "winner" : "loser";
-    return target.id === pw.variantB ? "winner" : "loser";
-  }, [pw, result, target.id, variantAName, variantBName]);
-
-  return <EvaluatorChip {...chipProps} pairwiseState={pairwiseState} />;
-}

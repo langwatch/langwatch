@@ -957,11 +957,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
   },
 
-  setHighlightedVariantTargetId: (targetId) => {
+  setHighlightedVariantTargetId: (targetId, outcome) => {
     set({
       ui: {
         ...get().ui,
         highlightedVariantTargetId: targetId,
+        highlightedVariantOutcome: targetId ? outcome : undefined,
       },
     });
   },

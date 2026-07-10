@@ -133,6 +133,15 @@ export const TargetHeader = memo(function TargetHeader({
     (state) => state.ui.highlightedVariantTargetId === target.id,
   );
 
+  // When the clicked verdict named this column as its winner, say so
+  // explicitly next to the name — the glow alone doesn't tell you whether
+  // you traced the winner or a loser.
+  const didWin = useEvaluationsV3Store(
+    (state) =>
+      state.ui.highlightedVariantTargetId === target.id &&
+      state.ui.highlightedVariantOutcome === "won",
+  );
+
   // Get the display name for this target
   const targetName = useTargetName(target);
 
@@ -432,6 +441,23 @@ export const TargetHeader = memo(function TargetHeader({
             <Text fontSize="13px" fontWeight="medium" truncate>
               {targetName}
             </Text>
+            {didWin && (
+              <HStack
+                gap={1}
+                flexShrink={0}
+                paddingX={1.5}
+                paddingY={0.5}
+                borderRadius="sm"
+                bg="green.subtle"
+                color="green.fg"
+                data-testid="target-header-won-badge"
+              >
+                <Trophy size={10} />
+                <Text fontSize="11px" fontWeight="semibold">
+                  Won
+                </Text>
+              </HStack>
+            )}
             {showVersionBadge && target.promptVersionNumber !== undefined && (
               <Box flexShrink={0}>
                 <VersionBadge version={target.promptVersionNumber} />
