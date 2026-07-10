@@ -48,6 +48,16 @@ export const EVAL_INPUTS_HARD_CEILING_BYTES = readByteEnv(
   50 * 1024 * 1024, // 50 MiB
 );
 
+/**
+ * The inline budget must never exceed the ceiling: an operator setting
+ * LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES above the ceiling would let the
+ * exact payload class the ceiling exists to catch flow through inline.
+ */
+const EVAL_INPUTS_INLINE_MAX_BYTES_EFFECTIVE = Math.min(
+  EVAL_INPUTS_INLINE_MAX_BYTES,
+  EVAL_INPUTS_HARD_CEILING_BYTES,
+);
+
 /** First N bytes of the serialized inputs kept inline on the marker. */
 export const EVAL_INPUTS_PREVIEW_BYTES = 16 * 1024; // 16 KiB
 
@@ -115,11 +125,19 @@ function buildPreview(serialized: string): {
   preview: string;
   truncatedPreview: boolean;
 } {
-  // Slice on bytes, not code units, so the marker's preview stays within the
-  // documented byte budget even for multibyte content.
-  const buf = Buffer.from(serialized, "utf8");
-  if (buf.length <= EVAL_INPUTS_PREVIEW_BYTES) {
+  // Never buffer the whole payload just to cut a preview: this function runs
+  // on the very payloads this module exists to bound (GB scale), and
+  // Buffer.from(serialized) would double peak memory. Buffer.byteLength
+  // computes without allocating, and a UTF-16 code unit encodes to at least
+  // one UTF-8 byte, so the first PREVIEW_BYTES code units always cover the
+  // first PREVIEW_BYTES output bytes; only that bounded slice gets buffered.
+  if (Buffer.byteLength(serialized, "utf8") <= EVAL_INPUTS_PREVIEW_BYTES) {
     return { preview: serialized, truncatedPreview: false };
+  }
+  const boundedSlice = serialized.slice(0, EVAL_INPUTS_PREVIEW_BYTES);
+  const buf = Buffer.from(boundedSlice, "utf8");
+  if (buf.length <= EVAL_INPUTS_PREVIEW_BYTES) {
+    return { preview: boundedSlice, truncatedPreview: true };
   }
   // toString on a mid-codepoint cut yields the replacement char rather than
   // throwing, which is fine for a human-readable preview.
@@ -161,7 +179,7 @@ export async function offloadInputsIfOversized({
 
   const serialized = JSON.stringify(inputs);
   const sizeBytes = Buffer.byteLength(serialized, "utf8");
-  if (sizeBytes <= EVAL_INPUTS_INLINE_MAX_BYTES) {
+  if (sizeBytes <= EVAL_INPUTS_INLINE_MAX_BYTES_EFFECTIVE) {
     return { inputs, offloaded: false };
   }
 

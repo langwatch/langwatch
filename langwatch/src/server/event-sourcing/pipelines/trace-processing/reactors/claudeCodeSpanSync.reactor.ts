@@ -30,6 +30,17 @@ export interface ClaudeCodeSpanSyncReactorDeps {
     occurredAtMs?: number,
     limit?: number,
   ) => Promise<StoredLogRecordRow[]>;
+  /**
+   * Count the turn's marked logs uncapped, so an overflowing turn stamps the TRUE
+   * dropped-log count instead of the `cap + 1` lower bound the fetch can observe.
+   * Called only in the over-cap branch; on failure the reactor falls back to the
+   * lower bound and the truncation marker is still stamped.
+   */
+  countMarkedClaudeCodeLogs: (
+    tenantId: string,
+    traceId: string,
+    occurredAtMs?: number,
+  ) => Promise<number>;
   recordSpan: CommandDispatcher<RecordSpanCommandData>;
   /**
    * Maximum number of a turn's marked log records to convert in one pass. The
@@ -107,12 +118,42 @@ export function createClaudeCodeSpanSyncReactor(
         );
         if (fetched.length === 0) return;
 
-        // Bound the conversion: keep the first `turnLogCap` records (turn order)
-        // and record how many were dropped so the root span is marked truncated.
-        const droppedLogCount = Math.max(0, fetched.length - turnLogCap);
-        const rows =
-          droppedLogCount > 0 ? fetched.slice(0, turnLogCap) : fetched;
-        if (droppedLogCount > 0) {
+        // Bound the conversion: keep the first `turnLogCap` records (turn order).
+        const overflowed = fetched.length > turnLogCap;
+        const rows = overflowed ? fetched.slice(0, turnLogCap) : fetched;
+
+        // Record how many were dropped so the root span is marked truncated. The
+        // fetch is capped at `turnLogCap + 1`, so `fetched.length - turnLogCap` is
+        // only ever a lower bound (>= 1); a turn with 50,000 marked logs would
+        // stamp 1, badly underestimating during an incident. Query the uncapped
+        // count to stamp the TRUE total. If that count call fails, fall back to
+        // the lower bound - the truncation marker must still stamp either way.
+        let droppedLogCount = 0;
+        if (overflowed) {
+          const lowerBound = Math.max(1, fetched.length - turnLogCap);
+          droppedLogCount = lowerBound;
+          try {
+            const total = await deps.countMarkedClaudeCodeLogs(
+              tenantId,
+              traceId,
+              event.occurredAt,
+            );
+            droppedLogCount = Math.max(1, total - turnLogCap);
+          } catch (countError) {
+            logger.debug(
+              {
+                tenantId,
+                traceId,
+                turnLogCap,
+                lowerBound,
+                error:
+                  countError instanceof Error
+                    ? countError.message
+                    : String(countError),
+              },
+              "Failed to count Claude Code turn's marked logs; stamping the lower-bound dropped count",
+            );
+          }
           logger.warn(
             {
               tenantId,

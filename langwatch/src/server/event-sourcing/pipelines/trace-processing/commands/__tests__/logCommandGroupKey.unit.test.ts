@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clampLogShardCount,
+  DEFAULT_LOG_COMMAND_SHARD_COUNT,
   logCommandGroupKey,
   logShardIndex,
   MAX_LOG_SHARD_COUNT,
@@ -213,10 +214,18 @@ describe("logCommandGroupKey", () => {
 
 describe("resolveLogCommandShardCount", () => {
   describe("given an absent, non-numeric, or below-one value", () => {
-    it("falls back to one so sharding stays disabled", () => {
+    it("falls back to the on-by-default shard count", () => {
       for (const raw of [undefined, "", "abc", "0", "-3", "2.5", "NaN"]) {
-        expect(resolveLogCommandShardCount(raw)).toBe(1);
+        expect(resolveLogCommandShardCount(raw)).toBe(
+          DEFAULT_LOG_COMMAND_SHARD_COUNT,
+        );
       }
+    });
+  });
+
+  describe("given an explicit one", () => {
+    it("disables sharding", () => {
+      expect(resolveLogCommandShardCount("1")).toBe(1);
     });
   });
 

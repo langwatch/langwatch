@@ -211,6 +211,69 @@ export class LogRecordStorageClickHouseRepository
     }));
   }
 
+  async countMarkedClaudeCodeLogsByTrace(
+    tenantId: string,
+    traceId: string,
+    occurredAtMs?: number,
+  ): Promise<number> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "LogRecordStorageClickHouseRepository.countMarkedClaudeCodeLogsByTrace",
+    );
+
+    const client = await this.resolveClient(tenantId);
+
+    // Same predicates as getMarkedClaudeCodeLogsByTrace (tenant-first filter,
+    // partition time-window, IN-tuple dedup + outer kind-attribute filter) so the
+    // count matches the set that method would return uncapped - only without the
+    // per-turn LIMIT, so the reactor can learn a pathological turn's TRUE marked
+    // count instead of the cap+1 lower bound. Keep both queries' WHERE identical.
+    const partitionWindowMs = 2 * 24 * 60 * 60 * 1000;
+    const ccRetentionMs = CLAUDE_CODE_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const fallbackLookbackMs = ccRetentionMs * 7;
+    const hasWindow = typeof occurredAtMs === "number" && occurredAtMs > 0;
+    const now = Date.now();
+    const fromMs = hasWindow
+      ? occurredAtMs - partitionWindowMs
+      : now - fallbackLookbackMs;
+    const toMs = hasWindow
+      ? occurredAtMs + partitionWindowMs
+      : now + partitionWindowMs;
+    const timeFilter =
+      `AND ${TABLE_NAME}.TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64}) ` +
+      `AND ${TABLE_NAME}.TimeUnixMs <= fromUnixTimestamp64Milli({toMs:Int64})`;
+
+    const result = await client.query({
+      query: `
+        SELECT count() AS c
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          ${timeFilter}
+          AND (TenantId, TraceId, SpanId, ProjectionId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, SpanId, ProjectionId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              ${timeFilter}
+            GROUP BY TenantId, TraceId, SpanId, ProjectionId
+          )
+          AND Attributes[{kindKey:String}] != ''
+      `,
+      query_params: {
+        tenantId,
+        traceId,
+        kindKey: CLAUDE_CODE_KIND_ATTR,
+        fromMs,
+        toMs,
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = (await result.json()) as Array<{ c: number | string }>;
+    return Number(rows[0]?.c ?? 0);
+  }
+
   async insertLogRecords(
     records: NormalizedLogRecord[],
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
