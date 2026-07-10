@@ -72,18 +72,23 @@ export type AssistantKind = (typeof SUPPORTED_ASSISTANT_KINDS)[number];
 /**
  * Maps a coding-assistant tile's `assistantKind` to the CLI tool slug the
  * `langwatch <tool>` wrapper uses (and the slug PlatformToolPolicy keyed on).
- * Only the five wrapped tools map; kinds with no CLI wrapper (github_copilot,
- * custom) are absent and contribute no toolPolicies entry. cliBootstrap reads
- * this to derive the login `toolPolicies` map from tile config.
+ * Only the wrapped tools map; kinds with no CLI wrapper (custom) are absent
+ * and contribute no toolPolicies entry. cliBootstrap reads this to derive
+ * the login `toolPolicies` map from tile config.
  */
 export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<
-  Record<AssistantKind, "claude" | "codex" | "gemini" | "opencode" | "cursor">
+  Record<
+    AssistantKind,
+    "claude" | "codex" | "gemini" | "opencode" | "cursor" | "copilot"
+  >
 > = {
   claude_code: "claude",
   codex: "codex",
   gemini: "gemini",
   opencode: "opencode",
   cursor: "cursor",
+  // GitHub Copilot CLI wrapper (`langwatch copilot`), ADR-039.
+  github_copilot: "copilot",
 };
 
 const codingAssistantConfig = z.object({
@@ -455,7 +460,7 @@ export class AiToolEntryService {
   }): Promise<
     Partial<
       Record<
-        "claude" | "codex" | "gemini" | "opencode" | "cursor",
+        "claude" | "codex" | "gemini" | "opencode" | "cursor" | "copilot",
         { allowVk: boolean; allowOtelDirect: boolean }
       >
     >
@@ -474,7 +479,7 @@ export class AiToolEntryService {
 
     const overrides: Partial<
       Record<
-        "claude" | "codex" | "gemini" | "opencode" | "cursor",
+        "claude" | "codex" | "gemini" | "opencode" | "cursor" | "copilot",
         { allowVk: boolean; allowOtelDirect: boolean }
       >
     > = {};

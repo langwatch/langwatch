@@ -25,7 +25,8 @@ export type PlatformToolSlug =
   | "codex"
   | "gemini"
   | "opencode"
-  | "cursor";
+  | "cursor"
+  | "copilot";
 
 export interface PlatformToolPolicy {
   allowVk: boolean;
@@ -53,6 +54,9 @@ export const PLATFORM_TOOL_POLICIES: Record<PlatformToolSlug, PlatformToolPolicy
   // reaches the agent panel). The wrapper still gates on this so
   // future GUI integrations can flip allowOtelDirect to true.
   cursor: { allowVk: true, allowOtelDirect: false },
+  // copilot (GitHub Copilot CLI >= 1.0.41) has native OTel export AND
+  // BYOK gateway env vars, so both paths are real. ADR-039.
+  copilot: { ...DEFAULTS },
 };
 
 function hardcodedPolicy(toolSlug: string): PlatformToolPolicy {
