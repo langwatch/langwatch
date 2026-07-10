@@ -40,6 +40,13 @@ export interface StoredBoundaryEvent {
  * makes it unrepresentable. A replayed event (same dedup identity) applies
  * nothing and reports `applied: false`.
  */
+export interface NonExitGroupSum {
+  category: string;
+  retentionDays: number;
+  /** Net of all non-EXIT events (entries, seeds, corrections), signed. */
+  totalBytes: bigint;
+}
+
 export interface StorageBoundaryEventRepository {
   append(input: AppendBoundaryEventInput): Promise<{ applied: boolean }>;
   findAllByOrganization(params: {
@@ -47,4 +54,14 @@ export interface StorageBoundaryEventRepository {
     /** Inclusive occurredAt upper bound — the fold-to-H replay cut. */
     upTo?: Date;
   }): Promise<StoredBoundaryEvent[]>;
+  /**
+   * Net recorded non-EXIT bytes per (category, retentionDays) for one
+   * project-partition — the "prior" side of the entry edge's
+   * cumulative-minus-prior delta.
+   */
+  sumNonExitByPartition(params: {
+    organizationId: string;
+    projectId: string;
+    partitionKey: string;
+  }): Promise<NonExitGroupSum[]>;
 }

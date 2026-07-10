@@ -50,14 +50,14 @@ Feature: Storage billing boundary measurement engine
 
   # Entries
 
-  @integration @unimplemented
+  @integration
   Scenario: Data aging past 35 days increases the gauge that day
     Given an organization with 63-day retention and a partition slice turning 35 days old
     When the daily crossing is measured
     Then an entry event with that slice's bytes is recorded
     And the gauge increases by the same amount
 
-  @integration @unimplemented
+  @integration
   Scenario: Measuring a crossing reads only the crossing week partition
     Given an organization with 40 weeks of stored data
     When one partition's daily crossing is measured

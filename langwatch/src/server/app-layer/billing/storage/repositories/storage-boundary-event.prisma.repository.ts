@@ -65,6 +65,32 @@ export class PrismaStorageBoundaryEventRepository
     }
   }
 
+  async sumNonExitByPartition({
+    organizationId,
+    projectId,
+    partitionKey,
+  }: {
+    organizationId: string;
+    projectId: string;
+    partitionKey: string;
+  }) {
+    const groups = await this.prisma.storageBoundaryEvent.groupBy({
+      by: ["category", "retentionDays"],
+      where: {
+        organizationId,
+        projectId,
+        partitionKey,
+        edge: { not: "EXIT" },
+      },
+      _sum: { deltaBytes: true },
+    });
+    return groups.map((group) => ({
+      category: group.category,
+      retentionDays: group.retentionDays,
+      totalBytes: group._sum.deltaBytes ?? 0n,
+    }));
+  }
+
   async findAllByOrganization({
     organizationId,
     upTo,
