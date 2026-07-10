@@ -256,7 +256,7 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.1",
+    "@biomejs/biome": "2.5.2",
     "@playwright/test": "^1.61.1",
     "@testcontainers/clickhouse": "^12.0.4",
     "@testcontainers/redis": "^12.0.4",
