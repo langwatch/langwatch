@@ -1,5 +1,4 @@
-import { Box, HStack, Icon, Link, Text } from "@chakra-ui/react";
-import { Swords } from "lucide-react";
+import { Box, HStack, Link, Text } from "@chakra-ui/react";
 import {
   type ColumnDef,
   type ColumnSizingState,
@@ -85,6 +84,7 @@ import { ColumnTypeIcon } from "./ColumnTypeIcon";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
 import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
 import { ComparisonCell } from "./ComparisonCell";
+import { ComparisonColumnHeader } from "./ComparisonColumnHeader";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxCellFromMeta,
@@ -1467,12 +1467,10 @@ export function EvaluationsV3Table({
               const meta = context.table.options.meta as TableMeta | undefined;
               const evaluator = meta?.evaluatorsMap.get(evaluatorId);
               return (
-                <HStack gap={1.5}>
-                  <Icon as={Swords} color="fg.muted" boxSize="14px" />
-                  <Text fontSize="13px" fontWeight="medium">
-                    {evaluator?.localEvaluatorConfig?.name ?? "Comparison"}
-                  </Text>
-                </HStack>
+                <ComparisonColumnHeader
+                  evaluatorId={evaluatorId}
+                  name={evaluator?.localEvaluatorConfig?.name ?? "Comparison"}
+                />
               );
             },
             cell: (info) => {

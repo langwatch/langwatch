@@ -83,12 +83,15 @@ export function ComparisonScoreboard({
           topLabel,
       )} wins`;
 
-  const tally = variantTargets.map(
-    (target, index) =>
-      `${variantDisplayNames[index] ?? `Variant ${index + 1}`}: ${winsForVariant(
-        { winsByLabel, target, resolvedName: variantNames[index] ?? "" },
-      )} wins`,
-  );
+  const tally = variantTargets.map((target, index) => {
+    const wins = winsForVariant({
+      winsByLabel,
+      target,
+      resolvedName: variantNames[index] ?? "",
+    });
+    const name = variantDisplayNames[index] ?? `Variant ${index + 1}`;
+    return `${name}: ${wins} ${wins === 1 ? "win" : "wins"}`;
+  });
   if (ties > 0) tally.push(`${ties} ${ties === 1 ? "tie" : "ties"}`);
 
   return (

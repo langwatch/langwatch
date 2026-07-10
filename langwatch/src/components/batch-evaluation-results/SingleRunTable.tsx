@@ -13,6 +13,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Swords } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
@@ -187,6 +188,7 @@ const buildColumns = (
               <ComparisonWinnerCell
                 column={comparisonMeta}
                 verdict={comparisonMeta.verdictsByRow[row.original.index]}
+                targetColors={targetColors}
               />
             );
           }
@@ -208,7 +210,50 @@ const buildColumns = (
     );
   }
 
+  // A comparison wired as an evaluator chip rather than as its own column has
+  // no target column to render its verdict inside, and its chip is suppressed
+  // above. Without a trailing Winner column the verdict would be invisible.
+  for (const column of trailingComparisonColumns(
+    comparisonColumns,
+    targetColumns,
+  )) {
+    columns.push(
+      columnHelper.display({
+        id: `comparison_${column.evaluatorId}`,
+        header: () => (
+          <HStack gap={1.5}>
+            <Swords size={14} />
+            <Text fontSize="12px" fontWeight="600">
+              {column.name}
+            </Text>
+          </HStack>
+        ),
+        size: 240,
+        minSize: 200,
+        cell: ({ row }) => (
+          <ComparisonWinnerCell
+            column={column}
+            verdict={column.verdictsByRow[row.original.index]}
+            targetColors={targetColors}
+          />
+        ),
+      }),
+    );
+  }
+
   return columns;
+};
+
+/**
+ * Comparison columns that need a Winner column of their own — i.e. those that
+ * are not already rendered inside a matching target column.
+ */
+export const trailingComparisonColumns = (
+  comparisonColumns: BatchComparisonColumn[],
+  targetColumns: BatchTargetColumn[],
+): BatchComparisonColumn[] => {
+  const targetIds = new Set(targetColumns.map((t) => t.id));
+  return comparisonColumns.filter((c) => !targetIds.has(c.evaluatorId));
 };
 
 export function SingleRunTable({
@@ -305,7 +350,12 @@ export function SingleRunTable({
     (c) => !hiddenColumns.has(c.name),
   ).length;
   const targetColCount = data.targetColumns.length;
-  const comparisonColCount = data.comparisonColumns?.length ?? 0;
+  // Only the comparisons that get their own trailing column add width; one
+  // rendered inside a target column is already paid for by that column.
+  const comparisonColCount = trailingComparisonColumns(
+    data.comparisonColumns ?? [],
+    data.targetColumns,
+  ).length;
   const minTableWidth = calculateMinTableWidth(
     datasetColCount,
     targetColCount,

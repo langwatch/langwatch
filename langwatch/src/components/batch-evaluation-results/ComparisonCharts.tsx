@@ -1372,6 +1372,7 @@ export const ComparisonCharts = ({
                     key={`comparison-${column.evaluatorId}`}
                     column={column}
                     chartHeight={chartHeight}
+                    targetColors={targetColors}
                   />
                 ),
             )}

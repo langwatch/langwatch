@@ -33,23 +33,10 @@ import type { BatchComparisonColumn, BatchComparisonVerdict } from "./types";
 /** Collapsed cell height cap. Long reasoning is faded out beyond this. */
 const CELL_MAX_HEIGHT = 140;
 
-/**
- * Cycled per variant position, matching WinRateChart's bar colors so the
- * chart and the rows read as one story. No red: the loser of a comparison
- * isn't a failure, and a red badge would code as one.
- */
-const VARIANT_PALETTES = [
-  "green",
-  "purple",
-  "blue",
-  "orange",
-  "pink",
-  "teal",
-] as const;
-
 type WinnerVisual = {
   label: string;
-  colorPalette: (typeof VARIANT_PALETTES)[number] | "gray";
+  /** Green for any winner: a win is a win, and the name says which. */
+  colorPalette: "green" | "gray";
 };
 
 const resolveWinner = (
@@ -59,24 +46,27 @@ const resolveWinner = (
   if (verdict.winnerId === null) {
     return { label: "Tie", colorPalette: "gray" };
   }
-  const index = column.variants.findIndex((v) => v.id === verdict.winnerId);
-  if (index < 0) {
-    // The run named a winner this snapshot can't place. Show the raw
-    // identifier rather than pretending the row had no verdict.
-    return { label: verdict.winnerId, colorPalette: "gray" };
-  }
+  const variant = column.variants.find((v) => v.id === verdict.winnerId);
+  // A winner this snapshot can't place (variant removed since the run). Show
+  // the raw identifier rather than pretending the row had no verdict.
   return {
-    label: column.variants[index]!.name,
-    colorPalette: VARIANT_PALETTES[index % VARIANT_PALETTES.length]!,
+    label: variant?.name ?? verdict.winnerId,
+    colorPalette: variant ? "green" : "gray",
   };
 };
 
 export function ComparisonWinnerCell({
   column,
   verdict,
+  targetColors,
 }: {
   column: BatchComparisonColumn;
   verdict: BatchComparisonVerdict | undefined;
+  /**
+   * Per-target colours shared with the target column dots and the win-rate
+   * chart bars, so a variant is one colour everywhere on the page.
+   */
+  targetColors?: Record<string, string>;
 }) {
   const cellRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -117,6 +107,9 @@ export function ComparisonWinnerCell({
   const winner = resolveWinner(column, verdict);
   const reasoning = verdict.reasoning?.trim();
   const winnerOutput = verdict.winnerOutput?.trim();
+  const winnerColor = verdict.winnerId
+    ? targetColors?.[verdict.winnerId]
+    : undefined;
 
   const badge = (
     <Badge
@@ -125,6 +118,17 @@ export function ComparisonWinnerCell({
       variant="subtle"
       data-testid={`comparison-winner-badge-${verdict.winnerId ?? "tie"}`}
     >
+      {/* Same colour square the target column header uses, so the reader can
+          trace the winner back to its column and its win-rate bar. */}
+      {winnerColor && (
+        <Box
+          width="8px"
+          height="8px"
+          borderRadius="sm"
+          bg={winnerColor}
+          flexShrink={0}
+        />
+      )}
       {isTie ? "Tie" : `Winner: ${winner.label}`}
     </Badge>
   );
@@ -143,7 +147,9 @@ export function ComparisonWinnerCell({
       {winnerOutput && (
         <Box
           borderLeftWidth="3px"
-          borderLeftColor={isTie ? "gray.subtle" : `${winner.colorPalette}.subtle`}
+          borderLeftColor={
+            winnerColor ?? (isTie ? "gray.subtle" : "green.subtle")
+          }
           paddingLeft={2}
           paddingY={1}
           maxWidth="100%"

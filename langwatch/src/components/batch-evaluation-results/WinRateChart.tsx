@@ -34,8 +34,9 @@ import {
 import type { BatchComparisonColumn } from "./types";
 
 /**
- * Cycled per variant, in order. Deliberately excludes red: a losing variant
- * isn't a failure, so no bar should read as one. Ties get their own gray.
+ * Fallback only, for a variant whose target this run has no colour for.
+ * Deliberately excludes red: a losing variant isn't a failure, so no bar
+ * should read as one. Ties get their own gray.
  */
 const VARIANT_COLORS = [
   "#22C55E",
@@ -53,6 +54,12 @@ export type WinRateChartProps = {
   column: BatchComparisonColumn;
   /** Matched to the sibling cost/latency charts in ComparisonCharts. */
   chartHeight: number;
+  /**
+   * Per-target colours used by the sibling Cost / Latency charts and the
+   * table's target dots. Reused here so one variant is one colour everywhere
+   * on the page — otherwise a prompt reads blue in the table and green here.
+   */
+  targetColors?: Record<string, string>;
 };
 
 // Truncate the variant name so the axis label doesn't wrap or overflow the
@@ -60,7 +67,11 @@ export type WinRateChartProps = {
 // charts trim at ~10 chars, so we match that.
 const trimAxisLabel = (s: string) => (s.length > 10 ? `${s.slice(0, 9)}…` : s);
 
-export function WinRateChart({ column, chartHeight }: WinRateChartProps) {
+export function WinRateChart({
+  column,
+  chartHeight,
+  targetColors,
+}: WinRateChartProps) {
   const verdicts = Object.values(column.verdictsByRow);
 
   const winsByVariantId = new Map<string, number>();
@@ -81,7 +92,9 @@ export function WinRateChart({ column, chartHeight }: WinRateChartProps) {
       key: variant.id ?? `variant-${index}`,
       name: trimAxisLabel(variant.name),
       wins: variant.id ? (winsByVariantId.get(variant.id) ?? 0) : 0,
-      color: VARIANT_COLORS[index % VARIANT_COLORS.length]!,
+      color:
+        (variant.id ? targetColors?.[variant.id] : undefined) ??
+        VARIANT_COLORS[index % VARIANT_COLORS.length]!,
     })),
     { key: "tie", name: "Tie", wins: ties, color: TIE_COLOR },
   ];
