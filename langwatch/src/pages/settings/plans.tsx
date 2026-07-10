@@ -30,7 +30,6 @@ function PlansPage() {
     <SettingsLayout>
       <PlansComparisonPage
         activePlan={activePlan.data}
-        pricingModel={organization?.pricingModel}
       />
     </SettingsLayout>
   );

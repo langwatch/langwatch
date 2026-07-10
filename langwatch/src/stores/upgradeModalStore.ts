@@ -7,6 +7,8 @@ type LimitVariant = {
   limitType: LimitType;
   current: number;
   max: number;
+  /** How the denial can be resolved (ADR-039): drives the CTA. */
+  resolution?: "purchase_seat" | "upgrade" | "hard_cap";
 };
 
 /** Modal opened to confirm a seat quantity update with proration preview. */
@@ -46,7 +48,12 @@ interface UpgradeModalState {
   max: number | null;
 
   /** Open the modal in limit enforcement mode. Backward-compatible signature. */
-  open: (limitType: LimitType, current: number, max: number) => void;
+  open: (
+    limitType: LimitType,
+    current: number,
+    max: number,
+    resolution?: "purchase_seat" | "upgrade" | "hard_cap",
+  ) => void;
 
   /** Open the modal in seats confirmation mode. */
   openSeats: (params: OpenSeatsParams) => void;
@@ -65,10 +72,10 @@ export const useUpgradeModalStore = create<UpgradeModalState>((set) => ({
   current: null,
   max: null,
 
-  open: (limitType, current, max) =>
+  open: (limitType, current, max, resolution) =>
     set({
       isOpen: true,
-      variant: { mode: "limit", limitType, current, max },
+      variant: { mode: "limit", limitType, current, max, resolution },
       // Populate legacy fields so existing callers (GlobalUpgradeModal, etc.) keep working.
       limitType,
       current,

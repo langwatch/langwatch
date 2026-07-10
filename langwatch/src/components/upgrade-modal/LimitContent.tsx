@@ -8,6 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { Crown } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
+import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 import { type FeatureKey, featureIcons } from "~/utils/featureIcons";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePlanManagementUrl } from "../../hooks/usePlanManagementUrl";
@@ -177,12 +178,21 @@ export function LimitContent({
     { enabled: !!organization?.id && !!featureKey },
   );
 
+  // ADR-039 Decision 10: hard_cap denials route to sales, everything else
+  // to plan management. purchase_seat denials open the seats modal upstream
+  // and normally never reach this component.
+  const isHardCap = variant.resolution === "hard_cap";
+
   const handleUpgrade = () => {
     trackEvent("subscription_hook_click", {
       project_id: project?.id,
       hook: `${variant.limitType}_limit_reached`,
     });
-    void router.push(planManagementUrl);
+    if (isHardCap) {
+      window.open(CONTACT_SALES_URL, "_blank", "noopener");
+    } else {
+      void router.push(planManagementUrl);
+    }
     onClose();
   };
 
@@ -220,7 +230,7 @@ export function LimitContent({
           Cancel
         </Button>
         <Button colorPalette="blue" onClick={handleUpgrade}>
-          {buttonLabel}
+          {isHardCap ? "Contact us" : buttonLabel}
         </Button>
       </Dialog.Footer>
     </>

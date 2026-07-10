@@ -144,9 +144,11 @@ export function SubscriptionPage() {
   const plan = activePlan.data;
   const isDeveloperPlan = plan?.free ?? true;
   const isLicenseOverride = plan?.planSource === "license";
-  const isTieredPricingModel = organization?.pricingModel === PricingModel.TIERED;
   const isEnterprisePlan = plan?.type === "ENTERPRISE" && !isLicenseOverride;
-  const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
+  // ADR-039: legacy-tiered is derived from the resolved plan, not the
+  // drift-prone pricingModel column.
+  const isTieredLegacyPaidPlan =
+    (plan?.billing?.isLegacyTiered ?? false) && !isEnterprisePlan;
 
   useEffect(() => {
     if (isTieredLegacyPaidPlan && plan && isAnnualTieredPlan(plan.type)) {
@@ -305,13 +307,13 @@ export function SubscriptionPage() {
 
   const currentPlanName = isLicenseOverride
     ? `License: ${plan.name ?? "Growth"}`
-    : isTieredPricingModel
+    : isTieredLegacyPaidPlan
       ? (plan.name ?? formatPlanTypeLabel(plan.type))
       : isDeveloperPlan
         ? "Free plan"
         : "Growth plan";
   const currentPlanPricing =
-    isTieredPricingModel || isDeveloperPlan || isLicenseOverride
+    isTieredLegacyPaidPlan || isDeveloperPlan || isLicenseOverride
       ? undefined
       : {
           totalPrice: `${formatPrice({ cents: seatPricePerPeriodCents * (plan?.maxMembers ?? 1), currency: effectiveCurrency })}${periodSuffix}`,
@@ -454,7 +456,7 @@ export function SubscriptionPage() {
           pricing={currentPlanPricing}
           features={currentPlanFeatures}
           userCount={seatUsageN}
-          maxSeats={isTieredPricingModel ? undefined : seatUsageM}
+          maxSeats={isTieredLegacyPaidPlan ? undefined : seatUsageM}
           upgradeRequired={updateRequired}
           onUserCountClick={() => setIsDrawerOpen(true)}
           onManageSubscription={
@@ -523,7 +525,7 @@ export function SubscriptionPage() {
         currency={effectiveCurrency}
         isLoading={organizationWithMembers.isLoading}
         onSave={handleDrawerSave}
-        maxSeats={isTieredPricingModel ? undefined : effectiveMaxSeats}
+        maxSeats={isTieredLegacyPaidPlan ? undefined : effectiveMaxSeats}
       />
     </SettingsLayout>
   );

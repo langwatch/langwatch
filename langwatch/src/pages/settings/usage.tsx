@@ -24,7 +24,7 @@ import {
   mapUsageToLimits,
 } from "../../components/license/ResourceLimitsDisplay";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
-import { PricingModel } from "@prisma/client";
+
 import { PlanTypes } from "../../../ee/billing/planTypes";
 
 function ResourceLimitsCard({
@@ -106,10 +106,13 @@ function Usage() {
       ? RESOURCE_LABELS.tracesPerMonth
       : usage.data?.usageUnit === "events"
         ? RESOURCE_LABELS.eventsPerMonth
-        : organization?.pricingModel === PricingModel.TIERED
+        : (activePlan.data ?? usage.data?.activePlan)?.billing?.meterUnit ===
+            "traces"
           ? RESOURCE_LABELS.tracesPerMonth
           : RESOURCE_LABELS.eventsPerMonth;
-  const showLiteMembers = organization?.pricingModel === PricingModel.SEAT_EVENT || isSaaS === false;
+  const showLiteMembers =
+    (activePlan.data ?? usage.data?.activePlan)?.billing?.meterUnit ===
+      "events" || isSaaS === false;
 
   const isSelfHosted = isSaaS === false;
   const isLoadingLimits =
@@ -133,7 +136,7 @@ function Usage() {
   const showLimits = shouldShowPlanLimits({
     isFree: saasPlan?.free ?? true,
     isEnterprise: saasPlan?.type === PlanTypes.ENTERPRISE,
-    pricingModel: organization?.pricingModel,
+    billing: saasPlan?.billing,
     planSource: saasPlan?.planSource,
   });
   const saasActionLabel = getPlanActionLabel({

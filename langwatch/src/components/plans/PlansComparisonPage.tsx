@@ -76,8 +76,8 @@ type PlansComparisonPageProps = {
   activePlan?: {
     type?: string | null;
     free?: boolean | null;
+    billing?: { isLegacyTiered: boolean };
   };
-  pricingModel?: string | null;
 };
 
 function getPlanPrice(
@@ -215,10 +215,10 @@ function PlanCard({
 
 export function PlansComparisonPage({
   activePlan,
-  pricingModel,
 }: PlansComparisonPageProps) {
   const currentPlan = resolveCurrentComparisonPlan(activePlan);
-  const showTieredNotice = pricingModel === "TIERED" && !activePlan?.free;
+  // ADR-039: derived from the resolved plan, not the pricingModel column.
+  const showTieredNotice = activePlan?.billing?.isLegacyTiered === true;
 
   const detectedCurrency = api.currency.detectCurrency.useQuery({});
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);

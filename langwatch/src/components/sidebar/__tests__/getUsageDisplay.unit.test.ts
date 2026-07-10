@@ -1,4 +1,3 @@
-import { PricingModel } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { getUsageDisplay } from "../UsageIndicator";
 
@@ -7,7 +6,7 @@ describe("getUsageDisplay()", () => {
     it("returns visible with the provided usage unit", () => {
       const result = getUsageDisplay({
         isSaaS: false,
-        pricingModel: undefined,
+        billing: undefined,
         isFree: false,
         usageUnit: "traces",
       });
@@ -18,7 +17,7 @@ describe("getUsageDisplay()", () => {
     it("returns visible with events usage unit", () => {
       const result = getUsageDisplay({
         isSaaS: false,
-        pricingModel: undefined,
+        billing: undefined,
         isFree: true,
         usageUnit: "events",
       });
@@ -33,7 +32,7 @@ describe("getUsageDisplay()", () => {
         it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
-            pricingModel: PricingModel.TIERED,
+            billing: { showUsageLimits: true },
             isFree: true,
             usageUnit: "events",
           });
@@ -46,7 +45,7 @@ describe("getUsageDisplay()", () => {
         it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
-            pricingModel: PricingModel.TIERED,
+            billing: { showUsageLimits: true },
             isFree: false,
             usageUnit: "traces",
           });
@@ -61,7 +60,7 @@ describe("getUsageDisplay()", () => {
         it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
-            pricingModel: PricingModel.SEAT_EVENT,
+            billing: { showUsageLimits: false },
             isFree: true,
             usageUnit: "events",
           });
@@ -74,7 +73,7 @@ describe("getUsageDisplay()", () => {
         it("returns not visible", () => {
           const result = getUsageDisplay({
             isSaaS: true,
-            pricingModel: PricingModel.SEAT_EVENT,
+            billing: { showUsageLimits: false },
             isFree: false,
             usageUnit: "events",
           });
@@ -89,7 +88,7 @@ describe("getUsageDisplay()", () => {
         it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
-            pricingModel: undefined,
+            billing: undefined,
             isFree: false,
             usageUnit: "traces",
           });
@@ -102,7 +101,7 @@ describe("getUsageDisplay()", () => {
         it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
-            pricingModel: null,
+            billing: undefined,
             isFree: false,
             usageUnit: "events",
           });
