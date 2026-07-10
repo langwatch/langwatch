@@ -301,7 +301,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("given the recordLog command emits its event", () => {
-      /** @scenario "the emitted events still aggregate under the turn's single trace" */
+      /** @scenario "one turn's logs fan out across ingest lanes" */
       it("keeps AggregateId = traceId regardless of the shard lane", async () => {
         // The event aggregate comes from getAggregateId (the bare traceId), not
         // the sharded group key, so folds/reactors/UI stay per-trace. Prove it by
