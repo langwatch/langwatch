@@ -38,7 +38,6 @@ interface ClickHouseLangyConversationRecord {
   SharedById: string | null;
   MessageCount: number;
   LastActivityAt: number | null;
-  LastHeartbeatAt: number | null;
   CurrentTurnId: string | null;
   LastError: string | null;
   CreatedAt: number;
@@ -61,7 +60,6 @@ interface ClickHouseLangyConversationWriteRecord {
   SharedById: string | null;
   MessageCount: number;
   LastActivityAt: Date | null;
-  LastHeartbeatAt: Date | null;
   CurrentTurnId: string | null;
   LastError: string | null;
   CreatedAt: Date;
@@ -90,8 +88,6 @@ export class LangyConversationStateRepositoryClickHouse<
       MessageCount: Number(record.MessageCount ?? 0),
       LastActivityAt:
         record.LastActivityAt === null ? null : Number(record.LastActivityAt),
-      LastHeartbeatAt:
-        record.LastHeartbeatAt === null ? null : Number(record.LastHeartbeatAt),
       CurrentTurnId: record.CurrentTurnId,
       LastError: record.LastError,
       ArchivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
@@ -122,8 +118,6 @@ export class LangyConversationStateRepositoryClickHouse<
       MessageCount: data.MessageCount,
       LastActivityAt:
         data.LastActivityAt != null ? new Date(data.LastActivityAt) : null,
-      LastHeartbeatAt:
-        data.LastHeartbeatAt != null ? new Date(data.LastHeartbeatAt) : null,
       CurrentTurnId: data.CurrentTurnId,
       LastError: data.LastError,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
@@ -164,7 +158,6 @@ export class LangyConversationStateRepositoryClickHouse<
             t.SharedById AS SharedById,
             t.MessageCount AS MessageCount,
             if(t.LastActivityAt IS NOT NULL, toUnixTimestamp64Milli(t.LastActivityAt), NULL) AS LastActivityAt,
-            if(t.LastHeartbeatAt IS NOT NULL, toUnixTimestamp64Milli(t.LastHeartbeatAt), NULL) AS LastHeartbeatAt,
             t.CurrentTurnId AS CurrentTurnId, t.LastError AS LastError,
             toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,

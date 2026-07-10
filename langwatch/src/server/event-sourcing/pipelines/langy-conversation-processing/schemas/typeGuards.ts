@@ -8,8 +8,6 @@ import type {
   LangyConversationMetadataUpdatedEvent,
   LangyConversationProcessingEvent,
   LangyMessageSentEvent,
-  LangyProgressReportedEvent,
-  LangyStatusReportedEvent,
   LangyToolCallCompletedEvent,
   LangyToolCallStartedEvent,
   LangyTurnFinalizedEvent,
@@ -55,18 +53,6 @@ export function isLangyAgentTurnFailedEvent(
   event: LangyConversationProcessingEvent,
 ): event is LangyAgentTurnFailedEvent {
   return event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_FAILED;
-}
-
-export function isLangyStatusReportedEvent(
-  event: LangyConversationProcessingEvent,
-): event is LangyStatusReportedEvent {
-  return event.type === LANGY_CONVERSATION_EVENT_TYPES.STATUS_REPORTED;
-}
-
-export function isLangyProgressReportedEvent(
-  event: LangyConversationProcessingEvent,
-): event is LangyProgressReportedEvent {
-  return event.type === LANGY_CONVERSATION_EVENT_TYPES.PROGRESS_REPORTED;
 }
 
 export function isLangyTurnFinalizedEvent(

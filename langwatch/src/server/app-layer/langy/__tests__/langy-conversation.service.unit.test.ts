@@ -33,8 +33,6 @@ function makeCommands(
   return {
     sendMessage: vi.fn(async () => {}),
     startAgentTurn: vi.fn(async () => {}),
-    reportStatus: vi.fn(async () => {}),
-    reportProgress: vi.fn(async () => {}),
     reconcileAgentTurn: vi.fn(async () => {}),
     archiveConversation: vi.fn(async () => {}),
     updateConversationMetadata: vi.fn(async () => {}),
