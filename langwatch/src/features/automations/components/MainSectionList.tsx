@@ -55,7 +55,7 @@ export function MainSectionList({
       <NameField isEdit={isEdit} />
       <AutomationTypePicker sourceLocked={sourceLocked} />
       <SubjectSection prefilledGraphId={prefilledGraphId} />
-      <CadenceSection />
+      <CadenceSection isEdit={isEdit} />
       <SeveritySection />
       <DeliveryPicker
         value={draft.action}

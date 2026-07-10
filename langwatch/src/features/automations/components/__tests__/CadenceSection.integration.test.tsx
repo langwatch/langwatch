@@ -95,11 +95,22 @@ describe("CadenceSection", () => {
   });
 
   describe("given a report draft", () => {
-    it("commits the cron schedule to the draft", async () => {
-      const user = userEvent.setup();
+    it("renders the friendly schedule picker, not a raw cron field", () => {
       seed({ source: "report" });
       render(<CadenceSection />, { wrapper: Wrapper });
 
+      expect(selectContainingOption(/Weekly/i)).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("0 9 * * 1")).not.toBeInTheDocument();
+    });
+
+    it("commits the cron schedule to the draft in advanced mode", async () => {
+      const user = userEvent.setup();
+      seed({ source: "report" });
+      render(<CadenceSection isEdit />, { wrapper: Wrapper });
+
+      await user.click(
+        screen.getByLabelText(/Edit as a cron expression/i),
+      );
       const cron = screen.getByPlaceholderText("0 9 * * 1");
       await user.clear(cron);
       await user.type(cron, "0 7 * * *");

@@ -20,6 +20,7 @@ import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { CadenceField } from "./CadenceField";
 import { FacetSection } from "./FacetSection";
+import { ReportScheduleField } from "./ReportScheduleField";
 import { TraceDebounceField } from "./TraceDebounceField";
 
 const CADENCE_HELP = {
@@ -36,7 +37,7 @@ const CADENCE_HELP = {
  * alert's threshold rule, a report's schedule. Reads and writes the draft
  * through the store.
  */
-export function CadenceSection() {
+export function CadenceSection({ isEdit = false }: { isEdit?: boolean }) {
   const draft = useDraft();
 
   return (
@@ -44,7 +45,7 @@ export function CadenceSection() {
       {draft.source === "customGraph" ? (
         <GraphCadence />
       ) : draft.source === "report" ? (
-        <ReportCadence />
+        <ReportCadence isEdit={isEdit} />
       ) : (
         <VStack align="stretch" gap={5}>
           <CadenceField />
@@ -158,46 +159,24 @@ function GraphCadence() {
   );
 }
 
-/** Report cadence: the cron schedule + timezone. */
-function ReportCadence() {
+/** Report cadence: a friendly recurring-schedule picker (raw cron behind an
+ *  opt-in Advanced switch), timezone defaulting to the viewer's locale. */
+function ReportCadence({ isEdit }: { isEdit: boolean }) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
   const report = draft.report;
-  const scheduleInvalid = report.cron.trim() === "";
 
   return (
-    <VStack align="stretch" gap={4}>
-      <Field.Root invalid={scheduleInvalid}>
-        <Field.Label>Schedule (cron)</Field.Label>
-        <Input
-          value={report.cron}
-          placeholder="0 9 * * 1"
-          onChange={(e) =>
-            dispatch({
-              type: "SET_REPORT",
-              value: { ...report, cron: e.target.value },
-            })
-          }
-        />
-        {scheduleInvalid ? (
-          <Field.ErrorText>
-            Enter a cron schedule (e.g. 0 9 * * 1 for Mondays at 9am).
-          </Field.ErrorText>
-        ) : null}
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Timezone</Field.Label>
-        <Input
-          value={report.timezone}
-          placeholder="UTC"
-          onChange={(e) =>
-            dispatch({
-              type: "SET_REPORT",
-              value: { ...report, timezone: e.target.value },
-            })
-          }
-        />
-      </Field.Root>
-    </VStack>
+    <ReportScheduleField
+      cron={report.cron}
+      timezone={report.timezone}
+      isEdit={isEdit}
+      onChange={(next) =>
+        dispatch({
+          type: "SET_REPORT",
+          value: { ...report, cron: next.cron, timezone: next.timezone },
+        })
+      }
+    />
   );
 }
