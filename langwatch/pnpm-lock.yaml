@@ -325,9 +325,6 @@ importers:
       emoji-picker-react:
         specifier: ^4.19.1
         version: 4.19.1(react@19.2.7)
-      escape-string-regexp:
-        specifier: ^5.0.0
-        version: 5.0.0
       express-prom-bundle:
         specifier: ^8.0.0
         version: 8.0.0(prom-client@15.1.3)
