@@ -3005,11 +3005,11 @@ describe("GroupStagingScripts", () => {
     /** @scenario drainTenant supports an optional groupIdContains substring filter */
     it("with groupIdContains filter, drains only matching groupIds within the tenant", async () => {
       // Stage groups across two projections for the same tenant + one group
-      // for a different tenant. Filter should hit only fold/projectDailySdkUsage.
+      // for a different tenant. Filter should hit only fold/traceSummary.
       await scripts.stage(
         makeJob({
           stagedJobId: "fold-a",
-          groupId: "project_X/fold/projectDailySdkUsage/key-1",
+          groupId: "project_X/fold/traceSummary/key-1",
           dispatchAfterMs: 100,
           jobDataJson: JSON.stringify({}),
         }),
@@ -3017,7 +3017,7 @@ describe("GroupStagingScripts", () => {
       await scripts.stage(
         makeJob({
           stagedJobId: "fold-b",
-          groupId: "project_X/fold/projectDailySdkUsage/key-2",
+          groupId: "project_X/fold/traceSummary/key-2",
           dispatchAfterMs: 100,
           jobDataJson: JSON.stringify({}),
         }),
@@ -3033,7 +3033,7 @@ describe("GroupStagingScripts", () => {
       await scripts.stage(
         makeJob({
           stagedJobId: "other-tenant",
-          groupId: "project_Y/fold/projectDailySdkUsage/key-1",
+          groupId: "project_Y/fold/traceSummary/key-1",
           dispatchAfterMs: 100,
           jobDataJson: JSON.stringify({}),
         }),
@@ -3042,7 +3042,7 @@ describe("GroupStagingScripts", () => {
       const result = await repo.drainTenant({
         queueName: QUEUE_NAME,
         tenantId: "project_X",
-        groupIdContains: "/fold/projectDailySdkUsage/",
+        groupIdContains: "/fold/traceSummary/",
       });
 
       expect(result.groupsDrained).toBe(2); // only the two fold groups for project_X
@@ -3054,7 +3054,7 @@ describe("GroupStagingScripts", () => {
       );
       expect(cmdJobs.filter((s) => !s.match(/^\d+$/))).toContain("cmd-c");
       const otherTenantJobs = await inspectGroupJobs(
-        "project_Y/fold/projectDailySdkUsage/key-1",
+        "project_Y/fold/traceSummary/key-1",
       );
       expect(otherTenantJobs.filter((s) => !s.match(/^\d+$/))).toContain(
         "other-tenant",

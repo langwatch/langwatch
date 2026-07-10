@@ -246,6 +246,118 @@ export class EventRepositoryClickHouse implements EventRepository {
     }
   }
 
+  /**
+   * Cursor-paginated `getEventRecordsUpTo`. Same (upToTimestamp, upToEventId)
+   * upper bound and (EventTimestamp ASC, EventId ASC) order, plus a strict
+   * `after` cursor and a `LIMIT`, so a re-fold of a huge aggregate streams the
+   * history a page at a time instead of materialising every EventPayload blob
+   * at once (which would exceed max_memory_usage_per_query and OOM the server).
+   */
+  async getEventRecordsUpToPaged(
+    tenantId: string,
+    aggregateType: string,
+    aggregateId: string,
+    upToTimestamp: number,
+    upToEventId: string,
+    after: { timestamp: number; eventId: string } | undefined,
+    limit: number,
+  ): Promise<EventRecord[]> {
+    try {
+      const client = await this.getClient(tenantId);
+      const afterClause = after
+        ? `AND (
+              EventTimestamp > {afterTimestamp:UInt64}
+              OR (
+                EventTimestamp = {afterTimestamp:UInt64}
+                AND EventId > {afterEventId:String}
+              )
+            )`
+        : "";
+      const result = await client.query({
+        query: `
+          SELECT
+            EventId,
+            EventTimestamp,
+            EventOccurredAt,
+            EventType,
+            EventPayload,
+            EventVersion,
+            ProcessingTraceparent,
+            IdempotencyKey
+          FROM event_log
+          WHERE TenantId = {tenantId:String}
+            AND AggregateType = {aggregateType:String}
+            AND AggregateId = {aggregateId:String}
+            AND (
+              EventTimestamp < {upToTimestamp:UInt64}
+              OR (
+                EventTimestamp = {upToTimestamp:UInt64}
+                AND EventId <= {upToEventId:String}
+              )
+            )
+            ${afterClause}
+          ORDER BY EventTimestamp ASC, EventId ASC
+          LIMIT {limit:UInt32}
+        `,
+        query_params: {
+          tenantId,
+          aggregateType,
+          aggregateId: String(aggregateId),
+          upToTimestamp,
+          upToEventId,
+          ...(after
+            ? { afterTimestamp: after.timestamp, afterEventId: after.eventId }
+            : {}),
+          limit,
+        },
+        format: "JSONEachRow",
+      });
+
+      const rows = await result.json<{
+        EventId: string;
+        EventTimestamp: number;
+        EventOccurredAt: number;
+        EventType: string;
+        EventPayload: unknown;
+        EventVersion: string;
+        ProcessingTraceparent: string;
+        IdempotencyKey: string;
+      }>();
+
+      return rows.map((row) => ({
+        TenantId: tenantId,
+        AggregateType: aggregateType,
+        AggregateId: String(aggregateId),
+        EventId: row.EventId,
+        EventTimestamp: row.EventTimestamp,
+        EventOccurredAt:
+          row.EventOccurredAt != null && row.EventOccurredAt > 0
+            ? row.EventOccurredAt
+            : null,
+        EventType: row.EventType,
+        EventVersion: row.EventVersion,
+        EventPayload: normalizePayloadValue(row.EventPayload),
+        ProcessingTraceparent: row.ProcessingTraceparent || "",
+        IdempotencyKey: row.IdempotencyKey || "",
+      }));
+    } catch (error) {
+      this.logger.error(
+        {
+          tenantId,
+          aggregateType,
+          aggregateId: String(aggregateId),
+          upToTimestamp,
+          upToEventId,
+          after,
+          limit,
+          error,
+        },
+        "Failed to get paged event records up to event from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   async countEventRecords(
     tenantId: string,
     aggregateType: string,

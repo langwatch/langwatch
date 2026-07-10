@@ -353,7 +353,7 @@ const updateProjectLambdaImage = async (
 // CallerRateLimitExceeded for every worker in the region. Each retried call
 // then burns 4-12s of fastq budget against a 429, pinning all 100 slots and
 // stalling every other group on the pod — including unrelated fold groups
-// like projectDailySdkUsage/<date>:other:. See
+// like traceSummary/<date>:other:. See
 // specs/nlp-go/studio-lambda-cache.feature.
 //
 // Two layers:

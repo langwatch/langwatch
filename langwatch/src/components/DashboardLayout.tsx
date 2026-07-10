@@ -65,7 +65,6 @@ import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { SdkRadarBanner } from "./SdkRadarBanner";
 import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -956,7 +955,6 @@ export const DashboardLayout = ({
                 )}
 
               <AnnouncementBanner />
-              <SdkRadarBanner />
 
               {adminViewingAs && (
                 <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />

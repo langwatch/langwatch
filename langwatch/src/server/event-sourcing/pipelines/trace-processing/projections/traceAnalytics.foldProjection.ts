@@ -607,8 +607,24 @@ export class TraceAnalyticsFoldProjection
    * miss folds ONLY the delivered events, so a partial batch overwrites the
    * complete row and late dimension-only events (topic classification, the
    * deferred origin resolution) land on empty state and are dropped.
+   *
+   * `refoldOnOutOfOrder: false` — spans are distributed and arrive in any
+   * order, and this fold is order-insensitive (sums / min / max + LWW-by-
+   * occurredAt), so a late event never needs the whole history replayed; the
+   * executor applies it on top in occurredAt order. WITHOUT this flag a hot
+   * trace (a Claude Code session streams 100k+ events into one aggregate) re-
+   * folds its ENTIRE history on every out-of-order batch, which pins the
+   * checkpoint at the max occurredAt and makes every later batch look out of
+   * order too — an O(n²) death spiral that never catches up (2026-07-09
+   * incident; see specs/event-sourcing/hot-trace-fold-amplification.feature).
+   * The sibling `traceSummary` fold carries the same flag; this slim mirror
+   * shipped without it (ADR-034 Phase 2). `refoldOnStoreMiss` still rebuilds
+   * the full state on a genuine cache miss.
    */
-  override options: FoldProjectionOptions = { refoldOnStoreMiss: true };
+  override options: FoldProjectionOptions = {
+    refoldOnStoreMiss: true,
+    refoldOnOutOfOrder: false,
+  };
 
   constructor(deps: { store: FoldProjectionStore<TraceAnalyticsData> }) {
     super({

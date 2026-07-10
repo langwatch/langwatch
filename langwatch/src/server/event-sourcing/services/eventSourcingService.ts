@@ -164,6 +164,36 @@ export class EventSourcingService<
             );
           };
         }
+        // Paginated companion loader for the store-miss re-fold streaming path.
+        // Returns one (timestamp, eventId)-ordered page — the executor pages
+        // through it so a huge aggregate's history never lands in memory whole.
+        // No occurredAt re-sort: the streaming path is used only for
+        // order-insensitive folds, where page order is immaterial.
+        if (
+          !fold.eventLoaderUpToPaged &&
+          eventStore &&
+          eventStore.getEventsUpToPaged
+        ) {
+          const capturedAggregateType = aggregateType;
+          const capturedEventStore = eventStore;
+          fold.eventLoaderUpToPaged = async (ctx: {
+            tenantId: string;
+            aggregateId: string;
+            upToEvent: Event;
+            after: { timestamp: number; eventId: string } | undefined;
+            limit: number;
+          }) => {
+            const events = await capturedEventStore.getEventsUpToPaged!(
+              ctx.aggregateId,
+              { tenantId: createTenantId(ctx.tenantId) },
+              capturedAggregateType,
+              ctx.upToEvent as EventType,
+              ctx.after,
+              ctx.limit,
+            );
+            return [...events];
+          };
+        }
         this.router.registerFoldProjection(fold);
       }
     }

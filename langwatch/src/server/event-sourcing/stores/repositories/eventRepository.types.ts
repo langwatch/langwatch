@@ -60,6 +60,26 @@ export interface EventRepository {
   ): Promise<EventRecord[]>;
 
   /**
+   * Cursor-paginated variant of `getEventRecordsUpTo`: returns at most `limit`
+   * records ordered by (EventTimestamp ASC, EventId ASC), starting strictly
+   * after the `after` cursor (or from the beginning when `after` is undefined).
+   * Bounds the working set so a re-fold of a huge aggregate (e.g. a 100k-span
+   * trace) streams the history page-by-page instead of materialising every
+   * EventPayload blob at once — which would blow `max_memory_usage_per_query`
+   * and OOM the ClickHouse instance. Optional: implementations without it fall
+   * back to the unbounded `getEventRecordsUpTo`.
+   */
+  getEventRecordsUpToPaged?(
+    tenantId: string,
+    aggregateType: string,
+    aggregateId: string,
+    upToTimestamp: number,
+    upToEventId: string,
+    after: { timestamp: number; eventId: string } | undefined,
+    limit: number,
+  ): Promise<EventRecord[]>;
+
+  /**
    * Counts event records that come before a given event.
    * Returns raw count without validation.
    */
