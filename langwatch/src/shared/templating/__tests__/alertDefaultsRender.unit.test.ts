@@ -105,7 +105,7 @@ describe("alert-default Slack rendering", () => {
   });
 
   describe("when rendering the default Block Kit template", () => {
-    it("emits a header + metric + value + open-dashboard + edit-automation blocks", async () => {
+    it("emits a header + metric + value + open-dashboard + edit-alert blocks", async () => {
       const slack = await renderTriggerSlack({
         templateType: "block_kit",
         template: null,
@@ -127,7 +127,7 @@ describe("alert-default Slack rendering", () => {
       expect(serialized).toContain(
         "https://app.langwatch.ai/acme/analytics/custom/graph_1",
       );
-      expect(serialized).toContain("Edit automation");
+      expect(serialized).toContain("Edit alert");
     });
   });
 });

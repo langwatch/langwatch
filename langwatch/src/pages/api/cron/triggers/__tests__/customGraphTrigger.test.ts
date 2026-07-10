@@ -238,8 +238,13 @@ describe("processCustomGraphTrigger", () => {
 
       vi.mocked(prisma.triggerSent.findFirst).mockResolvedValue(null);
 
+      // seriesName "1/errors/count" selects series INDEX 1 (the "errors"
+      // series); the evaluator queries it as a single-series input, so the
+      // analytics result bucket is keyed "0/errors/count" (query index 0) —
+      // NOT the stored "1/errors/count". The evaluator derives that lookup
+      // key via buildSeriesName, matching what the analytics service returns.
       mockGetTimeseries.mockResolvedValue({
-        currentPeriod: [{ "1/errors/count": 60 }, { "1/errors/count": 70 }],
+        currentPeriod: [{ "0/errors/count": 60 }, { "0/errors/count": 70 }],
         previousPeriod: [],
       } as any);
       vi.mocked(checkThreshold).mockReturnValue(true);
