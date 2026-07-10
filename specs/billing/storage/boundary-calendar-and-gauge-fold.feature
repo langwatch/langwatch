@@ -12,27 +12,27 @@ Feature: Storage billing boundary calendar and gauge fold
 
   # Boundary calendar
 
-  @unit @unimplemented
+  @unit
   Scenario: Retention below 35 days produces no billing boundaries
     Given a week partition with 30-day retention
     When crossing dates are computed
     Then no entry or exit dates are produced
     And the data is never billable
 
-  @unit @unimplemented
+  @unit
   Scenario: Retention of exactly 35 days nets to zero and is skipped
     Given a week partition with 35-day retention
     When crossing dates are computed
     Then entry and exit coincide
     And no events are scheduled for the partition
 
-  @unit @unimplemented
+  @unit
   Scenario: A week partition crosses the billable line over 7 consecutive days
     Given a week partition with 63-day retention
     When crossing dates are computed
     Then 7 daily entry dates are produced, one per day of the week slice
 
-  @unit @unimplemented
+  @unit
   Scenario: Exit dates mirror entry dates shifted by retention minus 35 days
     Given a week partition with 63-day retention
     When crossing dates are computed
