@@ -106,3 +106,28 @@ export const resolveVerdictLabel = ({
   if (label === "B") return variants[1] ?? label;
   return label;
 };
+
+/**
+ * Whether a stored verdict label names this variant.
+ *
+ * A variant answers to three identifiers, and which one a run recorded depends
+ * on what the orchestrator could resolve at execution time: the prompt handle
+ * (`"concise-support-v2"`) when the prompt was loaded, the prompt's KSUID when
+ * it wasn't, or the internal target id for non-prompt targets. `resolvedName`
+ * is the handle as the UI knows it — pass "" when it hasn't loaded yet.
+ *
+ * Shared by every surface that maps a verdict back onto a column, so the
+ * winner-by-identifier contract has exactly one interpretation.
+ */
+export const labelNamesVariant = ({
+  label,
+  target,
+  resolvedName,
+}: {
+  label: string;
+  target: Pick<TargetConfig, "id"> & { promptId?: string };
+  resolvedName?: string;
+}): boolean =>
+  label === target.id ||
+  label === target.promptId ||
+  (!!resolvedName && label === resolvedName);

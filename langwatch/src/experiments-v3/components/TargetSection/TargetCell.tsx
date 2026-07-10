@@ -8,7 +8,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -27,7 +26,6 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
-import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
@@ -38,7 +36,6 @@ import { isComparisonEvaluator } from "../../types";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
 import { formatLatency } from "../../utils/computeAggregates";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
-import { PairwiseVerdictRow } from "../PairwiseVerdictRow";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
 
 // Max characters to display for performance reasons
@@ -94,10 +91,9 @@ export function TargetCellContent({
   const { openDrawer } = useDrawer();
   const targetName = useTargetName(target);
   const openEvaluatorEditor = useOpenEvaluatorEditor();
-  const { evaluators, targets, activeDatasetId, removeEvaluator } =
+  const { evaluators, activeDatasetId, removeEvaluator } =
     useEvaluationsV3Store((state) => ({
       evaluators: state.evaluators,
-      targets: state.targets,
       activeDatasetId: state.activeDatasetId,
       removeEvaluator: state.removeEvaluator,
     }));
@@ -318,38 +314,6 @@ export function TargetCellContent({
     );
   };
 
-  // Render any pairwise verdict strips for this row (#5100). Rendered only
-  // when `target` is the variantA of a pairwise evaluator so we get one
-  // strip per row, not duplicated under variantB. The verdict result lives
-  // at `evaluatorResults[evaluator.id]` because the orchestrator anchors
-  // the Phase-2 cell on variantA. Normalization of the stored label
-  // (which is now the winner's candidate id, not a slot letter) happens
-  // inside PairwiseVerdictRow — it has access to `useTargetName` for both
-  // variants, which is required to match handle-shaped labels.
-  const renderPairwiseVerdicts = () => {
-    const strips: ReactNode[] = [];
-    for (const evaluator of evaluators) {
-      const pw = evaluator.pairwise;
-      if (!pw) continue;
-      if (pw.variantA !== target.id) continue;
-      const parsed = parseEvaluationResult(evaluatorResults[evaluator.id]);
-      if (parsed.status !== "processed") continue;
-      if (typeof parsed.label !== "string") continue;
-      const variantBTarget = targets.find((t) => t.id === pw.variantB);
-      if (!variantBTarget) continue;
-      strips.push(
-        <PairwiseVerdictRow
-          key={evaluator.id}
-          variantA={target}
-          variantB={variantBTarget}
-          label={parsed.label}
-          reasoning={parsed.details}
-        />,
-      );
-    }
-    return strips.length > 0 ? <>{strips}</> : null;
-  };
-
   // Render the evaluator chips section. Comparison evaluators (pairwise
   // #5100, N-way #5101) are excluded: they judge target columns against
   // each other and render their own dedicated verdict column, so showing
@@ -540,7 +504,6 @@ export function TargetCellContent({
         <VStack align="stretch" gap={2}>
           {renderActionButtons(false)}
           {renderOutput(false)}
-          {renderPairwiseVerdicts()}
           {renderEvaluatorChips(false)}
         </VStack>
       </Box>

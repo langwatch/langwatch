@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
-import { generateCells, generatePairwiseCells } from "../orchestrator";
+import { generateCells, generateComparisonCells } from "../orchestrator";
 import type { ExecutionScope } from "../types";
 
 describe("orchestrator", () => {
@@ -287,7 +287,7 @@ describe("orchestrator", () => {
         ],
         outputs: [{ identifier: "label", type: "str" }],
         mappings: {},
-        selectBest: {
+        comparison: {
           variants: ["target-1", "target-2"],
           hasGoldenAnswer: true,
           goldenField: "expected",
@@ -320,7 +320,7 @@ describe("orchestrator", () => {
           evaluatorType: "langevals/select_best_compare",
           inputs: [],
           mappings: {},
-          selectBest: {
+          comparison: {
             variants: ["target-1", "target-2"],
             hasGoldenAnswer: true,
             goldenField: "expected",
@@ -343,7 +343,7 @@ describe("orchestrator", () => {
     });
   });
 
-  describe("generatePairwiseCells", () => {
+  describe("generateComparisonCells", () => {
     it("creates a column-target pairwise cell with both candidate outputs", () => {
       const state = createTestState(2, 0);
       state.targets.push({
@@ -376,7 +376,7 @@ describe("orchestrator", () => {
         ],
       ]);
 
-      const { cells } = generatePairwiseCells(
+      const { cells } = generateComparisonCells(
         state,
         createTestDataset(1),
         completedTargetOutputs,
@@ -385,13 +385,13 @@ describe("orchestrator", () => {
       expect(cells).toHaveLength(1);
       expect(cells[0]?.targetId).toBe("pairwise-target");
       expect(cells[0]?.skipTarget).toBe(true);
-      expect(cells[0]?.pairwise?.candidateA.output).toEqual({
+      expect(cells[0]?.comparison?.candidates[0]?.output).toEqual({
         output: "answer from A",
       });
-      expect(cells[0]?.pairwise?.candidateB.output).toEqual({
+      expect(cells[0]?.comparison?.candidates[1]?.output).toEqual({
         output: "answer from B",
       });
-      expect(cells[0]?.evaluatorConfigs[0]?.pairwise?.goldenField).toBe(
+      expect(cells[0]?.evaluatorConfigs[0]?.comparison?.goldenField).toBe(
         "expected",
       );
     });
@@ -428,7 +428,7 @@ describe("orchestrator", () => {
         ["prompt_A", { handle: "say-hi" } as never],
         ["prompt_B", { handle: "be-formal" } as never],
       ]);
-      const { cells } = generatePairwiseCells(
+      const { cells } = generateComparisonCells(
         state,
         createTestDataset(1),
         new Map([
@@ -439,8 +439,8 @@ describe("orchestrator", () => {
         loadedPrompts as never,
       );
       expect(cells).toHaveLength(1);
-      expect(cells[0]?.pairwise?.candidateA.id).toBe("say-hi");
-      expect(cells[0]?.pairwise?.candidateB.id).toBe("be-formal");
+      expect(cells[0]?.comparison?.candidates[0]?.id).toBe("say-hi");
+      expect(cells[0]?.comparison?.candidates[1]?.id).toBe("be-formal");
     });
 
     it("falls back to target id (not promptId) when handle is unavailable", () => {
@@ -468,7 +468,7 @@ describe("orchestrator", () => {
           includeMetrics: [],
         },
       });
-      const { cells } = generatePairwiseCells(
+      const { cells } = generateComparisonCells(
         state,
         createTestDataset(1),
         new Map([
@@ -480,12 +480,12 @@ describe("orchestrator", () => {
       );
       // Must be the internal target id (which the aggregator can normalize),
       // never the raw promptId KSUID which would silently drop the verdict.
-      expect(cells[0]?.pairwise?.candidateA.id).toBe(variantA.id);
-      expect(cells[0]?.pairwise?.candidateB.id).toBe(variantB.id);
-      expect(cells[0]?.pairwise?.candidateA.id).not.toBe("prompt_A");
+      expect(cells[0]?.comparison?.candidates[0]?.id).toBe(variantA.id);
+      expect(cells[0]?.comparison?.candidates[1]?.id).toBe(variantB.id);
+      expect(cells[0]?.comparison?.candidates[0]?.id).not.toBe("prompt_A");
     });
 
-    it("does not create pairwise cells until both variants have output", () => {
+    it("does not create comparison cells until every variant has output", () => {
       const state = createTestState(2, 0);
       state.targets.push({
         id: "pairwise-target",
@@ -503,7 +503,7 @@ describe("orchestrator", () => {
         },
       });
 
-      const { cells, skipReasons } = generatePairwiseCells(
+      const { cells, skipReasons } = generateComparisonCells(
         state,
         createTestDataset(1),
         new Map([["0:target-1", { output: { output: "answer from A" } }]]),
@@ -511,7 +511,7 @@ describe("orchestrator", () => {
 
       expect(cells).toHaveLength(0);
       expect(skipReasons).toHaveLength(1);
-      expect(skipReasons[0]?.missing).toBe("B");
+      expect(skipReasons[0]?.missingVariantNames).toEqual(["target-2"]);
     });
 
     // #5378: golden field is only required when the user hasn't opted out
@@ -546,7 +546,7 @@ describe("orchestrator", () => {
         ],
       ]);
 
-      const { cells, skipReasons } = generatePairwiseCells(
+      const { cells, skipReasons } = generateComparisonCells(
         state,
         createTestDataset(1),
         completedTargetOutputs,
@@ -555,7 +555,7 @@ describe("orchestrator", () => {
       expect(skipReasons).toHaveLength(0);
       expect(cells).toHaveLength(1);
       expect(cells[0]?.targetId).toBe("pairwise-target");
-      expect(cells[0]?.evaluatorConfigs[0]?.pairwise?.goldenField).toBe("");
+      expect(cells[0]?.evaluatorConfigs[0]?.comparison?.goldenField).toBe("");
     });
 
     it("still skips when hasGoldenAnswer is true and goldenField is empty", () => {
@@ -580,7 +580,7 @@ describe("orchestrator", () => {
         ["0:target-2", { output: { output: "answer from B" } }],
       ]);
 
-      const { cells } = generatePairwiseCells(
+      const { cells } = generateComparisonCells(
         state,
         createTestDataset(1),
         completedTargetOutputs,

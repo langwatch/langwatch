@@ -5,8 +5,12 @@ import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../hooks/useTargetName";
 import type { TargetConfig } from "../types";
+import {
+  labelNamesVariant,
+  resolveVerdictLabel,
+} from "../utils/normalizeComparison";
 
-type SelectBestCompareCellProps = {
+type ComparisonCellProps = {
   result: unknown;
   isLoading?: boolean;
   variantTargets: (TargetConfig | undefined)[];
@@ -29,7 +33,7 @@ function friendlyError(details: string | undefined): {
   raw?: string;
 } {
   const raw = details?.trim();
-  if (!raw) return { headline: "Select-best compare failed" };
+  if (!raw) return { headline: "Comparison failed" };
 
   const lower = raw.toLowerCase();
   if (
@@ -121,7 +125,10 @@ function WinnerLabel({
   onPick: (targetId: string) => void;
 }) {
   const resolved = useTargetName(target ?? (PLACEHOLDER_TARGET as TargetConfig));
-  const isWinner = !!target && !!label && matchesLabel(label, target, resolved);
+  const isWinner =
+    !!target &&
+    !!label &&
+    labelNamesVariant({ label, target, resolvedName: resolved });
   if (!isWinner) return null;
 
   return (
@@ -137,7 +144,7 @@ function WinnerLabel({
         onPick(target.id);
       }}
       onDoubleClick={(e: MouseEvent) => e.stopPropagation()}
-      data-testid="select-best-winner"
+      data-testid="comparison-winner"
     >
       {resolved || fallback}
     </Text>
@@ -151,27 +158,11 @@ const PLACEHOLDER_TARGET = {
   mappings: {},
 } as const;
 
-/**
- * Match the judge's `label` against one variant. The label may be the
- * variant's target id, its prompt KSUID, or its resolved prompt handle.
- */
-function matchesLabel(
-  label: string,
-  target: TargetConfig,
-  resolvedName: string,
-): boolean {
-  return (
-    label === target.id ||
-    label === (target as { promptId?: string }).promptId ||
-    (!!resolvedName && label === resolvedName)
-  );
-}
-
-export function SelectBestCompareCell({
+export function ComparisonCell({
   result,
   isLoading = false,
   variantTargets,
-}: SelectBestCompareCellProps) {
+}: ComparisonCellProps) {
   const parsed = parseEvaluationResult(result);
 
   const highlightedVariantTargetId = useEvaluationsV3Store(
@@ -251,7 +242,16 @@ export function SelectBestCompareCell({
     );
   }
 
-  const label = parsed.label;
+  // Verdicts stored before the pairwise/N-way merge carry a slot letter
+  // ("A" / "B") rather than the winning candidate's identifier. Resolve those
+  // against the variant order so an old run still names its winner instead of
+  // rendering "No verdict yet".
+  const label = parsed.label
+    ? resolveVerdictLabel({
+        label: parsed.label,
+        variants: variantTargets.map((t) => t?.id ?? ""),
+      })
+    : parsed.label;
   const reasoning = stripBiasPreamble(parsed.details);
 
   if (label === "tie") {

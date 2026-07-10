@@ -34,26 +34,21 @@ import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
-import { useTargetName } from "../../hooks/useTargetName";
+import { useTargetName, useTargetNames } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
+import { isComparisonEvaluator } from "../../types";
+import { toComparisonConfig } from "../../utils/normalizeComparison";
 import {
-  computePairwiseColumnTargetAggregate,
-  computePairwiseTargetAggregate,
+  computeComparisonColumnTargetAggregate,
+  computeComparisonTargetAggregate,
   computeTargetAggregates,
 } from "../../utils/computeAggregates";
 import { isRowEmpty } from "../../utils/emptyRowDetection";
 import { countCellsForTarget } from "../../utils/executionScope";
 import { targetHasMissingMappings } from "../../utils/mappingValidation";
-import { disambiguateVariantNames } from "../../utils/variantDisambiguation";
+import { disambiguateNames } from "../../utils/variantDisambiguation";
+import { ComparisonScoreboard } from "./ComparisonScoreboard";
 import { TargetSummary } from "./TargetSummary";
-
-// Stable reference fed to useTargetName when a pairwise variant target hasn't
-// loaded yet — keeps the hook order constant across renders.
-const PLACEHOLDER_PAIRWISE_VARIANT = {
-  id: "__pairwise-placeholder__",
-  type: "prompt",
-  promptId: undefined,
-} as unknown as TargetConfig;
 
 // Pulsing animation for missing mapping alert
 const pulseAnimation = keyframes`
@@ -145,43 +140,30 @@ export const TargetHeader = memo(function TargetHeader({
   // Get the display name for this target
   const targetName = useTargetName(target);
 
-  // For pairwise column-targets, resolve variant A/B display names so the
-  // mini-summary at the right can say "{winner} wins 2" instead of just "2 wins".
-  const variantATarget = useEvaluationsV3Store((state) =>
-    target.pairwise?.variantA
-      ? state.targets.find((t) => t.id === target.pairwise!.variantA)
-      : undefined,
+  // For comparison column-targets, resolve every variant's display name so the
+  // mini-summary at the right can say "{winner} wins" rather than just "wins",
+  // and so the tooltip can break the tally down per variant.
+  const targetComparison = toComparisonConfig(target);
+  const variantIds = targetComparison?.variants;
+  const allTargets = useEvaluationsV3Store((state) => state.targets);
+  const variantTargets = useMemo(
+    () => (variantIds ?? []).map((id) => allTargets.find((t) => t.id === id)),
+    [allTargets, variantIds],
   );
-  const variantBTarget = useEvaluationsV3Store((state) =>
-    target.pairwise?.variantB
-      ? state.targets.find((t) => t.id === target.pairwise!.variantB)
-      : undefined,
-  );
-  // Always call useTargetName (Rules of Hooks). Fall back to a placeholder
-  // when the variant target isn't present; we suppress the placeholder
-  // result by checking the original variant ref before rendering.
-  const variantANameRaw = useTargetName(
-    variantATarget ?? (PLACEHOLDER_PAIRWISE_VARIANT as TargetConfig),
-  );
-  const variantBNameRaw = useTargetName(
-    variantBTarget ?? (PLACEHOLDER_PAIRWISE_VARIANT as TargetConfig),
-  );
-  const variantAName = variantATarget
-    ? variantANameRaw || target.pairwise?.variantA || ""
-    : "Variant A";
-  const variantBName = variantBTarget
-    ? variantBNameRaw || target.pairwise?.variantB || ""
-    : "Variant B";
 
-  // Display-only names: when both variants resolve to the same name (e.g.
-  // the same prompt re-run with a different config), disambiguate so the
-  // scoreboard doesn't show two identical labels. The raw names above stay
-  // untouched — they're still what's matched against the stored verdict
-  // label via `variantAHandle`/`variantBHandle` below.
-  const {
-    variantAName: variantADisplayName,
-    variantBName: variantBDisplayName,
-  } = disambiguateVariantNames({ variantAName, variantBName });
+  // Raw names are what the stored verdict label is matched against (the
+  // orchestrator emits a prompt's handle); display names additionally number
+  // same-name variants so the scoreboard never shows two identical labels.
+  const variantNames = useTargetNames(variantTargets);
+  const variantDisplayNames = useMemo(
+    () =>
+      disambiguateNames(
+        variantNames.map(
+          (name, i) => name || variantIds?.[i] || `Variant ${i + 1}`,
+        ),
+      ),
+    [variantNames, variantIds],
+  );
 
   // Get results, evaluators, and dataset for computing aggregates
   const { results, evaluators, activeDataset } = useEvaluationsV3Store(
@@ -255,9 +237,9 @@ export const TargetHeader = memo(function TargetHeader({
   // the same in the workbench").
   const aggregates = useMemo(
     () =>
-      target.type === "evaluator" && target.pairwise
-        ? computePairwiseColumnTargetAggregate(
-            target,
+      target.type === "evaluator" && targetComparison
+        ? computeComparisonColumnTargetAggregate(
+            { id: target.id, comparison: targetComparison },
             results,
             effectiveRowCount,
           )
@@ -270,24 +252,10 @@ export const TargetHeader = memo(function TargetHeader({
     [target, results, evaluators, effectiveRowCount],
   );
 
-  const pairwiseAggregate = useMemo(() => {
-    if (!target.pairwise) return null;
-    return computePairwiseTargetAggregate(target, results, effectiveRowCount, {
-      // Pass the RESOLVED prompt handle (e.g. "say-hi") so the normalizer can
-      // match what the orchestrator emits as the verdict label. variantANameRaw
-      // already comes from useTargetName, which is handle-aware.
-      variantAHandle: variantATarget ? variantANameRaw : undefined,
-      variantBHandle: variantBTarget ? variantBNameRaw : undefined,
-    });
-  }, [
-    target,
-    results,
-    effectiveRowCount,
-    variantATarget,
-    variantBTarget,
-    variantANameRaw,
-    variantBNameRaw,
-  ]);
+  const comparisonAggregate = useMemo(() => {
+    if (!targetComparison) return null;
+    return computeComparisonTargetAggregate(target, results, effectiveRowCount);
+  }, [target, targetComparison, results, effectiveRowCount]);
 
   // Show aggregates only when we have results or errors or running
   const hasAggregates =
@@ -339,16 +307,9 @@ export const TargetHeader = memo(function TargetHeader({
       // cards) so the column reads as "a comparison between columns" rather
       // than a generic evaluator. The Trophy is reserved for declaring the
       // winner of a comparison — the verdict cell and the "Won" badge below.
-      if (target.pairwise) {
+      if (isComparisonEvaluator(target)) {
         return (
-          <span data-testid="icon-pairwise">
-            <Swords size={12} />
-          </span>
-        );
-      }
-      if (target.selectBest) {
-        return (
-          <span data-testid="icon-nway">
+          <span data-testid="icon-comparison">
             <Swords size={12} />
           </span>
         );
@@ -378,7 +339,7 @@ export const TargetHeader = memo(function TargetHeader({
   const getTargetColor = () => {
     // Pairwise column-targets render in purple to match the picker card and
     // signal "comparison" at a glance.
-    if (target.type === "evaluator" && target.pairwise) {
+    if (target.type === "evaluator" && isComparisonEvaluator(target)) {
       return "purple.emphasized";
     }
     if (target.type === "prompt" || target.type === "evaluator") {
@@ -546,48 +507,18 @@ export const TargetHeader = memo(function TargetHeader({
       <Spacer />
 
       {/* Summary statistics (positioned on the right before play button).
-          Pairwise columns surface BOTH the "<winner> wins N" summary AND
+          Comparison columns surface BOTH the "<winner> wins" summary AND
           the shared Rows / Avg Latency / Total Cost / Execution Time
           popover — dogfood ask "I also want the cost metric in pairwise
-          compare in v3". Non-pairwise columns keep the single popover. */}
-      {pairwiseAggregate &&
-      pairwiseAggregate.counts.a +
-        pairwiseAggregate.counts.b +
-        pairwiseAggregate.counts.tie >
-        0 ? (
+          compare in v3". Other columns keep the single popover. */}
+      {comparisonAggregate && comparisonAggregate.decidedRows > 0 ? (
         <HStack gap={2}>
-          {(() => {
-            const { a, b, tie } = pairwiseAggregate.counts;
-            const isTie = a === b;
-            const winnerName =
-              a > b ? variantADisplayName : variantBDisplayName;
-            const shortName = (s: string) =>
-              s.length > 18 ? `${s.slice(0, 17)}…` : s;
-            // Show only the qualitative outcome ("<winner> wins" / "Tied")
-            // in the header — the exact per-variant counts live in the
-            // hover tooltip so numerically-curious users get details, but
-            // the header itself stays uncluttered (dogfood: "structured-
-            // demo-a wins 3 — random number, not useful in the header").
-            const summary = isTie ? "Tied" : `${shortName(winnerName)} wins`;
-            return (
-              <Tooltip
-                content={`${variantADisplayName}: ${a} wins · ${variantBDisplayName}: ${b} wins${
-                  tie > 0 ? ` · ${tie} ${tie === 1 ? "tie" : "ties"}` : ""
-                }`}
-                positioning={{ placement: "top" }}
-                openDelay={200}
-              >
-                <Text
-                  fontSize="11px"
-                  color="fg.muted"
-                  whiteSpace="nowrap"
-                  cursor="help"
-                >
-                  {summary}
-                </Text>
-              </Tooltip>
-            );
-          })()}
+          <ComparisonScoreboard
+            aggregate={comparisonAggregate}
+            variantTargets={variantTargets}
+            variantNames={variantNames}
+            variantDisplayNames={variantDisplayNames}
+          />
           {hasAggregates && (
             <TargetSummary
               aggregates={aggregates}
