@@ -135,7 +135,7 @@ function createLogShardingTestPipeline(
 
   // Install the sharded getGroupKey when enabled, exactly like the production
   // composition root in pipeline.ts. Off (shardCount <= 1) installs none, so the
-  // command falls back to getAggregateId — the historic per-trace key.
+  // command falls back to getAggregateId - the historic per-trace key.
   const recordLogOptions: {
     getGroupKey?: (payload: RecordLogCommandData) => string;
   } = {};

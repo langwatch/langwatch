@@ -70,7 +70,7 @@ async function boundedDecompress(data: Buffer): Promise<Buffer> {
 /**
  * Decode-side twin of {@link assertPayloadWithinCap}: values staged before the
  * encode cap existed (or via the bare-JSON path when envelope writes are off)
- * must not reach JSON.parse unbounded — a synchronous parse of a runaway value
+ * must not reach JSON.parse unbounded - a synchronous parse of a runaway value
  * seizes the worker event loop, which the liveness probe converts into a
  * process-wide crash loop.
  */

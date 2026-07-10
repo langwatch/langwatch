@@ -10,7 +10,7 @@ import type { RecordLogCommandData } from "../schemas/commands";
 // The blobStore registration branch eagerly constructs `new RecordSpanCommand`,
 // whose default-dependency path does `require("~/server/db")` (an alias vitest's
 // ESM can't resolve at runtime) and builds a tokenizer. Give the command a
-// complete set of no-op deps so construction is cheap — statics stay real, which
+// complete set of no-op deps so construction is cheap - statics stay real, which
 // is all the pipeline wiring under test needs. Mirrors spanCommandSharding.test.
 vi.mock("../commands/recordSpanCommand", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -72,7 +72,7 @@ function buildTraceDeps(
 
 const TRACE_ID = "534bd8a1bf83e7c58e8aaacefb047cc2";
 
-/** Minimal recordLog payload — getGroupKey only reads `{traceId,spanId}`. */
+/** Minimal recordLog payload - getGroupKey only reads `{traceId,spanId}`. */
 function payload(traceId: string, spanId: string): RecordLogCommandData {
   return { traceId, spanId } as unknown as RecordLogCommandData;
 }
@@ -92,7 +92,7 @@ function shardedGroupKey(deps: Partial<TraceProcessingPipelineDeps>) {
   return getGroupKey!;
 }
 
-/** Shard suffix from the LAST colon — robust to colon-bearing trace ids. */
+/** Shard suffix from the LAST colon - robust to colon-bearing trace ids. */
 function shardOf(key: string): number {
   return Number(key.slice(key.lastIndexOf(":") + 1));
 }

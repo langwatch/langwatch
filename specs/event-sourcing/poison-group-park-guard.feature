@@ -8,7 +8,7 @@ Feature: GroupQueue poison-group park guard
   # Incident 2026-07-10: a single group accumulated ~2,000 recordLog jobs for
   # one trace. Processing it seized the worker event loop, the liveness probe
   # SIGTERM'd the pod before any retry/park code path could run, and the next
-  # boot re-claimed the same group — a crash loop that survived every restart
+  # boot re-claimed the same group - a crash loop that survived every restart
   # and redeploy for 20+ hours. ADR-029/030 cap payloads at ENCODE time
   # (MAX_BLOB_BYTES); nothing guards the CLAIM/DECODE side, and job-level
   # retry accounting (JOB_RETRY_CONFIG, restageAndBlock after 25 attempts)
@@ -27,7 +27,7 @@ Feature: GroupQueue poison-group park guard
   #     parked without being JSON.parsed; gunzip output is bounded so a
   #     compressed bomb cannot balloon past the cap either.
   #   - Parked groups use the existing ops surface (getBlockedSummary,
-  #     unblockGroup, drainGroup) — no new operator concepts.
+  #     unblockGroup, drainGroup) - no new operator concepts.
 
   Background:
     Given a GroupQueue with jobs routed through queue-manager facades

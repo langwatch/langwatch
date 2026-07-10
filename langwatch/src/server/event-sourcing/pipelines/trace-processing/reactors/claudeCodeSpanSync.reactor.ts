@@ -48,7 +48,7 @@ export interface ClaudeCodeSpanSyncReactorDeps {
  * across export batches (request body at call START, anchor + response at call
  * END), so a per-batch converter can never rejoin them. The receiver instead
  * SAVES those logs to stored_log_records (marked), and this reactor — fired
- * after the trace fold on each claude log — re-reads the turn's saved logs and
+ * after the trace fold on each claude log - re-reads the turn's saved logs and
  * runs the converter over the set, dispatching the resulting spans. Because
  * trace == turn (`traceId = sha256(session:prompt)`), the set is one turn's
  * worth of records.

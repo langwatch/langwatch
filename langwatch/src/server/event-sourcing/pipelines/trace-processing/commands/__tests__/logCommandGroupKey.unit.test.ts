@@ -127,7 +127,7 @@ describe("logCommandGroupKey", () => {
 
   describe("given non-OTel-compliant trace or span ids", () => {
     // Span/trace ids are normalized to strings before this helper, but nothing
-    // forces them to be 16-char hex — a customer SDK can send arbitrary strings.
+    // forces them to be 16-char hex - a customer SDK can send arbitrary strings.
     // The FNV hash consumes any string, so bucketing stays total and stable.
     const NON_OTEL_SPAN_IDS = [
       "not-hex-at-all",
@@ -194,7 +194,7 @@ describe("logCommandGroupKey", () => {
       it("keeps distinct traces in distinct groups even when a trace id contains a colon", () => {
         // "always suffix when enabled" stops a colon-bearing trace id from
         // colliding with another trace's `traceId:<shard>` group. Same spanId so
-        // the shard suffix matches — only the trace prefix differs.
+        // the shard suffix matches - only the trace prefix differs.
         const plain = logCommandGroupKey({
           traceId: "abc",
           spanId: "s",

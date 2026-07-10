@@ -51,7 +51,7 @@ describe("decodeJobEnvelope decode cap", () => {
   describe("given a gzip envelope that would inflate past the cap", () => {
     /** @scenario a compressed staged value that would decompress past the cap is parked */
     it("stops decompression at the bound and throws PayloadTooLargeError", async () => {
-      // ~57 MB of JSON compresses to well under 1 MB — the zip-bomb shape a
+      // ~57 MB of JSON compresses to well under 1 MB - the zip-bomb shape a
       // pre-cap writer (or a tampered blob) could have staged.
       const body = JSON.stringify({ value: "0".repeat(MAX_BLOB_BYTES + 1024) });
       const compressed = gzipSync(body).toString("base64");
