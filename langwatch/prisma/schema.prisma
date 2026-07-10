@@ -2978,3 +2978,40 @@ model LangyConversation {
   @@index([sharedById])
 }
 
+// ADR-042 Phase 1: the generic calendar-scheduling primitive. One row per
+// scheduled thing, `targetType`/`targetId` keep it consumer-agnostic (a
+// scheduled report writes `("reportTrigger", trigger.id)`; a future weekly
+// rollup writes its own type). The durable Postgres row is the SOURCE OF
+// TRUTH AND the only coordination layer — NO Redis. The in-process
+// SchedulerService loop (worker-only) reads `nextRunAt` to sleep until the
+// soonest due job, scans due rows, and atomically CLAIMS each via a
+// conditional `UPDATE ... WHERE id = <id> AND nextRunAt = <expected>` before
+// firing its registered handler. That conditional claim is the SOLE
+// exactly-once mechanism: exactly one of N racing workers wins each slot, so
+// every worker can run the loop and share firing load (no leader-lock). See
+// src/server/app-layer/scheduler/ and dev/docs/adr/042-scheduled-reports-automation-kind.md.
+model ScheduledJob {
+  id         String    @id @default(nanoid())
+  projectId  String // multitenancy + per-tenant fairness
+  targetType String // the consumer key, e.g. "reportTrigger"
+  targetId   String // what to fire, e.g. the Trigger.id
+  cron       String // e.g. "0 9 * * 1"
+  timezone   String // IANA, e.g. "America/New_York"
+  // Forward marker: the resolved UTC instant of the next fire. Indexed so
+  // the loop's due-scan and MIN(nextRunAt) sleep target are cheap.
+  nextRunAt  DateTime
+  // Last calendar instant fired (the "slot"). NULL until the first fire.
+  lastSlot   DateTime?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+
+  // The due-scan: `WHERE active AND nextRunAt <= now` and MIN(nextRunAt).
+  @@index([active, nextRunAt])
+  // Per-project lookup.
+  @@index([projectId])
+  // One schedule per target — makes upsertForTarget / claim a clean
+  // conditional update keyed on the target identity.
+  @@unique([targetType, targetId])
+}
+

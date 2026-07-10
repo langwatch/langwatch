@@ -46,6 +46,9 @@ import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRete
 import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
+import { PrismaScheduledJobRepository } from "./scheduler/scheduled-job.repository";
+import { schedulerRegistry } from "./scheduler/scheduler.registry";
+import { SchedulerService } from "./scheduler/scheduler.service";
 import { EventSourcing } from "../event-sourcing";
 import { dispatchOutboxEnqueues } from "../event-sourcing/outbox/dispatchOutboxEnqueues";
 import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
@@ -670,6 +673,27 @@ export function initializeDefaultApp(options?: {
   }
   outboxHeartbeatScheduler?.start();
 
+  // ADR-042 Phase 1: the generic calendar scheduler. POSTGRES-ONLY — no Redis,
+  // no cron infra. A worker-only in-process loop that sleeps until the soonest
+  // due `ScheduledJob`, atomically claims each due row (a conditional nextRunAt
+  // update — the DB-level exactly-once guarantee), and fires it into a handler
+  // registered on `schedulerRegistry`. There is no leader-lock: because the
+  // claim guarantees exactly-once, every worker runs the loop and races the
+  // claim, sharing firing load across the fleet. Constructed on the worker role
+  // (Redis is irrelevant here). Kept dormant this phase — no consumers register
+  // yet (the report handler lands in a later phase), so the loop runs and
+  // log-and-skips any orphan targetType.
+  const scheduler =
+    config.processRole === "worker"
+      ? new SchedulerService({
+          repo: new PrismaScheduledJobRepository(prisma),
+          registry: schedulerRegistry,
+          processRole: config.processRole,
+          logger: createLogger("langwatch:app-layer:scheduler"),
+        })
+      : undefined;
+  scheduler?.start();
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
@@ -813,6 +837,12 @@ export function initializeDefaultApp(options?: {
       close: async () => {
         await outboxHeartbeatScheduler.stop();
       },
+    });
+  }
+  if (scheduler) {
+    gracefulCloseables.push({
+      name: "scheduler",
+      close: () => scheduler.stop(),
     });
   }
   gracefulCloseables.push({
