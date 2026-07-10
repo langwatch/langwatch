@@ -9,7 +9,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/langwatch"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     open-pull-requests-limit: 50
     cooldown:
       default-days: 8
@@ -17,7 +17,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/typescript-sdk"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     open-pull-requests-limit: 50
     cooldown:
       default-days: 8
@@ -25,7 +25,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/mcp-server"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     open-pull-requests-limit: 50
     cooldown:
       default-days: 8
@@ -33,7 +33,7 @@ updates:
   - package-ecosystem: "uv"
     directory: "/python-sdk"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     open-pull-requests-limit: 50
     cooldown:
       default-days: 8
@@ -41,11 +41,11 @@ updates:
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     open-pull-requests-limit: 50
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     open-pull-requests-limit: 50
