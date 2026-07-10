@@ -22,11 +22,7 @@ import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { Context } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
-import {
-  hasProjectPermission,
-  type Permission,
-  Resources,
-} from "~/server/api/rbac";
+import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
@@ -77,33 +73,6 @@ const logger = createLogger("langwatch:api:langy");
 function handledErrorBody(error: DomainError) {
   return { error: error.message, code: error.kind, meta: error.meta };
 }
-
-// The Langy worker carries a service API key with WRITE on every resource
-// listed here (see LANGY_PERMISSION_SELECTIONS in services/langy/langyApiKey.ts).
-// A user reaching /langy/chat must hold an UPDATE-capable role on EACH of
-// these in the project they're chatting against — otherwise Langy becomes a
-// privilege-escalation surface where a viewer asks "Langy" to create a
-// dataset / trigger / prompt they can't create directly.
-//
-// `:update` is the minimum because the hierarchy (rbac.ts:hasPermissionWith
-// Hierarchy) treats `:manage` as a superset; this lets editors AND admins
-// through but locks out view-only custom roles.
-//
-// Follow-up tracked: PR #4913 ships this admin-only gate as the "smallest
-// validating slice"; the correct long-term fix is a caller-scoped API key
-// minted per chat session so each tool authorises against the calling user's
-// own permissions, not a service key.
-const LANGY_REQUIRED_PERMISSIONS: Permission[] = [
-  `${Resources.TRACES}:update`,
-  `${Resources.EVALUATIONS}:update`,
-  `${Resources.DATASETS}:update`,
-  `${Resources.SCENARIOS}:update`,
-  `${Resources.ANNOTATIONS}:update`,
-  `${Resources.ANALYTICS}:update`,
-  `${Resources.PROMPTS}:update`,
-  `${Resources.TRIGGERS}:update`,
-  `${Resources.WORKFLOWS}:update`,
-];
 
 // Runtime validation for the untrusted /langy/chat body. Zod-only with infer
 // (no parallel TS interface) per the repo's validation convention.

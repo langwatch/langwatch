@@ -49,12 +49,26 @@ import {
   type ProposalHandlers,
 } from "./MessageContent";
 import { RecentChatsMenu } from "./RecentChatsMenu";
-import { useGlobalLangyShortcut } from "./useGlobalLangyShortcut";
+import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
 import {
   type LangyConversationSummary,
   type LangyMessageRecord,
   useLangyConversations,
-} from "./useLangyConversations";
+} from "../data/useLangyConversations";
+import { useLangyFreshness } from "../hooks/useLangyFreshness";
+import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
+import {
+  type LangyContextChip,
+  selectVisibleChips,
+  useLangyComposerStore,
+} from "../stores/langyComposerStore";
+import { LangyError } from "./LangyError";
+import { StreamingStatusLine } from "./StreamingStatusLine";
+import {
+  explainLangyError,
+  readLangyStreamError,
+} from "../logic/langyErrorExplainer";
+import { shouldAskFeedback } from "../logic/langyFeedbackDirective";
 
 // The same feature key Langy's chat route resolves against. Used to seed the
 // composer's model picker with whatever's actually resolving today — opening
@@ -338,10 +352,13 @@ function LangyPanel({
       setModelOverride(langyModelsAllowed[0]!);
     }
   }, [langyModelsAllowed, modelOverride]);
-  const { messages, sendMessage, stop, status, setMessages } = useChat({
+  const { messages, sendMessage, stop, status, setMessages, error } = useChat({
     transport,
     onError: (error) => {
       if (isHandledByGlobalHandler(error)) return;
+      // A structured domain error renders as an inline <LangyError> card
+      // (see turnError below); don't also toast it — one calm surface only.
+      if (readLangyStreamError(error.message)) return;
       toaster.create({
         title: "Langy error",
         description: error.message,
@@ -404,6 +421,11 @@ function LangyPanel({
     onActiveCleared: resetActivePanelState,
   });
   adoptConversationRef.current = adoptConversation;
+
+  // Real-time coordinator: one SSE subscription for the whole panel. Applies
+  // the pushed operational spine in place (or invalidates) so the recents list
+  // and the open conversation's status stay fresh without heavy polling.
+  useLangyFreshness(currentConversationId);
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -503,6 +525,57 @@ function LangyPanel({
     setDiscardedProposals((prev) => new Set(prev).add(proposalId));
   };
 
+  // Page-context chips that ride inside the composer. Derived from the current
+  // page context (the experiment the workbench registered); dismissals persist
+  // until the underlying context changes.
+  const dismissedChipIds = useLangyComposerStore((s) => s.dismissedChipIds);
+  const dismissChip = useLangyComposerStore((s) => s.dismissChip);
+  const contextChips = useMemo(() => {
+    const candidates: LangyContextChip[] = [];
+    if (experimentSlug) {
+      candidates.push({
+        id: `experiment:${experimentSlug}`,
+        kind: "experiment",
+        label: experimentSlug,
+      });
+    }
+    return selectVisibleChips(candidates, dismissedChipIds);
+  }, [experimentSlug, dismissedChipIds]);
+
+  // Default (non-directive) feedback is throttled so we don't nag; a
+  // [langy:feedback] directive from Langy bypasses this in MessageContent.
+  const canAskFeedback = useMemo(() => shouldAskFeedback(), [messages.length]);
+
+  // Granular streaming state (PR3 transport seam) + domain-error rendering.
+  const turnSignals = useLangyTurnSignals(currentConversationId);
+  const turnError = useMemo(() => {
+    if (!error) return null;
+    // The stream now carries a serialized domain error; fall back to a calm
+    // generic "unknown" for a plain-string legacy error.
+    const domain = readLangyStreamError(error.message) ?? {
+      kind: "unknown",
+      meta: {},
+      httpStatus: 500,
+    };
+    return explainLangyError(domain);
+  }, [error]);
+
+  const onErrorAction = useCallback(
+    (kind: "connect-github" | "configure-model" | "retry") => {
+      if (kind !== "retry") return;
+      const lastUser = [...messages]
+        .reverse()
+        .find((m) => m.role === "user");
+      const textPart = lastUser?.parts.find(
+        (p): p is { type: "text"; text: string } => p.type === "text",
+      );
+      if (textPart?.text) void send(textPart.text);
+    },
+    // `send` is defined below in render scope; it closes over stable refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messages],
+  );
+
   const subtitle = experimentSlug
     ? `On: ${experimentSlug}`
     : isEmpty
@@ -569,7 +642,7 @@ function LangyPanel({
               paddingTop="18px"
               paddingBottom="12px"
             >
-              {messages.map((message) => (
+              {messages.map((message, index) => (
                 <MessageContent
                   key={message.id}
                   message={message}
@@ -579,6 +652,20 @@ function LangyPanel({
                   applyingProposals={applyingProposals}
                   onApply={applyProposal}
                   onDiscard={discardProposal}
+                  conversationId={currentConversationId}
+                  // The in-flight assistant turn streams tokens with the
+                  // blur-reveal; feedback only shows under a settled reply.
+                  isStreaming={
+                    isBusy &&
+                    index === messages.length - 1 &&
+                    message.role === "assistant"
+                  }
+                  showFeedback={
+                    !isBusy &&
+                    message.role === "assistant" &&
+                    index === messages.length - 1 &&
+                    canAskFeedback
+                  }
                   onConnectedGithub={() =>
                     void utils.langyGithub.getConnection.invalidate({
                       organizationId: organizationId ?? "",
@@ -586,7 +673,21 @@ function LangyPanel({
                   }
                 />
               ))}
-              {isBusy && <ThinkingIndicator messages={messages} />}
+              {isBusy ? (
+                <>
+                  {/* Granular streaming states (PR3 transport); renders null
+                      until status/progress arrive, so the shimmer indicator
+                      covers the gap. */}
+                  <StreamingStatusLine
+                    status={turnSignals.status}
+                    progress={turnSignals.progress}
+                  />
+                  <ThinkingIndicator messages={messages} />
+                </>
+              ) : null}
+              {turnError ? (
+                <LangyError presentation={turnError} onAction={onErrorAction} />
+              ) : null}
             </VStack>
           )}
         </Box>
@@ -601,6 +702,8 @@ function LangyPanel({
           isBusy={isBusy}
           disabled={!projectId}
           canSend={!!input.trim() && !isBusy && !!projectId}
+          contextChips={contextChips}
+          onRemoveChip={dismissChip}
         />
       </VStack>
     </Box>

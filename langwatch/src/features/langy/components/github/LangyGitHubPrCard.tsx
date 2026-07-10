@@ -29,26 +29,26 @@ export function LangyGitHubPrCard({
     >
       <Box
         borderWidth="1px"
-        borderColor="gray.200"
+        borderColor="border"
         borderRadius="md"
         p={3}
         maxWidth="420px"
-        bg="white"
-        _hover={{ borderColor: "gray.400", bg: "gray.50" }}
+        bg="bg.panel"
+        _hover={{ borderColor: "border.emphasized", bg: "bg.subtle" }}
         transition="all 120ms"
       >
         <HStack gap={3} align="flex-start">
-          <Box pt="2px" color="green.600">
+          <Box pt="2px" color="green.fg">
             <GitPullRequest size={18} />
           </Box>
           <VStack align="stretch" gap={0} flex={1}>
             <HStack gap={2} fontSize="sm">
-              <Text fontWeight="600">
+              <Text fontWeight="600" color="fg">
                 {owner}/{repo}
               </Text>
-              <Text color="gray.500">#{number}</Text>
+              <Text color="fg.muted">#{number}</Text>
             </HStack>
-            <Text fontSize="xs" color="gray.500">
+            <Text fontSize="xs" color="fg.muted">
               Pull request — open on GitHub
             </Text>
           </VStack>

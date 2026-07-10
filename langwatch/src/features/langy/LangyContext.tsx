@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ProposalHandlers } from "./MessageContent";
+import type { ProposalHandlers } from "./components/MessageContent";
 
 interface LangyContextValue {
   isOpen: boolean;
