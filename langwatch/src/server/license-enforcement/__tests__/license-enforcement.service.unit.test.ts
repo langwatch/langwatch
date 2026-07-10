@@ -85,6 +85,7 @@ describe("LicenseEnforcementService", () => {
         current: 2,
         max: 3,
         limitType: "workflows",
+        resolution: "upgrade",
       });
     });
 
@@ -98,6 +99,7 @@ describe("LicenseEnforcementService", () => {
         current: 3,
         max: 3,
         limitType: "workflows",
+        resolution: "upgrade",
       });
     });
 
@@ -111,6 +113,7 @@ describe("LicenseEnforcementService", () => {
         current: 5,
         max: 3,
         limitType: "workflows",
+        resolution: "upgrade",
       });
     });
 
@@ -297,6 +300,107 @@ describe("LicenseEnforcementService", () => {
           limitType: "workflows",
         })
       ).resolves.toBeUndefined();
+    });
+  });
+});
+
+describe("LicenseEnforcementService — limit resolution (ADR-039)", () => {
+  const seatPlan: PlanInfo = {
+    planSource: "subscription",
+    type: "GROWTH_SEAT_EUR_MONTHLY",
+    name: "Growth",
+    free: false,
+    billing: {
+      meterUnit: "events",
+      memberPolicy: "purchase_seat",
+      showUsageLimits: false,
+      isLegacyTiered: false,
+    },
+    maxMembers: 6,
+    maxMembersLite: 9999,
+    maxTeams: 9999,
+    maxProjects: 99,
+    maxMessagesPerMonth: 999999999,
+    maxWorkflows: 9999,
+    maxPrompts: 9999,
+    maxEvaluators: 9999,
+    maxScenarios: 9999,
+    maxAgents: 9999,
+    maxExperiments: 9999,
+    maxOnlineEvaluations: 9999,
+    maxDatasets: 9999,
+    maxDashboards: 9999,
+    maxCustomGraphs: 9999,
+    maxAutomations: 9999,
+    canPublish: true,
+    prices: { USD: 0, EUR: 0 },
+  };
+
+  function makeService({ plan, memberCount }: { plan: PlanInfo; memberCount: number }) {
+    const repository = {
+      getMemberCount: vi.fn().mockResolvedValue(memberCount),
+      getMembersLiteCount: vi.fn().mockResolvedValue(0),
+      getWorkflowCount: vi.fn().mockResolvedValue(0),
+      getPromptCount: vi.fn().mockResolvedValue(0),
+      getEvaluatorCount: vi.fn().mockResolvedValue(0),
+      getActiveScenarioCount: vi.fn().mockResolvedValue(0),
+      getAgentCount: vi.fn().mockResolvedValue(0),
+      getExperimentCount: vi.fn().mockResolvedValue(0),
+      getOnlineEvaluationCount: vi.fn().mockResolvedValue(0),
+      getDatasetCount: vi.fn().mockResolvedValue(0),
+      getDashboardCount: vi.fn().mockResolvedValue(0),
+      getCustomGraphCount: vi.fn().mockResolvedValue(0),
+      getAutomationCount: vi.fn().mockResolvedValue(0),
+      getProjectCount: vi.fn().mockResolvedValue(0),
+      getTeamCount: vi.fn().mockResolvedValue(0),
+      getCurrentMonthCost: vi.fn().mockResolvedValue(0),
+      getCurrentMonthCostForProjects: vi.fn().mockResolvedValue(0),
+    } as unknown as ILicenseEnforcementRepository;
+    return new LicenseEnforcementService(repository, {
+      getActivePlan: vi.fn().mockResolvedValue(plan),
+    });
+  }
+
+  describe("when a seat-billed org hits its member cap", () => {
+    /** @scenario Admin invite denial carries the resolution */
+    it("returns resolution purchase_seat on the members check", async () => {
+      const service = makeService({ plan: seatPlan, memberCount: 6 });
+
+      const result = await service.checkLimit("org-1", "members");
+
+      expect(result.allowed).toBe(false);
+      expect(result.resolution).toBe("purchase_seat");
+    });
+
+    it("throws LimitExceededError carrying the resolution", async () => {
+      const service = makeService({ plan: seatPlan, memberCount: 6 });
+
+      await expect(
+        service.enforceLimit("org-1", "members"),
+      ).rejects.toMatchObject({ resolution: "purchase_seat" });
+    });
+  });
+
+  describe("when a non-member limit is hit", () => {
+    it("resolves upgrade regardless of the billing profile", async () => {
+      const service = makeService({ plan: seatPlan, memberCount: 0 });
+
+      const result = await service.checkLimit("org-1", "workflows");
+
+      expect(result.resolution).toBe("upgrade");
+    });
+  });
+
+  describe("when the plan has no billing profile (raw plan literal)", () => {
+    it("defaults the members resolution to upgrade", async () => {
+      const service = makeService({
+        plan: { ...seatPlan, billing: undefined },
+        memberCount: 6,
+      });
+
+      const result = await service.checkLimit("org-1", "members");
+
+      expect(result.resolution).toBe("upgrade");
     });
   });
 });

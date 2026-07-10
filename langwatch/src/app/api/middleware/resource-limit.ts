@@ -59,6 +59,9 @@ export async function enforceResourceLimitOrRespond({
           limitType: error.limitType,
           current: error.current,
           max: error.max,
+          // Advisory metadata for API consumers (ADR-039 Decision 5): how
+          // the limit can be resolved. Not a rendered flow on this path.
+          resolution: error.resolution,
         },
         403,
       );

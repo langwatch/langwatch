@@ -232,6 +232,34 @@ describe.skipIf(isTestcontainersOnly)(
           });
         });
 
+        /** @scenario Lite-to-full role change denial carries the resolution */
+        it("carries resolution purchase_seat when the org is seat-billed", async () => {
+          mockGetActivePlan.mockResolvedValue({
+            maxMembers: 100,
+            maxMembersLite: 0,
+            overrideAddingLimitations: false,
+            billing: {
+              meterUnit: "events",
+              memberPolicy: "purchase_seat",
+              showUsageLimits: false,
+              isLegacyTiered: false,
+            },
+          });
+
+          const caller = createCaller();
+
+          await expect(
+            caller.organization.updateMemberRole({
+              userId: targetUserId,
+              organizationId,
+              role: OrganizationUserRole.EXTERNAL,
+            }),
+          ).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            cause: { resolution: "purchase_seat" },
+          });
+        });
+
         it("allows when overrideAddingLimitations is true", async () => {
           mockGetActivePlan.mockResolvedValue({
             maxMembers: 100,

@@ -411,3 +411,49 @@ describe("createCompositePlanProvider — precedence rank (ADR-039)", () => {
     });
   });
 });
+
+describe("createCompositePlanProvider — rank chained through enforcement (ADR-039)", () => {
+  /** @scenario A stale GROWTH license no longer dead-ends the seat purchase flow */
+  it("resolves purchase_seat for a member denial when the rank lets the seat subscription win", async () => {
+    const { PlanProviderService } = await import("../plan-provider");
+    const { LicenseEnforcementService } = await import(
+      "../../../license-enforcement/license-enforcement.service"
+    );
+
+    const growthLicense: PlanInfo = {
+      ...ENTERPRISE_LICENSE_PLAN,
+      type: "GROWTH",
+      name: "Growth",
+      maxMembers: 6,
+    };
+    const seatSubscription: PlanInfo = {
+      ...SAAS_PRO_PLAN,
+      type: "GROWTH_SEAT_EUR_MONTHLY",
+      name: "Growth",
+      maxMembers: 6,
+    };
+
+    const provider = PlanProviderService.create(
+      createCompositePlanProvider({
+        licensePlanProvider: {
+          getActivePlan: vi.fn().mockResolvedValue(growthLicense),
+        },
+        saasPlanProvider: {
+          getActivePlan: vi.fn().mockResolvedValue(seatSubscription),
+        },
+        isPrecedenceRankEnabled: vi.fn().mockResolvedValue(true),
+      }),
+      { isSaaS: true },
+    );
+
+    const repository = {
+      getMemberCount: vi.fn().mockResolvedValue(6),
+    } as never;
+    const enforcement = new LicenseEnforcementService(repository, provider);
+
+    const result = await enforcement.checkLimit("org-1", "members");
+
+    expect(result.allowed).toBe(false);
+    expect(result.resolution).toBe("purchase_seat");
+  });
+});

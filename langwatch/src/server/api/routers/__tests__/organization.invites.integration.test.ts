@@ -561,6 +561,92 @@ describe("Organization Invites Integration", () => {
   });
 
   // ============================================================================
+  // Member limit denials carry a typed resolution (ADR-039 Decision 5)
+  // ============================================================================
+
+  describe("member limit denials carry a typed resolution", () => {
+    const seatBilledPlan = () =>
+      makeTestPlan({
+        type: "GROWTH_SEAT_EUR_MONTHLY",
+        maxMembers: 0,
+        billing: {
+          meterUnit: "events",
+          memberPolicy: "purchase_seat",
+          showUsageLimits: false,
+          isLegacyTiered: false,
+        },
+      });
+
+    /** @scenario Admin invite denial carries the resolution */
+    it("createInvites denial includes resolution purchase_seat", async () => {
+      mockGetActivePlan.mockResolvedValue(seatBilledPlan());
+
+      await expect(
+        adminCaller.organization.createInvites({
+          organizationId,
+          invites: [
+            {
+              email: "over-cap@example.com",
+              role: "MEMBER" as never,
+              teams: [{ teamId, role: "MEMBER" as never }],
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: { resolution: "purchase_seat" },
+      });
+    });
+
+    /** @scenario Non-admin invite request denial carries the resolution */
+    it("createInviteRequest denial includes resolution purchase_seat", async () => {
+      mockGetActivePlan.mockResolvedValue(seatBilledPlan());
+
+      await expect(
+        memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            {
+              email: "over-cap-request@example.com",
+              role: "MEMBER",
+              teamIds: teamId,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: { resolution: "purchase_seat" },
+      });
+    });
+
+    /** @scenario Invite approval denial carries the resolution */
+    it("approveInvite denial includes resolution purchase_seat", async () => {
+      mockGetActivePlan.mockResolvedValue(makeTestPlan({ maxMembers: 10 }));
+
+      const results = await memberCaller.organization.createInviteRequest({
+        organizationId,
+        invites: [
+          {
+            email: "approve-over-cap@example.com",
+            role: "MEMBER",
+            teamIds: teamId,
+          },
+        ],
+      });
+      const inviteId = results[0]!.invite.id;
+
+      mockGetActivePlan.mockResolvedValue(seatBilledPlan());
+
+      await expect(
+        adminCaller.organization.approveInvite({ inviteId, organizationId }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: { resolution: "purchase_seat" },
+      });
+    });
+  });
+
+  // ============================================================================
   // deleteInvite (reject WAITING_APPROVAL)
   // ============================================================================
 

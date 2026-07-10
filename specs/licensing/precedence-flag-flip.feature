@@ -47,7 +47,7 @@ Feature: Plan precedence rank behind the release flag
     When the active plan is resolved
     Then the plan comes from the subscription
 
-  @integration @unimplemented
+  @unit
   Scenario: A stale GROWTH license no longer dead-ends the seat purchase flow
     Given the precedence flag is enabled
     And an organization with a valid GROWTH license and an ACTIVE seat-event subscription at its member cap

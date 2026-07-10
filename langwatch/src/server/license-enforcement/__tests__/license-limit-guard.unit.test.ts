@@ -201,6 +201,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         limitType: "members",
         current: 5,
         max: 5,
+        resolution: "upgrade",
       });
     });
 
@@ -288,6 +289,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         limitType: "membersLite",
         current: 10,
         max: 10,
+        resolution: "upgrade",
       });
     });
 

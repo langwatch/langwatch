@@ -19,31 +19,31 @@ Feature: Member limit denials carry a typed resolution everywhere
 
   # --- Typed resolution on every denial path (Decision 5) ---
 
-  @integration @unimplemented
+  @integration
   Scenario: Admin invite denial carries the resolution
     Given an organization at its full member cap
     When an admin creates an invite for a new full member
     Then the denial includes the plan's member resolution
 
-  @integration @unimplemented
+  @integration
   Scenario: Non-admin invite request denial carries the resolution
     Given an organization at its full member cap
     When a non-admin submits an invite request for a new full member
     Then the denial includes the plan's member resolution
 
-  @integration @unimplemented
+  @integration
   Scenario: Invite approval denial carries the resolution
     Given an organization at its full member cap with an invite awaiting approval
     When an admin approves the pending invite
     Then the denial includes the plan's member resolution
 
-  @integration @unimplemented
+  @integration
   Scenario: Lite-to-full role change denial carries the resolution
     Given an organization at its full member cap with a lite member
     When an admin changes the lite member's role to a full member role
     Then the denial includes the plan's member resolution
 
-  @integration @unimplemented
+  @integration
   Scenario: Public API limit denial carries the resolution as advisory metadata
     Given an organization at a resource limit
     When an API client hits the limit through the public API
@@ -71,14 +71,14 @@ Feature: Member limit denials carry a typed resolution everywhere
 
   # --- Alert split (Decision 9) ---
 
-  @integration @unimplemented
+  @integration
   Scenario: A purchase_seat denial produces an info breadcrumb, not an ops page
     Given an organization at its seat cap with resolution "purchase_seat"
     When the member denial is recorded
     Then an info-level notification is emitted
     And no ops alert fires
 
-  @integration @unimplemented
+  @integration
   Scenario: A hard_cap denial fires a real ops alert
     Given an organization at its member cap with resolution "hard_cap"
     When the member denial is recorded

@@ -1,9 +1,24 @@
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
-import type { LimitCheckResult, LimitType } from "./types";
+import type { LimitCheckResult, LimitResolution, LimitType } from "./types";
 import { limitTypes } from "./types";
 import { LimitExceededError } from "./errors";
+
+/**
+ * Member limits resolve to the plan's memberPolicy (ADR-039 Decision 4);
+ * every other limit type resolves "upgrade" (extension point — see the ADR's
+ * Open questions).
+ */
+function resolveLimitResolution(
+  plan: PlanInfo,
+  limitType: LimitType,
+): LimitResolution {
+  if (limitType === "members" || limitType === "membersLite") {
+    return plan.billing?.memberPolicy ?? "upgrade";
+  }
+  return "upgrade";
+}
 
 /**
  * Configuration for a single limit type.
@@ -138,6 +153,7 @@ export class LicenseEnforcementService {
     user?: MinimalUser,
   ): Promise<LimitCheckResult> {
     const plan = await this.planProvider.getActivePlan({ organizationId, user });
+    const resolution = resolveLimitResolution(plan, limitType);
 
     // If plan has override flag, skip enforcement (e.g., unlimited OSS plan)
     if (plan.overrideAddingLimitations) {
@@ -146,13 +162,14 @@ export class LicenseEnforcementService {
         current: 0,
         max: this.getMaxForType(plan, limitType),
         limitType,
+        resolution,
       };
     }
 
     const current = await this.getCountForType(organizationId, limitType);
     const max = this.getMaxForType(plan, limitType);
 
-    return { allowed: current < max, current, max, limitType };
+    return { allowed: current < max, current, max, limitType, resolution };
   }
 
   /**
@@ -171,7 +188,12 @@ export class LicenseEnforcementService {
   ): Promise<void> {
     const result = await this.checkLimit(organizationId, limitType, user);
     if (!result.allowed) {
-      throw new LimitExceededError(limitType, result.current, result.max);
+      throw new LimitExceededError(
+        limitType,
+        result.current,
+        result.max,
+        result.resolution,
+      );
     }
   }
 

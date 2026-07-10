@@ -1,4 +1,14 @@
 import { z } from "zod";
+import type { MemberPolicy } from "../../../ee/licensing/planInfo";
+
+/**
+ * How a denied action can be resolved (ADR-039 Decision 5). Mirrors the plan's
+ * memberPolicy for member limits; every other limit type resolves "upgrade".
+ * The UI routes on this: purchase_seat → seat proration modal, upgrade → plan
+ * management, hard_cap → contact us. On the public API it is advisory
+ * metadata in the 403 body.
+ */
+export type LimitResolution = MemberPolicy;
 
 /**
  * Single source of truth for limit types.
@@ -38,4 +48,6 @@ export interface LimitCheckResult {
   readonly max: number;
   /** Type of limit being checked */
   readonly limitType: LimitType;
+  /** How the caller can resolve a denial (ADR-039 Decision 5) */
+  readonly resolution: LimitResolution;
 }

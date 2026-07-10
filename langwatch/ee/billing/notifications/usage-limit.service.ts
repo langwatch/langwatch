@@ -207,8 +207,19 @@ export class UsageLimitService {
     limitType,
     current,
     max,
+    resolution,
   }: ResourceLimitNotifierInput): Promise<void> {
     if (!env.IS_SAAS) {
+      return;
+    }
+
+    // ADR-039 Decision 9: a purchase_seat denial means the customer was
+    // shown the self-serve seat flow — that is funnel data, not an ops page.
+    if (resolution === "purchase_seat") {
+      logger.info(
+        { organizationId, limitType, current, max },
+        "seat purchase offered at member cap (self-serve, no ops alert)",
+      );
       return;
     }
 
