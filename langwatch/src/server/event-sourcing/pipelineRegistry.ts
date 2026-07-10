@@ -17,6 +17,7 @@ import type { Cluster, Redis } from "ioredis";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
+import { resolveClaudeTurnLogCap } from "~/server/app-layer/traces/claude-code-log-to-span";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
   createDatasetNormalizeHandler,
@@ -110,7 +111,6 @@ import type { TraceAnalyticsData } from "./pipelines/trace-processing/projection
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
-import { resolveClaudeTurnLogCap } from "~/server/app-layer/traces/claude-code-log-to-span";
 import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
@@ -323,10 +323,13 @@ export class PipelineRegistry {
       // class behind the 2026-07-10 outage); the SYSTEM flag
       // ops_evaluation_payload_offload_disabled is the operator kill switch.
       // A flag-store error keeps the DEFAULT (offload runs): the kill switch
-      // failing to read must not silently drop the protection. The offload
-      // itself stays FAIL-OPEN: storage errors are caught here and the inputs
-      // stay inline; the unconditional repository belt-and-braces cap keeps
-      // the ClickHouse row merge-safe in that case.
+      // failing to read must not silently drop the protection. Storage errors
+      // are handled INSIDE offloadInputsIfOversized, which degrades to a
+      // bounded preview-only marker so the event stays lean even when S3 is
+      // down. The catch below is the wiring-level fail-open for unexpected
+      // errors only (service construction, serialization); there the inputs
+      // stay inline and the unconditional repository belt-and-braces cap
+      // keeps the ClickHouse row merge-safe.
       offloadInputs: async ({ projectId, evaluationId, inputs }) => {
         try {
           let disabled = false;
@@ -975,24 +978,28 @@ function getDefinitions(): ReadonlyArray<
 export function getProjectionMetadata(): ProjectionMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    const folds = Array.from(def.foldProjections.values()).map(({ definition }) => ({
-      projectionName: definition.name,
-      pipelineName,
-      aggregateType,
-      source: "pipeline" as const,
-      pauseKey: `${pipelineName}/projection/${definition.name}`,
-      kind: "fold" as const,
-    }));
-    const maps = Array.from(def.mapProjections.values()).map(({ definition }) => ({
-      projectionName: definition.name,
-      pipelineName,
-      aggregateType,
-      source: "pipeline" as const,
-      // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
-      // entry must use the `handler` segment to match the dispatcher's Lua check.
-      pauseKey: `${pipelineName}/handler/${definition.name}`,
-      kind: "map" as const,
-    }));
+    const folds = Array.from(def.foldProjections.values()).map(
+      ({ definition }) => ({
+        projectionName: definition.name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline" as const,
+        pauseKey: `${pipelineName}/projection/${definition.name}`,
+        kind: "fold" as const,
+      }),
+    );
+    const maps = Array.from(def.mapProjections.values()).map(
+      ({ definition }) => ({
+        projectionName: definition.name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline" as const,
+        // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
+        // entry must use the `handler` segment to match the dispatcher's Lua check.
+        pauseKey: `${pipelineName}/handler/${definition.name}`,
+        kind: "map" as const,
+      }),
+    );
     return [...folds, ...maps];
   });
 }

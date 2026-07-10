@@ -105,15 +105,21 @@ Feature: Evaluation payload offload
     Then the offloaded objects under that project's scope are removed
     And their bytes stop counting toward the tenant's storage usage
 
-  # Fail-open: the offload is a protective transform, never a gate on producing
-  # the evaluation result. If object storage rejects the PUT (S3 outage), the
-  # inputs stay inline and a structured warning is logged; the unconditional
-  # repository row cap is the backstop that still keeps the ClickHouse part
-  # merge-safe. Mirrors the trace spool fail-open stance (ADR-022).
-  Scenario: when the offload PUT fails, the inputs stay inline and the evaluation still completes
+  # Fail-open, bounded: the offload is a protective transform, never a gate on
+  # producing the evaluation result. If object storage rejects the PUT (S3
+  # outage, bad credentials), the evaluation still completes, but the payload
+  # degrades to a preview-only marker instead of re-inlining the raw inputs:
+  # event_log.EventPayload and the fold must stay bounded precisely under the
+  # partial-failure paths this feature exists for. Full input recovery is
+  # unavailable for runs reported during the storage outage, observable via
+  # the marker's offloadFailed flag and a structured warning; the
+  # unconditional repository row cap remains the backstop for writers that
+  # bypass the offload entirely.
+  Scenario: when the offload PUT fails, the evaluation completes with a bounded preview marker
     Given an evaluation run whose serialized inputs exceed the inline threshold
     And the object-storage PUT fails
     When the evaluation run is persisted
-    Then the evaluation still records its result with the inputs kept inline
-    And a structured warning notes the offload was skipped
-    And the stored row is still bounded by the unconditional row cap
+    Then the evaluation still records its result
+    And the event payload carries a preview-only marker naming the failed offload
+    And the event payload does not carry the full oversized inputs inline
+    And a structured warning attributes the failure to the tenant and evaluation

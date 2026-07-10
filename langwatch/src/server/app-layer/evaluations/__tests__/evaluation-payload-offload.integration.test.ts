@@ -19,17 +19,23 @@
  *  - inputs beyond the hard ceiling are bounded with a preview-only marker
  *  - offloaded bytes are recorded per tenant (getStorageUsageByProject)
  */
+
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
+import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import type { EvaluationReportedEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
 import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
+import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { LocalFilesystemDriver } from "~/server/stored-objects/local-filesystem-driver";
 import { StorageRegistry } from "~/server/stored-objects/storage-registry";
@@ -37,12 +43,7 @@ import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.
 import type { MintStorageUri } from "~/server/stored-objects/stored-objects.service";
 import { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import { mintFileUri } from "~/server/stored-objects/uri";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
-import { EvaluationRunClickHouseRepository } from "../repositories/evaluation-run.clickhouse.repository";
-import type { EvaluationRunData } from "../types";
+import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
   EVAL_INPUTS_INLINE_MAX_BYTES,
@@ -52,8 +53,8 @@ import {
   resolveInputsMarker,
   STORED_OBJECT_MARKER_KEY,
 } from "../evaluation-inputs-offload";
-import { EvaluationService } from "~/server/evaluations/evaluation.service";
-import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
+import { EvaluationRunClickHouseRepository } from "../repositories/evaluation-run.clickhouse.repository";
+import type { EvaluationRunData } from "../types";
 
 // Route the stored-objects repository (which resolves its client internally)
 // to the shared test client. Everything else uses injected clients.
@@ -387,6 +388,61 @@ describe("evaluation inputs offload (integration)", () => {
         projectId: tenantId,
       });
       expect(soAfter.objectCount).toBe(soBefore.objectCount);
+    });
+  });
+
+  describe("given the storage PUT fails for oversized inputs", () => {
+    /** @scenario "when the offload PUT fails, the evaluation completes with a bounded preview marker" */
+    it("keeps event_log bounded with a preview-only marker instead of the raw inputs", async () => {
+      const storedObjects = buildStoredObjects();
+      vi.spyOn(storedObjects, "storeFromBytes").mockRejectedValueOnce(
+        new Error("s3 down"),
+      );
+      const evaluationId = `eval-put-fail-${nanoid()}`;
+      const originalInputs = inputsOfSize(EVAL_INPUTS_INLINE_MAX_BYTES + 4096);
+
+      const { inputs: bounded, offloaded } = await offloadInputsIfOversized({
+        inputs: originalInputs,
+        projectId: tenantId,
+        evaluationId,
+        storedObjects,
+      });
+      expect(offloaded).toBe(false);
+      expect(isStoredObjectMarker(bounded)).toBe(true);
+      const marker = (bounded as Record<string, any>)[STORED_OBJECT_MARKER_KEY];
+      expect(marker.offloadFailed).toBe(true);
+      expect(marker.id).toBe("");
+
+      // The evaluation still completes: the event is built and appended
+      // through the real event repository, and EventPayload stays bounded.
+      const event = EventUtils.createEvent<EvaluationReportedEvent>({
+        aggregateType: "evaluation",
+        aggregateId: evaluationId,
+        tenantId: createTenantId(tenantId),
+        type: EVALUATION_REPORTED_EVENT_TYPE,
+        version: EVALUATION_REPORTED_EVENT_VERSION_LATEST,
+        data: {
+          evaluationId,
+          evaluatorId: "evaluator-1",
+          evaluatorType: "test/evaluator",
+          status: "processed",
+          score: 1,
+          passed: true,
+          inputs: bounded,
+        } as EvaluationReportedEvent["data"],
+        occurredAt: Date.now(),
+        idempotencyKey: `${tenantId}:${evaluationId}:reported`,
+      });
+      await eventRepo.insertEventRecords([eventToRecord(event)]);
+
+      const payloadStr = await selectEventPayload(evaluationId);
+      expect(payloadStr).toContain(STORED_OBJECT_MARKER_KEY);
+      expect(payloadStr).toContain("offloadFailed");
+      // The raw blob must NOT ride into event_log under the S3-failure path.
+      expect(payloadStr).not.toContain(originalInputs.blob);
+      expect(Buffer.byteLength(payloadStr, "utf8")).toBeLessThan(
+        EVAL_INPUTS_INLINE_MAX_BYTES,
+      );
     });
   });
 

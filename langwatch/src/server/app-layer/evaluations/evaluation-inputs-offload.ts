@@ -97,6 +97,12 @@ export interface StoredObjectInputsMarker {
      * kept (no durable object). `id` is empty and `sha256` is null then.
      */
     ceilingExceeded?: boolean;
+    /**
+     * True when the durable PUT failed (storage outage, bad credentials) and
+     * the payload was bounded to this preview-only marker instead of
+     * re-inlining the raw inputs. `id` is empty and `sha256` is null then.
+     */
+    offloadFailed?: boolean;
   };
 }
 
@@ -186,6 +192,50 @@ function buildCeilingMarker({
 }
 
 /**
+ * Preview-only marker for inputs whose durable PUT failed: the evaluation
+ * still completes, but the raw inputs must NOT re-inline into the event - an
+ * unbounded `event_log.EventPayload` under the exact partial-failure path this
+ * module exists for would recreate the fat-payload class behind the 2026-07-10
+ * outage. Full recovery is unavailable for this run; the warning makes that
+ * observable per tenant and evaluation.
+ */
+function buildOffloadFailedMarker({
+  sizeBytes,
+  preview,
+  truncatedPreview,
+  projectId,
+  evaluationId,
+  error,
+}: {
+  sizeBytes: number;
+  preview: string;
+  truncatedPreview: boolean;
+  projectId: string;
+  evaluationId: string;
+  error: unknown;
+}): Record<string, unknown> {
+  logger.warn(
+    {
+      projectId,
+      evaluationId,
+      sizeBytes,
+      error: error instanceof Error ? error.message : String(error),
+    },
+    "Evaluation inputs offload failed; degrading to a bounded preview-only marker (evaluation completes, full content unavailable for this run)",
+  );
+  return {
+    [STORED_OBJECT_MARKER_KEY]: {
+      id: "",
+      sizeBytes,
+      sha256: null,
+      preview,
+      truncatedPreview,
+      offloadFailed: true,
+    },
+  } satisfies StoredObjectInputsMarker;
+}
+
+/**
  * Writes the serialized inputs to the stored-objects service and returns the
  * marker referencing them. The serialized payload is encoded to UTF-8 exactly
  * once; that single buffer feeds both the store PUT and the SHA-256, so a
@@ -232,10 +282,13 @@ async function storeOversizedInputs({
  * Offloads inputs to object storage when their serialized size exceeds the
  * inline threshold; otherwise returns them unchanged.
  *
- * Fail-open: a storage error keeps the inputs inline (with a warning) rather
- * than blocking the evaluation - the belt-and-braces repository cap
- * (evaluation-run.clickhouse.repository.ts) still keeps the ClickHouse row
- * merge-safe if an un-offloaded fat payload reaches the write.
+ * Fail-open, bounded: a storage error never blocks the evaluation, but the
+ * payload degrades to a preview-only marker (`offloadFailed`) instead of
+ * re-inlining the raw inputs - `event_log.EventPayload` and the fold stay
+ * bounded even under an S3 outage. Full input recovery is unavailable for
+ * runs reported during the outage window; the belt-and-braces repository cap
+ * (evaluation-run.clickhouse.repository.ts) remains the last line of defence
+ * for any writer that bypasses this path entirely.
  */
 export async function offloadInputsIfOversized({
   inputs,
@@ -299,18 +352,17 @@ export async function offloadInputsIfOversized({
       offloaded: true,
     };
   } catch (error) {
-    // Fail-open: keep inputs inline. The repository belt-and-braces cap is the
-    // backstop that keeps the ClickHouse row merge-safe.
-    logger.warn(
-      {
+    return {
+      inputs: buildOffloadFailedMarker({
+        sizeBytes,
+        preview,
+        truncatedPreview,
         projectId,
         evaluationId,
-        sizeBytes,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      "Evaluation inputs offload failed; keeping inputs inline (fail-open)",
-    );
-    return { inputs, offloaded: false };
+        error,
+      }),
+      offloaded: false,
+    };
   }
 }
 
@@ -333,9 +385,10 @@ export async function resolveInputsMarker({
   if (!isStoredObjectMarker(inputs)) return inputs;
 
   const marker = inputs[STORED_OBJECT_MARKER_KEY];
-  // Hard-ceiling marker: nothing durable was stored; the preview is all there
-  // is. Return the marker untouched so the caller can surface the preview.
-  if (marker.ceilingExceeded || !marker.id) {
+  // Preview-only markers (hard ceiling, failed offload): nothing durable was
+  // stored; the preview is all there is. Return the marker untouched so the
+  // caller can surface the preview.
+  if (!marker.id) {
     return inputs;
   }
 

@@ -41,7 +41,9 @@ function makeFakeStoredObjects(): StoredObjectsService & {
       return { row: {} as never, stream: Readable.from([bytes]) };
     },
   };
-  return fake as unknown as StoredObjectsService & { stored: Map<string, Buffer> };
+  return fake as unknown as StoredObjectsService & {
+    stored: Map<string, Buffer>;
+  };
 }
 
 /** Builds an inputs object whose JSON serialization is at least `bytes` long. */
@@ -214,8 +216,8 @@ describe("offloadInputsIfOversized", () => {
   });
 
   describe("given the storage PUT fails", () => {
-    /** @scenario "when the offload PUT fails, the inputs stay inline and the evaluation still completes" */
-    it("fails open by keeping inputs inline", async () => {
+    /** @scenario "when the offload PUT fails, the evaluation completes with a bounded preview marker" */
+    it("fails open to a bounded preview-only marker, never the raw inputs", async () => {
       const storedObjects = makeFakeStoredObjects();
       vi.spyOn(storedObjects, "storeFromBytes").mockRejectedValueOnce(
         new Error("s3 down"),
@@ -229,9 +231,34 @@ describe("offloadInputsIfOversized", () => {
         storedObjects,
       });
 
+      // The evaluation is not blocked, but the oversized inputs must not
+      // travel inline into the event either: the payload degrades to a
+      // preview-only marker so event_log stays bounded under an S3 outage.
       expect(result.offloaded).toBe(false);
-      expect(result.inputs).toBe(inputs);
-      expect(isStoredObjectMarker(result.inputs)).toBe(false);
+      expect(isStoredObjectMarker(result.inputs)).toBe(true);
+      const marker = (result.inputs as Record<string, any>)[
+        STORED_OBJECT_MARKER_KEY
+      ];
+      expect(marker.offloadFailed).toBe(true);
+      expect(marker.id).toBe("");
+      expect(marker.sha256).toBeNull();
+      expect(marker.sizeBytes).toBe(
+        Buffer.byteLength(JSON.stringify(inputs), "utf8"),
+      );
+      expect(marker.truncatedPreview).toBe(true);
+      expect(Buffer.byteLength(marker.preview, "utf8")).toBeLessThanOrEqual(
+        EVAL_INPUTS_PREVIEW_BYTES,
+      );
+      expect(
+        Buffer.byteLength(JSON.stringify(result.inputs), "utf8"),
+      ).toBeLessThan(EVAL_INPUTS_INLINE_MAX_BYTES);
+      // A preview-only marker resolves to itself (nothing durable to fetch).
+      const resolved = await resolveInputsMarker({
+        inputs: result.inputs,
+        projectId: "proj-1",
+        storedObjects,
+      });
+      expect(resolved).toBe(result.inputs);
     });
   });
 
@@ -296,7 +323,7 @@ describe("resolveInputsMarker", () => {
           id: "so-gone",
           sizeBytes: 123,
           sha256: "b".repeat(64),
-          preview: "{\"blob\":\"xxx",
+          preview: '{"blob":"xxx',
           truncatedPreview: true,
         },
       };
@@ -320,7 +347,7 @@ describe("resolveInputsMarker", () => {
           id: "",
           sizeBytes: EVAL_INPUTS_HARD_CEILING_BYTES + 1,
           sha256: null,
-          preview: "{\"blob\":\"xxx",
+          preview: '{"blob":"xxx',
           truncatedPreview: true,
           ceilingExceeded: true,
         },
