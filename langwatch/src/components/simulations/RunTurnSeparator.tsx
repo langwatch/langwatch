@@ -13,6 +13,58 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { api } from "~/utils/api";
 
+function SeparatorLine() {
+  return (
+    <Box
+      className="turn-line"
+      height="1px"
+      flex={1}
+      bg="border.muted"
+      transition="background 0.12s ease"
+    />
+  );
+}
+
+function SeparatorLabel({
+  index,
+  hasTrace,
+}: {
+  index: number;
+  hasTrace: boolean;
+}) {
+  return (
+    <HStack gap={1.5} flexShrink={0}>
+      <Text
+        textStyle="2xs"
+        fontWeight="600"
+        textTransform="uppercase"
+        letterSpacing="0.06em"
+        color="fg.subtle"
+      >
+        Turn {index}
+      </Text>
+      {hasTrace && (
+        <>
+          <Text textStyle="2xs" color="fg.subtle">
+            ·
+          </Text>
+          <HStack
+            className="turn-view-trace"
+            gap={1}
+            color="fg.subtle"
+            transition="color 0.12s ease"
+          >
+            <Icon as={LuListTree} boxSize={3} />
+            <Text textStyle="2xs" fontWeight="500">
+              View trace
+            </Text>
+          </HStack>
+        </>
+      )}
+    </HStack>
+  );
+}
+
 export function RunTurnSeparator({
   index,
   traceId,
@@ -80,49 +132,9 @@ export function RunTurnSeparator({
           : undefined
       }
     >
-      <Box
-        className="turn-line"
-        height="1px"
-        flex={1}
-        bg="border.muted"
-        transition="background 0.12s ease"
-      />
-      <HStack gap={1.5} flexShrink={0}>
-        <Text
-          textStyle="2xs"
-          fontWeight="600"
-          textTransform="uppercase"
-          letterSpacing="0.06em"
-          color="fg.subtle"
-        >
-          Turn {index}
-        </Text>
-        {hasTrace && (
-          <>
-            <Text textStyle="2xs" color="fg.subtle">
-              ·
-            </Text>
-            <HStack
-              className="turn-view-trace"
-              gap={1}
-              color="fg.subtle"
-              transition="color 0.12s ease"
-            >
-              <Icon as={LuListTree} boxSize={3} />
-              <Text textStyle="2xs" fontWeight="500">
-                View trace
-              </Text>
-            </HStack>
-          </>
-        )}
-      </HStack>
-      <Box
-        className="turn-line"
-        height="1px"
-        flex={1}
-        bg="border.muted"
-        transition="background 0.12s ease"
-      />
+      <SeparatorLine />
+      <SeparatorLabel index={index} hasTrace={hasTrace} />
+      <SeparatorLine />
     </Flex>
   );
 

@@ -9,6 +9,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunActions } from "../ScenarioRunActions";
 
@@ -25,12 +26,16 @@ describe("<ScenarioRunActions/>", () => {
     const archivedScenario = { archivedAt: new Date("2025-01-15T00:00:00Z") };
 
     describe("when viewing the run results", () => {
-      it("disables the Run Again button", () => {
+      // aria-disabled (not native disabled) keeps the button focusable so
+      // the archived-explanation tooltip stays reachable.
+      it("marks the Run Again button aria-disabled and ignores clicks", async () => {
+        const onRunAgain = vi.fn();
+        const user = userEvent.setup();
         render(
           <ScenarioRunActions
             scenario={archivedScenario}
             isRunning={false}
-            onRunAgain={vi.fn()}
+            onRunAgain={onRunAgain}
             onEditScenario={vi.fn()}
           />,
           { wrapper: Wrapper },
@@ -39,7 +44,10 @@ describe("<ScenarioRunActions/>", () => {
         const runAgainButton = screen.getByRole("button", {
           name: /run again/i,
         });
-        expect(runAgainButton).toBeDisabled();
+        expect(runAgainButton).toHaveAttribute("aria-disabled", "true");
+        expect(runAgainButton).not.toBeDisabled();
+        await user.click(runAgainButton);
+        expect(onRunAgain).not.toHaveBeenCalled();
       });
 
       // The always-visible archived notice moved out of the action cluster:

@@ -1,6 +1,7 @@
 import {
   Accordion,
   Box,
+  Button,
   Heading,
   HStack,
   Skeleton,
@@ -390,23 +391,12 @@ export function ScenarioRunDetailDrawer({
                     count={conversationCount}
                     isFirst
                     actions={
-                      <HStack
-                        as="span"
-                        role="button"
-                        tabIndex={0}
-                        gap={1}
+                      <Button
+                        size="2xs"
+                        variant="ghost"
                         color="fg.muted"
-                        cursor="pointer"
                         _hover={{ color: "fg" }}
-                        transition="color 0.12s ease"
                         onClick={() => setExpandAllMessages((v) => !v)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setExpandAllMessages((v) => !v);
-                          }
-                        }}
                         aria-label={
                           expandAllMessages
                             ? "Collapse all messages"
@@ -421,7 +411,7 @@ export function ScenarioRunDetailDrawer({
                         <Text textStyle="2xs" fontWeight="500">
                           {expandAllMessages ? "Collapse all" : "Expand all"}
                         </Text>
-                      </HStack>
+                      </Button>
                     }
                   >
                     <ConversationExpandContext.Provider

@@ -1,5 +1,5 @@
 import { Box, Circle, Code, HStack, Text, VStack } from "@chakra-ui/react";
-import type React from "react";
+import type { ReactNode } from "react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioResults } from "~/server/scenarios/schemas";
 import { CriteriaDetails } from "./CriteriaDetails";
@@ -17,7 +17,7 @@ const TRAFFIC_LIGHTS_WIDTH = "44px";
  * The right slot hosts actions (e.g. copy results) at the same width as
  * the light cluster so the filename stays centered.
  */
-function ConsoleTitleBar({ actions }: { actions?: React.ReactNode }) {
+function ConsoleTitleBar({ actions }: { actions?: ReactNode }) {
   return (
     <HStack
       paddingX={4}
@@ -70,7 +70,7 @@ export function SimulationConsole({
   status?: ScenarioRunStatus;
   durationInMs?: number;
   /** Rendered in the title bar's right slot (e.g. a copy-results button). */
-  titleBarActions?: React.ReactNode;
+  titleBarActions?: ReactNode;
 }) {
   const isPending =
     status === ScenarioRunStatus.IN_PROGRESS ||

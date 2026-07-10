@@ -11,7 +11,7 @@
  * Layout: sidebar (search, +New Run Plan, All Runs, suite list) + main panel.
  */
 
-import { Box, EmptyState, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
 import { subDays } from "date-fns";
 import { Plus, TriangleAlert } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";

@@ -63,12 +63,17 @@ export function ScenarioRunActions({
           }
           positioning={{ placement: "bottom" }}
         >
+          {/* aria-disabled instead of disabled: a natively disabled button
+              can't receive hover/focus, which would make the archived
+              explanation tooltip unreachable */}
           <Button
             size="xs"
             variant="ghost"
-            onClick={onRunAgain}
+            onClick={isArchived ? undefined : onRunAgain}
             loading={isRunning}
-            disabled={isArchived}
+            aria-disabled={isArchived}
+            opacity={isArchived ? 0.5 : undefined}
+            cursor={isArchived ? "not-allowed" : undefined}
             aria-label="Run again"
           >
             <Icon as={Play} boxSize={3.5} />
