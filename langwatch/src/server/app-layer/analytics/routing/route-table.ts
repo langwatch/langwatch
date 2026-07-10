@@ -2,7 +2,7 @@
  * Analytics table routing — ADR-034 Phase 3 (app-layer module), extended in
  * Phase 6 to cover the eval pipeline.
  *
- * Picks ONE of five ClickHouse tables to serve a `getTimeseries` query:
+ * Picks ONE of six ClickHouse tables to serve a `getTimeseries` query:
  *
  *   TRACE-source paths:
  *   - `trace_analytics_rollup` — additive `SimpleAggregateFunction(sum, …)`
@@ -56,7 +56,7 @@ import {
   getMetricSource,
 } from "./field-availability";
 
-/** The five destination tables routed between. */
+/** The six destination tables routed between. */
 export type AnalyticsTable =
   | "trace_analytics_rollup"
   | "trace_analytics"
@@ -564,13 +564,14 @@ function rollupHandlesSeries(
   source: AnalyticsMetricSource,
   groupBy?: string,
 ): boolean {
-  if (s.key !== undefined || s.subkey !== undefined) {
-    // Neither rollup carries a column that identifies an individual
-    // evaluator/user/thread within its group-by tuple, so any `key` filter
-    // would silently return cross-key aggregates (rt5014-002). Route to
-    // slim/legacy where per-key filtering is real.
-    return false;
-  }
+  // A `key` on an eval series is an evaluator ID. NEITHER fast-path table can
+  // filter by it: the rollup is keyed on `EvaluatorType` (a slug, which an ID
+  // never equals) and the slim row hoists `EvaluatorType` too — neither
+  // carries an `EvaluatorId` column (migrations 00040 / 00041). Serving a
+  // keyed series from either would silently aggregate across every evaluator
+  // in the project, so keyed series fall to `evaluation_runs`, the only table
+  // that can express the predicate. Trace-source metrics carry no key today.
+  if (s.key !== undefined || s.subkey !== undefined) return false;
   if (source === "evaluation") {
     if (!ROLLUP_EVAL_AGGREGATIONS.has(s.aggregation)) return false;
     return ROLLUP_ROLLABLE_EVAL_METRIC_KEYS.has(s.metric);
@@ -635,13 +636,10 @@ function slimHandlesSeries(
   // grows real pipeline support, route ALL pipeline series to the legacy
   // fallback, which computes the two-level aggregation correctly.
   if (s.pipeline) return false;
-  if (s.key !== undefined || s.subkey !== undefined) {
-    // Trace slim rejects `key`; eval slim would try to WHERE on `EvaluatorId`
-    // but that column does not exist on the eval slim table (migration 00040
-    // — rt5014-001). Route key-bearing queries to legacy `evaluation_runs`
-    // until the slim gains an EvaluatorId column.
-    return false;
-  }
+  // Same reasoning as the rollup branch: an eval `key` is an evaluator ID and
+  // the slim row has no `EvaluatorId` column, so keyed series go to
+  // `evaluation_runs` rather than being silently blended across evaluators.
+  if (s.key !== undefined || s.subkey !== undefined) return false;
   const keys =
     source === "trace"
       ? SLIM_ELIGIBLE_TRACE_METRIC_KEYS

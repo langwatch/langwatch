@@ -26,7 +26,7 @@
 -- trace_analytics:
 --   * `ReplacingMergeTree(UpdatedAt)` — re-folds replay-safely dedup to the
 --     latest version per (TenantId, EvaluationId) — same LWW column as
---     trace_analytics (00037). The Version column is the schema-snapshot
+--     trace_analytics (00039). The Version column is the schema-snapshot
 --     identifier (calendar date string).
 --   * `PARTITION BY toYearWeek(OccurredAt)` matches trace_analytics so
 --     partitions age and roll off in the same weekly cadence.
@@ -40,7 +40,7 @@
 --     `_retention_days` days after their `OccurredAt`.
 --
 -- Bloom indexes on `mapKeys(Attributes)` + `mapValues(Attributes)` mirror
--- trace_analytics (00037) so analytics filters on a metadata key / value get
+-- trace_analytics (00039) so analytics filters on a metadata key / value get
 -- index pruning. GRANULARITY 1 = check the bloom filter at the finest level —
 -- small payload, fast skip on misses. The Attributes map itself is bounded by
 -- `trimAttributesForAnalytics` (4 KiB hard cap on metadata.* values; 256-char
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.evaluation_analytics
     --   * Blocklisted keys dropped REGARDLESS of length.
     Attributes Map(String, String) CODEC(ZSTD(1)),
 
-    -- Bloom indexes on Attributes mirror trace_analytics (00037).
+    -- Bloom indexes on Attributes mirror trace_analytics (00039).
     INDEX idx_eval_analytics_attr_key mapKeys(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_eval_analytics_attr_value mapValues(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1,
     -- Mirror evaluation_runs' tenant+eval index so per-eval point-lookups
@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.evaluation_analytics
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 -- toYearWeek(OccurredAt) matches trace_analytics' partition expression
--- (00037). DateTime64(3) is accepted directly by toYearWeek, so no toDate(...)
+-- (00039). DateTime64(3) is accepted directly by toYearWeek, so no toDate(...)
 -- wrap is needed.
 PARTITION BY toYearWeek(OccurredAt)
 -- Time-leading sort key — the whole point of the slim table. evaluation_runs'
@@ -140,7 +140,7 @@ PARTITION BY toYearWeek(OccurredAt)
 -- part.
 ORDER BY (TenantId, OccurredAt, EvaluationId)
 -- Inline retention TTL: drop a row `_retention_days` days after its
--- OccurredAt. Mirrors the slim trace-analytics pattern (00037). OccurredAt is
+-- OccurredAt. Mirrors the slim trace-analytics pattern (00039). OccurredAt is
 -- DateTime64(3); CH rejects DateTime64 directly in TTL arithmetic, so wrap in
 -- toDateTime first.
 TTL IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE

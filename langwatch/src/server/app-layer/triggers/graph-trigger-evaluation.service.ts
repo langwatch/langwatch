@@ -52,6 +52,7 @@ import type {
   GraphTriggerSentRepository,
   OpenGraphTriggerSent,
 } from "./repositories/trigger.repository";
+import { parseSeriesIndex } from "./seriesName";
 
 /**
  * What woke the evaluator up. Carried into logs + telemetry so operators can
@@ -203,9 +204,7 @@ export async function evaluateGraphTrigger({
     });
   }
 
-  // seriesName format: "index/key/aggregation" — same parsing as cron.
-  const [indexStr] = seriesName.split("/");
-  const seriesIndex = Number.parseInt(indexStr ?? "0", 10);
+  const seriesIndex = parseSeriesIndex(seriesName);
   if (
     Number.isNaN(seriesIndex) ||
     seriesIndex < 0 ||

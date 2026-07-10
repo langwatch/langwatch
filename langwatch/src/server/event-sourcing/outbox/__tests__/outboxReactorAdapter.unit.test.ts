@@ -60,8 +60,13 @@ function makeRequest(
 
 function makeDefinition(
   decide: OutboxReactorDefinition<Event>["decide"],
+  shouldReact?: OutboxReactorDefinition<Event>["shouldReact"],
 ): OutboxReactorDefinition<Event> {
-  return { name: "alertTriggerNotifyOutbox", decide };
+  return {
+    name: "alertTriggerNotifyOutbox",
+    decide,
+    ...(shouldReact ? { shouldReact } : {}),
+  };
 }
 
 function makeContext(): ReactorContext<unknown> {
@@ -193,6 +198,66 @@ describe("adaptOutboxReactor", () => {
       await adapted.handle({} as Event, makeContext());
 
       expect(outbox.enqueueSettle).toHaveBeenCalledTimes(2);
+    });
+  });
+});
+
+/**
+ * `shouldReact` is what stops a stake-sensitive reactor from serializing and
+ * blobbing a payload the queue's dedup would discard. The adapter is the only
+ * thing standing between an `OutboxReactorDefinition` and the router, so a lost
+ * forward would silently re-enable the fan-out on every outbox reactor.
+ */
+describe("adaptOutboxReactor relevance check", () => {
+  const decideNever: OutboxReactorDefinition<Event>["decide"] = async () => [];
+
+  describe("when the definition declares a relevance check", () => {
+    /** @scenario "An outbox reactor's relevance check reaches the dispatcher" */
+    it("forwards it to the adapted reactor with and without an outbox runtime", () => {
+      const shouldReact = vi.fn().mockReturnValue(false);
+      const context = makeContext();
+      const event = {} as Event;
+
+      const withRuntime = adaptOutboxReactor(
+        makeDefinition(decideNever, shouldReact),
+        makeOutboxStub(),
+      );
+      expect(withRuntime.shouldReact?.(event, context)).toBe(false);
+
+      const withoutRuntime = adaptOutboxReactor(
+        makeDefinition(decideNever, shouldReact),
+        undefined,
+      );
+      expect(withoutRuntime.shouldReact?.(event, context)).toBe(false);
+
+      expect(shouldReact).toHaveBeenCalledTimes(2);
+      expect(shouldReact).toHaveBeenCalledWith(event, context);
+    });
+
+    it("keeps `this` bound to the definition", () => {
+      const definition: OutboxReactorDefinition<Event> = {
+        name: "alertTriggerNotifyOutbox",
+        decide: decideNever,
+        shouldReact() {
+          // Throws on an unbound call, so a lost binding fails loudly.
+          return this.name === "alertTriggerNotifyOutbox";
+        },
+      };
+
+      const adapted = adaptOutboxReactor(definition, makeOutboxStub());
+
+      expect(adapted.shouldReact?.({} as Event, makeContext())).toBe(true);
+    });
+  });
+
+  describe("when the definition declares no relevance check", () => {
+    it("leaves shouldReact undefined so the router treats every event as relevant", () => {
+      const adapted = adaptOutboxReactor(
+        makeDefinition(decideNever),
+        makeOutboxStub(),
+      );
+
+      expect(adapted.shouldReact).toBeUndefined();
     });
   });
 });

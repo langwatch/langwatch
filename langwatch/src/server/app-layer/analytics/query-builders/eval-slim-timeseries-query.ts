@@ -226,10 +226,10 @@ function buildEvalSlimFilterClauses(
 /**
  * Build a slim query for `evaluation_analytics`.
  *
- * Key-bearing series (registry `requiresKey`, e.g. per-evaluator queries)
- * are refused by the router (rt5014-001: no `EvaluatorId` column on the
- * slim table) and the builder throws loud if one slips through — see the
- * `s.key !== undefined` guard below.
+ * Serves UNKEYED eval series only. `evaluation_analytics` hoists
+ * `EvaluatorType`, not `EvaluatorId`, so a per-evaluator predicate cannot be
+ * expressed against this table; the router sends keyed series to
+ * `evaluation_runs`.
  */
 export function buildEvalSlimTimeseriesQuery(
   input: AnalyticsTimeseriesBuilderInput,
@@ -263,12 +263,14 @@ export function buildEvalSlimTimeseriesQuery(
         `Eval slim builder cannot serve metric "${s.metric}". The router should have routed this to evaluation_runs.`,
       );
     }
-    // Router refuses key-bearing series for eval slim (rt5014-001): the slim
-    // table has no EvaluatorId column, so per-evaluator filtering can't be
-    // served here. Fail loud if the router breaks.
-    if (s.key !== undefined) {
+    // `evaluation_analytics` hoists `EvaluatorType`, not `EvaluatorId`, so a
+    // per-evaluator predicate cannot be expressed against this table. The
+    // router keeps keyed series on `evaluation_runs`; this throw is the
+    // backstop for a routing regression, which would otherwise return numbers
+    // blended across every evaluator in the project.
+    if (s.key !== undefined || s.subkey !== undefined) {
       throw new Error(
-        `Eval slim builder cannot serve series with key="${s.key}" — the router should have routed this to evaluation_runs (no EvaluatorId column on evaluation_analytics; see migration 00040).`,
+        `Eval slim builder cannot filter by evaluator key "${String(s.key)}" — evaluation_analytics has no EvaluatorId column. The router should have routed this to evaluation_runs.`,
       );
     }
     const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);

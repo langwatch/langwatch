@@ -548,3 +548,80 @@ describe("evaluationTrigger reactor", () => {
     });
   });
 });
+
+/**
+ * The guards below used to live inside `handle`, so every span of a 10k-span
+ * trace was serialized, gzipped and blobbed into Redis before the queue's dedup
+ * threw the job away. They are pure and read only the payload `handle` receives,
+ * so `shouldReact` rejects them pre-enqueue instead (ADR-026). See
+ * specs/event-sourcing/hot-trace-fold-amplification.feature.
+ */
+describe("evaluationTrigger relevance check", () => {
+  const withOrigin = (overrides: Partial<TraceSummaryData> = {}) =>
+    createFoldState({
+      attributes: { "langwatch.origin": "application" },
+      ...overrides,
+    });
+
+  const shouldReact = (
+    event: TraceProcessingEvent,
+    state: TraceSummaryData,
+  ): boolean => {
+    const reactor = createEvaluationTriggerReactor(createDeps());
+    // biome-ignore lint/style/noNonNullAssertion: the reactor always declares one.
+    return reactor.shouldReact!(event, createContext(state));
+  };
+
+  describe("given a trace with a resolved origin", () => {
+    /** @scenario "The origin guard admits a genuine message event before enqueue" */
+    it("agrees to react to a recent span event", () => {
+      expect(shouldReact(createSpanEvent(), withOrigin())).toBe(true);
+    });
+
+    /** @scenario "The origin guard filters a non-message event before enqueue" */
+    it("declines a topic-assigned event", () => {
+      expect(shouldReact(createTopicAssignedEvent(), withOrigin())).toBe(false);
+    });
+
+    /** @scenario "The evaluation trigger declines a synthetic span before enqueue" */
+    it("declines a synthetic span", () => {
+      const synthetic = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
+      expect(shouldReact(synthetic, withOrigin())).toBe(false);
+    });
+
+    /** @scenario "The evaluation trigger dispatches nothing past the span processing cap" */
+    it("dispatches no evaluation once the span count reaches the processing cap", async () => {
+      // The cap guard deliberately lives in handle, not shouldReact: shouldReact
+      // runs once per event of a coalesced batch and would multiply the
+      // once-per-crossing warn by the batch size.
+      const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
+      expect(shouldReact(createSpanEvent(), atCap)).toBe(true);
+
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      await reactor.handle(createSpanEvent(), createContext(atCap));
+      expect(deps.evaluation).not.toHaveBeenCalled();
+
+      // A coalesced batch can jump the span count clean past the cap without
+      // ever landing on it, so the guard is `>=`, not `===`.
+      const pastCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS + 1 });
+      const depsPast = createDeps();
+      const reactorPast = createEvaluationTriggerReactor(depsPast);
+      await reactorPast.handle(createSpanEvent(), createContext(pastCap));
+      expect(depsPast.evaluation).not.toHaveBeenCalled();
+
+      const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
+      const depsBelow = createDeps();
+      const reactorBelow = createEvaluationTriggerReactor(depsBelow);
+      await reactorBelow.handle(createSpanEvent(), createContext(belowCap));
+      expect(depsBelow.evaluation).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a trace whose origin is unresolved", () => {
+    /** @scenario "The origin guard filters a trace with no resolved origin before enqueue" */
+    it("declines a span event", () => {
+      expect(shouldReact(createSpanEvent(), createFoldState())).toBe(false);
+    });
+  });
+});

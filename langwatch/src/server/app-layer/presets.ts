@@ -48,10 +48,8 @@ import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { EventSourcing } from "../event-sourcing";
 import { dispatchOutboxEnqueues } from "../event-sourcing/outbox/dispatchOutboxEnqueues";
-import {
-  OutboxHeartbeatScheduler,
-  outboxHeartbeatRegistry,
-} from "../event-sourcing/outbox/heartbeat";
+import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
+import { OutboxHeartbeatScheduler } from "../event-sourcing/outbox/heartbeat/heartbeat.scheduler";
 import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {

@@ -27,9 +27,22 @@ import { dateTrunc } from "./_shared";
 const ROLLUP_TABLE = "evaluation_analytics_rollup" as const;
 const ra = "ra";
 
+/**
+ * Aggregations the eval rollup can compute CORRECTLY from its
+ * `SimpleAggregateFunction(sum, …)` columns — exactly mirroring the router's
+ * `ROLLUP_EVAL_AGGREGATIONS`.
+ *
+ * `min`/`max` are DELIBERATELY absent. The rollup stores per-bucket sums, so
+ * the best it could do is `min/max(ScoreSum / ScoreCount)` — the extremum of
+ * per-bucket AVERAGES, which shifts as background merges combine parts and is
+ * never the true worst/best score. Those route to the eval slim table (one row
+ * per evaluation), where `min/max(Score)` is the real per-eval extremum.
+ * Narrowing the type here makes the exhaustive switches below reject them at
+ * compile time rather than silently returning merge-state noise.
+ */
 export type EvalRollupAggregation = Extract<
   AggregationTypes,
-  "sum" | "avg" | "min" | "max" | "cardinality"
+  "sum" | "avg" | "cardinality"
 >;
 
 export type EvalRollupGroupByKey =
@@ -80,13 +93,7 @@ function evalRollupGroupByExpression(groupBy?: string): string | null {
 function isEvalRollupAggregation(
   agg: AggregationTypes,
 ): agg is EvalRollupAggregation {
-  return (
-    agg === "sum" ||
-    agg === "avg" ||
-    agg === "min" ||
-    agg === "max" ||
-    agg === "cardinality"
-  );
+  return agg === "sum" || agg === "avg" || agg === "cardinality";
 }
 
 /**
@@ -105,10 +112,6 @@ function evalRollupAggExpression(
           return `sum(${ra}.ScoreSum)`;
         case "avg":
           return `sum(${ra}.ScoreSum) / nullIf(sum(${ra}.ScoreCount), 0)`;
-        case "min":
-          return `min(${ra}.ScoreSum / nullIf(${ra}.ScoreCount, 0))`;
-        case "max":
-          return `max(${ra}.ScoreSum / nullIf(${ra}.ScoreCount, 0))`;
         case "cardinality":
           return `sum(${ra}.ScoreCount)`;
         default: {
@@ -119,18 +122,13 @@ function evalRollupAggExpression(
         }
       }
     case "evaluations.evaluation_pass_rate":
-      // Pass rate is only meaningful as `avg` (the "fraction passed"). The
-      // other aggregations fall through to sensible additive shapes so the
-      // builder doesn't refuse what the router accepted.
+      // Pass rate is only meaningful as `avg` (the "fraction passed"); `sum`
+      // and `cardinality` fall through to their additive shapes.
       switch (agg) {
         case "sum":
           return `sum(${ra}.PassCount)`;
         case "avg":
           return `sum(${ra}.PassCount) / nullIf(sum(${ra}.PassCount) + sum(${ra}.FailCount), 0)`;
-        case "min":
-          return `min(${ra}.PassCount)`;
-        case "max":
-          return `max(${ra}.PassCount)`;
         case "cardinality":
           return `sum(${ra}.PassCount) + sum(${ra}.FailCount)`;
         default: {
@@ -146,11 +144,12 @@ function evalRollupAggExpression(
         case "cardinality":
           return `sum(${ra}.EvalCount)`;
         case "avg":
-          return `avg(${ra}.EvalCount)`;
-        case "min":
-          return `min(${ra}.EvalCount)`;
-        case "max":
-          return `max(${ra}.EvalCount)`;
+          // `avg(EvalCount)` is the mean of per-bucket counts, not a per-eval
+          // mean of anything — merge-state-dependent and meaningless. The
+          // router never sends it here.
+          throw new Error(
+            "Eval rollup builder cannot serve avg(evaluations.evaluation_runs) — averaging per-bucket counts is merge-state-dependent. The router should have routed this to evaluation_runs.",
+          );
         default: {
           const _exhaustive: never = agg;
           throw new Error(
@@ -191,11 +190,11 @@ export function buildEvalRollupTimeseriesQuery(
     selectExprs.push(`${groupByColumn} AS group_key`);
   }
 
-  // rt5014-002 fix: the router refuses key-bearing series for eval rollup
-  // (the rollup is keyed on EvaluatorType, has no EvaluatorId column, and
-  // ignoring `s.key` would silently return cross-evaluator aggregates).
-  // The builder throws loud below if a key ever reaches it, matching the
-  // slim builder's contract.
+  // NOTE: this builder emits NO evaluator predicate. The rollup is keyed on
+  // `EvaluatorType` (a slug) while an eval series' `key` carries an evaluator
+  // ID, and the two never match — so a per-evaluator filter cannot be
+  // expressed here. The router must therefore keep keyed eval series off the
+  // rollup; see `rollupHandlesSeries` in `routing/route-table.ts`.
   for (let i = 0; i < input.series.length; i++) {
     const s = input.series[i]!;
     if (!isEvalRollupMetricKey(s.metric)) {

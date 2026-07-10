@@ -1,6 +1,7 @@
 import { createLogger } from "~/utils/logger/server";
 import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
+import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
 import type { AppConfig } from "./config";
 import type {
   AppDependencies,
@@ -141,4 +142,8 @@ export async function resetApp(): Promise<void> {
   if (existing) {
     await existing.close();
   }
+  // The heartbeat registry is a module singleton, so it outlives the App it
+  // was populated from. Leaving it populated makes the next worker-role
+  // `initializeDefaultApp()` throw on re-registration.
+  outboxHeartbeatRegistry.clear();
 }
