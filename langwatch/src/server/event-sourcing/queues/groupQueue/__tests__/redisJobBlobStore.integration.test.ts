@@ -11,7 +11,7 @@ const BLOB_PREFIX = `${QUEUE_NAME}:gq:blob:`;
 // GQ1 has no refcount, so a staged-but-not-yet-dispatched job (long retry
 // backoff, paused pipeline, delayed schedule) sees no read between put and TTL
 // tick-down — the backstop must comfortably outlive that residence, so it's
-// 7 days, not 3. GQ2 (content-addressed, refcounted) uses the shorter 3-day
+// 7 days, not 4. GQ2 (content-addressed, refcounted) uses the shorter 4-day
 // number.
 const GQ1_SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
 
