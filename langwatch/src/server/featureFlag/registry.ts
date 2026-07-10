@@ -134,6 +134,19 @@ export const FEATURE_FLAGS = [
     description:
       "Routes over-threshold OTLP spans via a transient S3 spool at the ingestion edge (ADR-022). Off = current behavior (full value flows through the command queue; capOversizedAttributes(256 KB) is the only cap).",
   },
+  // Per-project gate for evaluation-inputs offload (ADR-039). Checked once per
+  // evaluation (not per span) via the postgres-cached store. When on,
+  // oversized evaluator inputs are written to the durable stored-objects
+  // service and the event/row carry a bounded marker instead of the full
+  // payload. Off = today's behavior (inputs flow inline; only the unconditional
+  // repository belt-and-braces cap bounds the ClickHouse row).
+  {
+    key: "release_evaluation_payload_offload",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Offloads oversized evaluator inputs to durable object storage, replacing the inline payload in event_log and evaluation_runs with a bounded marker that reads resolve transparently (ADR-039). Off = current behavior (inputs flow inline; the unconditional 8 MiB repository cap is the only bound).",
+  },
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",

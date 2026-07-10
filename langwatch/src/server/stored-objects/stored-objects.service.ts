@@ -338,6 +338,32 @@ export class StoredObjectsService {
   }
 
   /**
+   * Returns the storage-accounting byte ledger for a project (ADR-039): the
+   * summed `size_bytes` of the project's live stored objects, optionally scoped
+   * to one `purpose` (e.g. "evaluation_inputs"). This is the durable-object
+   * side of a tenant's storage usage, alongside the ClickHouse row bytes.
+   */
+  async getStorageUsageByProject({
+    projectId,
+    purpose,
+  }: {
+    projectId: string;
+    purpose?: string;
+  }): Promise<{ totalBytes: number; objectCount: number }> {
+    return tracer.withActiveSpan(
+      "StoredObjectsService.getStorageUsageByProject",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          ...(purpose ? { "stored_object.purpose": purpose } : {}),
+        },
+      },
+      async () => this.repository.sumSizeBytesByProject({ projectId, purpose }),
+    );
+  }
+
+  /**
    * Deletes all stored objects owned by a project: deletes the bytes from
    * the storage backend first, then deletes the stored_objects rows from
    * ClickHouse.

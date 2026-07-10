@@ -6,7 +6,7 @@ Feature: Evaluation payload offload
   merge-safe, queue payloads stay lean, and offloaded bytes remain
   attributable to the tenant for storage accounting.
 
-  # Incident lineage: 2026-05-29 and the stuck merge discovered 2026-07-10 —
+  # Incident lineage: 2026-05-29 and the stuck merge discovered 2026-07-10 -
   # raw JSON-stringified evaluator inputs (full conversation context) reached
   # GB-scale per row in evaluation_runs, making partition merges impossible
   # under the server memory cap. The 2026-06-02 write-time cap truncates at a
@@ -15,6 +15,29 @@ Feature: Evaluation payload offload
   # This feature replaces truncation with the offload pattern already proven
   # for trace payloads (ADR-022 lineage): bounded inline preview, full content
   # durable, transparent resolution on read.
+
+  # Implementation notes (bindings live on the test cases as @scenario tags):
+  #   - Offload decision + marker shaping + resolve fail-safe:
+  #     src/server/app-layer/evaluations/evaluation-inputs-offload.ts
+  #     (EVAL_INPUTS_INLINE_MAX_BYTES = 1 MiB, HARD_CEILING = 50 MiB, preview 16 KiB).
+  #   - Write-time wiring (event carries the marker): the offload runs inside
+  #     emitReported in executeEvaluation.command.ts BEFORE EventUtils.createEvent,
+  #     flag-gated + fail-open at the composition root (pipelineRegistry.ts) on
+  #     release_evaluation_payload_offload. Flag OFF = today's behavior EXCEPT
+  #     the unconditional repository cap below.
+  #   - Belt-and-braces UNCONDITIONAL row cap (merge-safety, flag-independent):
+  #     evaluation-run.clickhouse.repository.ts toClickHouseRecord via
+  #     evaluation-column-caps.ts (Inputs -> valid-JSON __lw_truncated marker at
+  #     8 MiB; Details/Error/ErrorDetails -> observable text truncation).
+  #   - Read resolution seam: EvaluationService.getEvaluationInputs
+  #     (evaluation.service.ts) resolves the marker; folds/reactors get it raw.
+  #   - Billing ledger: stored_objects.size_bytes, summed by
+  #     StoredObjectsService.getStorageUsageByProject; stored_objects added to
+  #     MONITORED_TABLES (clickhouse/metrics.ts).
+  # Integration coverage:
+  #   src/server/app-layer/evaluations/__tests__/evaluation-payload-offload.integration.test.ts
+  #   Unit coverage:
+  #   evaluation-inputs-offload.unit.test.ts, evaluation-column-caps.unit.test.ts
 
   Background:
     Given the evaluations pipeline persists evaluator inputs with each run
@@ -44,6 +67,12 @@ Feature: Evaluation payload offload
     Then the event payload carries the bounded preview and the content reference
     And the event payload does not carry the full oversized inputs inline
 
+  # The evaluation command queue stages ExecuteEvaluationCommandData, which
+  # carries only trace/evaluator ids - never the evaluator inputs. Inputs are
+  # produced during execution and offloaded before the reported event is built,
+  # so the queued command is already lean. Marked @unimplemented: there is no
+  # separate queue-payload transform to bind; the invariant is structural.
+  @unimplemented
   Scenario: queue payloads for evaluation processing stay lean
     Given an evaluation reported with oversized inputs
     When the evaluation is processed through the job queue
@@ -62,8 +91,28 @@ Feature: Evaluation payload offload
     Then the offloaded object's byte size is recorded against the tenant
     And the tenant's storage usage reflects offloaded bytes alongside database bytes
 
+  # The offload writes to the same content-addressed stored-objects service used
+  # for scenario media and trace blobs, whose project-delete cascade
+  # (StoredObjectsService.deleteOwnedBy, called from project.service.ts) already
+  # removes every row and its bytes. Bound by the existing stored-objects cascade
+  # integration test; marked @unimplemented here because no eval-specific cascade
+  # code exists to bind (offloaded eval inputs are ordinary stored_objects rows).
+  @unimplemented
   Scenario: deleting the project removes its offloaded evaluation content
     Given a project with offloaded evaluation inputs
     When the project's data is deleted
     Then the offloaded objects under that project's scope are removed
     And their bytes stop counting toward the tenant's storage usage
+
+  # Fail-open: the offload is a protective transform, never a gate on producing
+  # the evaluation result. If object storage rejects the PUT (S3 outage), the
+  # inputs stay inline and a structured warning is logged; the unconditional
+  # repository row cap is the backstop that still keeps the ClickHouse part
+  # merge-safe. Mirrors the trace spool fail-open stance (ADR-022).
+  Scenario: when the offload PUT fails, the inputs stay inline and the evaluation still completes
+    Given an evaluation run whose serialized inputs exceed the inline threshold
+    And the object-storage PUT fails
+    When the evaluation run is persisted
+    Then the evaluation still records its result with the inputs kept inline
+    And a structured warning notes the offload was skipped
+    And the stored row is still bounded by the unconditional row cap
