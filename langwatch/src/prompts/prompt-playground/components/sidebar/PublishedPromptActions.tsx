@@ -1,7 +1,13 @@
 import { Box, Button, Text, useDisclosure } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { ArrowUp, Copy, RefreshCw } from "react-feather";
-import { LuClock, LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
+import {
+  LuClock,
+  LuCopyPlus,
+  LuEllipsisVertical,
+  LuPencil,
+  LuTrash2,
+} from "react-icons/lu";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -48,6 +54,7 @@ export function PublishedPromptActions({
   } = useRenamePromptHandle({ promptId });
 
   const syncFromSource = api.prompts.syncFromSource.useMutation();
+  const duplicatePrompt = api.prompts.duplicate.useMutation();
   const utils = api.useContext();
 
   // Cascade-resolved model for new-tab "view history" prompts.
@@ -91,6 +98,39 @@ export function PublishedPromptActions({
       });
     }
   }, [syncFromSource, project, utils, promptId, promptHandle]);
+
+  const onDuplicate = useCallback(async () => {
+    if (!project) return;
+
+    try {
+      const duplicated = await duplicatePrompt.mutateAsync({
+        idOrHandle: promptId,
+        projectId: project.id,
+      });
+      await utils.prompts.getAllPromptsForProject.invalidate();
+      toaster.create({
+        title: "Prompt duplicated",
+        description: `"${getDisplayHandle(
+          promptHandle,
+        )}" was duplicated as "${getDisplayHandle(duplicated.handle)}"`,
+        type: "success",
+        meta: {
+          closable: true,
+        },
+      });
+    } catch (error) {
+      if (isHandledByGlobalHandler(error)) return;
+      toaster.create({
+        title: "Error duplicating prompt",
+        description:
+          error instanceof Error ? error.message : "Please try again later.",
+        type: "error",
+        meta: {
+          closable: true,
+        },
+      });
+    }
+  }, [duplicatePrompt, project, utils, promptId, promptHandle]);
 
   const { data: permission } = api.prompts.checkModifyPermission.useQuery(
     {
@@ -177,6 +217,12 @@ export function PublishedPromptActions({
                 onClick={() => setIsCopyDialogOpen(true)}
               >
                 <Copy size={16} /> Replicate to another project
+              </Menu.Item>
+              <Menu.Item
+                value="duplicate"
+                onClick={() => void onDuplicate()}
+              >
+                <LuCopyPlus size={16} /> Duplicate prompt
               </Menu.Item>
             <Menu.Item
               value="view-history"
