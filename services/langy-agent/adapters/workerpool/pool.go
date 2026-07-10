@@ -335,7 +335,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		p.mu.Unlock()
 	}
 
-	// Egress seam (ADR-043): a real guard (PR3) may set up per-worker egress
+	// Egress seam (ADR-047): a real guard (PR4) may set up per-worker egress
 	// monitoring here and fail the spawn closed. The default pass-through does
 	// nothing.
 	if err := p.egress.PrepareWorker(ctx, egress.WorkerContext{ConversationID: conversationID, UID: uid}); err != nil {
@@ -559,7 +559,7 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 	}
 	p.mu.Unlock()
 
-	// Egress teardown runs OUTSIDE the pool lock: a real PR3 guard may perform
+	// Egress teardown runs OUTSIDE the pool lock: a real PR4 guard may perform
 	// network/monitoring I/O here, which must never stall the pool. It is not
 	// part of the home-dir race, so ordering after the unlock is correct.
 	if shouldWipe {

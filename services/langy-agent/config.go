@@ -6,7 +6,7 @@
 // request body, get injected into the worker subprocess's env at spawn time,
 // and die with the subprocess. This is the only thing that makes per-session
 // isolation real — the OS kernel won't let worker A read worker B's env even
-// though they live in the same pod. See ADR-033 (isolation) and ADR-043 (this
+// though they live in the same pod. See ADR-033 (isolation) and ADR-047 (this
 // re-home).
 //
 // HTTP API:
@@ -15,7 +15,7 @@
 //	GET  /health                                     → "ok (N/MAX workers)" (legacy alias)
 //	GET  /healthz /readyz /startupz                  → k8s probes (pkg/health)
 //
-// Scaling & lifecycle (see ADR-043 "Durability, restart, and scaling"):
+// Scaling & lifecycle (see ADR-047 "Durability, restart, and scaling"):
 //   - SINGLE REPLICA ONLY. Workers live in-memory keyed by conversationId; the
 //     chart pins replicaCount=1 with a render-time guard. Not horizontally
 //     scalable until conversation-sticky routing exists.

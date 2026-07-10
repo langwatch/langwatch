@@ -121,7 +121,7 @@ func (w *Worker) StreamEvents(ctx context.Context, sink app.ChatSink) error {
 // per-project Langy VK reaches the model, never the human's personal provider
 // key).
 //
-// This stays a DENYLIST for compatibility. ACKNOWLEDGED SUFFIX-GAP (ADR-043,
+// This stays a DENYLIST for compatibility. ACKNOWLEDGED SUFFIX-GAP (ADR-047,
 // left as a comment ONLY — not widened in this PR): a denylist can never be
 // exhaustive; a var like `MY_APIKEY` (no separator before KEY) or a novel
 // secret prefix slips through. A true ALLOWLIST (PATH, HOME, LANG, USER, TZ +

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Integration tests for the per-session, caller-scoped Langy key (ADR-043).
+ * Integration tests for the per-session, caller-scoped Langy key (ADR-047).
  * Real database (Prisma), no mocks — the whole point is to prove that the key
  * ApiKeyService actually PERSISTS is clamped to the requesting user's own
  * permissions, so a Langy tool call can never exceed the human.

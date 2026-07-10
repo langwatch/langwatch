@@ -7,7 +7,7 @@ import (
 )
 
 // With no MeterProvider installed the instruments are no-ops, but every call
-// site must be safe to invoke (this is the ADR-043 seam PR3 lights up). A panic
+// site must be safe to invoke (this is the ADR-047 seam PR4 lights up). A panic
 // here means a nil instrument slipped through New's fallback.
 func TestTelemetry_AllCallSitesSafeWithoutProvider(t *testing.T) {
 	tel := New()
