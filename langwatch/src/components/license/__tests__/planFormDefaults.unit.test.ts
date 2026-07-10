@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../planFormDefaults";
 import {
-  PRO_TEMPLATE,
-  ENTERPRISE_TEMPLATE,
-} from "../../../../ee/licensing/planTemplates";
+  ENTERPRISE_LICENSE_TEMPLATE as ENTERPRISE_TEMPLATE,
+  PRO_LICENSE_TEMPLATE as PRO_TEMPLATE,
+} from "../../../../ee/plan-constants";
 
 describe("planFormDefaults", () => {
   describe("getPlanDefaults", () => {

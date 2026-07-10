@@ -1,5 +1,5 @@
 import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
-import { PricingModel } from "@prisma/client";
+
 import { Info } from "lucide-react";
 import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -24,17 +24,18 @@ export type UsageDisplay =
  *
  * Visibility rules:
  * - Self-hosted: always visible
- * - SaaS + SEAT_EVENT + paid: not visible
+ * - SaaS + seat-billed + paid: not visible
  * - All other SaaS: visible
  */
 export function getUsageDisplay({
   isSaaS,
-  pricingModel,
+  billing,
   isFree,
   usageUnit,
 }: {
   isSaaS: boolean;
-  pricingModel: PricingModel | undefined | null;
+  /** Derived billing profile from the resolved plan (ADR-039). */
+  billing?: { showUsageLimits: boolean };
   isFree: boolean;
   usageUnit: UsageUnit;
 }): UsageDisplay {
@@ -42,7 +43,8 @@ export function getUsageDisplay({
     return { visible: true, unitLabel: usageUnit };
   }
 
-  if (pricingModel === PricingModel.SEAT_EVENT && !isFree) {
+  // Paid seat-billed orgs are usage-billed: the indicator is not a limit.
+  if (billing?.showUsageLimits === false && !isFree) {
     return { visible: false };
   }
 
@@ -74,7 +76,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
 
   const display = getUsageDisplay({
     isSaaS: !!isSaaS,
-    pricingModel: organization?.pricingModel,
+    billing: usage.data.activePlan.billing,
     isFree: usage.data.activePlan.free,
     usageUnit: usage.data.usageUnit ?? "events",
   });

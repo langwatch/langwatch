@@ -11,9 +11,10 @@ import { isHandledByGlobalHandler } from "../utils/trpcError";
  * Encapsulates invite mutation handlers: create invite (admin), create invite request (non-admin),
  * approve, reject, and delete. Keeps MembersList focused on rendering.
  *
- * All pricing models go through enforcement first. When `pricingModel` is "SEAT_EVENT"
- * and the user has an active subscription, exceeding the limit opens the proration
- * preview modal. Otherwise, the standard upgrade modal is shown.
+ * All pricing models go through enforcement first. When the plan's limit
+ * resolution is "purchase_seat" (derived by the resolver from the active seat
+ * subscription — ADR-039), exceeding the limit opens the proration preview
+ * modal. Otherwise, the standard upgrade modal is shown.
  */
 export function useInviteActions({
   organizationId,
@@ -22,10 +23,7 @@ export function useInviteActions({
   onInviteCreated,
   onClose,
   refetchInvites,
-  pricingModel,
-  activePlanFree,
   activePlanType,
-  activePlanSource,
 }: {
   organizationId: string;
   isAdmin: boolean;
@@ -33,14 +31,8 @@ export function useInviteActions({
   onInviteCreated: (invites: { inviteCode: string; email: string }[]) => void;
   onClose: () => void;
   refetchInvites: () => void;
-  /** Pricing model of the organization (e.g. "SEAT_EVENT", "TIERED"). */
-  pricingModel?: string;
-  /** Whether the active plan is a free plan (no paid subscription). */
-  activePlanFree: boolean;
   /** The active plan type string (e.g. "GROWTH_SEAT_EUR_MONTHLY"). */
   activePlanType: string;
-  /** Where the active plan came from ("license", "subscription", or "free"). */
-  activePlanSource?: "license" | "subscription" | "free";
 }) {
   const membersEnforcement = useLicenseEnforcement("members");
   const membersLiteEnforcement = useLicenseEnforcement("membersLite");
@@ -221,13 +213,11 @@ export function useInviteActions({
       return;
     }
 
-    // Over limit — decide which modal to show
-    if (
-      activePlanSource === "subscription" &&
-      pricingModel === "SEAT_EVENT" &&
-      expandSeatsMutation
-    ) {
-      // SEAT_EVENT with active subscription — proration modal
+    // Over limit — route on the plan's resolution (ADR-039 Decision 10).
+    // The resolver derives purchase_seat from the active seat subscription,
+    // so a drifted pricingModel column can no longer dead-end this flow.
+    if (limitInfo.resolution === "purchase_seat" && expandSeatsMutation) {
+      // Seat-billed — proration modal
       const newSeats = limitInfo.current + newFullMemberInviteCount;
       openSeats({
         organizationId,

@@ -1,4 +1,3 @@
-import { PricingModel } from "@prisma/client";
 import { usePublicEnv } from "./usePublicEnv";
 
 /**
@@ -44,25 +43,26 @@ export function getPlanManagementButtonLabel(isSaaS: boolean): string {
  *
  * Free plans: always show limits
  * Enterprise: never show limits
- * Paid + TIERED: show limits (plan has hard caps)
- * Paid + SEAT_EVENT: hide limits (usage-based billing)
- * No pricing model (legacy): show limits (safe default)
+ * Paid legacy tiered: show limits (plan has hard caps)
+ * Paid seat-billed: hide limits (usage-based billing)
+ * No billing profile (raw plan literal): show limits (safe default)
  */
 export function shouldShowPlanLimits({
   isFree,
   isEnterprise,
-  pricingModel,
+  billing,
   planSource,
 }: {
   isFree: boolean;
   isEnterprise: boolean;
-  pricingModel: PricingModel | undefined | null;
+  /** Derived billing profile from the resolved plan (ADR-039). */
+  billing?: { showUsageLimits: boolean };
   planSource?: "license" | "subscription" | "free";
 }): boolean {
   if (isEnterprise) return false;
   if (planSource === "license") return true; // License plans always have hard caps
   if (isFree) return true;
-  return pricingModel !== PricingModel.SEAT_EVENT;
+  return billing?.showUsageLimits ?? true;
 }
 
 /**

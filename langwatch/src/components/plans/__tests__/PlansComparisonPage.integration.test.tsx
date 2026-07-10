@@ -156,8 +156,11 @@ describe("<PlansComparisonPage/>", () => {
     it("shows discontinued pricing notice for TIERED organizations", () => {
       render(
         <PlansComparisonPage
-          activePlan={{ type: "LAUNCH", free: false }}
-          pricingModel="TIERED"
+          activePlan={{
+            type: "LAUNCH",
+            free: false,
+            billing: { isLegacyTiered: true },
+          }}
         />,
         { wrapper: Wrapper },
       );
@@ -175,8 +178,11 @@ describe("<PlansComparisonPage/>", () => {
     it("does not show discontinued pricing notice for free plan on TIERED organizations", () => {
       render(
         <PlansComparisonPage
-          activePlan={{ type: "FREE", free: true }}
-          pricingModel="TIERED"
+          activePlan={{
+            type: "FREE",
+            free: true,
+            billing: { isLegacyTiered: false },
+          }}
         />,
         { wrapper: Wrapper },
       );
@@ -189,8 +195,11 @@ describe("<PlansComparisonPage/>", () => {
     it("does not show discontinued pricing notice for SEAT_EVENT organizations", () => {
       render(
         <PlansComparisonPage
-          activePlan={{ type: "GROWTH_SEAT_EUR_MONTHLY", free: false }}
-          pricingModel="SEAT_EVENT"
+          activePlan={{
+            type: "GROWTH_SEAT_EUR_MONTHLY",
+            free: false,
+            billing: { isLegacyTiered: false },
+          }}
         />,
         { wrapper: Wrapper },
       );

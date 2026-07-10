@@ -160,7 +160,7 @@ describe("useLicenseEnforcement", () => {
 
       // Verify the store's open function was called with correct parameters
       expect(mockOpenUpgradeModal).toHaveBeenCalledTimes(1);
-      expect(mockOpenUpgradeModal).toHaveBeenCalledWith("workflows", 10, 10);
+      expect(mockOpenUpgradeModal).toHaveBeenCalledWith("workflows", 10, 10, undefined);
     });
 
     it("does not open upgrade modal when allowed", () => {
@@ -298,7 +298,7 @@ describe("useLicenseEnforcement", () => {
           result.current.checkAndProceed(() => {});
         });
 
-        expect(mockOpenUpgradeModal).toHaveBeenCalledWith(limitType, 5, 5);
+        expect(mockOpenUpgradeModal).toHaveBeenCalledWith(limitType, 5, 5, undefined);
       });
     });
   });

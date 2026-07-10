@@ -10,7 +10,7 @@ Feature: Member limit denials carry a typed resolution everywhere
 
   # --- The incident regression ---
 
-  @regression @integration @unimplemented
+  @regression @unit
   Scenario: A seat-billed organization with a stale TIERED column is offered a seat purchase, not blocked
     Given an organization with pricingModel "TIERED" and an ACTIVE seat-event subscription at its member cap
     When an admin submits an invite for a new full member
@@ -51,19 +51,19 @@ Feature: Member limit denials carry a typed resolution everywhere
 
   # --- One UI handler (Decision 10) ---
 
-  @integration @unimplemented
+  @unit
   Scenario: Resolution purchase_seat opens the seat proration modal
     Given a member denial with resolution "purchase_seat"
     When the UI handles the denial
     Then the seat proration modal opens
 
-  @integration @unimplemented
+  @unit
   Scenario: Resolution upgrade routes to plan management
     Given a member denial with resolution "upgrade"
     When the UI handles the denial
     Then the user is directed to the plan management page
 
-  @integration @unimplemented
+  @unit
   Scenario: Resolution hard_cap directs to contact us
     Given a member denial with resolution "hard_cap"
     When the UI handles the denial
@@ -86,14 +86,14 @@ Feature: Member limit denials carry a typed resolution everywhere
 
   # --- Pending invites surfaced (Decision 13) ---
 
-  @integration @unimplemented
+  @unit
   Scenario: The member cap message itemizes members and pending invites
     Given an organization with 4 full members and 2 pending full-member invites on a 6-seat plan
     When an admin views the member limit state
     Then the count shows 4 members and 2 pending invites
     And each pending invite can be revoked from the same view
 
-  @unit @unimplemented
+  @unit
   Scenario: Pending invites still reserve seats
     Given an organization with 4 full members and 2 pending full-member invites on a 6-seat plan
     When a member limit check runs for one more full member

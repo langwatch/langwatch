@@ -1,4 +1,3 @@
-import { PricingModel } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   getPlanManagementUrl,
@@ -76,7 +75,7 @@ describe("shouldShowPlanLimits()", () => {
         shouldShowPlanLimits({
           isFree: true,
           isEnterprise: false,
-          pricingModel: PricingModel.SEAT_EVENT,
+          billing: { showUsageLimits: false },
         })
       ).toBe(true);
     });
@@ -86,7 +85,7 @@ describe("shouldShowPlanLimits()", () => {
         shouldShowPlanLimits({
           isFree: true,
           isEnterprise: false,
-          pricingModel: PricingModel.TIERED,
+          billing: { showUsageLimits: true },
         })
       ).toBe(true);
     });
@@ -99,7 +98,7 @@ describe("shouldShowPlanLimits()", () => {
           shouldShowPlanLimits({
             isFree: false,
             isEnterprise: false,
-            pricingModel: PricingModel.TIERED,
+            billing: { showUsageLimits: true },
           })
         ).toBe(true);
       });
@@ -111,7 +110,7 @@ describe("shouldShowPlanLimits()", () => {
           shouldShowPlanLimits({
             isFree: false,
             isEnterprise: false,
-            pricingModel: PricingModel.SEAT_EVENT,
+            billing: { showUsageLimits: false },
           })
         ).toBe(false);
       });
@@ -123,7 +122,7 @@ describe("shouldShowPlanLimits()", () => {
           shouldShowPlanLimits({
             isFree: false,
             isEnterprise: false,
-            pricingModel: undefined,
+            billing: undefined,
           })
         ).toBe(true);
       });
@@ -135,7 +134,7 @@ describe("shouldShowPlanLimits()", () => {
           shouldShowPlanLimits({
             isFree: false,
             isEnterprise: false,
-            pricingModel: null,
+            billing: undefined,
           })
         ).toBe(true);
       });
@@ -148,7 +147,7 @@ describe("shouldShowPlanLimits()", () => {
         shouldShowPlanLimits({
           isFree: false,
           isEnterprise: true,
-          pricingModel: PricingModel.TIERED,
+          billing: { showUsageLimits: true },
         })
       ).toBe(false);
     });
@@ -158,7 +157,7 @@ describe("shouldShowPlanLimits()", () => {
         shouldShowPlanLimits({
           isFree: false,
           isEnterprise: true,
-          pricingModel: PricingModel.SEAT_EVENT,
+          billing: { showUsageLimits: false },
         })
       ).toBe(false);
     });
