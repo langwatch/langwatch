@@ -23,7 +23,8 @@ Feature: Evaluation payload offload
   #   - Write-time wiring (event carries the marker): the offload runs inside
   #     emitReported in executeEvaluation.command.ts BEFORE EventUtils.createEvent,
   #     flag-gated + fail-open at the composition root (pipelineRegistry.ts) on
-  #     release_evaluation_payload_offload. Flag OFF = today's behavior EXCEPT
+  #     ON by default; the SYSTEM flag ops_evaluation_payload_offload_disabled
+  #     is the operator kill switch. Disabled = inputs flow inline EXCEPT
   #     the unconditional repository cap below.
   #   - Belt-and-braces UNCONDITIONAL row cap (merge-safety, flag-independent):
   #     evaluation-run.clickhouse.repository.ts toClickHouseRecord via
