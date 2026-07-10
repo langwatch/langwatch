@@ -94,3 +94,15 @@ Feature: GroupQueue poison-group park guard
     When an operator unblocks the group via the ops surface
     Then its claim strikes are reset
     And the group returns to normal dispatch
+
+  Scenario: draining a parked poison group resets its claim strikes
+    Given a group parked by the poison guard
+    When an operator drains the group via the ops surface
+    Then its claim strikes are reset
+    And a new job arriving under the same group id is dispatched normally
+
+  Scenario: moving a parked poison group to the dead-letter queue resets its claim strikes
+    Given a group parked by the poison guard
+    When an operator moves the group to the dead-letter queue via the ops surface
+    Then its claim strikes are reset
+    And a new job arriving under the same group id is dispatched normally

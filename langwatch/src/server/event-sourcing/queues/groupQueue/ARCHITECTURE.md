@@ -250,7 +250,7 @@ Job-level retry accounting assumes the process survives the job. A payload that 
 
 - **Claim strikes** - `processWithRetries` records a per-group strike in Redis (`{queue}:gq:group:{groupId}:strikes`, 1h TTL) before decoding and clears it in a `finally` on every surviving path. Only a job that kills the process leaves a strike behind. Once strikes exceed `LANGWATCH_GQ_POISON_STRIKE_THRESHOLD` (default 3, `0` disables), the claim parks the group into the blocked set with a stored explanation instead of running the killer again.
 - **Decode cap** - staged values whose serialized (or decompressed) size exceeds `MAX_BLOB_BYTES` park the group unparsed. These are legacy bare-JSON values or tampered envelopes that predate or bypass the encode cap; dropping them to replay would just re-materialize the same value.
-- **Recovery** - parked groups appear in the ops blocked summary with the stored error; unblocking resets the strike count. Draining the group discards the staged copies (event replay can rebuild).
+- **Recovery** - parked groups appear in the ops blocked summary with the stored error. Every operator exit resets the strike count: unblock, drain, and move-to-DLQ all clear the strikes key, so a group re-created under the same id gets a fresh run instead of insta-parking on stale strikes within the 1h TTL. Draining discards the staged copies (event replay can rebuild).
 
 ---
 

@@ -421,6 +421,92 @@ describe.skipIf(!hasTestcontainers)(
           expect(processed.mock.calls[0]![0].groupId).toBe("poisoned");
         });
       });
+
+      describe("when an operator drains it", () => {
+        /** @scenario draining a parked poison group resets its claim strikes */
+        it("resets the strikes so a re-created group dispatches normally", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          await redis.set(
+            strikesKey(name, "poisoned"),
+            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
+          );
+          await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
+
+          await vi.waitFor(
+            async () => {
+              expect(await blockedMembers(name)).toContain("poisoned");
+            },
+            { timeout: 5000, interval: 50 },
+          );
+
+          const ops = new QueueRedisRepository(redis);
+          const { jobsRemoved } = await ops.drainGroup({
+            queueName: name,
+            groupId: "poisoned",
+          });
+          expect(jobsRemoved).toBeGreaterThan(0);
+          expect(await redis.get(strikesKey(name, "poisoned"))).toBeNull();
+          expect(await blockedMembers(name)).not.toContain("poisoned");
+
+          // A new job under the same group id gets a fresh run instead of
+          // insta-parking on the stale strike count.
+          await queue.send({ id: "job-2", groupId: "poisoned", value: "y" });
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(processed.mock.calls[0]![0].id).toBe("job-2");
+          expect(await blockedMembers(name)).not.toContain("poisoned");
+        });
+      });
+
+      describe("when an operator moves it to the dead-letter queue", () => {
+        /** @scenario moving a parked poison group to the dead-letter queue resets its claim strikes */
+        it("resets the strikes so a re-created group dispatches normally", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          await redis.set(
+            strikesKey(name, "poisoned"),
+            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
+          );
+          await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
+
+          await vi.waitFor(
+            async () => {
+              expect(await blockedMembers(name)).toContain("poisoned");
+            },
+            { timeout: 5000, interval: 50 },
+          );
+
+          const ops = new QueueRedisRepository(redis);
+          const { jobsMoved } = await ops.moveToDlq({
+            queueName: name,
+            groupId: "poisoned",
+          });
+          expect(jobsMoved).toBeGreaterThan(0);
+          expect(await redis.get(strikesKey(name, "poisoned"))).toBeNull();
+          expect(await blockedMembers(name)).not.toContain("poisoned");
+
+          await queue.send({ id: "job-2", groupId: "poisoned", value: "y" });
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(processed.mock.calls[0]![0].id).toBe("job-2");
+          expect(await blockedMembers(name)).not.toContain("poisoned");
+        });
+      });
     });
   },
 );
