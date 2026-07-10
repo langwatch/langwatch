@@ -1,3 +1,26 @@
+# =============================================================================
+# LOCAL E2E ONLY — DO NOT USE IN PRODUCTION.
+#
+# The authoritative production posture is `charts/langy-agent/`. This manifest
+# mirrors that chart's pod/container securityContext so the per-worker UID
+# isolation actually functions locally, but deliberately DIFFERS from prod in
+# two ways for local kind/minikube testing:
+#   (1) `runtimeClassName: gvisor` is OMITTED because local clusters rarely
+#       define the gVisor RuntimeClass — prod REQUIRES it (see ADR-033 and
+#       charts/langy-agent/values.yaml).
+#   (2) no NetworkPolicy (a single local test pod has no siblings to isolate on
+#       the network).
+# Do not copy this file into a real cluster.
+#
+# Why the manager runs as ROOT with a narrow cap set (counter-intuitive but
+# load-bearing): per-worker UID isolation requires `child_process.spawn({uid,
+# gid})`, which needs CAP_SETUID + CAP_SETGID + CAP_CHOWN (+ FOWNER/DAC_OVERRIDE
+# for the per-worker chown/chmod handoff) — caps only a root-effective-uid
+# process holds inside a container. As UID 1000 with all caps dropped (the OLD,
+# BROKEN config this file used to ship) the manager physically CANNOT hand each
+# worker a distinct UID, so worker A could read worker B's project API key +
+# GitHub token off disk. This mirrors charts/langy-agent/values.yaml exactly.
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,6 +37,14 @@ spec:
       labels:
         app: opencode-agent
     spec:
+      # Pod-level securityContext — mirrors charts/langy-agent (podSecurityContext).
+      # fsGroup is intentionally OMITTED: setting it would group-share every
+      # worker's files and re-open the cross-worker boundary the per-UID
+      # isolation exists to close.
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+      # runtimeClassName: gvisor  # REQUIRED in prod; omitted locally — see banner
       containers:
         - name: agent
           image: opencode-agent:v7
@@ -40,15 +71,38 @@ spec:
             limits:
               memory: "4Gi"
               cpu: "2"
+          # Container-level securityContext — mirrors charts/langy-agent
+          # (containerSecurityContext). Root + a narrow cap set is what makes
+          # per-worker UID isolation function: the manager chowns each per-session
+          # dir to a unique UID, writes 0600 config blobs as that UID, and spawns
+          # the OpenCode subprocess directly into it. Drop ALL, then add back ONLY
+          # the five per-UID-handoff caps:
+          #   CHOWN        — chown per-session dirs to a unique worker UID
+          #   DAC_OVERRIDE — write into dirs now owned by the worker UID
+          #   FOWNER       — chmod 0700 a dir already chowned away to the worker UID
+          #                  (DAC_OVERRIDE does not cover the chmod ownership check)
+          #   SETUID/SETGID — spawn the worker subprocess directly into its UID/GID
+          # allowPrivilegeEscalation:false → no_new_privs, so children cannot regain
+          # caps via setuid binaries. readOnlyRootFilesystem keeps the image immutable.
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
+            runAsNonRoot: false
+            runAsUser: 0
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-          # readOnlyRootFilesystem locks everything below /. These mounts
+              add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID"]
+          # readOnlyRootFilesystem locks everything below /. These emptyDir mounts
           # provide the writable paths the agent + entrypoint actually need.
+          #
+          # NOTE ON MOUNTS vs PRODUCTION: the production chart mounts ONLY
+          # /workspace and /tmp — under the per-worker model each worker's HOME
+          # lives UNDER /workspace/sessions/<worker> and TMPDIR is set per-worker,
+          # so a fixed /home/agent is never written. The extra /home/agent/*
+          # mounts below are retained for LOCAL e2e only, as belt-and-suspenders
+          # for the opencode-agent:v7 image (which predates the per-worker-home
+          # model); they are inert writable emptyDirs and do not weaken isolation.
+          # Prod deliberately does NOT carry them.
           volumeMounts:
             - name: workspace
               mountPath: /workspace

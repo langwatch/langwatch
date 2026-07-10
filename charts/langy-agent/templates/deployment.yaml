@@ -4,6 +4,19 @@
 {{- if ne (int .Values.replicaCount) 1 }}
 {{- fail "langy-agent.replicaCount must remain 1 until conversation-sticky routing exists" }}
 {{- end }}
+{{- /* A sandboxed runtime is a hard requirement, not a default, when this
+       chart manages the pod. The agent runs LLM-driven arbitrary shell
+       (opencode workers spawn git/gh/npm), so an unset/empty runtimeClassName
+       drops the pod onto the node's default runtime (runc, no sandbox) and
+       re-opens the pod->host escape surface — the cross-worker credential-theft
+       regression the values.yaml header explicitly promises this chart refuses
+       to ship. `not` catches BOTH the absent key and the empty string. The only
+       legitimate way to run without the sandbox is to opt the whole pod out
+       (chartManaged=false), never to blank the runtime while still managed.
+       See ADR-033 and charts/langy-agent/values.yaml. */ -}}
+{{- if and .Values.chartManaged (not .Values.runtimeClassName) }}
+{{- fail "langy-agent.runtimeClassName must be set to a sandboxed runtime (e.g. \"gvisor\") when langy-agent.chartManaged=true — running this LLM-driven-shell workload without a sandbox re-opens the pod->host escape surface (see ADR-033). To intentionally run without the agent, set langy-agent.chartManaged=false." }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
