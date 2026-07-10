@@ -50,9 +50,8 @@ function TraceSuccessState({
   traceId,
   ...props
 }: { traceId: string } & StackProps) {
-  // useTraceDetailsDrawer routes to v1 or v2 based on the operator's
-  // localStorage opt-in (see `useTracesV2Preference`). The hover-peek
-  // popover is the same in both worlds.
+  // useTraceDetailsDrawer opens the Trace Explorer drawer (see
+  // `routeTraceDrawerForV2`). The hover-peek popover is unaffected.
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
 
   return (

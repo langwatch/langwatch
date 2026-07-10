@@ -28,7 +28,7 @@ const capabilities: CapabilityProps[] = [
     icon: Activity,
     title: "Traces & Analytics",
     description: "Monitor LLM calls, latency, costs, and user interactions",
-    path: "/messages",
+    path: "/traces",
   },
   {
     icon: Shield,

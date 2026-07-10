@@ -1,31 +1,35 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration test for the central traces-v2 opt-in routing inside
- * `openDrawer`. Exercises the real hook, the real `getTracesV2Preferred`
- * localStorage read, and the real `qs` URL serialization — only the router is
- * harnessed (to capture the navigation it would perform).
+ * Integration test for the central Trace Explorer default routing inside
+ * `openDrawer`. Exercises the real hook and the real `qs` URL serialization —
+ * only the router is harnessed (to capture the navigation it would perform
+ * and to stand on different pages).
  */
 
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { push, replace } = vi.hoisted(() => ({
-  push: vi.fn(),
-  replace: vi.fn(),
-}));
-
-vi.mock("~/utils/compat/next-router", () => {
-  const router = {
-    query: {},
-    asPath: "/test-project/experiments/exp-1",
+const { push, replace, router } = vi.hoisted(() => {
+  const push = vi.fn();
+  const replace = vi.fn();
+  return {
     push,
     replace,
+    router: {
+      query: {},
+      pathname: "/[project]/experiments",
+      asPath: "/test-project/experiments/exp-1",
+      push,
+      replace,
+    },
   };
+});
+
+vi.mock("~/utils/compat/next-router", () => {
   return { default: router, useRouter: () => router };
 });
 
-import { setTracesV2Preferred } from "../../features/traces-v2/hooks/useTracesV2Preference";
 import { useDrawer } from "../useDrawer";
 
 function lastOpenedUrl(): string {
@@ -33,20 +37,16 @@ function lastOpenedUrl(): string {
   return String(push.mock.calls[push.mock.calls.length - 1]?.[0]);
 }
 
-describe("openDrawer traces-v2 opt-in routing", () => {
+describe("openDrawer Trace Explorer default routing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.localStorage.clear();
+    router.pathname = "/[project]/experiments";
   });
 
-  describe("given the device has opted into traces v2", () => {
-    beforeEach(() => {
-      setTracesV2Preferred(true);
-    });
-
+  describe("given the open happens outside the legacy Traces page", () => {
     describe("when opening a trace's details from a results view", () => {
-      /** @scenario "A trace opened from a results view uses the new explorer when the device opted in" */
-      it("rewrites the open to the v2 drawer in the URL", () => {
+      /** @scenario "A trace opened from a results view uses the Trace Explorer" */
+      it("rewrites the open to the Trace Explorer drawer in the URL", () => {
         const { result } = renderHook(() => useDrawer());
 
         act(() => {
@@ -61,8 +61,7 @@ describe("openDrawer traces-v2 opt-in routing", () => {
     });
 
     describe("when opening a trace from the evaluation results View action", () => {
-      /** @scenario "Viewing a trace from evaluation results honors the opt-in" */
-      it("routes to v2 and drops the legacy-only tab param", () => {
+      it("routes to the Trace Explorer and drops the legacy-only tab param", () => {
         const { result } = renderHook(() => useDrawer());
 
         // Mirrors the exact payload the eval results "View" button sends.
@@ -81,9 +80,13 @@ describe("openDrawer traces-v2 opt-in routing", () => {
     });
   });
 
-  describe("given the device has not opted into traces v2", () => {
-    describe("when opening a trace's details from a results view", () => {
-      /** @scenario "A trace opened from a results view uses the legacy drawer when the device has not opted in" */
+  describe("given the open happens on the legacy Traces page", () => {
+    beforeEach(() => {
+      router.pathname = "/[project]/messages";
+    });
+
+    describe("when opening a trace's details from the legacy traces table", () => {
+      /** @scenario "Opening a trace from the legacy Traces page uses the legacy drawer" */
       it("keeps the open on the legacy drawer in the URL", () => {
         const { result } = renderHook(() => useDrawer());
 

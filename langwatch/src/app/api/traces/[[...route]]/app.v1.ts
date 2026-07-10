@@ -209,7 +209,7 @@ export function registerTracesRoutes(
             evaluations: trace.evaluations,
             platformUrl: platformUrl({
               projectSlug: project.slug,
-              path: `/messages/${trace.trace_id}`,
+              path: `/traces/${trace.trace_id}`,
             }),
           };
         }
@@ -217,7 +217,7 @@ export function registerTracesRoutes(
           ...trace,
           platformUrl: platformUrl({
             projectSlug: project.slug,
-            path: `/messages/${trace.trace_id}`,
+            path: `/traces/${trace.trace_id}`,
           }),
         };
       };
@@ -412,7 +412,7 @@ export function registerTracesRoutes(
           evaluations,
           platformUrl: platformUrl({
             projectSlug: project.slug,
-            path: `/messages/${resolvedTraceId}`,
+            path: `/traces/${resolvedTraceId}`,
           }),
         });
       }
@@ -424,7 +424,7 @@ export function registerTracesRoutes(
         ascii_tree: asciiTree,
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/messages/${resolvedTraceId}`,
+          path: `/traces/${resolvedTraceId}`,
         }),
       });
     },

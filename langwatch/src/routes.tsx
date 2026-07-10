@@ -408,6 +408,10 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/traces")),
       },
       {
+        path: "/:project/traces/:trace",
+        ...page(() => import("./pages/[project]/traces/[trace]")),
+      },
+      {
         path: "/:project/messages/:trace",
         ...page(() => import("./pages/[project]/messages/[trace]/index")),
       },

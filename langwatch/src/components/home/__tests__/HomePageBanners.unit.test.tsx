@@ -31,19 +31,12 @@ vi.mock("~/components/ui/link", () => ({
   ),
 }));
 
-vi.mock("~/features/traces-v2/hooks/useTracesV2Preference", () => ({
-  setTracesV2Preferred: vi.fn(),
-}));
-
 import { HomePageBanners } from "../HomePageBanners";
 
-const TRACES_KEY = "langwatch:tracesV2-home-banner-dismissed:v2:try:project-1";
 const VOICE_KEY = "langwatch:voice-agents-home-banner-dismissed:v1:project-1";
 
 function renderWithProviders(ui: React.ReactElement) {
-  return render(
-    <ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>,
-  );
+  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 }
 
 describe("<HomePageBanners />", () => {
@@ -57,39 +50,7 @@ describe("<HomePageBanners />", () => {
     localStorage.clear();
   });
 
-  it("renders the traces-v2 banner when the coin flip lands >= 0.5", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.9);
-    renderWithProviders(<HomePageBanners />);
-    expect(
-      screen.getByRole("heading", {
-        name: "The new Trace Explorer is here",
-      }),
-    ).toBeDefined();
-    expect(
-      screen.queryByRole("heading", {
-        name: "Voice agent simulations are here",
-      }),
-    ).toBeNull();
-  });
-
-  it("renders the voice banner when the coin flip lands < 0.5", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.1);
-    renderWithProviders(<HomePageBanners />);
-    expect(
-      screen.getByRole("heading", {
-        name: "Voice agent simulations are here",
-      }),
-    ).toBeDefined();
-    expect(
-      screen.queryByRole("heading", {
-        name: "The new Trace Explorer is here",
-      }),
-    ).toBeNull();
-  });
-
-  it("forces the voice banner when only traces-v2 is snoozed (no coin flip)", () => {
-    localStorage.setItem(TRACES_KEY, String(Date.now() + 60_000));
-    vi.spyOn(Math, "random").mockReturnValue(0.9); // would pick traces if eligible
+  it("renders the voice-agents banner when it is not snoozed", () => {
     renderWithProviders(<HomePageBanners />);
     expect(
       screen.getByRole("heading", {
@@ -98,29 +59,12 @@ describe("<HomePageBanners />", () => {
     ).toBeDefined();
   });
 
-  it("forces the traces-v2 banner when only voice-agents is snoozed (no coin flip)", () => {
-    localStorage.setItem(VOICE_KEY, String(Date.now() + 60_000));
-    vi.spyOn(Math, "random").mockReturnValue(0.1); // would pick voice if eligible
-    renderWithProviders(<HomePageBanners />);
-    expect(
-      screen.getByRole("heading", {
-        name: "The new Trace Explorer is here",
-      }),
-    ).toBeDefined();
-  });
-
-  it("renders neither banner when both are snoozed", () => {
-    localStorage.setItem(TRACES_KEY, String(Date.now() + 60_000));
+  it("renders nothing when the voice-agents banner is snoozed", () => {
     localStorage.setItem(VOICE_KEY, String(Date.now() + 60_000));
     renderWithProviders(<HomePageBanners />);
     expect(
       screen.queryByRole("heading", {
         name: "Voice agent simulations are here",
-      }),
-    ).toBeNull();
-    expect(
-      screen.queryByRole("heading", {
-        name: "The new Trace Explorer is here",
       }),
     ).toBeNull();
   });

@@ -3,7 +3,7 @@
  *
  * Integration test for the workflow execution panel's "Full Trace" button.
  * Renders the real component and clicks the real button so the test guards
- * against the button ever re-bypassing the central traces-v2 opt-in routing.
+ * against the button ever re-bypassing the central Trace Explorer routing.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -18,6 +18,7 @@ const { push, replace } = vi.hoisted(() => ({
 vi.mock("~/utils/compat/next-router", () => {
   const router = {
     query: {},
+    pathname: "/[project]/workflows/[workflow]",
     asPath: "/test-project/workflows/wf-1",
     push,
     replace,
@@ -26,7 +27,6 @@ vi.mock("~/utils/compat/next-router", () => {
 });
 
 import type { ExecutionState } from "~/optimization_studio/types/dsl";
-import { setTracesV2Preferred } from "../../../features/traces-v2/hooks/useTracesV2Preference";
 import { ExecutionOutputPanel } from "../ExecutionOutputPanel";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -44,17 +44,15 @@ const completedExecution = {
 describe("ExecutionOutputPanel Full Trace button", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.localStorage.clear();
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  describe("when the device has opted into traces v2", () => {
-    /** @scenario "Viewing the full trace from a workflow run honors the opt-in" */
-    it("opens the new explorer drawer for the run's trace", async () => {
-      setTracesV2Preferred(true);
+  describe("when viewing a completed workflow run", () => {
+    /** @scenario "The default applies to every trace entry point, not only the traces table" */
+    it("opens the Trace Explorer drawer for the run's trace", async () => {
       const user = userEvent.setup();
 
       render(
@@ -70,27 +68,6 @@ describe("ExecutionOutputPanel Full Trace button", () => {
       expect(push).toHaveBeenCalled();
       const url = String(push.mock.calls[0]?.[0]);
       expect(url).toMatch(/drawer\.open=traceV2Details/);
-      expect(url).toContain("trace-wf-7");
-    });
-  });
-
-  describe("when the device has not opted into traces v2", () => {
-    it("opens the legacy drawer for the run's trace", async () => {
-      const user = userEvent.setup();
-
-      render(
-        <ExecutionOutputPanel
-          executionState={completedExecution}
-          isTracingEnabled
-        />,
-        { wrapper: Wrapper },
-      );
-
-      await user.click(screen.getByRole("button", { name: /full trace/i }));
-
-      expect(push).toHaveBeenCalled();
-      const url = String(push.mock.calls[0]?.[0]);
-      expect(url).toMatch(/drawer\.open=traceDetails/);
       expect(url).toContain("trace-wf-7");
     });
   });
