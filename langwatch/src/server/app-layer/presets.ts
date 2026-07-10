@@ -49,6 +49,10 @@ import { RetroactiveUpdateService } from "../data-retention/retroactive/retroact
 import { PrismaScheduledJobRepository } from "./scheduler/scheduled-job.repository";
 import { schedulerRegistry } from "./scheduler/scheduler.registry";
 import { SchedulerService } from "./scheduler/scheduler.service";
+import { dispatchScheduledReport } from "./reports/report-dispatch";
+import { REPORT_SCHEDULER_TARGET_TYPE } from "./triggers/report.builder";
+import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
+import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
 import { EventSourcing } from "../event-sourcing";
 import { dispatchOutboxEnqueues } from "../event-sourcing/outbox/dispatchOutboxEnqueues";
 import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
@@ -702,6 +706,36 @@ export function initializeDefaultApp(options?: {
         })
       : undefined;
   scheduler?.start();
+
+  // ADR-042 Phase 3c: register the report handler so a due report ScheduledJob
+  // renders + dispatches on schedule (worker-only, same notify pipeline as
+  // alerts). The scheduler registry is a process singleton.
+  if (config.processRole === "worker") {
+    schedulerRegistry.register({
+      targetType: REPORT_SCHEDULER_TARGET_TYPE,
+      handler: (fire) =>
+        dispatchScheduledReport({
+          deps: {
+            loadTrigger: ({ projectId, triggerId }) =>
+              prisma.trigger.findFirst({
+                where: { id: triggerId, projectId },
+              }),
+            loadProject: (projectId) =>
+              prisma.project.findUnique({ where: { id: projectId } }),
+            sendEmail: sendRenderedTriggerEmail,
+            sendSlack: sendRenderedSlackMessage,
+            filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
+              emailSuppressions.filterSuppressed({
+                projectId,
+                triggerId,
+                emails,
+              }),
+            baseHost: config.baseHost ?? env.BASE_HOST,
+          },
+          fire,
+        }),
+    });
+  }
 
   const registry = new PipelineRegistry({
     eventSourcing: es,

@@ -495,3 +495,69 @@ export function buildTemplateContext({
     matches: mapped,
   };
 }
+
+
+/**
+ * Template-variable contract for a SCHEDULED REPORT (ADR-042). A report is
+ * schedule-triggered — it reads as "here is your {source} for {period}",
+ * distinct from both the trace-iteration shape and the alert-threshold shape.
+ * The dispatcher derives `sourceLabel` / `scheduleLabel` / `viewUrl` from the
+ * report's source + schedule and hands them in; rows (a trace-query table) are
+ * passed as prerendered lines so the context stays render-pure.
+ */
+export interface ReportTemplateContext {
+  trigger: { id: string; name: string; editUrl: string };
+  report: {
+    /** Human source description, e.g. "Top 5 errored traces". */
+    sourceLabel: string;
+    /** Human schedule description, e.g. "every Monday at 09:00 (UTC)". */
+    scheduleLabel: string;
+  };
+  /** Deep link to view the report's underlying data (traces / graph / board). */
+  viewUrl: string;
+  /** Optional prerendered rows (trace-query table lines). */
+  rows: string[];
+  occurredAt: string;
+  project: { id: string; name: string; slug: string; url: string };
+}
+
+/** Pure builder for the report template context (ADR-042). */
+export function buildReportTemplateContext({
+  trigger,
+  report,
+  viewUrl,
+  rows = [],
+  occurredAt,
+  project,
+  baseHost,
+}: {
+  trigger: { id: string; name: string };
+  report: { sourceLabel: string; scheduleLabel: string };
+  viewUrl: string;
+  rows?: string[];
+  occurredAt: Date;
+  project: { id: string; name: string; slug: string };
+  baseHost: string;
+}): ReportTemplateContext {
+  const projectUrl = `${baseHost}/${project.slug}`;
+  return {
+    trigger: {
+      id: trigger.id,
+      name: trigger.name,
+      editUrl: buildAutomationEditUrl({ projectUrl, triggerId: trigger.id }),
+    },
+    report: {
+      sourceLabel: report.sourceLabel,
+      scheduleLabel: report.scheduleLabel,
+    },
+    viewUrl,
+    rows,
+    occurredAt: occurredAt.toISOString(),
+    project: {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      url: projectUrl,
+    },
+  };
+}

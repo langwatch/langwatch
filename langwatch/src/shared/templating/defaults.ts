@@ -241,3 +241,58 @@ export const TRACE_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
   slackString: DEFAULT_SLACK_TEMPLATE,
   slackBlockKit: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
 };
+
+
+/**
+ * ADR-042: default templates for a SCHEDULED REPORT. Reads as "here is your
+ * {source} for {period}" — `report.sourceLabel`, `report.scheduleLabel`,
+ * `rows` (prerendered table lines), `viewUrl`. Rendered through the same
+ * Liquid pipeline; per-trigger custom templates still override.
+ */
+export const DEFAULT_REPORT_EMAIL_SUBJECT_TEMPLATE =
+  "[Report] {{ trigger.name }} — {{ report.scheduleLabel }}";
+
+export const DEFAULT_REPORT_EMAIL_BODY_TEMPLATE = `# {{ trigger.name }}
+
+{{ report.sourceLabel }} · {{ report.scheduleLabel }}.
+{% if rows.size > 0 %}
+{% for row in rows %}- {{ row }}
+{% endfor %}{% endif %}
+[View in LangWatch ↗]({{ viewUrl }})`;
+
+export const DEFAULT_REPORT_SLACK_TEMPLATE = `:bar_chart: *{{ trigger.name | mrkdwn_escape }}*
+{{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}{% if rows.size > 0 %}
+{% for row in rows %}• {{ row | mrkdwn_escape }}
+{% endfor %}{% endif %}
+<{{ viewUrl }}|View in LangWatch>`;
+
+export const DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE = `[
+  {
+    "type": "header",
+    "text": { "type": "plain_text", "text": {{ trigger.name | prepend: ":bar_chart: " | json }}, "emoji": true }
+  },
+  {%- capture _sub -%}{{ report.sourceLabel }} · {{ report.scheduleLabel }}{%- endcapture -%}
+  {
+    "type": "section",
+    "text": { "type": "mrkdwn", "text": {{ _sub | json }} }
+  },
+  {%- if rows.size > 0 -%}
+  {%- capture _rows -%}{% for row in rows %}• {{ row | mrkdwn_escape }}
+{% endfor %}{%- endcapture -%}
+  ,{
+    "type": "section",
+    "text": { "type": "mrkdwn", "text": {{ _rows | json }} }
+  }
+  {%- endif -%}
+  ,{
+    "type": "context",
+    "elements": [{ "type": "mrkdwn", "text": {{ viewUrl | prepend: "<" | append: "|View in LangWatch>" | json }} }]
+  }
+]`;
+
+export const REPORT_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
+  emailSubject: DEFAULT_REPORT_EMAIL_SUBJECT_TEMPLATE,
+  emailBody: DEFAULT_REPORT_EMAIL_BODY_TEMPLATE,
+  slackString: DEFAULT_REPORT_SLACK_TEMPLATE,
+  slackBlockKit: DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE,
+};
