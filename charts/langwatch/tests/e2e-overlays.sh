@@ -32,6 +32,14 @@ tmpl() {
   helm template "$RELEASE" "$CHART_DIR" "$@" 2>&1
 }
 
+# Render only a single template (no cluster needed) — scopes assertions to one
+# resource so env vars set on other deployments (workers/nlp also set
+# LANGWATCH_ENDPOINT) can't mask a missing one on the app deployment.
+tmpl_only() {
+  local only="$1"; shift
+  helm template "$RELEASE" "$CHART_DIR" --show-only "$only" "$@" 2>&1
+}
+
 # Check rendered YAML contains a string (uses <<< to avoid broken pipe with large output)
 assert_contains() {
   local label="$1" haystack="$2" needle="$3"
@@ -169,6 +177,30 @@ test_access_ingress() {
 
   # Service type = ClusterIP (default, not NodePort)
   assert_not_contains "No NodePort" "$out" "type: NodePort"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: LANGWATCH_ENDPOINT — app deployment self-references its telemetry
+# endpoint so post-#3541 images (which boot-validate LANGWATCH_ENDPOINT as a
+# required URL) don't crash-loop on chart defaults. Regression for #5659.
+# ─────────────────────────────────────────────────────────────────────────────
+test_langwatch_endpoint() {
+  sep; info "Suite: LANGWATCH_ENDPOINT on app deployment (#5659)"
+
+  # Default render: env present, self-referencing localhost on the app port.
+  local app_out
+  app_out=$(tmpl_only "templates/app/deployment.yaml" --set autogen.enabled=true)
+  assert_contains "app sets LANGWATCH_ENDPOINT" "$app_out" "name: LANGWATCH_ENDPOINT"
+  assert_contains "LANGWATCH_ENDPOINT self-references localhost:5560" \
+    "$app_out" "http://localhost:5560"
+
+  # Override via values is honored.
+  local app_override
+  app_override=$(tmpl_only "templates/app/deployment.yaml" \
+    --set autogen.enabled=true \
+    --set app.http.langwatchEndpoint=https://collector.example.com)
+  assert_contains "LANGWATCH_ENDPOINT override honored" \
+    "$app_override" "https://collector.example.com"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -513,6 +545,7 @@ main() {
   test_profile_rendering
   test_access_nodeport
   test_access_ingress
+  test_langwatch_endpoint
   test_size_overlays
   test_infra_overlays
   test_overlay_stacking

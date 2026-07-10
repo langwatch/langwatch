@@ -144,6 +144,14 @@ spec:
             - name: NEXTAUTH_URL_INTERNAL
               value: "http://localhost:{{ .Values.app.service.port | default 5560 }}"
 
+            # Self-telemetry endpoint. Post-#3541 the app boot-validates
+            # LANGWATCH_ENDPOINT as a required URL; self-reference over
+            # localhost (like NEXTAUTH_URL_INTERNAL) so chart-default installs
+            # boot without SKIP_ENV_VALIDATION. Override to ship the app's own
+            # traces elsewhere.
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.app.http.langwatchEndpoint | default (printf "http://localhost:%v" (.Values.app.service.port | default 5560)) | quote }}
+
             # Cron API key
             {{- if .Values.app.cronApiKey.secretKeyRef.name }}
             - name: CRON_API_KEY
