@@ -1,4 +1,4 @@
-import { Alert, Button, VStack } from "@chakra-ui/react";
+import { Alert, Button, HStack, VStack } from "@chakra-ui/react";
 
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";
@@ -6,6 +6,7 @@ import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { useAcceptInviteOnce } from "../../hooks/useAcceptInviteOnce";
 import { useRouter } from "~/utils/compat/next-router";
 import { signOut } from "~/utils/auth-client";
+import { hardRedirect } from "~/utils/hardRedirect";
 
 export default function Accept() {
   const router = useRouter();
@@ -41,9 +42,16 @@ export default function Accept() {
             <Alert.Description>{errorMessage}</Alert.Description>
           </Alert.Content>
         </Alert.Root>
-        <Button colorPalette="orange" onClick={() => void signOut()}>
-          Log Out and Try Again
-        </Button>
+        <HStack gap={3}>
+          {/* Hard navigation on purpose: busts caches primed with pre-invite
+              "no org" state, same reason the hook redirects hard on success. */}
+          <Button colorPalette="orange" onClick={() => hardRedirect("/")}>
+            Go to Dashboard
+          </Button>
+          <Button variant="outline" onClick={() => void signOut()}>
+            Log Out and Try Again
+          </Button>
+        </HStack>
       </VStack>
     </SetupLayout>
   );

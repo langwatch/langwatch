@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "~/server/invites/errors";
 import { api } from "~/utils/api";
@@ -16,9 +16,41 @@ import { toaster } from "~/components/ui/toaster";
  */
 const submittedInviteCodes = new Set<string>();
 
-/** Test-only: reset the module-scoped guard between test cases. */
+/**
+ * Module-scoped outcome store, the counterpart of `submittedInviteCodes`.
+ * Because the guard above survives remounts while `useMutation` state does
+ * not, a page-subtree remount after `mutate` was dispatched would otherwise
+ * leave the fresh mutation instance permanently idle → status stuck on
+ * "loading" and the error only visible in the console (#5550). Outcomes are
+ * recorded here by the mutation callbacks (which react-query keeps alive
+ * even if the dispatching component unmounted) and read back via
+ * `useSyncExternalStore`, so any remounted instance resolves to the real
+ * terminal state.
+ */
+interface InviteOutcome {
+  status: Extract<
+    AcceptInviteStatus,
+    "success" | "already-accepted" | "error"
+  >;
+  errorMessage: string | null;
+}
+const inviteOutcomes = new Map<string, InviteOutcome>();
+const outcomeListeners = new Set<() => void>();
+
+function recordInviteOutcome(inviteCode: string, outcome: InviteOutcome): void {
+  inviteOutcomes.set(inviteCode, outcome);
+  for (const listener of outcomeListeners) listener();
+}
+
+function subscribeToInviteOutcomes(listener: () => void): () => void {
+  outcomeListeners.add(listener);
+  return () => outcomeListeners.delete(listener);
+}
+
+/** Test-only: reset the module-scoped guard + outcomes between test cases. */
 export function _resetSubmittedInviteCodesForTests(): void {
   submittedInviteCodes.clear();
+  inviteOutcomes.clear();
 }
 
 type AcceptInviteMutation = ReturnType<
@@ -77,7 +109,11 @@ export function useAcceptInviteOnce({
   enabled,
 }: UseAcceptInviteOnceOptions): UseAcceptInviteOnceResult {
   const mutation = api.organization.acceptInvite.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
+      recordInviteOutcome(variables.inviteCode, {
+        status: "success",
+        errorMessage: null,
+      });
       toaster.create({
         title: "Invite Accepted",
         description: `You have successfully accepted the invite for ${data.invite.organization.name}.`,
@@ -88,11 +124,19 @@ export function useAcceptInviteOnce({
 
       hardRedirect(data.project?.slug ? `/${data.project.slug}` : "/");
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       if (error.message === INVITE_ALREADY_ACCEPTED_MESSAGE) {
+        recordInviteOutcome(variables.inviteCode, {
+          status: "already-accepted",
+          errorMessage: null,
+        });
         hardRedirect("/");
         return;
       }
+      recordInviteOutcome(variables.inviteCode, {
+        status: "error",
+        errorMessage: error.message,
+      });
       // Real failure (expired invite, email mismatch, …). The page renders
       // `errorMessage` inline; also capture for observability.
       captureException(toError(error), {
@@ -104,6 +148,12 @@ export function useAcceptInviteOnce({
   const { mutate } = mutation;
   const shouldTrigger = enabled && typeof inviteCode === "string";
 
+  // Terminal outcome recorded by a previous (possibly unmounted) instance of
+  // this hook for the same invite code — see `inviteOutcomes` above.
+  const storedOutcome = useSyncExternalStore(subscribeToInviteOutcomes, () =>
+    typeof inviteCode === "string" ? inviteOutcomes.get(inviteCode) : undefined,
+  );
+
   useEffect(() => {
     if (!shouldTrigger) return;
     if (typeof inviteCode !== "string") return;
@@ -113,14 +163,16 @@ export function useAcceptInviteOnce({
   }, [shouldTrigger, inviteCode, mutate]);
 
   return {
-    status: deriveStatus(mutation, shouldTrigger),
-    errorMessage: mutation.error?.message ?? null,
+    status: deriveStatus(mutation, shouldTrigger, storedOutcome),
+    errorMessage:
+      mutation.error?.message ?? storedOutcome?.errorMessage ?? null,
   };
 }
 
 function deriveStatus(
   mutation: AcceptInviteMutationResult,
   shouldTrigger: boolean,
+  storedOutcome: InviteOutcome | undefined,
 ): AcceptInviteStatus {
   if (!shouldTrigger) return "idle";
   if (mutation.isSuccess) return "success";
@@ -129,5 +181,10 @@ function deriveStatus(
       ? "already-accepted"
       : "error";
   }
+  // This instance's mutation is idle/loading, but a previous instance may
+  // already have finished — after a page-subtree remount the one-shot guard
+  // blocks a re-submit, so without this fallback the status would be stuck
+  // on "loading" forever (#5550).
+  if (storedOutcome) return storedOutcome.status;
   return "loading";
 }

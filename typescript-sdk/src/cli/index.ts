@@ -249,6 +249,7 @@ program
   .command("claude", { hidden: true })
   .description("Run `claude` (Claude Code) routed through the LangWatch gateway.")
   .allowUnknownOption(true)
+  .allowExcessArguments(true)
   .helpOption(false)
   .action(async (_opts, cmd: { args?: string[] }) => {
     try {
@@ -264,6 +265,7 @@ program
   .command("codex", { hidden: true })
   .description("Run `codex` (OpenAI Codex CLI) routed through the LangWatch gateway.")
   .allowUnknownOption(true)
+  .allowExcessArguments(true)
   .helpOption(false)
   .action(async (_opts, cmd: { args?: string[] }) => {
     try {
@@ -279,6 +281,7 @@ program
   .command("cursor", { hidden: true })
   .description("Run `cursor` routed through the LangWatch gateway.")
   .allowUnknownOption(true)
+  .allowExcessArguments(true)
   .helpOption(false)
   .action(async (_opts, cmd: { args?: string[] }) => {
     try {
@@ -294,6 +297,7 @@ program
   .command("gemini", { hidden: true })
   .description("Run `gemini` (Gemini CLI) routed through the LangWatch gateway.")
   .allowUnknownOption(true)
+  .allowExcessArguments(true)
   .helpOption(false)
   .action(async (_opts, cmd: { args?: string[] }) => {
     try {
@@ -309,6 +313,7 @@ program
   .command("opencode")
   .description("Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).")
   .allowUnknownOption(true)
+  .allowExcessArguments(true)
   .helpOption(false)
   .action(async (_opts, cmd: { args?: string[] }) => {
     try {
@@ -337,12 +342,14 @@ program.addHelpText(
 );
 
 program
-  .command("logout-device")
-  .description("Server-revoke the device-flow refresh token AND clear the local ~/.langwatch/config.json. Idempotent.")
-  .action(async () => {
+  .command("logout")
+  .description("Log out: revoke + clear the device session AND remove the telemetry wiring `langwatch <tool>` installed (claude settings.json, codex config.toml, gemini/opencode shell functions). Only langwatch-authored blocks are removed; the project API key in .env is left alone. Idempotent.")
+  .option("-y, --yes", "skip the confirmation prompt")
+  .option("--keep-credentials", "remove the telemetry wiring but stay logged in")
+  .action(async (options: { yes?: boolean; keepCredentials?: boolean }) => {
     try {
-      const { logoutDeviceCommand } = await import("./commands/logout-device.js");
-      await logoutDeviceCommand();
+      const { logoutCommand } = await import("./commands/logout.js");
+      await logoutCommand(options);
     } catch (error) {
       console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);

@@ -3,7 +3,7 @@ Feature: Evaluator Run/Rerun Enhancements
   I want to run individual evaluators on single cells and across all rows
   So that I can quickly test and refine evaluator settings without re-running targets
 
-  # Parity status: 8 of 11 scenarios bound to existing tests.
+  # Parity status: 9 of 11 scenarios bound to existing tests.
   # Remaining @unimplemented scenarios (#3458):
   #   3 NO_TEST: shipped behavior, no integration test yet
   #     - "Running a pending evaluator executes without re-running the target"

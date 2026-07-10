@@ -12,17 +12,6 @@ import { Sidebar } from "./ui/Sidebar";
 import { SidebarEmptyState } from "./ui/SidebarEmptyState";
 
 /**
- * Returns a display-friendly version of a prompt handle.
- * Single Responsibility: Formats prompt handles for UI display by extracting folder-relative names or returning "New Prompt".
- * @param handle - The prompt handle (may include folder prefix separated by "/")
- * @returns The display name (portion after "/" or full handle, or "New Prompt" if empty)
- */
-export function getDisplayHandle(handle?: string | null): string {
-  if (!handle) return "New Prompt";
-  return handle?.includes("/") ? handle.split("/")[1]! : handle;
-}
-
-/**
  * Displays a list of published prompts grouped by folder.
  * Single Responsibility: Renders published prompts organized by folder with click-to-open functionality.
  */

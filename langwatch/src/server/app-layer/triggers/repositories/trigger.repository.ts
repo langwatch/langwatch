@@ -60,6 +60,61 @@ export interface TriggerRepository {
   updateLastRunAt(triggerId: string, projectId: string): Promise<void>;
 }
 
+/**
+ * Snapshot of an open custom-graph TriggerSent row — the at-most-once
+ * dedup record the cron uses for "this graph alert is still firing".
+ * Used by the event-sourced path (ADR-034 Phase 5) to mirror the cron's
+ * dedup discipline EXACTLY: find unresolved row -> only fire once;
+ * resolve unresolved row when threshold clears.
+ */
+export interface OpenGraphTriggerSent {
+  id: string;
+  triggerId: string;
+  projectId: string;
+  customGraphId: string;
+}
+
+/**
+ * Repository surface for the event-sourced graph-trigger path
+ * (ADR-034 Phase 5). Models the EXACT TriggerSent dedup the cron uses:
+ * the (triggerId, projectId, customGraphId, resolvedAt IS NULL)
+ * row defines the alert's "currently firing" state.
+ */
+export interface GraphTriggerSentRepository {
+  /**
+   * Mirror of cron's `unresolvedTriggerSent` lookup
+   * (src/pages/api/cron/triggers/customGraphTrigger.ts:179-189):
+   * orderBy createdAt desc, take first.
+   */
+  findOpenForGraphAlert(params: {
+    triggerId: string;
+    projectId: string;
+    customGraphId: string;
+  }): Promise<OpenGraphTriggerSent | null>;
+
+  /**
+   * Mirror of cron's `addTriggersSent` graph branch
+   * (src/pages/api/cron/triggers/utils.ts:39-48): one create per fire,
+   * traceId null, customGraphId set, resolvedAt null.
+   */
+  createOpenForGraphAlert(params: {
+    triggerId: string;
+    projectId: string;
+    customGraphId: string;
+  }): Promise<OpenGraphTriggerSent>;
+
+  /**
+   * Mirror of cron's resolve sequence
+   * (src/pages/api/cron/triggers/customGraphTrigger.ts:264-271): update
+   * by id+projectId, set resolvedAt = now.
+   */
+  markResolvedById(params: {
+    id: string;
+    projectId: string;
+    now: Date;
+  }): Promise<void>;
+}
+
 export class NullTriggerRepository implements TriggerRepository {
   async findActiveForProject(_projectId: string): Promise<TriggerSummary[]> {
     return [];

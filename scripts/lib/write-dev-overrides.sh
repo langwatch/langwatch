@@ -112,6 +112,7 @@ EOF
 DATABASE_URL=postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
 REDIS_URL=redis://redis:6379
 CLICKHOUSE_URL=http://default:langwatch@clickhouse:8123/langwatch
+LANGWATCH_ENDPOINT=http://app:5560
 EOF
 
   # NLP / langevals overrides depend on which containers actually start.

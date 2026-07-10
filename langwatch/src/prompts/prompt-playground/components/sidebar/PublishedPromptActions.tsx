@@ -1,7 +1,13 @@
-import { Box, Button, Text } from "@chakra-ui/react";
+import { Box, Button, Text, useDisclosure } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { ArrowUp, Copy, RefreshCw } from "react-feather";
-import { LuClock, LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
+import {
+  LuClock,
+  LuCopyPlus,
+  LuEllipsisVertical,
+  LuPencil,
+  LuTrash2,
+} from "react-icons/lu";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -16,7 +22,7 @@ import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/Drag
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { getDisplayHandle } from "./PublishedPromptsList";
+import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 
 interface PublishedPromptActionsProps {
   promptId: string;
@@ -37,6 +43,7 @@ export function PublishedPromptActions({
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] =
     useState(false);
+  const { open, setOpen } = useDisclosure();
   const { deletePrompt } = usePrompts();
   const { project, hasPermission } = useOrganizationTeamProject();
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
@@ -47,12 +54,13 @@ export function PublishedPromptActions({
   } = useRenamePromptHandle({ promptId });
 
   const syncFromSource = api.prompts.syncFromSource.useMutation();
+  const duplicatePrompt = api.prompts.duplicate.useMutation();
   const utils = api.useContext();
 
   // Cascade-resolved model for new-tab "view history" prompts.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
+    { enabled: open && !!project?.id },
   );
 
   const isCopiedPrompt = !!prompt?.copiedFromPromptId;
@@ -91,17 +99,54 @@ export function PublishedPromptActions({
     }
   }, [syncFromSource, project, utils, promptId, promptHandle]);
 
+  const onDuplicate = useCallback(async () => {
+    if (!project) return;
+
+    try {
+      const duplicated = await duplicatePrompt.mutateAsync({
+        idOrHandle: promptId,
+        projectId: project.id,
+      });
+      await utils.prompts.getAllPromptsForProject.invalidate();
+      toaster.create({
+        title: "Prompt duplicated",
+        description: `"${getDisplayHandle(
+          promptHandle,
+        )}" was duplicated as "${getDisplayHandle(duplicated.handle)}"`,
+        type: "success",
+        meta: {
+          closable: true,
+        },
+      });
+    } catch (error) {
+      if (isHandledByGlobalHandler(error)) return;
+      toaster.create({
+        title: "Error duplicating prompt",
+        description:
+          error instanceof Error ? error.message : "Please try again later.",
+        type: "error",
+        meta: {
+          closable: true,
+        },
+      });
+    }
+  }, [duplicatePrompt, project, utils, promptId, promptHandle]);
+
   const { data: permission } = api.prompts.checkModifyPermission.useQuery(
     {
       idOrHandle: promptId,
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project?.id,
+      enabled: open && !!project?.id,
     },
   );
 
-  const canDelete = permission?.hasPermission ?? true;
+  // Default to NOT deletable until the permission query resolves. The query is
+  // gated on the menu being open, so there is a brief loading window on first
+  // open; defaulting to `true` there would enable the destructive Delete action
+  // before we know the caller is actually allowed.
+  const canDelete = permission?.hasPermission === true;
 
   const handleDelete = useCallback(async () => {
     if (!project?.id) return;
@@ -137,7 +182,10 @@ export function PublishedPromptActions({
         _groupHover={{ opacity: 1 }}
         transition="opacity 0.2s"
       >
-        <Menu.Root>
+        <Menu.Root
+          open={open}
+          onOpenChange={({ open }) => setOpen(open)}
+        >
           <Menu.Trigger asChild>
             <Button
               variant="ghost"
@@ -169,6 +217,12 @@ export function PublishedPromptActions({
                 onClick={() => setIsCopyDialogOpen(true)}
               >
                 <Copy size={16} /> Replicate to another project
+              </Menu.Item>
+              <Menu.Item
+                value="duplicate"
+                onClick={() => void onDuplicate()}
+              >
+                <LuCopyPlus size={16} /> Duplicate prompt
               </Menu.Item>
             <Menu.Item
               value="view-history"

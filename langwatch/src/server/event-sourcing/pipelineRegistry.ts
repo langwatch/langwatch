@@ -34,11 +34,15 @@ import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-saf
 import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
+import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
+import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
+import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
@@ -58,9 +62,13 @@ import {
 } from "./pipelines/billing-reporting/pipeline";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
+import type { EvaluationAnalyticsData } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
+import { EvaluationAnalyticsStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
+import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createEvaluationAlertTriggerReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTrigger.reactor";
 import { createEvaluationAlertTriggerNotifyOutboxReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTriggerNotifyOutbox.reactor";
+import { createEvaluationGraphTriggerEvaluationOutboxReactor } from "./pipelines/evaluation-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
@@ -94,11 +102,15 @@ import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/l
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
+import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
+import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
+import { createGraphTriggerEvaluationOutboxReactor } from "./pipelines/trace-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import {
   createDeferredOriginHandler,
   createOriginGateReactor,
@@ -180,6 +192,14 @@ export interface PipelineRepositories {
   traceSummaryFold: TraceSummaryRepository;
   logRecordStorage: LogRecordStorageRepository;
   metricRecordStorage: MetricRecordStorageRepository;
+  /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
+  traceAnalyticsRollup: TraceAnalyticsRollupRepository;
+  /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap). */
+  traceAnalytics: TraceAnalyticsRepository;
+  /** ADR-034 Phase 6: per-evaluation rollup repository. */
+  evaluationAnalyticsRollup: EvaluationAnalyticsRollupRepository;
+  /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
+  evaluationAnalytics: EvaluationAnalyticsRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
 }
 
@@ -311,14 +331,38 @@ export class PipelineRegistry {
         traceSummaryStore,
       });
 
+    // ADR-034 Phase 6: real-time graph-trigger reactor on the slim eval fold.
+    // Flag-gated per project via the same `release_es_graph_triggers_firing`
+    // flag the trace pipeline uses — disabled = empty decide; cron handles
+    // the project's graph triggers as today.
+    const graphTriggerEvaluationOutboxReactor =
+      createEvaluationGraphTriggerEvaluationOutboxReactor({
+        triggers: this.deps.triggers,
+      });
+
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
         evalRunStore: new EvaluationRunStore(
           this.deps.evaluations.runs.repository,
         ),
+        // Redis cache is the eval slim fold's ONLY warm read path — its
+        // store's get() returns null by design (lossy row, no read-back),
+        // and on a cache miss the fold's refoldOnStoreMiss option rebuilds
+        // state from the event log. Same wiring as trace_analytics.
+        evaluationAnalyticsStore: this.cached<EvaluationAnalyticsData>(
+          new EvaluationAnalyticsStore(
+            this.deps.repositories.evaluationAnalytics,
+          ),
+          "evaluation_analytics",
+        ),
+        evaluationAnalyticsRollupAppendStore:
+          new EvaluationAnalyticsRollupAppendStore(
+            this.deps.repositories.evaluationAnalyticsRollup,
+          ),
         executeEvaluationCommand,
         evaluationAlertTriggerReactor,
         evaluationAlertTriggerNotifyOutboxReactor,
+        graphTriggerEvaluationOutboxReactor,
       }),
     );
   }
@@ -367,6 +411,15 @@ export class PipelineRegistry {
 
     const alertTriggerNotifyOutboxReactor =
       createAlertTriggerNotifyOutboxReactor({
+        triggers: this.deps.triggers,
+      });
+
+    // ADR-034 Phase 5: real-time path for custom-graph threshold alerts.
+    // Flag-gated per project inside `decide` so a flag-OFF project sees
+    // an empty enqueue list and the cron handles its graph triggers
+    // unchanged.
+    const graphTriggerEvaluationOutboxReactor =
+      createGraphTriggerEvaluationOutboxReactor({
         triggers: this.deps.triggers,
       });
 
@@ -450,6 +503,18 @@ export class PipelineRegistry {
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
+        traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
+          this.deps.repositories.traceAnalyticsRollup,
+        ),
+        // Redis cache is the slim fold's ONLY warm read path — its store's
+        // get() returns null by design (lossy row, no read-back), and on a
+        // cache miss the fold's refoldOnStoreMiss option rebuilds state from
+        // the event log. Without this wrapper every event would trigger a
+        // full event-log re-fold.
+        traceAnalyticsStore: this.cached<TraceAnalyticsData>(
+          new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
+          "trace_analytics",
+        ),
         logRecordAppendStore: new LogRecordAppendStore(
           this.deps.repositories.logRecordStorage,
         ),
@@ -461,6 +526,7 @@ export class PipelineRegistry {
         evaluationTriggerReactor,
         alertTriggerReactor,
         alertTriggerNotifyOutboxReactor,
+        graphTriggerEvaluationOutboxReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
@@ -816,6 +882,7 @@ export interface ProjectionMetadata {
   aggregateType: string;
   source: "pipeline" | "global";
   pauseKey: string;
+  kind: "fold" | "map";
 }
 
 export interface ReactorMetadata {
@@ -841,13 +908,25 @@ function getDefinitions(): ReadonlyArray<
 export function getProjectionMetadata(): ProjectionMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    return Array.from(def.foldProjections.values()).map(({ definition }) => ({
+    const folds = Array.from(def.foldProjections.values()).map(({ definition }) => ({
       projectionName: definition.name,
       pipelineName,
       aggregateType,
       source: "pipeline" as const,
       pauseKey: `${pipelineName}/projection/${definition.name}`,
+      kind: "fold" as const,
     }));
+    const maps = Array.from(def.mapProjections.values()).map(({ definition }) => ({
+      projectionName: definition.name,
+      pipelineName,
+      aggregateType,
+      source: "pipeline" as const,
+      // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
+      // entry must use the `handler` segment to match the dispatcher's Lua check.
+      pauseKey: `${pipelineName}/handler/${definition.name}`,
+      kind: "map" as const,
+    }));
+    return [...folds, ...maps];
   });
 }
 

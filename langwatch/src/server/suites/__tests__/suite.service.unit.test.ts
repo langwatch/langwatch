@@ -167,6 +167,7 @@ describe("SuiteService", () => {
     });
 
     describe("given 2 scenarios, 1 target, and repeat count 3", () => {
+      /** @scenario "Suite run respects repeat count" */
       it("returns 6 jobs", () => {
         const result = SuiteService.calculateJobCount({
           scenarioCount: 2,
@@ -192,6 +193,8 @@ describe("SuiteService", () => {
   describe("run()", () => {
     describe("given a suite with 3 scenarios, 2 targets, and repeat count 1", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario "Suite run succeeds when all scenarios exist" */
+        /** @scenario "Suite run succeeds when HTTP target agent exists" */
         it("delegates to suiteRunService with 3 active scenarios and 2 active targets", async () => {
           const { service, suiteRunService } = createService();
           const suite = makeSuite();
@@ -242,6 +245,7 @@ describe("SuiteService", () => {
     describe("given a suite references a deleted scenario", () => {
       describe("when the suite run is triggered", () => {
         /** @scenario Deleted scenarios still cause validation errors */
+        /** @scenario "Suite run fails when a scenario does not exist" */
         it("throws InvalidScenarioReferencesError before reaching suiteRunService", async () => {
           const { service, suiteRunService } = createService({
             scenarioRepository: {
@@ -268,6 +272,7 @@ describe("SuiteService", () => {
 
     describe("given a suite references a removed HTTP target", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario "Suite run fails when HTTP target agent does not exist" */
         it("throws InvalidTargetReferencesError before reaching suiteRunService", async () => {
           const { service, suiteRunService } = createService({
             agentRepository: {
@@ -296,6 +301,7 @@ describe("SuiteService", () => {
 
     describe("given a suite references a removed prompt target", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario "Run validation rejects prompt from unrelated project without org scope" */
         it("throws InvalidTargetReferencesError before reaching suiteRunService", async () => {
           const { service, suiteRunService } = createService({
             llmConfigRepository: {
@@ -543,6 +549,8 @@ describe("SuiteService", () => {
 
     describe("given a suite with a prompt target referencing an existing config", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario "Suite run succeeds when prompt config exists in project" */
+        /** @scenario "Suite run succeeds when prompt config is org-scoped" */
         it("resolves via llmConfigRepository and delegates", async () => {
           const { service, llmConfigRepo } = createService();
           const suite = makeSuite({
@@ -568,6 +576,8 @@ describe("SuiteService", () => {
 
     describe("given a suite with a deleted prompt target", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario "Suite run fails when prompt config is soft-deleted" */
+        /** @scenario "Suite run fails when prompt config belongs to another organization" */
         it("throws InvalidTargetReferencesError (not AllTargetsArchivedError)", async () => {
           const { service } = createService({
             llmConfigRepository: {

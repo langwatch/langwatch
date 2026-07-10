@@ -27,12 +27,12 @@ import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { env } from "~/env.mjs";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
-import { getAnalyticsService } from "~/server/analytics/analytics.service";
 import {
   type TimeseriesInputType,
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
 import {
   createServiceApp,

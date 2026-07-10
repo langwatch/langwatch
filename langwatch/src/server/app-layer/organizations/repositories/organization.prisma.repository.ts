@@ -4,6 +4,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
   type Currency,
+  type OrganizationIntent,
   type Prisma,
   type PrismaClient,
 } from "@prisma/client";
@@ -189,6 +190,16 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return org ?? null;
   }
 
+  async findPrimaryIntentById(
+    organizationId: string,
+  ): Promise<OrganizationIntent | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { primaryIntent: true },
+    });
+    return org?.primaryIntent ?? null;
+  }
+
   async getOrganizationForBilling(
     organizationId: string,
   ): Promise<OrganizationForBilling | null> {
@@ -221,6 +232,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           slug: input.orgSlug,
           phoneNumber: input.phoneNumber,
           signupData: input.signUpData as Prisma.InputJsonValue | undefined,
+          primaryIntent: input.primaryIntent ?? null,
           pricingModel: input.pricingModel,
         },
       });
@@ -448,6 +460,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           : {}),
         ...(input.supportContact !== undefined
           ? { supportContact: input.supportContact?.trim() || null }
+          : {}),
+        ...(input.primaryIntent !== undefined
+          ? { primaryIntent: input.primaryIntent }
           : {}),
       },
     });

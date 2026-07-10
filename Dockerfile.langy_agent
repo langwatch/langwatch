@@ -17,15 +17,17 @@
 # -----------------------------------------------------------------------------
 # Stage 1: build the Go manager binary.
 # -----------------------------------------------------------------------------
-# Pin the Go toolchain to the version recorded in go.mod (`go 1.26.2`) so
-# CI and local builds produce byte-identical binaries. Bump in lockstep.
-FROM golang:1.26.4-bookworm AS builder
+# Pin an explicit Go toolchain patch (1.26.4) at or above the go.mod language
+# floor (`go 1.26.2`) so every build uses the same compiler. Bump this tag when
+# raising the go.mod floor.
+FROM --platform=$BUILDPLATFORM golang:1.26.4-bookworm AS builder
 
 WORKDIR /src
 
 # Cache go module downloads in a layer that only invalidates when go.mod/
 # go.sum changes — the rest of the source tree is a churnier input.
 COPY go.mod go.sum ./
+COPY sdk-go ./sdk-go
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go mod download
@@ -43,8 +45,15 @@ COPY services ./services
 # any glibc the Ubuntu base ships with no surprise dynamic-link issues.
 # -trimpath drops the host build path from binary metadata for cleaner
 # diffs across reproducible builds.
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+#
+# TARGETOS/TARGETARCH are left WITHOUT defaults on purpose: BuildKit fills them
+# from the target platform (`--platform`), and the builder runs on the native
+# BUILDPLATFORM (above) to cross-compile. A hardcoded `=amd64` default here
+# silently overrode BuildKit's value, so `--platform linux/arm64` (the
+# Graviton/gVisor publish matrix, which passes NO build-args) produced an amd64
+# binary in an arm64 image — dead on arrival with `exec format error`.
+ARG TARGETOS
+ARG TARGETARCH
 ARG SERVICE_VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -71,15 +80,12 @@ ARG OPENCODE_OTEL_PLUGIN_VERSION=1.0.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git ca-certificates unzip build-essential python3 \
-    iptables \
     && rm -rf /var/lib/apt/lists/*
-# `iptables` is installed so the manager (services/langy-agent/iptables.go)
-# can install a loopback OWNER-match DROP rule at startup. The rule closes
-# the sibling-worker exfiltration path Sergio flagged on 2026-06-30:
-# without it, a prompt-injected worker scans /proc/net/tcp, connects to a
-# sibling worker's unauthenticated opencode internal port as the victim's
-# UID, and `env` exfiltrates the victim's credentials. Requires
-# CAP_NET_ADMIN on the pod (set in charts/langy-agent/values.yaml).
+# NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
+# rule (services/langy-agent/iptables.go) that closed the sibling-worker
+# exfiltration path is removed under ADR-033 Fix A′ — sibling isolation is
+# now enforced by opencode's own per-worker OPENCODE_SERVER_PASSWORD, which
+# needs no netfilter (and works under gVisor, where netfilter is absent).
 
 # GitHub CLI (`gh`) is what Langy's github.md skill uses to open PRs
 # attributed to the requesting user. The user's short-lived user-to-server

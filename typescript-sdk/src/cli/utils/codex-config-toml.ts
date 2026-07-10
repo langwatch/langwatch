@@ -44,6 +44,28 @@ export function defaultCodexConfigPath(): string {
   return path.join(os.homedir(), ".codex", "config.toml");
 }
 
+/** Path shown in the persist prompt (`~/.codex/config.toml`). */
+export function displayCodexConfigPath(): string {
+  const codexHome = process.env.CODEX_HOME;
+  if (codexHome) return path.join(codexHome, "config.toml");
+  return "~/.codex/config.toml";
+}
+
+/**
+ * The trace-signal endpoint codex's otlp-http exporter posts to. codex
+ * (unlike the Node/Python/Go OTel SDKs) does NOT append `/v1/traces` to
+ * the configured endpoint, so the suffix is spelled out here. Callers
+ * pass the bare ingestion base (e.g. https://app.langwatch.ai/api/otel).
+ */
+export function codexTraceEndpoint(baseEndpoint: string): string {
+  return `${baseEndpoint.replace(/\/+$/, "")}/v1/traces`;
+}
+
+/** Escape a value for a TOML basic (double-quoted) string. */
+function tomlStr(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 /**
  * Build the bracketed [otel] + [otel.trace_exporter.otlp-http] block.
  * Returned WITH leading + trailing markers and a trailing newline.
@@ -52,29 +74,76 @@ export function defaultCodexConfigPath(): string {
  * (logs) in its config schema. We emit the trace_exporter form so
  * Path B span ingestion fires; the older `[otel.exporter.otlp-http]`
  * form is silently ignored on traces in the current schema.
+ *
+ * `includeAuthHeader` controls whether the write-only ingest key is
+ * inlined as a `headers` entry on the trace exporter. codex reads that
+ * header on every run, so persisting it makes a plain `codex` (no
+ * langwatch wrapper) capture without leaking OTEL vars into the shell
+ * rc. When false, the header comes from OTEL_EXPORTER_OTLP_HEADERS at
+ * runtime instead (the wrapper-only default that keeps the secret off
+ * disk until the user opts in).
  */
-export function buildCodexOtelBlock(inputs: CodexOtelBlockInputs): string {
+export function buildCodexOtelBlock(
+  inputs: CodexOtelBlockInputs,
+  options: { includeAuthHeader?: boolean } = {},
+): string {
   const env = inputs.environment ?? "langwatch";
-  // The header key is sent via OTEL_EXPORTER_OTLP_HEADERS at runtime so
-  // the toml block never persists the secret; the user only commits
-  // the endpoint + environment. We embed a note pointing at the env
-  // var so a reader of config.toml can audit the wiring.
+  const includeAuthHeader = options.includeAuthHeader ?? false;
+
+  const authNote = includeAuthHeader
+    ? [
+        `# The Authorization header below carries a write-only ingest key so`,
+        `# a plain 'codex' (without the langwatch wrapper) captures too. The`,
+        `# file is written 0600; remove the marker pair to opt back out.`,
+      ]
+    : [
+        `# Authorization header lives in OTEL_EXPORTER_OTLP_HEADERS;`,
+        `# this file persists only the endpoint + environment label.`,
+      ];
+
+  const exporter = [
+    "[otel.trace_exporter.otlp-http]",
+    `endpoint = "${tomlStr(inputs.endpoint)}"`,
+    `protocol = "json"`,
+  ];
+  if (includeAuthHeader) {
+    exporter.push(
+      `headers = { "Authorization" = "Bearer ${tomlStr(inputs.ingestionToken)}" }`,
+    );
+  }
+
   return [
     BEGIN,
-    `# Managed by 'langwatch ingest install codex'. Re-running the`,
-    `# command updates this block in place; remove the marker pair`,
-    `# above and below to opt back out.`,
-    `# Authorization header lives in OTEL_EXPORTER_OTLP_HEADERS;`,
-    `# this file persists only the endpoint + environment label.`,
+    `# Managed by 'langwatch codex'. Re-running the command updates this`,
+    `# block in place; remove the marker pair above and below to opt out.`,
+    ...authNote,
     "[otel]",
-    `environment = "${env}"`,
+    `environment = "${tomlStr(env)}"`,
     "",
-    "[otel.trace_exporter.otlp-http]",
-    `endpoint = "${inputs.endpoint}"`,
-    `protocol = "json"`,
+    ...exporter,
     END,
     "",
   ].join("\n");
+}
+
+/**
+ * Whether the current langwatch [otel] block in the file already
+ * carries a persisted `headers` line (the inlined Authorization
+ * header). Used to (a) stay quiet in the persist offer once the header
+ * is installed and (b) let the unconditional setup write preserve it.
+ */
+export function codexOtelBlockHasAuthHeader(filePath: string): boolean {
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return false;
+  }
+  const begin = content.indexOf(BEGIN);
+  const end = content.indexOf(END);
+  if (begin === -1 || end === -1 || end < begin) return false;
+  const block = content.slice(begin, end);
+  return /^\s*headers\s*=/m.test(block);
 }
 
 /**
@@ -101,14 +170,20 @@ export interface CodexOtelWriteResult {
  */
 export function writeCodexOtelBlock(
   inputs: CodexOtelBlockInputs,
-  options: { filePath?: string } = {},
+  options: { filePath?: string; persistAuthHeader?: boolean } = {},
 ): CodexOtelWriteResult {
   const filePath = options.filePath ?? defaultCodexConfigPath();
-  const block = buildCodexOtelBlock(inputs);
+  // Emit the Authorization header when explicitly asked (the persist
+  // opt-in); otherwise preserve whatever the current block has, so the
+  // unconditional setup write never strips a header a prior persist
+  // installed.
+  const includeAuthHeader =
+    options.persistAuthHeader ?? codexOtelBlockHasAuthHeader(filePath);
+  const block = buildCodexOtelBlock(inputs, { includeAuthHeader });
 
   if (!fs.existsSync(filePath)) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, block, { mode: 0o600 });
+    writeFile0600(filePath, block);
     return { action: "created", path: filePath };
   }
 
@@ -120,17 +195,35 @@ export function writeCodexOtelBlock(
   if (re.test(prior)) {
     const next = prior.replace(re, block);
     if (next === prior) return { action: "unchanged", path: filePath };
-    fs.writeFileSync(filePath, next, { mode: 0o600 });
+    writeFile0600(filePath, next);
     return { action: "updated", path: filePath };
   }
 
   const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-  fs.writeFileSync(filePath, prior + sep + block, { mode: 0o600 });
+  writeFile0600(filePath, prior + sep + block);
   return { action: "updated", path: filePath };
 }
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Write `content` and enforce `0600`. `writeFileSync`'s `mode` option is
+ * only honored when CREATING the file — on an existing file it is silently
+ * ignored, leaving whatever permissions the file already had. Codex may
+ * have created `config.toml` at `0644`, and these blocks can carry a bearer
+ * token, so narrow the file to `0600` BEFORE writing when it already exists:
+ * otherwise the token would land in a world-readable file for the window
+ * between the write and a trailing chmod. On create, the `mode` option sets
+ * `0600` up front. The final chmod is a belt-and-suspenders safety check.
+ */
+function writeFile0600(filePath: string, content: string): void {
+  if (fs.existsSync(filePath)) {
+    fs.chmodSync(filePath, 0o600);
+  }
+  fs.writeFileSync(filePath, content, { mode: 0o600 });
+  fs.chmodSync(filePath, 0o600);
 }
 
 const GW_BEGIN = "# >>> langwatch gateway begin >>>";
@@ -274,7 +367,7 @@ export function writeCodexGatewayBlock(
   let action: CodexOtelWriteAction;
   if (!fs.existsSync(filePath)) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, block, { mode: 0o600 });
+    writeFile0600(filePath, block);
     action = "created";
   } else {
     const prior = fs.readFileSync(filePath, "utf8");
@@ -287,12 +380,12 @@ export function writeCodexGatewayBlock(
       if (next === prior) {
         action = "unchanged";
       } else {
-        fs.writeFileSync(filePath, next, { mode: 0o600 });
+        writeFile0600(filePath, next);
         action = "updated";
       }
     } else {
       const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-      fs.writeFileSync(filePath, prior + sep + block, { mode: 0o600 });
+      writeFile0600(filePath, prior + sep + block);
       action = "updated";
     }
   }
@@ -300,14 +393,14 @@ export function writeCodexGatewayBlock(
   let profileAction: CodexOtelWriteAction;
   if (!fs.existsSync(profilePath)) {
     fs.mkdirSync(path.dirname(profilePath), { recursive: true });
-    fs.writeFileSync(profilePath, profileBody, { mode: 0o600 });
+    writeFile0600(profilePath, profileBody);
     profileAction = "created";
   } else {
     const priorProfile = fs.readFileSync(profilePath, "utf8");
     if (priorProfile === profileBody) {
       profileAction = "unchanged";
     } else {
-      fs.writeFileSync(profilePath, profileBody, { mode: 0o600 });
+      writeFile0600(profilePath, profileBody);
       profileAction = "updated";
     }
   }
@@ -317,3 +410,99 @@ export function writeCodexGatewayBlock(
 
 /** Exported so callers + tests can reference the profile name from one place. */
 export const CODEX_GATEWAY_PROFILE_NAME = PROFILE_NAME;
+
+/**
+ * Cut a marker-bracketed langwatch block out of `content`. Removes at most
+ * one leading newline and one trailing newline around the block so the
+ * blank line the install path inserts before the block goes with it, but
+ * unrelated user whitespace is left alone. Returns the stripped content, or
+ * null when no such block is present.
+ */
+function stripMarkerBlock(
+  content: string,
+  begin: string,
+  end: string,
+): string | null {
+  const re = new RegExp(
+    `\\n?${escapeRe(begin)}[\\s\\S]*?${escapeRe(end)}\\n?`,
+    "m",
+  );
+  if (!re.test(content)) return null;
+  return content.replace(re, "");
+}
+
+function removeMarkerBlockFromFile(
+  filePath: string,
+  begin: string,
+  end: string,
+): boolean {
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return false; // ENOENT
+  }
+  const next = stripMarkerBlock(content, begin, end);
+  if (next === null) return false;
+  // Plain write preserves the file's existing mode (writeFileSync's `mode`
+  // is ignored on an existing file) — removal strips our block, adding no
+  // secret, so a pre-existing 0600 stays 0600.
+  fs.writeFileSync(filePath, next);
+  return true;
+}
+
+function fileHasMarker(filePath: string, begin: string): boolean {
+  try {
+    return fs.readFileSync(filePath, "utf8").includes(begin);
+  } catch {
+    return false;
+  }
+}
+
+/** Whether config.toml currently carries the langwatch `[otel]` block. */
+export function codexHasOtelBlock(
+  filePath: string = defaultCodexConfigPath(),
+): boolean {
+  return fileHasMarker(filePath, BEGIN);
+}
+
+/** Whether config.toml currently carries the langwatch gateway block. */
+export function codexHasGatewayBlock(
+  filePath: string = defaultCodexConfigPath(),
+): boolean {
+  return fileHasMarker(filePath, GW_BEGIN);
+}
+
+/**
+ * Remove the langwatch `[otel]` (Path B) marker block from config.toml, if
+ * present. User config outside the marker pair is preserved. Returns true
+ * when a block was removed (idempotent — false when absent).
+ */
+export function removeCodexOtelBlock(
+  filePath: string = defaultCodexConfigPath(),
+): boolean {
+  return removeMarkerBlockFromFile(filePath, BEGIN, END);
+}
+
+/**
+ * Remove the langwatch gateway (Path A) provider marker block from
+ * config.toml, if present. Returns true when a block was removed.
+ */
+export function removeCodexGatewayBlock(
+  filePath: string = defaultCodexConfigPath(),
+): boolean {
+  return removeMarkerBlockFromFile(filePath, GW_BEGIN, GW_END);
+}
+
+/**
+ * Delete the sibling `<profile>.config.toml` file, which is entirely
+ * owned by langwatch. Returns true when a file was deleted (idempotent —
+ * false when it was already absent).
+ */
+export function removeCodexGatewayProfileFile(
+  profilePath: string = defaultCodexProfilePath(),
+): boolean {
+  if (!fs.existsSync(profilePath)) return false;
+  fs.rmSync(profilePath, { force: true });
+  return true;
+}

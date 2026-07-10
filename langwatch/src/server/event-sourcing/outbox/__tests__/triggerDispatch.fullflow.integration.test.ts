@@ -116,6 +116,9 @@ function makeNotifyDeps(opts?: { emailCap?: number }) {
     consumeTenantEmailCapSlot: async () => ({ allowed: true, count: 0 }),
     // Suppression isn't the focus here (the cap is) — pass recipients through.
     filterSuppressedEmails: async ({ emails }: { emails: string[] }) => emails,
+    // Graph-eval evaluation runs on a separate stage; these notify-focused
+    // flows never enter the graphEval branch so a no-op stub is enough.
+    evaluateGraphTrigger: vi.fn().mockResolvedValue(undefined),
   };
 }
 

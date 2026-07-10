@@ -5,6 +5,7 @@ import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   incrementEsFoldProjectionTotal,
   incrementEsMapProjectionTotal,
+  incrementEsReactorCollapsedTotal,
   incrementEsReactorTotal,
   observeEsFoldProjectionDuration,
   observeEsMapProjectionDuration,
@@ -399,6 +400,13 @@ export class ProjectionRouter<
         name,
         handler: {
           handle: async (event: EventType) => {
+            // Defer or skip if projection-replay is active for this aggregate.
+            // Mirrors the fold projection replay-marker check.
+            if (this.replayMarkerChecker) {
+              const decision = await this.replayMarkerChecker.check(name, event);
+              if (decision === "skip") return;
+            }
+
             const context = await this.buildStoreContext(event);
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, context),
@@ -423,7 +431,12 @@ export class ProjectionRouter<
             // Dispatch to map reactors after map execute succeeds
             const mapReactors = this.reactorsForMap.get(name);
             if (record !== null && mapReactors && mapReactors.length > 0) {
-              await this.dispatchToReactors(name, mapReactors, event, record);
+              await this.dispatchToReactors({
+                foldName: name,
+                reactors: mapReactors,
+                events: [event],
+                foldState: record,
+              });
             }
           },
         },
@@ -665,6 +678,13 @@ export class ProjectionRouter<
           }
 
           try {
+            // Defer or skip if projection-replay is active for this aggregate.
+            // Mirrors the fold projection replay-marker check.
+            if (this.replayMarkerChecker) {
+              const decision = await this.replayMarkerChecker.check(name, event);
+              if (decision === "skip") continue;
+            }
+
             const storeContext = await this.buildStoreContext(event);
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
@@ -689,7 +709,12 @@ export class ProjectionRouter<
             // Dispatch to map reactors after map execute succeeds
             const mapReactors = this.reactorsForMap.get(name);
             if (record !== null && mapReactors && mapReactors.length > 0) {
-              await this.dispatchToReactors(name, mapReactors, event, record);
+              await this.dispatchToReactors({
+                foldName: name,
+                reactors: mapReactors,
+                events: [event],
+                foldState: record,
+              });
             }
           } catch (error) {
             handleError(error, categorizeError(error), this.logger, {
@@ -791,12 +816,12 @@ export class ProjectionRouter<
         // After fold succeeds, dispatch to reactors for this fold
         const reactors = this.reactorsForFold.get(projectionName);
         if (reactors && reactors.length > 0) {
-          await this.dispatchToReactors(
-            projectionName,
+          await this.dispatchToReactors({
+            foldName: projectionName,
             reactors,
-            event,
+            events: [event],
             foldState,
-          );
+          });
         }
       },
     );
@@ -900,24 +925,22 @@ export class ProjectionRouter<
           },
         });
 
-        // Dispatch reactors for EVERY folded event, with the final fold state.
-        // Fold-state reactors (broadcast, metadata, alerts) carry makeJobId
-        // dedup and collapse to one effective run, so firing per event is cheap.
+        // Dispatch reactors for the whole batch, with the final fold state.
         // Per-span reactors must see every event: customEvaluationSync reads
-        // event.data.span to extract embedded SDK evals, and evaluationTrigger
-        // inspects each span's attributes — firing only once would silently
-        // drop N-1 spans' work, and only under backlog (the recovery path).
-        // The O(n²)->O(n) win lives in the single fold load/store, not here.
+        // event.data.span to extract embedded SDK evals, and its makeJobId
+        // carries the event id, so it is dispatched once per event. Reactors
+        // keyed on the aggregate (broadcast, metadata, alerts) would be squashed
+        // to one job by the queue's dedup anyway, so dispatchToReactors collapses
+        // them here instead of paying N serialize+gzip+blob round-trips to reach
+        // the same state. See ProjectionRouter.collapseByJobId.
         const reactors = this.reactorsForFold.get(projectionName);
         if (reactors && reactors.length > 0) {
-          for (const event of toApply) {
-            await this.dispatchToReactors(
-              projectionName,
-              reactors,
-              event,
-              foldState,
-            );
-          }
+          await this.dispatchToReactors({
+            foldName: projectionName,
+            reactors,
+            events: toApply,
+            foldState,
+          });
         }
       },
     );
@@ -975,95 +998,180 @@ export class ProjectionRouter<
   }
 
   /**
-   * Dispatches a single event to reactors registered on a fold projection.
-   * In queued mode, sends to reactor queues. In inline mode, calls directly.
+   * The events a reactor must actually be sent for, out of a coalesced batch.
+   *
+   * A reactor's `makeJobId` IS its collapse key: the queue dedups on it, so N
+   * sends carrying the same job id leave exactly one job behind — the last one,
+   * since staging replaces a squashed duplicate. Reactors keyed on the aggregate
+   * (`eval-trigger:${tenantId}:${aggregateId}`, `trace-update:…`) therefore
+   * produce one job no matter how many events a backed-up group drains.
+   *
+   * Sending all N anyway is not free: each send serializes `{event, foldState}`,
+   * gzips it, and — once past the envelope's inline ceiling — writes a
+   * content-addressed blob into Redis that the ensuing dedup squash immediately
+   * reclaims. On a 10k-span trace that was ~99 discarded round-trips per drained
+   * batch, per reactor. Collapsing here reaches the same queue state by the same
+   * rule the queue itself would have applied, without the churn.
+   *
+   * Reactors keyed per event (`…:${event.id}`) collapse to nothing and are
+   * dispatched for every event, as are reactors with no job id at all.
    */
-  private async dispatchToReactors(
-    foldName: string,
-    reactors: ReactorDefinition<EventType>[],
-    event: EventType,
-    foldState: unknown,
-  ): Promise<void> {
-    const hasReactorQueues = this.queueManager.hasReactorQueues();
+  private collapseByJobId({
+    reactor,
+    events,
+    foldState,
+  }: {
+    reactor: ReactorDefinition<EventType>;
+    events: EventType[];
+    foldState: unknown;
+  }): EventType[] {
+    const makeJobId = reactor.options?.makeJobId;
+    if (!makeJobId || events.length < 2) return events;
+
+    try {
+      // Keep the LAST event per job id — the one the queue's dedup squash would
+      // have left behind (STAGE_LUA overwrites the stored value when
+      // `shouldReplace`, which every reactor here defaults to).
+      //
+      // A Map alone would order the survivors by each job id's FIRST
+      // occurrence while holding its last value, so a batch carrying two job
+      // ids could dispatch a later event before an earlier one. Re-sort by the
+      // surviving event's position so dispatch really is in occurredAt order —
+      // `events` arrives sorted, so the index IS that order.
+      const lastIndexPerJobId = new Map<string, number>();
+      events.forEach((event, index) => {
+        lastIndexPerJobId.set(makeJobId({ event, foldState }), index);
+      });
+      const survivors = [...lastIndexPerJobId.values()].sort((a, b) => a - b);
+      if (survivors.length === events.length) return events;
+
+      incrementEsReactorCollapsedTotal(
+        this.pipelineName,
+        reactor.name,
+        events.length - survivors.length,
+      );
+      // biome-ignore lint/style/noNonNullAssertion: every index came from `events`.
+      return survivors.map((index) => events[index]!);
+    } catch (error) {
+      // Fail open, like `shouldReact`: a throwing job-id function must never
+      // drop a side effect. Worst case is the un-collapsed fan-out we had before.
+      this.logger.error(
+        {
+          reactorName: reactor.name,
+          eventCount: events.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Reactor makeJobId threw while collapsing a batch — dispatching every event",
+      );
+      return events;
+    }
+  }
+
+  /**
+   * Dispatches a coalesced batch of same-aggregate events to reactors registered
+   * on a fold projection. In queued mode, sends to reactor queues. In inline
+   * mode, calls directly. A single event is just a batch of one.
+   *
+   * Events are filtered by `shouldReact` BEFORE they are collapsed, so a reactor
+   * keyed on the aggregate receives the last event it actually cared about
+   * rather than the last event in the batch.
+   */
+  private async dispatchToReactors({
+    foldName,
+    reactors,
+    events,
+    foldState,
+  }: {
+    foldName: string;
+    reactors: ReactorDefinition<EventType>[];
+    events: EventType[];
+    foldState: unknown;
+  }): Promise<void> {
     const errors: Error[] = [];
 
     for (const reactor of reactors) {
       if (reactor.options?.disabled) continue;
       if (this.isReactorExcluded(reactor)) continue;
-      if (!this.reactorShouldReact(reactor, event, foldState)) {
-        incrementEsReactorTotal(this.pipelineName, reactor.name, "skipped");
-        continue;
-      }
 
-      if (hasReactorQueues) {
-        const queueProcessor = this.queueManager.getReactorQueue(reactor.name);
-        if (queueProcessor) {
-          try {
-            await queueProcessor.send({ event, foldState });
-          } catch (error) {
-            this.logger.error(
-              {
-                reactorName: reactor.name,
-                foldName,
-                eventId: event.id,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "Failed to dispatch event to reactor queue",
-            );
-            errors.push(toError(error));
-          }
+      const relevant: EventType[] = [];
+      for (const event of events) {
+        if (this.reactorShouldReact(reactor, event, foldState)) {
+          relevant.push(event);
         } else {
-          // Queue expected but not found — fall back to inline execution
-          this.logger.warn(
+          incrementEsReactorTotal(this.pipelineName, reactor.name, "skipped");
+        }
+      }
+      if (relevant.length === 0) continue;
+
+      for (const event of this.collapseByJobId({
+        reactor,
+        events: relevant,
+        foldState,
+      })) {
+        await this.dispatchOneToReactor({
+          foldName,
+          reactor,
+          event,
+          foldState,
+          errors,
+        });
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(
+        errors,
+        `${errors.length} reactor(s) failed during dispatch`,
+      );
+    }
+  }
+
+  /**
+   * Sends one event to one reactor, collecting rather than throwing failures so
+   * a single bad reactor can't skip the ones after it.
+   */
+  private async dispatchOneToReactor({
+    foldName,
+    reactor,
+    event,
+    foldState,
+    errors,
+  }: {
+    foldName: string;
+    reactor: ReactorDefinition<EventType>;
+    event: EventType;
+    foldState: unknown;
+    errors: Error[];
+  }): Promise<void> {
+    const hasReactorQueues = this.queueManager.hasReactorQueues();
+
+    if (hasReactorQueues) {
+      const queueProcessor = this.queueManager.getReactorQueue(reactor.name);
+      if (queueProcessor) {
+        try {
+          await queueProcessor.send({ event, foldState });
+        } catch (error) {
+          this.logger.error(
             {
               reactorName: reactor.name,
               foldName,
               eventId: event.id,
+              error: error instanceof Error ? error.message : String(error),
             },
-            "Reactor queue not found, falling back to inline execution",
+            "Failed to dispatch event to reactor queue",
           );
-          try {
-            await withMetrics({
-              fn: () =>
-                reactor.handle(
-                  event,
-                  this.buildReactorContext({ event, foldState }),
-                ),
-              onComplete: (ms) => {
-                incrementEsReactorTotal(
-                  this.pipelineName,
-                  reactor.name,
-                  "completed",
-                );
-                observeEsReactorDuration(this.pipelineName, reactor.name, ms);
-              },
-              onFail: (ms) => {
-                incrementEsReactorTotal(
-                  this.pipelineName,
-                  reactor.name,
-                  "failed",
-                );
-                observeEsReactorDuration(this.pipelineName, reactor.name, ms);
-              },
-            });
-          } catch (error) {
-            this.logger.error(
-              {
-                reactorName: reactor.name,
-                foldName,
-                eventId: event.id,
-                eventType: event.type,
-                aggregateId: String(event.aggregateId),
-                tenantId: event.tenantId,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "Reactor failed during inline fallback execution",
-            );
-            errors.push(toError(error));
-          }
+          errors.push(toError(error));
         }
       } else {
-        // Inline mode: call reactor directly
+        // Queue expected but not found — fall back to inline execution
+        this.logger.warn(
+          {
+            reactorName: reactor.name,
+            foldName,
+            eventId: event.id,
+          },
+          "Reactor queue not found, falling back to inline execution",
+        );
         try {
           await withMetrics({
             fn: () =>
@@ -1099,18 +1207,52 @@ export class ProjectionRouter<
               tenantId: event.tenantId,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
+            "Reactor failed during inline fallback execution",
           );
           errors.push(toError(error));
         }
       }
-    }
-
-    if (errors.length > 0) {
-      throw new AggregateError(
-        errors,
-        `${errors.length} reactor(s) failed during dispatch`,
-      );
+    } else {
+      // Inline mode: call reactor directly
+      try {
+        await withMetrics({
+          fn: () =>
+            reactor.handle(
+              event,
+              this.buildReactorContext({ event, foldState }),
+            ),
+          onComplete: (ms) => {
+            incrementEsReactorTotal(
+              this.pipelineName,
+              reactor.name,
+              "completed",
+            );
+            observeEsReactorDuration(this.pipelineName, reactor.name, ms);
+          },
+          onFail: (ms) => {
+            incrementEsReactorTotal(
+              this.pipelineName,
+              reactor.name,
+              "failed",
+            );
+            observeEsReactorDuration(this.pipelineName, reactor.name, ms);
+          },
+        });
+      } catch (error) {
+        this.logger.error(
+          {
+            reactorName: reactor.name,
+            foldName,
+            eventId: event.id,
+            eventType: event.type,
+            aggregateId: String(event.aggregateId),
+            tenantId: event.tenantId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
+        );
+        errors.push(toError(error));
+      }
     }
   }
 

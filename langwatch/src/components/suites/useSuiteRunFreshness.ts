@@ -56,10 +56,19 @@ export function useSuiteRunFreshness({
   );
 
   // Invalidate the heavy run-data query only when freshness advances past the
-  // last observed value. The first observation is only recorded — the heavy
-  // query has just fetched on mount, so there is nothing newer to pull.
+  // last observed value within the current probe scope. The first observation
+  // for a scope is only recorded — the heavy query has just fetched for that
+  // scope, so there is nothing newer to pull. A scope change re-baselines the
+  // high-water mark, otherwise a previous set/period with a newer
+  // `lastUpdatedAt` would suppress invalidations in the new scope.
+  const scopeKey = `${project?.id ?? ""}:${scenarioSetId ?? ""}:${startDateMs}:${endDateMs ?? ""}`;
   const lastSeenRef = useRef<number | null>(null);
+  const lastScopeRef = useRef(scopeKey);
   useEffect(() => {
+    if (lastScopeRef.current !== scopeKey) {
+      lastScopeRef.current = scopeKey;
+      lastSeenRef.current = null;
+    }
     const lastUpdatedAt = data?.lastUpdatedAt;
     if (lastUpdatedAt === undefined) return;
     if (lastSeenRef.current === null) {
@@ -70,5 +79,5 @@ export function useSuiteRunFreshness({
       lastSeenRef.current = lastUpdatedAt;
       void utils.scenarios.getSuiteRunData.invalidate();
     }
-  }, [data?.lastUpdatedAt, utils]);
+  }, [scopeKey, data?.lastUpdatedAt, utils]);
 }

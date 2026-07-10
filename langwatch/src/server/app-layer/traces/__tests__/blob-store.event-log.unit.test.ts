@@ -856,6 +856,8 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
         droppedAttributesCount: 0,
         droppedEventsCount: 0,
         droppedLinksCount: 0,
+        cost: null,
+        nonBilledCost: null,
       };
 
       const logger: WarnLogger = {
