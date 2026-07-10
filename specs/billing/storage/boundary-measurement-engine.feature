@@ -11,25 +11,25 @@ Feature: Storage billing boundary measurement engine
 
   # Sweep trigger
 
-  @integration @unimplemented
+  @integration
   Scenario: The sweep runs once per sealed hour regardless of ingest volume
     Given the current sealed hour was already swept
     When 1000 more ingest events arrive within the same hour
     Then no additional measurement work is performed
 
-  @integration @unimplemented
+  @integration
   Scenario: The once-per-hour guarantee survives a process restart
     Given the current sealed hour was swept before a worker restart
     When an ingest event wakes the restarted worker within the same hour
     Then no additional measurement work is performed
 
-  @integration @unimplemented
+  @integration
   Scenario: Ingest from any organization triggers measurement for all billable organizations
     Given two billable organizations where only one is actively ingesting
     When a new sealed hour is swept
     Then both organizations get their gauge sampled for that hour
 
-  @integration @unimplemented
+  @integration
   Scenario: A failing organization does not block the rest of the sweep
     Given three billable organizations where one fails during measurement
     When the sweep runs
@@ -110,7 +110,7 @@ Feature: Storage billing boundary measurement engine
     Then a drift alarm is raised for that organization
     And the hourly row is still written as zero megabytes
 
-  @integration @unimplemented
+  @integration
   Scenario: With the metering flag off the engine stays fully dark
     Given the storage metering flag is disabled
     When sealed hours pass with active ingestion
