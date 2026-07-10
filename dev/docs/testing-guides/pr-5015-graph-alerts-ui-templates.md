@@ -100,8 +100,9 @@ FROM "Trigger" WHERE ...;
 ```
 
 Expected:
-- `name` = `Alert: <what-you-typed>` (single prefix, even if you
-  typed `alert: cost spike` yourself).
+- `name` = exactly what you typed, with any legacy `Alert:` prefix
+  stripped (the builder no longer stores an `Alert:` prefix — the
+  Type column already labels the row a Graph alert).
 - `customGraphId` populated.
 - `filters_type` = `object`. **Never `string`.** (Regression trap.)
 - `threshold` matches what you set.
@@ -145,10 +146,9 @@ Expected:
 
 ### 6. Persist actions blocked for graph alerts
 
-1. Author a new graph alert. On the Type stage, confirm the
-   `ADD_TO_DATASET` and `ADD_TO_ANNOTATION_QUEUE` cards are visually
-   disabled with a tooltip explaining "not available for graph
-   alerts."
+1. Author a new graph alert. On the Type stage, confirm the Action
+   group (`ADD_TO_DATASET` / `ADD_TO_ANNOTATION_QUEUE`) is not
+   rendered at all — graph alerts only show the Notify group.
 2. Server-side gate: even if you smuggle one through in the wire
    payload, `automation.upsert` throws `BAD_REQUEST` on those
    actions when `customGraphId` is set.
@@ -166,10 +166,11 @@ Expected:
   should return zero rows across the whole project. If it does not,
   the dispatch drift bug is live and the trigger's filter evaluation
   either explodes or silently matches nothing.
-- **Case-insensitive `Alert:` prefix.** Save a trigger named
-  `alert: cost spike`. Row must read `Alert: cost spike`, not
-  `Alert: alert: cost spike`. Also test `ALERT: foo` — must not
-  double-prefix. Regex is `/^\s*alert:\s*/i`.
+- **Legacy `Alert:` prefix stripped, never re-added.** Save a trigger
+  named `alert: cost spike`. Row must read `cost spike` — the builder
+  strips a leading `alert:` (regex `/^\s*alert:\s*/i`) and stores the
+  bare name. A pre-existing `Alert: foo` row cleans up to `foo` on its
+  next save.
 - **SSOT builder covers UPDATE too.** `graphs.updateById`'s UPDATE
   branch previously bypassed `buildGraphAlertTriggerData` and wrote
   an inline shape. P0 fix routed it through the builder. Regression
