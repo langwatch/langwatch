@@ -1,12 +1,12 @@
 Feature: Stripe metering gate derives from the active plan
   # ADR-039 rollout step 1. The event-metering population and meter unit
   # must derive from the resolved plan, never from the Organization.pricingModel
-  # column, so column drift can no longer silently exclude a paying org
-  # from usage billing.
+  # column, so the metering population always matches the active seat
+  # subscriptions regardless of column drift.
 
   As the billing reporting pipeline
   I want the metering population and meter unit derived from the resolved plan
-  So that a paying seat-billed organization is always metered regardless of stored column drift
+  So that the metering population always matches active seat subscriptions regardless of stored column drift
 
   @integration
   Scenario: Organization with an active seat subscription and a stale TIERED column is metered
