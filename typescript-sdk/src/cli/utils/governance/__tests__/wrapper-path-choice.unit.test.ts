@@ -327,6 +327,134 @@ describe("resolveWrapperPath", () => {
     });
   });
 
+  describe("when the tool is copilot (ingestion-first defaults, ADR-039)", () => {
+    // Copilot inverts every silent gateway default: Path A switches
+    // copilot into BYOK mode, moving spend off the user's paid Copilot
+    // seat onto the org's provider keys — not billing-neutral like the
+    // claude/codex base-URL swap. Explicit choices are honored unchanged.
+
+    /** @scenario Non-interactive copilot run with no pinned mode resolves to direct OTLP */
+    it("defaults copilot to ingestion on non-TTY runs (billing neutrality)", async () => {
+      const save = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: false,
+        promptImpl: neverPrompt,
+        saveImpl: save,
+        env: {},
+      });
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The copilot path prompt pre-selects direct OTLP */
+    it("pre-selects the direct OTLP choice on the copilot prompt", async () => {
+      const prompt = vi.fn(async () => ({
+        path: "ingestion",
+      })) as unknown as Parameters<typeof resolveWrapperPath>[0]["promptImpl"];
+      await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: prompt,
+        saveImpl: vi.fn(),
+        writeImpl: vi.fn(),
+        env: {},
+      });
+      const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]![0] as {
+        choices: Array<{ value: string }>;
+        initial: number;
+      };
+      const values = promptArg.choices.map((c) => c.value);
+      expect(values[promptArg.initial]).toBe("ingestion");
+    });
+
+    /** @scenario Aborting the copilot path prompt falls back to direct OTLP for this run */
+    it("falls back to ingestion (not gateway) when the copilot prompt is aborted", async () => {
+      const save = vi.fn();
+      const abortPrompt = vi.fn(async () => ({})) as unknown as Parameters<
+        typeof resolveWrapperPath
+      >[0]["promptImpl"];
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: abortPrompt,
+        saveImpl: save,
+        env: {},
+      });
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    /** @scenario An explicit --tool-mode=gateway flag routes copilot through the gateway */
+    it("honors an explicit gateway override for copilot", async () => {
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        override: "gateway",
+        isTTY: false,
+        promptImpl: neverPrompt,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+    });
+
+    /** @scenario A pinned gateway mode for copilot is honored without prompting */
+    it("honors a pinned gateway mode for copilot without prompting", async () => {
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({ tool_mode: { copilot: "gateway" } }),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(out.prompted).toBe(false);
+    });
+
+    /** @scenario Policy-forced gateway routing for copilot names the seat bypass */
+    it("names the Copilot seat bypass when policy forces the gateway path", async () => {
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          tool_policies: { copilot: { allowVk: true, allowOtelDirect: false } },
+        }),
+        tool: "copilot",
+        args: [],
+        isTTY: false,
+        promptImpl: neverPrompt,
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      const written = write.mock.calls.map((c) => c[0]).join("");
+      expect(written).toContain("Copilot seat");
+    });
+
+    /** @scenario Non-copilot tools keep the gateway default on non-interactive runs */
+    it("keeps the gateway default for non-copilot tools on non-TTY runs", async () => {
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "claude",
+        args: [],
+        isTTY: false,
+        promptImpl: neverPrompt,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+    });
+  });
+
   describe("when there is no remembered answer (run-time policy refresh)", () => {
     it("re-checks the policy at run time and honors a freshly-disabled gateway", async () => {
       // Login cached BOTH paths; the admin has since turned the gateway off.

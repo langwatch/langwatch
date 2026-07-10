@@ -45,6 +45,19 @@ import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 
 export type WrapperMode = "gateway" | "ingestion";
 
+/**
+ * Copilot is the one tool where landing on the gateway changes WHO PAYS:
+ * BYOK routing bills the org's provider keys while the user's Copilot
+ * seat sits idle (ADR-039 Decision 3). Every mid-run fallback ONTO the
+ * gateway (policy downgrade here, mint-failure fallback in wrapper.ts)
+ * appends this so the shift is named, never silent. Empty for every
+ * other tool — their gateway swap is billing-neutral.
+ */
+export function copilotSeatBypassSuffix(tool: string): string {
+  if (tool !== "copilot") return "";
+  return " NOTE: gateway usage bills your org's provider keys, not your Copilot seat.";
+}
+
 export interface WrapperModeResult {
   mode: WrapperMode;
   /** Env additions to merge into the child process.env. */
@@ -192,7 +205,7 @@ export async function resolveWrapperMode(
   }
   if (mode === "ingestion" && !policy.allowOtelDirect) {
     mode = "gateway";
-    notice = `${lwTag()} direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.`;
+    notice = `${lwTag()} direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.${copilotSeatBypassSuffix(tool)}`;
   }
 
   if (mode === "gateway") {

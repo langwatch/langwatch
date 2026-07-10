@@ -23,7 +23,7 @@ import { getCliBootstrap, GovernanceCliError } from "./cli-api";
 import { runDeviceFlowLogin } from "./login-flow";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
-import { resolveWrapperMode } from "./wrapper-mode";
+import { copilotSeatBypassSuffix, resolveWrapperMode } from "./wrapper-mode";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
 
@@ -498,7 +498,8 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     if (pathChoice.mode === "ingestion" && policy.allowVk && !isToolDisabled) {
       process.stderr.write(
         `${lwTag()} couldn't set up direct OTLP ingestion for ${tool} ` +
-          `(${(err as Error).message}). Falling back to the gateway path.\n`,
+          `(${(err as Error).message}). Falling back to the gateway path.` +
+          `${copilotSeatBypassSuffix(tool)}\n`,
       );
       try {
         modeResult = await resolveWrapperMode(

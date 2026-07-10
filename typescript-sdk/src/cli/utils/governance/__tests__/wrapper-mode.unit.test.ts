@@ -527,6 +527,36 @@ describe("resolveWrapperMode", () => {
     });
   });
 
+  describe("when the cached policy disables direct OTLP for copilot", () => {
+    /** @scenario Policy-forced gateway routing for copilot names the seat bypass */
+    it("routes through the gateway with a notice naming the Copilot seat bypass", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+
+      const cfg = baseCfg({
+        default_personal_vk: { id: "vk1", secret: "lw_vk", prefix: "lw_" },
+        tool_policies: { copilot: { allowVk: true, allowOtelDirect: false } },
+      });
+      const gw = { COPILOT_PROVIDER_BASE_URL: "http://gw/v1" };
+      const out = await resolveWrapperMode(cfg, "copilot", gw, [], "ingestion");
+
+      expect(out.mode).toBe("gateway");
+      expect(out.notice).toContain("Copilot seat");
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("copilotSeatBypassSuffix()", () => {
+    // runWrapped's ingestion-mint-failure fallback appends this suffix to
+    // its stderr message (wrapper.ts); asserting the helper here keeps the
+    // who-pays wording pinned without simulating a full spawn.
+    /** @scenario Ingestion setup failure falling back to the gateway names the seat bypass */
+    it("names the seat bypass for copilot and stays silent for other tools", async () => {
+      const { copilotSeatBypassSuffix } = await import("../wrapper-mode.js");
+      expect(copilotSeatBypassSuffix("copilot")).toContain("Copilot seat");
+      expect(copilotSeatBypassSuffix("claude")).toBe("");
+    });
+  });
+
   describe("when the cached policy disables both paths for a tool", () => {
     it("throws a tool-disabled error with an admin hint", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
