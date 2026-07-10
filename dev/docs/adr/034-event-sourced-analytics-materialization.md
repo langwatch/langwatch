@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-20
 - **Supersedes:** the abandoned Postgres app-rollup (sign-collapsing + HLL/t-digest sketches — wrong layer).
-- **Behavioural contract:** [specs/analytics/event-sourced-analytics-materialization.feature](../../specs/analytics/event-sourced-analytics-materialization.feature)
+- **Behavioural contract:** [specs/analytics/event-sourced-analytics-materialization.feature](../../../specs/analytics/event-sourced-analytics-materialization.feature)
 
 ## Context
 

@@ -1,8 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
-import { handleSendEmail } from "~/pages/api/cron/triggers/actions/sendEmail";
-import { handleSendSlackMessage } from "~/pages/api/cron/triggers/actions/sendSlackMessage";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";

@@ -93,8 +93,8 @@ export interface GraphAlertDispatchResult {
  * Squeezing this into the existing helper would require a kind-
  * discriminated branch whose two arms share no logic.
  *
- * Picks `ALERT_TRIGGER_DEFAULTS` via `pickTriggerDefaults({
- * hasCustomGraph: true })`, then defers to the same Liquid pipeline the
+ * Uses `ALERT_TRIGGER_DEFAULTS` directly as the default template set,
+ * then defers to the same Liquid pipeline the
  * trace notify path uses (`renderTriggerEmail` / `renderTriggerSlack`)
  * so per-trigger custom templates (the four Trigger columns) override
  * the defaults uniformly. The senders are the rendered-form variants

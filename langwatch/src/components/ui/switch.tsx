@@ -13,7 +13,7 @@ import * as React from "react";
  * `onChange` off the type surface forces TypeScript to catch mis-wired
  * consumers instead of silently no-op'ing them.
  */
-export interface SwitchProps extends ChakraSwitch.RootProps {
+export interface SwitchProps extends Omit<ChakraSwitch.RootProps, "onChange"> {
   inputProps?: React.InputHTMLAttributes<HTMLInputElement>;
   rootRef?: React.Ref<HTMLLabelElement>;
   trackLabel?: { on: React.ReactNode; off: React.ReactNode };

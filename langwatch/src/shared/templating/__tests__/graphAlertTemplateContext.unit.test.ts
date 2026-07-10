@@ -20,6 +20,73 @@ const baseArgs = {
 };
 
 describe("buildGraphAlertTemplateContext", () => {
+  describe("given a metric label carrying CR/LF (SMTP header-injection attempt)", () => {
+    it("collapses CR/LF/NUL to spaces in metric.label while leaving seriesName untouched", () => {
+      const ctx = buildGraphAlertTemplateContext({
+        ...baseArgs,
+        metric: {
+          label: "Latency\r\nBcc: evil@x.com\0end",
+          seriesName: "0/error_count/sum",
+        },
+      });
+      expect(ctx.metric.label).not.toMatch(/[\r\n\0]/);
+      expect(ctx.metric.label).toBe("Latency Bcc: evil@x.com end");
+      expect(ctx.metric.seriesName).toBe("0/error_count/sum");
+    });
+  });
+
+  describe("given metric history and a previous value", () => {
+    it("carries history through as ISO-stamped points with a matching sparkline", () => {
+      const ctx = buildGraphAlertTemplateContext({
+        ...baseArgs,
+        history: [
+          { timestamp: new Date("2026-06-21T09:00:00.000Z"), value: 1 },
+          { timestamp: "2026-06-21T09:30:00Z", value: 5 },
+          { timestamp: new Date("2026-06-21T10:00:00.000Z"), value: 9 },
+        ],
+        previousValue: 4,
+      });
+      expect(ctx.history).toEqual([
+        { timestamp: "2026-06-21T09:00:00.000Z", value: 1 },
+        { timestamp: "2026-06-21T09:30:00Z", value: 5 },
+        { timestamp: "2026-06-21T10:00:00.000Z", value: 9 },
+      ]);
+      expect(ctx.sparkline).toBe("▁▅█");
+      expect(ctx.previousValue).toBe(4);
+    });
+
+    it("renders a flat series as mid glyphs and an empty history as an empty sparkline", () => {
+      const flat = buildGraphAlertTemplateContext({
+        ...baseArgs,
+        history: [
+          { timestamp: "t1", value: 5 },
+          { timestamp: "t2", value: 5 },
+        ],
+      });
+      expect(flat.sparkline).toBe("▄▄");
+      const empty = buildGraphAlertTemplateContext(baseArgs);
+      expect(empty.history).toEqual([]);
+      expect(empty.sparkline).toBe("");
+      expect(empty.previousValue).toBeNull();
+    });
+  });
+
+  describe("given an incident window", () => {
+    it("appends startDate/endDate to the graph URL", () => {
+      const ctx = buildGraphAlertTemplateContext({
+        ...baseArgs,
+        window: {
+          start: new Date("2026-06-21T09:00:00.000Z"),
+          end: NOW,
+        },
+      });
+      expect(ctx.graph.url).toBe(
+        "https://app.langwatch.ai/acme/analytics/custom/graph_42" +
+          "?startDate=2026-06-21T09%3A00%3A00.000Z&endDate=2026-06-21T10%3A00%3A00.000Z",
+      );
+    });
+  });
+
   describe("given a breach context", () => {
     it("carries every trigger field through unchanged", () => {
       const ctx = buildGraphAlertTemplateContext(baseArgs);

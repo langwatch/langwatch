@@ -234,7 +234,11 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
   describe("given an evaluation metric with a per-evaluator key", () => {
     it("falls back to evaluation_runs (rt5014-001: eval slim has no EvaluatorId column; rt5014-002: rollup would silently drop the key)", () => {
       const table = pickAnalyticsTable({
-        series: [series("evaluations.evaluation_score", "avg")],
+        series: [
+          series("evaluations.evaluation_score", "avg", {
+            key: "evaluator_abc123",
+          }),
+        ],
       });
       expect(table).toBe("evaluation_runs");
     });

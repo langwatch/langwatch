@@ -205,6 +205,62 @@ describe("evaluateGraphTrigger", () => {
     harness = makeHarness({ series: timeseries(15) });
   });
 
+  describe("given a keyed series whose stored identifier differs from the result bucket key", () => {
+    // Regression: stored trigger identifiers are `{index}/{key|metric}/{agg}`
+    // while result buckets are keyed `{queryIndex}/{metric}/{agg}/{key}`.
+    // Before the buildSeriesName fix this lookup missed, read 0, and a `gt`
+    // alert never fired.
+    it("reads the bucket via the buildSeriesName encoding and fires", async () => {
+      const harness = makeHarness({
+        trigger: makeTrigger({
+          actionParams: {
+            threshold: 10,
+            operator: "gt",
+            timePeriod: 60,
+            seriesName: "0/eval-checker-1/avg",
+            members: ["a@example.com"],
+          },
+        } as Partial<Trigger>),
+        graph: makeGraph({
+          graph: {
+            series: [
+              {
+                name: "Checker score",
+                metric: "evaluations.evaluation_score",
+                aggregation: "avg",
+                key: "eval-checker-1",
+                colorSet: "blueTones",
+              },
+            ],
+            groupBy: undefined,
+            groupByKey: undefined,
+            timeScale: 60,
+          },
+        } as Partial<CustomGraph>),
+        series: {
+          currentPeriod: [
+            {
+              date: "2026-06-20T11:00:00Z",
+              "0/evaluations.evaluation_score/avg/eval-checker-1": 15,
+            },
+          ],
+          previousPeriod: [],
+        } as unknown as TimeseriesResult,
+      });
+
+      const result = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.status).toBe("fired");
+      expect(result.value).toBe(15);
+      expect(harness.dispatch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given a breach with no open TriggerSent", () => {
     it("fires the dispatch notifier and inserts a TriggerSent", async () => {
       const result = await evaluateGraphTrigger({
@@ -262,8 +318,12 @@ describe("evaluateGraphTrigger", () => {
       expect(arg.project.id).toBe(PROJECT_ID);
       expect(arg.context.graph.id).toBe(GRAPH_ID);
       expect(arg.context.graph.name).toBe("Trace count");
+      // Windowed deep link: lands the reader on the incident window
+      // (NOW - timePeriod → NOW), not "now".
       expect(arg.context.graph.url).toBe(
-        "https://app.langwatch.test/demo/analytics/custom/graph-1",
+        "https://app.langwatch.test/demo/analytics/custom/graph-1" +
+          `?startDate=${encodeURIComponent(new Date(NOW.getTime() - 60 * 60 * 1000).toISOString())}` +
+          `&endDate=${encodeURIComponent(NOW.toISOString())}`,
       );
       expect(arg.context.metric.label).toBe("Trace count");
       expect(arg.context.metric.seriesName).toBe(
@@ -277,6 +337,19 @@ describe("evaluateGraphTrigger", () => {
       expect(arg.context.currentValue).toBe(15);
       expect(arg.context.occurredAt).toBe(NOW.toISOString());
       expect(arg.context.reason).toBe("real-time");
+      // Graph data for templates: the buckets the threshold read, plus the
+      // prebuilt sparkline; previousValue is null (harness has no previous
+      // period).
+      expect(
+        (arg.context as unknown as { history: unknown }).history,
+      ).toEqual([{ timestamp: "2026-06-20T11:00:00Z", value: 15 }]);
+      expect(
+        (arg.context as unknown as { sparkline: string }).sparkline,
+      ).toHaveLength(1);
+      expect(
+        (arg.context as unknown as { previousValue: number | null })
+          .previousValue,
+      ).toBeNull();
       expect(arg.context.project.url).toBe("https://app.langwatch.test/demo");
       expect(arg.recipients).toEqual(["a@example.com"]);
       expect(arg.slackWebhook).toBeNull();

@@ -21,20 +21,21 @@ export const GRAPH_ALERT_OPERATORS = ["gt", "lt", "gte", "lte", "eq"] as const;
 export type GraphAlertOperator = (typeof GRAPH_ALERT_OPERATORS)[number];
 
 /** Time-window values the graph-alert UI offers (minutes). Mirrors the
- *  values rendered in `AlertDrawer.tsx`. The dispatcher accepts any
- *  positive integer, but the UI is constrained to this set so the
- *  validator can reject typos / hostile input on the wire. */
+ *  `TIME_PERIOD_LABELS` options rendered in `FiltersSecondaryDrawer.tsx`.
+ *  The dispatcher accepts any positive integer, but the UI is constrained
+ *  to this set so the validator can reject typos / hostile input on the
+ *  wire. */
 export const GRAPH_ALERT_TIME_PERIODS = [5, 15, 30, 60, 1440] as const;
 export type GraphAlertTimePeriod = (typeof GRAPH_ALERT_TIME_PERIODS)[number];
 
 export const graphAlertOperatorSchema = z.enum(GRAPH_ALERT_OPERATORS);
-export const graphAlertTimePeriodSchema = z.union([
-  z.literal(5),
-  z.literal(15),
-  z.literal(30),
-  z.literal(60),
-  z.literal(1440),
-]);
+export const graphAlertTimePeriodSchema = z.union(
+  GRAPH_ALERT_TIME_PERIODS.map((value) => z.literal(value)) as unknown as [
+    z.ZodLiteral<GraphAlertTimePeriod>,
+    z.ZodLiteral<GraphAlertTimePeriod>,
+    ...z.ZodLiteral<GraphAlertTimePeriod>[],
+  ],
+);
 
 /** Validation schema for the graph-alert portion of `actionParams`. The
  *  destination keys (`members` / `slackWebhook`) are validated by the

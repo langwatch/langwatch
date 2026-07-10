@@ -204,7 +204,7 @@ Adapter writes are still best-effort relative to dispatch: a PG outage logs and 
 
 ### Why the `TriggerSent` claim moved post-dispatch (ADR-035)
 
-**Original design (this ADR, pre-2026-06-something):** gate outbox INSERT on `TriggerSent.claimSend`. Rationale was that an out-of-order replay could insert a new `queued` outbox row for a `(triggerId, subjectId)` whose digest had already been dispatched, and the drainer would happily re-notify.
+**Original design (this ADR, pre-ADR-035, 2026-06-19):** gate outbox INSERT on `TriggerSent.claimSend`. Rationale was that an out-of-order replay could insert a new `queued` outbox row for a `(triggerId, subjectId)` whose digest had already been dispatched, and the drainer would happily re-notify.
 
 **Current design (ADR-035):** enqueue unconditionally, claim `TriggerSent` in the cadence dispatcher **after** a successful send. Rationale: mid-dispatch crash + retry semantics require the claim to bind to the successful send, not to enqueue. Under the original design, a worker that crashed between claim and dispatch left `TriggerSent` claimed but no email/Slack ever went out — the retry saw an already-claimed row and silently dropped. ADR-035's post-dispatch claim inverts that: a crashed dispatch leaves `TriggerSent` unclaimed so the retry re-sends; only a successful send marks the row.
 

@@ -11,8 +11,11 @@ import {
   type SlackPayload,
   type SlackTemplateType,
 } from "~/shared/templating/renderSlack";
+import { ALERT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
 import {
+  buildExampleGraphAlertTemplateContext,
   buildTemplateContext,
+  type GraphAlertTemplateContext,
   type TemplateContext,
 } from "~/shared/templating/templateContext";
 import { validateLiquid } from "~/shared/templating/validate";
@@ -147,6 +150,20 @@ export interface TestFireTriggerDeps {
   notifier: TriggerNotifier;
 }
 
+/**
+ * Marks the test-fired draft as a graph alert so the test message renders
+ * the alert-shaped example context + `ALERT_TRIGGER_DEFAULTS` — the same
+ * pair the real fire renders — instead of trace matches. Optional detail
+ * fields make the example read like the author's alert.
+ */
+export interface TestFireGraphAlertInput {
+  graphName?: string;
+  metricLabel?: string;
+  operator?: string;
+  threshold?: number;
+  timePeriodMinutes?: number;
+}
+
 export interface TestFireTriggerInput {
   channel: TemplateChannel;
   trigger: DraftIdentity;
@@ -154,13 +171,30 @@ export interface TestFireTriggerInput {
   draft: TemplateDraft;
   recipients: string[];
   webhook: string | null;
+  /** Present when the draft is a custom-graph alert. */
+  graphAlert?: TestFireGraphAlertInput | null;
 }
 
 function buildTestFireContext(
   identity: DraftIdentity,
   project: DraftProject,
   baseHost: string,
-): TemplateContext {
+  graphAlert: TestFireGraphAlertInput | null | undefined,
+): TemplateContext | GraphAlertTemplateContext {
+  if (graphAlert) {
+    return buildExampleGraphAlertTemplateContext({
+      baseHost,
+      project,
+      trigger: { name: identity.name, alertType: identity.alertType },
+      graph: { name: graphAlert.graphName },
+      metricLabel: graphAlert.metricLabel,
+      condition: {
+        operator: graphAlert.operator,
+        threshold: graphAlert.threshold,
+        timePeriodMinutes: graphAlert.timePeriodMinutes,
+      },
+    });
+  }
   return buildTemplateContext({
     trigger: {
       id: "preview",
@@ -178,7 +212,13 @@ export async function testFireTrigger(
   input: TestFireTriggerInput,
 ): Promise<TestFireResult> {
   const { channel, trigger, project, draft, recipients, webhook } = input;
-  const context = buildTestFireContext(trigger, project, deps.baseHost);
+  const context = buildTestFireContext(
+    trigger,
+    project,
+    deps.baseHost,
+    input.graphAlert,
+  );
+  const defaults = input.graphAlert ? ALERT_TRIGGER_DEFAULTS : undefined;
 
   // Run the same validation save uses so a Test Fire can't bypass the
   // discriminator contract — without this, a draft with `slackTemplate`
@@ -199,6 +239,7 @@ export async function testFireTrigger(
       subjectTemplate: draft.emailSubjectTemplate ?? null,
       bodyTemplate: draft.emailBodyTemplate ?? null,
       context,
+      defaults,
       testFire: true,
     });
     const noReplyTo = buildTriggerNoReplyAddress({
@@ -230,6 +271,7 @@ export async function testFireTrigger(
     templateType: normalizeSlackType(draft.slackTemplateType),
     template: draft.slackTemplate ?? null,
     context,
+    defaults,
     testFire: true,
   });
   await deps.notifier.sendSlack({ webhook, payload: rendered.payload });

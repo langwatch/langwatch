@@ -460,6 +460,20 @@ export const automationRouter = createTRPCRouter({
           .startsWith("https://hooks.slack.com/")
           .nullable()
           .default(null),
+        // Present when the draft is a custom-graph alert: the test message
+        // then renders the alert-shaped example context + alert defaults,
+        // matching what a real fire sends. Detail fields only shape the
+        // example copy — they are not persisted.
+        graphAlert: z
+          .object({
+            graphName: z.string().max(200).optional(),
+            metricLabel: z.string().max(200).optional(),
+            operator: z.string().max(10).optional(),
+            threshold: z.number().optional(),
+            timePeriodMinutes: z.number().int().positive().optional(),
+          })
+          .nullable()
+          .default(null),
       }),
     )
     .use(checkProjectPermission("triggers:update"))
@@ -508,6 +522,7 @@ export const automationRouter = createTRPCRouter({
           draft: input.draft,
           recipients,
           webhook: input.webhook,
+          graphAlert: input.graphAlert,
         });
       } catch (err) {
         throw toTemplateTRPCError(err);

@@ -129,7 +129,27 @@ export interface GraphAlertTemplateContext {
    *  / `heartbeat-resolve`). Surfaced so a custom template can branch on
    *  it if needed. */
   reason: "real-time" | "heartbeat-absence" | "heartbeat-resolve";
+  /** The metric's recent numeric history (chronological, oldest first) —
+   *  the buckets the evaluator read around the alert window. Templates can
+   *  iterate this to render their own representation (a table, an ASCII
+   *  chart); `sparkline` below is the prebuilt shorthand. Empty when the
+   *  evaluator had no buckets (e.g. heartbeat absence on total silence). */
+  history: GraphAlertHistoryPoint[];
+  /** Unicode sparkline (`▁▂▄▆█`) of `history`, prebuilt here because
+   *  value→glyph mapping is impractical in Liquid. Empty string when
+   *  `history` is empty. Renders monospace-safe in Slack mrkdwn and email. */
+  sparkline: string;
+  /** The metric's value over the window immediately preceding the alert
+   *  window (same aggregation), for "was X, now Y" phrasing. Null when the
+   *  evaluator had no preceding buckets. */
+  previousValue: number | null;
   project: GraphAlertProjectVars;
+}
+
+export interface GraphAlertHistoryPoint {
+  /** ISO-8601 bucket timestamp. */
+  timestamp: string;
+  value: number;
 }
 
 export interface GraphAlertTriggerVars {
@@ -210,13 +230,6 @@ function timePeriodLabel(minutes: number): string {
 }
 
 /**
- * Pure builder for the alert template context (ADR-034 Phase 8.1).
- * `baseHost` is injected (not read from env) so the renderer stays pure
- * and testable. The graph URL points at the canonical custom-graph page
- * — same path `matchUrl` produces for graph-shaped trace matches, kept
- * in sync here so chrome / template URLs agree.
- */
-/**
  * Neutralise CR/LF and NUL that could enable header injection when a value
  * flows into an email subject or a Slack payload string. Applied to
  * user-controlled fields (metric.label, trigger.name display strings, etc.)
@@ -227,6 +240,48 @@ function stripHeaderInjection(input: string): string {
   return input.replace(/[\r\n\0]+/g, " ");
 }
 
+const SPARKLINE_GLYPHS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"] as const;
+
+/**
+ * Map a numeric series onto `▁▂▃▄▅▆▇█`. A flat series (min === max)
+ * renders as the mid glyph so "constant 5" doesn't read as "zero".
+ */
+function buildSparkline(values: number[]): string {
+  if (values.length === 0) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (max === min) return SPARKLINE_GLYPHS[3].repeat(values.length);
+  return values
+    .map((v) => {
+      const idx = Math.round(
+        ((v - min) / (max - min)) * (SPARKLINE_GLYPHS.length - 1),
+      );
+      return SPARKLINE_GLYPHS[idx] ?? SPARKLINE_GLYPHS[0];
+    })
+    .join("");
+}
+
+/** Single source of the automations-drawer deep link both context builders
+ *  embed as `trigger.editUrl` — the query-string contract `useDrawer` parses. */
+function buildAutomationEditUrl({
+  projectUrl,
+  triggerId,
+}: {
+  projectUrl: string;
+  triggerId: string;
+}): string {
+  return `${projectUrl}/automations?drawer.open=automation&drawer.automationId=${triggerId}&drawer.source=email-link`;
+}
+
+/**
+ * Pure builder for the alert template context (ADR-034 Phase 8.1).
+ * `baseHost` is injected (not read from env) so the renderer stays pure
+ * and testable. The graph URL points at the canonical custom-graph page
+ * — same path `matchUrl` produces for graph-shaped trace matches, kept
+ * in sync here so chrome / template URLs agree — and carries the incident
+ * window as `startDate`/`endDate` query params (the shape
+ * `usePeriodSelector` parses) so the link lands on the spike, not "now".
+ */
 export function buildGraphAlertTemplateContext({
   trigger,
   graph,
@@ -235,6 +290,9 @@ export function buildGraphAlertTemplateContext({
   currentValue,
   occurredAt,
   reason,
+  history,
+  previousValue,
+  window,
   project,
   baseHost,
 }: {
@@ -253,21 +311,40 @@ export function buildGraphAlertTemplateContext({
   currentValue: number;
   occurredAt: Date;
   reason: GraphAlertTemplateContext["reason"];
+  /** Recent buckets around the alert window (chronological). Optional so
+   *  callers without timeseries access (preview, test-fire) can omit it. */
+  history?: Array<{ timestamp: Date | string; value: number }>;
+  /** Aggregated value over the window preceding the alert window. */
+  previousValue?: number | null;
+  /** Incident window appended to `graph.url` as `startDate`/`endDate`. */
+  window?: { start: Date; end: Date };
   project: { id: string; name: string; slug: string };
   baseHost: string;
 }): GraphAlertTemplateContext {
   const projectUrl = `${baseHost}/${project.slug}`;
-  const graphUrl = matchUrl({
+  const baseGraphUrl = matchUrl({
     baseHost,
     projectSlug: project.slug,
     graphId: graph.id,
   });
+  const graphUrl = window
+    ? `${baseGraphUrl}?startDate=${encodeURIComponent(window.start.toISOString())}&endDate=${encodeURIComponent(window.end.toISOString())}`
+    : baseGraphUrl;
+  const historyPoints: GraphAlertHistoryPoint[] = (history ?? []).map(
+    (point) => ({
+      timestamp:
+        typeof point.timestamp === "string"
+          ? point.timestamp
+          : point.timestamp.toISOString(),
+      value: point.value,
+    }),
+  );
   return {
     trigger: {
       id: trigger.id,
       name: trigger.name,
       alertType: trigger.alertType,
-      editUrl: `${projectUrl}/automations?drawer.open=automation&drawer.automationId=${trigger.id}&drawer.source=email-link`,
+      editUrl: buildAutomationEditUrl({ projectUrl, triggerId: trigger.id }),
     },
     graph: {
       id: graph.id,
@@ -291,6 +368,9 @@ export function buildGraphAlertTemplateContext({
     currentValue,
     occurredAt: occurredAt.toISOString(),
     reason,
+    history: historyPoints,
+    sparkline: buildSparkline(historyPoints.map((point) => point.value)),
+    previousValue: previousValue ?? null,
     project: {
       id: project.id,
       name: project.name,
@@ -298,6 +378,65 @@ export function buildGraphAlertTemplateContext({
       url: projectUrl,
     },
   };
+}
+
+/**
+ * Example alert context for surfaces that render a graph-alert template
+ * without a real fire: the drawer's preview pane and test-fire. Keeps the
+ * preview honest — same shape `dispatchGraphAlertAction` renders — with
+ * placeholder values a reader immediately recognises as an example.
+ */
+export function buildExampleGraphAlertTemplateContext({
+  baseHost,
+  project,
+  trigger,
+  graph,
+  metricLabel,
+  condition,
+}: {
+  baseHost: string;
+  project: { id?: string; name: string; slug: string };
+  trigger?: { id?: string; name?: string; alertType?: "INFO" | "WARNING" | "CRITICAL" | null };
+  graph?: { id?: string; name?: string };
+  metricLabel?: string;
+  condition?: { operator?: string; threshold?: number; timePeriodMinutes?: number };
+}): GraphAlertTemplateContext {
+  const occurredAt = new Date();
+  const exampleHistory = [4, 5, 4, 6, 7, 9, 12].map((value, i) => ({
+    timestamp: new Date(occurredAt.getTime() - (6 - i) * 5 * 60 * 1000),
+    value,
+  }));
+  return buildGraphAlertTemplateContext({
+    trigger: {
+      id: trigger?.id ?? "example-trigger",
+      name: trigger?.name ?? "Example alert",
+      alertType: trigger?.alertType ?? "WARNING",
+    },
+    graph: {
+      id: graph?.id ?? "example-graph",
+      name: graph?.name ?? "Example graph",
+    },
+    metric: {
+      label: metricLabel ?? "Trace count",
+      seriesName: "0/trace_id/cardinality",
+    },
+    condition: {
+      operator: condition?.operator ?? "gt",
+      threshold: condition?.threshold ?? 10,
+      timePeriodMinutes: condition?.timePeriodMinutes ?? 30,
+    },
+    currentValue: 12,
+    previousValue: 7,
+    history: exampleHistory,
+    occurredAt,
+    reason: "real-time",
+    project: {
+      id: project.id ?? "example-project",
+      name: project.name,
+      slug: project.slug,
+    },
+    baseHost,
+  });
 }
 
 /**
@@ -340,7 +479,7 @@ export function buildTemplateContext({
   return {
     trigger: {
       ...trigger,
-      editUrl: `${projectUrl}/automations?drawer.open=automation&drawer.automationId=${trigger.id}&drawer.source=email-link`,
+      editUrl: buildAutomationEditUrl({ projectUrl, triggerId: trigger.id }),
     },
     project: {
       name: project.name,

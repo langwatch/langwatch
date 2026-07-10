@@ -122,8 +122,8 @@ export function GraphCardHeader({
            * with this chart's graphId + series; the bell additionally
            * passes `automationId` so the drawer hydrates the existing
            * trigger row in edit mode. The legacy `customGraphAlert`
-           * drawer is kept in the registry as an unreachable fallback per
-           * the side-by-side rollout decision in ADR-034.
+           * drawer and its registry entry were removed in this PR — the
+           * automations drawer is the only alert-authoring path.
            */}
           {trigger?.active ? (
             <Tooltip

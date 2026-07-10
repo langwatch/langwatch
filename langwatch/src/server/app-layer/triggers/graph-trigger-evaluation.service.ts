@@ -31,6 +31,7 @@ import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { sumMetricAcrossGroups } from "~/pages/api/cron/triggers/customGraphTrigger";
 import type { ActionParams } from "~/pages/api/cron/triggers/types";
+import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
 import type {
   SeriesInputType,
   TimeseriesInputType,
@@ -255,12 +256,38 @@ export async function evaluateGraphTrigger({
   };
 
   const timeseriesResult = await deps.getTimeseries(timeseriesInput);
-  const currentValue = calculateCurrentValue(
-    timeseriesResult,
-    series,
-    seriesName,
+  // The stored `seriesName` identifies WHICH series the trigger watches
+  // (`{index}/{key|metric}/{aggregation}` — parsed above via
+  // `parseSeriesIndex`). Result buckets use a DIFFERENT encoding —
+  // `buildSeriesName`: `{queryIndex}/{metric}/{agg}[/{key}]` with terms→
+  // cardinality — and we query a single-series input, so the bucket key is
+  // always derived from `seriesInput` at index 0. Passing the stored
+  // identifier straight through only matched for a first-position, keyless,
+  // non-terms series; everything else silently read 0.
+  const bucketKey = buildSeriesName(seriesInput, 0);
+  const currentPoints = extractSeriesPoints(
+    timeseriesResult.currentPeriod,
+    bucketKey,
     graphData.groupBy,
   );
+  const previousPoints = extractSeriesPoints(
+    timeseriesResult.previousPeriod,
+    bucketKey,
+    graphData.groupBy,
+  );
+  const currentValue = aggregateSeriesValues(
+    currentPoints.map((point) => point.value),
+    series.aggregation as string,
+    timeseriesResult.currentPeriod.length,
+  );
+  const previousValue =
+    timeseriesResult.previousPeriod.length === 0
+      ? null
+      : aggregateSeriesValues(
+          previousPoints.map((point) => point.value),
+          series.aggregation as string,
+          timeseriesResult.previousPeriod.length,
+        );
 
   const { breached } = evaluateCustomGraphThreshold({
     value: currentValue,
@@ -320,6 +347,13 @@ export async function evaluateGraphTrigger({
         timePeriodMinutes: timePeriod,
       },
       currentValue,
+      previousValue,
+      // Chronological metric history (previous window + alert window) so
+      // templates can render the trend — the prebuilt `sparkline` or the
+      // raw `history` points. Same buckets the threshold read; no extra
+      // query.
+      history: [...previousPoints, ...currentPoints],
+      window: { start: startDate, end: endDate },
       occurredAt: now,
       reason,
       project: { id: project.id, name: project.name, slug: project.slug },
@@ -419,40 +453,48 @@ function noteIfNoData(operator: string, threshold: number): string | undefined {
 }
 
 /**
- * Mirror of cron's `calculateCurrentValue`
- * (src/pages/api/cron/triggers/customGraphTrigger.ts:340-382).
- * Kept here, NOT re-exported from the cron file, because the cron file
- * is a Next.js page module and the spec asks for the eval logic to
- * live in the app layer. Pure-function form for unit testing.
+ * Read one series' per-bucket values out of a timeseries period, keyed by
+ * the `buildSeriesName` result-bucket encoding. Buckets missing the key
+ * contribute 0 — same behaviour as cron's `calculateCurrentValue` loop
+ * (src/pages/api/cron/triggers/customGraphTrigger.ts:340-382), split out
+ * here so the same points also feed the template context's `history`.
  */
-function calculateCurrentValue(
-  timeseriesResult: TimeseriesResult,
-  series: CustomGraphInput["series"][number],
-  seriesKey: string,
+function extractSeriesPoints(
+  dataPoints: TimeseriesBucket[],
+  bucketKey: string,
   groupBy?: string,
-): number {
-  const dataPoints = timeseriesResult.currentPeriod;
-  if (dataPoints.length === 0) return 0;
-
-  const values: number[] = [];
-  for (const entry of dataPoints as TimeseriesBucket[]) {
-    const direct = entry[seriesKey];
+): Array<{ timestamp: string; value: number }> {
+  const points: Array<{ timestamp: string; value: number }> = [];
+  for (const entry of dataPoints) {
+    const timestamp = entry.date;
+    const direct = entry[bucketKey];
     if (typeof direct === "number") {
-      values.push(direct);
+      points.push({ timestamp, value: direct });
       continue;
     }
     if (groupBy) {
-      const grouped = sumMetricAcrossGroups(entry, groupBy, seriesKey);
+      const grouped = sumMetricAcrossGroups(entry, groupBy, bucketKey);
       if (typeof grouped === "number") {
-        values.push(grouped);
+        points.push({ timestamp, value: grouped });
         continue;
       }
     }
-    values.push(0);
+    points.push({ timestamp, value: 0 });
   }
-  if (values.length === 0) return 0;
+  return points;
+}
 
-  const aggregation = series.aggregation as string;
+/**
+ * Cron-parity window aggregation: additive aggregations sum across
+ * buckets; everything else averages. `bucketCount` (the raw period
+ * length) preserves the cron's "no buckets at all → 0" behaviour.
+ */
+function aggregateSeriesValues(
+  values: number[],
+  aggregation: string,
+  bucketCount: number,
+): number {
+  if (bucketCount === 0 || values.length === 0) return 0;
   if (
     aggregation === "cardinality" ||
     aggregation === "terms" ||

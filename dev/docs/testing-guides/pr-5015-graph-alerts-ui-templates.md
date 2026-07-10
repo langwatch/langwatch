@@ -30,11 +30,14 @@ The user-facing layer of the graph-trigger migration.
   from trace context (`trigger` / `graph` / `metric` / `condition` /
   `currentValue` / `occurredAt` / `reason` / `project`;
   `operatorLabel` + `timePeriodLabel` resolved). Per-trigger custom
-  templates via Monaco override the alert-default templates.
+  templates via Monaco override the alert-default templates. See
+  [ADR-036](../adr/036-liquid-templates-for-trigger-notifications.md)
+  for the templating decision and
+  [specs/triggers/event-sourced-graph-triggers.feature](../../../specs/triggers/event-sourced-graph-triggers.feature)
+  for the behavioural contract.
 
-The legacy `AlertDrawer` is kept registered as an unreachable fallback
-per the side-by-side rollout directive — no code path in this PR opens
-it.
+The legacy `AlertDrawer` component was DELETED in this PR — the
+automations drawer is the only graph-alert authoring surface.
 
 ## Env vars & feature flags
 
@@ -198,10 +201,10 @@ Expected:
   subject template. Author an alert with a series name literally
   containing `\r\n` (via SQL if the UI won't let you), fire it —
   outbound email must have a single-line subject.
-- **Legacy `AlertDrawer` unreachable.** Grep the running frontend
-  for anything opening `AlertDrawer`. Expected: zero call sites.
-  It's registered but no code path reaches it — the side-by-side
-  rollout directive keeps it around only as an unreachable fallback.
+- **Legacy `AlertDrawer` deleted.** The component no longer exists.
+  Grep the frontend for `AlertDrawer` — expected: zero component
+  references (only historical comments). If a component with that
+  name reappears, the deletion regressed.
 - **Slack template escape chain is gone.** In a graph-alert Slack
   post with a series or graph name containing `&`, the post must
   render literally `&`, NOT `&amp;`. Same P0 as PR #4498's Slack
@@ -228,9 +231,8 @@ Expected:
    type from the `TypePicker`. There's no flag; a small commit
    removing the type suffices, then redeploy.
 3. Migrations are inert under old code paths. No down migration.
-4. Legacy `AlertDrawer` is still registered — it can be reopened by
-   restoring the dashboard callsites' pre-repoint code path if the
-   automations-drawer flow is broken in prod.
+4. The legacy `AlertDrawer` was deleted — if the automations-drawer
+   flow is broken in prod, roll back by reverting this PR.
 
 ## Failure modes to alert on
 
@@ -247,9 +249,6 @@ Expected:
   graph alerts → escape chain regressed.
 - Sentry: `header injection detected` on outbound trigger emails →
   `metric.label` sanitizer regressed.
-- CloudWatch: `AlertDrawer opened` any occurrence → unreachable
-  fallback was reached, meaning some new code path opened it.
-  Investigate.
 - Grafana: authoring-drawer save latency p99 spike → deep-review
   fix N1 (SSOT builder routing) was reverted; upsert doing double
   writes.

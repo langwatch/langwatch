@@ -14,6 +14,7 @@ import type {
   TimeseriesResult,
 } from "~/server/analytics/types";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
+import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
 import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -164,12 +165,17 @@ export const processCustomGraphTrigger = async (
     const timeseriesResult =
       await analyticsService.getTimeseries(timeseriesInput);
 
-    // Calculate current value (sum or average of the last period)
-    // Use seriesName as the key to find the value in timeseries results
+    // Calculate current value (sum or average of the last period).
+    // The stored `seriesName` identifies WHICH series to watch; result
+    // buckets are keyed by `buildSeriesName` (`{queryIndex}/{metric}/{agg}
+    // [/{key}]`, terms→cardinality) and we query a single-series input, so
+    // the lookup key must be derived from `seriesInput` at index 0 — the
+    // stored identifier only matches for a first-position, keyless,
+    // non-terms series.
     const currentValue = calculateCurrentValue(
       timeseriesResult,
       series,
-      seriesName,
+      buildSeriesName(seriesInput, 0),
       graphData.groupBy,
     );
 

@@ -214,6 +214,7 @@ export abstract class BaseAnalyticsRollupClickHouseRepository<
     } catch (error) {
       this.logger.error(
         {
+          tenantId,
           count: rows.length,
           error: formatError(error),
         },

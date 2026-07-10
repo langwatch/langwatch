@@ -1,16 +1,16 @@
-# PR #5014 testing guide — eval analytics + write-side aggregates (ADR-034 Phases 6 + 7)
+# PR #5014 testing guide — eval analytics write-side aggregates (ADR-034 Phase 6)
 
 Branch: `pr/05-eval-and-write-side-aggregates`.
 Stacked on PR #5013 — merge PR #5013 first.
 
 ## What shipped
 
-The analytics substrate PR #5012 built for traces gets extended to the
-remaining four event-sourced aggregates.
+The analytics substrate PR #5012 built for traces gets extended to
+evaluations.
 
 - **Phase 6 — evaluations.** New `evaluation_analytics_rollup`
-  (`AggregatingMergeTree`, migration 00039) and `evaluation_analytics`
-  (`ReplacingMergeTree(UpdatedAt)`, migration 00040). Per-eval-terminal-event
+  (`AggregatingMergeTree`, migration 00040) and `evaluation_analytics`
+  (`ReplacingMergeTree(UpdatedAt)`, migration 00041). Per-eval-terminal-event
   map projection + lean cherry-pick fold. Read routing extended to cover
   the eval union; two new SQL builders (`eval-slim` + `eval-rollup`) and
   three new read repos. A parallel
@@ -19,12 +19,11 @@ remaining four event-sourced aggregates.
   trace-side reactor. The heartbeat is now source-aware — per-trigger
   metric routes to the correct slim table (trace vs eval) and batches
   per `(project, source)`.
-- **Phase 7 — sims / experiments / suites.** Six ClickHouse
-  migrations (00041-00046): slim + rollup per aggregate. Lean
-  cherry-pick folds + per-terminal-event map projections registered
-  silently on the three pipelines. **No read routing, no graph-trigger
-  reactor** — those aggregates have no `analytics/registry.ts` metric
-  entries. Data accumulates silently for future analytics work.
+- **Phase 7 — pulled back.** The simulation / experiment / suite
+  aggregates (six additional slim + rollup migrations) were pulled
+  back in the 2026-07-07 stack review and do NOT ship in this PR.
+  Only the evaluation pair (`evaluation_analytics` +
+  `evaluation_analytics_rollup`) shipped.
 
 ## Env vars & feature flags
 
@@ -38,10 +37,9 @@ PR-5013 graph-trigger flag now also gates eval graph triggers.
 | `release_event_sourced_analytics_read_tripwire` | Same tripwire from PR #5012, now compares eval-source routed queries to legacy `evaluation_runs` too. Requires the read flag ON. | PostHog ON. | Default OFF. |
 | `release_es_graph_triggers_firing` | Extended by this PR. Eval-source graph triggers now respect the same per-project flag as trace-source graph triggers. When ON, cron skips those triggers too. | PostHog ON. Local: `FEATURE_FLAG_FORCE_ENABLE=release_es_graph_triggers_firing`. | Default OFF. Cron handles as today. |
 
-Sims / experiments / suites have **no read routing and no graph
-triggers** shipped by this PR. Their slim + rollup tables accumulate
-data silently; nothing reads them yet. That's intentional — future
-analytics work will consume them.
+Sims / experiments / suites ship **nothing** in this PR — their
+slim + rollup tables were pulled back in the 2026-07-07 stack review.
+Only the evaluation aggregate is covered here.
 
 ## Setup
 
@@ -50,20 +48,17 @@ make quickstart all-local-nlp      # need NLP engine for evaluator runs
 pnpm dev                            # from langwatch/
 ```
 
-- **ClickHouse migrations.** This PR ships migrations 00039-00046:
+- **ClickHouse migrations.** This PR ships migrations 00040-00041:
 
   ```bash
   clickhouse-client -q "SHOW TABLES LIKE '%_analytics%'"
   ```
 
-  Expect: `evaluation_analytics`, `evaluation_analytics_rollup`,
-  `simulation_analytics`, `simulation_analytics_rollup`,
-  `experiment_analytics`, `experiment_analytics_rollup`,
-  `suite_analytics`, `suite_analytics_rollup` — plus the trace pair
-  from PR #5012.
+  Expect: `evaluation_analytics`, `evaluation_analytics_rollup` — plus
+  the trace pair from PR #5012. No simulation / experiment / suite
+  tables (Phase 7 was pulled back in the 2026-07-07 stack review).
 - Test-tenant prep: run an evaluator on at least ~20 traces (any
-  built-in judge will do). Also kick off a batch experiment and a
-  scenario suite so the sim / exp / suite tables get real rows.
+  built-in judge will do).
 
 ## Golden path — happy flow
 
@@ -109,16 +104,19 @@ SELECT count() FROM evaluation_analytics_rollup WHERE TenantId = '<projectId>';
 
 Both non-zero after evaluator terminal events land.
 
-### 6. Sims / experiments / suites populate silently
+### 6. No sim / exp / suite tables exist
+
+Phase 7 was pulled back in the 2026-07-07 stack review. Confirm no
+`simulation_analytics`, `experiment_analytics`, or `suite_analytics`
+tables (or their rollups) exist:
 
 ```sql
-SELECT count() FROM simulation_analytics WHERE TenantId = '<projectId>';
-SELECT count() FROM experiment_analytics WHERE TenantId = '<projectId>';
-SELECT count() FROM suite_analytics WHERE TenantId = '<projectId>';
+SHOW TABLES LIKE 'simulation_analytics%';
+SHOW TABLES LIKE 'experiment_analytics%';
+SHOW TABLES LIKE 'suite_analytics%';
 ```
 
-After running a scenario / experiment / suite: rows land in slim +
-rollup. Nothing in the UI reads them yet — that's expected.
+All three return empty.
 
 ### 7. Eval read routing
 
@@ -146,9 +144,9 @@ rollup. Nothing in the UI reads them yet — that's expected.
   clause references `EvaluatorId`; the rollup does NOT. Router must
   reject `key !== undefined` for both, and the eval slim builder
   must throw loud if a key reaches it despite that.
-- **TTL sentinel — 8 tables.** All 8 new tables (00039-00046) use the
+- **TTL sentinel — 2 tables.** Both new tables (00040-00041) use the
   `IF(_retention_days > 0, …, '2106-01-01')` form. This was the
-  10-migration P0 fix (00037-00046). Regression = bare
+  P0 TTL fix spanning migrations 00037-00041. Regression = bare
   `INTERVAL _retention_days DAY` = TTL reaps indefinite-retention rows
   on the next merge. SHOW CREATE TABLE for each.
 - **Reactor name stamp.** The eval notify reactor must emit
@@ -169,11 +167,10 @@ rollup. Nothing in the UI reads them yet — that's expected.
   the PR-4498 `attachOutbox()` wire-up. Absence signature: eval
   reactor's `decide` returns enqueues, no `ReactorOutbox` row lands,
   no dispatch.
-- **Silent write side for sims/exp/suites.** The three
-  aggregates' slim + rollup tables get rows; the UI does NOT read
-  them. If someone shipped a read query against `simulation_analytics`
-  or `experiment_analytics`, that's out of scope for this PR and
-  regresses the "silent accumulation" contract.
+- **No sim/exp/suite artifacts.** Phase 7 was pulled back — no
+  `simulation_analytics` / `experiment_analytics` / `suite_analytics`
+  tables, folds, or projections should exist. If any of those
+  migrations or registrations show up, the pull-back regressed.
 - **Case-insensitive `Alert:` prefix.** Same as PR #5013 — regression
   applies to eval-source graph alerts too.
 
@@ -189,9 +186,8 @@ rollup. Nothing in the UI reads them yet — that's expected.
    slim table if data corruption is suspected — folds are idempotent.
    Rollup is not; truncate then replay per the ADR-034 replay
    discipline.
-4. Sims / experiments / suites projections have no read path; can be
-   left running or killed via the per-component
-   `es-<aggregate>-<component>-<name>-killswitch` family.
+4. Eval projections can be killed via the per-component
+   `es-<aggregate>-<component>-<name>-killswitch` family if needed.
 
 ## Failure modes to alert on
 
@@ -204,7 +200,7 @@ rollup. Nothing in the UI reads them yet — that's expected.
 - Grafana: p99 on eval-source `getTimeseries` up 5-10× after
   `release_event_sourced_analytics_read` ON → routing miss dropping
   to legacy under an inefficient predicate.
-- CloudWatch: `TTL merge dropped N rows` on any of the 8 new tables
+- CloudWatch: `TTL merge dropped N rows` on either of the 2 new tables
   where tenant has `_retention_days = 0` → TTL sentinel regressed.
 - CloudWatch: `analytics.tripwire.divergence` on eval-source queries
   — real numeric mismatch, triage before wider rollout.

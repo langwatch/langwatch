@@ -38,9 +38,9 @@ make quickstart all-local          # local CH + PG + Redis + app + workers
 pnpm dev                            # from langwatch/
 ```
 
-- **ClickHouse migrations.** This PR ships migrations 00034 (per-span
-  `Cost` + `NonBilledCost` columns on `stored_spans`), 00035
-  (`trace_analytics_rollup`), 00037 (`trace_analytics`). They apply via
+- **ClickHouse migrations.** This PR ships migrations 00037 (per-span
+  `Cost` + `NonBilledCost` columns on `stored_spans`), 00038
+  (`trace_analytics_rollup`), 00039 (`trace_analytics`). They apply via
   the goose runner at worker startup; verify with:
 
   ```bash

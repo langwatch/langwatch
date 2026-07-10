@@ -9,9 +9,11 @@
  * ALERTS (`alertDefaults` below). The shape of an alert is "metric X
  * crossed threshold Y" — not "this trace happened matching filters" —
  * so the default subject + body + Slack mrkdwn all read in metric-
- * crossed-threshold terms instead of trace terms. Selection happens
- * via `pickTriggerDefaults({ hasCustomGraph })`; per-trigger custom
- * Liquid still overrides whichever default it picks.
+ * crossed-threshold terms instead of trace terms. Callers pick the set
+ * directly — graph-alert dispatch passes `ALERT_TRIGGER_DEFAULTS` as the
+ * `defaults` override on `renderTriggerEmail` / `renderTriggerSlack`,
+ * trace dispatch relies on the renderers' built-in trace defaults —
+ * and per-trigger custom Liquid still overrides whichever default applies.
  */
 
 export const DEFAULT_EMAIL_SUBJECT_TEMPLATE =
@@ -75,9 +77,9 @@ export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ�
  * Phase 8.1 wires the graph-trigger evaluator through the same Liquid
  * pipeline trace triggers use, so these defaults must read those
  * fields directly instead of the trace-iteration shape Phase 5 used as
- * a placeholder. `pickTriggerDefaults({ hasCustomGraph: true })` picks
- * the set; per-trigger custom Liquid (the four Trigger columns) still
- * overrides whichever default it picks.
+ * a placeholder. Graph-alert dispatch passes `ALERT_TRIGGER_DEFAULTS`
+ * explicitly as the renderers' `defaults`; per-trigger custom Liquid
+ * (the four Trigger columns) still overrides it.
  */
 export const DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE =
   "[Alert] {{ trigger.name }} — {{ metric.label }} {{ condition.operatorLabel }} {{ condition.threshold }}";
@@ -85,14 +87,20 @@ export const DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE =
 export const DEFAULT_ALERT_EMAIL_BODY_TEMPLATE = `# [Alert] {{ trigger.name }}
 
 **{{ metric.label }}** {{ condition.operatorLabel }} **{{ condition.threshold }}** over the {{ condition.timePeriodLabel }}.
-
-Current value: **{{ currentValue }}** (threshold: {{ condition.operator }} {{ condition.threshold }}).
-
+{% if reason == "heartbeat-absence" %}
+No qualifying data was seen in the window.
+{% endif %}
+Current value: **{{ currentValue }}**{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operator }} {{ condition.threshold }}.
+{% if sparkline != "" %}
+Trend: \`{{ sparkline }}\`
+{% endif %}
 [Open dashboard ↗]({{ graph.url }})`;
 
-export const DEFAULT_ALERT_SLACK_TEMPLATE = `:rotating_light: *{{ trigger.name }}*{% if trigger.alertType %} _({{ trigger.alertType }})_{% endif %}
-*{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} *{{ condition.threshold }}* over the {{ condition.timePeriodLabel }}.
-Current value: *{{ currentValue }}* (threshold: {{ condition.operator }} {{ condition.threshold }}).
+export const DEFAULT_ALERT_SLACK_TEMPLATE = `:rotating_light: *{{ trigger.name | mrkdwn_escape }}*{% if trigger.alertType %} _({{ trigger.alertType }})_{% endif %}
+*{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} *{{ condition.threshold }}* over the {{ condition.timePeriodLabel }}.{% if reason == "heartbeat-absence" %}
+No qualifying data was seen in the window.{% endif %}
+Current value: *{{ currentValue }}*{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operator }} {{ condition.threshold }}.{% if sparkline != "" %}
+Trend: \`{{ sparkline }}\`{% endif %}
 <{{ graph.url }}|Open dashboard>`;
 
 export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
@@ -117,11 +125,20 @@ export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
     "type": "section",
     "text": { "type": "mrkdwn", "text": {{ _metric_line | json }} }
   },
-  {%- capture _value_line -%}Current value: *{{ currentValue }}* (threshold: {{ condition.operator }} {{ condition.threshold }}).{%- endcapture -%}
+  {%- capture _value_line -%}Current value: *{{ currentValue }}*{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operator }} {{ condition.threshold }}.{%- endcapture -%}
   {
     "type": "section",
     "text": { "type": "mrkdwn", "text": {{ _value_line | json }} }
   },
+  {% if sparkline != "" %}
+  {%- capture _trend_line -%}Trend: \`{{ sparkline }}\`{%- endcapture -%}
+  {
+    "type": "context",
+    "elements": [
+      { "type": "mrkdwn", "text": {{ _trend_line | json }} }
+    ]
+  },
+  {% endif %}
   {%- capture _link -%}<{{ graph.url }}|Open dashboard>{%- endcapture -%}
   {
     "type": "context",

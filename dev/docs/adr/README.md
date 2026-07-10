@@ -21,16 +21,16 @@ Document **important technical and architectural decisions** — context, trade-
 | [025](./025-remove-orphan-sweep.md) | Remove the PG orphan sweep entirely | Accepted |
 | [026](./026-per-trigger-dispatch-timing.md) | Per-trigger dispatch timing — cadence and trace-readiness debounce | Accepted |
 | [027](./027-typed-dispatcherror-contract.md) | Typed `DispatchError` contract for dispatch endpoints | Accepted |
+| [030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
+| [031](./031-trigger-email-abuse-protections.md) | Trigger email abuse protections — per-trigger cap, per-project daily cap, unsubscribe | Accepted |
+| [032](./032-datasets-s3-jsonl.md) | Datasets stored as S3 JSONL chunks | Accepted |
+| [033](./033-langy-worker-network-isolation-under-gvisor.md) | Langy worker network isolation under gVisor | Draft |
+| [034](./034-event-sourced-analytics-materialization.md) | Event-sourced analytics materialization — slim + rollup ClickHouse tables | Accepted |
+| [035](./035-persist-class-debounce.md) | Persist-class actions ride the settle → cadence outbox path | Accepted |
 | [036](./036-liquid-templates-for-trigger-notifications.md) | Liquid templates for user-customizable trigger notifications | Accepted |
 | [037](./037-automation-operator-surfaces.md) | Automation operator surfaces — authoring drawer & dispatch-health view | Accepted |
 | [038](./038-intent-forked-onboarding-governance-vs-llmops.md) | Onboarding forks on a first-class Organization intent | Accepted |
 | [039](./039-outbox-heartbeat.md) | Outbox heartbeat primitive | Accepted |
-| [030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
-| [031](./031-trigger-email-abuse-protections.md) | Trigger email abuse protections — per-trigger cap, per-project daily cap, unsubscribe | Accepted |
-| [032](./032-datasets-s3-jsonl.md) | Datasets stored as S3 JSONL chunks | Accepted |
-| [038](./038-outbox-heartbeat.md) | Outbox heartbeat primitive for absent-detection rollups | Accepted |
-| [034](./034-event-sourced-analytics-materialization.md) | Event-sourced analytics materialization — slim + rollup ClickHouse tables | Accepted |
-| [035](./035-persist-class-debounce.md) | Persist-class actions ride the settle → cadence outbox path | Accepted |
 
 ## When to Write an ADR
 
