@@ -47,6 +47,22 @@ export interface NonExitGroupSum {
   totalBytes: bigint;
 }
 
+/**
+ * The net of ALL recorded events (exits included) for one slice-group — the
+ * bytes the gauge currently carries for it. A fully exited, fully reversed,
+ * or fully deleted group nets to zero and needs no further action; a nonzero
+ * net is exactly what a due exit mirrors (negated), what a deletion negates,
+ * and what a retention change re-books.
+ */
+export interface LiveNetGroup {
+  projectId: string;
+  category: string;
+  partitionKey: string;
+  sliceDate: Date;
+  retentionDays: number;
+  netBytes: bigint;
+}
+
 export interface StorageBoundaryEventRepository {
   append(input: AppendBoundaryEventInput): Promise<{ applied: boolean }>;
   findAllByOrganization(params: {
@@ -64,4 +80,9 @@ export interface StorageBoundaryEventRepository {
     projectId: string;
     partitionKey: string;
   }): Promise<NonExitGroupSum[]>;
+  /** Live net per slice-group (see LiveNetGroup), optionally scoped to a project. */
+  sumLiveNetGroups(params: {
+    organizationId: string;
+    projectId?: string;
+  }): Promise<LiveNetGroup[]>;
 }

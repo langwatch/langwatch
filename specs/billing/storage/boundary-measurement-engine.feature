@@ -65,7 +65,7 @@ Feature: Storage billing boundary measurement engine
 
   # Exits
 
-  @integration @unimplemented
+  @integration
   Scenario: Data reaching its retention age decreases the gauge without a query
     Given a recorded entry for a partition slice under 63-day retention
     When the slice reaches 63 days of age

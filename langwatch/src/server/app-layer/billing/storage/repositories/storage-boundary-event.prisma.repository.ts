@@ -91,6 +91,36 @@ export class PrismaStorageBoundaryEventRepository
     }));
   }
 
+  async sumLiveNetGroups({
+    organizationId,
+    projectId,
+  }: {
+    organizationId: string;
+    projectId?: string;
+  }) {
+    const groups = await this.prisma.storageBoundaryEvent.groupBy({
+      by: [
+        "projectId",
+        "category",
+        "partitionKey",
+        "sliceDate",
+        "retentionDays",
+      ],
+      where: { organizationId, ...(projectId ? { projectId } : {}) },
+      _sum: { deltaBytes: true },
+    });
+    return groups
+      .map((group) => ({
+        projectId: group.projectId,
+        category: group.category,
+        partitionKey: group.partitionKey,
+        sliceDate: group.sliceDate,
+        retentionDays: group.retentionDays,
+        netBytes: group._sum.deltaBytes ?? 0n,
+      }))
+      .filter((group) => group.netBytes !== 0n);
+  }
+
   async findAllByOrganization({
     organizationId,
     upTo,
