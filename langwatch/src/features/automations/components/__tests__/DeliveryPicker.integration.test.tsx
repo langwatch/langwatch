@@ -3,13 +3,13 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { TriggerAction } from "@prisma/client";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TypePicker } from "../TypePicker";
+import { DeliveryPicker } from "../DeliveryPicker";
 
 // Transitive: provider ConfigForms import ~/utils/api at module scope.
-// TypePicker itself never touches tRPC, so an empty shape suffices.
+// DeliveryPicker itself never touches tRPC, so an empty shape suffices.
 vi.mock("~/utils/api", () => ({
   api: { useContext: () => ({}) },
 }));
@@ -18,15 +18,23 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const renderPicker = (props: Partial<Parameters<typeof TypePicker>[0]> = {}) =>
+const renderPicker = (
+  props: Partial<Parameters<typeof DeliveryPicker>[0]> = {},
+) =>
   render(
-    <TypePicker value={null} onChange={vi.fn()} source="trace" {...props} />,
+    <DeliveryPicker value={null} onChange={vi.fn()} source="trace" {...props} />,
     { wrapper: Wrapper },
   );
 
-describe("TypePicker", () => {
+describe("DeliveryPicker", () => {
   afterEach(() => {
     cleanup();
+  });
+
+  it("renders under the Delivery facet header", () => {
+    renderPicker();
+
+    expect(screen.getByText("Delivery")).toBeInTheDocument();
   });
 
   describe("given the draft source is customGraph", () => {

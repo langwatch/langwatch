@@ -1,133 +1,74 @@
-import { Badge, Text, VStack } from "@chakra-ui/react";
-import { ListFilter, TrendingUp } from "lucide-react";
+import { VStack } from "@chakra-ui/react";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useGraphAlertLabels } from "../logic/useGraphAlertLabels";
 import { useAutomationStore } from "../state/automationStore";
 import {
-  useCadenceConfirmed,
-  useCadenceSummary,
-  useConditionsSet,
   useConfigComplete,
   useConfigurationSummary,
   useDraft,
-  useIsNotifyAction,
-  useSummariseConditions,
 } from "../state/selectors";
-import { IdentityFields } from "./IdentityFields";
+import { AutomationTypePicker } from "./AutomationTypePicker";
+import { CadenceSection } from "./CadenceSection";
+import { DeliveryPicker } from "./DeliveryPicker";
+import { NameField } from "./NameField";
 import { SectionRow } from "./SectionRow";
+import { SeveritySection } from "./SeveritySection";
+import { SubjectSection } from "./SubjectSection";
 import { TestFireSection } from "./TestFireSection";
-import { TypePicker } from "./TypePicker";
 
 /**
- * Composes the rows the user sees on the main drawer. The top of the
- * pane is the name + alert-type row (always visible), then the
- * `When → Then` pair of section rows with the type picker between
- * them, and finally the test-fire row (notify providers only).
- *
- * Lifting name + alert type to the main pane mirrors how every modern
- * automation builder (Linear, Notion, Sentry, Datadog, PagerDuty,
- * Zapier, n8n) treats the rule name — it's the primary identity, so
- * it sits at the top, not buried in a secondary drawer.
+ * The main pane, rendered top-to-bottom in ADR-043 facet order:
+ * Name → Type → Subject → Cadence → Severity (alerts) → Delivery, then the
+ * test-fire row. Picking the Type first fixes which later facets show and
+ * drives every label (no more "New report" over a trace source). Subject,
+ * Cadence, and Severity are authored inline; Delivery's guided template
+ * authoring is the one piece kept behind a secondary drawer so its live
+ * preview effect can gate on `section === "configuration"`.
  */
 export function MainSectionList({
   onTestFire,
   testFireLoading,
+  isEdit,
+  sourceLocked,
+  prefilledGraphId,
 }: {
   onTestFire: () => void;
   testFireLoading: boolean;
+  isEdit: boolean;
+  /** The Type facet can't change (editing a saved alert, or opened from a
+   *  specific chart). */
+  sourceLocked: boolean;
+  prefilledGraphId?: string;
 }) {
   const draft = useDraft();
-  const { project } = useOrganizationTeamProject();
-  // Graph alerts summarise with the series' human label, not the raw
-  // `{index}/{key}/{aggregation}` key the draft stores.
-  const { seriesLabel } = useGraphAlertLabels({
-    projectId: project?.id ?? "",
-    enabled: draft.source === "customGraph",
-    customGraphId: draft.customGraphId,
-    seriesName: draft.graphAlert.seriesName,
-  });
-  const conditionsSet = useConditionsSet();
   const configComplete = useConfigComplete();
-  const conditionsSummary = useSummariseConditions(seriesLabel);
   const configSummary = useConfigurationSummary();
-  const cadenceSummary = useCadenceSummary();
-  const cadenceConfirmed = useCadenceConfirmed();
-  const isNotifyAction = useIsNotifyAction();
   const setSection = useAutomationStore((s) => s.setSection);
   const dispatch = useAutomationStore((s) => s.dispatch);
 
   const providerLabel = draft.action
     ? CLIENT_PROVIDERS[draft.action].shared.label
     : null;
-  const configTitle = providerLabel ? `${providerLabel} setup` : "Setup";
-  const isFresh = !draft.name && !draft.action && !conditionsSet;
+  const setupTitle = providerLabel ? `${providerLabel} setup` : "Setup";
 
   return (
     <VStack align="stretch" gap={4}>
-      {isFresh ? (
-        <Text textStyle="sm" color="fg.muted">
-          Send Slack messages, emails, or other actions when traces match
-          conditions you define.
-        </Text>
-      ) : null}
-
-      <IdentityFields />
-
-      <SectionRow
-        title="When"
-        badge={
-          // Trace automations and graph alerts behave differently end to
-          // end (filters vs threshold, template variables, cadence), so
-          // the kind is stamped on the row rather than buried in the
-          // summary sentence.
-          draft.source === "customGraph" ? (
-            <Badge size="sm" variant="surface" colorPalette="purple" gap={1}>
-              <TrendingUp size={12} />
-              Graph alert
-            </Badge>
-          ) : (
-            <Badge size="sm" variant="surface" gap={1}>
-              <ListFilter size={12} />
-              Trace data
-            </Badge>
-          )
-        }
-        summary={
-          conditionsSet
-            ? conditionsSummary
-            : "Pick the trace filters or custom graph that should trigger this."
-        }
-        complete={conditionsSet}
-        onClick={() => setSection("filters")}
-      />
-      <TypePicker
+      <NameField isEdit={isEdit} />
+      <AutomationTypePicker sourceLocked={sourceLocked} />
+      <SubjectSection prefilledGraphId={prefilledGraphId} />
+      <CadenceSection />
+      <SeveritySection />
+      <DeliveryPicker
         value={draft.action}
         onChange={(value) => dispatch({ type: "SET_ACTION", value })}
         source={draft.source}
       />
       <SectionRow
-        title={configTitle}
+        title={setupTitle}
         summary={configSummary}
         complete={configComplete}
         disabled={!draft.action}
         onClick={() => setSection("configuration")}
       />
-      {/* Alerts are incident-based — they fire once when the threshold is
-          breached and resolve on recovery, with the cadence pinned server-
-          side. The cadence stage only applies to trace automations. */}
-      {isNotifyAction && draft.source !== "customGraph" ? (
-        <SectionRow
-          title="Cadence"
-          summary={
-            cadenceConfirmed
-              ? cadenceSummary
-              : `Choose when to deliver — currently ${cadenceSummary}.`
-          }
-          complete={cadenceConfirmed}
-          onClick={() => setSection("cadence")}
-        />
-      ) : null}
       <TestFireSection loading={testFireLoading} onFire={onTestFire} />
     </VStack>
   );

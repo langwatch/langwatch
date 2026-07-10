@@ -4,12 +4,12 @@
  *
  * The threshold rule the automations drawer stores against a custom
  * graph is keyed off `"{index}/{key|metric}/{aggregation}"` — the same
- * shape `FiltersSecondaryDrawer.deriveSeriesOptionsFromGraph` derives
- * when it builds the series picker. Every "Add alert" / "edit alert"
- * button that opens the drawer pre-filled with a graph must emit the
- * same encoding, otherwise the secondary drawer fails to match the
- * passed `prefilledSeriesName` against any option and the threshold
- * field renders blank.
+ * shape `deriveSeriesOptionsFromGraph` (in the drawer's
+ * `logic/seriesOptions.ts`) derives when the Subject facet builds its
+ * series picker. Every "Add alert" / "edit alert" button that opens the
+ * drawer pre-filled with a graph must emit the same encoding, otherwise
+ * the picker fails to match the passed `prefilledSeriesName` against any
+ * option and the threshold field renders blank.
  *
  * The `name` field on a series is a free-form human label (e.g.
  * "p95 latency"), so we have to read the structural fields directly.

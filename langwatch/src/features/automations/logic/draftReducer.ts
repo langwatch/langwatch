@@ -1,6 +1,5 @@
 import type { AlertType, TriggerAction } from "@prisma/client";
 import {
-  CADENCE_LABELS,
   DEFAULT_TRACE_DEBOUNCE_MS,
   type NotificationCadence,
 } from "~/automations/cadences";
@@ -241,6 +240,60 @@ export function reducer(
   }
 }
 
+/** The Automation / Alert / Report noun set for one preset. */
+export interface PresetLabels {
+  /** Drawer heading. */
+  title: string;
+  /** Footer save button. */
+  saveButton: string;
+  /** Toast title after a successful create. */
+  createdToast: string;
+  /** Toast title after a successful update. */
+  updatedToast: string;
+  /** Lowercase singular noun for inline copy ("this report has changes…"). */
+  noun: string;
+}
+
+/**
+ * The single source of truth for the Automation / Alert / Report nouns,
+ * keyed on the preset (`draft.source`) so every heading, button, and toast
+ * stays in step with the chosen type. Replaces the scattered
+ * `source === "customGraph" ? … : …` two-way branches that classified a
+ * REPORT as trace data — the visible bug where the drawer said "New report"
+ * yet the save button read "Create automation" (field-5015).
+ */
+export function presetLabels(
+  source: ConditionSource,
+  isEdit: boolean,
+): PresetLabels {
+  switch (source) {
+    case "customGraph":
+      return {
+        title: isEdit ? "Edit alert" : "New alert",
+        saveButton: isEdit ? "Save alert" : "Create alert",
+        createdToast: "Alert created",
+        updatedToast: "Alert updated",
+        noun: "alert",
+      };
+    case "report":
+      return {
+        title: isEdit ? "Edit report" : "New report",
+        saveButton: isEdit ? "Save report" : "Create report",
+        createdToast: "Report created",
+        updatedToast: "Report updated",
+        noun: "report",
+      };
+    case "trace":
+      return {
+        title: isEdit ? "Edit automation" : "Add automation",
+        saveButton: isEdit ? "Save changes" : "Create automation",
+        createdToast: "Automation created",
+        updatedToast: "Automation updated",
+        noun: "automation",
+      };
+  }
+}
+
 // ---- Helpers, all delegating via the provider registry ------------------
 
 export function notifyChannel(
@@ -321,29 +374,55 @@ export function filtersAreSet(filters: AutomationDraft["filters"]): boolean {
   );
 }
 
-export function conditionsAreSet(draft: AutomationDraft): boolean {
+/**
+ * The "what" facet (ADR-043 Subject): is the thing it's about chosen?
+ * - Automation: at least one trace filter.
+ * - Alert: a custom graph plus a series to watch.
+ * - Report: a valid content source — a trace table, a picked graph, or a
+ *   picked dashboard.
+ */
+export function subjectIsSet(draft: AutomationDraft): boolean {
   if (draft.source === "customGraph") {
-    // A graph alert isn't a condition until the threshold rule is filled
-    // in. Without the rule there's nothing to fire on; without the series
-    // the dispatcher has no metric to evaluate. The severity is part of the
-    // rule too — the router rejects graph alerts without one, so gating it
-    // here keeps Save honest instead of surfacing a server 400.
     return (
-      draft.customGraphId !== null &&
-      draft.graphAlert.seriesName.length > 0 &&
-      Number.isFinite(draft.graphAlert.threshold) &&
-      draft.alertType !== null
+      draft.customGraphId !== null && draft.graphAlert.seriesName.length > 0
     );
   }
   if (draft.source === "report") {
     const r = draft.report;
-    const sourceOk =
+    return (
       r.sourceKind === "traceQuery" ||
       (r.sourceKind === "customGraph" && r.customGraphId !== null) ||
-      (r.sourceKind === "dashboard" && r.dashboardId !== null);
-    return sourceOk && r.cron.trim().length > 0;
+      (r.sourceKind === "dashboard" && r.dashboardId !== null)
+    );
   }
   return filtersAreSet(draft.filters);
+}
+
+/**
+ * The "when" facet (ADR-043 Cadence): is the run-trigger timing set?
+ * - Automation: always — the digest cadence and settle window carry valid
+ *   defaults, so there is nothing to block on.
+ * - Alert: a finite threshold to compare the metric against.
+ * - Report: a cron schedule.
+ */
+export function cadenceIsSet(draft: AutomationDraft): boolean {
+  if (draft.source === "customGraph") {
+    return Number.isFinite(draft.graphAlert.threshold);
+  }
+  if (draft.source === "report") {
+    return draft.report.cron.trim().length > 0;
+  }
+  return true;
+}
+
+export function conditionsAreSet(draft: AutomationDraft): boolean {
+  if (!subjectIsSet(draft) || !cadenceIsSet(draft)) return false;
+  // Alerts additionally require a severity (ADR-043 facet 5) — without the
+  // series the dispatcher has no metric, and the router rejects a graph
+  // alert with no severity, so gating it here keeps Save honest instead of
+  // surfacing a server 400.
+  if (draft.source === "customGraph") return draft.alertType !== null;
+  return true;
 }
 
 /**
@@ -356,42 +435,6 @@ export function configIsComplete(draft: AutomationDraft): boolean {
   if (!draft.action) return false;
   const provider = CLIENT_PROVIDERS[draft.action];
   return provider.client.isComplete(draft.slices[draft.action]);
-}
-
-export function summariseConditions(
-  draft: AutomationDraft,
-  opts?: {
-    /** Human label of the monitored series, when the caller has the graph
-     *  loaded. Falls back to the raw series key so the summary never goes
-     *  blank while the graph is still loading. */
-    seriesLabel?: string | null;
-  },
-): string {
-  if (draft.source === "customGraph") {
-    if (!draft.customGraphId) return "Pick a graph";
-    if (!draft.graphAlert.seriesName) return "Pick a series to monitor";
-    const op = OPERATOR_LABELS[draft.graphAlert.operator];
-    const window = TIME_PERIOD_LABELS[draft.graphAlert.timePeriod];
-    const series = opts?.seriesLabel ?? draft.graphAlert.seriesName;
-    return `${series} ${op} ${draft.graphAlert.threshold} over ${window}`;
-  }
-  if (draft.source === "report") {
-    const r = draft.report;
-    const src =
-      r.sourceKind === "traceQuery"
-        ? `Top ${r.topN} traces`
-        : r.sourceKind === "customGraph"
-          ? r.customGraphId
-            ? "Custom graph"
-            : "Pick a graph"
-          : r.dashboardId
-            ? "Dashboard"
-            : "Pick a dashboard";
-    return `${src} · schedule ${r.cron} (${r.timezone})`;
-  }
-  const keys = Object.keys(draft.filters);
-  if (keys.length === 0) return "No conditions yet";
-  return `${keys.length} condition${keys.length === 1 ? "" : "s"}: ${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "…" : ""}`;
 }
 
 /** Operator labels matching the dashboard "Configure Alert" copy verbatim
@@ -452,17 +495,6 @@ export function extractGraphAlertFromTriggerRow(
     seriesName: parsed.seriesName,
   };
 }
-
-/** One-line summary of the cadence + settle window, shown on the cadence
- *  section row in the main drawer. Notify actions only — persist actions
- *  ignore both knobs and the row is hidden. */
-export function cadenceSummary(draft: AutomationDraft): string {
-  const cadence = CADENCE_LABELS[draft.notificationCadence];
-  const seconds = Math.round(draft.traceDebounceMs / 1000);
-  const settle = `${seconds}s settle window`;
-  return `${cadence} · ${settle}`;
-}
-
 
 /**
  * Map the flat `ReportDraft` to the `report` upsert input (source discriminated

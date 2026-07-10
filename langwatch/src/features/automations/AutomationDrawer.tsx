@@ -46,18 +46,19 @@ import {
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { MainSectionList } from "./components/MainSectionList";
-import { CadenceSecondaryDrawer } from "./components/secondaries/CadenceSecondaryDrawer";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
-import { FiltersSecondaryDrawer } from "./components/secondaries/FiltersSecondaryDrawer";
 import {
   type AutomationDraft,
   actionParamsFromDraft,
   buildTestFirePayload,
+  cadenceIsSet,
   extractGraphAlertFromTriggerRow,
   filtersAreSet,
   INITIAL_DRAFT,
   notifyChannel,
+  presetLabels,
   reportInputFromDraft,
+  subjectIsSet,
   templatesFromDraft,
 } from "./logic/draftReducer";
 import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
@@ -65,30 +66,58 @@ import { explainDomainError, readDomainError } from "./logic/errorExplainer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
 import {
-  useCadenceConfirmed,
   useConditionsSet,
   useConfigComplete,
   useDraft,
-  useIsNotifyAction,
   useSection,
 } from "./state/selectors";
 
-function saveDisabledReason(
-  conditionsSet: boolean,
-  configComplete: boolean,
-  actionPicked: boolean,
-  cadenceNeedsReview: boolean,
-  nameSet: boolean,
-): string {
+/** Facet-ordered "why can't I save yet" copy: Name → Type → Subject →
+ *  Cadence → Severity → Delivery. Type is always chosen (the source defaults
+ *  to an automation), so it never contributes a message. */
+function saveDisabledReason({
+  draft,
+  nameSet,
+  configComplete,
+  actionPicked,
+}: {
+  draft: AutomationDraft;
+  nameSet: boolean;
+  configComplete: boolean;
+  actionPicked: boolean;
+}): string {
   const missing: string[] = [];
   if (!nameSet) missing.push("give it a name");
-  if (!conditionsSet) missing.push("set a trigger");
-  if (!actionPicked) missing.push("pick a type");
+  if (!subjectIsSet(draft)) missing.push(subjectTodo(draft));
+  else if (!cadenceIsSet(draft)) missing.push(cadenceTodo(draft));
+  if (draft.source === "customGraph" && draft.alertType === null)
+    missing.push("set a severity");
+  if (!actionPicked) missing.push("pick a delivery channel");
   else if (!configComplete) missing.push("complete the setup");
-  if (cadenceNeedsReview)
-    missing.push("confirm how notifications are delivered in Cadence");
   if (missing.length === 0) return "";
   return `To save, ${missing.join(" and ")}.`;
+}
+
+function subjectTodo(draft: AutomationDraft): string {
+  switch (draft.source) {
+    case "customGraph":
+      return "pick a graph and series to watch";
+    case "report":
+      return "choose what the report sends";
+    case "trace":
+      return "choose which traces to act on";
+  }
+}
+
+function cadenceTodo(draft: AutomationDraft): string {
+  switch (draft.source) {
+    case "customGraph":
+      return "set the alert threshold";
+    case "report":
+      return "set a schedule";
+    case "trace":
+      return "";
+  }
 }
 
 /**
@@ -146,14 +175,18 @@ export function AutomationDrawer({
   const section = useSection();
   const conditionsSet = useConditionsSet();
   const configComplete = useConfigComplete();
-  const isNotify = useIsNotifyAction();
-  const cadenceConfirmed = useCadenceConfirmed();
-  // Alerts are incident-based — they fire once on breach and resolve on
-  // recovery; the server pins their cadence to immediate. There is no
-  // cadence to review, so the gate only applies to trace automations.
   const isGraphAlert = draft.source === "customGraph";
-  const isReport = draft.source === "report";
-  const cadenceNeedsReview = isNotify && !isGraphAlert && !cadenceConfirmed;
+  // Single source of truth for every heading / button / toast noun. Treat a
+  // graph-prefilled create as an alert from the first paint so the title
+  // doesn't flash "Add automation" before the prefill effect lands.
+  const labels = presetLabels(
+    prefilledGraphId ? "customGraph" : draft.source,
+    !!automationId,
+  );
+  // A saved graph alert can't become a trace automation mid-edit, and a
+  // drawer opened from a specific chart is pinned to that alert — lock the
+  // Type cards visibly in both cases.
+  const sourceLocked = (!!automationId && isGraphAlert) || !!prefilledGraphId;
   const dispatch = useAutomationStore((s) => s.dispatch);
   const setSection = useAutomationStore((s) => s.setSection);
   const hydrate = useAutomationStore((s) => s.hydrate);
@@ -531,8 +564,10 @@ export function AutomationDrawer({
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
   const nameSet = draft.name.trim().length > 0;
-  const canSave =
-    nameSet && conditionsSet && configComplete && !cadenceNeedsReview;
+  // Cadence is an always-visible inline facet now (ADR-043), so there is no
+  // "confirm the cadence" detour to gate on — subject + cadence validity is
+  // folded into conditionsSet.
+  const canSave = nameSet && conditionsSet && configComplete;
 
   const onTestFire = useCallback(() => {
     if (!channel || !projectId || !draft.action) return;
@@ -635,17 +670,7 @@ export function AutomationDrawer({
       {
         onSuccess: () => {
           toaster.create({
-            title: isReport
-              ? automationId
-                ? "Report updated"
-                : "Report created"
-              : isGraphAlert
-                ? automationId
-                  ? "Alert updated"
-                  : "Alert created"
-                : automationId
-                  ? "Automation updated"
-                  : "Automation created",
+            title: automationId ? labels.updatedToast : labels.createdToast,
             type: "success",
             meta: { closable: true },
           });
@@ -752,38 +777,28 @@ export function AutomationDrawer({
         <Drawer.Content bg="bg">
           <Drawer.Header>
             <Drawer.CloseTrigger />
-            <Heading size="md">
-              {isReport
-                ? automationId
-                  ? "Edit report"
-                  : "New report"
-                : isGraphAlert || prefilledGraphId
-                  ? automationId
-                    ? "Edit alert"
-                    : "New alert"
-                  : automationId
-                    ? "Edit automation"
-                    : "Add automation"}
-            </Heading>
+            <Heading size="md">{labels.title}</Heading>
           </Drawer.Header>
           <Drawer.Body>
             {source === "email-link" ? <EmailLinkLandingBanner /> : null}
             <MainSectionList
               onTestFire={onTestFire}
               testFireLoading={testFire.isLoading}
+              isEdit={!!automationId}
+              sourceLocked={sourceLocked}
+              prefilledGraphId={prefilledGraphId}
             />
           </Drawer.Body>
           <Drawer.Footer>
             <HStack width="full">
               <Spacer />
               <Tooltip
-                content={saveDisabledReason(
-                  conditionsSet,
-                  configComplete,
-                  !!draft.action,
-                  cadenceNeedsReview,
+                content={saveDisabledReason({
+                  draft,
                   nameSet,
-                )}
+                  configComplete,
+                  actionPicked: !!draft.action,
+                })}
                 disabled={canSave}
               >
                 <Button
@@ -792,13 +807,7 @@ export function AutomationDrawer({
                   loading={upsert.isLoading}
                   disabled={!canSave}
                 >
-                  {isGraphAlert || prefilledGraphId
-                    ? automationId
-                      ? "Save alert"
-                      : "Create alert"
-                    : automationId
-                      ? "Save changes"
-                      : "Create automation"}
+                  {labels.saveButton}
                 </Button>
               </Tooltip>
             </HStack>
@@ -806,56 +815,10 @@ export function AutomationDrawer({
         </Drawer.Content>
       </Drawer.Root>
 
-      <FiltersSecondaryDrawer
-        open={section === "filters"}
-        source={draft.source}
-        filters={draft.filters}
-        customGraphId={draft.customGraphId}
-        graphAlert={draft.graphAlert}
-        report={draft.report}
-        alertType={draft.alertType}
-        projectId={projectId}
-        prefilledGraphId={prefilledGraphId}
-        prefilledSeriesName={prefilledSeriesName}
-        // A saved graph alert can't become a trace automation mid-edit —
-        // lock the source cards visibly instead of letting the switch look
-        // available.
-        sourceLocked={!!automationId && isGraphAlert}
-        onSave={({
-          source,
-          filters,
-          customGraphId,
-          graphAlert,
-          report,
-          alertType,
-        }) => {
-          dispatch({ type: "SET_SOURCE", value: source });
-          if (source === "trace") {
-            dispatch({ type: "SET_FILTERS", value: filters });
-          } else if (source === "report") {
-            if (report) dispatch({ type: "SET_REPORT", value: report });
-          } else {
-            dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: customGraphId });
-            dispatch({ type: "SET_GRAPH_ALERT", value: graphAlert });
-            dispatch({ type: "SET_ALERT_TYPE", value: alertType });
-          }
-          setSection(null);
-        }}
-        onCancel={() => setSection(null)}
-      />
-
       <ConfigurationSecondaryDrawer
         open={section === "configuration"}
         ctx={configCtx}
         onDone={() => setSection(null)}
-      />
-
-      <CadenceSecondaryDrawer
-        open={section === "cadence"}
-        onDone={() => {
-          dispatch({ type: "CONFIRM_CADENCE" });
-          setSection(null);
-        }}
       />
 
       <Dialog.Root
@@ -871,7 +834,7 @@ export function AutomationDrawer({
           </Dialog.Header>
           <Dialog.Body>
             <Text color="fg.muted" textStyle="sm">
-              This automation has changes you haven't saved yet. Close the
+              This {labels.noun} has changes you haven't saved yet. Close the
               drawer and discard them?
             </Text>
           </Dialog.Body>

@@ -5,13 +5,13 @@ import {
   type NotifyClientEntry,
 } from "~/automations/providers/types";
 import {
-  cadenceSummary,
+  cadenceIsSet,
   conditionsAreSet,
   configIsComplete,
   configurationSummary,
-  isNotifyAction,
   notifyChannel,
-  summariseConditions,
+  presetLabels,
+  subjectIsSet,
 } from "../logic/draftReducer";
 import { useAutomationStore } from "./automationStore";
 
@@ -27,20 +27,23 @@ export const useTestHistory = () => useAutomationStore((s) => s.testHistory);
 
 export const useConditionsSet = () =>
   useAutomationStore((s) => conditionsAreSet(s.draft));
+export const useSubjectSet = () =>
+  useAutomationStore((s) => subjectIsSet(s.draft));
+export const useCadenceSet = () =>
+  useAutomationStore((s) => cadenceIsSet(s.draft));
+/** Preset noun set (heading / button / toast copy) for the chosen type.
+ *  `isEdit` is a caller concern, so it stays an argument rather than store
+ *  state; the hook only subscribes to `draft.source`. */
+export const usePresetLabels = (isEdit: boolean) => {
+  const source = useAutomationStore((s) => s.draft.source);
+  return presetLabels(source, isEdit);
+};
 export const useConfigComplete = () =>
   useAutomationStore((s) => configIsComplete(s.draft));
-export const useSummariseConditions = (seriesLabel?: string | null) =>
-  useAutomationStore((s) => summariseConditions(s.draft, { seriesLabel }));
 export const useConfigurationSummary = () =>
   useAutomationStore((s) => configurationSummary(s.draft));
-export const useCadenceSummary = () =>
-  useAutomationStore((s) => cadenceSummary(s.draft));
-export const useCadenceConfirmed = () =>
-  useAutomationStore((s) => s.draft.cadenceConfirmed);
 export const useNotifyChannel = () =>
   useAutomationStore((s) => notifyChannel(s.draft));
-export const useIsNotifyAction = () =>
-  useAutomationStore((s) => isNotifyAction(s.draft));
 
 /**
  * Resolves the active notify provider + its slice, or null when the

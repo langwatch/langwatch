@@ -208,9 +208,12 @@ describe("AutomationDrawer", () => {
         });
         await user.hover(createButton);
 
+        // Facet-ordered todo copy: name, then the trace subject, then delivery.
         await waitFor(() => {
           expect(
-            screen.getByText(/set a trigger and pick a type/i),
+            screen.getByText(
+              /choose which traces to act on.*pick a delivery channel/i,
+            ),
           ).toBeInTheDocument();
         });
       });
@@ -270,28 +273,22 @@ describe("AutomationDrawer", () => {
     });
   });
 
-  describe("given the When secondary is open", () => {
-    describe("when a filter is saved from the secondary", () => {
-      it("updates the When-row summary on the main drawer", async () => {
+  describe("given the trace subject is edited inline", () => {
+    describe("when a filter is added", () => {
+      it("records it on the draft without opening a secondary", async () => {
         renderDrawer();
 
-        // Open the When secondary.
-        fireEvent.click(screen.getByText("When"));
-
-        // The stubbed FieldsFilters hands a full filter object back up.
+        // The subject facet is inline now — the filter editor is on the main
+        // pane, no "When" row to open first.
         await waitFor(() => {
           expect(screen.getByTestId("add-filter")).toBeInTheDocument();
         });
         fireEvent.click(screen.getByTestId("add-filter"));
 
-        // Commit via the secondary's Done action.
-        fireEvent.click(screen.getByRole("button", { name: "Done" }));
-
-        // Back on the main drawer the When row now summarises the filter.
         await waitFor(() => {
           expect(
-            screen.getByText(/1 condition: metadata\.labels/i),
-          ).toBeInTheDocument();
+            useAutomationStore.getState().draft.filters["metadata.labels"],
+          ).toEqual(["production"]);
         });
       });
     });
@@ -320,8 +317,8 @@ describe("AutomationDrawer", () => {
             "customGraph",
           );
         });
-        fireEvent.click(screen.getByText("When"));
 
+        // The subject facet is inline — the graph select is on the main pane.
         await waitFor(() => {
           expect(selectContainingOption(/select a graph/i)).toBeEnabled();
         });
@@ -385,9 +382,9 @@ describe("AutomationDrawer", () => {
     });
   });
 
-  describe("given severity lives next to the name for both kinds", () => {
+  describe("given severity is an alert-only facet", () => {
     describe("when the draft is an alert", () => {
-      it("shows the severity field without the optional hint", async () => {
+      it("shows the severity facet", async () => {
         renderDrawer({ initialSource: "customGraph" });
 
         await waitFor(() => {
@@ -396,16 +393,16 @@ describe("AutomationDrawer", () => {
           );
         });
         expect(screen.getByText(/Severity/)).toBeInTheDocument();
-        expect(screen.queryByText("(optional)")).not.toBeInTheDocument();
       });
     });
 
     describe("when the draft is a trace automation", () => {
-      it("shows the severity field with the optional hint", async () => {
+      it("does not show a severity facet", async () => {
         renderDrawer();
 
-        expect(await screen.findByText(/Severity/)).toBeInTheDocument();
-        expect(screen.getByText("(optional)")).toBeInTheDocument();
+        // Automations don't carry a severity (ADR-043) — the facet is gone.
+        await screen.findByText("Type");
+        expect(screen.queryByText(/Severity/)).not.toBeInTheDocument();
       });
     });
   });

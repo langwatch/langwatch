@@ -2,77 +2,81 @@ import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type { TriggerAction } from "@prisma/client";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import type { ClientEntry } from "~/automations/providers/types";
-import type { ConditionSource } from "~/features/automations/logic/draftReducer";
+import type { ConditionSource } from "../logic/draftReducer";
+import { FacetSection } from "./FacetSection";
+
+/** The active channel card is tinted with the preset's list-page accent. */
+const ACCENT_FOR_SOURCE: Record<ConditionSource, string> = {
+  trace: "blue",
+  customGraph: "orange",
+  report: "purple",
+};
 
 /**
- * The provider-card picker on the main drawer's Type section. Entries come
- * straight from `CLIENT_PROVIDERS` so adding a definition registers a new
- * card here automatically.
- *
- * Grouped by `shared.category` (`notify` first, then `action`) because more
- * action types are coming and a single 2×N grid stops reading as "pick how
- * to be alerted vs. pick a side-effect" once the list crosses ~4 entries.
- * The two groups also let an `action`-only future deployment hide the
- * Notify group cleanly via the category filter.
- *
- * Graph alerts (source = customGraph) only support `notify`-category actions
- * — the `action` group is not rendered at all for alerts. The router
- * enforces the same rule server-side; hiding at the UI layer keeps options
- * that would error at save time out of sight entirely.
+ * The Delivery facet (ADR-043 facet 6) — where it goes and what it sends.
+ * Cards come straight from `CLIENT_PROVIDERS` so registering a provider adds
+ * a card automatically. Grouped by `shared.category` (`notify` first, then
+ * `action`); alerts and reports only ever notify, so the `action` group is
+ * hidden for them (the router enforces the same rule server-side). The
+ * guided template authoring lives one level down, behind the setup row.
  */
-export function TypePicker({
+export function DeliveryPicker({
   value,
   onChange,
   source,
 }: {
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
-  source?: ConditionSource;
+  source: ConditionSource;
 }) {
   const entries = Object.values(CLIENT_PROVIDERS);
   const notify = entries.filter((e) => e.shared.category === "notify");
   const action = entries.filter((e) => e.shared.category === "action");
   const isAlertKind = source === "customGraph";
   const notifyOnly = isAlertKind || source === "report";
+  const accent = ACCENT_FOR_SOURCE[source];
 
   return (
-    <Box padding={3} borderRadius="md" border="1px solid" borderColor="border">
-      <Text fontWeight="semibold" mb={3}>
-        Type
-      </Text>
+    <FacetSection
+      title="Delivery"
+      help="Where the notification goes and what it sends. Notify channels post to Slack, email, or a webhook; actions add matching traces to a dataset or annotation queue."
+    >
       <VStack align="stretch" gap={3}>
         {notify.length > 0 ? (
-          <TypeGroup
+          <DeliveryGroup
             label="Notify"
             description="Tell someone — Slack, email, webhook."
             entries={notify}
             value={value}
             onChange={onChange}
             isAlertKind={isAlertKind}
+            accent={accent}
           />
         ) : null}
         {action.length > 0 && !notifyOnly ? (
-          <TypeGroup
+          <DeliveryGroup
             label="Action"
             description="Do something to the matched trace."
             entries={action}
             value={value}
             onChange={onChange}
             isAlertKind={isAlertKind}
+            accent={accent}
           />
         ) : null}
       </VStack>
-    </Box>
+    </FacetSection>
   );
 }
 
-function TypeGroup({
+function DeliveryGroup({
   label,
   description,
   entries,
   value,
   onChange,
   isAlertKind,
+  accent,
 }: {
   label: string;
   description: string;
@@ -80,6 +84,7 @@ function TypeGroup({
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
   isAlertKind: boolean;
+  accent: string;
 }) {
   return (
     <VStack align="stretch" gap={2}>
@@ -99,12 +104,13 @@ function TypeGroup({
       </HStack>
       <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
         {entries.map((entry) => (
-          <TypeCard
+          <DeliveryCard
             key={entry.shared.action}
             entry={entry}
             active={entry.shared.action === value}
             onClick={() => onChange(entry.shared.action)}
             isAlertKind={isAlertKind}
+            accent={accent}
           />
         ))}
       </Box>
@@ -112,16 +118,18 @@ function TypeGroup({
   );
 }
 
-function TypeCard({
+function DeliveryCard({
   entry,
   active,
   onClick,
   isAlertKind,
+  accent,
 }: {
   entry: ClientEntry;
   active: boolean;
   onClick: () => void;
   isAlertKind: boolean;
+  accent: string;
 }) {
   const Icon = entry.client.Icon;
   return (
@@ -131,9 +139,7 @@ function TypeCard({
       padding={3}
       borderRadius="md"
       border="1px solid"
-      // ui5015-001: semantic colorPalette tokens — mirrors SourceCard;
-      // avoids raw scale + `_dark` gymnastics (memory feedback_no_hex_colours).
-      colorPalette="orange"
+      colorPalette={accent}
       borderColor={active ? "colorPalette.emphasized" : "border"}
       bg={active ? "colorPalette.subtle" : "bg"}
       cursor="pointer"

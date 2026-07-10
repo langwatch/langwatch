@@ -5,6 +5,7 @@ import type { EmailSlice } from "~/automations/providers/definitions/email/clien
 import {
   type AutomationDraft,
   buildTestFirePayload,
+  cadenceIsSet,
   conditionsAreSet,
   configIsComplete,
   configurationSummary,
@@ -13,11 +14,12 @@ import {
   INITIAL_DRAFT,
   INITIAL_GRAPH_ALERT_DRAFT,
   INITIAL_REPORT_DRAFT,
+  presetLabels,
   reportInputFromDraft,
   isNotifyAction,
   notifyChannel,
   reducer,
-  summariseConditions,
+  subjectIsSet,
   templatesFromDraft,
 } from "../draftReducer";
 
@@ -240,48 +242,116 @@ describe("SET_GRAPH_ALERT", () => {
   });
 });
 
-describe("summariseConditions for graph alerts", () => {
-  it("describes the rule when fully filled in", () => {
-    const draft: AutomationDraft = {
+describe("subjectIsSet + cadenceIsSet split", () => {
+  describe("when the source is customGraph", () => {
+    const alert: AutomationDraft = {
       ...SAMPLE,
       source: "customGraph",
+      filters: {},
       customGraphId: "g_1",
       graphAlert: {
-        seriesName: "0/latency/p95",
+        seriesName: "0/value/avg",
         operator: "gt",
         threshold: 250,
         timePeriod: 60,
       },
     };
-    expect(summariseConditions(draft)).toMatch(
-      /0\/latency\/p95.*greater than.*250.*over 1 hour/i,
-    );
+
+    it("subjectIsSet needs a graph and a series", () => {
+      expect(subjectIsSet(alert)).toBe(true);
+      expect(subjectIsSet({ ...alert, customGraphId: null })).toBe(false);
+      expect(
+        subjectIsSet({
+          ...alert,
+          graphAlert: { ...alert.graphAlert, seriesName: "" },
+        }),
+      ).toBe(false);
+    });
+
+    it("cadenceIsSet needs a finite threshold, not a severity", () => {
+      expect(cadenceIsSet(alert)).toBe(true);
+      // Severity is a separate facet — cadence stays set without it.
+      expect(cadenceIsSet({ ...alert, alertType: null })).toBe(true);
+      expect(
+        cadenceIsSet({
+          ...alert,
+          graphAlert: { ...alert.graphAlert, threshold: NaN },
+        }),
+      ).toBe(false);
+    });
   });
 
-  it("prefers the resolved series label over the raw key", () => {
-    const draft: AutomationDraft = {
-      ...SAMPLE,
-      source: "customGraph",
-      customGraphId: "g_1",
-      graphAlert: {
-        seriesName: "0/latency/p95",
-        operator: "gt",
-        threshold: 250,
-        timePeriod: 60,
-      },
-    };
-    const summary = summariseConditions(draft, { seriesLabel: "p95 latency" });
-    expect(summary).toMatch(/p95 latency.*greater than.*250.*over 1 hour/i);
-    expect(summary).not.toContain("0/latency/p95");
+  describe("when the source is report", () => {
+    it("subjectIsSet follows the content source, cadenceIsSet follows the cron", () => {
+      const report: AutomationDraft = {
+        ...SAMPLE,
+        source: "report",
+        report: { ...INITIAL_REPORT_DRAFT },
+      };
+      expect(subjectIsSet(report)).toBe(true);
+      expect(cadenceIsSet(report)).toBe(true);
+      expect(
+        subjectIsSet({
+          ...report,
+          report: {
+            ...INITIAL_REPORT_DRAFT,
+            sourceKind: "dashboard",
+            dashboardId: null,
+          },
+        }),
+      ).toBe(false);
+      expect(
+        cadenceIsSet({
+          ...report,
+          report: { ...INITIAL_REPORT_DRAFT, cron: "  " },
+        }),
+      ).toBe(false);
+    });
   });
 
-  it("prompts for a graph when none is picked", () => {
-    const draft: AutomationDraft = {
-      ...SAMPLE,
-      source: "customGraph",
-      customGraphId: null,
-    };
-    expect(summariseConditions(draft)).toMatch(/pick a graph/i);
+  describe("when the source is trace", () => {
+    it("subjectIsSet follows the filters and cadenceIsSet is always true", () => {
+      expect(subjectIsSet(SAMPLE)).toBe(true);
+      expect(subjectIsSet({ ...SAMPLE, filters: {} })).toBe(false);
+      expect(cadenceIsSet({ ...SAMPLE, filters: {} })).toBe(true);
+    });
+  });
+});
+
+describe("presetLabels", () => {
+  it("keys the noun set on the preset for a trace automation", () => {
+    expect(presetLabels("trace", false)).toEqual({
+      title: "Add automation",
+      saveButton: "Create automation",
+      createdToast: "Automation created",
+      updatedToast: "Automation updated",
+      noun: "automation",
+    });
+    expect(presetLabels("trace", true).title).toBe("Edit automation");
+    expect(presetLabels("trace", true).saveButton).toBe("Save changes");
+  });
+
+  it("gives an alert its own copy", () => {
+    expect(presetLabels("customGraph", false)).toMatchObject({
+      title: "New alert",
+      saveButton: "Create alert",
+      createdToast: "Alert created",
+      noun: "alert",
+    });
+    expect(presetLabels("customGraph", true).title).toBe("Edit alert");
+  });
+
+  it("gives a report report copy — never automation copy (field-5015)", () => {
+    const create = presetLabels("report", false);
+    expect(create).toMatchObject({
+      title: "New report",
+      saveButton: "Create report",
+      createdToast: "Report created",
+      updatedToast: "Report updated",
+      noun: "report",
+    });
+    expect(create.saveButton).not.toMatch(/automation/i);
+    expect(presetLabels("report", true).title).toBe("Edit report");
   });
 });
 

@@ -21,7 +21,7 @@ export const GRAPH_ALERT_OPERATORS = ["gt", "lt", "gte", "lte", "eq"] as const;
 export type GraphAlertOperator = (typeof GRAPH_ALERT_OPERATORS)[number];
 
 /** Time-window values the graph-alert UI offers (minutes). Mirrors the
- *  `TIME_PERIOD_LABELS` options rendered in `FiltersSecondaryDrawer.tsx`.
+ *  `TIME_PERIOD_LABELS` options rendered in the drawer's `CadenceSection.tsx`.
  *  The dispatcher accepts any positive integer, but the UI is constrained
  *  to this set so the validator can reject typos / hostile input on the
  *  wire. */
