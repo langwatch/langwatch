@@ -91,6 +91,26 @@ export class PrismaStorageBoundaryEventRepository
     }));
   }
 
+  async snapshotFoldState({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ events: StoredBoundaryEvent[]; gaugeBytes: bigint }> {
+    return await this.prisma.$transaction(
+      async (tx) => {
+        const events = await tx.storageBoundaryEvent.findMany({
+          where: { organizationId },
+          orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+        });
+        const gauge = await tx.storageBillableGauge.findUnique({
+          where: { organizationId },
+        });
+        return { events, gaugeBytes: gauge?.billableBytes ?? 0n };
+      },
+      { isolationLevel: "RepeatableRead" },
+    );
+  }
+
   async countEventsAfter({
     organizationId,
     after,

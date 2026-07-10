@@ -37,6 +37,7 @@ function makeAudit({
     gauge,
     auditState,
     measurement: { measureReferenceBytes },
+    tier: { computeTier: async () => ({ tier: "daily", reasons: [] }) },
     onAuditAlarm: ({ kind }) => alarms.push({ kind }),
   });
   return { service, alarms, measureReferenceBytes };

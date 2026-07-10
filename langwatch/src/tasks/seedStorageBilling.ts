@@ -42,6 +42,11 @@ export default async function execute(
   const lookbackDays = lookbackDaysArg
     ? Number(lookbackDaysArg)
     : SEED_DEFAULT_LOOKBACK_DAYS;
+  if (!Number.isFinite(lookbackDays) || lookbackDays <= 0) {
+    throw new Error(
+      `lookbackDays must be a positive number, got "${lookbackDaysArg}"`,
+    );
+  }
 
   const events = new PrismaStorageBoundaryEventRepository(prisma);
   const listProjectIds = async ({

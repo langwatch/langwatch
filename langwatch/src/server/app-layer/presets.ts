@@ -92,6 +92,7 @@ import { PrismaStorageBoundaryEventRepository } from "./billing/storage/reposito
 import { PrismaStorageSweepCursorRepository } from "./billing/storage/repositories/storage-sweep-cursor.prisma.repository";
 import { PrismaStorageUsageHourlyRepository } from "./billing/storage/repositories/storage-usage-hourly.prisma.repository";
 import { StorageAuditService } from "./billing/storage/storageAudit.service";
+import { StorageAuditTierService } from "./billing/storage/storageAuditTier.service";
 import { StorageCorrectionService } from "./billing/storage/storageCorrection.service";
 import { StorageSweepService } from "./billing/storage/storageSweep.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
@@ -628,11 +629,31 @@ export function initializeDefaultApp(options?: {
     },
   });
   const storageGaugeRepo = new PrismaStorageBillableGaugeRepository(prisma);
+  const storageAuditTier = new StorageAuditTierService({
+    auditState: new PrismaStorageAuditStateRepository(prisma),
+    // Any in-flight/wedged `ALTER UPDATE _retention_days` mutation on any of
+    // the org's projects pins the org to the daily audit tier until it
+    // completes (ADR-039 Decision 3).
+    hasRetentionMutationInFlight: async ({ organizationId }) => {
+      const orgProjects = await prisma.project.findMany({
+        where: { team: { organizationId } },
+        select: { id: true },
+      });
+      for (const project of orgProjects) {
+        const inFlight = await retroactiveUpdateService.getMutationProgress({
+          projectId: project.id,
+        });
+        if (inFlight.length > 0) return true;
+      }
+      return false;
+    },
+  });
   const storageAudits = new StorageAuditService({
     events: storageBoundaryEvents,
     gauge: storageGaugeRepo,
     auditState: new PrismaStorageAuditStateRepository(prisma),
     measurement: storageBoundaryMeasurement,
+    tier: storageAuditTier,
     onAuditAlarm: ({ organizationId, kind, detail }) => {
       void withScope(async (scope) => {
         scope.setTag?.("handler", "storageAudit");

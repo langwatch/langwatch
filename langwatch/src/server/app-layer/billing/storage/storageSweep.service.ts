@@ -35,14 +35,10 @@ export interface StorageSweepDeps {
    * state. Optional — absent in non-SaaS presets.
    */
   audits?: {
-    runFoldAudit: (params: {
+    runScheduledAudits: (params: {
       organizationId: string;
       at: Date;
-    }) => Promise<{ clean: boolean }>;
-    runReferenceAudit: (params: {
-      organizationId: string;
-      at: Date;
-    }) => Promise<{ clean: boolean; partitionsChecked: number }>;
+    }) => Promise<{ ran: boolean }>;
   };
   /** Per-org failure sink (alarmed, never rethrown — no poison org). */
   onOrgFailure: (params: { organizationId: string; error: unknown }) => void;
@@ -98,8 +94,7 @@ export class StorageSweepService {
         }
         await this.deps.sampling.sampleHoursForOrg({ organizationId, at });
         if (entryDay.claimed && this.deps.audits) {
-          await this.deps.audits.runFoldAudit({ organizationId, at });
-          await this.deps.audits.runReferenceAudit({ organizationId, at });
+          await this.deps.audits.runScheduledAudits({ organizationId, at });
         }
       } catch (error) {
         logger.error(
