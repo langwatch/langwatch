@@ -50,6 +50,21 @@ export interface BillingCheckpointService {
     pendingReportedTotal: number;
     consecutiveFailures: number;
   }): Promise<void>;
+
+  /**
+   * Seeds the month's checkpoint for an organization whose metering turns on
+   * mid-month, so the first report bills only post-cutover events (ADR-039
+   * Invariant I8: no retroactive billing). Create-only: an existing
+   * checkpoint is NEVER modified — the org was already metered, and raising
+   * its checkpoint would skip legitimately-owed usage.
+   *
+   * @returns whether a new checkpoint row was created
+   */
+  seedIfAbsent(params: {
+    organizationId: string;
+    billingMonth: string;
+    monthToDateTotal: number;
+  }): Promise<{ seeded: boolean }>;
 }
 
 /**
@@ -174,5 +189,37 @@ export class PrismaBillingCheckpointService implements BillingCheckpointService 
         consecutiveFailures: params.consecutiveFailures,
       },
     });
+  }
+
+  async seedIfAbsent(params: {
+    organizationId: string;
+    billingMonth: string;
+    monthToDateTotal: number;
+  }): Promise<{ seeded: boolean }> {
+    const existing = await this.prisma.billingMeterCheckpoint.findUnique({
+      where: {
+        organizationId_billingMonth: {
+          organizationId: params.organizationId,
+          billingMonth: params.billingMonth,
+        },
+      },
+      select: { organizationId: true },
+    });
+    if (existing) {
+      return { seeded: false };
+    }
+
+    // create (not upsert-with-noop) so a concurrent seed surfaces as a
+    // unique-constraint conflict instead of silently racing.
+    await this.prisma.billingMeterCheckpoint.create({
+      data: {
+        organizationId: params.organizationId,
+        billingMonth: params.billingMonth,
+        lastReportedTotal: params.monthToDateTotal,
+        pendingReportedTotal: null,
+        consecutiveFailures: 0,
+      },
+    });
+    return { seeded: true };
   }
 }

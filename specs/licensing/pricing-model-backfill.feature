@@ -8,25 +8,25 @@ Feature: Pricing model backfill converges drifted organizations
   I want drifted pricingModel columns converged to match the active subscription
   So that display and analytics surfaces stop contradicting how the organization is billed
 
-  @integration @unimplemented
+  @integration
   Scenario: Backfill flips organizations with an active seat-event subscription
     Given an organization with pricingModel "TIERED" and an ACTIVE "GROWTH_SEAT_EUR_ANNUAL" subscription
     When the pricing model backfill runs
     Then the organization's pricingModel becomes "SEAT_EVENT"
 
-  @integration @unimplemented
+  @integration
   Scenario: Backfill ignores organizations whose seat subscription is cancelled
     Given an organization with pricingModel "TIERED" and a CANCELLED "GROWTH_SEAT_EUR_MONTHLY" subscription
     When the pricing model backfill runs
     Then the organization's pricingModel remains "TIERED"
 
-  @integration @unimplemented
+  @integration
   Scenario: Backfill ignores organizations on legacy tiered plans
     Given an organization with pricingModel "TIERED" and an ACTIVE "ACCELERATE" subscription
     When the pricing model backfill runs
     Then the organization's pricingModel remains "TIERED"
 
-  @integration @unimplemented
+  @integration
   Scenario: Backfilling the column does not change any billing decision
     Given a drifted organization whose plan already resolves to seat-event behavior
     When the pricing model backfill updates its column
