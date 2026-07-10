@@ -18,6 +18,8 @@ const {
   mockCustomGraphFindUnique,
   mockCustomGraphFindMany,
   mockTriggersInvalidate,
+  mockSyncReportSchedule,
+  mockRemoveReportSchedule,
   mockTriggerSentGroupBy,
   mockTriggerSentFindMany,
 } = vi.hoisted(() => ({
@@ -30,6 +32,8 @@ const {
   mockCustomGraphFindUnique: vi.fn(),
   mockCustomGraphFindMany: vi.fn(),
   mockTriggersInvalidate: vi.fn().mockResolvedValue(undefined),
+  mockSyncReportSchedule: vi.fn().mockResolvedValue(undefined),
+  mockRemoveReportSchedule: vi.fn().mockResolvedValue(undefined),
   mockTriggerSentGroupBy: vi.fn(),
   mockTriggerSentFindMany: vi.fn(),
 }));
@@ -111,7 +115,11 @@ describe("automationRouter", () => {
     });
     previousApp = globalForApp.__langwatch_app;
     globalForApp.__langwatch_app = createTestApp({
-      triggers: { invalidate: mockTriggersInvalidate } as any,
+      triggers: {
+        invalidate: mockTriggersInvalidate,
+        syncReportSchedule: mockSyncReportSchedule,
+        removeReportSchedule: mockRemoveReportSchedule,
+      } as any,
     });
     caller = createTestCaller();
   });
@@ -427,6 +435,55 @@ describe("automationRouter", () => {
             },
           } as any),
         ).rejects.toBeDefined();
+      });
+    });
+  });
+
+  describe("upsert with report variant", () => {
+    const baseReportInput = {
+      projectId: "proj_123",
+      name: "Weekly errors",
+      action: TriggerAction.SEND_SLACK_MESSAGE,
+      filters: {},
+      report: {
+        source: {
+          kind: "traceQuery" as const,
+          filters: { "traces.error": ["true"] },
+          topN: 5,
+        },
+        schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+        compareToPrevious: false,
+      },
+      actionParams: { slackWebhook: "https://hooks.slack.com/services/abc" },
+      templates: {
+        slackTemplate: null,
+        slackTemplateType: null,
+        emailSubjectTemplate: null,
+        emailBodyTemplate: null,
+      },
+    };
+
+    describe("on create", () => {
+      it("persists a REPORT row and syncs the calendar schedule", async () => {
+        mockTriggerCreate.mockResolvedValueOnce({ id: "report_trig" });
+
+        await caller.upsert(baseReportInput as any);
+
+        expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
+        const createArgs = mockTriggerCreate.mock.calls[0]![0];
+        expect(createArgs.data.triggerKind).toBe("REPORT");
+        expect(createArgs.data.filters).toEqual({});
+        expect(createArgs.data.actionParams).toMatchObject({
+          source: { kind: "traceQuery", topN: 5 },
+          schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+          slackWebhook: "https://hooks.slack.com/services/abc",
+        });
+        expect(mockSyncReportSchedule).toHaveBeenCalledWith({
+          projectId: "proj_123",
+          triggerId: "report_trig",
+          cron: "0 9 * * 1",
+          timezone: "UTC",
+        });
       });
     });
   });

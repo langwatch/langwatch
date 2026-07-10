@@ -1,4 +1,9 @@
+import type { Cluster, Redis } from "ioredis";
+import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
+import { SchedulerService } from "~/server/app-layer/scheduler/scheduler.service";
+import type { ScheduledJobRepository } from "~/server/app-layer/scheduler/scheduler.types";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { REPORT_SCHEDULER_TARGET_TYPE } from "./report.builder";
 import type {
   TriggerRepository,
   TriggerSummary,
@@ -20,7 +25,16 @@ export class TriggerService {
     "triggers:",
   );
 
-  constructor(private readonly repo: TriggerRepository) {}
+  /**
+   * `scheduledJobs` + `redis` are present only where reports are managed (they
+   * back the report-schedule sync). Optional so the null/test wiring can omit
+   * them; the sync methods no-op without a repository.
+   */
+  constructor(
+    private readonly repo: TriggerRepository,
+    private readonly scheduledJobs?: ScheduledJobRepository,
+    private readonly redis?: Redis | Cluster | null,
+  ) {}
 
   private async loadAll(projectId: string): Promise<TriggerSummary[]> {
     const cached = await this.cache.get(projectId);
@@ -84,5 +98,48 @@ export class TriggerService {
 
   async invalidate(projectId: string): Promise<void> {
     await this.cache.delete(projectId);
+  }
+
+  /**
+   * Sync a scheduled report's calendar entry (ADR-042): create/refresh the
+   * `ScheduledJob` for this report trigger and best-effort wake every pod's
+   * scheduler loop so it picks up the (possibly sooner) next run now. The
+   * report trigger id IS the scheduler `targetId`. No-op if the scheduler
+   * repository isn't wired (test/null environments).
+   */
+  async syncReportSchedule(params: {
+    projectId: string;
+    triggerId: string;
+    cron: string;
+    timezone: string;
+  }): Promise<void> {
+    if (!this.scheduledJobs) return;
+    const nextRunAt = computeNextRunAt({
+      cron: params.cron,
+      timezone: params.timezone,
+      after: new Date(),
+    });
+    await this.scheduledJobs.upsertForTarget({
+      projectId: params.projectId,
+      targetType: REPORT_SCHEDULER_TARGET_TYPE,
+      targetId: params.triggerId,
+      cron: params.cron,
+      timezone: params.timezone,
+      nextRunAt,
+    });
+    SchedulerService.publishWake(this.redis);
+  }
+
+  /** Deactivate a report's schedule so the scheduler due-scan skips it. */
+  async removeReportSchedule(params: {
+    projectId: string;
+    triggerId: string;
+  }): Promise<void> {
+    if (!this.scheduledJobs) return;
+    await this.scheduledJobs.deactivateForTarget({
+      projectId: params.projectId,
+      targetType: REPORT_SCHEDULER_TARGET_TYPE,
+      targetId: params.triggerId,
+    });
   }
 }

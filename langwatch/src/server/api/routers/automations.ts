@@ -24,6 +24,10 @@ import {
   type GraphAlertActionParams,
   graphAlertActionParamsSchema,
 } from "~/server/app-layer/triggers/graph-alert.builder";
+import {
+  buildReportTriggerData,
+  reportActionParamsSchema,
+} from "~/server/app-layer/triggers/report.builder";
 import { TriggerFireHistoryService } from "~/server/app-layer/triggers/trigger-fire-history.service";
 import {
   type DraftProject,
@@ -308,6 +312,13 @@ export const automationRouter = createTRPCRouter({
         },
       });
 
+      // Best-effort: deactivate any scheduled-report entry for this trigger
+      // (harmless no-op for non-report triggers).
+      await getApp().triggers.removeReportSchedule({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+      });
+
       await getApp().triggers.invalidate(input.projectId);
 
       return { success: true };
@@ -576,6 +587,9 @@ export const automationRouter = createTRPCRouter({
          *  (`customGraphId` set); merged into `actionParams` before persist
          *  so the dispatcher (cron + event-sourced) reads one shape. */
         graphAlert: graphAlertActionParamsSchema.optional(),
+        /** Scheduled-report shape (source + schedule). Present iff this is a
+         *  REPORT; mutually exclusive with graphAlert. */
+        report: reportActionParamsSchema.optional(),
         actionParams: actionParamsSchema,
         templates: templateDraftSchema,
         notificationCadence: notificationCadenceSchema.optional(),
@@ -585,6 +599,7 @@ export const automationRouter = createTRPCRouter({
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
       const isGraphAlert = !!input.customGraphId;
+      const isReport = !isGraphAlert && !!input.report;
       try {
         validateTemplateDraft(input.templates);
         if (isGraphAlert) {
@@ -627,6 +642,19 @@ export const automationRouter = createTRPCRouter({
             throw new TRPCError({
               code: "NOT_FOUND",
               message: "Graph not found in this project.",
+            });
+          }
+        }
+        if (isReport) {
+          // A report sends a rendered notification on a schedule — notify
+          // channels only, like alerts.
+          if (
+            input.action !== TriggerAction.SEND_EMAIL &&
+            input.action !== TriggerAction.SEND_SLACK_MESSAGE
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Reports can only send Email or Slack notifications.",
             });
           }
         }
@@ -713,6 +741,25 @@ export const automationRouter = createTRPCRouter({
           alertType: built.alertType,
           filters: built.filters,
           customGraphId: built.customGraphId,
+          actionParams: built.actionParams,
+          slackTemplateType: input.templates.slackTemplateType ?? null,
+          slackTemplate: input.templates.slackTemplate ?? null,
+          emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+          emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+        };
+      } else if (isReport && input.report) {
+        const built = buildReportTriggerData({
+          id: input.triggerId ?? ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+          name: input.name,
+          projectId: input.projectId,
+          action: input.action,
+          actionParams: { ...actionParams, ...input.report },
+        });
+        data = {
+          name: built.name,
+          action: built.action,
+          triggerKind: TriggerKind.REPORT,
+          filters: built.filters,
           actionParams: built.actionParams,
           slackTemplateType: input.templates.slackTemplateType ?? null,
           slackTemplate: input.templates.slackTemplate ?? null,
@@ -806,6 +853,17 @@ export const automationRouter = createTRPCRouter({
             },
           });
         }
+      }
+
+      if (isReport && input.report) {
+        // Wire the report onto the calendar scheduler (ADR-042): its trigger
+        // id is the scheduler targetId; publishWake nudges every pod's loop.
+        await getApp().triggers.syncReportSchedule({
+          projectId: input.projectId,
+          triggerId: trigger.id,
+          cron: input.report.schedule.cron,
+          timezone: input.report.schedule.timezone,
+        });
       }
 
       await getApp().triggers.invalidate(input.projectId);

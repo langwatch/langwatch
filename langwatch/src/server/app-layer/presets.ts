@@ -469,7 +469,11 @@ export function initializeDefaultApp(options?: {
     new MonitorService(new PrismaMonitorRepository(prisma)),
     "MonitorService",
   );
-  const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
+  const triggers = new TriggerService(
+    new PrismaTriggerRepository(prisma),
+    new PrismaScheduledJobRepository(prisma),
+    redis,
+  );
   const emailSuppressions = new EmailSuppressionService(
     new PrismaEmailSuppressionRepository(prisma),
     new PrismaEmailSuppressionNameLookupRepository(prisma),
