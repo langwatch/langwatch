@@ -33,6 +33,23 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     Then I do not see a "Comparison" card
     But adding a Comparison from Add to Evaluation opens the form with the variant picker
 
+  # The Comparison card collects the variants before Create, so by the time the
+  # column is added there is nothing left to configure. Re-opening the config
+  # form on top of it reads as the drawer refusing to close.
+  Scenario: Creating a configured Comparison closes the drawer
+    Given I have added a Comparison from Add to Evaluation
+    And I have selected two variants
+    When I create it
+    Then the Comparison column is added
+    And the drawer closes
+
+  # Picking a comparison judge straight off the evaluator list skips the card,
+  # so it arrives with no variants and cannot judge anything yet.
+  Scenario: Creating an unconfigured Comparison opens its config form
+    Given I pick a comparison evaluator with no variants selected
+    When it is added as a column
+    Then its config form opens so I can pick the variants
+
   Scenario: Compare two variants
     When I add a Comparison evaluator
     And I select targets "variant_1", "variant_2" as the variants to compare
@@ -153,6 +170,22 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     Given "variant_1" produces a structured output with fields "answer" and "confidence"
     When I select "answer" as the output field to compare for "variant_1"
     Then only that field's value is presented to the judge as that candidate's output
+
+  # Each variant chooses its own field. Two variants may name the same answer
+  # differently — one calls it "answer", another "reply" — and only the user
+  # knows they mean the same thing. Nothing forces the choice to be uniform.
+  Scenario: Each variant chooses its output field independently
+    Given "variant_1" and "variant_2" both produce structured outputs
+    When I select "answer" for "variant_1"
+    Then "variant_2"'s output field is unchanged
+
+  # A plain prompt declares exactly one output field, so a picker there would
+  # be a dropdown with one option.
+  Scenario: No field picker when a variant has only one output field
+    Given "variant_1" produces a single output field
+    When I view its variant card
+    Then no output field picker is shown
+    And its whole output is presented to the judge
 
   Scenario: A structured output with no field selected still judges
     Given "variant_1" produces a structured output with fields "answer" and "confidence"

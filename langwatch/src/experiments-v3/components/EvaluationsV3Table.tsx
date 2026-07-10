@@ -429,6 +429,14 @@ export function EvaluationsV3Table({
         config?.evaluatorType === COMPARISON_EVALUATOR_TYPE ||
         config?.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
 
+      const comparison = pendingComparisonRef.current ?? {
+        variants: [],
+        hasGoldenAnswer: true,
+        goldenField: "",
+        includeMetrics: [],
+        randomizeOrder: true,
+      };
+
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`,
         type: "evaluator",
@@ -436,22 +444,18 @@ export function EvaluationsV3Table({
         inputs,
         outputs,
         mappings: {},
-        ...(isComparisonJudge && {
-          comparison: pendingComparisonRef.current ?? {
-            variants: [],
-            hasGoldenAnswer: true,
-            goldenField: "",
-            includeMetrics: [],
-            randomizeOrder: true,
-          },
-        }),
+        ...(isComparisonJudge && { comparison }),
       };
       pendingComparisonRef.current = null;
       addOrReplaceTarget(targetConfig);
-      // Open the ComparisonConfigForm immediately so the user can pick variants
-      // and the golden field without having to find and click the target chip
-      // again.
-      if (isComparisonJudge) {
+
+      // A comparison needs two variants before it can judge anything. Picking
+      // one straight off the evaluator list leaves it unconfigured, so open the
+      // ComparisonConfigForm rather than dropping the user back on a column
+      // that cannot run. The Comparison card collects the variants up front, so
+      // that flow arrives here already configured and the drawer just closes.
+      const needsConfiguration = comparison.variants.length < 2;
+      if (isComparisonJudge && needsConfiguration) {
         // openTargetEditor reads fresh store state, so the target we just added
         // is visible when the drawer opens.
         void openTargetEditor(targetConfig);

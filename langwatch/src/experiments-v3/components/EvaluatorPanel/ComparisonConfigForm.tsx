@@ -8,20 +8,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
-import {
-  type AvailableSource,
-  type FieldMapping as UIFieldMapping,
-  VariableMappingInput,
-} from "~/components/variables";
-import type { Field as DSLField } from "~/optimization_studio/types/dsl";
 
-import { useTargetName, useTargetNames } from "../../hooks/useTargetName";
+import { useTargetName } from "../../hooks/useTargetName";
 import { balancedColumns } from "../../utils/balancedColumns";
 import type {
   ComparisonEvaluatorConfig,
@@ -153,22 +147,15 @@ function VariantsMultiSelect({
     });
   };
 
-  // The mapping widget can retarget a slot as well as re-field it, so a
-  // change may rewrite both the variant id (in place, preserving order) and
-  // its output path. A cleared mapping is a no-op: dropping the variant on a
-  // stray clear would delete a column the user only meant to re-point.
-  const setMapping = (index: number, mapping: UIFieldMapping | undefined) => {
-    if (!mapping || mapping.type !== "source") return;
-    const previousId = selected[index];
-    const nextVariants = [...selected];
-    nextVariants[index] = mapping.sourceId;
-
+  // An empty path means "the whole output", which is how a variant with no
+  // chosen field is stored — so clearing the choice drops the entry rather
+  // than writing [].
+  const setOutputPath = (id: string, path: string[]) => {
     const nextPaths = { ...outputPaths };
-    if (previousId) delete nextPaths[previousId];
-    if (mapping.path.length > 0) nextPaths[mapping.sourceId] = mapping.path;
+    if (path.length > 0) nextPaths[id] = path;
+    else delete nextPaths[id];
 
     update({
-      variants: nextVariants,
       variantOutputPaths: Object.keys(nextPaths).length ? nextPaths : undefined,
     });
   };
@@ -189,19 +176,15 @@ function VariantsMultiSelect({
         data-testid="comparison-variants-grid"
         data-columns={columns}
       >
-        {selected.map((id, index) => {
+        {selected.map((id) => {
           const target = targets.find((t) => t.id === id);
           if (!target) return null;
           return (
             <VariantCard
               key={id}
               target={target}
-              // Retargeting is allowed, so a slot's own target must stay in
-              // its source list — otherwise the widget renders its current
-              // value as an unknown source and blanks the pill.
-              sources={[target, ...remaining]}
               path={outputPaths[id]}
-              onMappingChange={(mapping) => setMapping(index, mapping)}
+              onPathChange={(path) => setOutputPath(id, path)}
               onRemove={() => remove(id)}
             />
           );
@@ -255,39 +238,39 @@ function VariantsMultiSelect({
   );
 }
 
+/** Storage for "compare the whole output" — no field narrowing. */
+const WHOLE_OUTPUT = "__whole_output__";
+
 /**
- * One cell of the variants grid: which column, and which of its output
- * fields feeds the judge.
+ * One cell of the variants grid: which column, and — when the target emits
+ * more than one output field — which of those fields feeds the judge.
  *
- * The field picker is `VariableMappingInput` — the same widget the rest of
- * the app maps variables with, restored here from PairwiseConfigForm, which
- * had it before the two forms merged. Without it a variant emitting a
- * structured output has no way to say "judge the `.answer` field", and the
- * whole object reaches the judge, where `CandidateInput.output: str` rejects
- * it. Whole-output selection stays representable as an empty path, so
- * single-field targets and previously saved configs keep working untouched.
+ * A variant emitting a structured output needs a way to say "judge the
+ * `.answer` field", or the whole object reaches the judge serialized as JSON.
+ * Which field to pick is a per-variant call: two variants may name the same
+ * answer differently, and the user is the only one who knows they mean the
+ * same thing.
+ *
+ * The picker is hidden when the target has a single output field, because
+ * there is no choice to make. That is the common case — a plain prompt
+ * declares one `output` field — and the runtime unwraps a single-field
+ * target's dict back to a scalar before the judge sees it, so an unset path
+ * already feeds the judge the plain string.
  */
 function VariantCard({
   target,
-  sources,
   path,
-  onMappingChange,
+  onPathChange,
   onRemove,
 }: {
   target: TargetConfig;
-  sources: TargetConfig[];
   path: string[] | undefined;
-  onMappingChange: (mapping: UIFieldMapping | undefined) => void;
+  onPathChange: (path: string[]) => void;
   onRemove: () => void;
 }) {
-  // Resolved in one batched lookup rather than a useTargetName per source,
-  // which would be a hook inside a .map() over a list that changes length.
-  const sourceNames = useTargetNames(sources);
-  const name = sourceNames[0] || target.id;
-  const availableSources = useMemo(
-    () => sources.map((source, i) => targetToSource(source, sourceNames[i])),
-    [sources, sourceNames],
-  );
+  const name = useTargetName(target) ?? target.id;
+  const fields = target.outputs ?? [];
+  const selectedField = path?.[0];
 
   return (
     <VStack
@@ -317,34 +300,58 @@ function VariantCard({
           <X size={12} />
         </Button>
       </HStack>
-      <VariableMappingInput
-        mapping={{ type: "source", sourceId: target.id, path: path ?? [] }}
-        onMappingChange={onMappingChange}
-        availableSources={availableSources}
-        placeholder="Select an output field"
-        inputTestId={`comparison-variant-output-${target.id}`}
-      />
+
+      {fields.length > 1 && (
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              variant="outline"
+              colorPalette="gray"
+              size="xs"
+              fontWeight="normal"
+              justifyContent="space-between"
+              width="full"
+              data-testid={`comparison-variant-output-${target.id}`}
+            >
+              <Text
+                fontSize="12px"
+                fontFamily="mono"
+                color={selectedField ? "fg" : "fg.subtle"}
+                truncate
+              >
+                {selectedField ?? "Whole output"}
+              </Text>
+              <ChevronDown size={12} color="var(--chakra-colors-fg-muted)" />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
+            <Menu.Item
+              value={WHOLE_OUTPUT}
+              onClick={() => onPathChange([])}
+              data-testid={`comparison-variant-output-${target.id}-option-whole`}
+            >
+              <Text fontSize="12px" color="fg.subtle">
+                Whole output
+              </Text>
+            </Menu.Item>
+            {fields.map((field) => (
+              <Menu.Item
+                key={field.identifier}
+                value={field.identifier}
+                onClick={() => onPathChange([field.identifier])}
+                data-testid={`comparison-variant-output-${target.id}-option-${field.identifier}`}
+              >
+                <Text fontSize="12px" fontFamily="mono">
+                  {field.identifier}
+                </Text>
+              </Menu.Item>
+            ))}
+          </Menu.Content>
+        </Menu.Root>
+      )}
     </VStack>
   );
 }
-
-/**
- * Shape a target as a mapping source. "signature" matches the source type
- * the evaluator mappings drawer uses, so the widget renders the same icon
- * and the same `<target>.<field>` pill it does everywhere else.
- */
-const targetToSource = (
-  target: TargetConfig,
-  displayName: string | undefined,
-): AvailableSource => ({
-  id: target.id,
-  name: displayName || target.id,
-  type: "signature",
-  fields: (target.outputs ?? []).map((output) => ({
-    name: output.identifier,
-    type: output.type as DSLField["type"],
-  })),
-});
 
 /**
  * Menu item for a target the user can add. Split into its own component so

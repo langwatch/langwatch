@@ -52,13 +52,23 @@ const baseConfig = (
   ...overrides,
 });
 
+/** A plain prompt: one output field, so there is no field to choose. */
 const target = (id: string): TargetConfig => ({
   id,
   type: "prompt",
   promptId: `prompt_${id}`,
   inputs: [],
-  outputs: [],
+  outputs: [{ identifier: "output", type: "str" }],
   mappings: {},
+});
+
+/** A prompt with a structured output schema — several fields to choose from. */
+const structuredTarget = (id: string): TargetConfig => ({
+  ...target(id),
+  outputs: [
+    { identifier: "answer", type: "str" },
+    { identifier: "confidence", type: "float" },
+  ],
 });
 
 const renderForm = (
@@ -158,17 +168,117 @@ describe("ComparisonConfigForm", () => {
 
   // Restored from PairwiseConfigForm, which had a per-variant output picker
   // before the forms merged. Without it a variant emitting a structured
-  // output cannot be narrowed to a field.
+  // output cannot be narrowed to a field. Which field is a per-variant call:
+  // two variants may name the same answer differently.
   describe("the per-variant output picker", () => {
-    it("renders one for every picked variant", () => {
-      renderForm({ value: baseConfig({ variants: ["t1", "t2"] }) });
+    describe("given a variant with a single output field", () => {
+      it("hides the picker, because there is nothing to choose", () => {
+        renderForm({ value: baseConfig({ variants: ["t1", "t2"] }) });
 
-      expect(
-        screen.getByTestId("comparison-variant-output-t1"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByTestId("comparison-variant-output-t2"),
-      ).toBeInTheDocument();
+        expect(
+          screen.queryByTestId("comparison-variant-output-t1"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("given a variant with a structured output", () => {
+      const structured = {
+        targets: [structuredTarget("t1"), target("t2")],
+      };
+
+      it("shows the picker for that variant only", () => {
+        renderForm({
+          ...structured,
+          value: baseConfig({ variants: ["t1", "t2"] }),
+        });
+
+        expect(
+          screen.getByTestId("comparison-variant-output-t1"),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByTestId("comparison-variant-output-t2"),
+        ).not.toBeInTheDocument();
+      });
+
+      it("compares the whole output until a field is picked", () => {
+        renderForm({
+          ...structured,
+          value: baseConfig({ variants: ["t1", "t2"] }),
+        });
+
+        expect(screen.getByTestId("comparison-variant-output-t1")).toHaveTextContent(
+          "Whole output",
+        );
+      });
+
+      describe("when the user picks a field", () => {
+        it("stores it as that variant's output path", async () => {
+          const user = userEvent.setup();
+          const onChange = vi.fn();
+          renderForm({
+            ...structured,
+            value: baseConfig({ variants: ["t1", "t2"] }),
+            onChange,
+          });
+
+          await user.click(screen.getByTestId("comparison-variant-output-t1"));
+          await user.click(
+            screen.getByTestId("comparison-variant-output-t1-option-answer"),
+          );
+
+          expect(onChange).toHaveBeenCalledWith(
+            expect.objectContaining({ variantOutputPaths: { t1: ["answer"] } }),
+          );
+        });
+
+        it("leaves the other variants' fields alone", async () => {
+          const user = userEvent.setup();
+          const onChange = vi.fn();
+          renderForm({
+            targets: [structuredTarget("t1"), structuredTarget("t2")],
+            value: baseConfig({
+              variants: ["t1", "t2"],
+              variantOutputPaths: { t2: ["confidence"] },
+            }),
+            onChange,
+          });
+
+          await user.click(screen.getByTestId("comparison-variant-output-t1"));
+          await user.click(
+            screen.getByTestId("comparison-variant-output-t1-option-answer"),
+          );
+
+          expect(onChange).toHaveBeenCalledWith(
+            expect.objectContaining({
+              variantOutputPaths: { t1: ["answer"], t2: ["confidence"] },
+            }),
+          );
+        });
+      });
+
+      describe("when the user picks Whole output back", () => {
+        it("drops the saved path rather than storing an empty one", async () => {
+          const user = userEvent.setup();
+          const onChange = vi.fn();
+          renderForm({
+            ...structured,
+            value: baseConfig({
+              variants: ["t1", "t2"],
+              variantOutputPaths: { t1: ["answer"] },
+            }),
+            onChange,
+          });
+
+          await user.click(screen.getByTestId("comparison-variant-output-t1"));
+          await user.click(
+            screen.getByTestId("comparison-variant-output-t1-option-whole"),
+          );
+
+          expect(onChange).toHaveBeenCalledWith(
+            expect.objectContaining({ variantOutputPaths: undefined }),
+          );
+        });
+      });
     });
 
     describe("when a variant is removed", () => {
