@@ -12,6 +12,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
+	"github.com/langwatch/langwatch/services/langy-agent/langytracebridge"
 	"github.com/langwatch/langwatch/services/langy-agent/telemetry"
 )
 
@@ -22,6 +23,9 @@ type Deps struct {
 	OTel      *otelsetup.Provider
 	Health    *health.Registry
 	Telemetry *telemetry.Telemetry
+	// InternalTeeShutdown flushes/stops the self-observability tee (ADR-044
+	// part 4). A no-op when LANGY_INTERNAL_OTLP_ENDPOINT is unset.
+	InternalTeeShutdown func(context.Context) error
 }
 
 // NewDeps wires every adapter from the validated Config. It installs the
@@ -40,15 +44,26 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		return ctx, nil, fmt.Errorf("otel init: %w", err)
 	}
 
+	// Self-observability tee (ADR-044 part 4): fan the manager's OWN spans to a
+	// static internal project as well, content-stripped. No-op when the internal
+	// endpoint is unset. Must run AFTER the global provider is installed above so
+	// the additional span processor lands on it.
+	teeShutdown, err := langytracebridge.Install(ctx, cfg.LangyInternalOTLPEndpoint, cfg.LangyInternalOTLPHeaders)
+	if err != nil {
+		logger.Warn("langy_internal_tee_init_failed", zap.Error(err))
+		teeShutdown = func(context.Context) error { return nil }
+	}
+
 	probes := health.New(contexts.MustGetServiceInfo(ctx).Environment)
 	probes.MarkStarted()
 
 	return ctx, &Deps{
-		Logger:    logger,
-		NodeID:    nodeID,
-		OTel:      otelProvider,
-		Health:    probes,
-		Telemetry: telemetry.New(),
+		Logger:              logger,
+		NodeID:              nodeID,
+		OTel:                otelProvider,
+		Health:              probes,
+		Telemetry:           telemetry.New(),
+		InternalTeeShutdown: teeShutdown,
 	}, nil
 }
 

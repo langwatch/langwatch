@@ -78,6 +78,13 @@ export function isEphemeralLangyConversationEventType(type: string): boolean {
 export const LANGY_CONVERSATION_COMMAND_TYPES = {
   SEND_MESSAGE: "lw.langy_conversation.send_message",
   START_AGENT_TURN: "lw.langy_conversation.start_agent_turn",
+  // PR3 turn-lifecycle write surface. The durable milestones the streaming
+  // worker records during a turn (ADR-044): a meaningful result the agent
+  // produces is a durable event; transient progress ticks stay ephemeral.
+  RECORD_TOOL_CALL_STARTED: "lw.langy_conversation.record_tool_call_started",
+  RECORD_TOOL_CALL_COMPLETED: "lw.langy_conversation.record_tool_call_completed",
+  RECORD_AGENT_RESPONDED: "lw.langy_conversation.record_agent_responded",
+  FAIL_AGENT_TURN: "lw.langy_conversation.fail_agent_turn",
   RECONCILE_AGENT_TURN: "lw.langy_conversation.reconcile_agent_turn",
   ARCHIVE: "lw.langy_conversation.archive_conversation",
   UPDATE_METADATA: "lw.langy_conversation.update_metadata",
@@ -86,6 +93,10 @@ export const LANGY_CONVERSATION_COMMAND_TYPES = {
 export const LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES = [
   LANGY_CONVERSATION_COMMAND_TYPES.SEND_MESSAGE,
   LANGY_CONVERSATION_COMMAND_TYPES.START_AGENT_TURN,
+  LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TOOL_CALL_STARTED,
+  LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TOOL_CALL_COMPLETED,
+  LANGY_CONVERSATION_COMMAND_TYPES.RECORD_AGENT_RESPONDED,
+  LANGY_CONVERSATION_COMMAND_TYPES.FAIL_AGENT_TURN,
   LANGY_CONVERSATION_COMMAND_TYPES.RECONCILE_AGENT_TURN,
   LANGY_CONVERSATION_COMMAND_TYPES.ARCHIVE,
   LANGY_CONVERSATION_COMMAND_TYPES.UPDATE_METADATA,

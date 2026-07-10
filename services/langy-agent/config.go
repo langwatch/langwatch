@@ -61,6 +61,20 @@ type Config struct {
 	SessionsRoot       string `env:"SESSIONS_ROOT" validate:"required"`
 	OTelPluginVersion  string `env:"OPENCODE_OTEL_PLUGIN_VERSION" validate:"required"`
 
+	// Self-observability (ADR-044 part 4). When set, the manager tees its own
+	// spans to a static INTERNAL LangWatch project so the team can observe how
+	// Langy behaves in the wild. Unset (the default, and self-hosted) means NO
+	// tee — behaviour is exactly today's single export. Message content is
+	// stripped from the internal tee (behavioural shape only, no customer text).
+	LangyInternalOTLPEndpoint string `env:"LANGY_INTERNAL_OTLP_ENDPOINT"`
+	LangyInternalOTLPHeaders  string `env:"LANGY_INTERNAL_OTLP_HEADERS"`
+
+	// Egress monitoring (ADR-044 part 5). Comma-separated hosts a worker may
+	// legitimately reach (control plane, gateway, git / gh / registry). Calls
+	// outside this set are FLAGGED (never blocked in PR3). Empty = flag every
+	// non-IP-literal host as unexpected; operators should set the real hosts.
+	EgressAllowedHosts string `env:"LANGY_EGRESS_ALLOWED_HOSTS"`
+
 	// OpenCodeBinaryPath is the opencode executable (resolved via PATH). Not
 	// env-configurable in the original; kept as a fixed default so behaviour is
 	// unchanged, but overridable in tests.

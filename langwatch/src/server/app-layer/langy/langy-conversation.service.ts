@@ -5,12 +5,16 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import type { CommandEnvelope } from "~/server/event-sourcing/commands/commandEnvelope";
 import type {
+  LangyAgentRespondedEventData,
+  LangyAgentTurnFailedEventData,
   LangyConversationArchivedEventData,
   LangyConversationMetadataUpdatedEventData,
   LangyAgentTurnStartedEventData,
   LangyMessagePart,
   LangyMessageRole,
   LangyMessageSentEventData,
+  LangyToolCallCompletedEventData,
+  LangyToolCallStartedEventData,
   LangyTurnFinalizedEventData,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -214,6 +218,10 @@ type Dispatch<T> = (data: T & CommandEnvelope) => Promise<void>;
 export interface LangyConversationCommands {
   sendMessage: Dispatch<LangyMessageSentEventData>;
   startAgentTurn: Dispatch<LangyAgentTurnStartedEventData>;
+  recordToolCallStarted: Dispatch<LangyToolCallStartedEventData>;
+  recordToolCallCompleted: Dispatch<LangyToolCallCompletedEventData>;
+  recordAgentResponded: Dispatch<LangyAgentRespondedEventData>;
+  failAgentTurn: Dispatch<LangyAgentTurnFailedEventData>;
   reconcileAgentTurn: Dispatch<LangyTurnFinalizedEventData>;
   archiveConversation: Dispatch<LangyConversationArchivedEventData>;
   updateConversationMetadata: Dispatch<LangyConversationMetadataUpdatedEventData>;
@@ -355,15 +363,22 @@ export class LangyConversationService {
     return { messageId };
   }
 
-  /** Mark the start of an agent turn. Returns the turnId to correlate finalize. */
+  /**
+   * Mark the start of an agent turn. Returns the turnId to correlate finalize.
+   * Accepts an optional turnId so a caller can stash the out-of-band spawn
+   * handoff (ADR-044) under the same id BEFORE the `agent_turn_started` event is
+   * dispatched — closing the race where the spawn reactor fires before the
+   * handoff exists.
+   */
   async startTurn({
     projectId,
     conversationId,
+    turnId = crypto.randomUUID(),
   }: {
     projectId: string;
     conversationId: string;
+    turnId?: string;
   }): Promise<{ turnId: string }> {
-    const turnId = crypto.randomUUID();
     await this.commands.startAgentTurn({
       tenantId: projectId,
       occurredAt: Date.now(),
@@ -371,6 +386,104 @@ export class LangyConversationService {
       turnId,
     });
     return { turnId };
+  }
+
+  /**
+   * Record a durable turn milestone: a tool the agent began running. Transient
+   * progress ticks stay ephemeral (Redis); a tool call is a meaningful audit of
+   * what the agent did, so it is a durable event (ADR-044).
+   */
+  async recordToolCallStarted({
+    projectId,
+    conversationId,
+    turnId,
+    toolCallId,
+    toolName,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    toolCallId: string;
+    toolName: string;
+  }): Promise<void> {
+    await this.commands.recordToolCallStarted({
+      tenantId: projectId,
+      occurredAt: Date.now(),
+      conversationId,
+      turnId,
+      toolCallId,
+      toolName,
+    });
+  }
+
+  /** Record a durable turn milestone: a tool the agent finished running. */
+  async recordToolCallCompleted({
+    projectId,
+    conversationId,
+    turnId,
+    toolCallId,
+    toolName,
+    isError,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    toolCallId: string;
+    toolName: string;
+    isError?: boolean;
+  }): Promise<void> {
+    await this.commands.recordToolCallCompleted({
+      tenantId: projectId,
+      occurredAt: Date.now(),
+      conversationId,
+      turnId,
+      toolCallId,
+      toolName,
+      ...(isError !== undefined ? { isError } : {}),
+    });
+  }
+
+  /** Record a durable intermediate assistant response within a turn. */
+  async recordAgentResponded({
+    projectId,
+    conversationId,
+    turnId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<void> {
+    await this.commands.recordAgentResponded({
+      tenantId: projectId,
+      occurredAt: Date.now(),
+      conversationId,
+      turnId,
+    });
+  }
+
+  /**
+   * Terminal failure for a turn that has no answer to carry (stalled/orphaned
+   * turn reconciled, or drained on shutdown). Emits `agent_turn_failed`, which
+   * clears the fold's CurrentTurnId and surfaces the error to the user.
+   */
+  async failTurn({
+    projectId,
+    conversationId,
+    turnId,
+    error,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    error: string;
+  }): Promise<void> {
+    await this.commands.failAgentTurn({
+      tenantId: projectId,
+      occurredAt: Date.now(),
+      conversationId,
+      turnId,
+      error,
+    });
   }
 
   /**
