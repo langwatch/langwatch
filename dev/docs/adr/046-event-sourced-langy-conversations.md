@@ -59,77 +59,85 @@ outright** (no dual-write, no migration, no back-compat).
 |---|---|---|
 | `SendMessage` | `message_sent` | `/chat` route, on the user's turn |
 | `StartAgentTurn` | `agent_turn_started` | `/chat` route, when the agent turn begins |
-| `ReportStatus` | `status_reported` | worker heartbeat (API surface; wired in PR3) |
-| `ReportProgress` | `progress_reported` | worker progress (API surface; wired in PR3) |
 | `ReconcileAgentTurn` | `turn_finalized` | `/chat` route, when the streamed answer completes |
 | `ArchiveConversation` | `conversation_archived` | delete / clear-memory routes |
 | `UpdateConversationMetadata` | `conversation_metadata_updated` | PATCH rename/share route |
 
 `UpdateConversationMetadata` / `conversation_metadata_updated` is **beyond the
-prescribed 6-command / 11-event vocabulary** — added to preserve the existing
+prescribed vocabulary** — added to preserve the existing
 `PATCH /langy/conversations/:id` rename+share surface (and its audit-log +
 cross-user-visibility behaviour) without a feature regression. Flagged as an
-open question below.
+open question below. (`ReportStatus` / `ReportProgress` from the prescribed set
+are NOT commands — they are ephemeral signals; see below.)
 
 ### Events (past-tense — an event records)
 
-`message_sent`, `agent_turn_started`, `tool_call_started`,
-`tool_call_completed`, `agent_responded`, `agent_turn_completed`,
-`agent_turn_failed`, `status_reported`, `progress_reported`, `turn_finalized`,
+**Durable events** (→ `event_log` → fold/map): `message_sent`,
+`agent_turn_started`, `tool_call_started`, `tool_call_completed`,
+`agent_responded`, `agent_turn_completed`, `agent_turn_failed`, `turn_finalized`,
 `conversation_archived` (+ `conversation_metadata_updated`).
 
-In PR2, six of these have a dispatching command (see table). The remaining
-turn-lifecycle events — `tool_call_started`, `tool_call_completed`,
-`agent_responded`, `agent_turn_completed`, `agent_turn_failed` — are the **PR3
-seam**: their schemas and fold handlers ship now (so the projection is complete
-and forward-compatible) but the worker/reactor that emits them lands in PR3.
+In PR2, five have a dispatching command (see table). The remaining
+turn-lifecycle events — `tool_call_started/completed`, `agent_responded`,
+`agent_turn_completed/failed` — are the **PR3 seam**: their schemas + fold
+handlers ship now (so the projection is complete and forward-compatible) but the
+worker/reactor that emits them lands in PR3. Tool-call events are **durable,
+meaningful transitions** (an audit of what the agent did) and bump
+`LastActivityAt` — they are NOT liveness heartbeats.
+
+`status_reported` and `progress_reported` are **ephemeral signals, not events** —
+see below.
 
 ### Streaming-persistence rule
 
 Individual streamed tokens are **not** events — persisting one event per token
 would flood `event_log`. Only meaningful transitions (turn start, tool calls,
-final answer) and liveness signals (status/progress heartbeats) are events.
-**`turn_finalized` carries the whole final answer payload as the source of
-truth.** In PR3 the live token tail accumulates in a Redis buffer (not the
-event log) and the worker emits one `turn_finalized` when the turn ends; in PR2
-the `/chat` route, which still owns the stream, emits `turn_finalized` directly
-after it assembles the full text.
+final answer) become durable events. **`turn_finalized` carries the whole final
+answer payload as the source of truth.** In PR3 the live token tail accumulates
+in a Redis buffer (not the event log) and the worker emits one `turn_finalized`
+when the turn ends; in PR2 the `/chat` route, which still owns the stream, emits
+`turn_finalized` directly after it assembles the full text.
 
-### Ephemeral events (PR3 seam + cross-pipeline direction)
+### Ephemeral signals — NOT durable, NOT folded (PR3 seam + cross-pipeline direction)
 
-Not every event needs to be durable. `status_reported` and `progress_reported`
-(and, in PR3, streamed token deltas) are pure **liveness/transport** signals:
-they carry no state the conversation needs after the turn ends, and persisting
-one per tick/token would flood `event_log`. We classify these as **ephemeral
-events**: they keep the *same* event vocabulary and command surface as durable
-events, but PR3 will route them to a short-lived, per-aggregate **Redis buffer**
-(TTL'd) that backs the live UI transport, instead of appending them to
-`event_log` / projecting them to ClickHouse.
+`status_reported` and `progress_reported` (and, in PR3, streamed token deltas)
+are pure **live transport**: they tell the UI "searching traces…" / "42% done"
+while a turn runs and carry **no state the conversation needs after the turn
+ends**. Earlier this ADR let them touch a fold `LastHeartbeatAt` — that was
+wrong. An ephemeral signal that leaves a residue in a durable projection isn't
+ephemeral. So they now:
 
-The key invariant that makes this safe: because ephemeral events are never
-replayed, the fold only lets them touch transient "live" fields (here,
-`LastHeartbeatAt`). On replay they are simply absent and that field resets to
-null harmlessly — no durable projection state depends on an ephemeral event.
-Everything the conversation must keep (messages, counts, turn outcome) rides on
-durable events (`message_sent`, `turn_finalized`, …).
+- are **NOT** written to `event_log`, the fold, or the map projection;
+- are **NOT** commands (removed from the pipeline — they never reach
+  `storeEvents`);
+- flow instead through a short-lived, per-conversation **Redis buffer** (TTL'd,
+  keyed `langy:ephemeral:{tenantId}:{conversationId}`), tailed by the live
+  `/chat` stream, and **dropped** when the turn ends or the TTL lapses.
 
-PR2 ships the classification (`LANGY_EPHEMERAL_EVENT_TYPES` +
-`isEphemeralLangyConversationEventType`) and the fold discipline; PR3 adds the
-Redis ephemeral store + the routing that reads the classification. This is
-deliberately a **candidate to generalise**: simulations already flood
-`simulation_runs` with `text_message_start` / `text_message_end` /
-`message_snapshot`, which are the same durable-vs-ephemeral split. The
-classification should graduate from Langy-local to a framework-level durability
-tag on the event/command definition, shared across pipelines, once the Redis
-transport exists. Flagged as open question 4.
+They "just sit there" and vanish — on history reload only durable messages
+appear. **Liveness leaves the fold entirely.** The durable fold says a turn is
+in flight (`CurrentTurnId`, set by `agent_turn_started`, cleared by
+`turn_finalized`); the *recency of ephemeral heartbeats in Redis* says whether
+the worker is alive. PR3's orphan detection is "`CurrentTurnId` set but no
+ephemeral signal for N s → dispatch `ReconcileAgentTurn`".
+
+PR2 ships the **contract only**: `LangyEphemeralPublisher` (the publish
+interface), the `LangyEphemeralSignal` schemas, a `NoopLangyEphemeralPublisher`
+default, and the `LANGY_EPHEMERAL_SIGNAL_TYPES` / `isEphemeral…` classification.
+PR3 implements the Redis transport, the producing worker, and the live consumer.
+This is deliberately a **candidate to generalise**: simulations flood
+`simulation_runs` with `text_message_start/end` / `message_snapshot` — the same
+durable-vs-ephemeral split — so the classification should graduate to a
+framework-level durability tag shared across pipelines (open question 4).
 
 ### Projections
 
 - **Fold** `langyConversationState` → a **new** ClickHouse `langy_conversations`
   table (`ReplacingMergeTree(UpdatedAt)`, `ORDER BY (TenantId, ConversationId)`).
   Accumulates `UserId`, `Title`, `Status`, `IsShared`/`SharedAt`/`SharedById`,
-  `MessageCount`, `LastActivityAt`, `LastHeartbeatAt`, `CurrentTurnId`,
-  `LastError`, `ArchivedAt`. This replaces the Postgres spine.
+  `MessageCount`, `LastActivityAt`, `CurrentTurnId`, `LastError`, `ArchivedAt`.
+  This replaces the Postgres spine. (No `LastHeartbeatAt` — liveness is
+  ephemeral, see below.)
 - **Map** `langyMessageStorage` → the **existing** `langy_messages` table
   (reused as-is). Maps `message_sent` (the user message) and `turn_finalized`
   (the assistant's final message) into per-message rows.

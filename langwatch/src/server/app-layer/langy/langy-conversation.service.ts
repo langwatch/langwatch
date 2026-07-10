@@ -11,8 +11,6 @@ import type {
   LangyMessagePart,
   LangyMessageRole,
   LangyMessageSentEventData,
-  LangyProgressReportedEventData,
-  LangyStatusReportedEventData,
   LangyTurnFinalizedEventData,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -216,8 +214,6 @@ type Dispatch<T> = (data: T & CommandEnvelope) => Promise<void>;
 export interface LangyConversationCommands {
   sendMessage: Dispatch<LangyMessageSentEventData>;
   startAgentTurn: Dispatch<LangyAgentTurnStartedEventData>;
-  reportStatus: Dispatch<LangyStatusReportedEventData>;
-  reportProgress: Dispatch<LangyProgressReportedEventData>;
   reconcileAgentTurn: Dispatch<LangyTurnFinalizedEventData>;
   archiveConversation: Dispatch<LangyConversationArchivedEventData>;
   updateConversationMetadata: Dispatch<LangyConversationMetadataUpdatedEventData>;

@@ -1071,8 +1071,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         {
           sendMessage: noop,
           startAgentTurn: noop,
-          reportStatus: noop,
-          reportProgress: noop,
           reconcileAgentTurn: noop,
           archiveConversation: noop,
           updateConversationMetadata: noop,
@@ -1153,8 +1151,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       langy: {
         sendMessage: noop,
         startAgentTurn: noop,
-        reportStatus: noop,
-        reportProgress: noop,
         reconcileAgentTurn: noop,
         archiveConversation: noop,
         updateConversationMetadata: noop,

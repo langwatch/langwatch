@@ -4,12 +4,21 @@ export type { LangyConversationProcessingPipelineDeps } from "./pipeline";
 export {
   ArchiveConversationCommand,
   ReconcileAgentTurnCommand,
-  ReportProgressCommand,
-  ReportStatusCommand,
   SendMessageCommand,
   StartAgentTurnCommand,
   UpdateConversationMetadataCommand,
 } from "./commands";
+
+export {
+  NoopLangyEphemeralPublisher,
+  langyEphemeralSignalSchema,
+} from "./ephemeral";
+export type {
+  LangyEphemeralPublisher,
+  LangyEphemeralSignal,
+  LangyStatusSignal,
+  LangyProgressSignal,
+} from "./ephemeral";
 
 export * from "./projections";
 export * from "./repositories";
