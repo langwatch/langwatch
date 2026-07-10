@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDisplayHandle } from "../PublishedPromptsList";
+import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 
 describe("getDisplayHandle", () => {
   describe("when handle is missing or nullish", () => {
@@ -20,8 +20,8 @@ describe("getDisplayHandle", () => {
       expect(getDisplayHandle("folder/myPrompt")).toBe("myPrompt");
     });
 
-    it("returns part after first slash if multiple slashes", () => {
-      expect(getDisplayHandle("folder/subfolder/myPrompt")).toBe("subfolder");
+    it("returns the last segment if multiple slashes", () => {
+      expect(getDisplayHandle("folder/subfolder/myPrompt")).toBe("myPrompt");
     });
   });
 });
