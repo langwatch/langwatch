@@ -92,6 +92,20 @@ export const FEATURE_FLAGS = [
       "Skips the strict PII redaction pass that calls the external analysis service (Presidio via langevals). The native secrets and essential PII redaction in the ingestion pipeline are unaffected. Emergency operator override to shed analysis-service load.",
     family: "Collector",
   },
+  // Kill switch for the evaluation-inputs offload (ADR-039). The offload is ON
+  // by default: oversized evaluator inputs go to the durable stored-objects
+  // service and the event/row carry a bounded marker instead of the full
+  // payload. Flipping this ON keeps inputs inline (only the unconditional
+  // repository cap bounds the ClickHouse row). Operators flip it from
+  // /ops/feature-flags.
+  {
+    key: "ops_evaluation_payload_offload_disabled",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Disables the oversized evaluator-inputs offload to durable object storage (ADR-039). While on, inputs flow inline and only the unconditional 8 MiB repository cap bounds the ClickHouse row. Emergency operator override for object-storage trouble.",
+    family: "Event sourcing",
+  },
   // Per-span token estimation kill switches. Hardcoded raw keys before;
   // each `record_span` job was a PostHog /flags call for the global key
   // plus another for the project key (~5k calls/day in dogfood at modest
@@ -133,19 +147,6 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Routes over-threshold OTLP spans via a transient S3 spool at the ingestion edge (ADR-022). Off = current behavior (full value flows through the command queue; capOversizedAttributes(256 KB) is the only cap).",
-  },
-  // Per-project gate for evaluation-inputs offload (ADR-039). Checked once per
-  // evaluation (not per span) via the postgres-cached store. When on,
-  // oversized evaluator inputs are written to the durable stored-objects
-  // service and the event/row carry a bounded marker instead of the full
-  // payload. Off = today's behavior (inputs flow inline; only the unconditional
-  // repository belt-and-braces cap bounds the ClickHouse row).
-  {
-    key: "release_evaluation_payload_offload",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Offloads oversized evaluator inputs to durable object storage, replacing the inline payload in event_log and evaluation_runs with a bounded marker that reads resolve transparently (ADR-039). Off = current behavior (inputs flow inline; the unconditional 8 MiB repository cap is the only bound).",
   },
   {
     key: "release_ui_ai_governance_enabled",

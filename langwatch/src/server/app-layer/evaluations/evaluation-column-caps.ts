@@ -3,7 +3,7 @@
  * (ADR-039).
  *
  * These run UNCONDITIONALLY at the repository write, independent of the
- * `release_evaluation_payload_offload` feature flag and independent of which
+ * ops_evaluation_payload_offload_disabled kill switch and independent of which
  * writer produced the row. They are the last line of defence that keeps a
  * ClickHouse part merge-safe: even if the offload path is off, fails open, or
  * some other writer inserts a fat payload, a single row can never carry an

@@ -24,7 +24,7 @@ import {
 } from "~/server/datasets/dataset-normalize.job";
 import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
-import { getFeatureFlagStore } from "~/server/featureFlag";
+import { featureFlagService } from "~/server/featureFlag";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
@@ -319,19 +319,26 @@ export class PipelineRegistry {
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
       // ADR-039: offload oversized evaluator inputs to durable object storage
-      // before the event is built. Flag-gated per project on
-      // release_evaluation_payload_offload (checked once per evaluation via the
-      // 5s-cached flag store) and FAIL-OPEN: any error from the flag store or
-      // the offload (S3 outage, storeFromBytes throws) is caught here and the
-      // inputs stay inline. The unconditional repository belt-and-braces cap
-      // keeps the ClickHouse row merge-safe in that case.
+      // before the event is built. ON by default (this bounds the fat-payload
+      // class behind the 2026-07-10 outage); the SYSTEM flag
+      // ops_evaluation_payload_offload_disabled is the operator kill switch.
+      // A flag-store error keeps the DEFAULT (offload runs): the kill switch
+      // failing to read must not silently drop the protection. The offload
+      // itself stays FAIL-OPEN: storage errors are caught here and the inputs
+      // stay inline; the unconditional repository belt-and-braces cap keeps
+      // the ClickHouse row merge-safe in that case.
       offloadInputs: async ({ projectId, evaluationId, inputs }) => {
         try {
-          const enabled = await getFeatureFlagStore().get(
-            "release_evaluation_payload_offload",
-            { projectId },
-          );
-          if (enabled !== true) return inputs;
+          let disabled = false;
+          try {
+            disabled = await featureFlagService.isEnabled(
+              "ops_evaluation_payload_offload_disabled",
+              { distinctId: "evaluation-inputs-offload", defaultValue: false },
+            );
+          } catch {
+            // Unreadable kill switch: stay on the default (offload enabled).
+          }
+          if (disabled) return inputs;
           const { inputs: maybeOffloaded } = await offloadInputsIfOversized({
             inputs,
             projectId,
@@ -483,6 +490,12 @@ export class PipelineRegistry {
           occurredAtMs,
           limit,
         ),
+      countMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs) =>
+        this.deps.repositories.logRecordStorage.countMarkedClaudeCodeLogsByTrace(
+          tenantId,
+          traceId,
+          occurredAtMs,
+        ),
       // Per-turn conversion cap (env LANGWATCH_CLAUDE_TURN_LOG_CAP, default
       // CLAUDE_TURN_LOG_CAP). Bounds how many of a pathological turn's marked
       // logs the span-sync reactor folds in one pass so a runaway turn can't
@@ -590,10 +603,11 @@ export class PipelineRegistry {
         spanCommandShardCount: resolveSpanCommandShardCount(
           process.env.TRACE_SPAN_PROCESSING_SHARDS,
         ),
-        // Log-command sharding fan-out (env TRACE_LOG_PROCESSING_SHARDS,
-        // default 1 = disabled). Lets one Claude Code turn's recordLog commands
-        // drain in parallel across `traceId:<shard>` GroupQueue groups; the fold
-        // and the claude-span-sync reactor stay per-trace.
+        // Log-command sharding fan-out, ON by default (4 lanes; env
+        // TRACE_LOG_PROCESSING_SHARDS tunes it, 1 disables). Lets one Claude
+        // Code turn's recordLog commands drain in parallel across
+        // `traceId:<shard>` GroupQueue groups; the fold and the
+        // claude-span-sync reactor stay per-trace.
         logCommandShardCount: resolveLogCommandShardCount(
           process.env.TRACE_LOG_PROCESSING_SHARDS,
         ),
