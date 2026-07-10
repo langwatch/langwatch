@@ -124,8 +124,10 @@ func newLeveledCore(inner zapcore.Core, enab zapcore.LevelEnabler) zapcore.Core 
 func (c *leveledCore) Enabled(l zapcore.Level) bool { return c.enab.Enabled(l) }
 
 func (c *leveledCore) Check(e zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	// Standard level-filter pattern: gate on our level, then delegate to the
+	// wrapped core's own Check so it registers itself for the write.
 	if c.enab.Enabled(e.Level) {
-		return ce.AddCore(e, c)
+		return c.Core.Check(e, ce)
 	}
 	return ce
 }

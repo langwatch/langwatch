@@ -344,29 +344,39 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	otelapi.SetTracerProvider(tp)
 	provider := &Provider{tp: tp}
 
-	// Net-new OTLP logs + metrics to the debug collector. Gated on the
-	// same endpoint, so nothing here runs unless a developer opted in.
-	if opts.DebugCollectorEndpoint != "" {
-		lp, err := newLoggerProvider(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders, res)
-		if err != nil {
-			return nil, err
-		}
-		provider.lp = lp
-
-		mp, err := newMeterProvider(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders, res)
-		if err != nil {
-			return nil, err
-		}
-		otelapi.SetMeterProvider(mp)
-		// Runtime metrics (GC, goroutines, mem) are the first cut — a
-		// start failure must not sink service init, so warn and carry on.
-		if err := startRuntimeMetrics(mp); err != nil {
-			slog.Warn("otel runtime metrics start failed", "err", err)
-		}
-		provider.mp = mp
+	if err := installDebugSignals(ctx, opts, res, provider); err != nil {
+		return nil, err
 	}
 
 	return provider, nil
+}
+
+// installDebugSignals attaches the debug collector's net-new OTLP log + metric
+// pipelines to the provider and registers the global MeterProvider. Gated on
+// the debug endpoint, so it's a no-op unless a developer opted into the local
+// observability stack.
+func installDebugSignals(ctx context.Context, opts Options, res *resource.Resource, provider *Provider) error {
+	if opts.DebugCollectorEndpoint == "" {
+		return nil
+	}
+	lp, err := newLoggerProvider(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders, res)
+	if err != nil {
+		return err
+	}
+	provider.lp = lp
+
+	mp, err := newMeterProvider(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders, res)
+	if err != nil {
+		return err
+	}
+	otelapi.SetMeterProvider(mp)
+	// Runtime metrics (GC, goroutines, mem) are the first cut — a start failure
+	// must not sink service init, so warn and carry on.
+	if err := startRuntimeMetrics(mp); err != nil {
+		slog.Warn("otel runtime metrics start failed", "err", err)
+	}
+	provider.mp = mp
+	return nil
 }
 
 // Shutdown flushes pending telemetry across every configured signal
