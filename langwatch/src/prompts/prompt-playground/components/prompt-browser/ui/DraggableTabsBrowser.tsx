@@ -387,6 +387,8 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
     <Box
       {...rest}
       ref={setNodeRef}
+      // Lets the tab switcher find this tab in the strip to scroll it into view.
+      data-tab-id={id}
       flex={1}
       alignItems="stretch"
       cursor={isDragging ? "grabbing" : "grab"}

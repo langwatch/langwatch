@@ -6,7 +6,7 @@ import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/Drag
 import { AddPromptButton } from "../sidebar/AddPromptButton";
 import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
-import { PromptBrowserTab } from "./tab/PromptBrowserTab";
+import { PromptTabStrip } from "./PromptTabStrip";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
 
@@ -91,25 +91,17 @@ export function PromptPlaygroundBrowser() {
           <DraggableTabsBrowser.TabBar
             tabIds={tabbedWindow.tabs.map((tab) => tab.id)}
           >
-            <HStack
-              gap={0}
-              overflow="auto"
-              height="full"
-              paddingY={2}
-              paddingX={2}
-            >
-              {tabbedWindow.tabs.map((tab) => (
-                <TabIdProvider key={tab.id} tabId={tab.id}>
-                  <DraggableTabsBrowser.Tab id={tab.id} height="full">
-                    <DraggableTabsBrowser.Trigger value={tab.id}>
-                      <PromptBrowserTab
-                        dimmed={tabbedWindow.id !== activeWindowId}
-                      />
-                    </DraggableTabsBrowser.Trigger>
-                  </DraggableTabsBrowser.Tab>
-                </TabIdProvider>
-              ))}
-            </HStack>
+            {/* The switcher lives inside the strip, not in the toolbar below,
+                because the toolbar only renders for the active pane — and a
+                pane you are not working in still has tabs worth reaching. */}
+            <PromptTabStrip
+              tabs={tabbedWindow.tabs}
+              activeTabId={tabbedWindow.activeTabId ?? undefined}
+              isActiveWindow={tabbedWindow.id === activeWindowId}
+              onSelectTab={(tabId) =>
+                setActiveTab({ windowId: tabbedWindow.id, tabId })
+              }
+            />
             <Spacer />
             {tabbedWindow.id === activeWindowId && (
               <>
