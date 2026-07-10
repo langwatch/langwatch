@@ -55,7 +55,9 @@ describe("serveStaticOrFallback", () => {
     );
     writeFileSync(
       join(clientDistDir, "index.html"),
-      "<!doctype html><html><body><div id=root></div></body></html>",
+      '<!doctype html><html><head><script type="module" ' +
+        'src="/assets/index-abc123.js"></script></head>' +
+        "<body><div id=root></div></body></html>",
     );
 
     server = createServer((req, res) => {
@@ -156,6 +158,63 @@ describe("serveStaticOrFallback", () => {
       const cacheControl = res.headers.get("cache-control") ?? "";
       expect(cacheControl).toMatch(/no-cache|no-store/);
       expect(cacheControl).not.toMatch(/immutable/);
+    });
+  });
+
+  describe("given the runtime asset base is served into the shell", () => {
+    const original = process.env.LANGWATCH_ASSET_BASE;
+    afterAll(() => {
+      if (original === undefined) delete process.env.LANGWATCH_ASSET_BASE;
+      else process.env.LANGWATCH_ASSET_BASE = original;
+    });
+
+    describe("when no asset base is configured (self-host default)", () => {
+      beforeAll(() => {
+        delete process.env.LANGWATCH_ASSET_BASE;
+      });
+
+      it("defines the resolver and leaves entry refs same-origin", async () => {
+        const res = await fetch(`${baseUrl}/projects/foo/traces`);
+        const body = await res.text();
+        expect(body).toContain("window.__lwAssetUrl");
+        expect(body).toContain('src="/assets/index-abc123.js"');
+      });
+    });
+
+    describe("when a CDN asset base is configured (SaaS)", () => {
+      beforeAll(() => {
+        process.env.LANGWATCH_ASSET_BASE = "https://cdn.langwatch.ai/abc123/";
+      });
+
+      it("rewrites the entry ref to the CDN and points the resolver at it", async () => {
+        const res = await fetch(`${baseUrl}/projects/foo/traces`);
+        const body = await res.text();
+        expect(body).toContain(
+          'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
+        );
+        expect(body).not.toContain('src="/assets/index-abc123.js"');
+        expect(body).toContain("https://cdn.langwatch.ai/abc123/");
+      });
+
+      it("rewrites a directly requested /index.html too", async () => {
+        const res = await fetch(`${baseUrl}/index.html`);
+        const body = await res.text();
+        expect(res.headers.get("content-type")).toBe("text/html");
+        expect(body).toContain(
+          'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
+        );
+      });
+
+      it("rewrites the root path via the index.html fall-through", async () => {
+        // `/` reaches the shell through a different branch (tryServeFile on the
+        // dist dir returns false → tryServeHtml(index.html)) than the routes above.
+        const res = await fetch(`${baseUrl}/`);
+        const body = await res.text();
+        expect(res.status).toBe(200);
+        expect(body).toContain(
+          'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
+        );
+      });
     });
   });
 

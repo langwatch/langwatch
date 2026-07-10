@@ -2,6 +2,8 @@ import fs from "fs";
 import type { ServerResponse } from "http";
 import path from "path";
 
+import { getAssetBase, injectAssetBaseIntoHtml } from "./asset-base";
+
 const MIME_TYPES: Record<string, string> = {
   ".js": "application/javascript",
   ".mjs": "application/javascript",
@@ -32,6 +34,11 @@ const HTML_REVALIDATE_CACHE = "no-cache";
  * Returns false only when there is no index.html to fall back to (caller decides
  * how to 404).
  *
+ * The HTML shell (the SPA fallback and any `.html` request) is read and
+ * transformed to inject the runtime asset base (see src/server/asset-base.ts and
+ * ADR-038), so it cannot be streamed raw like other static files. Everything
+ * else is streamed straight off disk.
+ *
  * Why missing /assets/* returns 404 instead of falling through to index.html:
  * Vite hashes asset filenames per build, so chunk URLs from a previous deploy
  * point to files that no longer exist. If we returned the SPA shell with a 200
@@ -60,7 +67,11 @@ export function serveStaticOrFallback({
   }
 
   const staticPath = path.join(clientDistDir, normalizedRelative);
-  if (tryServeFile({ res, filePath: staticPath, pathname })) {
+  if (path.extname(staticPath) === ".html") {
+    if (tryServeHtml({ res, htmlPath: staticPath })) {
+      return true;
+    }
+  } else if (tryServeFile({ res, filePath: staticPath, pathname })) {
     return true;
   }
 
@@ -72,14 +83,14 @@ export function serveStaticOrFallback({
     return true;
   }
 
-  const indexHtml = path.join(clientDistDir, "index.html");
-  return tryServeSpaFallback({ res, indexHtmlPath: indexHtml });
+  return tryServeHtml({ res, htmlPath: path.join(clientDistDir, "index.html") });
 }
 
 /**
  * Open + stream a static file in one step, avoiding the TOCTOU race between
  * existsSync and createReadStream. Returns false when the file doesn't exist
- * or isn't a regular file so the caller can fall through.
+ * or isn't a regular file so the caller can fall through. Never handles HTML —
+ * `.html` is routed to tryServeHtml so the asset base can be injected.
  */
 function tryServeFile({
   res,
@@ -107,8 +118,6 @@ function tryServeFile({
   res.setHeader("Content-Type", MIME_TYPES[ext] ?? "application/octet-stream");
   if (pathname.startsWith("/assets/")) {
     res.setHeader("Cache-Control", IMMUTABLE_CACHE);
-  } else if (ext === ".html") {
-    res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
   }
 
   pipeWithErrorHandling({ stream: fs.createReadStream("", { fd }), res });
@@ -116,27 +125,37 @@ function tryServeFile({
 }
 
 /**
- * Serve the SPA shell (index.html) as a fallback for non-asset routes.
- * Returns false only when index.html itself doesn't exist.
+ * Read an HTML shell, inject the runtime asset base, and send it with a
+ * revalidate cache. Held open via fd (atomic, no TOCTOU) while read. Returns
+ * false only when the file doesn't exist or isn't a regular file, so the SPA
+ * fallback can decide how to 404.
  */
-function tryServeSpaFallback({
+function tryServeHtml({
   res,
-  indexHtmlPath,
+  htmlPath,
 }: {
   res: ServerResponse;
-  indexHtmlPath: string;
+  htmlPath: string;
 }): boolean {
   let fd: number;
   try {
-    fd = fs.openSync(indexHtmlPath, "r");
+    fd = fs.openSync(htmlPath, "r");
   } catch {
     return false;
   }
 
-  res.setHeader("Content-Type", "text/html");
-  res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
-  pipeWithErrorHandling({ stream: fs.createReadStream("", { fd }), res });
-  return true;
+  try {
+    if (!fs.fstatSync(fd).isFile()) {
+      return false;
+    }
+    const html = fs.readFileSync(fd, "utf8");
+    res.setHeader("Content-Type", "text/html");
+    res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
+    res.end(injectAssetBaseIntoHtml(html, getAssetBase()));
+    return true;
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 /**

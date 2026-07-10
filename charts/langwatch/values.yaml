@@ -234,6 +234,16 @@ app:
     # Public URL that users will access the application from
     publicUrl: "http://localhost:5560"
 
+  # Base URL for content-hashed frontend assets (JS/CSS chunks). Empty (default)
+  # serves them same-origin straight from the pod, exactly as before. Set to a
+  # commit-prefixed CDN base — e.g. "https://cdn.langwatch.ai/<commit-sha>/" — so
+  # a rolling deploy never strands a browser on a 404: every past build's assets
+  # remain under their own immutable prefix. The deploy pipeline both uploads
+  # dist/client/assets to that prefix and sets this value for the same SHA. See
+  # ADR-038. Rendered into the LANGWATCH_ASSET_BASE env var when non-empty.
+  ## @param app.assetBase [string, default: ""] CDN base URL for content-hashed assets; empty = serve same-origin from the pod.
+  assetBase: ""
+
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
   ## @param app.features.skipEnvValidation [default: false] Skip env var validation (dev only).
