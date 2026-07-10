@@ -7,7 +7,9 @@ import (
 	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
@@ -130,6 +132,12 @@ func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIK
 		trace.WithSpanKind(trace.SpanKindServer),
 		trace.WithAttributes(attrs...),
 	)
+	// Stamp our root span_id on the context logger so every downstream log
+	// line is joinable to this span. trace_id (the customer's continued Studio
+	// trace) is already stamped on the logger by enrichRequestLogContext.
+	if sc := span.SpanContext(); sc.IsValid() {
+		ctx = clog.With(ctx, zap.String(clog.FieldSpanID, sc.SpanID().String()))
+	}
 	return ctx, span //nolint:spancheck // caller (executeSyncHandler) defers span.End() on the returned span.
 }
 

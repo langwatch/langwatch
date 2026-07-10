@@ -37,15 +37,37 @@ telemetry additionally goes to the collector. Setting
 `OTEL_DEBUG_COLLECTOR_ENDPOINT` empty (the default everywhere, prod included)
 leaves Go behavior byte-for-byte unchanged.
 
+## Log correlation fields
+
+Go log lines carry standard correlation fields (matching the TS app's
+`getLogContext()` keys) so logs are filterable and joinable with traces:
+
+- `trace_id`, `span_id` — the service's **own** active span.
+- `project_id`, `team_id`, `organization_id` (and `user_id`/`tenant_id` when a
+  service has them) — the tenant hierarchy, stamped at auth.
+- `observed.trace_id`, `observed.span_id` — a **customer** trace the service is
+  proxying/ingesting, kept distinct from its own. The AI gateway runs its own
+  ops trace and stamps the customer's inbound trace as `observed.*`; nlpgo
+  *continues* the customer's Studio trace, so that id is its `trace_id`.
+
+The shared keys + helpers live in `pkg/clog/fields.go`
+(`WithIdentity` / `WithSpanContext` / `WithObserved`).
+
 ## The stack
 
-`compose.observability.yml` runs one container, `grafana/otel-lgtm`, which
-bundles the OpenTelemetry Collector (OTLP on `:4317` gRPC / `:4318` HTTP, fanning
-traces → Tempo, logs → Loki, metrics → Prometheus) and a pre-provisioned
-Grafana on `:3000`. Data is **ephemeral** — there is no persistent volume, so
-`make observability-down` discards everything. That keeps the footprint tiny and
-retention naturally low. To persist + hard-cap retention, see the commented
-block in `compose.observability.yml`.
+The `otel-lgtm` service lives in `compose.dev.yml` under the optional
+`observability` profile — one `grafana/otel-lgtm` container that bundles the
+OpenTelemetry Collector (OTLP on `:4317` gRPC / `:4318` HTTP, fanning traces →
+Tempo, logs → Loki, metrics → Prometheus) and a pre-provisioned Grafana on
+`:3000`. It's a shared singleton (fixed container name + host ports, no volume),
+so every worktree exports to the same collector — which is what makes the
+`langwatch.worktree` tag useful. It is not part of any `quickstart` preset;
+`make observability` starts just this service and `make observability-down`
+stops just this service (never the rest of the dev stack). Data is
+**ephemeral** — no persistent volume — so a down discards everything, keeping the
+footprint tiny and retention naturally low. To persist + hard-cap retention,
+mount trimmed Loki/Tempo/Prometheus configs (otel-lgtm reads them from
+`/otel-lgtm/*.yaml`).
 
 Override ports if `:3000`/`:4318` are taken:
 

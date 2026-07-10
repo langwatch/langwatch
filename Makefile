@@ -59,9 +59,10 @@ include boxd.mk
 
 COMPOSE = docker compose -f compose.dev.yml
 
-# Local observability stack (compose.observability.yml) — separate compose
-# project so it comes up/down independently of the dev stack.
-OBS_COMPOSE = docker compose -f compose.observability.yml
+# Local observability stack — the `otel-lgtm` service in compose.dev.yml under
+# the optional `observability` profile. Targeted by service name so it comes
+# up/down without touching the rest of the dev stack.
+OBS_COMPOSE = docker compose -f compose.dev.yml
 
 # Sources scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
 # NEXTAUTH_URL / BASE_HOST exports to the compose-derived APP_PORT (default
@@ -118,7 +119,7 @@ service-watch:
 			--build.exclude_dir "tmp,vendor,node_modules"
 
 # =============================================================================
-# LOCAL OBSERVABILITY STACK (compose.observability.yml)
+# LOCAL OBSERVABILITY STACK (compose.dev.yml, `observability` profile)
 # =============================================================================
 # A lightweight, ephemeral OTLP Collector + Loki + Tempo + Prometheus + Grafana
 # for reading local logs/traces/metrics — including from an agent over the
@@ -127,7 +128,7 @@ service-watch:
 
 # Start the stack and wait until Grafana is healthy.
 observability:
-	$(OBS_COMPOSE) up -d
+	$(OBS_COMPOSE) --profile observability up -d otel-lgtm
 	@echo "Waiting for Grafana to become healthy..."
 	@for i in $$(seq 1 30); do \
 		if curl -sf -o /dev/null http://localhost:$${LW_OBS_GRAFANA_PORT:-3000}/api/health; then \
@@ -147,15 +148,16 @@ observability-connect:
 
 # Tail the stack logs.
 observability-logs:
-	$(OBS_COMPOSE) logs -f
+	$(OBS_COMPOSE) logs -f otel-lgtm
 
 # Show the stack status.
 observability-status:
-	$(OBS_COMPOSE) ps
+	$(OBS_COMPOSE) ps otel-lgtm
 
-# Stop the stack. Data is ephemeral, so this discards all collected telemetry.
+# Stop ONLY the observability stack (never the rest of the dev stack). Data is
+# ephemeral, so this discards all collected telemetry.
 observability-down:
-	$(OBS_COMPOSE) down
+	$(OBS_COMPOSE) rm -sf otel-lgtm
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`
 # (interactive) or `./scripts/dev.sh <preset>` directly. Preset list:

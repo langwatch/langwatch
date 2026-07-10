@@ -30,14 +30,18 @@ stack is strictly a **local-dev debugging aid** and must not touch the prod path
 Ship a **local, ephemeral** observability stack plus the wiring to feed and read
 it.
 
-1. **Stack** — `compose.observability.yml` runs one `grafana/otel-lgtm`
-   container: OpenTelemetry Collector (OTLP `:4317`/`:4318`, fanning traces →
-   Tempo, logs → Loki, metrics → Prometheus) and a pre-provisioned Grafana on
-   `:3000`. No persistent volume → data is ephemeral, footprint is tiny,
+1. **Stack** — an `otel-lgtm` service in `compose.dev.yml` under the optional
+   `observability` profile: one `grafana/otel-lgtm` container (OpenTelemetry
+   Collector on `:4317`/`:4318`, fanning traces → Tempo, logs → Loki, metrics →
+   Prometheus) + a pre-provisioned Grafana on `:3000`. Shared singleton (fixed
+   container name + ports, no volume) so every worktree exports to the same
+   collector. No persistent volume → data is ephemeral, footprint is tiny,
    retention is naturally low. Chosen over a hand-rolled multi-container LGTM
    compose for lightness, and over deploying to the shared dev cluster because
    local debugging wants per-developer isolation, no VPN/port-forward, and no
-   cross-developer trace noise.
+   cross-developer trace noise. Folded into `compose.dev.yml` (rather than a
+   separate compose file) for discoverability; `make observability{,-down}`
+   target only the `otel-lgtm` service so the rest of the dev stack is untouched.
 
 2. **TS app** — traces + logs already flow on config alone. Added a self-
    contained global `MeterProvider` (OTLP push + `@opentelemetry/host-metrics`)
