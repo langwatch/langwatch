@@ -33,6 +33,7 @@ export function TypePicker({
   const notify = entries.filter((e) => e.shared.category === "notify");
   const action = entries.filter((e) => e.shared.category === "action");
   const isAlertKind = source === "customGraph";
+  const notifyOnly = isAlertKind || source === "report";
 
   return (
     <Box padding={3} borderRadius="md" border="1px solid" borderColor="border">
@@ -50,7 +51,7 @@ export function TypePicker({
             isAlertKind={isAlertKind}
           />
         ) : null}
-        {action.length > 0 && !isAlertKind ? (
+        {action.length > 0 && !notifyOnly ? (
           <TypeGroup
             label="Action"
             description="Do something to the matched trace."

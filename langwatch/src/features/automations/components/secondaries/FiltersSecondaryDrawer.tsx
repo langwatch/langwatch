@@ -39,6 +39,9 @@ import { useMonacoTheme } from "../../editors/useMonacoTheme";
 import {
   type ConditionSource,
   type GraphAlertDraft,
+  INITIAL_REPORT_DRAFT,
+  type ReportDraft,
+  type ReportSourceKind,
   INITIAL_GRAPH_ALERT_DRAFT,
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
@@ -64,6 +67,7 @@ export interface FiltersDrawerResult {
   filters: Partial<Record<FilterField, FilterParam>>;
   customGraphId: string | null;
   graphAlert: GraphAlertDraft;
+  report?: ReportDraft;
   alertType: AlertType | null;
 }
 
@@ -82,6 +86,7 @@ export function FiltersSecondaryDrawer({
   filters,
   customGraphId,
   graphAlert,
+  report,
   alertType,
   projectId,
   prefilledGraphId,
@@ -95,6 +100,7 @@ export function FiltersSecondaryDrawer({
   filters: Partial<Record<FilterField, FilterParam>>;
   customGraphId: string | null;
   graphAlert: GraphAlertDraft;
+  report: ReportDraft;
   alertType: AlertType | null;
   projectId: string;
   /** When set, the graph-id field is initialised to this value and locked
@@ -117,6 +123,7 @@ export function FiltersSecondaryDrawer({
   );
   const [localGraphAlert, setLocalGraphAlert] =
     useState<GraphAlertDraft>(graphAlert);
+  const [localReport, setLocalReport] = useState<ReportDraft>(report);
   // The threshold is held as text while editing so intermediate states
   // ("-", "1e", empty) don't get coerced mid-keystroke; it parses on Done.
   const [thresholdText, setThresholdText] = useState(
@@ -133,11 +140,12 @@ export function FiltersSecondaryDrawer({
       setLocal(filters);
       setLocalCustomGraphId(customGraphId);
       setLocalGraphAlert(graphAlert);
+      setLocalReport(report);
       setThresholdText(String(graphAlert.threshold));
       setCode(JSON.stringify(filters, null, 2));
       setCodeError(null);
     }
-  }, [open, source, filters, customGraphId, graphAlert]);
+  }, [open, source, filters, customGraphId, graphAlert, report]);
 
   const graphs = api.graphs.getAll.useQuery(
     { projectId },
@@ -184,12 +192,27 @@ export function FiltersSecondaryDrawer({
     setCodeMode(toCode);
   };
 
+  const reportScheduleInvalid =
+    localSource === "report" && localReport.cron.trim() === "";
+
   const parsedThreshold =
     thresholdText.trim() === "" ? NaN : Number(thresholdText);
   const thresholdInvalid =
     localSource === "customGraph" && !Number.isFinite(parsedThreshold);
 
   const apply = () => {
+    if (localSource === "report") {
+      if (reportScheduleInvalid) return;
+      onSave({
+        source: "report",
+        report: localReport,
+        filters: {},
+        customGraphId: null,
+        graphAlert: INITIAL_GRAPH_ALERT_DRAFT,
+        alertType,
+      });
+      return;
+    }
     if (localSource === "customGraph") {
       if (thresholdInvalid) return;
       onSave({
@@ -251,7 +274,12 @@ export function FiltersSecondaryDrawer({
       title="When"
       onClose={onCancel}
       onDone={apply}
-      doneDisabled={customGraphMissing || seriesMissing || thresholdInvalid}
+      doneDisabled={
+        customGraphMissing ||
+        seriesMissing ||
+        thresholdInvalid ||
+        reportScheduleInvalid
+      }
       headerRight={
         localSource === "trace" ? (
           <>
@@ -287,9 +315,78 @@ export function FiltersSecondaryDrawer({
             lockedTooltip="This automation watches trace data. Create a new automation to trigger on a graph."
             onClick={() => !sourceIsLocked && setLocalSource("customGraph")}
           />
+          <SourceCard
+            active={localSource === "report"}
+            title="Scheduled report"
+            description="Send a dashboard, graph, or trace table on a schedule."
+            locked={sourceIsLocked && localSource !== "report"}
+            lockedTooltip="Create a new automation to send a scheduled report."
+            onClick={() => !sourceIsLocked && setLocalSource("report")}
+          />
         </HStack>
       </Box>
-      {localSource === "customGraph" ? (
+      {localSource === "report" ? (
+        <VStack align="stretch" gap={4}>
+          <Field.Root>
+            <Field.Label>What to send</Field.Label>
+            <NativeSelect.Root>
+              <NativeSelect.Field
+                value={localReport.sourceKind}
+                onChange={(ev) =>
+                  setLocalReport((p) => ({
+                    ...p,
+                    sourceKind: ev.target.value as ReportSourceKind,
+                  }))
+                }
+              >
+                <option value="traceQuery">Top matching traces (table)</option>
+                <option value="customGraph">A custom graph (chart)</option>
+                <option value="dashboard">A dashboard (all graphs)</option>
+              </NativeSelect.Field>
+            </NativeSelect.Root>
+          </Field.Root>
+          {localReport.sourceKind === "traceQuery" ? (
+            <Field.Root>
+              <Field.Label>How many rows</Field.Label>
+              <Input
+                type="number"
+                value={localReport.topN}
+                onChange={(ev) =>
+                  setLocalReport((p) => ({
+                    ...p,
+                    topN: Number(ev.target.value) || 5,
+                  }))
+                }
+              />
+            </Field.Root>
+          ) : null}
+          <Field.Root invalid={reportScheduleInvalid}>
+            <Field.Label>Schedule (cron)</Field.Label>
+            <Input
+              value={localReport.cron}
+              placeholder="0 9 * * 1"
+              onChange={(ev) =>
+                setLocalReport((p) => ({ ...p, cron: ev.target.value }))
+              }
+            />
+            {reportScheduleInvalid ? (
+              <Field.ErrorText>
+                Enter a cron schedule (e.g. 0 9 * * 1 for Mondays at 9am).
+              </Field.ErrorText>
+            ) : null}
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>Timezone</Field.Label>
+            <Input
+              value={localReport.timezone}
+              placeholder="UTC"
+              onChange={(ev) =>
+                setLocalReport((p) => ({ ...p, timezone: ev.target.value }))
+              }
+            />
+          </Field.Root>
+        </VStack>
+      ) : localSource === "customGraph" ? (
         <VStack align="stretch" gap={4}>
           {/* `disabled` lives on Field.Root — the field context is what
               actually stamps the native attribute on the select, so the

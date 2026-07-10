@@ -215,8 +215,15 @@ function Automations() {
     () => (triggers.data ?? []).filter((t) => !!t.customGraphId),
     [triggers.data],
   );
+  const reports = useMemo(
+    () => (triggers.data ?? []).filter((t) => t.triggerKind === "REPORT"),
+    [triggers.data],
+  );
   const traceAutomations = useMemo(
-    () => (triggers.data ?? []).filter((t) => !t.customGraphId),
+    () =>
+      (triggers.data ?? []).filter(
+        (t) => !t.customGraphId && t.triggerKind !== "REPORT",
+      ),
     [triggers.data],
   );
 
@@ -603,6 +610,69 @@ function Automations() {
                             </Table.Row>
                           );
                         })}
+                      </Table.Body>
+                    </Table.Root>
+                  </Box>
+                )}
+              </VStack>
+
+              {/* Reports: send a digest on a schedule */}
+              <VStack align="stretch" gap={3}>
+                <SectionHeader
+                  icon={<CalendarClock size={18} />}
+                  title="Reports"
+                  count={reports.length}
+                  description="A report sends a dashboard, a graph, or a table of traces (e.g. the top errors) on a schedule — a recurring Slack or email digest."
+                  addLabel="New report"
+                  onAdd={() =>
+                    openDrawer("automation", { initialSource: "report" })
+                  }
+                />
+                {reports.length === 0 ? (
+                  <Text textStyle="sm" color="fg.muted">
+                    No scheduled reports yet. Create one to get a recurring
+                    digest in Slack or email — timing is visible in Ops →
+                    Scheduler.
+                  </Text>
+                ) : (
+                  <Box
+                    border="1px solid"
+                    borderColor="border"
+                    borderRadius="lg"
+                    overflow="hidden"
+                  >
+                    <Table.Root variant="line" width="full">
+                      <Table.Header>
+                        <Table.Row>
+                          <Table.ColumnHeader>Name</Table.ColumnHeader>
+                          <Table.ColumnHeader>Destination</Table.ColumnHeader>
+                          <Table.ColumnHeader>Schedule</Table.ColumnHeader>
+                        </Table.Row>
+                      </Table.Header>
+                      <Table.Body>
+                        {reports.map((trigger) => (
+                          <Table.Row
+                            key={trigger.id}
+                            cursor="pointer"
+                            onClick={() =>
+                              openDrawer("automation", {
+                                automationId: trigger.id,
+                              })
+                            }
+                          >
+                            <Table.Cell>{trigger.name}</Table.Cell>
+                            <Table.Cell>
+                              {trigger.action === "SEND_SLACK_MESSAGE"
+                                ? "Slack"
+                                : "Email"}
+                            </Table.Cell>
+                            <Table.Cell>
+                              <Text textStyle="xs" color="fg.muted">
+                                On schedule — see Ops → Scheduler
+                              </Text>
+                            </Table.Cell>
+                          </Table.Row>
+                        ))}
                       </Table.Body>
                     </Table.Root>
                   </Box>

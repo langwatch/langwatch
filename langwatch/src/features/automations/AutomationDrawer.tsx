@@ -57,6 +57,7 @@ import {
   filtersAreSet,
   INITIAL_DRAFT,
   notifyChannel,
+  reportInputFromDraft,
   templatesFromDraft,
 } from "./logic/draftReducer";
 import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
@@ -151,6 +152,7 @@ export function AutomationDrawer({
   // recovery; the server pins their cadence to immediate. There is no
   // cadence to review, so the gate only applies to trace automations.
   const isGraphAlert = draft.source === "customGraph";
+  const isReport = draft.source === "report";
   const cadenceNeedsReview = isNotify && !isGraphAlert && !cadenceConfirmed;
   const dispatch = useAutomationStore((s) => s.dispatch);
   const setSection = useAutomationStore((s) => s.setSection);
@@ -223,6 +225,9 @@ export function AutomationDrawer({
       // Alerts require a severity — seed the default so the fresh draft can
       // save without a detour; the author can change it next to the name.
       dispatch({ type: "SET_ALERT_TYPE", value: AlertType.WARNING });
+    }
+    if (initialSource === "report") {
+      dispatch({ type: "SET_SOURCE", value: "report" });
     }
     if (initialName) {
       dispatch({ type: "SET_NAME", value: initialName });
@@ -618,6 +623,10 @@ export function AutomationDrawer({
         // keys; the router merges them into the persisted `actionParams`.
         graphAlert:
           draft.source === "customGraph" ? draft.graphAlert : undefined,
+        report:
+          draft.source === "report"
+            ? reportInputFromDraft(draft.report)
+            : undefined,
         actionParams: actionParamsFromDraft(draft) as never,
         templates: templatesFromDraft(draft),
         notificationCadence: draft.notificationCadence,
@@ -626,13 +635,17 @@ export function AutomationDrawer({
       {
         onSuccess: () => {
           toaster.create({
-            title: isGraphAlert
+            title: isReport
               ? automationId
-                ? "Alert updated"
-                : "Alert created"
-              : automationId
-                ? "Automation updated"
-                : "Automation created",
+                ? "Report updated"
+                : "Report created"
+              : isGraphAlert
+                ? automationId
+                  ? "Alert updated"
+                  : "Alert created"
+                : automationId
+                  ? "Automation updated"
+                  : "Automation created",
             type: "success",
             meta: { closable: true },
           });
@@ -740,13 +753,17 @@ export function AutomationDrawer({
           <Drawer.Header>
             <Drawer.CloseTrigger />
             <Heading size="md">
-              {isGraphAlert || prefilledGraphId
+              {isReport
                 ? automationId
-                  ? "Edit alert"
-                  : "New alert"
-                : automationId
-                  ? "Edit automation"
-                  : "Add automation"}
+                  ? "Edit report"
+                  : "New report"
+                : isGraphAlert || prefilledGraphId
+                  ? automationId
+                    ? "Edit alert"
+                    : "New alert"
+                  : automationId
+                    ? "Edit automation"
+                    : "Add automation"}
             </Heading>
           </Drawer.Header>
           <Drawer.Body>
@@ -795,6 +812,7 @@ export function AutomationDrawer({
         filters={draft.filters}
         customGraphId={draft.customGraphId}
         graphAlert={draft.graphAlert}
+        report={draft.report}
         alertType={draft.alertType}
         projectId={projectId}
         prefilledGraphId={prefilledGraphId}
@@ -803,10 +821,19 @@ export function AutomationDrawer({
         // lock the source cards visibly instead of letting the switch look
         // available.
         sourceLocked={!!automationId && isGraphAlert}
-        onSave={({ source, filters, customGraphId, graphAlert, alertType }) => {
+        onSave={({
+          source,
+          filters,
+          customGraphId,
+          graphAlert,
+          report,
+          alertType,
+        }) => {
           dispatch({ type: "SET_SOURCE", value: source });
           if (source === "trace") {
             dispatch({ type: "SET_FILTERS", value: filters });
+          } else if (source === "report") {
+            if (report) dispatch({ type: "SET_REPORT", value: report });
           } else {
             dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: customGraphId });
             dispatch({ type: "SET_GRAPH_ALERT", value: graphAlert });
