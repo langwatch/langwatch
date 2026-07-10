@@ -19,6 +19,7 @@ import type { EvaluationRunService } from "./evaluations/evaluation-run.service"
 import type { EventExplorerService } from "./ops/event-explorer.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
+import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { ReplayService } from "./ops/replay.service";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PresenceService } from "./presence/presence.service";
@@ -54,6 +55,7 @@ export interface DataRetentionDependencies {
 
 export interface OpsDependencies {
   queues: QueueService;
+  scheduler: SchedulerOpsService;
   eventExplorer: EventExplorerService;
   replay: ReplayService;
   metricsCollector: OpsMetricsCollector | null;

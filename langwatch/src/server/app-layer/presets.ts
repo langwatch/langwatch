@@ -117,6 +117,7 @@ import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.
 import { EventExplorerService } from "./ops/event-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
+import { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import { ReplayService } from "./ops/replay.service";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
@@ -887,6 +888,7 @@ export function initializeDefaultApp(options?: {
 
   const ops = {
     queues: new QueueService(queueRepo),
+    scheduler: new SchedulerOpsService(new PrismaScheduledJobRepository(prisma)),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
     replay: new ReplayService(replayRepo),
     metricsCollector: redis
@@ -1094,6 +1096,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     usageLimits: UsageLimitService.createNull(),
     ops: {
       queues: new QueueService(new NullQueueRepository()),
+      scheduler: new SchedulerOpsService(new PrismaScheduledJobRepository(prisma)),
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),

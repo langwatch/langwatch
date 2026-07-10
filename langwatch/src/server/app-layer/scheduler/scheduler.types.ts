@@ -109,4 +109,11 @@ export interface ScheduledJobRepository {
     targetType: string;
     targetId: string;
   }): Promise<void>;
+
+  /**
+   * Cross-tenant read for the ops dashboard: the most-imminent scheduled jobs
+   * (active first, soonest `nextRunAt` first), bounded by `limit`. Read-only
+   * operator visibility — never a firing path.
+   */
+  listForOps(params: { limit: number }): Promise<ScheduledJobRecord[]>;
 }

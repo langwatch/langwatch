@@ -172,4 +172,18 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
       data: { active: false },
     });
   }
+
+  async listForOps({ limit }: { limit: number }): Promise<ScheduledJobRecord[]> {
+    // Cross-tenant operator read (all projects): active jobs first, then by
+    // soonest next fire. The `-- @tenancy:` marker is the guard's sanctioned
+    // opt-out for a system-owned cross-tenant view (read-only, never fires).
+    return this.prisma.$queryRaw<ScheduledJobRecord[]>`
+      SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
+             "nextRunAt", "lastSlot", "active", "createdAt", "updatedAt"
+      FROM "ScheduledJob"
+      ORDER BY "active" DESC, "nextRunAt" ASC
+      LIMIT ${limit}
+      -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
+    `;
+  }
 }
