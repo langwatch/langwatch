@@ -4,7 +4,7 @@ import type { Redis as IORedis } from "ioredis";
 import { CachedLuaScript } from "../cachedLuaScript";
 
 function makeRedis({ cacheHit }: { cacheHit: boolean }) {
-  const evalsha = vi.fn(async () => {
+  const evalsha = vi.fn(async (..._args: Array<string | number>) => {
     if (!cacheHit) throw new Error("NOSCRIPT No matching script.");
     return "sha-result";
   });
