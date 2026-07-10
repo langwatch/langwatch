@@ -2,8 +2,9 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { templateOptionsFor } from "../registry";
 import { SlackBlockKitTemplatePicker } from "../TemplatePicker";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -51,6 +52,29 @@ describe("SlackBlockKitTemplatePicker", () => {
       expect(
         screen.getByText(/more layouts for digest cadences/i),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("when a layout is picked", () => {
+    it("hands the chosen option back to the caller", () => {
+      const onSelect = vi.fn();
+      const [firstOption] = templateOptionsFor({
+        cadence: "immediate",
+        kind: "trace",
+      });
+      renderPicker({ onSelect });
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: new RegExp(`use ${firstOption!.displayName} template`, "i"),
+        }),
+      );
+
+      expect(onSelect).toHaveBeenCalledTimes(1);
+      expect(onSelect.mock.calls[0]![0]).toMatchObject({
+        id: firstOption!.id,
+        source: firstOption!.source,
+      });
     });
   });
 

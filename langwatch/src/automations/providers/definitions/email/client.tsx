@@ -15,6 +15,7 @@ import {
   CompactEmailPreview,
   FieldHeader,
   LiquidEditor,
+  TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
 import {
   DEFAULT_ALERT_EMAIL_BODY_TEMPLATE,
@@ -183,6 +184,13 @@ function EmailConfigForm({
     [ctx.variables, ctx.cadenceMode],
   );
 
+  // The default surface is the ready-made email plus its preview — most
+  // authors never edit the wording. A returning author who already changed
+  // the subject or body lands with the editors open so their edits show.
+  const [wordingOpen, setWordingOpen] = useState(
+    !slice.subject.usingDefault || !slice.body.usingDefault,
+  );
+
   return (
     <VStack align="stretch" gap={4}>
       {/* Alerts always deliver immediately (cadence is pinned server-side),
@@ -280,34 +288,55 @@ function EmailConfigForm({
         ) : null}
       </Box>
 
-      <FieldHeader
-        label="Subject"
-        usingDefault={slice.subject.usingDefault}
-        onReset={() => onChange({ ...slice, subject: EMPTY_FIELD })}
-        trailing={<VariableInfoIcon variables={variables} />}
-      />
-      <LiquidEditor
-        variables={variables}
-        height="56px"
-        value={subjectValue}
-        onChange={(value) =>
-          onChange({ ...slice, subject: { value, usingDefault: false } })
-        }
-      />
-      <FieldHeader
-        label="Body (Markdown + Liquid)"
-        usingDefault={slice.body.usingDefault}
-        onReset={() => onChange({ ...slice, body: EMPTY_FIELD })}
-        trailing={<VariableInfoIcon variables={variables} />}
-      />
-      <LiquidEditor
-        variables={variables}
-        height="520px"
-        value={bodyValue}
-        onChange={(value) =>
-          onChange({ ...slice, body: { value, usingDefault: false } })
-        }
-      />
+      <VStack align="stretch" gap={2}>
+        <Text textStyle="sm" fontWeight="semibold">
+          Message
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
+          We send a ready-made summary email. Customize the wording to change
+          the subject or body.
+        </Text>
+        {/* "Edit text" tier: the subject and body editors sit behind an
+            opt-in so the default surface stays a preview only. */}
+        <TemplateDisclosure
+          triggerLabel="Customize wording"
+          open={wordingOpen}
+          onToggle={() => setWordingOpen((prev) => !prev)}
+        >
+          <FieldHeader
+            label="Subject"
+            usingDefault={slice.subject.usingDefault}
+            onReset={() => onChange({ ...slice, subject: EMPTY_FIELD })}
+            trailing={<VariableInfoIcon variables={variables} />}
+          />
+          <Box data-testid="email-subject-editor">
+            <LiquidEditor
+              variables={variables}
+              height="56px"
+              value={subjectValue}
+              onChange={(value) =>
+                onChange({ ...slice, subject: { value, usingDefault: false } })
+              }
+            />
+          </Box>
+          <FieldHeader
+            label="Body (Markdown + Liquid)"
+            usingDefault={slice.body.usingDefault}
+            onReset={() => onChange({ ...slice, body: EMPTY_FIELD })}
+            trailing={<VariableInfoIcon variables={variables} />}
+          />
+          <Box data-testid="email-body-editor">
+            <LiquidEditor
+              variables={variables}
+              height="520px"
+              value={bodyValue}
+              onChange={(value) =>
+                onChange({ ...slice, body: { value, usingDefault: false } })
+              }
+            />
+          </Box>
+        </TemplateDisclosure>
+      </VStack>
 
       {emailPreview ? (
         <CompactEmailPreview

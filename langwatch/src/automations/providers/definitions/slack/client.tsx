@@ -1,13 +1,13 @@
 import {
+  Box,
   Button,
   createListCollection,
   Field,
-  HStack,
   Input,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FaSlack } from "react-icons/fa";
 import { Select } from "~/components/ui/select";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
@@ -17,6 +17,7 @@ import {
   CompactSlackPreview,
   FieldHeader,
   LiquidEditor,
+  TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
 import {
   DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE,
@@ -133,6 +134,15 @@ function SlackConfigForm({
     [ctx.variables, ctx.cadenceMode],
   );
 
+  // A returning author who hand-edited the Block Kit source (not a preset,
+  // not the framework default) lands with the code editor already open so
+  // their custom layout is visible; everyone else starts on the gallery.
+  const isCustomBlockKit =
+    isBlockKit &&
+    !slice.template.usingDefault &&
+    !findTemplateOptionBySource(slice.template.value);
+  const [codeOpen, setCodeOpen] = useState(isCustomBlockKit);
+
   // If the cadence or trigger kind switches away from what the picked
   // preset was built for (immediate template on a digest dispatch, trace
   // template on a graph alert, or vice versa), the source would render
@@ -149,6 +159,11 @@ function SlackConfigForm({
     onChange({ ...slice, template: EMPTY_FIELD });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.cadenceMode, ctx.sourceKind]);
+
+  const usePlainText = () =>
+    onChange({ ...slice, templateType: "string", template: EMPTY_FIELD });
+  const useGuidedTemplates = () =>
+    onChange({ ...slice, templateType: "block_kit", template: EMPTY_FIELD });
 
   return (
     <VStack align="stretch" gap={4}>
@@ -174,121 +189,122 @@ function SlackConfigForm({
         />
       </Field.Root>
       <FieldHeader
-        label="Message template"
+        label="Message"
         usingDefault={slice.template.usingDefault}
         onReset={() => onChange({ ...slice, template: EMPTY_FIELD })}
-        trailing={
-          <HStack gap={2}>
-            <MessageTypeToggle
-              value={slice.templateType}
-              onChange={(next) =>
-                // Reset template to default when toggling type so the right
-                // default shows in the editor.
+        trailing={<VariableInfoIcon variables={variables} />}
+      />
+      {isBlockKit ? (
+        // Default tier: the guided gallery is the primary surface. The
+        // author picks a ready-made layout and sees a preview; the plain
+        // text and code escape hatches sit below as opt-ins.
+        <VStack align="stretch" gap={3}>
+          <SlackBlockKitTemplatePicker
+            cadence={ctx.cadenceMode}
+            kind={ctx.sourceKind}
+            hasEvaluationFilter={ctx.hasEvaluationFilter}
+            currentSource={templateValue}
+            onSelect={(option) =>
+              onChange({
+                ...slice,
+                template: { value: option.source, usingDefault: false },
+              })
+            }
+            onSelectOtherCadence={(option) => {
+              // Cross-cadence pick: switch the cadence alongside the template
+              // so the author doesn't have to round-trip via the Cadence
+              // section. Both land in the same batch, so the cadence-mismatch
+              // reset effect above sees a consistent pair and leaves it alone.
+              ctx.setNotificationCadence(
+                option.cadenceFit === "digest" ? "5min_digest" : "immediate",
+              );
+              onChange({
+                ...slice,
+                template: { value: option.source, usingDefault: false },
+              });
+            }}
+          />
+          {slackPreview ? (
+            <CompactSlackPreview payload={slackPreview.payload} />
+          ) : null}
+          {/* Escape hatch 1: write the message yourself as plain text. */}
+          <Button
+            variant="plain"
+            size="xs"
+            width="fit-content"
+            paddingX={0}
+            color="fg.muted"
+            _hover={{ color: "fg" }}
+            onClick={usePlainText}
+          >
+            Write the message as plain text instead
+          </Button>
+          {/* Escape hatch 2: the raw Block Kit editor. This is the only
+              place "Block Kit" and Liquid braces are exposed — everything
+              above stays no-code. The `liquid-json` Monaco language tokenizes
+              the JSON and its embedded Liquid, and the Block Kit schema drives
+              in-editor markers. */}
+          <TemplateDisclosure
+            triggerLabel="Edit as code"
+            hint="Write the layout yourself in Block Kit. Values in braces fill in from your trace or alert when the message sends."
+            open={codeOpen}
+            onToggle={() => setCodeOpen((prev) => !prev)}
+          >
+            <Box data-testid="slack-code-editor">
+              <LiquidEditor
+                variables={variables}
+                height="320px"
+                language={LIQUID_JSON_LANGUAGE_ID}
+                value={templateValue}
+                onChange={(value) =>
+                  onChange({
+                    ...slice,
+                    template: { value, usingDefault: false },
+                  })
+                }
+                jsonSchema={SLACK_BLOCK_KIT_JSON_SCHEMA}
+                jsonSchemaShadowUri="file:///automation/slack-block-kit-shadow.json"
+              />
+            </Box>
+          </TemplateDisclosure>
+        </VStack>
+      ) : (
+        // "Edit text" tier: a plain text Slack message, no Block Kit JSON.
+        <VStack align="stretch" gap={3}>
+          <Text textStyle="xs" color="fg.muted">
+            Write the message Slack will post. Markdown and variables are
+            supported.
+          </Text>
+          <Box data-testid="slack-text-editor">
+            <LiquidEditor
+              variables={variables}
+              height="200px"
+              value={templateValue}
+              onChange={(value) =>
                 onChange({
                   ...slice,
-                  templateType: next,
-                  template: EMPTY_FIELD,
+                  template: { value, usingDefault: false },
                 })
               }
             />
-            <VariableInfoIcon variables={variables} />
-          </HStack>
-        }
-      />
-      {isBlockKit ? (
-        <SlackBlockKitTemplatePicker
-          cadence={ctx.cadenceMode}
-          kind={ctx.sourceKind}
-          hasEvaluationFilter={ctx.hasEvaluationFilter}
-          currentSource={templateValue}
-          onSelect={(option) =>
-            onChange({
-              ...slice,
-              template: { value: option.source, usingDefault: false },
-            })
-          }
-          onSelectOtherCadence={(option) => {
-            // Cross-cadence pick: switch the cadence alongside the template
-            // so the author doesn't have to round-trip via the Cadence
-            // section. Both land in the same batch, so the cadence-mismatch
-            // reset effect above sees a consistent pair and leaves it alone.
-            ctx.setNotificationCadence(
-              option.cadenceFit === "digest" ? "5min_digest" : "immediate",
-            );
-            onChange({
-              ...slice,
-              template: { value: option.source, usingDefault: false },
-            });
-          }}
-        />
-      ) : null}
-      {/* Block Kit templates are JSON whose string values contain Liquid.
-          We use the custom `liquid-json` Monaco language so the editor
-          tokenizes both, and we pass the Block Kit schema down — the
-          editor pre-substitutes Liquid spans with same-length placeholders
-          and runs the JSON language service on the synthetic text so the
-          author still gets in-editor schema markers. */}
-      <LiquidEditor
-        variables={variables}
-        height="320px"
-        language={isBlockKit ? LIQUID_JSON_LANGUAGE_ID : undefined}
-        value={templateValue}
-        onChange={(value) =>
-          onChange({ ...slice, template: { value, usingDefault: false } })
-        }
-        jsonSchema={isBlockKit ? SLACK_BLOCK_KIT_JSON_SCHEMA : undefined}
-        jsonSchemaShadowUri={
-          isBlockKit
-            ? "file:///automation/slack-block-kit-shadow.json"
-            : undefined
-        }
-      />
-
-      {slackPreview ? (
-        <CompactSlackPreview payload={slackPreview.payload} />
-      ) : null}
+          </Box>
+          {slackPreview ? (
+            <CompactSlackPreview payload={slackPreview.payload} />
+          ) : null}
+          <Button
+            variant="plain"
+            size="xs"
+            width="fit-content"
+            paddingX={0}
+            color="fg.muted"
+            _hover={{ color: "fg" }}
+            onClick={useGuidedTemplates}
+          >
+            Use a guided template instead
+          </Button>
+        </VStack>
+      )}
     </VStack>
-  );
-}
-
-/**
- * Compact two-state segmented control for "plain text" vs "block_kit".
- * Lives inside the template field header so we don't burn a full row on a
- * binary choice — saves vertical space in a drawer that already crams a
- * webhook input, the editor, and the preview.
- */
-function MessageTypeToggle({
-  value,
-  onChange,
-}: {
-  value: SlackTemplateType;
-  onChange: (next: SlackTemplateType) => void;
-}) {
-  return (
-    <HStack
-      gap={0}
-      border="1px solid"
-      borderColor="border"
-      borderRadius="md"
-      padding="2px"
-    >
-      <Button
-        size="2xs"
-        variant={value === "string" ? "solid" : "ghost"}
-        colorPalette={value === "string" ? "orange" : undefined}
-        onClick={() => onChange("string")}
-      >
-        Text
-      </Button>
-      <Button
-        size="2xs"
-        variant={value === "block_kit" ? "solid" : "ghost"}
-        colorPalette={value === "block_kit" ? "orange" : undefined}
-        onClick={() => onChange("block_kit")}
-      >
-        Block Kit
-      </Button>
-    </HStack>
   );
 }
 
