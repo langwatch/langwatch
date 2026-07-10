@@ -26,21 +26,21 @@ Feature: Gateway runs neutralize persisted Path B shell functions so no call is 
 
   Rule: gateway spawns remove the tool's scoped function before invocation
 
-    @unit @unimplemented
+    @unit
     Scenario: A gateway copilot run with a persisted rc function emits no OTLP
       Given tool_mode.copilot is saved as "gateway"
       When the user runs `langwatch copilot`
       Then the shell command removes the `copilot` function before invoking the tool
       And the child env carries no OTLP exporter endpoint
 
-    @unit @unimplemented
+    @unit
     Scenario: A gateway opencode run with a persisted rc function emits no OTLP
       Given tool_mode.opencode is saved as "gateway"
       When the user runs `langwatch opencode`
       Then the shell command removes the `opencode` function before invoking the tool
       And the child env carries no OTLP exporter endpoint
 
-    @unit @unimplemented
+    @unit
     Scenario: A gateway gemini run with a persisted rc function emits no OTLP
       Given tool_mode.gemini is saved as "gateway"
       When the user runs `langwatch gemini`
@@ -49,14 +49,14 @@ Feature: Gateway runs neutralize persisted Path B shell functions so no call is 
 
   Rule: user aliases and ingestion runs are untouched
 
-    @unit @unimplemented
+    @unit
     Scenario: Gateway runs still honor the user's alias for the tool
       Given tool_mode.copilot is saved as "gateway"
       And the user's rc defines an alias adding a flag to `copilot`
       When the user runs `langwatch copilot`
       Then the alias's flag is present on the spawned invocation
 
-    @unit @unimplemented
+    @unit
     Scenario: Ingestion runs leave the persisted function in place
       Given tool_mode.copilot is saved as "ingestion"
       When the user runs `langwatch copilot`

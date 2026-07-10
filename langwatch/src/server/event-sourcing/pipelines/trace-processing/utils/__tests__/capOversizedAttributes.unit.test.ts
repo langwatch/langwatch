@@ -161,6 +161,69 @@ describe("capOversizedAttributes", () => {
 // valueExceeds
 // ---------------------------------------------------------------------------
 
+describe("capOversizedAttributes with copilot content-capture payloads", () => {
+  // Copilot CLI (ADR-039) ships prompt/response content on span-EVENT
+  // attributes (gen_ai.input/output.messages) when content capture is
+  // on, with no documented client-side size cap — the span path's
+  // per-value guard is the only ceiling.
+
+  /** @scenario An oversized content value on a span event is capped at ingestion */
+  it("caps an oversized gen_ai content value on a span event and keeps the span intact", () => {
+    const big = "m".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
+    const span = makeSpan([
+      { key: "gen_ai.request.model", value: { stringValue: "gpt-5" } },
+    ]);
+    (span as unknown as { events: unknown[] }).events = [
+      {
+        name: "gen_ai.content",
+        attributes: [
+          { key: "gen_ai.input.messages", value: { stringValue: big } },
+        ],
+      },
+    ];
+
+    const cappedCount = capOversizedAttributes(span, null);
+
+    expect(cappedCount).toBe(1);
+    const eventAttr = (
+      span as unknown as {
+        events: Array<{
+          attributes: Array<{ value: { stringValue: string } }>;
+        }>;
+      }
+    ).events[0]!.attributes[0]!;
+    expect(eventAttr.value.stringValue).toMatch(/^\[truncated: \d+ bytes/);
+    // The span itself (model attr) is untouched.
+    expect(span.attributes[0]!.value.stringValue).toBe("gpt-5");
+  });
+
+  /** @scenario A long session of content-carrying spans ingests without unbounded accumulation */
+  it("caps every span of a long content-carrying session independently", () => {
+    // The CH-merge OOM vector is accumulation across many spans, not one
+    // big value — every span in a 100-span session must come out of the
+    // guard individually bounded so the fold's input has a hard ceiling.
+    const big = "n".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
+    const spans = Array.from({ length: 100 }, (_, i) => {
+      const span = makeSpan([
+        { key: "gen_ai.output.messages", value: { stringValue: big } },
+      ]);
+      (span as unknown as { spanId: string }).spanId = `span-${i}`;
+      return span;
+    });
+
+    let totalCapped = 0;
+    for (const span of spans) {
+      totalCapped += capOversizedAttributes(span, null);
+    }
+
+    expect(totalCapped).toBe(100);
+    for (const span of spans) {
+      const value = span.attributes[0]!.value.stringValue!;
+      expect(value.length).toBeLessThan(64);
+    }
+  });
+});
+
 describe("valueExceeds", () => {
   describe("given a stringValue", () => {
     describe("when the string exceeds maxBytes", () => {

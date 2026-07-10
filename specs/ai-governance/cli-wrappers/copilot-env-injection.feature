@@ -11,8 +11,11 @@ Feature: `langwatch copilot` injects the right env for each path
       audit-feed source).
 
   Capture-everything default (ADR-039 constraint): content capture is on by
-  default with a locked degradation ladder — env var, else idempotent config
-  write, else a loud tokens-only warning. Never silently tokens-only.
+  default via the standard OTel GenAI env var
+  (OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT — spike-verified
+  against the copilot 1.0.69 binary, no config write needed). An explicit
+  user opt-out is respected with a loud tokens-only notice; never silently
+  tokens-only.
 
   Pairs with:
     - specs/ai-governance/cli-wrappers/cli-mints-ingest-key.feature
@@ -23,7 +26,7 @@ Feature: `langwatch copilot` injects the right env for each path
 
   Rule: Path A injects the BYOK gateway env
 
-    @unit @unimplemented
+    @unit
     Scenario: Gateway mode points copilot's BYOK provider at the LangWatch gateway
       Given tool_mode.copilot is saved as "gateway"
       And the user has a personal virtual key
@@ -32,7 +35,7 @@ Feature: `langwatch copilot` injects the right env for each path
       And COPILOT_PROVIDER_BASE_URL is the gateway URL
       And COPILOT_PROVIDER_API_KEY is the personal virtual key
 
-    @unit @unimplemented
+    @unit
     Scenario: Gateway mode does not enable copilot's own OTel export
       Given tool_mode.copilot is saved as "gateway"
       And the user has a personal virtual key
@@ -40,7 +43,7 @@ Feature: `langwatch copilot` injects the right env for each path
       Then the child env does not set COPILOT_OTEL_ENABLED
       And no OTEL_EXPORTER_OTLP_ENDPOINT is injected
 
-    @unit @unimplemented
+    @unit
     Scenario: Copilot's provider families accept either an OpenAI or Anthropic upstream
       Given the org has only an Anthropic provider credential configured
       When the gateway preflight for "copilot" checks provider families
@@ -48,7 +51,7 @@ Feature: `langwatch copilot` injects the right env for each path
 
   Rule: Path B enables copilot's native OTel export against LangWatch
 
-    @unit @unimplemented
+    @unit
     Scenario: Ingestion mode mints a copilot_cli ingest key and enables native OTel
       Given tool_mode.copilot is saved as "ingestion"
       And no cached ingest key exists for "copilot_cli"
@@ -59,7 +62,7 @@ Feature: `langwatch copilot` injects the right env for each path
       And OTEL_EXPORTER_OTLP_HEADERS carries the ingest key as a Bearer token
       And OTEL_EXPORTER_OTLP_PROTOCOL is "http/json"
 
-    @unit @unimplemented
+    @unit
     Scenario: Ingestion mode pins the OTLP exporter type against an inherited file exporter
       Given tool_mode.copilot is saved as "ingestion"
       And the parent shell exports COPILOT_OTEL_EXPORTER_TYPE=file
@@ -67,7 +70,7 @@ Feature: `langwatch copilot` injects the right env for each path
       Then the child env's COPILOT_OTEL_EXPORTER_TYPE is the OTLP exporter value
       And telemetry is not redirected to a local file
 
-    @unit @unimplemented
+    @unit
     Scenario: A cached copilot_cli ingest key is reused instead of re-minting
       Given tool_mode.copilot is saved as "ingestion"
       And a cached ingest key exists for "copilot_cli" and is still live on the platform
@@ -76,22 +79,15 @@ Feature: `langwatch copilot` injects the right env for each path
 
   Rule: content capture degrades loudly, never silently
 
-    @unit @unimplemented
+    @unit
     Scenario: Content capture is enabled by default in ingestion mode
       Given tool_mode.copilot is saved as "ingestion"
       When the user runs `langwatch copilot`
       Then copilot's content capture setting is enabled for the child
 
-    @unit @unimplemented
+    @unit
     Scenario: An explicit user opt-out of content capture is never overwritten
       Given the user's copilot config explicitly disables content capture
       When the user runs `langwatch copilot` in ingestion mode
       Then the user's content capture setting is left as disabled
       And the wrapper warns that traces will carry tokens only
-
-    @unit @unimplemented
-    Scenario: Content capture setup failure warns instead of running silently tokens-only
-      Given enabling content capture fails through every mechanism
-      When the user runs `langwatch copilot` in ingestion mode
-      Then the wrapper prints a warning that content capture is unavailable
-      And the run proceeds with token telemetry only

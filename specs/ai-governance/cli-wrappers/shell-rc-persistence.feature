@@ -166,7 +166,7 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
         | opencode |
         | copilot  |
 
-    @unit @unimplemented
+    @unit
     Scenario: The copilot wrapper function carries the tool-specific telemetry vars
       Given `langwatch copilot` resolves to ingestion mode
       When the user types "y" at the persistence prompt

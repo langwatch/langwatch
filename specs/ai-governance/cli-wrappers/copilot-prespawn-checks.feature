@@ -18,20 +18,20 @@ Feature: `langwatch copilot` warns before spawn when telemetry can silently vani
 
   Rule: an enterprise-managed OTel pin is detected and named
 
-    @unit @unimplemented
+    @unit
     Scenario: A managed OTel pin produces a one-line warning and the run continues
       Given an enterprise managed-settings file pins an OTel collector for copilot
       When the user runs `langwatch copilot` in ingestion mode
       Then the wrapper warns that enterprise policy routes copilot telemetry elsewhere
       And the copilot process is still spawned
 
-    @unit @unimplemented
+    @unit
     Scenario: No managed-settings file produces no warning
       Given no enterprise managed-settings file exists
       When the user runs `langwatch copilot` in ingestion mode
       Then no managed-settings warning is printed
 
-    @unit @unimplemented
+    @unit
     Scenario: The managed-settings warning also fires on the gateway path
       Given an enterprise managed-settings file pins an OTel collector for copilot
       And tool_mode.copilot is saved as "gateway"
@@ -40,20 +40,20 @@ Feature: `langwatch copilot` warns before spawn when telemetry can silently vani
 
   Rule: old copilot versions are warned about, not blocked
 
-    @unit @unimplemented
+    @unit
     Scenario: A copilot older than 1.0.41 gets an upgrade warning and still runs
       Given the installed copilot version is 1.0.30
       When the user runs `langwatch copilot`
       Then the wrapper warns that telemetry is incomplete on this version and suggests upgrading
       And the copilot process is still spawned
 
-    @unit @unimplemented
+    @unit
     Scenario: A copilot at or above 1.0.41 produces no version warning
       Given the installed copilot version is 1.0.41
       When the user runs `langwatch copilot`
       Then no version warning is printed
 
-    @unit @unimplemented
+    @unit
     Scenario: An unparseable copilot version does not block the run
       Given `copilot --version` returns unparseable output
       When the user runs `langwatch copilot`

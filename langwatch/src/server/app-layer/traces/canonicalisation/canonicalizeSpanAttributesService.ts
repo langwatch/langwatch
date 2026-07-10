@@ -6,6 +6,7 @@ import { parseJsonStringValues } from "../../../event-sourcing/pipelines/trace-p
 import {
   ClaudeCodeExtractor,
   CodexExtractor,
+  CopilotExtractor,
   FallbackExtractor,
   GenAIExtractor,
   HaystackExtractor,
@@ -47,6 +48,10 @@ export class CanonicalizeSpanAttributesService {
     // spans; CodexExtractor lifts session_task.turn into gen_ai.*.
     new ClaudeCodeExtractor(),
     new CodexExtractor(),
+    // Copilot CLI: MUST run after GenAIExtractor — the standard gen_ai.*
+    // core is GenAI's job; CopilotExtractor lifts only the
+    // github.copilot.* extras + enduser.pseudo.id (ADR-039 Decision 6).
+    new CopilotExtractor(),
     new SpringAIExtractor(),
     new StrandsExtractor(),
     new LogfireExtractor(),

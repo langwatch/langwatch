@@ -25,14 +25,14 @@ Feature: Copilot CLI OTLP spans canonicalize on the unified substrate
 
   Rule: the standard GenAI attributes canonicalize without copilot-specific code
 
-    @integration @unimplemented
+    @unit
     Scenario: A copilot chat span yields model and token usage on the canonical trace
       Given a copilot OTLP span named "chat" with gen_ai request model and token usage attributes
       When the span is ingested with the copilot_cli ingest key
       Then the recorded span carries the model name
       And the recorded span carries input and output token counts
 
-    @integration @unimplemented
+    @unit
     Scenario: A copilot tool-execution span canonicalizes as a tool span
       Given a copilot OTLP span named "execute_tool" with gen_ai tool attributes
       When the span is ingested with the copilot_cli ingest key
@@ -40,25 +40,25 @@ Feature: Copilot CLI OTLP spans canonicalize on the unified substrate
 
   Rule: the copilot extractor lifts only the Copilot-specific extras
 
-    @unit @unimplemented
+    @unit
     Scenario: Repository and organization context are lifted onto the canonical span
       Given a copilot span carrying github repository and organization attributes
       When the canonicalisation chain runs
       Then the canonical span carries the repository and organization as metadata
 
-    @unit @unimplemented
+    @unit
     Scenario: Premium request consumption is lifted onto the canonical span
       Given a copilot span carrying a premium-request consumption attribute
       When the canonicalisation chain runs
       Then the canonical span records the premium-request consumption
 
-    @unit @unimplemented
+    @unit
     Scenario: Captured content payloads are lifted as span input and output
       Given a copilot span whose events carry captured prompt and response content
       When the canonicalisation chain runs
       Then the canonical span's input and output carry the captured content
 
-    @unit @unimplemented
+    @unit
     Scenario: A span without gen_ai attributes is left untouched by the copilot extractor
       Given an OTLP span with no gen_ai or github copilot attributes
       When the canonicalisation chain runs
@@ -66,14 +66,14 @@ Feature: Copilot CLI OTLP spans canonicalize on the unified substrate
 
   Rule: oversized copilot content cannot destabilize the pipeline
 
-    @integration @unimplemented
+    @unit
     Scenario: An oversized content value on a span event is capped at ingestion
       Given a copilot span event carrying a content attribute larger than the per-value cap
       When the span is ingested with the copilot_cli ingest key
       Then the stored attribute value is truncated to the cap
       And the span is otherwise recorded intact
 
-    @integration @unimplemented
+    @unit
     Scenario: A long session of content-carrying spans ingests without unbounded accumulation
       Given a session of one hundred copilot spans each carrying captured content
       When all spans are ingested with the copilot_cli ingest key
