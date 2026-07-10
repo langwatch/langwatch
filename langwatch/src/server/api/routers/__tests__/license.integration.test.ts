@@ -27,7 +27,11 @@ import {
   ENTERPRISE_LICENSE_KEY,
 } from "../../../../../ee/licensing/__tests__/fixtures/testLicenses";
 import { TEST_PUBLIC_KEY, TEST_PRIVATE_KEY } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
-import { parseLicenseKey, verifySignature, PRO_TEMPLATE, ENTERPRISE_TEMPLATE } from "../../../../../ee/licensing";
+import { parseLicenseKey, verifySignature } from "../../../../../ee/licensing";
+import {
+  ENTERPRISE_LICENSE_TEMPLATE as ENTERPRISE_TEMPLATE,
+  PRO_LICENSE_TEMPLATE as PRO_TEMPLATE,
+} from "../../../../../ee/plan-constants";
 import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { GROWTH_TEMPLATE, PRO_TEMPLATE, ENTERPRISE_TEMPLATE, getPlanTemplate } from "../planTemplates";
+import { getPlanTemplate } from "../planTemplates";
+import {
+  ENTERPRISE_LICENSE_TEMPLATE as ENTERPRISE_TEMPLATE,
+  GROWTH_LICENSE_TEMPLATE as GROWTH_TEMPLATE,
+  PRO_LICENSE_TEMPLATE as PRO_TEMPLATE,
+} from "../../plan-constants";
 import { DEFAULT_LIMIT } from "../constants";
 
 describe("PRO_TEMPLATE", () => {

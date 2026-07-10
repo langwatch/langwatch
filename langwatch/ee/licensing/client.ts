@@ -23,7 +23,7 @@ export { FREE_PLAN, LICENSE_ERRORS, UNLIMITED_PLAN } from "./constants";
 export type { LicenseError } from "./constants";
 
 // Plan Templates (plain objects, client-safe)
-export { PRO_TEMPLATE, ENTERPRISE_TEMPLATE, getPlanTemplate } from "./planTemplates";
+export { getPlanTemplate } from "./planTemplates";
 
 // Errors (plain JS classes)
 export { OrganizationNotFoundError } from "./errors";

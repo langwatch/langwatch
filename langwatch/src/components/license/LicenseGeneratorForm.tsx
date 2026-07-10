@@ -17,7 +17,7 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../ui/toaster";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Select } from "~/components/ui/select";
-import { ENTERPRISE_TEMPLATE } from "../../../ee/licensing/planTemplates";
+import { ENTERPRISE_LICENSE_TEMPLATE as ENTERPRISE_TEMPLATE } from "../../../ee/plan-constants";
 import { getPlanDefaults, type PlanType } from "./planFormDefaults";
 import { formatFileSize } from "./licenseStatusUtils";
 

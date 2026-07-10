@@ -2,7 +2,6 @@ import { prisma } from "../../src/server/db";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createCustomerService } from "./services/customerService";
 import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription";
-import { createSeatSyncService } from "./services/seatSyncService";
 import * as subscriptionItemCalculator from "./services/subscriptionItemCalculator";
 import { EESubscriptionService } from "./services/subscription.service";
 import { createStripeClient } from "./stripe/stripeClient";
@@ -42,17 +41,6 @@ export const createSubscriptionRouter = () => {
     seatEventFns,
   });
   return createSubscriptionRouterFactory({ customerService, subscriptionService });
-};
-
-let seatSyncServiceInstance: ReturnType<typeof createSeatSyncService> | null = null;
-
-export const getSeatSyncService = () => {
-  if (!seatSyncServiceInstance) {
-    const s = getStripe();
-    const seatEventFns = createSeatEventSubscriptionFns({ stripe: s, db: prisma });
-    seatSyncServiceInstance = createSeatSyncService({ seatEventFns, db: prisma });
-  }
-  return seatSyncServiceInstance;
 };
 
 let saasPlanProvider: ReturnType<typeof createSaaSPlanProvider> | null = null;

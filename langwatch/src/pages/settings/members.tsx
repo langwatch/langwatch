@@ -31,6 +31,8 @@ import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useInviteActions } from "../../hooks/useInviteActions";
+import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
+import { MemberSeatUsageLine } from "../../components/settings/MemberSeatUsageLine";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
@@ -103,6 +105,7 @@ function MembersList({
     value: team.id,
   }));
   const queryClient = api.useContext();
+  const membersLimit = useLicenseEnforcement("members");
 
   const [selectedMember, setSelectedMember] = useState<{
     userId: string;
@@ -274,7 +277,17 @@ function MembersList({
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
         <HStack width="full">
-          <Heading>Organization Members</Heading>
+          <VStack align="start" gap={1}>
+            <Heading>Organization Members</Heading>
+            {membersLimit.limitInfo && (
+              <MemberSeatUsageLine
+                memberCount={sortedMembers.length}
+                pendingInviteCount={pendingInvites.data?.length ?? 0}
+                current={membersLimit.limitInfo.current}
+                max={membersLimit.limitInfo.max}
+              />
+            )}
+          </VStack>
           <Spacer />
           {hasOrganizationManagePermission && (
             <PageLayout.HeaderButton onClick={onAddMembersOpen}>

@@ -23,12 +23,8 @@ export { LicenseHandler } from "./licenseHandler";
 export type { PlanInfo } from "./planInfo";
 // Plan Mapping
 export { mapToPlanInfo } from "./planMapping";
-// Plan Templates
-export {
-  ENTERPRISE_TEMPLATE,
-  getPlanTemplate,
-  PRO_TEMPLATE,
-} from "./planTemplates";
+// Plan Templates (values live in ee/plan-constants.ts — ADR-039 Decision 7)
+export { getPlanTemplate } from "./planTemplates";
 export type {
   LicenseData,
   LicensePlanLimits,

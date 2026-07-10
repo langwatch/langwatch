@@ -264,6 +264,7 @@ describe("LicenseEnforcementRepository", () => {
     });
 
     /** @scenario Pending invites count toward total member limit */
+    /** @scenario Pending invites still reserve seats */
     it("counts pending invites with ADMIN role as full members", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
