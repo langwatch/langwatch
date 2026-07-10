@@ -180,27 +180,33 @@ test_access_ingress() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SUITE: LANGWATCH_ENDPOINT — app deployment self-references its telemetry
-# endpoint so post-#3541 images (which boot-validate LANGWATCH_ENDPOINT as a
-# required URL) don't crash-loop on chart defaults. Regression for #5659.
+# SUITE: LANGWATCH_ENDPOINT — the app deployment sets its own internal
+# platform-API callback URL so post-#3541 images (which boot-validate
+# LANGWATCH_ENDPOINT as a required URL) don't crash-loop on chart defaults.
+# Regression for #5659.
 # ─────────────────────────────────────────────────────────────────────────────
 test_langwatch_endpoint() {
   sep; info "Suite: LANGWATCH_ENDPOINT on app deployment (#5659)"
 
   # Default render: env present, self-referencing localhost on the app port.
-  local app_out
-  app_out=$(tmpl_only "templates/app/deployment.yaml" --set autogen.enabled=true)
-  assert_contains "app sets LANGWATCH_ENDPOINT" "$app_out" "name: LANGWATCH_ENDPOINT"
+  # Assert the value on the LANGWATCH_ENDPOINT line itself — grepping the whole
+  # render for "http://localhost:5560" would pass off BASE_HOST / NEXTAUTH_URL*,
+  # which render the same value, and miss a wrong LANGWATCH_ENDPOINT value.
+  local ep_default
+  ep_default=$(tmpl_only "templates/app/deployment.yaml" --set autogen.enabled=true \
+    | grep -A1 "name: LANGWATCH_ENDPOINT")
+  assert_contains "app sets LANGWATCH_ENDPOINT" "$ep_default" "name: LANGWATCH_ENDPOINT"
   assert_contains "LANGWATCH_ENDPOINT self-references localhost:5560" \
-    "$app_out" "http://localhost:5560"
+    "$ep_default" "http://localhost:5560"
 
-  # Override via values is honored.
-  local app_override
-  app_override=$(tmpl_only "templates/app/deployment.yaml" \
+  # Override via values is honored (on the LANGWATCH_ENDPOINT line).
+  local ep_override
+  ep_override=$(tmpl_only "templates/app/deployment.yaml" \
     --set autogen.enabled=true \
-    --set app.http.langwatchEndpoint=https://collector.example.com)
+    --set app.http.langwatchEndpoint=https://collector.example.com \
+    | grep -A1 "name: LANGWATCH_ENDPOINT")
   assert_contains "LANGWATCH_ENDPOINT override honored" \
-    "$app_override" "https://collector.example.com"
+    "$ep_override" "https://collector.example.com"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -228,7 +228,7 @@ app:
   ## @extra app.http HTTP configuration for base/public URLs.
   ## @param app.http.baseHost [string, default: http://localhost:5560] Internal base URL.
   ## @param app.http.publicUrl [string, default: http://localhost:5560] Public URL for users.
-  ## @param app.http.langwatchEndpoint [string, default: ""] Internal platform-API URL (LANGWATCH_ENDPOINT) that in-pod scenario/simulation runners call back to. Empty self-references the app over localhost on app.service.port — correct because on the app pod the app is local (unlike workers/nlp, which reach it via service DNS). Override only if in-pod runners must reach the app through a different URL.
+  ## @param app.http.langwatchEndpoint [string, default: ""] Internal LANGWATCH_ENDPOINT in-pod scenario runners call back to. Empty self-references the app over localhost.
   http:
     # Base host URL for internal communication
     baseHost: "http://localhost:5560"
