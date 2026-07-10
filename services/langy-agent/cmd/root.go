@@ -34,8 +34,8 @@ func Root(ctx context.Context, _ []string) error {
 
 	// The worker pool is the driven adapter. It wipes SESSIONS_ROOT before
 	// accepting traffic and binds worker subprocesses to the pool-lifetime
-	// context. The egress guard is the ADR-043 stub seam (pass-through in PR1;
-	// PR3 slots real monitoring in without touching the pool).
+	// context. The egress guard is the ADR-047 stub seam (pass-through in PR1;
+	// PR4 slots real monitoring in without touching the pool).
 	pool, err := workerpool.New(ctx, workerpool.Options{
 		MaxWorkers:         cfg.MaxWorkers,
 		WorkerIdle:         cfg.WorkerIdle(),

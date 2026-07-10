@@ -1,4 +1,4 @@
-# ADR-043: Langy Foundations — hexagonal Go service, caller-scoped session key, deploy hardening
+# ADR-047: Langy Foundations — hexagonal Go service, caller-scoped session key, deploy hardening
 
 **Date:** 2026-07-10
 
@@ -57,7 +57,7 @@ services/langy-agent/
   adapters/
     httpapi/           # driving adapter: chi router + middleware, auth/validate only
     workerpool/        # driven adapter: the ADR-033 isolation logic, wrapped in herr/otel
-    egress/            # stub seam (interface + pass-through impl) for PR3 egress monitoring
+    egress/            # stub seam (interface + pass-through impl) for PR4 egress monitoring
   telemetry/           # otel span + metric instruments shared by app + workerpool
 ```
 
@@ -78,10 +78,10 @@ Concretely:
 - **Telemetry** is `pkg/otelsetup` plus a `telemetry` package that emits spans
   and metrics on the manager: worker spawn/kill, at-capacity, per-turn latency,
   readiness. The manager previously emitted **zero** OTel. *This is a
-  load-bearing seam: PR3's egress monitoring depends on it.* The global
+  load-bearing seam: PR4's egress monitoring depends on it.* The global
   `TracerProvider` is installed by `otelsetup`, so spans export today; the
   metric instruments are created against the global `Meter` (a no-op until a
-  `MeterProvider` is wired) so the call sites exist and light up the moment PR3
+  `MeterProvider` is wired) so the call sites exist and light up the moment PR4
   installs one — no restructuring required.
 - **`context.Context` is threaded everywhere.** The spawn path no longer drops
   the caller's context via `context.Background()`. The worker subprocess is now
@@ -105,7 +105,7 @@ The known `filterSensitiveEnv` suffix-gap is left as a code comment only — **n
 widened in this PR** (out of scope).
 
 An `adapters/egress/` package is added as a **thin stub seam** (interface +
-pass-through impl) so PR3 can add egress monitoring without restructuring. No
+pass-through impl) so PR4 can add egress monitoring without restructuring. No
 monitoring logic lands here.
 
 ### B. Per-session, caller-scoped LangWatch key (replaces the shared service key)
@@ -207,7 +207,7 @@ revisit.
 - A managed deploy without a sandboxed runtime now fails fast at `helm template`
   time instead of silently shipping an unsafe pod.
 - The `telemetry` metric instruments are no-ops until a `MeterProvider` is wired
-  (a deliberate PR3 seam); spans export immediately.
+  (a deliberate PR4 seam); spans export immediately.
 
 ## Future directions (explicitly deferred to the later stack PRs)
 

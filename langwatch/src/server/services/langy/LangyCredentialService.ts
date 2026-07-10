@@ -47,7 +47,7 @@ export class LangyCredentialResolutionError extends Error {
 export type LangyCredentials = {
   /**
    * Ephemeral per-session sk-lw-* key scoped to the requesting user's own
-   * permissions (ADR-043). Used by the MCP server in the worker to call the LW
+   * permissions (ADR-047). Used by the MCP server in the worker to call the LW
    * API, so a Langy tool call can never exceed what the caller could do by hand.
    */
   langwatchApiKey: string;
@@ -84,7 +84,7 @@ export type LangyCredentials = {
  * Resolves the credentials a Langy worker subprocess needs in its env.
  *
  * The LangWatch API key is minted PER CHAT SESSION and scoped to the requesting
- * user's own permissions (ADR-043) — so a Langy tool call can never exceed what
+ * user's own permissions (ADR-047) — so a Langy tool call can never exceed what
  * the caller could do by hand. The LLM virtual key, by contrast, is per-project:
  * one Langy VK is auto-provisioned on first use and stored encrypted in
  * ProjectSecret, and all Langy chats in that project share it. Cost attribution
@@ -128,7 +128,7 @@ export class LangyCredentialService {
       );
     }
 
-    // Mint a per-session key scoped to THIS user's own permissions (ADR-043).
+    // Mint a per-session key scoped to THIS user's own permissions (ADR-047).
     // The key is owned by the user, so ApiKeyService clamps it to what they
     // actually hold — a Langy tool call can never exceed the human. Fail-closed:
     // wrap mint failures as LangyCredentialResolutionError so the route returns a

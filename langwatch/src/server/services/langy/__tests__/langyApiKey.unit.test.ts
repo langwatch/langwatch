@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Unit tests for mintLangySessionApiKey — the per-chat-session, caller-scoped
- * Langy key (ADR-043). The two boundaries are mocked: hasProjectPermission
+ * Langy key (ADR-047). The two boundaries are mocked: hasProjectPermission
  * (what the user holds) and ApiKeyService.create (the mint). These tests pin
  * the contract that the minted key is OWNED BY THE USER, RESTRICTED,
  * PROJECT-scoped, EXPIRING, and carries EXACTLY the intersection of the Langy

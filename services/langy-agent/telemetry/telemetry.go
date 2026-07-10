@@ -5,7 +5,7 @@
 // telemetry has ONE definition instead of being scattered.
 //
 // The manager previously emitted zero OTel. This package is the load-bearing
-// seam ADR-043 calls out: PR3's egress monitoring hangs off the same tracer
+// seam ADR-047 calls out: PR4's egress monitoring hangs off the same tracer
 // and meter. The global TracerProvider is installed by pkg/otelsetup, so spans
 // export today. The metric instruments are created against the global Meter —
 // a no-op MeterProvider until one is wired — so every call site exists and
