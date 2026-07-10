@@ -280,9 +280,6 @@ importers:
       '@trpc/server':
         specifier: ^10.45.4
         version: 10.45.4
-      '@vitejs/plugin-react':
-        specifier: ^6.0.3
-        version: 6.0.3(babel-plugin-react-compiler@1.0.0)(vite@8.1.2(@types/node@26.1.0)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
       '@xyflow/react':
         specifier: ^12.11.1
         version: 12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(immer@11.1.8)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -644,6 +641,9 @@ importers:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260705.1
         version: 7.0.0-dev.20260705.1
+      '@vitejs/plugin-react':
+        specifier: ^6.0.3
+        version: 6.0.3(babel-plugin-react-compiler@1.0.0)(vite@8.1.2(@types/node@26.1.0)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
       '@vitest/browser':
         specifier: ^4.1.9
         version: 4.1.9(bufferutil@4.1.0)(vite@8.1.2(@types/node@26.1.0)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.9)
