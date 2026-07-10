@@ -1,13 +1,18 @@
 import type { PrismaClient } from "@prisma/client";
 
+import type { Session } from "~/server/auth";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { getLangyApiKeyToken, provisionLangyApiKey } from "./langyApiKey";
+import {
+  LangySessionKeyScopeError,
+  mintLangySessionApiKey,
+} from "./langyApiKey";
 import { getGithubTokenForUser } from "./langyGithubToken";
 import { provisionLangyVirtualKey } from "./langyVirtualKey";
 
+const logger = createLogger("langwatch:langy:credentials");
 const githubLogger = createLogger("langwatch:langy:credentials:github");
 
 /**
@@ -40,7 +45,11 @@ export class LangyCredentialResolutionError extends Error {
 }
 
 export type LangyCredentials = {
-  /** Project's sk-lw-* key. Used by the MCP server in the worker to call the LW API. */
+  /**
+   * Ephemeral per-session sk-lw-* key scoped to the requesting user's own
+   * permissions (ADR-047). Used by the MCP server in the worker to call the LW
+   * API, so a Langy tool call can never exceed what the caller could do by hand.
+   */
   langwatchApiKey: string;
   /** Project's Langy VK secret. Used by opencode as OPENAI_API_KEY against the AI gateway. */
   llmVirtualKey: string;
@@ -74,10 +83,13 @@ export type LangyCredentials = {
 /**
  * Resolves the credentials a Langy worker subprocess needs in its env.
  *
- * Per-project model: one Langy VK is auto-provisioned on first use and
- * stored encrypted in ProjectSecret. All Langy chats in that project
- * share that VK. Cost attribution is per-project, not per-user — when
- * we want per-user attribution we'll add a per-user secret store.
+ * The LangWatch API key is minted PER CHAT SESSION and scoped to the requesting
+ * user's own permissions (ADR-047) — so a Langy tool call can never exceed what
+ * the caller could do by hand. The LLM virtual key, by contrast, is per-project:
+ * one Langy VK is auto-provisioned on first use and stored encrypted in
+ * ProjectSecret, and all Langy chats in that project share it. Cost attribution
+ * is per-project, not per-user — when we want per-user attribution we'll add a
+ * per-user secret store.
  */
 export class LangyCredentialService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -88,11 +100,12 @@ export class LangyCredentialService {
 
   async getOrProvision({
     projectId,
-    actorUserId,
+    session,
   }: {
     projectId: string;
-    actorUserId: string;
+    session: Session;
   }): Promise<LangyCredentials> {
+    const actorUserId = session.user.id;
     const projectRepo = new ProjectRepository(this.prisma);
     const project = await projectRepo.findForLangyCredentials(projectId);
     if (!project) {
@@ -115,26 +128,39 @@ export class LangyCredentialService {
       );
     }
 
-    // Use the dedicated, least-privilege "Langy" key (LANGY_REQUIRED_PERMISSIONS
-    // only). Provision-on-first-use makes it self-healing if project creation
-    // missed it. Fail-closed if it can't be created — falling back to
-    // project.apiKey (full ingestion power) would silently bypass the RBAC
-    // gate the chat route enforces on every request.
-    await provisionLangyApiKey({
-      prisma: this.prisma,
-      projectId,
-      organizationId: project.organizationId,
-      createdByUserId: actorUserId,
-    });
-    const langyApiKeyToken = await getLangyApiKeyToken({
-      prisma: this.prisma,
-      projectId,
-    });
-    if (!langyApiKeyToken) {
+    // Mint a per-session key scoped to THIS user's own permissions (ADR-047).
+    // The key is owned by the user, so ApiKeyService clamps it to what they
+    // actually hold — a Langy tool call can never exceed the human. Fail-closed:
+    // wrap mint failures as LangyCredentialResolutionError so the route returns a
+    // 409 rather than falling back to a broader key. A user who holds none of
+    // Langy's permissions here gets a clean, actionable refusal.
+    let langwatchApiKey: string;
+    try {
+      langwatchApiKey = await mintLangySessionApiKey({
+        prisma: this.prisma,
+        session,
+        projectId,
+        organizationId: project.organizationId,
+      });
+    } catch (error) {
+      if (error instanceof LangySessionKeyScopeError) {
+        // Carries a user-safe message (the caller holds no Langy permissions
+        // in this project) — surface it verbatim as the 409 body.
+        throw new LangyCredentialResolutionError(error.message);
+      }
+      logger.error(
+        { error, projectId, userId: actorUserId },
+        "failed to mint Langy session key",
+      );
+      captureException(toError(error), {
+        extra: {
+          projectId,
+          context:
+            "mintLangySessionApiKey:LangyCredentialService.getOrProvision",
+        },
+      });
       throw new LangyCredentialResolutionError(
-        `Failed to provision Langy API key for project ${projectId} — ` +
-          "no user could be attributed (the project's organization has no " +
-          "resolvable members). Ensure the org has at least one active member.",
+        `Failed to mint a Langy session key for project ${projectId}.`,
       );
     }
 
@@ -173,7 +199,7 @@ export class LangyCredentialService {
     }
 
     return {
-      langwatchApiKey: langyApiKeyToken,
+      langwatchApiKey,
       llmVirtualKey,
       langwatchEndpoint,
       gatewayBaseUrl: ensureGatewayV1BaseUrl(gatewayBaseUrl),

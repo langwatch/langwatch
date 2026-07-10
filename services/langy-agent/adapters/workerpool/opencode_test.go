@@ -1,4 +1,4 @@
-package langyagent
+package workerpool
 
 import (
 	"context"
@@ -11,8 +11,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 func portOf(t *testing.T, serverURL string) int {
@@ -25,8 +23,8 @@ func portOf(t *testing.T, serverURL string) int {
 }
 
 // requireOpenCodeAuthEnforced is the Fix A′ fail-closed guard (ADR-033): if
-// opencode is genuinely requiring auth, an unauthenticated probe gets 401
-// and the guard passes.
+// opencode is genuinely requiring auth, an unauthenticated probe gets 401 and
+// the guard passes.
 func TestRequireOpenCodeAuthEnforced_PassesWhenBackendReturns401(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -38,9 +36,8 @@ func TestRequireOpenCodeAuthEnforced_PassesWhenBackendReturns401(t *testing.T) {
 	}
 }
 
-// If opencode ever stops honoring OPENCODE_SERVER_PASSWORD (upstream
-// regression, misconfiguration), an unauthenticated request would get 200
-// instead of 401 — the sibling-isolation guarantee this whole PR adds would
+// If opencode ever stops honoring OPENCODE_SERVER_PASSWORD, an unauthenticated
+// request would get 200 instead of 401 — the sibling-isolation guarantee would
 // be silently void. The guard must refuse to consider the worker ready.
 func TestRequireOpenCodeAuthEnforced_FailsWhenBackendIsUnauthenticated(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -53,9 +50,9 @@ func TestRequireOpenCodeAuthEnforced_FailsWhenBackendIsUnauthenticated(t *testin
 	}
 }
 
-// waitForReadiness must fail closed if the proxy chain is up but the
-// underlying opencode doesn't actually require auth — booting the worker in
-// that state would mean any sibling can reach it unauthenticated.
+// waitForReadiness must fail closed if the proxy chain is up but the underlying
+// opencode doesn't actually require auth — booting the worker in that state
+// would mean any sibling can reach it unauthenticated.
 func TestWaitForReadiness_FailsIfInternalPortIsUnauthenticated(t *testing.T) {
 	external := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -90,20 +87,13 @@ func TestWaitForReadiness_SucceedsWhenProxyUpAndInternalPortEnforcesAuth(t *test
 	}
 }
 
-// Regression test for the spawn race in manager.go: startAuthProxy binds and
-// starts serving :externalPort synchronously, but opencode's actual listener
-// on :internalPort comes up later (it's a separate process). Before it's
-// listening, the proxy's own rev.ErrorHandler answers polls with a genuine
-// "502 Bad Gateway" -- a real, err==nil HTTP response, not a transport
-// failure. waitForReadiness must not mistake that for "ready": doing so
-// triggers a one-shot requireOpenCodeAuthEnforced probe against a port
-// nothing is listening on yet, which fails and aborts the spawn. In
-// production the proxy always wins this race against opencode's startup, so
-// this used to fail almost every spawn.
-//
-// This drives waitForReadiness through the real startAuthProxy reverse-proxy
-// chain (unlike the tests above, which poll two independent, already-up
-// httptest servers and so never produce an actual 502).
+// Regression for the spawn race: startAuthProxy binds and serves synchronously,
+// but opencode's listener on internalPort comes up later. Before it's
+// listening, the proxy's ErrorHandler answers polls with a genuine 502 — a
+// real, err==nil HTTP response, not a transport failure. waitForReadiness must
+// not mistake that for "ready": doing so triggers a one-shot
+// requireOpenCodeAuthEnforced probe against a port nothing is listening on yet.
+// In production the proxy always wins this race against opencode's startup.
 func TestWaitForReadiness_SurvivesProxy502BeforeBackendListens(t *testing.T) {
 	internalPort, err := getFreePort()
 	if err != nil {
@@ -114,15 +104,15 @@ func TestWaitForReadiness_SurvivesProxy502BeforeBackendListens(t *testing.T) {
 		t.Fatalf("reserve external port: %v", err)
 	}
 
-	proxy, err := startAuthProxy(externalPort, internalPort, "bearer", "opencode-pw", zap.NewNop())
+	proxy, err := startAuthProxy(context.Background(), externalPort, internalPort, "bearer", "opencode-pw")
 	if err != nil {
 		t.Fatalf("start auth proxy: %v", err)
 	}
 	defer proxy.shutdown()
 
-	// Nothing listens on internalPort yet -- the proxy's first polls hit
-	// connection-refused and answer 502. Only after a delay does the
-	// "opencode" backend start listening, simulating its real startup time.
+	// Nothing listens on internalPort yet — the proxy's first polls hit
+	// connection-refused and answer 502. Only after a delay does the "opencode"
+	// backend start listening, simulating its real startup time.
 	backend := &http.Server{
 		Addr: fmt.Sprintf("127.0.0.1:%d", internalPort),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -177,8 +167,8 @@ func TestEventBelongsToSession_PropertiesNested(t *testing.T) {
 }
 
 func TestEventBelongsToSession_EmptyTargetRejects(t *testing.T) {
-	// An empty sessionID must never match — otherwise events from a worker
-	// whose session id we don't yet know would be forwarded blindly.
+	// An empty sessionID must never match — otherwise events from a worker whose
+	// session id we don't yet know would be forwarded blindly.
 	ev := map[string]any{"sessionID": "s1"}
 	if eventBelongsToSession(ev, "") {
 		t.Errorf("expected empty sessionID to reject")
@@ -199,10 +189,10 @@ func TestTerminalEventTypes_Present(t *testing.T) {
 	}
 }
 
-// The guard must probe a real CONTROL endpoint, not just `/`. A worker where
-// the root route returns 401 but the actual control API (POST /session) is
-// reachable unauthenticated is exactly the cross-worker exposure ADR-033
-// closes — the guard must refuse to start it even though `/` looks protected.
+// The guard must probe a real CONTROL endpoint, not just `/`. A worker where the
+// root route returns 401 but the actual control API (POST /session) is reachable
+// unauthenticated is exactly the cross-worker exposure ADR-033 closes — the
+// guard must refuse to start it even though `/` looks protected.
 func TestRequireOpenCodeAuthEnforced_FailsWhenControlEndpointReachableEvenIfRootIs401(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/session" {
