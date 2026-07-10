@@ -49,6 +49,9 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 	)
 	g.Add(
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
+		// Flush + stop the self-observability tee before OTel tears down (ADR-044
+		// part 4). No-op when the internal tee is disabled.
+		lifecycle.Closer("langy-internal-tee", deps.InternalTeeShutdown),
 		// The PID-1 orphan reaper: opencode's children (gh/git/npm) reparent to
 		// the manager on worker kill; only PID 1 may reap them. Fire-and-forget,
 		// stops when the group context cancels.

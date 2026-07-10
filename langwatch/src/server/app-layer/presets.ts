@@ -69,6 +69,7 @@ import {
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import { LangyMessageService } from "./langy/langy-message.service";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import type { SpawnAgentReactorHandle } from "../event-sourcing/pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
@@ -201,6 +202,15 @@ import { UsageService } from "./usage/usage.service";
  */
 export function getScenarioExecutionHandle(): ScenarioExecutionReactorHandle | null {
   return (globalForApp as any).__scenarioExecutionHandle ?? null;
+}
+
+/**
+ * Late-bound handle for the Langy spawnAgent reactor (ADR-044). The worker pool
+ * is created during worker startup and wired via `setPool()`, so the reactor
+ * (constructed at registry time) reaches the pool through this global.
+ */
+export function getLangySpawnAgentHandle(): SpawnAgentReactorHandle | null {
+  return (globalForApp as any).__langySpawnAgentHandle ?? null;
 }
 
 export function initializeWebApp(): App {
@@ -704,6 +714,7 @@ export function initializeDefaultApp(options?: {
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle =
     commands.scenarioExecutionHandle;
+  (globalForApp as any).__langySpawnAgentHandle = commands.spawnAgentHandle;
 
   // Langy (ADR-046): conversation reads come from the fold projection; writes
   // are dispatched via the langy pipeline commands. No Postgres spine.
@@ -1056,6 +1067,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         {
           sendMessage: noop,
           startAgentTurn: noop,
+          recordToolCallStarted: noop,
+          recordToolCallCompleted: noop,
+          recordAgentResponded: noop,
+          failAgentTurn: noop,
           reconcileAgentTurn: noop,
           archiveConversation: noop,
           updateConversationMetadata: noop,
@@ -1136,6 +1151,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       langy: {
         sendMessage: noop,
         startAgentTurn: noop,
+        recordToolCallStarted: noop,
+        recordToolCallCompleted: noop,
+        recordAgentResponded: noop,
+        failAgentTurn: noop,
         reconcileAgentTurn: noop,
         archiveConversation: noop,
         updateConversationMetadata: noop,
@@ -1146,6 +1165,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       scenarioExecutionHandle: {
         reactor: {
           name: "scenarioExecution",
+          options: { runIn: ["worker"] },
+          handle: async () => {
+            /* noop */
+          },
+        },
+        setPool: () => {
+          /* noop */
+        },
+      },
+      spawnAgentHandle: {
+        reactor: {
+          name: "spawnAgent",
           options: { runIn: ["worker"] },
           handle: async () => {
             /* noop */

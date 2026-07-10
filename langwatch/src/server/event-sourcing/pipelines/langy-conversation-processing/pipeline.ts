@@ -1,8 +1,13 @@
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   ArchiveConversationCommand,
+  FailAgentTurnCommand,
+  RecordAgentRespondedCommand,
+  RecordToolCallCompletedCommand,
+  RecordToolCallStartedCommand,
   ReconcileAgentTurnCommand,
   SendMessageCommand,
   StartAgentTurnCommand,
@@ -21,6 +26,22 @@ import type { LangyConversationProcessingEvent } from "./schemas/events";
 export interface LangyConversationProcessingPipelineDeps {
   langyConversationStateFoldStore: FoldProjectionStore<LangyConversationStateData>;
   langyMessageAppendStore: AppendStore<ClickHouseLangyMessageRecord>;
+  /**
+   * PR3 (ADR-044): reacts to `agent_turn_started` and dispatches the turn to
+   * the `LangyWorkerPool`. Optional so the PR2 shape (no reactor) still builds.
+   */
+  spawnAgentReactor?: ReactorDefinition<
+    LangyConversationProcessingEvent,
+    LangyConversationStateData
+  >;
+  /**
+   * PR3 (ADR-044): a delayed per-turn timer that reconciles a stalled turn to a
+   * terminal state when its heartbeat lapses. Optional for the same reason.
+   */
+  reconcileAgentTurnReactor?: ReactorDefinition<
+    LangyConversationProcessingEvent,
+    LangyConversationStateData
+  >;
 }
 
 /**
@@ -56,7 +77,7 @@ export interface LangyConversationProcessingPipelineDeps {
 export function createLangyConversationProcessingPipeline(
   deps: LangyConversationProcessingPipelineDeps,
 ) {
-  return definePipeline<LangyConversationProcessingEvent>()
+  let builder = definePipeline<LangyConversationProcessingEvent>()
     .withName("langy_conversation_processing")
     .withAggregateType("langy_conversation")
     .withFoldProjection(
@@ -70,9 +91,30 @@ export function createLangyConversationProcessingPipeline(
       new LangyMessageStorageMapProjection({
         store: deps.langyMessageAppendStore,
       }),
-    )
+    );
+
+  if (deps.spawnAgentReactor) {
+    builder = builder.withReactor(
+      "langyConversationState",
+      "spawnAgent",
+      deps.spawnAgentReactor,
+    );
+  }
+  if (deps.reconcileAgentTurnReactor) {
+    builder = builder.withReactor(
+      "langyConversationState",
+      "reconcileAgentTurn",
+      deps.reconcileAgentTurnReactor,
+    );
+  }
+
+  return builder
     .withCommand("sendMessage", SendMessageCommand)
     .withCommand("startAgentTurn", StartAgentTurnCommand)
+    .withCommand("recordToolCallStarted", RecordToolCallStartedCommand)
+    .withCommand("recordToolCallCompleted", RecordToolCallCompletedCommand)
+    .withCommand("recordAgentResponded", RecordAgentRespondedCommand)
+    .withCommand("failAgentTurn", FailAgentTurnCommand)
     .withCommand("reconcileAgentTurn", ReconcileAgentTurnCommand)
     .withCommand("archiveConversation", ArchiveConversationCommand)
     .withCommand("updateConversationMetadata", UpdateConversationMetadataCommand)

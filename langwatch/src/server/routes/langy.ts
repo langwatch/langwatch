@@ -43,7 +43,13 @@ import {
   reserveLangyGithubPrPermit,
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { extractOpenedPrLinks } from "~/server/services/langy/githubPrLinks";
+import { connection } from "~/server/redis";
+import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+import { createLangyTurnHandoffStore } from "~/server/services/langy/streaming/langyTurnHandoff";
+import {
+  createLangyTokenBuffer,
+  type LangyStreamEntry,
+} from "~/server/services/langy/streaming/langyTokenBuffer";
 import type { DomainError } from "~/server/app-layer/domain-error";
 import {
   LangyConversationNotFoundError,
@@ -405,39 +411,27 @@ langyRoute().post("/langy/chat", async (c) => {
     }
   }
 
-  if (!(await isAgentHealthy(agentUrl))) {
-    logger.error({ agentUrl }, "opencode agent failed preflight health check");
-    return c.json(
-      { error: "Agent is currently unavailable. Please try again shortly." },
-      { status: 503 },
-    );
-  }
+  // No more synchronous `isAgentHealthy` preflight: the turn is dispatched
+  // asynchronously and the liveness reconcile sweep (ADR-044) recovers a turn
+  // whose worker never comes up, so a preflight round-trip buys nothing.
 
   // Per-user daily PR cap, enforced by atomic permit reservation BEFORE we
-  // hand the worker a GitHub token. If we're over cap, we strip the token
-  // from `credentials` below so the worker physically cannot `gh pr create`
-  // (no GH_TOKEN env in the subprocess) — the system note is a courtesy
+  // hand the worker a GitHub token. If we're over cap, we strip the token from
+  // `credentials` below so the worker physically cannot `gh pr create` (no
+  // GH_TOKEN env in the subprocess) — the system note is a courtesy
   // explanation, not the authorisation boundary.
   //
-  // Permit lifecycle: once reserved, the slot is owned by THIS request and
-  // MUST be released on every exit path that didn't open a PR (read-only
-  // chat, agent fetch failure, stream error, client disconnect). A
-  // `permitReleased` latch + a `releasePermitIfUnused()` helper centralises
-  // the release so a future edit can't introduce a fresh leak. The earlier
-  // shape only released inside the stream executor's happy path — every
-  // pre-stream error (502, throw, disconnect) leaked one permit per turn.
+  // Permit lifecycle now spans the async turn (ADR-044): the RESERVE stays here
+  // (gate-keeping GH_TOKEN before the worker spawns), but the RECONCILE/RELEASE
+  // moves to the worker's runTurn, which sees the PRs the turn actually opened.
+  // The route only releases on an early exit that never starts a turn (the
+  // busy-guard below). Release still gates on `permit.reserved`, NOT
+  // `permit.allowed`: a Redis-down reserve returns `reserved: false`, and
+  // DECRing that path walks the shared daily counter negative (the
+  // erosion-via-blip cap-bypass Sergio caught on 2026-06-30).
   const permit = await reserveLangyGithubPrPermit({ userId: session.user.id });
-  let permitReleased = false;
-  // Release MUST gate on `permit.reserved`, NOT `permit.allowed`. The
-  // reserve-side returns `allowed: true, reserved: false` on Redis-down /
-  // Redis-blip paths (so a transient outage doesn't strip GitHub from
-  // every connected user). If we DECR on those paths, we walk the shared
-  // daily counter into negative space — the Lua floor at 0 then refunds N
-  // free permits to whoever calls reserve next. Sergio caught this as the
-  // erosion-via-blip cap-bypass on 2026-06-30.
-  const releasePermitIfUnused = async () => {
-    if (!permit.reserved || permitReleased) return;
-    permitReleased = true;
+  const releaseReservedPermit = async () => {
+    if (!permit.reserved) return;
     try {
       await releaseLangyGithubPrPermit({ userId: session.user.id });
     } catch (error) {
@@ -468,215 +462,188 @@ langyRoute().post("/langy/chat", async (c) => {
     delete (credentials as { githubLogin?: string }).githubLogin;
   }
 
-  let agentResponse: Response;
-  try {
-    agentResponse = await fetch(`${agentUrl}/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${internalSecret}`,
-      },
-      body: JSON.stringify({
-        conversationId: conversation.id,
-        prompt: userText,
-        system: capReachedNote
-          ? `${langyOverride}\n\n${capReachedNote}`
-          : langyOverride,
-        credentials,
-        // Forwarded for the agent to thread through to the gateway as the
-        // `model` parameter when its support lands. Today the agent ignores
-        // unrecognized fields, so this is effectively a wire-up that doesn't
-        // change behavior — but the user's picker choice rides through.
-        ...(modelOverride ? { modelOverride } : {}),
-      }),
-      signal: AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
-    });
-  } catch (error) {
-    // Transport failure (DNS, connection refused, timeout). The agent
-    // never accepted the work — no idempotency mechanism exists on its
-    // side, so this is deliberately NOT retried (see isAgentHealthy's
-    // comment above). The permit must be released before we surface the
-    // 502.
-    await releasePermitIfUnused();
-    logger.error({ error }, "opencode agent request transport failure");
-    return c.json({ error: "Agent request failed" }, { status: 502 });
-  }
-
-  if (!agentResponse.ok) {
-    // The agent answered, but with a non-2xx — same shape: no PR was
-    // opened so the permit must come back. Cancel the body so the
-    // connection doesn't stay held open (mirrors isAgentHealthy above).
-    void agentResponse.body?.cancel();
-    await releasePermitIfUnused();
-    logger.error(
-      { status: agentResponse.status },
-      "opencode agent request failed",
+  // Busy-guard: one turn in flight per conversation. Replaces the manager's
+  // Worker.tryClaim 409 — a turn in flight means the fold status is "running".
+  const current = await conversationService.getById({
+    id: conversation.id,
+    projectId,
+    userId: session.user.id,
+  });
+  if (current?.status === LANGY_CONVERSATION_STATUS.RUNNING) {
+    await releaseReservedPermit();
+    return c.json(
+      { error: "A response is already in progress for this conversation." },
+      { status: 409 },
     );
-    return c.json({ error: "Agent request failed" }, { status: 502 });
   }
 
-  // Record the agent-turn boundary. turnId correlates the started/finalized
-  // events; PR3's streaming worker drives status/progress heartbeats against it.
-  const { turnId } = await conversationService.startTurn({
+  if (!connection) {
+    await releaseReservedPermit();
+    logger.error("No Redis connection — cannot start langy turn");
+    return c.json(
+      { error: "Agent is temporarily unavailable. Please try again shortly." },
+      { status: 503 },
+    );
+  }
+
+  // Generate the turnId up front so the out-of-band spawn handoff is stashed
+  // BEFORE `agent_turn_started` is dispatched — otherwise the spawn reactor
+  // could fire and find no handoff. The handoff carries the session-scoped
+  // credentials + prompt + system; the durable event carries only ids (ADR-044).
+  const turnId = crypto.randomUUID();
+  const system = capReachedNote
+    ? `${langyOverride}\n\n${capReachedNote}`
+    : langyOverride;
+
+  const handoffStore = createLangyTurnHandoffStore({ redis: connection });
+  await handoffStore.stash({
     projectId,
     conversationId: conversation.id,
+    turnId,
+    actorUserId: session.user.id,
+    prompt: userText,
+    system,
+    ...(modelOverride ? { modelOverride } : {}),
+    credentials,
+    permitReserved: permit.reserved,
   });
 
-  const textId = crypto.randomUUID();
-  let fullText = "";
+  try {
+    await conversationService.startTurn({
+      projectId,
+      conversationId: conversation.id,
+      turnId,
+    });
+  } catch (error) {
+    await releaseReservedPermit();
+    logger.error({ error }, "failed to dispatch langy StartAgentTurn");
+    return c.json({ error: "Agent request failed" }, { status: 502 });
+  }
 
-  const stream = createUIMessageStream({
-    execute: async ({ writer }) => {
-      try {
-        writer.write({ type: "text-start", id: textId });
-
-        const reader = agentResponse.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        const handleLine = (line: string) => {
-          if (!line.trim()) return;
-          try {
-            const event = JSON.parse(line) as {
-              type: string;
-              part?: { type?: string; text?: string };
-              properties?: {
-                field?: string;
-                delta?: string;
-                part?: { type?: string; text?: string };
-              };
-            };
-            // Legacy shape (kept for older agent versions).
-            if (event.type === "text" && event.part?.text) {
-              fullText += event.part.text;
-              writer.write({
-                type: "text-delta",
-                delta: event.part.text,
-                id: textId,
-              });
-              return;
-            }
-            // OpenCode shape: text deltas arrive as message.part.delta with field=text.
-            if (
-              event.type === "message.part.delta" &&
-              event.properties?.field === "text" &&
-              typeof event.properties?.delta === "string"
-            ) {
-              fullText += event.properties.delta;
-              writer.write({
-                type: "text-delta",
-                delta: event.properties.delta,
-                id: textId,
-              });
-            }
-          } catch {
-            // Ignore malformed/partial JSON lines from the agent stream.
-          }
-        };
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          for (const line of lines) {
-            handleLine(line);
-          }
-        }
-        // Flush the trailing record when the stream ends without a final newline,
-        // otherwise the last delta is silently dropped and the reply is truncated.
-        if (buffer.trim()) handleLine(buffer);
-
-        writer.write({ type: "text-end", id: textId });
-
-        // Strip every Langy sentinel ([langy:connect-github] + [langy:progress:...])
-        // from the persisted body — they're wire-protocol for the live UI, not
-        // history. Persisting them re-triggers the connect card on history reload
-        // and pollutes GDPR exports. Keep `fullText` unchanged for PR-URL
-        // extraction below: PR URLs live in prose, not sentinels.
-        const persistedText = stripLangySentinels(fullText);
-        try {
-          // turn_finalized carries the WHOLE final answer as the source of
-          // truth (streamed tokens were never events). It feeds the assistant
-          // langy_messages row and the conversation fold's terminal state.
-          await conversationService.finalizeTurn({
-            projectId,
-            conversationId: conversation.id,
-            turnId,
-            parts: [{ type: "text", text: persistedText, role: "assistant" }],
-            outcome: "completed",
-          });
-        } catch (error) {
-          logger.error({ error }, "failed to finalize langy agent turn");
-        }
-
-        // Audit each PR the assistant actually OPENED this turn — links are
-        // cross-referenced against the skill's `[langy:progress:opened:...]`
-        // sentinels so merely *mentioning* a PR ("summarize PR #4751") doesn't
-        // forge a `pr_opened` audit entry. Parse from `fullText` (pre-strip) —
-        // sentinels are gone from `persistedText`.
-        //
-        // Counting reconciles: the pre-turn reserve was a single permit
-        // (gate-keeping GH_TOKEN). The actual PR count is whatever the
-        // worker opened. Bump the daily counter by the remaining N-1 PRs
-        // so the cap is per-PR, not per-turn. Sergio caught this as the
-        // "20/day actually means 20-turns/day, a runaway loop opens
-        // hundreds against one permit" bug on 2026-06-30.
-        try {
-          const links = extractOpenedPrLinks(fullText);
-          if (links.length > 0) {
-            // PR(s) opened — the up-front permit is consumed, latch it
-            // closed so the cleanup finally doesn't reverse the consumption.
-            permitReleased = true;
-            // Reconcile: if N>1 PRs landed, INCRBY (N - 1). If N==1, no-op.
-            if (links.length > 1 && permit.reserved) {
-              await recordExtraLangyGithubPrs({
-                userId: session.user.id,
-                extra: links.length - 1,
-              });
-            }
-          }
-          for (const link of links) {
-            await auditLog({
-              userId: session.user.id,
-              projectId,
-              action: "langy.github.pr_opened",
-              args: {
-                owner: link.owner,
-                repo: link.repo,
-                number: link.number,
-                url: link.url,
-              },
-            });
-          }
-        } catch (error) {
-          logger.error({ error }, "failed to record langy github PR usage");
-        }
-      } finally {
-        // Single release point for the executor's normal end AND any throw
-        // inside it. If a PR was opened, the earlier block latched
-        // `permitReleased = true` so this is a no-op; otherwise the slot
-        // is returned to the daily counter so a read-only chat doesn't
-        // burn a permit.
-        await releasePermitIfUnused();
-      }
-    },
-    onError: (error) => {
-      // Stream-level errors (writer.write throws, AbortController fires
-      // before the executor finally runs, etc.) land here. Release the
-      // permit on this path too — releasePermitIfUnused is idempotent so
-      // a duplicate call from the finally above is harmless.
-      void releasePermitIfUnused();
-      logger.error({ error }, "error in opencode agent stream");
-      return "An error occurred while processing your request.";
-    },
+  // Attach to the turn's live token stream (tail + follow). Same read path a
+  // refreshed client uses — the browser is unchanged (same UI-message envelope,
+  // same x-langy-conversation-id header). The permit reconcile/audit now happen
+  // on the worker (runTurn), not here.
+  const stream = attachTurnStream({
+    conversationId: conversation.id,
+    turnId,
   });
-
   const streamResponse = createUIMessageStreamResponse({ stream });
   const headers = new Headers(streamResponse.headers);
   headers.set("x-langy-conversation-id", conversation.id);
+  headers.set("x-langy-turn-id", turnId);
+  return new Response(streamResponse.body, {
+    status: streamResponse.status,
+    headers,
+  });
+});
+
+/**
+ * Bridge a turn's Redis token stream to a UI-message stream (ADR-044 part 3).
+ * Reads the buffered tail (`XRANGE`) then follows the live edge (`XREAD BLOCK`)
+ * from the last-seen id — one primitive, so a chunk emitted between replay and
+ * attach is never lost. Raw `delta` entries (which still carry the `[langy:*]`
+ * sentinels the existing client parses) become text-deltas; the separated
+ * status/progress/milestone entries are additive and ignored by today's client.
+ */
+function attachTurnStream({
+  conversationId,
+  turnId,
+}: {
+  conversationId: string;
+  turnId: string;
+}) {
+  return createUIMessageStream({
+    execute: async ({ writer }) => {
+      const textId = crypto.randomUUID();
+      writer.write({ type: "text-start", id: textId });
+
+      const emit = (entry: LangyStreamEntry) => {
+        if (entry.type === "delta") {
+          writer.write({ type: "text-delta", delta: entry.text, id: textId });
+        }
+      };
+
+      if (!connection) {
+        writer.write({ type: "text-end", id: textId });
+        return;
+      }
+
+      // A dedicated connection for the blocking follow read so it never wedges
+      // the shared client; closed in the finally below.
+      const blocking = connection.duplicate();
+      const buffer = createLangyTokenBuffer({
+        redis: connection,
+        blockingRedis: blocking,
+      });
+      // Bound the attach to the turn timeout so a wedged worker can't hold the
+      // response open forever; the reconcile sweep terminalizes the turn.
+      const abort = AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS);
+      try {
+        const { reads, lastId } = await buffer.readTail({
+          conversationId,
+          turnId,
+        });
+        let terminal = false;
+        for (const { entry } of reads) {
+          emit(entry);
+          if (entry.type === "end" || entry.type === "error") terminal = true;
+        }
+        if (!terminal) {
+          for await (const { entry } of buffer.follow({
+            conversationId,
+            turnId,
+            fromId: lastId,
+            signal: abort,
+          })) {
+            emit(entry);
+            if (entry.type === "end" || entry.type === "error") break;
+          }
+        }
+      } finally {
+        writer.write({ type: "text-end", id: textId });
+        blocking.disconnect();
+      }
+    },
+    onError: (error) => {
+      logger.error({ error }, "error attaching to langy turn stream");
+      return "An error occurred while processing your request.";
+    },
+  });
+}
+
+/**
+ * Refresh-resume: reattach to a turn without POSTing a new message (ADR-044).
+ * A refreshed client reconnects here with the turnId it was streaming. Finished
+ * turns are served from durable state (the assistant message), so no worker is
+ * spawned to reproduce an answer.
+ */
+langyRoute().get("/langy/conversations/:id/stream", async (c) => {
+  const projectId = c.req.query("projectId");
+  const guard = await requireSessionAndPermission(c, projectId);
+  if (guard.error) return guard.error;
+  const id = c.req.param("id");
+  const turnId = c.req.query("turnId");
+  if (!turnId) {
+    return c.json({ error: "Missing turnId" }, { status: 400 });
+  }
+  const convService = getApp().langy.conversations;
+  const conv = await convService.getById({
+    id,
+    projectId: projectId!,
+    userId: guard.session!.user.id,
+  });
+  if (!conv) {
+    return c.json(handledErrorBody(new LangyConversationNotFoundError(id)), {
+      status: 404,
+    });
+  }
+
+  const stream = attachTurnStream({ conversationId: id, turnId });
+  const streamResponse = createUIMessageStreamResponse({ stream });
+  const headers = new Headers(streamResponse.headers);
+  headers.set("x-langy-conversation-id", id);
+  headers.set("x-langy-turn-id", turnId);
   return new Response(streamResponse.body, {
     status: streamResponse.status,
     headers,

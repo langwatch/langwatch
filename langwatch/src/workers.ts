@@ -126,6 +126,33 @@ void verifyRedisReady().then(async () => {
     }
     logger.info("scenario processor ready");
 
+    // Langy turn executor (ADR-044): an in-process pool late-bound into the
+    // spawnAgent reactor (runIn: ["worker"]). Mirrors the scenario block above.
+    // The pool calls the Go langy-agent manager, bridges its NDJSON to the Redis
+    // token buffer, and drives durable milestones + finalize. The processor also
+    // boots the liveness reconcile sweep (deploy-survival backstop).
+    const { getLangySpawnAgentHandle } = await import(
+      "./server/app-layer/presets"
+    );
+    const { LangyWorkerPool } = await import(
+      "./server/services/langy/execution/langy-worker-pool"
+    );
+    const { startLangyTurnProcessor } = await import(
+      "./server/services/langy/execution/langy-turn.processor"
+    );
+    const { LANGY_WORKER } = await import(
+      "./server/services/langy/streaming/langy.streaming.constants"
+    );
+    const langyPool = new LangyWorkerPool({
+      concurrency: LANGY_WORKER.CONCURRENCY,
+    });
+    getLangySpawnAgentHandle()?.setPool(langyPool);
+    const langyProcessor = await startLangyTurnProcessor(langyPool);
+    if (langyProcessor) {
+      shutdownHandles.push(() => langyProcessor.close());
+    }
+    logger.info("langy turn processor ready");
+
     // Per-tenant enqueue-rate anomaly detector (surfaces runaway tenants on
     // the Ops page).
     const { startAnomalyWorker } = await import(
