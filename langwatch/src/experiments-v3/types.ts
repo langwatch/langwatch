@@ -265,6 +265,18 @@ export type SelectBestEvaluatorConfig = z.infer<
   typeof selectBestEvaluatorConfigSchema
 >;
 
+/**
+ * Pairwise (#5100) and N-way (#5101) evaluators compare target columns
+ * against each other, so they render as their own dedicated verdict column
+ * rather than as a chip attached to each target. Everywhere the per-target
+ * chip list is built, these must be filtered out — otherwise the same
+ * comparison appears once per column and reads as N separate evaluations.
+ */
+export const isComparisonEvaluator = (e: {
+  pairwise?: unknown;
+  selectBest?: unknown;
+}): boolean => !!e.pairwise || !!e.selectBest;
+
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
   evaluatorType: z.string(),
@@ -498,8 +510,12 @@ export type UIState = {
   selectedCell?: CellPosition;
   editingCell?: CellPosition;
   // Which target column is highlighted via clicking a variant name in a
-  // pairwise verdict (glow effect on that column's header).
+  // pairwise / N-way verdict (glow effect on that column's header).
   highlightedVariantTargetId?: string;
+  // Whether the highlighted column was the winner or a loser of the verdict
+  // that was clicked. Drives the glow colour and the "Won" badge on the
+  // target header. Undefined for a tie (or when nothing is highlighted).
+  highlightedVariantOutcome?: "won" | "lost";
   selectedRows: Set<number>;
   expandedEvaluator?: {
     targetId: string;
@@ -675,7 +691,10 @@ export type EvaluationsV3Actions = {
   closeOverlay: () => void;
   setSelectedCell: (cell: CellPosition | undefined) => void;
   setEditingCell: (cell: CellPosition | undefined) => void;
-  setHighlightedVariantTargetId: (targetId: string | undefined) => void;
+  setHighlightedVariantTargetId: (
+    targetId: string | undefined,
+    outcome?: "won" | "lost",
+  ) => void;
   toggleRowSelection: (row: number) => void;
   selectAllRows: (rowCount: number) => void;
   clearRowSelection: () => void;

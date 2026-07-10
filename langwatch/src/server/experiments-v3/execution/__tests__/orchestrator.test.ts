@@ -274,6 +274,73 @@ describe("orchestrator", () => {
         "target-2",
       ]);
     });
+
+    it("skips column-style n-way evaluator targets during phase 1", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "select-best-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-select-best-evaluator",
+        inputs: [
+          { identifier: "input", type: "str" },
+          { identifier: "golden", type: "str" },
+        ],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        selectBest: {
+          variants: ["target-1", "target-2"],
+          hasGoldenAnswer: true,
+          goldenField: "expected",
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      });
+      const datasetRows = createTestDataset(1);
+      const scope: ExecutionScope = { type: "full" };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells.map((cell) => cell.targetId)).toEqual([
+        "target-1",
+        "target-2",
+      ]);
+    });
+
+    describe("when an n-way evaluator is attached as a chip evaluator", () => {
+      // Regression (#5101): phase 1 excluded `e.pairwise` but not
+      // `e.selectBest`, so the n-way evaluator was attached to every
+      // per-target cell. Those cells have no `cell.selectBest`, so
+      // buildEvaluatorInputs fell through to the generic mapping branch,
+      // produced an empty input object, and nlpgo rejected the request
+      // with "evaluatorblock: Data required".
+      it("does not attach it to per-target phase 1 cells", () => {
+        const state = createTestState(2, 0);
+        state.evaluators.push({
+          id: "eval-select-best",
+          evaluatorType: "langevals/select_best_compare",
+          inputs: [],
+          mappings: {},
+          selectBest: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        } as EvaluationsV3State["evaluators"][0]);
+        const datasetRows = createTestDataset(1);
+        const scope: ExecutionScope = { type: "full" };
+
+        const cells = generateCells(state, datasetRows, scope);
+
+        expect(cells.length).toBeGreaterThan(0);
+        for (const cell of cells) {
+          expect(cell.evaluatorConfigs.map((e) => e.id)).not.toContain(
+            "eval-select-best",
+          );
+        }
+      });
+    });
   });
 
   describe("generatePairwiseCells", () => {

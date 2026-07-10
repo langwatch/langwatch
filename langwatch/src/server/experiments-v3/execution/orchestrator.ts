@@ -18,7 +18,10 @@ import type {
   FieldMapping,
   TargetConfig,
 } from "~/experiments-v3/types";
-import { isGoldenFieldSatisfied } from "~/experiments-v3/types";
+import {
+  isComparisonEvaluator,
+  isGoldenFieldSatisfied,
+} from "~/experiments-v3/types";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
@@ -192,21 +195,24 @@ export const generateCells = (
 
   // Determine which targets to process.
   //
-  // For target-/cell-scoped runs against a pairwise column-target, the
-  // pairwise verdict needs both variants' outputs to exist before Phase 2
-  // can synthesize the comparison cell. If the user hits Play on the
-  // Pairwise Compare column without first running the variants, expand
-  // the scope to include variantA + variantB so Phase 1 produces what
-  // Phase 2 needs. Without this, only the pairwise target is dispatched,
-  // Phase 1 skips it (column-style pairwise is always Phase-2-only),
+  // For target-/cell-scoped runs against a comparison column-target, the
+  // verdict needs every variant's output to exist before Phase 2 can
+  // synthesize the comparison cell. If the user hits Play on the Pairwise
+  // Compare / N-way Compare column without first running the variants,
+  // expand the scope to include those variants so Phase 1 produces what
+  // Phase 2 needs. Without this, only the comparison target is dispatched,
+  // Phase 1 skips it (column-style comparisons are always Phase-2-only),
   // and the run completes with 0 cells — visible to the user as a
   // silent no-op with "No verdict yet" everywhere.
   const expandPairwiseDeps = (id: string): string[] => {
     const t = state.targets.find((tg: TargetConfig) => tg.id === id);
-    if (!t || t.type !== "evaluator" || !t.pairwise) return [id];
-    const deps = [t.pairwise.variantA, t.pairwise.variantB].filter(
-      (v): v is string => !!v,
-    );
+    if (!t || t.type !== "evaluator") return [id];
+    const deps = (
+      t.pairwise
+        ? [t.pairwise.variantA, t.pairwise.variantB]
+        : (t.selectBest?.variants ?? [])
+    ).filter((v): v is string => !!v);
+    if (deps.length === 0) return [id];
     return Array.from(new Set([...deps, id]));
   };
 
@@ -238,12 +244,14 @@ export const generateCells = (
       );
       if (!targetConfig) continue;
 
-      // Skip column-style pairwise targets (#5100) in Phase 1 — they need
-      // both variants' outputs which are not yet available in a single
-      // per-target cell. Picked up by generatePairwiseCells in Phase 2.
-      // Strictly additive: only triggered when target.pairwise is set,
-      // which only happens for column-style langevals/pairwise_compare.
-      if (targetConfig.type === "evaluator" && targetConfig.pairwise) {
+      // Skip column-style comparison targets (pairwise #5100, N-way #5101)
+      // in Phase 1 — they need every variant's output, which is not yet
+      // available in a single per-target cell. Picked up by
+      // generatePairwiseCells / generateSelectBestCells in Phase 2.
+      if (
+        targetConfig.type === "evaluator" &&
+        isComparisonEvaluator(targetConfig)
+      ) {
         continue;
       }
 
@@ -251,10 +259,13 @@ export const generateCells = (
         rowIndex,
         targetId,
         targetConfig,
-        // Pairwise evaluators run in Phase 2 after both variants' outputs
-        // exist — they would crash here because candidate_b's output is not
-        // available within a single per-target cell. See generatePairwiseCells.
-        evaluatorConfigs: state.evaluators.filter((e) => !e.pairwise),
+        // Comparison evaluators (pairwise #5100, N-way #5101) run in Phase 2
+        // once every variant's output exists — they would crash here because
+        // the other candidates' outputs are not available within a single
+        // per-target cell. See generatePairwiseCells / generateSelectBestCells.
+        evaluatorConfigs: state.evaluators.filter(
+          (e) => !isComparisonEvaluator(e),
+        ),
         datasetEntry: {
           _datasetId: datasetId,
           ...datasetEntry,

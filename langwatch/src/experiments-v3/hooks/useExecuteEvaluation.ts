@@ -612,6 +612,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           // and the judge endpoint 400s with "candidate_a_output is
           // required".
           pairwise: t.pairwise,
+          // N-way column-targets (#5101): same reason as `pairwise` above.
+          selectBest: t.selectBest,
         })),
         evaluators: evaluators.map((e) => ({
           id: e.id,
@@ -620,6 +622,13 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           mappings: e.mappings,
           dbEvaluatorId: e.dbEvaluatorId,
           localEvaluatorConfig: e.localEvaluatorConfig,
+          // Comparison configs must survive the wire. The orchestrator keys
+          // its whole Phase-1/Phase-2 split off these two fields: without
+          // them every comparison evaluator looks like a plain per-row
+          // evaluator, gets attached to each target cell in Phase 1, and
+          // dispatches an empty input payload (nlpgo: "Data required").
+          pairwise: e.pairwise,
+          selectBest: e.selectBest,
         })),
         scope,
         concurrency,
