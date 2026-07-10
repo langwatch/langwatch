@@ -27,9 +27,18 @@ function makeFakes() {
         ),
       setCachedBaseline: vi
         .fn()
-        .mockImplementation(async (tid: string, v: number) => {
-          baselineCache.set(tid, v);
-        }),
+        .mockImplementation(
+          async ({
+            tenantId,
+            baseline,
+          }: {
+            tenantId: string;
+            baseline: number;
+            ttlSeconds?: number;
+          }) => {
+            baselineCache.set(tenantId, baseline);
+          },
+        ),
     } as any,
     baselineCache,
     anomalyState: {
@@ -324,11 +333,11 @@ describe("AnomalyDetector.tick", () => {
       const detector = new AnomalyDetector(fakes);
       await detector.tick();
 
-      expect(fakes.rateTracker.setCachedBaseline).toHaveBeenCalledWith(
-        "proj_new",
-        0,
-        INSUFFICIENT_DATA_RECHECK_SECONDS,
-      );
+      expect(fakes.rateTracker.setCachedBaseline).toHaveBeenCalledWith({
+        tenantId: "proj_new",
+        baseline: 0,
+        ttlSeconds: INSUFFICIENT_DATA_RECHECK_SECONDS,
+      });
       // The verdict re-check window must stay well under the 1h baseline TTL
       // so a ramping tenant gets its first baseline within minutes.
       expect(INSUFFICIENT_DATA_RECHECK_SECONDS).toBeLessThan(

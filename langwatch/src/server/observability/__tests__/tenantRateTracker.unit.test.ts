@@ -203,7 +203,7 @@ describe("TenantRateTracker", () => {
     it("round-trips a numeric baseline through Redis", async () => {
       const redis = fakeRedis();
       const tracker = new TenantRateTracker(redis, nowFn);
-      await tracker.setCachedBaseline("proj_acme", 42.5);
+      await tracker.setCachedBaseline({ tenantId: "proj_acme", baseline: 42.5 });
       expect(await tracker.getCachedBaseline("proj_acme")).toBeCloseTo(42.5);
     });
 
@@ -356,7 +356,11 @@ describe("TenantRateTracker", () => {
     };
     const tracker = new TenantRateTracker(redis, () => now);
 
-    await tracker.setCachedBaseline("proj_acme", 0, 600);
+    await tracker.setCachedBaseline({
+      tenantId: "proj_acme",
+      baseline: 0,
+      ttlSeconds: 600,
+    });
 
     expect(setCalls[0]).toEqual([
       "obs:tenant_rate:baseline:proj_acme",

@@ -245,18 +245,18 @@ export class AnomalyDetector {
       // long enough that a fleet of quiet tenants doesn't re-read its full
       // minute series every 1-minute tick, short enough that a ramping
       // tenant gets its first baseline within minutes.
-      await this.deps.rateTracker.setCachedBaseline(
+      await this.deps.rateTracker.setCachedBaseline({
         tenantId,
-        0,
-        INSUFFICIENT_DATA_RECHECK_SECONDS,
-      );
+        baseline: 0,
+        ttlSeconds: INSUFFICIENT_DATA_RECHECK_SECONDS,
+      });
       return null;
     }
 
     const baseline = percentile({ values: nonZero, p: 95 });
     // Cache whatever we compute (including below-floor values) so the
     // "too-quiet" tenants don't keep paying the series-read cost every tick.
-    await this.deps.rateTracker.setCachedBaseline(tenantId, baseline);
+    await this.deps.rateTracker.setCachedBaseline({ tenantId, baseline });
     return baseline < MIN_BASELINE_RATE ? null : baseline;
   }
 }

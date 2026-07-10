@@ -265,11 +265,15 @@ export class TenantRateTracker {
    * briefly so quiet tenants don't re-pay the full-series read every tick).
    * Called once per tenant per tick at most when the cache is cold or stale.
    */
-  async setCachedBaseline(
-    tenantId: string,
-    baseline: number,
-    ttlSeconds: number = TenantRateTracker.BASELINE_TTL_SECONDS,
-  ): Promise<void> {
+  async setCachedBaseline({
+    tenantId,
+    baseline,
+    ttlSeconds = TenantRateTracker.BASELINE_TTL_SECONDS,
+  }: {
+    tenantId: string;
+    baseline: number;
+    ttlSeconds?: number;
+  }): Promise<void> {
     try {
       await this.redis.set(
         `${TenantRateTracker.BASELINE_PREFIX}${tenantId}`,
