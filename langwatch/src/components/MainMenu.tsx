@@ -1,6 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { Activity, Anvil, Film, Flag, History, Shield  CalendarClock,} from "lucide-react";
+import { Activity, Anvil, Film, Flag, History, Shield, CalendarClock,} from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOpsPermission } from "../hooks/useOpsPermission";
