@@ -855,4 +855,246 @@ describe("extractInlineMediaFromEvent", () => {
       });
     });
   });
+
+  describe("when an event has an AI-SDK image part with a base64 data URI (typescript scenario SDK shape)", () => {
+    /** @scenario "MESSAGE_SNAPSHOT with an AI-SDK image part is accepted (201) and the image is externalized" */
+    it("extracts the bytes and rewrites image to /api/files/<projectId>/<id>", async () => {
+      const base64Payload = makeBase64Payload("WEBP_BYTES");
+      const storedId = "stored-image-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: "image/webp",
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        { type: "text", text: "What do you see in this image?" },
+        { type: "image", image: `data:image/webp;base64,${base64Payload}` },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(service.storeFromBytes).toHaveBeenCalledOnce();
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaType: "image/webp",
+          bytes: Buffer.from("WEBP_BYTES"),
+        }),
+      );
+
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
+      expect(content[0]).toEqual({
+        type: "text",
+        text: "What do you see in this image?",
+      });
+      expect(content[1]).toEqual({
+        type: "image",
+        image: `/api/files/proj-1/${storedId}`,
+      });
+
+      expect(refs).toHaveLength(1);
+      expect(refs[0]!.id).toBe(storedId);
+    });
+  });
+
+  describe("when an event has an AI-SDK image part with an http URL", () => {
+    /** @scenario "AI-SDK image parts with http(s) URLs validate and pass through unchanged" */
+    it("returns the event unchanged and does not call the storage service", async () => {
+      const service = makeService();
+      const event = makeEventWithContent([
+        { type: "image", image: "https://example.com/cat.png" },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(rewrittenEvent).toBe(event);
+      expect(refs).toHaveLength(0);
+      expect(service.storeFromBytes).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an event has an OpenAI file part with a data URI file_data (multimodal-files docs shape)", () => {
+    /** @scenario "MESSAGE_SNAPSHOT with an OpenAI file part is accepted (201) and the file is externalized preserving the filename" */
+    it("extracts the bytes and rewrites the part to a binary reference preserving the filename", async () => {
+      const base64Payload = makeBase64Payload("%PDF-1.4 fake pdf bytes");
+      const storedId = "stored-openai-file-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: "application/pdf",
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        { type: "text", text: "Please summarize this document." },
+        {
+          type: "file",
+          file: {
+            filename: "document.pdf",
+            file_data: `data:application/pdf;base64,${base64Payload}`,
+          },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(service.storeFromBytes).toHaveBeenCalledOnce();
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaType: "application/pdf",
+          bytes: Buffer.from("%PDF-1.4 fake pdf bytes"),
+        }),
+      );
+
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
+      const part = content[1] as {
+        type: string;
+        id: string;
+        url: string;
+        data: unknown;
+        filename: string;
+      };
+      expect(part.type).toBe("binary");
+      expect(part.id).toBe(storedId);
+      expect(part.url).toBe(`/api/files/proj-1/${storedId}`);
+      expect(part.data).toBeUndefined();
+      expect(part.filename).toBe("document.pdf");
+
+      expect(refs).toHaveLength(1);
+      expect(refs[0]!.id).toBe(storedId);
+    });
+  });
+
+  describe("when an event has an OpenAI file part with raw base64 file_data (OpenAI API wire format)", () => {
+    it("infers the mime type from the filename extension and externalizes the bytes", async () => {
+      const base64Payload = makeBase64Payload("%PDF-1.4 raw base64 pdf");
+      const storedId = "stored-raw-file-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: "application/pdf",
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "file",
+          file: { filename: "report.pdf", file_data: base64Payload },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaType: "application/pdf",
+          bytes: Buffer.from("%PDF-1.4 raw base64 pdf"),
+        }),
+      );
+
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
+      expect(content[0]).toMatchObject({
+        type: "binary",
+        url: `/api/files/proj-1/${storedId}`,
+        filename: "report.pdf",
+      });
+      expect(refs).toHaveLength(1);
+    });
+  });
+
+  describe("when an event has an OpenAI file part carrying only a provider file_id", () => {
+    /** @scenario "OpenAI file parts carrying only a provider file_id pass through unchanged" */
+    it("returns the event unchanged and does not call the storage service", async () => {
+      const service = makeService();
+      const event = makeEventWithContent([
+        { type: "file", file: { file_id: "file-abc123" } },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(rewrittenEvent).toBe(event);
+      expect(refs).toHaveLength(0);
+      expect(service.storeFromBytes).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an event has an OpenAI file part with an audio data URI", () => {
+    it("routes to the input_audio externalization path so the rewrite stays playable", async () => {
+      const base64Payload = makeBase64Payload("WAV_BYTES");
+      const storedId = "stored-openai-audio-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: "audio/wav",
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "file",
+          file: {
+            filename: "recording.wav",
+            file_data: `data:audio/wav;base64,${base64Payload}`,
+          },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaType: "audio/wav",
+          bytes: Buffer.from("WAV_BYTES"),
+        }),
+      );
+
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
+      expect(content[0]).toEqual({
+        type: "input_audio",
+        input_audio: {
+          data: undefined,
+          url: `/api/files/proj-1/${storedId}`,
+          mimeType: "audio/wav",
+        },
+      });
+      expect(refs).toHaveLength(1);
+    });
+  });
 });

@@ -203,11 +203,14 @@ async function processContentPart({
       };
 
       const original = part as Record<string, unknown>;
-      // AI-SDK file shape (`type:"file", mediaType, data`) is dispatched here
-      // by the visitor when mimeType is not audio/*. Normalise to a clean
+      // File shapes (AI-SDK `{type:"file", mediaType, data}` and OpenAI
+      // `{type:"file", file:{file_data, filename}}`) are dispatched here by
+      // the visitor when the mime type is not audio/*. Normalise to a clean
       // `binary` shape (the same canonical form the inputAudio handler
       // produces for the audio path) so the rewrite is not a chimera of
-      // `type:"file"` + binary externalised fields.
+      // `type:"file"` + binary externalised fields. The filename comes from
+      // the dispatched part — the visitor already resolved it from whichever
+      // nesting the wire shape used.
       const isFileShape = original.type === "file";
       const rewrittenPart = isFileShape
         ? {
@@ -216,8 +219,8 @@ async function processContentPart({
             id: stored.id,
             url: `/api/files/${projectId}/${stored.id}`,
             data: undefined,
-            ...(typeof original.filename === "string"
-              ? { filename: original.filename }
+            ...(typeof binPart.filename === "string"
+              ? { filename: binPart.filename }
               : {}),
           }
         : {
@@ -321,7 +324,8 @@ async function processContentPart({
       const original = part as Record<string, unknown>;
       const isFileShape = original.type === "file";
       const originalInputAudio =
-        typeof original.input_audio === "object" && original.input_audio !== null
+        typeof original.input_audio === "object" &&
+        original.input_audio !== null
           ? (original.input_audio as Record<string, unknown>)
           : {};
 

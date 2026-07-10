@@ -210,6 +210,36 @@ export function visitContentPart<R>(
     }
   }
 
+  // OpenAI ChatCompletion file part: {type:"file", file:{filename?, file_data?, file_id?}}.
+  // The scenario multimodal-files docs instruct exactly this shape for
+  // document attachments in simulated user messages. Bytes dispatch to
+  // `binary` (or `inputAudio` for audio mime types, keeping a playable shape
+  // downstream) so the extractor externalises them; a `file_id`-only part
+  // references a provider-hosted file with no bytes, so it falls through to
+  // `unknown` and passes along unchanged.
+  if (
+    o["type"] === "file" &&
+    typeof o["file"] === "object" &&
+    o["file"] !== null
+  ) {
+    const binPart = openAiFilePayloadToBinaryPart(
+      o["file"] as Record<string, unknown>,
+    );
+    if (binPart?.mimeType.startsWith("audio/")) {
+      return visitor.inputAudio
+        ? visitor.inputAudio({
+            data: binPart.data,
+            format: mediaTypeToAudioFormat(binPart.mimeType),
+            mimeType: binPart.mimeType,
+          })
+        : visitor.unknown?.(part);
+    }
+    if (binPart) {
+      return visitor.binary(binPart);
+    }
+    return visitor.unknown?.(part);
+  }
+
   // binary parts
   if (o["type"] === "binary" && o["mimeType"]) {
     return visitor.binary({
@@ -244,17 +274,13 @@ export function visitContentPart<R>(
     (o["image_url"] as Record<string, unknown>)["url"]
   ) {
     const url = (o["image_url"] as Record<string, unknown>)["url"] as string;
-    return visitor.imageUrl
-      ? visitor.imageUrl(url)
-      : visitor.unknown?.(part);
+    return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
   }
 
   // Bare {image:"..."} shape (rare; some fixtures)
   if (o["image"]) {
     const src = o["image"] as string;
-    return visitor.bareImage
-      ? visitor.bareImage(src)
-      : visitor.unknown?.(part);
+    return visitor.bareImage ? visitor.bareImage(src) : visitor.unknown?.(part);
   }
 
   return visitor.unknown?.(part);
@@ -376,6 +402,36 @@ export async function visitContentPartAsync<R>(
     }
   }
 
+  // OpenAI ChatCompletion file part: {type:"file", file:{filename?, file_data?, file_id?}}.
+  // The scenario multimodal-files docs instruct exactly this shape for
+  // document attachments in simulated user messages. Bytes dispatch to
+  // `binary` (or `inputAudio` for audio mime types, keeping a playable shape
+  // downstream) so the extractor externalises them; a `file_id`-only part
+  // references a provider-hosted file with no bytes, so it falls through to
+  // `unknown` and passes along unchanged.
+  if (
+    o["type"] === "file" &&
+    typeof o["file"] === "object" &&
+    o["file"] !== null
+  ) {
+    const binPart = openAiFilePayloadToBinaryPart(
+      o["file"] as Record<string, unknown>,
+    );
+    if (binPart?.mimeType.startsWith("audio/")) {
+      return visitor.inputAudio
+        ? visitor.inputAudio({
+            data: binPart.data,
+            format: mediaTypeToAudioFormat(binPart.mimeType),
+            mimeType: binPart.mimeType,
+          })
+        : visitor.unknown?.(part);
+    }
+    if (binPart) {
+      return visitor.binary(binPart);
+    }
+    return visitor.unknown?.(part);
+  }
+
   // binary parts
   if (o["type"] === "binary" && o["mimeType"]) {
     return visitor.binary({
@@ -410,20 +466,81 @@ export async function visitContentPartAsync<R>(
     (o["image_url"] as Record<string, unknown>)["url"]
   ) {
     const url = (o["image_url"] as Record<string, unknown>)["url"] as string;
-    return visitor.imageUrl
-      ? visitor.imageUrl(url)
-      : visitor.unknown?.(part);
+    return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
   }
 
   // Bare {image:"..."} shape (rare; some fixtures)
   if (o["image"]) {
     const src = o["image"] as string;
-    return visitor.bareImage
-      ? visitor.bareImage(src)
-      : visitor.unknown?.(part);
+    return visitor.bareImage ? visitor.bareImage(src) : visitor.unknown?.(part);
   }
 
   return visitor.unknown?.(part);
+}
+
+/**
+ * Decode an OpenAI ChatCompletion `file` payload ({file_data, filename,
+ * file_id}) into a binary part the visitor can dispatch. `file_data` accepts
+ * both a base64 data: URI (the shape the scenario multimodal-files docs
+ * instruct) and raw base64 (the OpenAI API wire format), resolving the mime
+ * type from the data URI header or the filename extension. Returns null when
+ * the payload carries no bytes (e.g. provider-hosted `file_id` references),
+ * so the caller can fall through to `unknown` and pass the part along
+ * unchanged.
+ */
+function openAiFilePayloadToBinaryPart(
+  file: Record<string, unknown>,
+): BinaryPart | null {
+  const fileData =
+    typeof file["file_data"] === "string" ? file["file_data"] : undefined;
+  if (!fileData) return null;
+  const filename =
+    typeof file["filename"] === "string" ? file["filename"] : undefined;
+
+  if (fileData.startsWith("data:")) {
+    const commaIdx = fileData.indexOf(",");
+    if (commaIdx === -1) return null;
+    const header = fileData.slice(5, commaIdx);
+    if (!header.endsWith(";base64")) return null;
+    const mimeType = header.slice(0, -7).toLowerCase();
+    if (!mimeType) return null;
+    return {
+      type: "binary",
+      mimeType,
+      data: fileData.slice(commaIdx + 1),
+      filename,
+    };
+  }
+
+  return {
+    type: "binary",
+    mimeType: mimeTypeFromFilename(filename),
+    data: fileData,
+    filename,
+  };
+}
+
+/**
+ * Mime type for a raw-base64 OpenAI `file_data` payload, inferred from the
+ * filename extension. Covers the document types the /api/files read path
+ * serves faithfully; everything else downgrades to a generic download.
+ */
+function mimeTypeFromFilename(filename: string | undefined): string {
+  const ext = filename?.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "pdf":
+      return "application/pdf";
+    case "txt":
+      return "text/plain";
+    case "csv":
+      return "text/csv";
+    case "json":
+      return "application/json";
+    case "md":
+      return "text/markdown";
+    default:
+      return "application/octet-stream";
+  }
 }
 
 /**

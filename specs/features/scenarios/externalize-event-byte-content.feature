@@ -411,6 +411,64 @@ Feature: Externalize event byte content to stored_objects
     Then the AG-UI schema rejects it as invalid
 
   # ---------------------------------------------------------------
+  # Ingest — image and file attachment wire acceptance (AC41)
+  # ---------------------------------------------------------------
+  #
+  # The documented multimodal shapes (scenario docs: multimodal-images,
+  # multimodal-files) must pass the route validator so the snapshot reaches
+  # the extractor. Same failure mode as the voice wire leg above: the
+  # typescript scenario SDK stopped JSON-stringifying array content, so
+  # AI-SDK image parts and OpenAI-shaped file parts arrive as raw arrays
+  # and were 400-rejected before extraction ever ran, leaving runs with
+  # zero conversation turns in the simulations UI.
+
+  @integration
+  Scenario: MESSAGE_SNAPSHOT with an AI-SDK image part is accepted (201) and the image is externalized
+    Given a MESSAGE_SNAPSHOT whose message content is [text, {type:"image", image:"data:image/webp;base64,..."}]
+    When the event is POSTed to /api/scenario-events
+    Then the request is accepted with 201 rather than 400 from schema validation
+    And the inline image bytes are externalized to a stored_objects row with media type image/webp
+    And the image part is rewritten to reference /api/files/<projectId>/<id>
+
+  @integration
+  Scenario: MESSAGE_SNAPSHOT with an OpenAI file part is accepted (201) and the file is externalized preserving the filename
+    Given a MESSAGE_SNAPSHOT whose message content is [text, {type:"file", file:{filename:"document.pdf", file_data:"data:application/pdf;base64,..."}}]
+    When the event is POSTed to /api/scenario-events
+    Then the request is accepted with 201 rather than 400 from schema validation
+    And the inline file bytes are externalized to a stored_objects row with media type application/pdf
+    And the part is rewritten to a binary reference carrying url and filename and no inline data
+
+  @unit
+  Scenario: AI-SDK file parts with a document mediaType validate on the wire
+    Given a MESSAGE_SNAPSHOT whose message content includes {type:"file", mediaType:"application/pdf", data:"<base64>"}
+    When the wire validator parses the event
+    Then the parse succeeds
+    And the part survives with its data intact for the extractor
+
+  @unit
+  Scenario: AI-SDK image parts with http(s) URLs validate and pass through unchanged
+    Given a message content part {type:"image", image:"https://example.com/cat.png"}
+    When the wire validator parses the event and the extractor processes the part
+    Then the parse succeeds
+    And no stored_objects row is created
+    And the part passes through unchanged
+
+  @unit
+  Scenario: Post-extraction image and file rewrites still validate on the wire
+    Given an image part rewritten to {type:"image", image:"/api/files/<projectId>/<id>"}
+    And a file part rewritten to {type:"binary", mimeType, url, id, filename}
+    When the wire validator parses a MESSAGE_SNAPSHOT carrying them
+    Then the parse succeeds
+
+  @unit
+  Scenario: OpenAI file parts carrying only a provider file_id pass through unchanged
+    Given a message content part {type:"file", file:{file_id:"file-abc123"}}
+    When the wire validator parses the event and the extractor processes the part
+    Then the parse succeeds
+    And no stored_objects row is created
+    And the part passes through unchanged
+
+  # ---------------------------------------------------------------
   # S3 client credential mode handling (AC40)
   # ---------------------------------------------------------------
   #
