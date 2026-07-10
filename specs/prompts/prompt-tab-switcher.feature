@@ -23,6 +23,9 @@
 #   - Tabs are never hidden, only narrowed. A hidden element has a zero-size
 #     rect, which corrupts @dnd-kit's drop-index maths, so hiding overflowed
 #     tabs — the way the traces-v2 lens strip does — would break drag-to-reorder.
+#   - A crowded tab gives up its close button rather than its name. Narrowing
+#     alone bought tabs the user could see but not tell apart. The close button
+#     comes back under the pointer, and the active tab always keeps it.
 #   - The switcher is the fallback, not the fix. It appears only once the strip
 #     really has run out of room, and lists every open prompt in that pane. While
 #     every tab fits, a dropdown would only list what is already on screen.
@@ -180,6 +183,72 @@ Rule: A switcher row shows the same state as its tab
     When I open the tab switcher
     Then the "summarizer" row offers no upgrade action
     And the "summarizer" row offers no close action
+
+Rule: A prompt in a folder shows its own name, not its folder
+
+  # A prompt has no folder column. Its folder is a prefix on its handle, so
+  # "onboarding/welcome" is the prompt "welcome" in the folder "onboarding".
+  # A shrunk tab has room for one of the two, and the useful one is the name.
+
+  Background:
+    Given I am logged into project "my-project"
+    And I have opened the prompt "onboarding/welcome"
+
+  @integration
+  Scenario: A tab shows the prompt's name without its folder
+    Then the "onboarding/welcome" tab reads "welcome"
+    And hovering the tab reveals the full "onboarding/welcome"
+
+  @integration
+  Scenario: A switcher row shows the folder alongside the name
+    Given I have also opened the prompt "support/welcome"
+    And the strip has run out of room
+    When I open the tab switcher
+    Then one row reads "onboarding/welcome"
+    And another row reads "support/welcome"
+
+  @integration
+  Scenario: A prompt outside any folder shows no folder
+    Given I have opened the prompt "classifier"
+    And the strip has run out of room
+    When I open the tab switcher
+    Then the "classifier" row shows no folder
+
+Rule: A crowded strip spends its width on names, not close buttons
+
+  # At its floor a tab has room for roughly three characters once the padding,
+  # the unsaved dot and the close button have taken their share, so two
+  # different prompts both read "str...". The close button is the part worth
+  # giving up: it comes back under the pointer, and the tab the user is closing
+  # is usually the one they are looking at.
+  #
+  # Nothing is lost to a keyboard user: the close control has never carried a
+  # tabindex, so it was never in the tab order to begin with. Tapping a tab on
+  # a touch device activates it, and the active tab always keeps its button.
+
+  Background:
+    Given I am logged into project "my-project"
+    And I have opened the prompts "summarizer" and "classifier"
+
+  @integration
+  Scenario: An inactive tab drops its close button once the strip is crowded
+    Given the strip has run out of room
+    And "summarizer" is the active prompt
+    Then the "classifier" tab offers no close action
+    And the "summarizer" tab still offers a close action
+
+  @integration
+  Scenario: Pointing at a crowded tab brings its close button back
+    Given the strip has run out of room
+    And "summarizer" is the active prompt
+    When I hover the "classifier" tab
+    Then the "classifier" tab offers a close action
+
+  @integration
+  Scenario: With room to spare every tab keeps its close button
+    Given every tab still fits in the strip
+    And "summarizer" is the active prompt
+    Then the "classifier" tab offers a close action
 
 Rule: Comparing prompts gives each pane its own switcher
 

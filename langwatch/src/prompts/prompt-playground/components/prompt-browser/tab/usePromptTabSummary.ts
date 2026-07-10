@@ -1,11 +1,16 @@
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
+import { NEW_PROMPT_TITLE } from "~/prompts/utils/promptHandle";
 import { useHasUnsavedChanges } from "../../../hooks/useHasUnsavedChanges";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { shouldShowVersionBadge } from "./shouldShowVersionBadge";
 
 /** What a prompt tab displays about itself, wherever it is displayed. */
 export interface PromptTabSummary {
-  /** The prompt's title, or a placeholder when it has never been saved. */
+  /**
+   * The prompt's full handle, folder and all (`onboarding/welcome`), or a
+   * placeholder when it has never been saved. Callers decide how much of it to
+   * show: a tab has room only for the name, a switcher row shows the folder too.
+   */
   title: string;
   hasUnsavedChanges: boolean;
   /** The version this tab has loaded. Absent on a prompt never saved. */
@@ -15,8 +20,6 @@ export interface PromptTabSummary {
   isOutdated: boolean;
   showVersionBadge: boolean;
 }
-
-export const NEW_PROMPT_TITLE = "New Prompt";
 
 /**
  * usePromptTabSummary

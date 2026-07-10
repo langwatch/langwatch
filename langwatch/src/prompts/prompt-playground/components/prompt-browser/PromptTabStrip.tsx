@@ -51,7 +51,11 @@ export function PromptTabStrip({
           <TabIdProvider key={tab.id} tabId={tab.id}>
             <DraggableTabsBrowser.Tab id={tab.id} height="full">
               <DraggableTabsBrowser.Trigger value={tab.id}>
-                <PromptBrowserTab dimmed={!isActiveWindow} />
+                <PromptBrowserTab
+                  dimmed={!isActiveWindow}
+                  isActive={tab.id === activeTabId}
+                  isCrowded={isStripOverflowing}
+                />
               </DraggableTabsBrowser.Trigger>
             </DraggableTabsBrowser.Tab>
           </TabIdProvider>

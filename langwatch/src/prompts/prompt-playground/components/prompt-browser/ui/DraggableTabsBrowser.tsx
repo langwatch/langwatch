@@ -298,7 +298,7 @@ function DraggableTabsTabBar({
   ...props
 }: DraggableTabsTabBarProps) {
   return (
-    <HStack gap={0} width="full" {...props}>
+    <HStack gap={0} width="full" flexWrap="nowrap" minWidth={0} {...props}>
       <SortableContext
         items={tabIds ?? []}
         strategy={horizontalListSortingStrategy}
@@ -309,6 +309,12 @@ function DraggableTabsTabBar({
           height="full"
           paddingY={0}
           background="none"
+          // The strip, the switcher and the toolbar share one row. Without
+          // this the switcher wraps onto a line of its own once the tabs fill
+          // the width, and the tab bar grows a second row.
+          flexWrap="nowrap"
+          alignItems="center"
+          minWidth={0}
         >
           {children}
         </Tabs.List>

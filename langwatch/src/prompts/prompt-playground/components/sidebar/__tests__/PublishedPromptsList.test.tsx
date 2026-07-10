@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDisplayHandle } from "../PublishedPromptsList";
+import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 
 describe("PublishedPromptsList", () => {
   describe("getDisplayHandle", () => {

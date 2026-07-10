@@ -7,6 +7,7 @@ import {
   MenuRoot,
   MenuTrigger,
 } from "~/components/ui/menu";
+import { getDisplayHandle, getPromptFolder } from "~/prompts/utils/promptHandle";
 import { usePromptTabSummary } from "../tab/usePromptTabSummary";
 
 interface PromptTabSwitcherProps {
@@ -71,18 +72,28 @@ export function PromptTabSwitcher({
     <MenuRoot lazyMount unmountOnExit>
       <MenuTrigger asChild>
         <Button
-          size="xs"
-          variant="ghost"
+          // `plain` keeps it a quiet count rather than a competing button: no
+          // background or border until hovered. It sits in the tab row, so it
+          // must never wrap out of it or grow the row's height.
+          size="2xs"
+          variant="plain"
           flexShrink={0}
-          gap={1}
-          paddingX={2}
-          color="fg.muted"
+          alignSelf="center"
+          height="24px"
+          minWidth="auto"
+          gap={0.5}
+          paddingX={1}
+          borderRadius="sm"
+          whiteSpace="nowrap"
+          color="fg.subtle"
+          _hover={{ background: "bg.subtle", color: "fg" }}
+          _focusVisible={{ outline: "none", background: "bg.subtle" }}
           aria-label={`Show ${tabIds.length} open prompts`}
         >
           <Text fontSize="xs" fontWeight="medium">
             {tabIds.length}
           </Text>
-          <LuChevronDown size={12} />
+          <LuChevronDown size={11} />
         </Button>
       </MenuTrigger>
       <MenuContent minWidth="240px">
@@ -119,6 +130,8 @@ function PromptTabSwitcherRow({
 }) {
   const { title, hasUnsavedChanges, versionNumber, showVersionBadge } =
     usePromptTabSummary(tabId);
+  const folder = getPromptFolder(title);
+  const name = getDisplayHandle(title);
 
   return (
     <MenuItem
@@ -127,9 +140,21 @@ function PromptTabSwitcherRow({
       aria-current={isActive ? "true" : undefined}
       fontWeight={isActive ? "semibold" : undefined}
     >
-      <HStack gap={2} width="full">
-        <Text textOverflow="ellipsis" whiteSpace="nowrap" overflow="hidden">
-          {title}
+      <HStack gap={2} width="full" minWidth={0}>
+        <Text
+          textOverflow="ellipsis"
+          whiteSpace="nowrap"
+          overflow="hidden"
+          minWidth={0}
+        >
+          {/* The row has room the tab does not, so it carries the folder. It is
+              what tells two prompts both named "welcome" apart. */}
+          {folder && (
+            <Text as="span" color="fg.subtle">
+              {folder}/
+            </Text>
+          )}
+          {name}
         </Text>
         {hasUnsavedChanges && (
           <Circle

@@ -363,6 +363,40 @@ describe("PromptTabSwitcher", () => {
     });
   });
 
+  describe("given prompts live in folders", () => {
+    /** @scenario A switcher row shows the folder alongside the name */
+    it("shows the folder alongside the name, telling same-named prompts apart", async () => {
+      givenTabs({
+        "tab-a": { title: "onboarding/welcome" },
+        "tab-b": { title: "support/welcome" },
+      });
+      renderSwitcher({ tabIds: ["tab-a", "tab-b"], activeTabId: "tab-a" });
+
+      const menu = await openSwitcher(2);
+
+      expect(
+        within(menu).getByRole("menuitem", { name: /onboarding\/welcome/ }),
+      ).toBeInTheDocument();
+      expect(
+        within(menu).getByRole("menuitem", { name: /support\/welcome/ }),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario A prompt outside any folder shows no folder */
+    it("shows no folder for a prompt that lives at the top level", async () => {
+      givenTabs({
+        classifier: { title: "classifier" },
+        "tab-b": { title: "support/welcome" },
+      });
+      renderSwitcher({ tabIds: ["classifier", "tab-b"] });
+
+      const menu = await openSwitcher(2);
+      const row = within(menu).getByRole("menuitem", { name: /classifier/ });
+
+      expect(row.textContent).not.toContain("/");
+    });
+  });
+
   describe("given prompts are split across two panes", () => {
     /** @scenario Splitting a prompt into a second pane splits the switchers */
     it("shows a switcher for the pane with two prompts and none for the pane with one", () => {
