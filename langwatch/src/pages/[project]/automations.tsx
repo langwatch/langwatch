@@ -16,6 +16,7 @@ import {
   Eye,
   Filter,
   HelpCircle,
+  Calendar,
   MoreVertical,
   Plus,
   Trash,
@@ -619,7 +620,7 @@ function Automations() {
               {/* Reports: send a digest on a schedule */}
               <VStack align="stretch" gap={3}>
                 <SectionHeader
-                  icon={<CalendarClock size={18} />}
+                  icon={<Calendar size={18} />}
                   title="Reports"
                   count={reports.length}
                   description="A report sends a dashboard, a graph, or a table of traces (e.g. the top errors) on a schedule — a recurring Slack or email digest."
