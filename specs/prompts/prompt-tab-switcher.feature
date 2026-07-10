@@ -6,8 +6,10 @@
 #   langwatch/src/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore.ts   (windows -> tabs state)
 #
 # Related specs:
-#   specs/traces-v2/lens-preset-groups.feature — the lens strip that solved the same
-#     "strip ran out of room" problem; its overflow menu is the shared component reused here
+#   specs/traces-v2/lens-preset-groups.feature — the lens strip that hit the same
+#     "strip ran out of room" problem, and solved it by hiding the tabs that overflow.
+#     This switcher deliberately does not hide tabs (see Decisions), so it shares the
+#     menu primitives rather than that overflow machinery.
 #
 # Motivation: opening several prompts fills the tab strip, and the extra tabs
 # scroll off the right edge behind a fade gradient. Nothing tells the user those
@@ -163,15 +165,19 @@ Rule: The tab strip keeps its existing behaviour
     Given I am logged into project "my-project"
     And I have opened more prompts than fit across the tab strip
 
-  @integration
+  # Both scenarios below are strip invariants, not switcher behaviour, and both
+  # turn on layout that jsdom does not compute: overflow scrolling needs real
+  # scroll metrics, and @dnd-kit's sensors need real layout rects. Asserting
+  # them against a mounted switcher would produce a green test that proves
+  # nothing. They are verified by hand against the running app, and tracked
+  # here so the invariants are not silently lost when the switcher lands
+  # beside the strip.
+
+  @e2e @unimplemented
   Scenario: Tabs still scroll rather than disappear
     Then every open prompt still has a tab in the strip
     And the strip scrolls horizontally to reach them
 
-  # Drag-reorder is exercised against a real pointer, not jsdom: @dnd-kit's
-  # sensors depend on layout rects that jsdom does not compute. Verified by
-  # hand against the running app, and tracked here so the invariant is not
-  # silently lost when the switcher lands beside the strip.
   @e2e @unimplemented
   Scenario: Every open prompt can still be dragged to reorder
     When I drag the "eval-judge" tab before the "summarizer" tab
