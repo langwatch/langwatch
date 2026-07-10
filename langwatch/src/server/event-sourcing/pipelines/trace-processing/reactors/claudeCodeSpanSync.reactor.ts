@@ -2,6 +2,7 @@ import {
   type ClaudeCodeLogRecordInput,
   CLAUDE_CODE_EVENT_SCOPE,
   CLAUDE_CODE_PII_ATTR,
+  CLAUDE_TURN_LOG_CAP,
   convertClaudeCodeTurnToSpans,
 } from "~/server/app-layer/traces/claude-code-log-to-span";
 import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
@@ -27,8 +28,17 @@ export interface ClaudeCodeSpanSyncReactorDeps {
     tenantId: string,
     traceId: string,
     occurredAtMs?: number,
+    limit?: number,
   ) => Promise<StoredLogRecordRow[]>;
   recordSpan: CommandDispatcher<RecordSpanCommandData>;
+  /**
+   * Maximum number of a turn's marked log records to convert in one pass. The
+   * reactor fetches `cap + 1` so it can both convert the first `cap` records and
+   * detect an overflowing turn, marking the root span truncated. Defaults to
+   * {@link CLAUDE_TURN_LOG_CAP}; the composition root resolves the operator
+   * override from `LANGWATCH_CLAUDE_TURN_LOG_CAP`.
+   */
+  turnLogCap?: number;
 }
 
 /**
@@ -38,10 +48,19 @@ export interface ClaudeCodeSpanSyncReactorDeps {
  * across export batches (request body at call START, anchor + response at call
  * END), so a per-batch converter can never rejoin them. The receiver instead
  * SAVES those logs to stored_log_records (marked), and this reactor — fired
- * after the trace fold on each claude log — re-reads the WHOLE turn's saved
- * logs and runs the converter over the complete set, dispatching the resulting
- * spans. Because trace == turn (`traceId = sha256(session:prompt)`), the set is
- * small and bounded.
+ * after the trace fold on each claude log — re-reads the turn's saved logs and
+ * runs the converter over the set, dispatching the resulting spans. Because
+ * trace == turn (`traceId = sha256(session:prompt)`), the set is one turn's
+ * worth of records.
+ *
+ * A turn is NOT assumed small: one pathological agentic turn can stream
+ * thousands of tool/model calls, which on `main` FIFO'd ~2,000+ recordLog jobs
+ * into one command group and made this reactor re-read and re-convert the whole
+ * growing set on every debounce. The reactor fetches at most `turnLogCap + 1`
+ * marked records (in turn order), converts the first `turnLogCap`, and stamps
+ * the root span truncated (via the converter's `truncation` arg) when the turn
+ * overflows, so a runaway turn can neither seize the worker nor build an
+ * unbounded span tree. See CLAUDE_TURN_LOG_CAP.
  *
  * Idempotent: the converter emits stable SpanIds + a completeness-nudged
  * StartTime, so re-firing as more of the turn arrives converges on the same
@@ -73,16 +92,38 @@ export function createClaudeCodeSpanSyncReactor(
 
       const tenantId = event.tenantId;
       const traceId = String(event.aggregateId);
+      const turnLogCap = deps.turnLogCap ?? CLAUDE_TURN_LOG_CAP;
 
       try {
         // The triggering log event's occurredAt bounds the stored_log_records
-        // scan to the turn's partitions instead of cold-scanning S3.
-        const rows = await deps.getMarkedClaudeCodeLogs(
+        // scan to the turn's partitions instead of cold-scanning S3. Fetch one
+        // past the cap so an overflowing turn is detectable while still bounding
+        // the read; a pathological turn never materializes all of its records.
+        const fetched = await deps.getMarkedClaudeCodeLogs(
           tenantId,
           traceId,
           event.occurredAt,
+          turnLogCap + 1,
         );
-        if (rows.length === 0) return;
+        if (fetched.length === 0) return;
+
+        // Bound the conversion: keep the first `turnLogCap` records (turn order)
+        // and record how many were dropped so the root span is marked truncated.
+        const droppedLogCount = Math.max(0, fetched.length - turnLogCap);
+        const rows =
+          droppedLogCount > 0 ? fetched.slice(0, turnLogCap) : fetched;
+        if (droppedLogCount > 0) {
+          logger.warn(
+            {
+              tenantId,
+              traceId,
+              turnLogCap,
+              convertedLogCount: rows.length,
+              droppedLogCount,
+            },
+            "Claude Code turn exceeded the per-turn conversion cap; converting the capped set and marking the trace truncated",
+          );
+        }
 
         const records = rows.map(rowToRecord);
         const piiRedactionLevel = resolvePiiLevel(rows);
@@ -96,7 +137,9 @@ export function createClaudeCodeSpanSyncReactor(
           const promptText = record.attrs.prompt;
           if (promptId && promptText) promptTextById.set(promptId, promptText);
         }
-        const spans = convertClaudeCodeTurnToSpans(records, promptTextById);
+        const spans = convertClaudeCodeTurnToSpans(records, promptTextById, {
+          droppedLogCount,
+        });
 
         for (const synthesized of spans) {
           await deps.recordSpan({
@@ -110,7 +153,13 @@ export function createClaudeCodeSpanSyncReactor(
         }
 
         logger.debug(
-          { tenantId, traceId, logCount: rows.length, spanCount: spans.length },
+          {
+            tenantId,
+            traceId,
+            logCount: rows.length,
+            droppedLogCount,
+            spanCount: spans.length,
+          },
           "Synced Claude Code logs into spans",
         );
       } catch (error) {

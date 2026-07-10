@@ -88,6 +88,7 @@ export class LogRecordStorageClickHouseRepository
     tenantId: string,
     traceId: string,
     occurredAtMs?: number,
+    limit?: number,
   ): Promise<StoredLogRecordRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
@@ -140,6 +141,18 @@ export class LogRecordStorageClickHouseRepository
     // Moving it out makes the inner read lightweight key columns only; the
     // outer SELECT then applies the filter to one row per (TenantId, TraceId,
     // SpanId, ProjectionId), which is the right scale to read the map at.
+    // Turn order: TimeUnixMs first, event.sequence as the tiebreaker so the
+    // per-turn LIMIT (when the caller caps the conversion) drops a deterministic
+    // suffix of the turn rather than an arbitrary one when two records share a
+    // millisecond. toInt64OrZero keeps a non-numeric / missing sequence stable.
+    const orderBy =
+      "ORDER BY TimeUnixMs ASC, toInt64OrZero(Attributes['event.sequence']) ASC";
+    // Bound the read when the caller caps the conversion (Claude turn log cap):
+    // the reactor requests cap+1 so it can detect overflow, and the LIMIT keeps
+    // a pathological turn from materializing every marked row.
+    const hasLimit = typeof limit === "number" && limit > 0;
+    const limitClause = hasLimit ? "LIMIT {limit:UInt64}" : "";
+
     const result = await client.query({
       query: `
         SELECT
@@ -163,7 +176,8 @@ export class LogRecordStorageClickHouseRepository
             GROUP BY TenantId, TraceId, SpanId, ProjectionId
           )
           AND Attributes[{kindKey:String}] != ''
-        ORDER BY TimeUnixMs ASC
+        ${orderBy}
+        ${limitClause}
       `,
       query_params: {
         tenantId,
@@ -171,6 +185,7 @@ export class LogRecordStorageClickHouseRepository
         kindKey: CLAUDE_CODE_KIND_ATTR,
         fromMs,
         toMs,
+        ...(hasLimit ? { limit } : {}),
       },
       format: "JSONEachRow",
     });
