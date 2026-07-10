@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Bot, CheckCircle, FileText, Swords, Trophy } from "lucide-react";
+import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -78,7 +78,9 @@ const targetTypes: Array<{
   },
   {
     type: "nway",
-    icon: Trophy,
+    // Swords, like Pairwise: the icon identifies "a comparison between
+    // columns". A Trophy is reserved for declaring the winner of one.
+    icon: Swords,
     title: "N-way Compare",
     description:
       "Judge 2+ prior columns in one call and pick the best — golden reference optional",

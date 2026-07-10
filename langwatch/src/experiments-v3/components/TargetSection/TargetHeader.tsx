@@ -335,9 +335,10 @@ export const TargetHeader = memo(function TargetHeader({
       );
     }
     if (target.type === "evaluator") {
-      // Pairwise column-targets use the Swords icon (matches the picker card)
-      // so the column visually reads as "head-to-head comparison" rather than
-      // a generic evaluator.
+      // Comparison column-targets use the Swords icon (matching their picker
+      // cards) so the column reads as "a comparison between columns" rather
+      // than a generic evaluator. The Trophy is reserved for declaring the
+      // winner of a comparison — the verdict cell and the "Won" badge below.
       if (target.pairwise) {
         return (
           <span data-testid="icon-pairwise">
@@ -345,11 +346,10 @@ export const TargetHeader = memo(function TargetHeader({
           </span>
         );
       }
-      // N-way (#5101) select-best sibling — matches its picker card's Trophy.
       if (target.selectBest) {
         return (
           <span data-testid="icon-nway">
-            <Trophy size={12} />
+            <Swords size={12} />
           </span>
         );
       }

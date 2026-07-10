@@ -1,5 +1,5 @@
 import { Box, HStack, Icon, Link, Text } from "@chakra-ui/react";
-import { Trophy } from "lucide-react";
+import { Swords } from "lucide-react";
 import {
   type ColumnDef,
   type ColumnSizingState,
@@ -1497,7 +1497,7 @@ export function EvaluationsV3Table({
               const evaluator = meta?.evaluatorsMap.get(evaluatorId);
               return (
                 <HStack gap={1.5}>
-                  <Icon as={Trophy} color="yellow.fg" boxSize="14px" />
+                  <Icon as={Swords} color="fg.muted" boxSize="14px" />
                   <Text fontSize="13px" fontWeight="medium">
                     {evaluator?.localEvaluatorConfig?.name ?? "Pairwise"}
                   </Text>
@@ -1547,7 +1547,7 @@ export function EvaluationsV3Table({
               const evaluator = meta?.evaluatorsMap.get(evaluatorId);
               return (
                 <HStack gap={1.5}>
-                  <Icon as={Trophy} color="yellow.fg" boxSize="14px" />
+                  <Icon as={Swords} color="fg.muted" boxSize="14px" />
                   <Text fontSize="13px" fontWeight="medium">
                     {evaluator?.localEvaluatorConfig?.name ?? "N-way Compare"}
                   </Text>

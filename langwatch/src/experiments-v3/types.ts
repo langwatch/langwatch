@@ -394,7 +394,7 @@ export const targetConfigSchema = z
      * N-way select-best config for column-style N-way targets (#5101).
      * Sibling of `pairwise` above — set only when type === "evaluator" AND
      * the underlying evaluator is langevals/select_best_compare. Used by
-     * the target-column icon to render a Trophy instead of the generic
+     * the target-column icon to render Swords instead of the generic
      * evaluator checkmark, and by the "reuse existing N-way" flow so
      * clicking the picker card returns to the same target.
      */
