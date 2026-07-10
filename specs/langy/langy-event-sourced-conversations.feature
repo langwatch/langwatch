@@ -55,7 +55,14 @@ Feature: Langy conversations are an event-sourced projection
     Given an agent turn is streaming its answer token by token
     When 500 tokens have streamed
     Then no per-token event is written to the event log
-    And only meaningful transitions and heartbeats are recorded as events
+    And only meaningful transitions are recorded as durable events
+
+  Scenario: Status and progress are ephemeral, never durable
+    Given an agent turn is reporting status and progress while it runs
+    When the turn ends
+    Then no status or progress signal was written to the event log
+    And none reached the conversation fold or the message rows
+    And they left no residue once the turn finished
 
   Scenario: The finalized turn carries the whole answer as the source of truth
     Given an agent turn has streamed to completion

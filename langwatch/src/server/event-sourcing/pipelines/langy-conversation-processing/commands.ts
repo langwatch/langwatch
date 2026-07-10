@@ -9,8 +9,6 @@ import {
   langyConversationMetadataUpdatedEventDataSchema,
   langyAgentTurnStartedEventDataSchema,
   langyMessageSentEventDataSchema,
-  langyProgressReportedEventDataSchema,
-  langyStatusReportedEventDataSchema,
   langyTurnFinalizedEventDataSchema,
 } from "./schemas/events";
 
@@ -55,40 +53,9 @@ export const StartAgentTurnCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.conversationId}:turn-start:${d.turnId}`,
 });
 
-/** ReportStatus → status_reported (worker heartbeat; PR3 caller). */
-export const ReportStatusCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.REPORT_STATUS,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.STATUS_REPORTED,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.STATUS_REPORTED,
-  aggregateType: "langy_conversation",
-  schema: langyStatusReportedEventDataSchema,
-  aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:status:${d.turnId ?? ""}:${d.occurredAt}`,
-  spanAttributes: (d) => ({
-    "payload.conversation.id": d.conversationId,
-    "payload.status": d.status,
-  }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.conversationId}:status:${d.turnId ?? ""}:${d.occurredAt}`,
-});
-
-/** ReportProgress → progress_reported (worker progress; PR3 caller). */
-export const ReportProgressCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.REPORT_PROGRESS,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.PROGRESS_REPORTED,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.PROGRESS_REPORTED,
-  aggregateType: "langy_conversation",
-  schema: langyProgressReportedEventDataSchema,
-  aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:progress:${d.turnId ?? ""}:${d.occurredAt}`,
-  spanAttributes: (d) => ({
-    "payload.conversation.id": d.conversationId,
-  }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.conversationId}:progress:${d.turnId ?? ""}:${d.occurredAt}`,
-});
+// NOTE: status_reported / progress_reported are EPHEMERAL signals, not durable
+// commands — they are published to the Redis buffer via LangyEphemeralPublisher
+// (see ../ephemeral.ts), never dispatched through this pipeline (ADR-046).
 
 /** ReconcileAgentTurn → turn_finalized (the whole final answer, source of truth). */
 export const ReconcileAgentTurnCommand = defineCommand({

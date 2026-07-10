@@ -16,8 +16,6 @@ import type {
   LangyConversationArchivedEvent,
   LangyConversationMetadataUpdatedEvent,
   LangyMessageSentEvent,
-  LangyProgressReportedEvent,
-  LangyStatusReportedEvent,
   LangyToolCallCompletedEvent,
   LangyToolCallStartedEvent,
   LangyTurnFinalizedEvent,
@@ -30,8 +28,6 @@ import {
   LangyConversationArchivedEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
   LangyMessageSentEventSchema,
-  LangyProgressReportedEventSchema,
-  LangyStatusReportedEventSchema,
   LangyToolCallCompletedEventSchema,
   LangyToolCallStartedEventSchema,
   LangyTurnFinalizedEventSchema,
@@ -57,9 +53,14 @@ export interface LangyConversationStateData {
   SharedById: string | null;
   MessageCount: number;
   LastActivityAt: number | null;
-  /** Liveness signal from status/progress/tool heartbeats during a turn. */
-  LastHeartbeatAt: number | null;
-  /** The turn currently in flight, or null when idle. */
+  /**
+   * The turn currently in flight, or null when idle. Set by the durable
+   * `agent_turn_started`, cleared by `turn_finalized` / `agent_turn_*`.
+   * Turn LIVENESS (is the worker still alive?) is NOT tracked here — it is a
+   * purely ephemeral concern that lives in the Redis signal buffer (ADR-046);
+   * PR3's orphan detection compares "CurrentTurnId set" against ephemeral
+   * heartbeat recency.
+   */
   CurrentTurnId: string | null;
   LastError: string | null;
   ArchivedAt: number | null;
@@ -81,8 +82,6 @@ const langyConversationEvents = [
   LangyAgentRespondedEventSchema,
   LangyAgentTurnCompletedEventSchema,
   LangyAgentTurnFailedEventSchema,
-  LangyStatusReportedEventSchema,
-  LangyProgressReportedEventSchema,
   LangyTurnFinalizedEventSchema,
   LangyConversationArchivedEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
@@ -131,7 +130,6 @@ export class LangyConversationStateFoldProjection
       SharedById: null,
       MessageCount: 0,
       LastActivityAt: null,
-      LastHeartbeatAt: null,
       CurrentTurnId: null,
       LastError: null,
       ArchivedAt: null,
@@ -183,10 +181,12 @@ export class LangyConversationStateFoldProjection
       Status: this.nextStatus(state, LANGY_CONVERSATION_STATUS.RUNNING),
       CurrentTurnId: event.data.turnId,
       LastActivityAt: event.occurredAt,
-      LastHeartbeatAt: event.occurredAt,
     };
   }
 
+  // Tool calls are DURABLE, meaningful transitions (an audit of what the agent
+  // did during the turn); they bump LastActivityAt. They are NOT liveness
+  // heartbeats — those are ephemeral (status/progress) and never reach the fold.
   handleLangyConversationToolCallStarted(
     event: LangyToolCallStartedEvent,
     state: LangyConversationStateData,
@@ -194,7 +194,7 @@ export class LangyConversationStateFoldProjection
     return {
       ...state,
       ConversationId: state.ConversationId || event.data.conversationId,
-      LastHeartbeatAt: event.occurredAt,
+      LastActivityAt: event.occurredAt,
     };
   }
 
@@ -205,7 +205,7 @@ export class LangyConversationStateFoldProjection
     return {
       ...state,
       ConversationId: state.ConversationId || event.data.conversationId,
-      LastHeartbeatAt: event.occurredAt,
+      LastActivityAt: event.occurredAt,
     };
   }
 
@@ -217,7 +217,6 @@ export class LangyConversationStateFoldProjection
       ...state,
       ConversationId: state.ConversationId || event.data.conversationId,
       LastActivityAt: event.occurredAt,
-      LastHeartbeatAt: event.occurredAt,
     };
   }
 
@@ -245,30 +244,6 @@ export class LangyConversationStateFoldProjection
       CurrentTurnId: null,
       LastError: event.data.error,
       LastActivityAt: event.occurredAt,
-    };
-  }
-
-  handleLangyConversationStatusReported(
-    event: LangyStatusReportedEvent,
-    state: LangyConversationStateData,
-  ): LangyConversationStateData {
-    // Heartbeat only — the reported status string is a transient live-UI label,
-    // not the lifecycle Status.
-    return {
-      ...state,
-      ConversationId: state.ConversationId || event.data.conversationId,
-      LastHeartbeatAt: event.occurredAt,
-    };
-  }
-
-  handleLangyConversationProgressReported(
-    event: LangyProgressReportedEvent,
-    state: LangyConversationStateData,
-  ): LangyConversationStateData {
-    return {
-      ...state,
-      ConversationId: state.ConversationId || event.data.conversationId,
-      LastHeartbeatAt: event.occurredAt,
     };
   }
 

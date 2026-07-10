@@ -40,9 +40,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.langy_conversations
 
     MessageCount    UInt32                 DEFAULT 0,
     LastActivityAt  Nullable(DateTime64(3)) CODEC(Delta(8), ZSTD(1)),
-    -- Liveness heartbeat from status/progress/tool signals during a turn.
-    LastHeartbeatAt Nullable(DateTime64(3)) CODEC(Delta(8), ZSTD(1)),
-    -- The turn currently in flight, or NULL when idle.
+    -- The turn currently in flight, or NULL when idle. Turn LIVENESS is NOT
+    -- stored here — it is an ephemeral, Redis-only concern (ADR-046).
     CurrentTurnId   Nullable(String)       CODEC(ZSTD(1)),
     LastError       Nullable(String)       CODEC(ZSTD(1)),
 

@@ -208,22 +208,22 @@ describe("LangyConversationStateFoldProjection", () => {
     });
   });
 
-  describe("given ephemeral heartbeats during a turn", () => {
-    it("only advances the heartbeat, leaving durable state untouched", () => {
+  describe("given a tool call during a turn (a durable transition)", () => {
+    it("bumps activity without adding a message or a heartbeat field", () => {
       const base = fold.apply(fold.init(), messageSent({}, 1000));
       const state = fold.apply(
         base,
         event(
-          "STATUS_REPORTED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.STATUS_REPORTED,
-          { status: "searching traces" },
+          "TOOL_CALL_STARTED",
+          LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_STARTED,
+          { turnId: "turn-1", toolCallId: "tc-1", toolName: "search_traces" },
           1200,
         ),
       );
 
-      expect(state.LastHeartbeatAt).toBe(1200);
+      expect(state.LastActivityAt).toBe(1200);
       expect(state.MessageCount).toBe(1);
-      expect(state.Status).toBe(LANGY_CONVERSATION_STATUS.ACTIVE);
+      expect(state).not.toHaveProperty("LastHeartbeatAt");
     });
   });
 });

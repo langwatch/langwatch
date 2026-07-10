@@ -162,50 +162,11 @@ export type LangyAgentTurnFailedEvent = z.infer<
   typeof LangyAgentTurnFailedEventSchema
 >;
 
-/**
- * StatusReported — a liveness/status heartbeat from the worker during a turn.
- * Only refreshes the fold's heartbeat + status label; not a token, not content.
- */
-export const langyStatusReportedEventDataSchema = z.object({
-  conversationId: z.string(),
-  turnId: z.string().optional(),
-  status: z.string(),
-});
-export type LangyStatusReportedEventData = z.infer<
-  typeof langyStatusReportedEventDataSchema
->;
-
-export const LangyStatusReportedEventSchema = EventSchema.extend({
-  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.STATUS_REPORTED),
-  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.STATUS_REPORTED),
-  data: langyStatusReportedEventDataSchema,
-});
-export type LangyStatusReportedEvent = z.infer<
-  typeof LangyStatusReportedEventSchema
->;
-
-/**
- * ProgressReported — a coarse progress heartbeat from the worker during a turn.
- * Refreshes the fold's heartbeat only; the progress payload is for the live UI.
- */
-export const langyProgressReportedEventDataSchema = z.object({
-  conversationId: z.string(),
-  turnId: z.string().optional(),
-  message: z.string().optional(),
-  progress: z.number().optional(),
-});
-export type LangyProgressReportedEventData = z.infer<
-  typeof langyProgressReportedEventDataSchema
->;
-
-export const LangyProgressReportedEventSchema = EventSchema.extend({
-  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.PROGRESS_REPORTED),
-  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.PROGRESS_REPORTED),
-  data: langyProgressReportedEventDataSchema,
-});
-export type LangyProgressReportedEvent = z.infer<
-  typeof LangyProgressReportedEventSchema
->;
+// NOTE: `status_reported` and `progress_reported` are EPHEMERAL signals, not
+// durable events — they never reach `event_log`, the fold, or the map
+// projection (ADR-046). Their PAYLOAD schemas live in `./ephemeral.ts` (the
+// signal contract PR3's Redis transport implements), not here, because these
+// schemas are for durable event-sourcing events.
 
 /**
  * TurnFinalized — the whole final answer of an agent turn, the source of truth.
@@ -290,8 +251,6 @@ export type LangyConversationProcessingEvent =
   | LangyAgentRespondedEvent
   | LangyAgentTurnCompletedEvent
   | LangyAgentTurnFailedEvent
-  | LangyStatusReportedEvent
-  | LangyProgressReportedEvent
   | LangyTurnFinalizedEvent
   | LangyConversationArchivedEvent
   | LangyConversationMetadataUpdatedEvent;
@@ -304,8 +263,6 @@ export {
   isLangyAgentRespondedEvent,
   isLangyAgentTurnCompletedEvent,
   isLangyAgentTurnFailedEvent,
-  isLangyStatusReportedEvent,
-  isLangyProgressReportedEvent,
   isLangyTurnFinalizedEvent,
   isLangyConversationArchivedEvent,
   isLangyConversationMetadataUpdatedEvent,

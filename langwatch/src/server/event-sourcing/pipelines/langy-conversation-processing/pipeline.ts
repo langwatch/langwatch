@@ -4,8 +4,6 @@ import type { AppendStore } from "../../projections/mapProjection.types";
 import {
   ArchiveConversationCommand,
   ReconcileAgentTurnCommand,
-  ReportProgressCommand,
-  ReportStatusCommand,
   SendMessageCommand,
   StartAgentTurnCommand,
   UpdateConversationMetadataCommand,
@@ -43,7 +41,6 @@ export interface LangyConversationProcessingPipelineDeps {
  * Commands (PR2 write surface):
  * - sendMessage: user turn -> message_sent
  * - startAgentTurn: agent turn begins -> agent_turn_started
- * - reportStatus / reportProgress: worker heartbeats -> status/progress_reported
  * - reconcileAgentTurn: streamed answer completes -> turn_finalized
  * - archiveConversation: soft-delete -> conversation_archived
  * - updateConversationMetadata: rename/share -> conversation_metadata_updated
@@ -51,6 +48,10 @@ export interface LangyConversationProcessingPipelineDeps {
  * The turn-lifecycle events (tool_call_*, agent_responded,
  * agent_turn_completed/failed) are defined with fold handlers but their
  * dispatching worker/reactor is PR3.
+ *
+ * Status/progress are EPHEMERAL signals (ADR-046): NOT commands and NOT durable
+ * events — they are published to a Redis buffer via LangyEphemeralPublisher
+ * (./ephemeral.ts), never through this pipeline. PR3 wires that transport.
  */
 export function createLangyConversationProcessingPipeline(
   deps: LangyConversationProcessingPipelineDeps,
@@ -72,8 +73,6 @@ export function createLangyConversationProcessingPipeline(
     )
     .withCommand("sendMessage", SendMessageCommand)
     .withCommand("startAgentTurn", StartAgentTurnCommand)
-    .withCommand("reportStatus", ReportStatusCommand)
-    .withCommand("reportProgress", ReportProgressCommand)
     .withCommand("reconcileAgentTurn", ReconcileAgentTurnCommand)
     .withCommand("archiveConversation", ArchiveConversationCommand)
     .withCommand("updateConversationMetadata", UpdateConversationMetadataCommand)
