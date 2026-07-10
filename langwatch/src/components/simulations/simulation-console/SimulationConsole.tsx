@@ -1,5 +1,5 @@
 import { Box, Circle, Code, HStack, Text, VStack } from "@chakra-ui/react";
-import React from "react";
+import type React from "react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioResults } from "~/server/scenarios/schemas";
 import { CriteriaDetails } from "./CriteriaDetails";

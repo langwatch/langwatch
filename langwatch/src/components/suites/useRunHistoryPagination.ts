@@ -65,7 +65,7 @@ export function useRunHistoryPagination({
 
   // Accumulate pages as data arrives
   useEffect(() => {
-    if (!runDataResult || !runDataResult.changed) return;
+    if (!runDataResult?.changed) return;
 
     if (cursor === undefined) {
       setPages([runDataResult]);

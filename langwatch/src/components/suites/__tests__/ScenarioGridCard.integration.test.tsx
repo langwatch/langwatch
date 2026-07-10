@@ -16,8 +16,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioGridCard } from "../ScenarioGridCard";
 import { makeScenarioRunData } from "./test-helpers";
 
+const prefetchMock = vi.hoisted(() => vi.fn());
 vi.mock("../usePrefetchRunState", () => ({
-  usePrefetchRunState: () => vi.fn(),
+  usePrefetchRunState: () => prefetchMock,
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -156,6 +157,31 @@ describe("<ScenarioGridCard/>", () => {
       expect(
         screen.getByText("Staging Agent: Refund Flow (#2)"),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("when the user hovers the card", () => {
+    /** @scenario "Hovering a run pre-loads its details" */
+    it("prefetches the run state for the hovered run", async () => {
+      prefetchMock.mockClear();
+      const user = userEvent.setup();
+      render(
+        <ScenarioGridCard
+          scenarioRun={makeScenarioRunData({
+            name: "Login Flow",
+            scenarioRunId: "run_hover",
+          })}
+          targetName={null}
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.hover(
+        screen.getByRole("button", { name: "View details for Login Flow" }),
+      );
+
+      expect(prefetchMock).toHaveBeenCalledWith("run_hover");
     });
   });
 });

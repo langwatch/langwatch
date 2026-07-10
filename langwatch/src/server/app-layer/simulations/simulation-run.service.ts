@@ -82,13 +82,6 @@ export class SimulationRunService {
     return this.repository.getAllRunDataForScenarioSet(params);
   }
 
-  async getScenarioRunDataByScenarioId(params: {
-    projectId: string;
-    scenarioId: string;
-  }): Promise<ScenarioRunData[] | null> {
-    return this.repository.getScenarioRunDataByScenarioId(params);
-  }
-
   async getBatchRunCountForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;

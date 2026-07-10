@@ -2,7 +2,8 @@ Feature: Simulations run history performance
   The simulations views stay responsive by fetching only what each view
   renders, refreshing only when something actually changed, and rendering
   only what is on screen. Live updates arrive over the event stream;
-  polling exists solely as a fallback when the stream is down.
+  polling drops to a slow safety net while the stream is healthy and
+  speeds up only when it is down.
 
   Background:
     Given a project with simulation runs

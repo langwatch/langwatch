@@ -19,7 +19,7 @@ export function CopyIdChip({ label, value }: { label: string; value: string }) {
       onClick={() => copy(value)}
       tooltip={`Click to copy: ${value}`}
       maxValueWidth="140px"
-      ariaLabel={`Copy ${label} ${value}`}
+      ariaLabel={copied ? `${label} copied` : `Copy ${label} ${value}`}
     />
   );
 }

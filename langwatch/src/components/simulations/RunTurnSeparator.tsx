@@ -7,6 +7,7 @@
 
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuListTree } from "react-icons/lu";
+import { TRACE_QUERY_CONFIG } from "~/components/copilot-kit/TraceMessage";
 import { TracePreviewHoverCard } from "~/features/traces-v2/components/TraceIdPeek";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
@@ -24,17 +25,12 @@ export function RunTurnSeparator({
 
   // Same guarded fetch the old View Trace button used: traces land a beat
   // after the message snapshot, so retry quietly and only advertise the
-  // affordance once the trace actually exists. Traces are immutable, so
-  // cache forever.
+  // affordance once the trace actually exists.
   const traceQuery = api.traces.getById.useQuery(
     { projectId: project?.id ?? "", traceId },
     {
       enabled: !!project && !!traceId,
-      retry: 10,
-      retryDelay: (attemptIndex: number) =>
-        Math.min(2000 * 2 ** attemptIndex, 60000),
-      staleTime: Infinity,
-      cacheTime: Infinity,
+      ...TRACE_QUERY_CONFIG,
     },
   );
   const hasTrace = !!traceQuery.data;
@@ -66,6 +62,18 @@ export function RunTurnSeparator({
       _hover={
         hasTrace
           ? {
+              "& .turn-line": { bg: "border.emphasized" },
+              "& .turn-view-trace": { color: "fg.muted" },
+            }
+          : undefined
+      }
+      _focusVisible={
+        hasTrace
+          ? {
+              outline: "2px solid",
+              outlineColor: "border.emphasized",
+              outlineOffset: "2px",
+              borderRadius: "sm",
               "& .turn-line": { bg: "border.emphasized" },
               "& .turn-view-trace": { color: "fg.muted" },
             }

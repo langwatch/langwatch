@@ -195,18 +195,6 @@ const PREVIEW_COLUMNS = `
   arraySlice(\`Messages.Role\`, 1, 4) AS MessagePreviewRoles,
   arraySlice(\`Messages.Content\`, 1, 4) AS MessagePreviewContents` as const;
 
-/** Minimal columns for inner subquery in aggregation-only queries (count, max, group by) */
-const DEDUP_COLUMNS = `
-  TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
-  Status, UpdatedAt, CreatedAt, StartedAt, FinishedAt, ArchivedAt` as const;
-
-/** Inner subquery columns for preview queries (getBatchHistory items) */
-const DEDUP_PREVIEW_COLUMNS = `
-  TenantId, ScenarioSetId, BatchRunId, ScenarioRunId,
-  Status, Name, Description,
-  \`Messages.Role\`, \`Messages.Content\`,
-  DurationMs, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
-
 interface CursorPayload {
   ts: string;
   batchRunId: string;
@@ -646,37 +634,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
   }
 
-  async getScenarioRunDataByScenarioId({
-    projectId,
-    scenarioId,
-  }: {
-    projectId: string;
-    scenarioId: string;
-  }): Promise<ScenarioRunData[] | null> {
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${RUN_COLUMNS}
-       FROM ${TABLE_NAME} AS t
-       WHERE t.TenantId = {tenantId:String}
-         AND t.ScenarioId = {scenarioId:String}
-         AND t.ArchivedAt IS NULL
-         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND ScenarioId = {scenarioId:String}
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )
-       ORDER BY CreatedAt DESC
-       LIMIT 1000`,
-      { tenantId: projectId, scenarioId },
-    );
-
-    if (rows.length === 0) return null;
-
-    const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
-  }
-
   async getAllRunDataForScenarioSet({
     projectId,
     scenarioSetId,
@@ -929,7 +886,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     startDate?: number;
     endDate?: number;
   }): Promise<number> {
-    const dateFilter = buildDateFilter({ startDate, endDate });
+    // Freshness probes poll frequently, so an unbounded StartedAt window
+    // (scanning every partition, including cold storage) is never acceptable
+    // here — floor the window at 30 days when the caller omits it.
+    const dateFilter = buildDateFilter({
+      startDate: startDate ?? Date.now() - 30 * 24 * 60 * 60 * 1000,
+      endDate,
+    });
     const setFilter = scenarioSetId
       ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})"
       : "";

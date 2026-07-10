@@ -289,29 +289,6 @@ export const scenarioEventsRouter = createTRPCRouter({
       return { count };
     }),
 
-  // Get scenario run data by scenario id
-  getRunDataByScenarioId: protectedProcedure
-    .input(
-      projectSchema.extend({
-        scenarioId: z.string(),
-      }),
-    )
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input, ctx }) => {
-      logger.debug(
-        { projectId: input.projectId, scenarioId: input.scenarioId },
-        "Fetching run data by scenario id",
-      );
-      const service = getApp().simulations.runs;
-      // Point lookup by scenario id — no date window, so a scenario's full run
-      // history stays reachable.
-      const data = await service.getScenarioRunDataByScenarioId({
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-      });
-      return { data };
-    }),
-
   // Get pre-aggregated batch history for the sidebar (no full messages)
   getScenarioSetBatchHistory: protectedProcedure
     .input(

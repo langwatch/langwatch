@@ -18,7 +18,8 @@ Feature: Scenario result grid view and full-width borderless run history
   # This feature adds a grid/list toggle so scenario results within an
   # expanded run can display as cards (reusing SimulationCard) or rows.
   # It also updates run history styling to full-width borderless tables
-  # with sticky collapsible headers. All run rows are expanded by default.
+  # with sticky collapsible headers. Only the most recent run row starts
+  # expanded (see specs/suites/simulations-performance.feature).
 
   # --- List/Grid View Toggle ---
 

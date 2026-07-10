@@ -63,11 +63,6 @@ export interface SimulationRepository {
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]>;
 
-  getScenarioRunDataByScenarioId(params: {
-    projectId: string;
-    scenarioId: string;
-  }): Promise<ScenarioRunData[] | null>;
-
   getBatchRunCountForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
@@ -156,10 +151,6 @@ export class NullSimulationRepository implements SimulationRepository {
 
   async getAllRunDataForScenarioSet(): Promise<ScenarioRunData[]> {
     return [];
-  }
-
-  async getScenarioRunDataByScenarioId(): Promise<ScenarioRunData[] | null> {
-    return null;
   }
 
   async getBatchRunCountForScenarioSet(): Promise<number> {

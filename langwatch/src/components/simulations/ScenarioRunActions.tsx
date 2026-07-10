@@ -112,16 +112,17 @@ export function ScenarioRunActions({
               </Menu.Item>
             )}
             {dejaViewHref && (
-              <Menu.Item
-                value="deja-view"
-                onClick={() =>
-                  window.open(dejaViewHref, "_blank", "noopener,noreferrer")
-                }
-              >
-                <HStack gap={2}>
-                  <Icon as={ExternalLink} boxSize={3.5} />
-                  <Text>Open in DejaView</Text>
-                </HStack>
+              <Menu.Item value="deja-view" asChild>
+                <a
+                  href={dejaViewHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <HStack gap={2}>
+                    <Icon as={ExternalLink} boxSize={3.5} />
+                    <Text>Open in DejaView</Text>
+                  </HStack>
+                </a>
               </Menu.Item>
             )}
           </Menu.Content>

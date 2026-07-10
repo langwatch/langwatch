@@ -98,6 +98,42 @@ describe("useAutoExpansion()", () => {
     });
   });
 
+  describe("given older batches are paginated in via Load More", () => {
+    it("marks them seen without auto-expanding them", () => {
+      const panelKey = freshPanelKey();
+      const { result, rerender } = renderHook(
+        ({ batchRuns }) =>
+          useAutoExpansion({ panelKey, groupBy: "none", batchRuns, groups: [] }),
+        { initialProps: { batchRuns: batches("newest", "older") } },
+      );
+
+      // Load More appends older pages behind the already-seen rows
+      rerender({
+        batchRuns: batches("newest", "older", "paged-1", "paged-2"),
+      });
+
+      expect(result.current.expandedIds.has("paged-1")).toBe(false);
+      expect(result.current.expandedIds.has("paged-2")).toBe(false);
+      expect(result.current.expandedIds.has("newest")).toBe(true);
+    });
+
+    it("still auto-expands a new arrival delivered alongside a paged-in tail", () => {
+      const panelKey = freshPanelKey();
+      const { result, rerender } = renderHook(
+        ({ batchRuns }) =>
+          useAutoExpansion({ panelKey, groupBy: "none", batchRuns, groups: [] }),
+        { initialProps: { batchRuns: batches("newest", "older") } },
+      );
+
+      rerender({
+        batchRuns: batches("brand-new", "newest", "older", "paged-1"),
+      });
+
+      expect(result.current.expandedIds.has("brand-new")).toBe(true);
+      expect(result.current.expandedIds.has("paged-1")).toBe(false);
+    });
+  });
+
   describe("given grouped mode", () => {
     it("expands only the most recent group on first load", () => {
       const panelKey = freshPanelKey();

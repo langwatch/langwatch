@@ -9,12 +9,13 @@
 
 import {
   Box,
+  Button,
   EmptyState,
   HStack,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { FlaskConical, TriangleAlert } from "lucide-react";
+import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -91,6 +92,7 @@ export function ExternalSetDetailPanel({
     data: runDataResult,
     isLoading,
     error,
+    refetch,
   } = api.scenarios.getSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
@@ -281,6 +283,13 @@ export function ExternalSetDetailPanel({
               <EmptyState.Description maxWidth="360px" textAlign="center">
                 {error.message}
               </EmptyState.Description>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void refetch()}
+              >
+                <RefreshCw size={14} /> Try again
+              </Button>
             </EmptyState.Content>
           </EmptyState.Root>
         )}

@@ -220,7 +220,7 @@ export function ScenarioRunDetailDrawer({
     (scenarioState?.messages ?? []).length > 0 ||
     (streamingMessages ?? []).length > 0;
   const conversationCount =
-    (scenarioState?.messages ?? []).length || (streamingMessages ?? []).length;
+    (scenarioState?.messages ?? []).length + (streamingMessages ?? []).length;
 
   const [openSections, setOpenSections] = useState<string[]>([
     "conversation",
