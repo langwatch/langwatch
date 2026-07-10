@@ -1,6 +1,7 @@
-package langyagent
+package workerpool
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -11,13 +12,10 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"go.uber.org/zap"
 )
 
-// freePortForTest mirrors getFreePort but with t.Fatal on error so tests
-// stay clean. Using a separate helper keeps the production getFreePort
-// signature unchanged.
+// freePortForTest mirrors getFreePort but with t.Fatal on error so tests stay
+// clean.
 func freePortForTest(t *testing.T) int {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -46,17 +44,15 @@ func TestGenerateBearerToken_UniqueAndLongEnough(t *testing.T) {
 	}
 }
 
-// authProxy must let through a request that carries the right Bearer token
-// and reject one that doesn't (or that carries a different token). Verifies
-// the basic credential gate.
+// authProxy must let through a request that carries the right Bearer token and
+// reject one that doesn't (or carries a different token). It also must present
+// opencode's own Basic credential to the backend on every forwarded request
+// (Fix A′, ADR-033) — it REPLACES Authorization, it no longer strips it.
 func TestAuthProxy_BearerGate(t *testing.T) {
 	const openCodePassword = "op-password-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	wantBasic := "Basic " + base64.StdEncoding.EncodeToString([]byte("opencode:"+openCodePassword))
 
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// authproxy must present opencode's own Basic credential on every
-		// forwarded request (Fix A′, ADR-033) — it no longer strips
-		// Authorization, it REPLACES it with the worker's opencode password.
 		if got := r.Header.Get("Authorization"); got != wantBasic {
 			t.Errorf("backend got Authorization %q, want %q", got, wantBasic)
 		}
@@ -72,7 +68,7 @@ func TestAuthProxy_BearerGate(t *testing.T) {
 
 	token := "test-token-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	port := freePortForTest(t)
-	proxy, err := startAuthProxy(port, internalPort, token, openCodePassword, zap.NewNop())
+	proxy, err := startAuthProxy(context.Background(), port, internalPort, token, openCodePassword)
 	if err != nil {
 		t.Fatalf("startAuthProxy: %v", err)
 	}
@@ -110,9 +106,8 @@ func TestAuthProxy_BearerGate(t *testing.T) {
 	}
 }
 
-// Two workers' bearer tokens must not interchange. Reuses the same
-// backend (the test isn't proving end-to-end isolation, only that each
-// proxy enforces its own token).
+// Two workers' bearer tokens must not interchange — the headline cross-worker
+// bypass attempt. Worker A calling worker B's proxy with A's token must 401.
 func TestAuthProxy_TokensDoNotInterchangeAcrossProxies(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -127,12 +122,12 @@ func TestAuthProxy_TokensDoNotInterchangeAcrossProxies(t *testing.T) {
 
 	portA := freePortForTest(t)
 	portB := freePortForTest(t)
-	proxyA, err := startAuthProxy(portA, internalPort, tokenA, passwordA, zap.NewNop())
+	proxyA, err := startAuthProxy(context.Background(), portA, internalPort, tokenA, passwordA)
 	if err != nil {
 		t.Fatalf("startAuthProxy A: %v", err)
 	}
 	defer proxyA.shutdown()
-	proxyB, err := startAuthProxy(portB, internalPort, tokenB, passwordB, zap.NewNop())
+	proxyB, err := startAuthProxy(context.Background(), portB, internalPort, tokenB, passwordB)
 	if err != nil {
 		t.Fatalf("startAuthProxy B: %v", err)
 	}
@@ -140,8 +135,6 @@ func TestAuthProxy_TokensDoNotInterchangeAcrossProxies(t *testing.T) {
 	waitForListenerOrFail(t, portA)
 	waitForListenerOrFail(t, portB)
 
-	// Sibling worker A tries to call worker B's proxy with A's token →
-	// the headline cross-worker bypass attempt. Must 401.
 	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/", portB), nil)
 	req.Header.Set("Authorization", "Bearer "+tokenA)
 	resp, err := http.DefaultClient.Do(req)
@@ -156,12 +149,10 @@ func TestAuthProxy_TokensDoNotInterchangeAcrossProxies(t *testing.T) {
 
 // TestWorkerIsolation_SiblingCannotAuthenticateWithoutPassword is the
 // integration test for the core security property in
-// specs/langy/langy-worker-isolation.feature: a sibling that reaches
-// worker B's opencode port without B's password is rejected with 401,
-// while B's own authProxy — which is wired with B's password — gets
-// through. The fake backend reproduces the exact Basic-auth behavior
-// opencode exhibits when OPENCODE_SERVER_PASSWORD is set (ADR-033
-// evidence table).
+// specs/langy/langy-worker-isolation.feature: a sibling that reaches worker B's
+// opencode port without B's password is rejected 401, while B's own authProxy —
+// wired with B's password — gets through. The fake backend reproduces the exact
+// Basic-auth behavior opencode exhibits when OPENCODE_SERVER_PASSWORD is set.
 func TestWorkerIsolation_SiblingCannotAuthenticateWithoutPassword(t *testing.T) {
 	password := "worker-b-opencode-password-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	wantBasic := "Basic " + base64.StdEncoding.EncodeToString([]byte("opencode:"+password))
@@ -206,7 +197,7 @@ func TestWorkerIsolation_SiblingCannotAuthenticateWithoutPassword(t *testing.T) 
 	t.Run("authProxy with the real password gets through", func(t *testing.T) {
 		bearer := "bearer-for-worker-b-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 		externalPort := freePortForTest(t)
-		proxy, err := startAuthProxy(externalPort, internalPort, bearer, password, zap.NewNop())
+		proxy, err := startAuthProxy(context.Background(), externalPort, internalPort, bearer, password)
 		if err != nil {
 			t.Fatalf("startAuthProxy: %v", err)
 		}
@@ -226,9 +217,8 @@ func TestWorkerIsolation_SiblingCannotAuthenticateWithoutPassword(t *testing.T) 
 	})
 }
 
-// waitForListenerOrFail polls a TCP port for a brief window. Hides the
-// startAuthProxy goroutine race window from individual tests; failing
-// here means the proxy didn't come up at all, which is a real fault.
+// waitForListenerOrFail polls a TCP port for a brief window. Failing here means
+// the proxy didn't come up at all, which is a real fault.
 func waitForListenerOrFail(t *testing.T, port int) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
