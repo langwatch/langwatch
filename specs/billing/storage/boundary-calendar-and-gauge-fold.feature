@@ -40,7 +40,7 @@ Feature: Storage billing boundary calendar and gauge fold
 
   # Billable-table set
 
-  @unit @unimplemented
+  @unit
   Scenario: Derived analytics tables and evaluation runs are excluded from billable storage
     Given the retention system manages 13 tables
     When the billable-table set is resolved
