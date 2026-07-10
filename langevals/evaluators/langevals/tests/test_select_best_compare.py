@@ -1,11 +1,11 @@
 """
-Unit tests for select_best_compare (N-way Compare). Mocks litellm.completion
+Unit tests for select_best_compare ("Comparison"). Mocks litellm.completion
 at the boundary so the shuffle logic, slot-to-id translation, and metrics
 injection are exercised without API keys.
 
 Refs:
   - https://github.com/langwatch/langwatch/issues/5101
-  - specs/experiments/select-best-nway.feature
+  - specs/experiments/comparison.feature
 """
 
 import json

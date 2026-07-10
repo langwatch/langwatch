@@ -1,16 +1,19 @@
 """
-N-way Compare: native LLM-as-judge "select best of N" evaluator.
+Comparison: the native LLM-as-judge preference evaluator.
 
-Standalone evaluator, separate from `langevals/pairwise_compare` (#5100) —
-shown as its own card in Add Evaluator rather than a mode toggle inside
-Pairwise Compare. Given 3+ candidate outputs (from different EvaluationsV3
-target columns) and a golden reference, asks an LLM judge to pick the
-single best candidate in one judge call, with deterministic candidate-order
-shuffling (seeded by `row_index`) for position-bias mitigation.
+Given 2+ candidate outputs (from different EvaluationsV3 target columns) and
+an optional golden reference, asks an LLM judge to pick the single best
+candidate in one judge call, with deterministic candidate-order shuffling
+(seeded by `row_index`) for position-bias mitigation.
+
+Two candidates is not a special case. This evaluator is the only comparison
+judge offered, superseding the two-slot `langevals/pairwise_compare` (#5100),
+which stays runnable but hidden so pre-merge experiments and monitors keep
+working.
 
 Issue:        https://github.com/langwatch/langwatch/issues/5101
 Parent epic:  https://github.com/langwatch/langwatch/issues/5099
-BDD spec:     specs/experiments/select-best-nway.feature
+BDD spec:     specs/experiments/comparison.feature
 """
 
 import json
@@ -150,20 +153,21 @@ class SelectBestCompareResult(EvaluationResult):
     )
 
 
+# The class docstring below is emitted verbatim as the evaluator's
+# `description` — the copy on its Add Evaluator card. Keep it customer-facing:
+# no module names, no deprecation history, no judge-call mechanics. The
+# engineering story (why pairwise_compare was folded in here, why shuffling
+# replaced swap-and-confirm) belongs in the module docstring, not the card.
 class SelectBestCompareEvaluator(
     BaseEvaluator[
         SelectBestCompareEntry, SelectBestCompareSettings, SelectBestCompareResult
     ]
 ):
     """
-    Native LLM-as-judge preference evaluator. Picks the best of 2+ candidate
-    outputs against an optional golden reference in a single judge call, with
-    deterministic candidate-order shuffling for position-bias mitigation.
-
-    Two candidates is not a special case: this is the single evaluator behind
-    both pairwise and multi-candidate comparisons. The older, two-slot
-    pairwise_compare evaluator is deprecated and kept only so that experiments
-    and monitors created before the merge keep running.
+    Compare two or more candidate outputs and pick the best one, optionally
+    against a reference answer. The judge sees every candidate at once and
+    explains why the winner is better. Candidate order is shuffled so that a
+    candidate's position never sways the verdict.
     """
 
     name = "Comparison"

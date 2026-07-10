@@ -2270,16 +2270,8 @@ This evaluator checks if the user message is concerning one of the allowed topic
   "langevals/pairwise_compare": {
     name: `Pairwise Compare (deprecated)`,
     description: `
-Native pairwise LLM-as-judge evaluator. Compare two candidate
-outputs against a golden reference, with optional swap-and-confirm
-position-bias mitigation.
-
-DEPRECATED. Superseded by select_best_compare ("Comparison"), which
-judges 2+ candidates in one call. This evaluator is retained, and stays
-fully runnable, only so that experiments and monitors created before the
-merge keep working. It is no longer offered when creating something new.
-Note that it is the only judge with swap-and-confirm; select_best_compare
-mitigates position bias by deterministic shuffling instead.
+Compare two candidate outputs against a reference answer and pick the
+better one. Superseded by Comparison, which judges two or more candidates.
 `,
     category: "quality",
     docsUrl: "",
@@ -2346,14 +2338,10 @@ mitigates position bias by deterministic shuffling instead.
   "langevals/select_best_compare": {
     name: `Comparison`,
     description: `
-Native LLM-as-judge preference evaluator. Picks the best of 2+ candidate
-outputs against an optional golden reference in a single judge call, with
-deterministic candidate-order shuffling for position-bias mitigation.
-
-Two candidates is not a special case: this is the single evaluator behind
-both pairwise and multi-candidate comparisons. The older, two-slot
-pairwise_compare evaluator is deprecated and kept only so that experiments
-and monitors created before the merge keep running.
+Compare two or more candidate outputs and pick the best one, optionally
+against a reference answer. The judge sees every candidate at once and
+explains why the winner is better. Candidate order is shuffled so that a
+candidate's position never sways the verdict.
 `,
     category: "quality",
     docsUrl: "",
