@@ -26,6 +26,7 @@ function makeService({
       // Force the replay path in unit tests — the O(1) fast path is proven
       // in the integration suite against real repositories.
       countEventsAfter: vi.fn(async () => 1),
+      snapshotFoldState: vi.fn(async () => ({ events: [], gaugeBytes: 0n })),
     },
     gauge: { findByOrganization: vi.fn(async () => null) },
     usageHourly: {

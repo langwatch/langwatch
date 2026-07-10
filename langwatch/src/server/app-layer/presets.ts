@@ -86,10 +86,13 @@ import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.serv
 import { BoundaryExitService } from "./billing/storage/boundaryExit.service";
 import { BoundaryMeasurementService } from "./billing/storage/boundaryMeasurement.service";
 import { GaugeSamplingService } from "./billing/storage/gaugeSampling.service";
+import { PrismaStorageAuditStateRepository } from "./billing/storage/repositories/storage-audit-state.prisma.repository";
 import { PrismaStorageBillableGaugeRepository } from "./billing/storage/repositories/storage-billable-gauge.prisma.repository";
 import { PrismaStorageBoundaryEventRepository } from "./billing/storage/repositories/storage-boundary-event.prisma.repository";
 import { PrismaStorageSweepCursorRepository } from "./billing/storage/repositories/storage-sweep-cursor.prisma.repository";
 import { PrismaStorageUsageHourlyRepository } from "./billing/storage/repositories/storage-usage-hourly.prisma.repository";
+import { StorageAuditService } from "./billing/storage/storageAudit.service";
+import { StorageAuditTierService } from "./billing/storage/storageAuditTier.service";
 import { StorageCorrectionService } from "./billing/storage/storageCorrection.service";
 import { StorageSweepService } from "./billing/storage/storageSweep.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
@@ -613,6 +616,56 @@ export function initializeDefaultApp(options?: {
   const storageCorrections = new StorageCorrectionService({
     events: storageBoundaryEvents,
   });
+  const storageBoundaryMeasurement = new BoundaryMeasurementService({
+    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
+    events: storageBoundaryEvents,
+    listProjectIds: async ({ organizationId }) => {
+      // Archived projects included: archived data still occupies storage.
+      const orgProjects = await prisma.project.findMany({
+        where: { team: { organizationId } },
+        select: { id: true },
+      });
+      return orgProjects.map((project) => project.id);
+    },
+  });
+  const storageGaugeRepo = new PrismaStorageBillableGaugeRepository(prisma);
+  const storageAuditTier = new StorageAuditTierService({
+    auditState: new PrismaStorageAuditStateRepository(prisma),
+    // Any in-flight/wedged `ALTER UPDATE _retention_days` mutation on any of
+    // the org's projects pins the org to the daily audit tier until it
+    // completes (ADR-039 Decision 3).
+    hasRetentionMutationInFlight: async ({ organizationId }) => {
+      const orgProjects = await prisma.project.findMany({
+        where: { team: { organizationId } },
+        select: { id: true },
+      });
+      for (const project of orgProjects) {
+        const inFlight = await retroactiveUpdateService.getMutationProgress({
+          projectId: project.id,
+        });
+        if (inFlight.length > 0) return true;
+      }
+      return false;
+    },
+  });
+  const storageAudits = new StorageAuditService({
+    events: storageBoundaryEvents,
+    gauge: storageGaugeRepo,
+    auditState: new PrismaStorageAuditStateRepository(prisma),
+    measurement: storageBoundaryMeasurement,
+    tier: storageAuditTier,
+    onAuditAlarm: ({ organizationId, kind, detail }) => {
+      void withScope(async (scope) => {
+        scope.setTag?.("handler", "storageAudit");
+        scope.setExtra?.("organizationId", organizationId);
+        scope.setExtra?.("kind", kind);
+        for (const [k, v] of Object.entries(detail)) scope.setExtra?.(k, v);
+        captureException(
+          new Error(`storage ${kind} audit discrepancy — not auto-corrected`),
+        );
+      });
+    },
+  });
   const storageSweep = new StorageSweepService({
     cursor: new PrismaStorageSweepCursorRepository(prisma),
     listBillableOrganizationIds: () =>
@@ -633,24 +686,12 @@ export function initializeDefaultApp(options?: {
         return value;
       };
     })(),
-    measurement: new BoundaryMeasurementService({
-      resolveClickHouseClient: clickhouseEnabled
-        ? resolveClickHouseClient
-        : null,
-      events: storageBoundaryEvents,
-      listProjectIds: async ({ organizationId }) => {
-        // Archived projects included: archived data still occupies storage.
-        const orgProjects = await prisma.project.findMany({
-          where: { team: { organizationId } },
-          select: { id: true },
-        });
-        return orgProjects.map((project) => project.id);
-      },
-    }),
+    measurement: storageBoundaryMeasurement,
     exits: new BoundaryExitService({ events: storageBoundaryEvents }),
+    audits: storageAudits,
     sampling: new GaugeSamplingService({
       events: storageBoundaryEvents,
-      gauge: new PrismaStorageBillableGaugeRepository(prisma),
+      gauge: storageGaugeRepo,
       usageHourly: new PrismaStorageUsageHourlyRepository(prisma),
       onDriftAlarm: ({ organizationId, sealedHour, gaugeBytes }) => {
         void withScope(async (scope) => {

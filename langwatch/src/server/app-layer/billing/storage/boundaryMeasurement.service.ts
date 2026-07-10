@@ -168,19 +168,145 @@ export class BoundaryMeasurementService {
     }
   }
 
+  /**
+   * Seeding / re-seed path (ADR-039 Decision 6): the SAME bounded query and
+   * cumulative-minus-prior delta as live measurement — the full-backlog
+   * query shape is never run, not even once — but emitted as SEED events
+   * keyed by the seed run's cause id. The cause key keeps a corrective
+   * re-seed from colliding with already-recorded events on the same slice
+   * (dedup is identity-level; idempotency here is VALUE-level: a re-run
+   * measures delta 0 and emits nothing). Groups already past their
+   * entitlement are skipped — they would enter and exit in the same breath.
+   *
+   * Known tail: a seeded partition collapses its slices onto the partition's
+   * last day, so seeded bytes exit up to 6 days later than their per-slice
+   * truth — a bounded over-bill at the very end of already-old data's life,
+   * accepted for single-query seeding. The reference audit skips partitions
+   * inside this window rather than flagging it as drift.
+   */
+  async seedPartition({
+    organizationId,
+    projectId,
+    partitionStart,
+    at,
+    causeId,
+  }: {
+    organizationId: string;
+    projectId: string;
+    partitionStart: Date;
+    at: Date;
+    causeId: string;
+  }): Promise<{ appended: number }> {
+    if (!this.deps.resolveClickHouseClient) return { appended: 0 };
+    const cutoff = floorToDay(
+      new Date(at.getTime() - BILLABLE_AFTER_DAYS * MS_PER_DAY),
+    );
+    const sliceDate = new Date(cutoff.getTime() - MS_PER_DAY);
+    return await this.measurePartition({
+      organizationId,
+      projectId,
+      partitionStart,
+      cutoff,
+      sliceDate,
+      edge: "SEED",
+      causeId,
+      entitlementAt: at,
+    });
+  }
+
+  /**
+   * Reference-audit read (ADR-039 Decision 7): re-measure one partition's
+   * billing-live bytes at DAY-SLICE granularity — entitlement applied per
+   * slice (`sliceDay + retention > at`), exactly the model the exit edge
+   * bills on — WITHOUT emitting anything. Partition-granular entitlement
+   * here would false-alarm on every live-tracked partition mid-exit-week
+   * (recorded nets exit slice-by-slice; TTL-lagged rows linger physically).
+   */
+  async measureReferenceBytes({
+    projectId,
+    partitionStart,
+    at,
+  }: {
+    projectId: string;
+    partitionStart: Date;
+    at: Date;
+  }): Promise<bigint> {
+    if (!this.deps.resolveClickHouseClient) return 0n;
+    const cutoff = floorToDay(
+      new Date(at.getTime() - BILLABLE_AFTER_DAYS * MS_PER_DAY),
+    );
+    const partitionEnd = new Date(partitionStart.getTime() + 7 * MS_PER_DAY);
+    const client = await this.deps.resolveClickHouseClient(projectId);
+
+    let total = 0n;
+    for (const table of BILLABLE_STORAGE_TABLES) {
+      const ageExpr = AGE_EXPRESSION_BY_TABLE[table];
+      const result = await client.query({
+        query: `
+          SELECT
+            _retention_days AS retentionDays,
+            toDate(${ageExpr}) AS sliceDay,
+            toString(sum(_size_bytes)) AS bytes
+          FROM ${table}
+          WHERE TenantId = {tenantId:String}
+            AND ${ageExpr} >= {partitionStart:DateTime64(3)}
+            AND ${ageExpr} < {partitionEnd:DateTime64(3)}
+            AND ${ageExpr} < {cutoff:DateTime64(3)}
+          GROUP BY _retention_days, sliceDay
+        `,
+        query_params: {
+          tenantId: projectId,
+          partitionStart,
+          partitionEnd,
+          cutoff,
+        },
+        format: "JSONEachRow",
+        clickhouse_settings: BOUNDARY_QUERY_SETTINGS,
+      });
+      const rows = await result.json<{
+        retentionDays: number;
+        sliceDay: string;
+        bytes: string;
+      }>();
+
+      for (const row of rows) {
+        const retentionDays = Number(row.retentionDays);
+        if (retentionDays !== 0 && retentionDays <= BILLABLE_AFTER_DAYS)
+          continue;
+        // Per-slice entitlement: rows whose slice already exited the bill
+        // are excluded even if TTL has not physically deleted them yet.
+        const sliceMs = Date.parse(`${row.sliceDay}T00:00:00.000Z`);
+        if (
+          retentionDays !== 0 &&
+          sliceMs + retentionDays * MS_PER_DAY <= at.getTime()
+        )
+          continue;
+        total += BigInt(row.bytes);
+      }
+    }
+    return total;
+  }
+
   private async measurePartition({
     organizationId,
     projectId,
     partitionStart,
     cutoff,
     sliceDate,
+    edge = "ENTRY",
+    causeId,
+    entitlementAt,
   }: {
     organizationId: string;
     projectId: string;
     partitionStart: Date;
     cutoff: Date;
     sliceDate: Date;
-  }): Promise<void> {
+    edge?: "ENTRY" | "SEED";
+    causeId?: string;
+    /** When set, groups whose exit is already due are skipped (seeding). */
+    entitlementAt?: Date;
+  }): Promise<{ appended: number }> {
     const partitionKey = partitionKeyFor(partitionStart);
     const partitionEnd = new Date(partitionStart.getTime() + 7 * MS_PER_DAY);
     // Attribute the delta to the newest completed slice, clamped into this
@@ -210,6 +336,7 @@ export class BoundaryMeasurementService {
       ]),
     );
 
+    let appended = 0;
     for (const group of measured) {
       // Retention at or under the billable window never bills: those rows die
       // before day 35 (any still-visible ones are past their entitlement).
@@ -217,6 +344,17 @@ export class BoundaryMeasurementService {
       if (
         group.retentionDays !== 0 &&
         group.retentionDays <= BILLABLE_AFTER_DAYS
+      )
+        continue;
+
+      // Seeding only: rows physically present but already past their
+      // retention entitlement (TTL lag) must not enter the gauge — they
+      // would exit on the very next sweep anyway.
+      if (
+        entitlementAt &&
+        group.retentionDays !== 0 &&
+        attributedSlice.getTime() + group.retentionDays * MS_PER_DAY <=
+          entitlementAt.getTime()
       )
         continue;
 
@@ -232,13 +370,16 @@ export class BoundaryMeasurementService {
         partitionKey,
         sliceDate: attributedSlice,
         retentionDays: group.retentionDays,
-        edge: "ENTRY",
+        edge,
         deltaBytes,
         occurredAt: new Date(
           attributedSlice.getTime() + BILLABLE_AFTER_DAYS * MS_PER_DAY,
         ),
+        ...(causeId ? { causeId } : {}),
       });
+      appended += 1;
     }
+    return { appended };
   }
 
   /**

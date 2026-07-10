@@ -1960,6 +1960,16 @@ model StorageBillingCheckpoint {
   @@unique([organizationId, billingMonth])
 }
 
+// Audit posture per org (ADR-039 Decision 7). An org that has EVER tripped
+// a drift/audit alarm stays on the daily audit tier permanently; the row is
+// written by the audit services only — alarms are never auto-corrected.
+model StorageAuditState {
+  organizationId String    @id
+  everAlarmedAt  DateTime?
+  lastAlarmKind  String? // "fold" | "reference" | "gauge-drift"
+  updatedAt      DateTime  @updatedAt
+}
+
 // Durable home for the once-per-effective-sweep-per-hour guarantee. Queue
 // dedup only squashes re-enqueues while a job is staged; this cursor is the
 // guarantee and survives redeploys, which a process-local guard cannot.
