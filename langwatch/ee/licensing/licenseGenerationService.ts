@@ -8,6 +8,12 @@ interface GenerateLicenseKeyParams {
   planType: string;
   maxMembers: number;
   privateKey: string;
+  /**
+   * Marks the license as a trial (ADR-039 Decision 8): trial licenses are
+   * auto-cleared when a Stripe subscription activates; non-trial licenses
+   * never are. Omitted (not stamped) for purchased licenses.
+   */
+  isTrial?: boolean;
   /** Override current time for deterministic testing */
   now?: Date;
 }
@@ -29,6 +35,7 @@ export function generateLicenseKey({
   planType,
   maxMembers,
   privateKey,
+  isTrial,
   now = new Date(),
 }: GenerateLicenseKeyParams): GenerateLicenseKeyResult {
   const template = getPlanTemplate(planType);
@@ -78,6 +85,9 @@ export function generateLicenseKey({
     issuedAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
     plan,
+    // Only stamped when explicitly set — absent means non-trial, and key
+    // order must stay stable for signature re-serialization.
+    ...(isTrial !== undefined && { isTrial }),
   };
 
   const signedLicense = signLicense(licenseData, privateKey);

@@ -322,11 +322,9 @@ export function initializeDefaultApp(options?: {
     ExperimentService.create(prisma),
     "ExperimentService",
   );
+  const appOrgRepo = new PrismaOrganizationRepository(prisma);
   const organizations = traced(
-    new OrganizationService(
-      new PrismaOrganizationRepository(prisma),
-      new PromptTagRepository(prisma),
-    ),
+    new OrganizationService(appOrgRepo, new PromptTagRepository(prisma)),
     "OrganizationService",
   );
   const traceService = TraceService.create(prisma, {
@@ -398,6 +396,19 @@ export function initializeDefaultApp(options?: {
       orgRepo.setPricingModel({ organizationId, pricingModel }),
     invalidateMeterDecision: (organizationId) =>
       usage.invalidateMeterDecision(organizationId),
+    notifyLicenseSubscriptionConflict: async ({
+      organizationId,
+      licensePlanType,
+    }) => {
+      const org = await appOrgRepo.findNameById(organizationId);
+      await getApp().notifications.sendSlackLicenseConflictAlert({
+        organizationId,
+        organizationName: org?.name ?? organizationId,
+        licensePlanType,
+        subscriptionPlan: "GROWTH_SEAT_*",
+        reason: "license outranks an active seat subscription at resolution",
+      });
+    },
   });
 
   const planProvider = config.isSaas

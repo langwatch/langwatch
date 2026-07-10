@@ -97,13 +97,13 @@ Feature: Billing profile resolution in the composite plan provider
 
   # --- Trial licenses (Decision 8) ---
 
-  @integration @unimplemented
+  @unit
   Scenario: Subscription activation clears a trial license
     Given an organization holding a license marked as trial
     When a Stripe subscription activates for the organization
     Then the trial license is removed
 
-  @integration @unimplemented
+  @unit
   Scenario: Subscription activation preserves a non-trial license and alerts ops
     Given an organization holding a license not marked as trial
     When a Stripe subscription activates for the organization
@@ -112,7 +112,7 @@ Feature: Billing profile resolution in the composite plan provider
 
   # --- Orphaned subscription (Decision 11) ---
 
-  @integration @unimplemented
+  @unit
   Scenario: An ENTERPRISE license winning over an active subscription alerts without touching the subscription
     Given an organization with a valid ENTERPRISE license and an ACTIVE seat-event subscription
     When the active plan is resolved

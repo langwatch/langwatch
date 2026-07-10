@@ -17,6 +17,11 @@ export const pricingModelHealGuard = new TtlCache<true>(
 
 export type PricingModelSelfHeal = (params: {
   organizationId: string;
+  plan?: {
+    planSource: "license" | "subscription" | "free";
+    type: string;
+    free: boolean;
+  };
 }) => Promise<void>;
 
 /**
@@ -32,6 +37,7 @@ export function createPricingModelSelfHeal({
   getPricingModel,
   setPricingModel,
   invalidateMeterDecision,
+  notifyLicenseSubscriptionConflict,
   guard = pricingModelHealGuard,
 }: {
   hasActiveSeatEventSubscription: (organizationId: string) => Promise<boolean>;
@@ -41,9 +47,13 @@ export function createPricingModelSelfHeal({
     pricingModel: "SEAT_EVENT";
   }) => Promise<void>;
   invalidateMeterDecision: (organizationId: string) => Promise<void>;
+  notifyLicenseSubscriptionConflict?: (params: {
+    organizationId: string;
+    licensePlanType: string;
+  }) => Promise<void>;
   guard?: TtlCache<true>;
 }): PricingModelSelfHeal {
-  return async ({ organizationId }) => {
+  return async ({ organizationId, plan }) => {
     try {
       const claimed = await guard.claim(organizationId, true);
       if (!claimed) {
@@ -53,6 +63,16 @@ export function createPricingModelSelfHeal({
       const isSeatEvent = await hasActiveSeatEventSubscription(organizationId);
       if (!isSeatEvent) {
         return;
+      }
+
+      // ADR-039 Decision 11: a license winning the rank while a paid
+      // seat-event subscription runs is a billing conflict a human must
+      // resolve. Alert only — never cancel or mutate the subscription.
+      if (plan?.planSource === "license" && !plan.free) {
+        await notifyLicenseSubscriptionConflict?.({
+          organizationId,
+          licensePlanType: plan.type,
+        });
       }
 
       const pricingModel = await getPricingModel(organizationId);

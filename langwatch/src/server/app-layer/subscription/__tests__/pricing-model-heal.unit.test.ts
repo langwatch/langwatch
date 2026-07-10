@@ -1,12 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { TtlCache } from "../../../utils/ttlCache";
 import { createPricingModelSelfHeal } from "../pricing-model-heal";
 
 describe("createPricingModelSelfHeal()", () => {
-  let hasActiveSeatEventSubscription: ReturnType<typeof vi.fn>;
-  let getPricingModel: ReturnType<typeof vi.fn>;
-  let setPricingModel: ReturnType<typeof vi.fn>;
-  let invalidateMeterDecision: ReturnType<typeof vi.fn>;
+  let hasActiveSeatEventSubscription: Mock<(organizationId: string) => Promise<boolean>>;
+  let getPricingModel: Mock<(organizationId: string) => Promise<string | null>>;
+  let setPricingModel: Mock<
+    (params: {
+      organizationId: string;
+      pricingModel: "SEAT_EVENT";
+    }) => Promise<void>
+  >;
+  let invalidateMeterDecision: Mock<(organizationId: string) => Promise<void>>;
   let guard: TtlCache<true>;
 
   function makeHeal() {
@@ -75,6 +80,58 @@ describe("createPricingModelSelfHeal()", () => {
 
       expect(setPricingModel).not.toHaveBeenCalled();
       expect(invalidateMeterDecision).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a non-free license wins while an active seat subscription exists", () => {
+    /** @scenario An ENTERPRISE license winning over an active subscription alerts without touching the subscription */
+    it("alerts ops and mutates nothing beyond the column heal", async () => {
+      const notifyLicenseSubscriptionConflict = vi
+        .fn()
+        .mockResolvedValue(undefined);
+      const heal = createPricingModelSelfHeal({
+        hasActiveSeatEventSubscription,
+        getPricingModel,
+        setPricingModel,
+        invalidateMeterDecision,
+        notifyLicenseSubscriptionConflict,
+        guard,
+      });
+
+      await heal({
+        organizationId: "org-conflict",
+        plan: { planSource: "license", type: "ENTERPRISE", free: false },
+      });
+
+      expect(notifyLicenseSubscriptionConflict).toHaveBeenCalledWith({
+        organizationId: "org-conflict",
+        licensePlanType: "ENTERPRISE",
+      });
+    });
+
+    it("does not alert when the winning plan is not a license", async () => {
+      const notifyLicenseSubscriptionConflict = vi
+        .fn()
+        .mockResolvedValue(undefined);
+      const heal = createPricingModelSelfHeal({
+        hasActiveSeatEventSubscription,
+        getPricingModel,
+        setPricingModel,
+        invalidateMeterDecision,
+        notifyLicenseSubscriptionConflict,
+        guard,
+      });
+
+      await heal({
+        organizationId: "org-sub",
+        plan: {
+          planSource: "subscription",
+          type: "GROWTH_SEAT_USD_MONTHLY",
+          free: false,
+        },
+      });
+
+      expect(notifyLicenseSubscriptionConflict).not.toHaveBeenCalled();
     });
   });
 

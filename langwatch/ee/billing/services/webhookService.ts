@@ -13,6 +13,7 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
+import { parseLicenseKey } from "../../licensing/validation";
 import { createLogger } from "../../../src/utils/logger";
 import { SubscriptionRecordNotFoundError } from "../errors";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
@@ -937,11 +938,38 @@ export class EEWebhookService implements WebhookService {
     }
   }
 
+  /**
+   * ADR-039 Decision 8: only licenses explicitly marked `isTrial` are cleared
+   * when a subscription activates. A non-trial license (including every
+   * license issued before the flag existed) is never auto-deleted — deleting
+   * a paid license is the worse failure — so the conflict is surfaced to ops
+   * instead.
+   */
   private async clearTrialLicenseIfPresent(
     updatedSubscription: SubscriptionWithOrg,
     reason: string,
   ) {
-    if (!updatedSubscription.organization.license) return;
+    const licenseKey = updatedSubscription.organization.license;
+    if (!licenseKey) return;
+
+    const parsed = parseLicenseKey(licenseKey);
+    const isTrial = parsed?.data.isTrial === true;
+
+    if (!isTrial) {
+      logger.warn(
+        { organizationId: updatedSubscription.organizationId },
+        `[stripeWebhook] Non-trial license coexists with an activating subscription — keeping license, alerting ops (${reason})`,
+      );
+      await getApp().notifications.sendSlackLicenseConflictAlert({
+        organizationId: updatedSubscription.organizationId,
+        organizationName: updatedSubscription.organization.name,
+        licensePlanType: parsed?.data.plan.type ?? "unparseable",
+        subscriptionPlan: updatedSubscription.plan,
+        reason,
+      });
+      return;
+    }
+
     logger.info(
       { organizationId: updatedSubscription.organizationId },
       `[stripeWebhook] Clearing trial license — ${reason}`,

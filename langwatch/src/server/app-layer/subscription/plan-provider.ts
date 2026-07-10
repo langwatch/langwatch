@@ -45,10 +45,10 @@ export class PlanProviderService implements PlanProvider {
   }): Promise<PlanInfo> {
     const plan = await this.provider.getActivePlan(params);
 
-    // Lazy pricingModel convergence (ADR-039 Decision 3). Fire-and-forget:
-    // the heal guards, logs, and swallows internally — never blocks or
-    // fails plan resolution.
-    void this.selfHeal?.({ organizationId: params.organizationId });
+    // Lazy pricingModel convergence + license/subscription conflict detection
+    // (ADR-039 Decisions 3 & 11). Fire-and-forget: the heal guards, logs, and
+    // swallows internally — never blocks or fails plan resolution.
+    void this.selfHeal?.({ organizationId: params.organizationId, plan });
 
     return {
       ...plan,
