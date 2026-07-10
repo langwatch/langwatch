@@ -101,7 +101,7 @@
     "@opentelemetry/exporter-trace-otlp-grpc": "0.219.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.219.0",
-    "@opentelemetry/otlp-transformer": "0.55.0",
+    "@opentelemetry/otlp-transformer": "0.219.0",
     "@opentelemetry/otlp-transformer-next": "npm:@opentelemetry/otlp-transformer@0.219.0",
     "@opentelemetry/resource-detector-aws": "^2.19.0",
     "@opentelemetry/resources": "^2.8.0",
