@@ -10,7 +10,11 @@
  * the CI integration runner provides — the same pattern the invites
  * integration suite runs on every shard.
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -62,6 +66,18 @@ describe("organization member role denial resolution", () => {
         userId: adminUser.id,
         organizationId: organization.id,
         role: OrganizationUserRole.ADMIN,
+      },
+    });
+
+    // Org-scoped ADMIN RoleBinding so checkOrganizationPermission passes
+    await prisma.roleBinding.create({
+      data: {
+        id: `rb-role-res-${nanoid(8)}`,
+        organizationId: organization.id,
+        userId: adminUser.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organization.id,
       },
     });
 
@@ -125,6 +141,9 @@ describe("organization member role denial resolution", () => {
   });
 
   afterAll(async () => {
+    await prisma.roleBinding
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
     await prisma.teamUser
       .deleteMany({ where: { team: { slug: `--test-team-${testNamespace}` } } })
       .catch(() => {});
