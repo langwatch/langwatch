@@ -108,8 +108,6 @@ model User {
   anomalyRulesCreated      AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   pinnedTraces             PinnedTrace[]
   userGitHubCredentials    UserGitHubCredential[]
-  langyConversations       LangyConversation[]      @relation("LangyConversationUser")
-  sharedLangyConversations LangyConversation[]      @relation("LangyConversationSharedBy")
 }
 
 model VerificationToken {
@@ -405,7 +403,6 @@ model Project {
   gatewayChangeEvents      GatewayChangeEvent[]
   pinnedTraces             PinnedTrace[]
   emailSuppressions        EmailSuppression[]
-  langyConversations       LangyConversation[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -2920,46 +2917,11 @@ model ReactorOutbox {
     @@index([status, leasedUntil])
 }
 // ============================================================================
-// Langy assistant — see specs/assistant/memory-design.md §3
+// Langy assistant
 // ============================================================================
-
-model LangyConversation {
-  id              String    @id @default(cuid())
-  projectId       String
-  userId          String
-  title           String?
-  isShared        Boolean   @default(false)
-  sharedAt        DateTime?
-  sharedById      String?
-  lastActivityAt  DateTime?
-  messageCount    Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
-
-  // PII purge path: when a Project or User is deleted VIA THE PRISMA
-  // CLIENT, the conversation (and its messages via the LangyMessage
-  // cascade below) goes too. Postgres tables are outside the ClickHouse
-  // retention sweep, so without this the chat text would be retained
-  // indefinitely.
-  //
-  // IMPORTANT under relationMode="prisma": NO SQL FK constraint is
-  // emitted. The cascade runs at the Prisma-client layer ONLY — a raw
-  // `DELETE FROM "Project"` issued via psql or direct-SQL admin tooling
-  // will NOT cascade and will orphan chat content. For GDPR-correct
-  // purges, all Project/User deletes MUST route through the Prisma
-  // client (or a future SQL trigger we haven't built yet).
-  //
-  // The sharedBy relation uses SetNull so a shared conversation outlives
-  // the sharer's account (the recipient can still see it, attributed to
-  // no one).
-  project  Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user     User           @relation("LangyConversationUser", fields: [userId], references: [id], onDelete: Cascade)
-  sharedBy User?          @relation("LangyConversationSharedBy", fields: [sharedById], references: [id], onDelete: SetNull)
-  @@index([projectId, userId, lastActivityAt])
-  @@index([projectId, isShared, updatedAt])
-  @@index([deletedAt])
-  @@index([userId])
-  @@index([sharedById])
-}
+// The Langy conversation SPINE moved off Postgres onto the event-sourcing
+// framework (ADR-043). The conversation is now a projection of an event stream:
+// its spine lives in the ClickHouse `langy_conversations` fold table and its
+// messages in `langy_messages`. The old `LangyConversation` Postgres model was
+// deleted; see migration `..._drop_langy_conversation`.
 

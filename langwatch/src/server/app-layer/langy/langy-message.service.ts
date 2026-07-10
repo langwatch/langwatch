@@ -1,17 +1,9 @@
-import { randomUUID } from "crypto";
 import {
   type ClickHouseClientResolver,
   getClickHouseClientForProject,
 } from "~/server/clickhouse/clickhouseClient";
 
 export type MessageRole = "user" | "assistant" | "tool" | "system";
-
-export type CreateMessageInput = {
-  conversationId: string;
-  projectId: string;
-  role: MessageRole;
-  parts: unknown;
-};
 
 export type LangyMessageRow = {
   id: string;
@@ -21,9 +13,9 @@ export type LangyMessageRow = {
 };
 
 /**
- * Display shape the UI consumes when restoring a conversation. The raw
- * row stores `parts` (JSON string); the UI only renders text, so we flatten
- * the text parts into `content` here rather than leaking the blob.
+ * Display shape the UI consumes when restoring a conversation. The raw row
+ * stores `parts` (JSON string); the UI only renders text, so we flatten the
+ * text parts into `content` here rather than leaking the blob.
  */
 export type LangyMessageRecord = {
   id: string;
@@ -45,6 +37,13 @@ export function extractTextFromParts(parts: unknown): string {
 
 const TABLE_NAME = "langy_messages" as const;
 
+/**
+ * Read-only repository over the `langy_messages` ClickHouse table (ADR-043).
+ *
+ * Writes are no longer done here — a Langy message row is now produced by the
+ * `langyMessageStorage` MAP PROJECTION when a `message_sent` / `turn_finalized`
+ * event is folded. This repository only reads back the projected rows.
+ */
 export class LangyMessageRepository {
   constructor(private readonly resolver: ClickHouseClientResolver) {}
 
@@ -56,15 +55,25 @@ export class LangyMessageRepository {
     projectId: string;
   }): Promise<LangyMessageRow[]> {
     const client = await this.resolver(projectId);
+    // TenantId-first, IN-tuple dedup on (TenantId, ConversationId, MessageId)
+    // keeping the latest UpdatedAt — never FINAL (CLAUDE.md ClickHouse rules).
     const result = await client.query({
       query: `
         SELECT MessageId, Role, Parts, CreatedAt
-        FROM ${TABLE_NAME} FINAL
+        FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND ConversationId = {conversationId:String}
-        ORDER BY CreatedAt ASC
+          AND (TenantId, ConversationId, MessageId, UpdatedAt) IN (
+            SELECT TenantId, ConversationId, MessageId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND ConversationId = {conversationId:String}
+            GROUP BY TenantId, ConversationId, MessageId
+          )
+        ORDER BY CreatedAt ASC, MessageId ASC
       `,
       query_params: { tenantId: projectId, conversationId },
+      format: "JSONEachRow",
     });
     const rows = await result.json<{
       MessageId: string;
@@ -72,40 +81,12 @@ export class LangyMessageRepository {
       Parts: string;
       CreatedAt: string;
     }>();
-    return rows.data.map((r) => ({
+    return rows.map((r) => ({
       id: r.MessageId,
       role: r.Role as MessageRole,
       parts: JSON.parse(r.Parts) as unknown,
       createdAt: new Date(r.CreatedAt),
     }));
-  }
-
-  async create(input: CreateMessageInput): Promise<LangyMessageRow> {
-    const client = await this.resolver(input.projectId);
-    const messageId = randomUUID();
-    const now = new Date().toISOString();
-    await client.insert({
-      table: TABLE_NAME,
-      values: [
-        {
-          TenantId: input.projectId,
-          ConversationId: input.conversationId,
-          MessageId: messageId,
-          Role: input.role,
-          Parts: JSON.stringify(input.parts ?? []),
-          CreatedAt: now,
-          UpdatedAt: now,
-        },
-      ],
-      format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-    });
-    return {
-      id: messageId,
-      role: input.role,
-      parts: input.parts,
-      createdAt: new Date(now),
-    };
   }
 }
 
@@ -153,9 +134,5 @@ export class LangyMessageService {
       role: r.role,
       content: extractTextFromParts(r.parts),
     }));
-  }
-
-  async append(input: CreateMessageInput): Promise<LangyMessageRow> {
-    return await this.repository.create(input);
   }
 }

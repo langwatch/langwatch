@@ -61,6 +61,13 @@ import {
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
+import { createLangyMessageAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyMessageStorage.store";
+import {
+  LangyConversationStateRepositoryClickHouse,
+  LangyConversationStateRepositoryMemory,
+} from "../event-sourcing/pipelines/langy-conversation-processing/repositories";
+import { LangyConversationService } from "./langy/langy-conversation.service";
+import { LangyMessageService } from "./langy/langy-message.service";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,
@@ -577,6 +584,12 @@ export function initializeDefaultApp(options?: {
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
+    langyConversationState: clickhouseEnabled
+      ? new LangyConversationStateRepositoryClickHouse(resolveClickHouseClient)
+      : new LangyConversationStateRepositoryMemory(),
+    langyMessageStorage: createLangyMessageAppendStore(
+      clickhouseEnabled ? resolveClickHouseClient : null,
+    ),
   };
 
   const gatewayBudgetSync = clickhouseEnabled
@@ -706,6 +719,14 @@ export function initializeDefaultApp(options?: {
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle =
     commands.scenarioExecutionHandle;
+
+  // Langy (ADR-043): conversation reads come from the fold projection; writes
+  // are dispatched via the langy pipeline commands. No Postgres spine.
+  const langyConversations = LangyConversationService.create(
+    commands.langy,
+    clickhouseEnabled ? resolveClickHouseClient : undefined,
+  );
+  const langyMessages = LangyMessageService.create();
 
   const suiteRunService = SuiteRunService.create({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
@@ -883,6 +904,7 @@ export function initializeDefaultApp(options?: {
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
+    langy: { conversations: langyConversations, messages: langyMessages },
     organizations,
     projects,
     tokenizer,
@@ -1044,6 +1066,23 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         queueSimulationRun: noop,
       }),
     },
+    langy: {
+      conversations: LangyConversationService.create(
+        {
+          sendMessage: noop,
+          startAgentTurn: noop,
+          reportStatus: noop,
+          reportProgress: noop,
+          reconcileAgentTurn: noop,
+          archiveConversation: noop,
+          updateConversationMetadata: noop,
+        },
+        async () => {
+          throw new Error("ClickHouse not available in test app");
+        },
+      ),
+      messages: LangyMessageService.create(),
+    },
     organizations: nullOrganizations,
     projects: nullProjects,
     tokenizer: new TokenizerService(new NullTokenizerClient()),
@@ -1111,6 +1150,15 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordSuiteRunItemStarted: noop,
         completeSuiteRunItem: noop,
       } as AppCommands["suiteRuns"],
+      langy: {
+        sendMessage: noop,
+        startAgentTurn: noop,
+        reportStatus: noop,
+        reportProgress: noop,
+        reconcileAgentTurn: noop,
+        archiveConversation: noop,
+        updateConversationMetadata: noop,
+      } as AppCommands["langy"],
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
