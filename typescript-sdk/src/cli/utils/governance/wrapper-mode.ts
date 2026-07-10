@@ -102,6 +102,11 @@ const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
   codex: "codex",
   gemini: "gemini",
   opencode: "opencode",
+  // `copilot_cli`, NOT `copilot` — `copilot_studio` (the Microsoft
+  // Copilot Studio audit feed) already exists as a sourceType and a bare
+  // `copilot` would be confusable with it in the API-keys page and
+  // analytics filters. ADR-039 Decision 2.
+  copilot: "copilot_cli",
 };
 
 /**
@@ -298,6 +303,21 @@ export async function resolveWrapperMode(
 
   const vars = buildOtelEnvBlock(tool, endpoint, token);
 
+  // Copilot content-capture opt-out: the capture flag is a STANDARD OTel
+  // GenAI env var, so a user (or enterprise policy) that exported it as
+  // "false" expressed explicit intent — never override it (same semantics
+  // as the opencode experimental-flag respect below). Dropping our "true"
+  // lets the inherited "false" win in the spawn merge; the notice makes
+  // the tokens-only consequence visible instead of silent (ADR-039 D5).
+  if (
+    tool === "copilot" &&
+    process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT === "false"
+  ) {
+    delete vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
+    const optOutNotice = `${lwTag()} content capture is disabled in your environment (OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false); copilot traces will carry tokens only.`;
+    notice = notice ? `${notice}\n${optOutNotice}` : optOutNotice;
+  }
+
   let codexConfigPath: string | undefined;
   if (tool === "codex") {
     // codex's OTLP/HTTP exporter sends every signal to the configured
@@ -475,6 +495,36 @@ function buildOtelEnvBlock(
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=opencode",
+      };
+    case "copilot":
+      // GitHub Copilot CLI (>= 1.0.41) native OTel, verified against the
+      // 1.0.69 bundle string sweep:
+      //   COPILOT_OTEL_ENABLED=1 unlocks export (setting the OTLP
+      //     endpoint alone also enables it; both set for explicitness).
+      //   COPILOT_OTEL_EXPORTER_TYPE accepts "otlp-http" (default) or
+      //     "file". Pinned here because a user who previously wired the
+      //     file exporter (the ccusage setup) has =file exported in their
+      //     shell — inherited, it silently redirects ALL telemetry to a
+      //     local JSONL file and Path B captures nothing (ADR-039 D5).
+      //   OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true puts
+      //     full prompt/response content on gen_ai.input.messages /
+      //     gen_ai.output.messages span attributes — the ONLY surface
+      //     carrying content (hook payloads and the stats footer are
+      //     metadata-only). Capture-everything default per ADR-039; an
+      //     explicit user "false" in the parent env is respected by the
+      //     resolver (never overridden), with a tokens-only notice.
+      //   Copilot emits spans + metrics only (no standalone log records),
+      //   so no OTEL_LOGS_EXPORTER. Transport is otlp-http only; a grpc
+      //   protocol value silently falls back, so http/json is pinned.
+      return {
+        COPILOT_OTEL_ENABLED: "true",
+        COPILOT_OTEL_EXPORTER_TYPE: "otlp-http",
+        OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true",
+        OTEL_TRACES_EXPORTER: "otlp",
+        OTEL_METRICS_EXPORTER: "otlp",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+        ...base,
+        OTEL_RESOURCE_ATTRIBUTES: "service.name=copilot-cli",
       };
     default:
       return base;

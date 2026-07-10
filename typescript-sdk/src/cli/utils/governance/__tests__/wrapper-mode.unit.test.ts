@@ -27,6 +27,7 @@ vi.mock("../cli-api", async () => {
   return {
     ...actual,
     mintIngestionKey: vi.fn(),
+    listIngestionKeys: vi.fn().mockRejectedValue(new Error("offline")),
   };
 });
 
@@ -343,6 +344,108 @@ describe("resolveWrapperMode", () => {
       expect(out.vars.GEMINI_TELEMETRY_LOG_PROMPTS).toBe("true");
       expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
         "Authorization=Bearer sk-lw-gemini-test-token",
+      );
+    });
+  });
+
+  describe("when copilot resolves to ingestion mode", () => {
+    const mintCopilot = () => {
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-copilot-test-token",
+        prefix: "sk-lw-copi",
+        endpoint: "http://app.example.com/api/otel",
+      });
+    };
+
+    /** @scenario Ingestion mode mints a copilot_cli ingest key and enables native OTel */
+    it("mints a copilot_cli key and enables copilot's native OTel export", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      mintCopilot();
+
+      const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
+      const out = await resolveWrapperMode(cfg, "copilot", {});
+
+      expect(out.mode).toBe("ingestion");
+      expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(cfg, "copilot_cli");
+      expect(out.vars.COPILOT_OTEL_ENABLED).toBe("true");
+      expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+        "http://app.example.com/api/otel",
+      );
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
+        "Authorization=Bearer sk-lw-copilot-test-token",
+      );
+      expect(out.vars.OTEL_EXPORTER_OTLP_PROTOCOL).toBe("http/json");
+      expect(out.vars.OTEL_RESOURCE_ATTRIBUTES).toBe(
+        "service.name=copilot-cli",
+      );
+    });
+
+    /** @scenario Ingestion mode pins the OTLP exporter type against an inherited file exporter */
+    it("pins COPILOT_OTEL_EXPORTER_TYPE=otlp-http so an inherited file exporter can't swallow telemetry", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      mintCopilot();
+
+      const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
+      const out = await resolveWrapperMode(cfg, "copilot", {});
+
+      expect(out.vars.COPILOT_OTEL_EXPORTER_TYPE).toBe("otlp-http");
+    });
+
+    /** @scenario Content capture is enabled by default in ingestion mode */
+    it("enables content capture via the standard GenAI env var (capture-everything default)", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      mintCopilot();
+
+      const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
+      const out = await resolveWrapperMode(cfg, "copilot", {});
+
+      expect(
+        out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+      ).toBe("true");
+    });
+
+    /** @scenario An explicit user opt-out of content capture is never overwritten */
+    it("respects an explicit user opt-out of content capture and warns tokens-only", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      mintCopilot();
+      process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = "false";
+      try {
+        const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
+        const out = await resolveWrapperMode(cfg, "copilot", {});
+
+        expect(
+          out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+        ).toBeUndefined();
+        expect(out.notice).toContain("tokens only");
+      } finally {
+        delete process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
+      }
+    });
+
+    /** @scenario A cached copilot_cli ingest key is reused instead of re-minting */
+    it("reuses a live cached copilot_cli key instead of minting again", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (
+        cliApi.listIngestionKeys as ReturnType<typeof vi.fn>
+      ).mockResolvedValueOnce([
+        { sourceType: "copilot_cli", lookupId: "cachedlookupid123" },
+      ]);
+
+      const cfg = baseCfg({
+        tool_mode: { copilot: "ingestion" },
+        default_personal_ingest_keys: {
+          copilot_cli: {
+            id: "ik_cp",
+            secret: "ik-lw-cachedlookupid123_secretpart",
+            prefix: "ik-lw-",
+          },
+        },
+      });
+      const out = await resolveWrapperMode(cfg, "copilot", {});
+
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+      expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
+        "ik-lw-cachedlookupid123_secretpart",
       );
     });
   });

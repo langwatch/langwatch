@@ -127,6 +127,27 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
           GOOGLE_API_KEY: auth,
         },
       };
+    case "copilot":
+      // GitHub Copilot CLI BYOK (>= 1.0.41): COPILOT_PROVIDER_* switches
+      // ALL LLM traffic off GitHub's backend onto the configured endpoint
+      // (without these, traffic goes to api.githubcopilot.com over GitHub
+      // auth and cannot be intercepted). Wire format is always
+      // OpenAI-compatible (ADR-039 Decision 4); the gateway routes to any
+      // configured upstream. The bundled SDK appends `/chat/completions`
+      // WITHOUT prepending `/v1` — the binary's own local-provider example
+      // is `localhost:11434/v1` — so the base must already include `/v1`,
+      // same convention as opencode. NOTE: routing copilot through the
+      // gateway bills the org's provider keys, not the user's Copilot
+      // seat — which is why copilot defaults to the ingestion path
+      // (wrapper-path-choice.ts) and only lands here on explicit choice
+      // or policy force.
+      return {
+        vars: {
+          COPILOT_PROVIDER_TYPE: "openai",
+          COPILOT_PROVIDER_BASE_URL: `${gw}/v1`,
+          COPILOT_PROVIDER_API_KEY: auth,
+        },
+      };
     case "opencode":
       // opencode 1.x is multi-provider; under the hood it uses the
       // Vercel AI SDK, which appends `/messages` and `/chat/completions`
@@ -171,6 +192,12 @@ const TOOL_PROVIDER_FAMILIES: Record<string, string[]> = {
   cursor: ["anthropic", "openai"],
   gemini: ["google", "gemini"],
   opencode: ["anthropic", "openai"],
+  // copilot always speaks the OpenAI wire format to the gateway
+  // (ADR-039 Decision 4), but the gateway can translate to either
+  // upstream, so both families satisfy preflight. Model-level
+  // servability (a Claude-family model against an openai-only org)
+  // cannot be validated here — see ADR-039 open questions.
+  copilot: ["openai", "anthropic"],
 };
 
 export interface PreflightResult {

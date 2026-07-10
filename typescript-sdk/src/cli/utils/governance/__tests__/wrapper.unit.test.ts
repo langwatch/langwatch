@@ -150,6 +150,21 @@ describe("envForTool", () => {
     );
   });
 
+  /** @scenario Gateway mode points copilot's BYOK provider at the LangWatch gateway */
+  it("copilot → COPILOT_PROVIDER_TYPE=openai + /v1 base + VK as API key", () => {
+    const env = envForTool(cfg, "copilot").vars;
+    expect(env.COPILOT_PROVIDER_TYPE).toBe("openai");
+    expect(env.COPILOT_PROVIDER_BASE_URL).toBe("http://gw.example.com/v1");
+    expect(env.COPILOT_PROVIDER_API_KEY).toBe("lw_vk_test_x");
+  });
+
+  /** @scenario Gateway mode does not enable copilot's own OTel export */
+  it("copilot → gateway env never enables copilot's own OTel export (no-double-trace)", () => {
+    const env = envForTool(cfg, "copilot").vars;
+    expect(env.COPILOT_OTEL_ENABLED).toBeUndefined();
+    expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+  });
+
   it("unknown tool → empty env", () => {
     const env = envForTool(cfg, "nonsense").vars;
     expect(env).toEqual({});
@@ -171,7 +186,7 @@ describe("envForTool", () => {
         opencode: { id: "ik_o", secret: "sk-lw-w", prefix: "sk-lw-" },
       },
     };
-    for (const tool of ["claude", "codex", "gemini", "cursor", "opencode"]) {
+    for (const tool of ["claude", "codex", "gemini", "cursor", "opencode", "copilot"]) {
       const env = envForTool(cfgWithIk, tool).vars;
       expect(env.OTEL_TRACES_EXPORTER).toBeUndefined();
       expect(env.OTEL_LOGS_EXPORTER).toBeUndefined();
@@ -275,6 +290,19 @@ describe("preflightWrapper", () => {
       const r = await preflightWrapper(cfg, "gemini", {
         fetchImpl: okFetch,
         bootstrapImpl: bootstrapWith(["google"]),
+      });
+      expect(r.ok).toBe(true);
+    });
+
+    /** @scenario Copilot's provider families accept either an OpenAI or Anthropic upstream */
+    it("passes copilot when either anthropic OR openai is present", async () => {
+      const r = await preflightWrapper(cfg, "copilot", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(
+          ["anthropic"],
+          "admin@acme.test",
+          ["claude", "codex", "gemini", "cursor", "opencode", "copilot"],
+        ),
       });
       expect(r.ok).toBe(true);
     });
