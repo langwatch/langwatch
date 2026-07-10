@@ -14,32 +14,20 @@ import { TrendingUp } from "react-feather";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Drawer } from "~/components/ui/drawer";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
+import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
+import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  GraphAlertOperator,
-  GraphAlertTimePeriod,
-} from "~/server/app-layer/triggers/graph-alert.builder";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 interface ViewAutomationDrawerProps {
   automationId: string;
-}
-
-interface ViewActionParams {
-  slackWebhook?: string;
-  members?: string[];
-  datasetId?: string;
-  annotators?: { id: string; name: string }[];
-  seriesName?: string;
-  operator?: GraphAlertOperator;
-  threshold?: number;
-  timePeriod?: GraphAlertTimePeriod;
 }
 
 /**
@@ -73,19 +61,53 @@ export function ViewAutomationDrawer({
 
   const trigger = triggerQuery.data;
   const isGraphAlert = !!trigger?.customGraphId;
-  const actionParams = (trigger?.actionParams ?? {}) as ViewActionParams;
+  const actionParams = (trigger?.actionParams ?? {}) as TriggerActionParams;
 
-  const destinationSummary = () => {
+  // Resolve the watched graph's JSON so the stored series key renders as its
+  // human label (falls back to the raw key when the graph is gone), and the
+  // dataset name so ADD_TO_DATASET destinations don't show a bare cuid.
+  const graphQuery = api.graphs.getById.useQuery(
+    { projectId: project?.id ?? "", id: trigger?.customGraphId ?? "" },
+    { enabled: !!project?.id && !!trigger?.customGraphId, retry: false },
+  );
+  const datasetsQuery = api.dataset.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id && trigger?.action === "ADD_TO_DATASET" },
+  );
+  const datasetName = actionParams.datasetId
+    ? (datasetsQuery.data?.find((d) => d.id === actionParams.datasetId)?.name ??
+      null)
+    : null;
+
+  const destinationSummary = (): React.ReactNode => {
     if (!trigger) return null;
     switch (trigger.action) {
       case "SEND_SLACK_MESSAGE":
-        return actionParams.slackWebhook ?? "Slack webhook";
+        // The webhook URL carries a secret token — mask it and surface the
+        // full URL only on hover, mirroring the list page's Slack cell.
+        return actionParams.slackWebhook ? (
+          <Tooltip content={actionParams.slackWebhook}>
+            <Text textStyle="sm" lineClamp={1} width="fit-content" cursor="help">
+              Slack webhook
+            </Text>
+          </Tooltip>
+        ) : (
+          <Text textStyle="sm">Slack webhook</Text>
+        );
       case "SEND_EMAIL":
-        return actionParams.members?.join(", ") ?? null;
+        return actionParams.members?.length ? (
+          <Text textStyle="sm" wordBreak="break-all">
+            {actionParams.members.join(", ")}
+          </Text>
+        ) : null;
       case "ADD_TO_DATASET":
-        return actionParams.datasetId ?? null;
+        return datasetName ? <Text textStyle="sm">{datasetName}</Text> : null;
       case "ADD_TO_ANNOTATION_QUEUE":
-        return actionParams.annotators?.map((a) => a.name).join(", ") ?? null;
+        return actionParams.annotators?.length ? (
+          <Text textStyle="sm" wordBreak="break-all">
+            {actionParams.annotators.map((a) => a.name).join(", ")}
+          </Text>
+        ) : null;
       default:
         return null;
     }
@@ -100,9 +122,13 @@ export function ViewAutomationDrawer({
       const window = actionParams.timePeriod
         ? TIME_PERIOD_LABELS[actionParams.timePeriod]
         : null;
+      const seriesLabel = actionParams.seriesName
+        ? (resolveSeriesLabel(graphQuery.data?.graph, actionParams.seriesName) ??
+          actionParams.seriesName)
+        : "Metric";
       return (
         <Text textStyle="sm">
-          {actionParams.seriesName ?? "Metric"}
+          {seriesLabel}
           {operator ? ` ${operator}` : ""}
           {actionParams.threshold !== undefined
             ? ` ${actionParams.threshold}`
@@ -137,7 +163,9 @@ export function ViewAutomationDrawer({
             {triggerQuery.isLoading ? (
               <Skeleton height="24px" width="200px" />
             ) : (
-              <Heading size="md">{trigger?.name ?? "Automation"}</Heading>
+              <Heading size="md">
+                {trigger?.name ?? (isGraphAlert ? "Alert" : "Automation")}
+              </Heading>
             )}
             {isGraphAlert ? (
               <Badge colorPalette="purple" gap={1}>
@@ -167,9 +195,7 @@ export function ViewAutomationDrawer({
               <Text textStyle="xs" color="fg.muted" fontWeight="medium">
                 Destination
               </Text>
-              <Text textStyle="sm" wordBreak="break-all">
-                {destinationSummary() ?? "None"}
-              </Text>
+              {destinationSummary() ?? <Text textStyle="sm">None</Text>}
             </VStack>
 
             <VStack align="start" gap={1} width="full">
@@ -187,7 +213,9 @@ export function ViewAutomationDrawer({
                 <Skeleton height="60px" width="full" />
               ) : (recentFiresQuery.data ?? []).length === 0 ? (
                 <Text textStyle="sm" color="fg.muted">
-                  This automation has not fired yet.
+                  {isGraphAlert
+                    ? "This alert has not fired yet."
+                    : "This automation has not fired yet."}
                 </Text>
               ) : (
                 <VStack align="stretch" gap={0} width="full">

@@ -29,13 +29,18 @@ export const GRAPH_ALERT_TIME_PERIODS = [1, 5, 15, 30, 60, 1440] as const;
 export type GraphAlertTimePeriod = (typeof GRAPH_ALERT_TIME_PERIODS)[number];
 
 export const graphAlertOperatorSchema = z.enum(GRAPH_ALERT_OPERATORS);
-export const graphAlertTimePeriodSchema = z.union(
-  GRAPH_ALERT_TIME_PERIODS.map((value) => z.literal(value)) as unknown as [
-    z.ZodLiteral<GraphAlertTimePeriod>,
-    z.ZodLiteral<GraphAlertTimePeriod>,
-    ...z.ZodLiteral<GraphAlertTimePeriod>[],
-  ],
-);
+// Keep the literals in sync with GRAPH_ALERT_TIME_PERIODS above. Spelling
+// them out (instead of casting `.map(z.literal)` to a tuple) means a
+// mismatch surfaces as a type error rather than being silently swallowed by
+// an `as unknown as` cast.
+export const graphAlertTimePeriodSchema = z.union([
+  z.literal(1),
+  z.literal(5),
+  z.literal(15),
+  z.literal(30),
+  z.literal(60),
+  z.literal(1440),
+]);
 
 /** Validation schema for the graph-alert portion of `actionParams`. The
  *  destination keys (`members` / `slackWebhook`) are validated by the

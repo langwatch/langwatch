@@ -89,7 +89,7 @@ export const ALERT_TEMPLATE_VARIABLES: VariableInfo[] = [
     path: "history",
     type: "Array<{ timestamp: string; value: number }>",
     description:
-      "Recent metric buckets (chronological) — iterate to render your own trend.",
+      "Recent metric buckets (chronological): iterate to render your own trend.",
   },
   {
     path: "occurredAt",

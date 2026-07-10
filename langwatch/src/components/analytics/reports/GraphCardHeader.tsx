@@ -98,6 +98,18 @@ export function GraphCardHeader({
   // Check if this is a saved graph (has valid database ID)
   const isSavedGraph = !!(graphId && graphId !== "custom" && graph);
 
+  // Opens the automations drawer in edit mode for this graph's existing
+  // trigger. Shared by the bell's click and keyboard handlers so both entry
+  // points stay identical.
+  const openEditAlert = () => {
+    if (!trigger) return;
+    openDrawer("automation", {
+      automationId: trigger.id,
+      prefilledGraphId: graphId,
+      prefilledSeriesName: defaultSeriesName,
+    });
+  };
+
   return (
     <HStack
       {...dragAttributes}
@@ -139,11 +151,14 @@ export function GraphCardHeader({
                 cursor="pointer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  openDrawer("automation", {
-                    automationId: trigger.id,
-                    prefilledGraphId: graphId,
-                    prefilledSeriesName: defaultSeriesName,
-                  });
+                  openEditAlert();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openEditAlert();
+                  }
                 }}
               >
                 <Bell width={18} color="black" />

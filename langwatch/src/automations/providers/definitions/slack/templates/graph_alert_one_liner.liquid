@@ -1,6 +1,6 @@
 {%- capture _emoji -%}{% if trigger.alertType == 'INFO' %}ℹ️{% elsif trigger.alertType == 'CRITICAL' %}🔴{% else %}🚨{% endif %}{%- endcapture -%}
 {%- capture _line -%}
-{{ _emoji }} *{{ trigger.name }}* · {{ metric.label | mrkdwn_escape }} {{ condition.operatorLabel }} {{ condition.threshold }} — now {{ currentValue }} · <{{ graph.url }}|Open dashboard ↗>
+{{ _emoji }} *{{ trigger.name | mrkdwn_escape }}* · {{ metric.label | mrkdwn_escape }} {{ condition.operatorLabel }} {{ condition.threshold }} — now {{ currentValue }} · <{{ graph.url }}|Open dashboard ↗>
 {%- endcapture -%}
 [
   { "type": "section", "text": { "type": "mrkdwn", "text": {{ _line | json }} } }

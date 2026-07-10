@@ -159,10 +159,10 @@ export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
 ]`;
 
 /**
- * The four default-template strings a renderer needs, picked together
- * to keep email + slack defaults aligned. `pickTriggerDefaults`
- * returns the trace-shape set or the alert-shape set based on whether
- * the trigger is a custom-graph alert.
+ * The four default-template strings a renderer needs, grouped together
+ * to keep email + slack defaults aligned. Callers select the set that
+ * matches the trigger directly — `ALERT_TRIGGER_DEFAULTS` for custom-graph
+ * threshold alerts, `TRACE_TRIGGER_DEFAULTS` for trace triggers.
  */
 export interface TriggerTemplateDefaults {
   emailSubject: string;

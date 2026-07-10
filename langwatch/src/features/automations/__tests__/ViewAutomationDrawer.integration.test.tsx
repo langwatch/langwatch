@@ -12,6 +12,8 @@ const MINUTE_MS = 60 * 1000;
 
 let mockTriggerRow: Record<string, unknown> | null = null;
 let mockRecentFires: Array<Record<string, unknown>> = [];
+let mockGraphRow: Record<string, unknown> | null = null;
+let mockDatasets: Array<Record<string, unknown>> = [];
 
 const { mockOpenDrawer, mockCloseDrawer } = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
@@ -56,6 +58,24 @@ vi.mock("~/utils/api", () => ({
       getRecentFires: {
         useQuery: () => ({
           data: mockRecentFires,
+          isLoading: false,
+          error: null,
+        }),
+      },
+    },
+    graphs: {
+      getById: {
+        useQuery: () => ({
+          data: mockGraphRow,
+          isLoading: false,
+          error: null,
+        }),
+      },
+    },
+    dataset: {
+      getAll: {
+        useQuery: () => ({
+          data: mockDatasets,
           isLoading: false,
           error: null,
         }),
@@ -151,6 +171,63 @@ describe("ViewAutomationDrawer", () => {
         expect(mockOpenDrawer).toHaveBeenCalledWith("automation", {
           automationId: "trigger_1",
         });
+      });
+    });
+  });
+
+  describe("given a graph alert whose incident ran for over an hour", () => {
+    beforeEach(() => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "p95 latency alert",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: "graph_1",
+        filters: "{}",
+        actionParams: {
+          slackWebhook: "https://hooks.slack.com/services/abc",
+          seriesName: "0/latency/p95",
+          operator: "gt",
+          threshold: 250,
+          timePeriod: 60,
+        },
+      };
+    });
+
+    describe("when the incident resolved 1h 30m after firing", () => {
+      it("formats the resolution duration in hours and minutes", () => {
+        const firedAt = new Date(Date.now() - 3 * HOUR_MS);
+        mockRecentFires = [
+          {
+            id: "sent_long",
+            triggerId: "trigger_1",
+            customGraphId: "graph_1",
+            createdAt: firedAt,
+            resolvedAt: new Date(firedAt.getTime() + HOUR_MS + 30 * MINUTE_MS),
+          },
+        ];
+
+        renderDrawer();
+
+        expect(screen.getByText(/resolved after 1h 30m/)).toBeDefined();
+      });
+    });
+
+    describe("when the incident resolved on an exact hour boundary", () => {
+      it("omits the trailing minutes for a whole-hour duration", () => {
+        const firedAt = new Date(Date.now() - 4 * HOUR_MS);
+        mockRecentFires = [
+          {
+            id: "sent_exact",
+            triggerId: "trigger_1",
+            customGraphId: "graph_1",
+            createdAt: firedAt,
+            resolvedAt: new Date(firedAt.getTime() + 2 * HOUR_MS),
+          },
+        ];
+
+        renderDrawer();
+
+        expect(screen.getByText(/resolved after 2h$/)).toBeDefined();
       });
     });
   });

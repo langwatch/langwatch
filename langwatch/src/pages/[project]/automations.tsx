@@ -36,11 +36,8 @@ import {
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
+import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { useDrawer } from "~/hooks/useDrawer";
-import type {
-  GraphAlertOperator,
-  GraphAlertTimePeriod,
-} from "~/server/app-layer/triggers/graph-alert.builder";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
@@ -54,17 +51,6 @@ import { formatTimeAgo } from "../../utils/formatTimeAgo";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 type TriggerStats = RouterOutputs["automation"]["getTriggerStats"][number];
-
-interface ActionParams {
-  slackWebhook?: string;
-  members?: string[];
-  datasetId?: string;
-  // Graph-alert keys — present on rows where `customGraphId` is set.
-  seriesName?: string;
-  operator?: GraphAlertOperator;
-  threshold?: number;
-  timePeriod?: GraphAlertTimePeriod;
-}
 
 /** Column header with a help tooltip explaining the metric. */
 function MetricHeader({ label, help }: { label: string; help: string }) {
@@ -285,7 +271,7 @@ function Automations() {
     );
   };
 
-  const getDatasetName = (actionParams: ActionParams) => {
+  const getDatasetName = (actionParams: TriggerActionParams) => {
     if (actionParams.datasetId) {
       return (
         <Link href={`/${project?.slug}/datasets/${actionParams.datasetId}`}>
@@ -334,7 +320,10 @@ function Automations() {
   const triggerActionName = (action: TriggerAction) =>
     CLIENT_PROVIDERS[action]?.shared.label ?? action;
 
-  const actionItems = (action: TriggerAction, actionParams: ActionParams) => {
+  const actionItems = (
+    action: TriggerAction,
+    actionParams: TriggerActionParams,
+  ) => {
     switch (action) {
       case "SEND_SLACK_MESSAGE":
         return (
@@ -576,7 +565,7 @@ function Automations() {
                       <Table.Body>
                         {alerts.map((trigger) => {
                           const actionParams =
-                            trigger.actionParams as ActionParams;
+                            trigger.actionParams as TriggerActionParams;
                           const stats = statsByTriggerId.get(trigger.id);
                           return (
                             <Table.Row {...sharedRowProps(trigger)}>
@@ -668,7 +657,7 @@ function Automations() {
                       <Table.Body>
                         {traceAutomations.map((trigger) => {
                           const actionParams =
-                            trigger.actionParams as ActionParams;
+                            trigger.actionParams as TriggerActionParams;
                           const stats = statsByTriggerId.get(trigger.id);
                           return (
                             <Table.Row {...sharedRowProps(trigger)}>
@@ -730,12 +719,7 @@ interface GraphAlertConditionsProps {
   /** The joined custom graph's JSON, used to resolve the stored series key
    *  into its display name. Undefined when the graph was deleted. */
   graph?: unknown;
-  actionParams: {
-    seriesName?: string;
-    operator?: GraphAlertOperator;
-    threshold?: number;
-    timePeriod?: GraphAlertTimePeriod;
-  };
+  actionParams: TriggerActionParams;
 }
 
 /**

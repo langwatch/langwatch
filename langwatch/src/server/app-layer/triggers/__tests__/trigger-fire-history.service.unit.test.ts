@@ -85,7 +85,7 @@ describe("TriggerFireHistoryService", () => {
         });
       });
 
-      it("returns metadata-only fire rows without trace references", async () => {
+      it("returns the repository's fire rows unchanged", async () => {
         const result = await service.getAllRecentFiresForTrigger({
           projectId: "proj_123",
           triggerId: "trigger_1",
@@ -93,9 +93,11 @@ describe("TriggerFireHistoryService", () => {
         });
 
         expect(result).toEqual(fires);
-        // Fire history is readable with triggers:view only, so rows must
-        // never carry trace ids or captured content.
-        expect(result[0]).not.toHaveProperty("traceId");
+        // The metadata-only guarantee (no traceId / captured content) is
+        // enforced by the repository's `select`, not by this service — the
+        // service is a passthrough, so asserting the shape here would only
+        // test the fixture. That guard is asserted directly against the
+        // prisma `select` in trigger-fire-history.prisma.repository.unit.test.ts.
       });
     });
   });

@@ -392,6 +392,107 @@ describe("evaluateGraphTrigger", () => {
     });
   });
 
+  describe("given a breach with a non-empty previous window", () => {
+    it("carries the previous-window aggregate as previousValue and prepends its points to history", async () => {
+      harness = makeHarness({
+        series: {
+          currentPeriod: [
+            {
+              date: "2026-06-20T11:00:00Z",
+              "0/metadata.trace_id/cardinality": 15,
+            },
+          ],
+          previousPeriod: [
+            {
+              date: "2026-06-20T10:00:00Z",
+              "0/metadata.trace_id/cardinality": 7,
+            },
+          ],
+        } as unknown as TimeseriesResult,
+      });
+
+      const result = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.status).toBe("fired");
+      expect(harness.dispatch).toHaveBeenCalledTimes(1);
+      const arg = harness.dispatch.mock.calls[0]?.[0] as {
+        context: {
+          previousValue: number | null;
+          history: Array<{ timestamp: string; value: number }>;
+        };
+      };
+      // previousValue is the aggregate over the window preceding the alert
+      // window (cardinality → additive sum of the previous buckets).
+      expect(arg.context.previousValue).toBe(7);
+      // history is chronological: previous-window points prepended before the
+      // current-window points so templates can render the full trend.
+      expect(arg.context.history).toEqual([
+        { timestamp: "2026-06-20T10:00:00Z", value: 7 },
+        { timestamp: "2026-06-20T11:00:00Z", value: 15 },
+      ]);
+    });
+  });
+
+  describe("given a series aggregated with terms whose bucket is keyed .../cardinality", () => {
+    // Regression: `buildSeriesName` rewrites terms→cardinality when composing
+    // the result-bucket key. The stored `seriesName` keeps `terms`, so the
+    // evaluator must read the rewritten `.../cardinality` bucket — otherwise
+    // it reads 0 and the alert never fires.
+    it("reads the cardinality-keyed bucket and fires", async () => {
+      const harness = makeHarness({
+        trigger: makeTrigger({
+          actionParams: {
+            threshold: 10,
+            operator: "gt",
+            timePeriod: 60,
+            seriesName: "0/metadata.user_id/terms",
+            members: ["a@example.com"],
+          },
+        } as Partial<Trigger>),
+        graph: makeGraph({
+          graph: {
+            series: [
+              {
+                name: "Distinct users",
+                metric: "metadata.user_id",
+                aggregation: "terms",
+                colorSet: "blueTones",
+              },
+            ],
+            groupBy: undefined,
+            groupByKey: undefined,
+            timeScale: 60,
+          },
+        } as Partial<CustomGraph>),
+        series: {
+          currentPeriod: [
+            {
+              date: "2026-06-20T11:00:00Z",
+              "0/metadata.user_id/cardinality": 42,
+            },
+          ],
+          previousPeriod: [],
+        } as unknown as TimeseriesResult,
+      });
+
+      const result = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.status).toBe("fired");
+      expect(result.value).toBe(42);
+      expect(harness.dispatch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given a breach with an existing open TriggerSent", () => {
     it("reports already_firing and does not re-notify", async () => {
       harness.triggerSent.openRows.push({

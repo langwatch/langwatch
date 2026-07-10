@@ -328,6 +328,67 @@ describe("automationRouter", () => {
       });
     });
 
+    describe("notification cadence pinning", () => {
+      // Graph alerts are incident-based (fire on breach, silent while open,
+      // resolve on recovery) — there is nothing to digest, so the storage
+      // boundary pins cadence to `immediate` on both write paths, overriding
+      // whatever the client requested (the isGraphAlert→immediate guard in
+      // resolveCadenceForCreate / resolveCadenceForUpdate).
+      describe("on create (no triggerId)", () => {
+        it("pins the persisted cadence to immediate", async () => {
+          mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+          mockTriggerCreate.mockResolvedValueOnce({ id: "trigger_new" });
+
+          await caller.upsert(baseGraphAlertInput as any);
+
+          const createArgs = mockTriggerCreate.mock.calls[0]![0];
+          expect(createArgs.data.notificationCadence).toBe("immediate");
+        });
+
+        it("overrides a requested 5min_digest with immediate", async () => {
+          mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+          mockTriggerCreate.mockResolvedValueOnce({ id: "trigger_new" });
+
+          await caller.upsert({
+            ...baseGraphAlertInput,
+            notificationCadence: "5min_digest",
+          } as any);
+
+          const createArgs = mockTriggerCreate.mock.calls[0]![0];
+          expect(createArgs.data.notificationCadence).toBe("immediate");
+        });
+      });
+
+      describe("on edit (triggerId set)", () => {
+        it("pins the persisted cadence to immediate", async () => {
+          mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+          mockTriggerUpdate.mockResolvedValueOnce({ id: "trigger-1" });
+
+          await caller.upsert({
+            ...baseGraphAlertInput,
+            triggerId: "trigger-1",
+          } as any);
+
+          const updateArgs = mockTriggerUpdate.mock.calls[0]![0];
+          expect(updateArgs.data.notificationCadence).toBe("immediate");
+        });
+
+        it("overrides a requested 5min_digest with immediate", async () => {
+          mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+          mockTriggerUpdate.mockResolvedValueOnce({ id: "trigger-1" });
+
+          await caller.upsert({
+            ...baseGraphAlertInput,
+            triggerId: "trigger-1",
+            notificationCadence: "5min_digest",
+          } as any);
+
+          const updateArgs = mockTriggerUpdate.mock.calls[0]![0];
+          expect(updateArgs.data.notificationCadence).toBe("immediate");
+        });
+      });
+    });
+
     describe("when the graphAlert rule is missing", () => {
       it("rejects the upsert", async () => {
         await expect(

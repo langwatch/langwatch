@@ -382,7 +382,7 @@ export function FiltersSecondaryDrawer({
                 <NativeSelect.Indicator />
               </NativeSelect.Root>
             </Field.Root>
-            <Field.Root flex="1">
+            <Field.Root flex="1" invalid={thresholdInvalid}>
               <Field.Label>Threshold</Field.Label>
               <Input
                 type="number"
@@ -390,6 +390,9 @@ export function FiltersSecondaryDrawer({
                 value={thresholdText}
                 onChange={(e) => setThresholdText(e.target.value)}
               />
+              <Field.ErrorText>
+                Enter a number to compare against.
+              </Field.ErrorText>
             </Field.Root>
           </HStack>
 
