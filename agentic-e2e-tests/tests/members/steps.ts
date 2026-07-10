@@ -8,23 +8,28 @@
  */
 import { Page, expect } from "@playwright/test";
 
+import { getProjectSlug } from "../helpers";
 
 /**
- * Typed shape of the batched tRPC response from organization.getAll.
- * The batch API wraps results under a numeric string key ("0").
+ * Typed shape of a tRPC response from organization.getAll.
+ * tRPC wraps results in a nested `result.data` structure,
+ * with the actual payload under `result.data.json`.
  */
-type OrgGetAllBatchResponse = {
-  "0"?: {
-    result?: {
-      data?: {
-        json?: Array<{
+interface TrpcOrganizationResponse {
+  result?: {
+    data?:
+      | {
+          json?: Array<{
+            id: string;
+            teams?: Array<{ id: string }>;
+          }>;
+        }
+      | Array<{
           id: string;
           teams?: Array<{ id: string }>;
         }>;
-      };
-    };
   };
-};
+}
 
 // =============================================================================
 // Navigation Steps
@@ -35,9 +40,10 @@ type OrgGetAllBatchResponse = {
  * Extracts the org slug from the Home link to build the URL.
  */
 export async function givenIAmOnTheMembersPage(page: Page) {
-  // The members page lives at /settings/members (src/pages/settings/members.tsx),
-  // NOT under /{project}/settings/members — it has no [project] path segment.
-  await page.goto(`/settings/members`);
+  const projectSlug = await getProjectSlug(page);
+
+  // Navigate to settings/members using the org context
+  await page.goto(`/${projectSlug}/settings/members`);
   await expect(
     page.getByRole("heading", { name: "Organization Members" })
   ).toBeVisible({ timeout: 15000 });
@@ -62,7 +68,7 @@ export async function whenIClickAddMembers(page: Page) {
  * Fill the email input field in the Add Members dialog.
  */
 export async function whenIFillEmailWith(page: Page, email: string) {
-  await page.getByPlaceholder("alice@example.com, bob@example.com").last().fill(email);
+  await page.getByPlaceholder("Enter email address").last().fill(email);
 }
 
 /**
@@ -181,10 +187,8 @@ export async function thenEmailIsNotVisible(page: Page, email: string) {
  * Assert that a success toast with the given title text appears.
  */
 export async function thenISeeSuccessToast(page: Page, titleText: string) {
-  // 15 s: CI mutation round-trips can be slow; toast appears only after the
-  // server responds, and the default 5 s is too tight under load.
   await expect(page.getByText(titleText, { exact: false })).toBeVisible({
-    timeout: 15000,
+    timeout: 5000,
   });
 }
 
@@ -209,67 +213,33 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
   organizationId: string;
   teamId: string;
 }> {
-  // Use page.request (same as getProjectSlug in helpers.ts) so this works
-  // even before the browser has navigated anywhere — page.evaluate with a
-  // relative URL fails on about:blank because there is no base URL.
-  const response = await page.request.get(
-    "/api/trpc/organization.getAll?batch=1&input=" +
-      encodeURIComponent(JSON.stringify({ "0": { json: {} } })),
-  );
+  // Confirm the authenticated app loaded before calling the org API.
+  await getProjectSlug(page);
 
-  const data = (await response.json().catch(() => null)) as OrgGetAllBatchResponse | null;
-  const orgs = data?.["0"]?.result?.data?.json ?? [];
+  // Use the settings API to get org data
+  const orgData = await page.evaluate(async () => {
+    const response = await fetch("/api/trpc/organization.getAll");
+    const json = (await response.json()) as TrpcOrganizationResponse;
+    // tRPC wraps the result; data may be {json: [...]} or directly [...]
+    const data = json.result?.data;
+    const orgs = (data && !Array.isArray(data) ? data.json : data) ?? [];
+    if (!Array.isArray(orgs) || orgs.length === 0) {
+      throw new Error("No organizations found");
+    }
+    const org = orgs[0]!;
+    return {
+      organizationId: org.id,
+      teamId: org.teams?.[0]?.id ?? "",
+    };
+  });
 
-  if (!Array.isArray(orgs) || orgs.length === 0) {
+  if (!orgData.organizationId || !orgData.teamId) {
     throw new Error(
-      `No organizations found in organization.getAll (status ${response.status()})`,
+      `Could not extract org/team IDs: ${JSON.stringify(orgData)}`
     );
   }
 
-  const org = orgs[0]!;
-  const organizationId = org.id;
-  const teamId = org.teams?.[0]?.id ?? "";
-
-  if (!organizationId || !teamId) {
-    throw new Error(
-      `Could not extract org/team IDs: ${JSON.stringify(org)}`,
-    );
-  }
-
-  return { organizationId, teamId };
-}
-
-/**
- * Purge all PENDING/WAITING_APPROVAL invites for the org before seeding.
- * Required because the CI DB persists across runs (SKIP_PRISMA_MIGRATE=true),
- * so accumulated invites count toward the free plan maxMembers=2 cap and
- * cause 403 FORBIDDEN on subsequent seeding calls.
- */
-async function purgeExistingInvites({
-  page,
-  organizationId,
-}: {
-  page: Page;
-  organizationId: string;
-}) {
-  const listResponse = await page.request.get(
-    "/api/trpc/organization.getOrganizationPendingInvites?batch=1&input=" +
-      encodeURIComponent(
-        JSON.stringify({ "0": { json: { organizationId } } }),
-      ),
-  );
-  if (!listResponse.ok()) return; // best-effort
-
-  const data = (await listResponse.json().catch(() => null)) as
-    | { "0": { result: { data: { json: { id: string }[] } } } }
-    | null;
-  const invites = data?.["0"]?.result?.data?.json ?? [];
-
-  for (const invite of invites) {
-    await page.request.post("/api/trpc/organization.deleteInvite", {
-      data: { json: { inviteId: invite.id, organizationId } },
-    });
-  }
+  return orgData;
 }
 
 /**
@@ -286,9 +256,6 @@ export async function seedWaitingApprovalInvite({
   organizationId: string;
   teamId: string;
 }) {
-  // Purge accumulated invites first so we don't hit the free plan member cap.
-  await purgeExistingInvites({ page, organizationId });
-
   const response = await page.request.post(
     "/api/trpc/organization.createInviteRequest",
     {
@@ -303,7 +270,7 @@ export async function seedWaitingApprovalInvite({
                 {
                   teamId,
                   role: "MEMBER",
-                  // customRoleId omitted — z.string().optional() accepts undefined, not null
+                  customRoleId: null,
                 },
               ],
             },

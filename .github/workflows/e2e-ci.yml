@@ -47,7 +47,6 @@ jobs:
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/langwatch"
       IS_OPENSEARCH: "true"
       REDIS_URL: "redis://localhost:6380"
-      ELASTICSEARCH_NODE_URL: "http://localhost:9201"
       LANGWATCH_NLP_SERVICE: "http://localhost:5563"
       LANGEVALS_ENDPOINT: "http://localhost:5564"
       NEXTAUTH_SECRET: "test-secret-for-e2e-testing"

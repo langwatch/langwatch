@@ -26,6 +26,10 @@ import {
  * Note: These tests require NLP service to be running for execution.
  */
 test.describe("Scenario Execution", () => {
+  // Describe-level slow() applies to every test in the suite (Playwright pushes
+  // it onto the suite's static annotations) — the execution test drives an NLP
+  // round-trip; the others are cheap but the longer budget is harmless.
+  test.slow();
   test.beforeEach(async ({ page }) => {
     await givenIAmLoggedIntoProject(page);
   });
@@ -54,7 +58,6 @@ test.describe("Scenario Execution", () => {
    * Workflow test: creates scenario, runs it, and verifies results appear.
    * Requires NLP service to be running.
    */
-  test.slow();
   test("executes scenario and displays run results", async ({ page }) => {
     // Create a scenario first
     await givenIAmOnTheScenariosListPage(page);

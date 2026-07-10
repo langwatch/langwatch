@@ -136,19 +136,23 @@ export async function thenISeeTheScenarioEditor(page: Page) {
  */
 export async function thenISeeScenarioFormFields(page: Page) {
   // Name field — SectionHeader renders as <p> not <label>, so there is no
-  // ARIA name association; match by placeholder instead.
+  // ARIA name association; match by placeholder instead. .last() picks the
+  // visible dialog when Chakra renders duplicates (same reason as the sibling
+  // fill/assert helpers in this file).
   await expect(
-    page.getByPlaceholder(/angry refund request/i).first()
+    page.getByPlaceholder(/angry refund request/i).last()
   ).toBeVisible();
 
   // Situation field
   await expect(
-    page.getByPlaceholder(/a frustrated premium subscriber/i).first()
+    page.getByPlaceholder(/a frustrated premium subscriber/i).last()
   ).toBeVisible();
 
-  // Criteria field
+  // Criteria field — CriteriaInput mounts the entry textarea only after the
+  // add button is clicked (isAddingNew), so assert the reveal control instead
+  // of the not-yet-rendered placeholder textarea.
   await expect(
-    page.getByPlaceholder(/must apologize for the inconvenience/i).first()
+    page.getByRole("button", { name: /add.*criteria/i }).last()
   ).toBeVisible();
 }
 
@@ -177,21 +181,27 @@ export async function whenIFillInSituationWith(page: Page, situation: string) {
  * When I add criterion "<criterion>"
  */
 export async function whenIAddCriterion(page: Page, criterion: string) {
-  await page
+  // CriteriaInput hides the entry textarea behind an "Add ... criteria" button
+  // (label is "Add the first criteria" when empty, "Add criteria" otherwise);
+  // the textarea only mounts once adding starts (isAddingNew).
+  await page.getByRole("button", { name: /add.*criteria/i }).last().click();
+  const input = page
     .getByPlaceholder(/must apologize for the inconvenience/i)
-    .last()
-    .fill(criterion);
-  await page.getByRole("button", { name: "Add" }).last().click();
+    .last();
+  await input.fill(criterion);
+  // Enter commits the new criterion (handleAddKeyDown → handleSaveNew).
+  await input.press("Enter");
 }
 
 /**
  * Then the criterion appears in the criteria list
  */
 export async function thenCriterionAppearsInList(page: Page, criterion: string) {
-  // Scope to the criteria list container so we only match rendered criteria items.
-  // Saved criteria render as plain text (not inputs), so we assert visibility of
-  // the criterion text within the container rather than an input value.
-  const criteriaList = page.getByTestId("criteria-list");
+  // Committed criteria render as plain text within the criteria-list container
+  // (not as inputs). Scope to that container so we don't match the criterion
+  // text elsewhere on the page; .last() picks the visible Chakra dialog when
+  // duplicate dialogs are rendered.
+  const criteriaList = page.getByTestId("criteria-list").last();
   await expect(criteriaList.getByText(criterion)).toBeVisible({ timeout: 5000 });
 }
 
