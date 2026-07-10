@@ -1,9 +1,9 @@
 import { z } from "zod";
+import { skipPermissionCheck } from "../../src/server/api/rbac";
 import {
   createTRPCRouter,
   protectedProcedure,
 } from "../../src/server/api/trpc";
-import { skipPermissionCheck } from "../../src/server/api/rbac";
 import { detectCurrencyFromRequest } from "./utils/currency";
 
 export const createCurrencyRouter = () => {

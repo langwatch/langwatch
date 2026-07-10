@@ -3,6 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import type {
   HourlySample,
   StorageUsageHourlyRepository,
+  UnreportedHour,
 } from "./storage-usage-hourly.repository";
 
 export class PrismaStorageUsageHourlyRepository
@@ -21,6 +22,36 @@ export class PrismaStorageUsageHourlyRepository
       select: { sealedHour: true },
     });
     return row?.sealedHour ?? null;
+  }
+
+  async findUnreportedHours({
+    organizationId,
+    limit,
+  }: {
+    organizationId: string;
+    limit: number;
+  }): Promise<UnreportedHour[]> {
+    return await this.prisma.storageUsageHourly.findMany({
+      where: { organizationId, reportedAt: null },
+      orderBy: { sealedHour: "asc" },
+      take: limit,
+      select: { sealedHour: true, megabytes: true },
+    });
+  }
+
+  async markReported({
+    organizationId,
+    sealedHour,
+    reportedAt,
+  }: {
+    organizationId: string;
+    sealedHour: Date;
+    reportedAt: Date;
+  }): Promise<void> {
+    await this.prisma.storageUsageHourly.update({
+      where: { organizationId_sealedHour: { organizationId, sealedHour } },
+      data: { reportedAt },
+    });
   }
 
   async recordHours({

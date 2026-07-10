@@ -26,7 +26,7 @@ const reportUsageSetInputSchema = z.object({
     .array(
       meterEventSchema.extend({
         previouslyReportedValue: z.number().int().nonnegative(),
-      })
+      }),
     )
     .min(1),
 });
@@ -102,7 +102,7 @@ export class StripeUsageReportingService implements UsageReportingService {
 
       logger.info(
         { organizationId, identifier, valueSent: value, reported: true },
-        "[billing] Meter event sent"
+        "[billing] Meter event sent",
       );
 
       return { identifier, reported: true, valueSent: value };
@@ -111,7 +111,7 @@ export class StripeUsageReportingService implements UsageReportingService {
         if (error.code === "resource_already_exists") {
           logger.info(
             { organizationId, identifier, valueSent: value, reported: true },
-            "[billing] Meter event already exists (duplicate identifier)"
+            "[billing] Meter event already exists (duplicate identifier)",
           );
           return { identifier, reported: true, valueSent: value };
         }
@@ -124,7 +124,7 @@ export class StripeUsageReportingService implements UsageReportingService {
             reported: false,
             error: error.message,
           },
-          "[billing] Meter event rejected by Stripe"
+          "[billing] Meter event rejected by Stripe",
         );
         return {
           identifier,
@@ -143,7 +143,7 @@ export class StripeUsageReportingService implements UsageReportingService {
             reported: false,
             error: error.message,
           },
-          "[billing] Stripe authentication error"
+          "[billing] Stripe authentication error",
         );
         return {
           identifier,
@@ -158,7 +158,9 @@ export class StripeUsageReportingService implements UsageReportingService {
     }
   }
 
-  async reportUsageDelta(input: ReportUsageDeltaInput): Promise<MeterEventResult[]> {
+  async reportUsageDelta(
+    input: ReportUsageDeltaInput,
+  ): Promise<MeterEventResult[]> {
     const validated = reportUsageDeltaInputSchema.parse(input);
     const results: MeterEventResult[] = [];
 
@@ -171,7 +173,7 @@ export class StripeUsageReportingService implements UsageReportingService {
             valueSent: 0,
             reported: false,
           },
-          "[billing] Skipping zero-value meter event"
+          "[billing] Skipping zero-value meter event",
         );
         results.push({
           identifier: event.identifier,
@@ -195,7 +197,9 @@ export class StripeUsageReportingService implements UsageReportingService {
     return results;
   }
 
-  async reportUsageSet(input: ReportUsageSetInput): Promise<MeterEventResult[]> {
+  async reportUsageSet(
+    input: ReportUsageSetInput,
+  ): Promise<MeterEventResult[]> {
     const validated = reportUsageSetInputSchema.parse(input);
     const results: MeterEventResult[] = [];
 
@@ -210,7 +214,7 @@ export class StripeUsageReportingService implements UsageReportingService {
             valueSent: 0,
             reported: false,
           },
-          "[billing] Skipping non-positive delta meter event"
+          "[billing] Skipping non-positive delta meter event",
         );
         results.push({
           identifier: event.identifier,
@@ -243,7 +247,7 @@ export class StripeUsageReportingService implements UsageReportingService {
         customer: validated.stripeCustomerId,
         start_time: validated.startTime,
         end_time: validated.endTime,
-      }
+      },
     );
 
     if (response.data.length === 0) {
@@ -254,7 +258,7 @@ export class StripeUsageReportingService implements UsageReportingService {
           startTime: validated.startTime,
           endTime: validated.endTime,
         },
-        "[billing] Empty usage summary from Stripe — could mean zero usage or misconfigured meter"
+        "[billing] Empty usage summary from Stripe — could mean zero usage or misconfigured meter",
       );
 
       return {
@@ -277,7 +281,7 @@ export class StripeUsageReportingService implements UsageReportingService {
         startTime: validated.startTime,
         endTime: validated.endTime,
       },
-      "[billing] Usage summary retrieved"
+      "[billing] Usage summary retrieved",
     );
 
     return {
@@ -288,14 +292,14 @@ export class StripeUsageReportingService implements UsageReportingService {
   }
 }
 
-const isStripeInvalidRequestError = (
-  error: unknown
+export const isStripeInvalidRequestError = (
+  error: unknown,
 ): error is Stripe.errors.StripeInvalidRequestError =>
   error instanceof Error &&
   (error as Stripe.errors.StripeError).type === "StripeInvalidRequestError";
 
-const isStripeAuthenticationError = (
-  error: unknown
+export const isStripeAuthenticationError = (
+  error: unknown,
 ): error is Stripe.errors.StripeAuthenticationError =>
   error instanceof Error &&
   (error as Stripe.errors.StripeError).type === "StripeAuthenticationError";

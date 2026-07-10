@@ -34,6 +34,8 @@ function makeService({
       recordHours: vi.fn(async ({ rows }) => {
         recorded.push(...rows);
       }),
+      findUnreportedHours: vi.fn(async () => []),
+      markReported: vi.fn(),
     },
     onDriftAlarm: (params) => {
       alarms.push(params);

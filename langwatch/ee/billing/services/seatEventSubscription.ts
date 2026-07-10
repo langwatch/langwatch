@@ -1,18 +1,22 @@
-import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/client";
+import {
+  Currency,
+  type OrganizationUserRole,
+  type PrismaClient,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import type Stripe from "stripe";
+import {
+  NoActiveSubscriptionError,
+  SubscriptionItemNotFoundError,
+} from "../errors";
 import { SubscriptionStatus } from "../planTypes";
+import type { BillingInterval } from "../utils/growthSeatEvent";
 import {
   createCheckoutLineItems,
   GROWTH_SEAT_PLAN_TYPES,
   isGrowthSeatPrice,
   resolveGrowthSeatPlanType,
 } from "../utils/growthSeatEvent";
-import {
-  NoActiveSubscriptionError,
-  SubscriptionItemNotFoundError,
-} from "../errors";
-import type { BillingInterval } from "../utils/growthSeatEvent";
 
 type InviteInput = {
   email: string;
@@ -100,7 +104,10 @@ export const createSeatEventSubscriptionFns = ({
         data: {
           organizationId,
           status: SubscriptionStatus.PENDING,
-          plan: resolveGrowthSeatPlanType({ currency, interval: billingInterval }),
+          plan: resolveGrowthSeatPlanType({
+            currency,
+            interval: billingInterval,
+          }),
           maxMembers: membersToAdd,
         },
       });
@@ -152,9 +159,7 @@ export const createSeatEventSubscriptionFns = ({
     const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] =
       {
         metadata: selectedOptionsMetadata,
-        billing_cycle_anchor: Math.floor(
-          billingCycleAnchor.getTime() / 1000,
-        ),
+        billing_cycle_anchor: Math.floor(billingCycleAnchor.getTime() / 1000),
         proration_behavior:
           "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
       };
@@ -194,7 +199,9 @@ export const createSeatEventSubscriptionFns = ({
     const lastSubscription = await db.subscription.findFirst({
       where: {
         organizationId,
-        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED] },
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED],
+        },
         stripeSubscriptionId: { not: null },
       },
       orderBy: { createdAt: "desc" },
@@ -255,7 +262,9 @@ export const createSeatEventSubscriptionFns = ({
     const lastSubscription = await db.subscription.findFirst({
       where: {
         organizationId,
-        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED] },
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED],
+        },
         stripeSubscriptionId: { not: null },
       },
       orderBy: { createdAt: "desc" },
@@ -285,9 +294,7 @@ export const createSeatEventSubscriptionFns = ({
     // Fetch upcoming invoice WITH the proposed seat change
     const upcomingWithChange = await stripe.invoices.retrieveUpcoming({
       subscription: lastSubscription.stripeSubscriptionId,
-      subscription_items: [
-        { id: seatItem.id, quantity: newTotalSeats },
-      ],
+      subscription_items: [{ id: seatItem.id, quantity: newTotalSeats }],
       subscription_proration_behavior: "create_prorations",
     });
 
@@ -297,7 +304,8 @@ export const createSeatEventSubscriptionFns = ({
       subscription: lastSubscription.stripeSubscriptionId,
     });
 
-    const currency = (upcomingWithChange.currency?.toUpperCase() ?? Currency.USD) as Currency;
+    const currency = (upcomingWithChange.currency?.toUpperCase() ??
+      Currency.USD) as Currency;
     const billingInterval = seatItem.price.recurring?.interval ?? "month";
 
     // Subtract existing prorations from changed prorations to get ONLY
@@ -319,12 +327,15 @@ export const createSeatEventSubscriptionFns = ({
 
     const format = (cents: number) => {
       const amount = cents / 100;
-      return new Intl.NumberFormat(currency === Currency.EUR ? "en-IE" : "en-US", {
-        style: "currency",
-        currency,
-        minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-        maximumFractionDigits: 2,
-      }).format(amount);
+      return new Intl.NumberFormat(
+        currency === Currency.EUR ? "en-IE" : "en-US",
+        {
+          style: "currency",
+          currency,
+          minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+          maximumFractionDigits: 2,
+        },
+      ).format(amount);
     };
 
     return {

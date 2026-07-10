@@ -1945,6 +1945,8 @@ model StorageUsageHourly {
 
   @@id([organizationId, sealedHour])
   @@index([reportedAt])
+  // Reporter work queue: unreported rows per org, oldest first.
+  @@index([organizationId, reportedAt, sealedHour])
 }
 
 // Reporter failure tracking for the storage meter — sibling of
