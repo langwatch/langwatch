@@ -14,6 +14,7 @@ export interface StorageSweepDeps {
     measureEntriesForOrg: (params: {
       organizationId: string;
       at: Date;
+      sinceDay?: Date | null;
     }) => Promise<void>;
   };
   exits: {
@@ -56,9 +57,8 @@ export class StorageSweepService {
     const hour = await this.deps.cursor.claimHour({ sealedHour });
     if (!hour.claimed) return;
 
-    const entryDay = await this.deps.cursor.claimEntryDay({
-      day: floorToDay(at),
-    });
+    const entryDay: { claimed: boolean; previousDay: Date | null } =
+      await this.deps.cursor.claimEntryDay({ day: floorToDay(at) });
 
     const organizationIds = await this.deps.listBillableOrganizationIds();
 
@@ -66,13 +66,21 @@ export class StorageSweepService {
       try {
         if (!(await this.deps.isMeteringEnabled(organizationId))) continue;
 
+        // Entry crossings and exits both move at day grain, so both run
+        // under the day claim (exits scan the org's recorded groups — doing
+        // that hourly would be 24x wasted work for values that cannot
+        // change mid-day). Known blind spot: the day cursor advances before
+        // the org loop, so an org failing during the day pass misses that
+        // day; in-transit partitions self-heal tomorrow, and a partition on
+        // its final transit day is caught by the phase-3 reference audit.
         if (entryDay.claimed) {
           await this.deps.measurement.measureEntriesForOrg({
             organizationId,
             at,
+            sinceDay: entryDay.previousDay,
           });
+          await this.deps.exits.emitExitsDue({ organizationId, at });
         }
-        await this.deps.exits.emitExitsDue({ organizationId, at });
         await this.deps.sampling.sampleHoursForOrg({ organizationId, at });
       } catch (error) {
         logger.error(

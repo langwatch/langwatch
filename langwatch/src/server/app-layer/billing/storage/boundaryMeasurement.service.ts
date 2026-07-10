@@ -29,6 +29,13 @@ export const BOUNDARY_QUERY_SETTINGS = {
 } as const;
 
 /**
+ * Most partitions one entry catch-up may cover (~2 months of missed sweep
+ * days). A gap beyond this is re-seed-runbook territory, not a silent
+ * self-heal.
+ */
+export const MAX_CATCHUP_PARTITIONS = 9;
+
+/**
  * The partition-aligned retention-age expression per billable table, derived
  * from the same config the TTL reconciler deletes on (`retentionTTLColumn`) —
  * the billability axis IS the retention axis by definition. Every billable
@@ -36,7 +43,7 @@ export const BOUNDARY_QUERY_SETTINGS = {
  * ClickHouse DDL), which is what lets the range predicate below prune to a
  * single partition.
  */
-const AGE_EXPRESSION_BY_TABLE: Record<BillableStorageTable, string> =
+export const AGE_EXPRESSION_BY_TABLE: Record<BillableStorageTable, string> =
   Object.fromEntries(
     BILLABLE_STORAGE_TABLES.map((table) => {
       const entry = TABLE_TTL_CONFIG.find((config) => config.table === table);
@@ -46,10 +53,17 @@ const AGE_EXPRESSION_BY_TABLE: Record<BillableStorageTable, string> =
             `it cannot be measured for storage billing`,
         );
       }
-      return [
-        table,
-        entry.retentionTTLColumnExpression ?? entry.retentionTTLColumn,
-      ];
+      // event_log's TTL expression uses toDateTime(...), but its PARTITION
+      // expression is toYearWeek(toDateTime64(EventOccurredAt / 1000, 3)) —
+      // the predicate must structurally match the partition's inner
+      // expression or ClickHouse cannot prune, and an unpruned event_log
+      // scan is exactly the OOM shape this design eliminates. Verified per
+      // table against system.tables by the partition-alignment test.
+      const expression =
+        table === "event_log"
+          ? "toDateTime64(EventOccurredAt / 1000, 3)"
+          : (entry.retentionTTLColumnExpression ?? entry.retentionTTLColumn);
+      return [table, expression];
     }),
   ) as Record<BillableStorageTable, string>;
 
@@ -74,10 +88,14 @@ export interface BoundaryMeasurementDeps {
  * total minus the net of already-recorded non-exit events — so missed days
  * self-heal and re-runs emit nothing.
  *
- * Each day measures the partition containing `day(cutoff)` AND the previous
- * day's partition when it differs (the first sweep after a partition
- * completes its transit catches the final day's tail hours): ≤ 8 bounded
- * queries per partition lifetime, exactly the ADR budget.
+ * The cutoff is capped to a WHOLE-DAY boundary: on day D the measurement
+ * covers slices complete through day(at − 35d), so each day-slice is
+ * measured exactly once, completely, on the first sweep after it fully
+ * crosses — never split across two measurements with the same identity
+ * (which the dedup key would collapse, silently dropping the second part).
+ * A slice therefore enters the bill up to ~1 day late — inside the ADR's
+ * stated ~1-day, customer-favorable accuracy — and 7 bounded queries cover
+ * a partition's lifetime with no special final pass.
  */
 export class BoundaryMeasurementService {
   constructor(private readonly deps: BoundaryMeasurementDeps) {}
@@ -85,20 +103,54 @@ export class BoundaryMeasurementService {
   async measureEntriesForOrg({
     organizationId,
     at,
+    sinceDay,
   }: {
     organizationId: string;
     at: Date;
+    /**
+     * The previous entry-sweep day (from the day cursor). Bounds the
+     * catch-up: every slice completed since then gets its partition
+     * measured, so an outage crossing a partition boundary can't strand the
+     * old partition's tail. Null/omitted = current slice only.
+     */
+    sinceDay?: Date | null;
   }): Promise<void> {
     if (!this.deps.resolveClickHouseClient) return;
 
-    const cutoff = new Date(at.getTime() - BILLABLE_AFTER_DAYS * MS_PER_DAY);
-    const cutoffDay = floorToDay(cutoff);
-    const previousDay = new Date(cutoffDay.getTime() - MS_PER_DAY);
+    // Whole-day cutoff: slices strictly before this instant are complete.
+    const cutoff = floorToDay(
+      new Date(at.getTime() - BILLABLE_AFTER_DAYS * MS_PER_DAY),
+    );
+    // The newest fully-crossed slice — what a measurement attributes its
+    // delta to (clamped into each measured partition).
+    const sliceDate = new Date(cutoff.getTime() - MS_PER_DAY);
 
-    const partitionStarts = [partitionStartFor(cutoffDay)];
-    const previousPartitionStart = partitionStartFor(previousDay);
-    if (previousPartitionStart.getTime() !== partitionStarts[0]!.getTime()) {
-      partitionStarts.push(previousPartitionStart);
+    // Partitions to measure: the current slice's, plus every partition a
+    // missed slice falls into (cumulative-minus-prior self-heals WITHIN a
+    // partition, but only if that partition is queried at all). Capped at
+    // the catch-up ceiling — beyond it, the re-seed runbook owns recovery.
+    const oldestMissedSlice = sinceDay
+      ? floorToDay(
+          new Date(sinceDay.getTime() - BILLABLE_AFTER_DAYS * MS_PER_DAY),
+        )
+      : sliceDate;
+    const partitionStarts: Date[] = [];
+    for (
+      let dayMs = Math.max(
+        oldestMissedSlice.getTime(),
+        sliceDate.getTime() - (MAX_CATCHUP_PARTITIONS - 1) * 7 * MS_PER_DAY,
+      );
+      dayMs <= sliceDate.getTime();
+      dayMs += MS_PER_DAY
+    ) {
+      const start = partitionStartFor(new Date(dayMs));
+      if (
+        partitionStarts.length === 0 ||
+        partitionStarts[partitionStarts.length - 1]!.getTime() !==
+          start.getTime()
+      ) {
+        partitionStarts.push(start);
+      }
     }
 
     const projectIds = await this.deps.listProjectIds({ organizationId });
@@ -110,7 +162,7 @@ export class BoundaryMeasurementService {
           projectId,
           partitionStart,
           cutoff,
-          cutoffDay,
+          sliceDate,
         });
       }
     }
@@ -121,22 +173,22 @@ export class BoundaryMeasurementService {
     projectId,
     partitionStart,
     cutoff,
-    cutoffDay,
+    sliceDate,
   }: {
     organizationId: string;
     projectId: string;
     partitionStart: Date;
     cutoff: Date;
-    cutoffDay: Date;
+    sliceDate: Date;
   }): Promise<void> {
     const partitionKey = partitionKeyFor(partitionStart);
     const partitionEnd = new Date(partitionStart.getTime() + 7 * MS_PER_DAY);
-    // The slice this delta is attributed to: the day being crossed, clamped
-    // into the partition (the final-pass query for last week's partition
-    // attributes its tail to that partition's Saturday).
+    // Attribute the delta to the newest completed slice, clamped into this
+    // partition (a catch-up pass over an older partition attributes to its
+    // Saturday).
     const partitionLastDay = new Date(partitionEnd.getTime() - MS_PER_DAY);
-    const sliceDate = new Date(
-      Math.min(cutoffDay.getTime(), partitionLastDay.getTime()),
+    const attributedSlice = new Date(
+      Math.min(sliceDate.getTime(), partitionLastDay.getTime()),
     );
 
     const measured = await this.measureBillableBytes({
@@ -178,12 +230,12 @@ export class BoundaryMeasurementService {
         projectId,
         category: group.category,
         partitionKey,
-        sliceDate,
+        sliceDate: attributedSlice,
         retentionDays: group.retentionDays,
         edge: "ENTRY",
         deltaBytes,
         occurredAt: new Date(
-          sliceDate.getTime() + BILLABLE_AFTER_DAYS * MS_PER_DAY,
+          attributedSlice.getTime() + BILLABLE_AFTER_DAYS * MS_PER_DAY,
         ),
       });
     }
@@ -220,7 +272,7 @@ export class BoundaryMeasurementService {
           WHERE TenantId = {tenantId:String}
             AND ${ageExpr} >= {partitionStart:DateTime64(3)}
             AND ${ageExpr} < {partitionEnd:DateTime64(3)}
-            AND ${ageExpr} <= {cutoff:DateTime64(3)}
+            AND ${ageExpr} < {cutoff:DateTime64(3)}
           GROUP BY _retention_days
         `,
         query_params: {

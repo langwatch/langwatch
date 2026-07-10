@@ -217,24 +217,41 @@ export const dataRetentionRouter = createTRPCRouter({
         });
       }
       const storageBilling = getApp().storageBilling;
-      if (storageBilling) {
-        const organizationId = await resolveOrganizationId(input.projectId);
-        if (organizationId) {
-          await storageBilling.corrections.emitRetentionChange({
-            organizationId,
-            projectId: input.projectId,
-            category,
-            newRetentionDays,
-            causeId: `retchange_${nanoid()}`,
+      const organizationId = storageBilling
+        ? await resolveOrganizationId(input.projectId)
+        : null;
+      const causeId = `retchange_${nanoid()}`;
+      const rebooked =
+        storageBilling && organizationId
+          ? await storageBilling.corrections.emitRetentionChange({
+              organizationId,
+              projectId: input.projectId,
+              category,
+              newRetentionDays,
+              causeId,
+              at: new Date(),
+            })
+          : null;
+      let result;
+      try {
+        result = await getApp().dataRetention.retroactive.triggerUpdate({
+          projectId: input.projectId,
+          category,
+          newRetentionDays,
+        });
+      } catch (error) {
+        // The mutation was never submitted: the rows keep their old
+        // retention, so the re-booked billing groups must be restored —
+        // otherwise exits would follow an entitlement that never applied.
+        if (storageBilling && rebooked && rebooked.emitted.length > 0) {
+          await storageBilling.corrections.rollbackRetentionChange({
+            emitted: rebooked.emitted,
+            causeId,
             at: new Date(),
           });
         }
+        throw error;
       }
-      const result = await getApp().dataRetention.retroactive.triggerUpdate({
-        projectId: input.projectId,
-        category,
-        newRetentionDays,
-      });
       return { ...result, appliedRetentionDays: newRetentionDays };
     }),
 

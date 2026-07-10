@@ -10,7 +10,12 @@ export interface StorageSweepCursorRepository {
   /**
    * True exactly once per UTC day — the entry-transit measurement is
    * day-grained while the sweep is hourly. Call only after claimHour
-   * succeeded (the winner of the hour claims the day).
+   * succeeded (the winner of the hour claims the day). `previousDay` is the
+   * day the LAST successful claim covered (null on the very first claim):
+   * it tells the measurement exactly which missed slices — and therefore
+   * which partitions — a catch-up must cover.
    */
-  claimEntryDay(params: { day: Date }): Promise<{ claimed: boolean }>;
+  claimEntryDay(params: {
+    day: Date;
+  }): Promise<{ claimed: boolean; previousDay: Date | null }>;
 }

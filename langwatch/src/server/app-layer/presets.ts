@@ -86,6 +86,7 @@ import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.serv
 import { BoundaryExitService } from "./billing/storage/boundaryExit.service";
 import { BoundaryMeasurementService } from "./billing/storage/boundaryMeasurement.service";
 import { GaugeSamplingService } from "./billing/storage/gaugeSampling.service";
+import { PrismaStorageBillableGaugeRepository } from "./billing/storage/repositories/storage-billable-gauge.prisma.repository";
 import { PrismaStorageBoundaryEventRepository } from "./billing/storage/repositories/storage-boundary-event.prisma.repository";
 import { PrismaStorageSweepCursorRepository } from "./billing/storage/repositories/storage-sweep-cursor.prisma.repository";
 import { PrismaStorageUsageHourlyRepository } from "./billing/storage/repositories/storage-usage-hourly.prisma.repository";
@@ -616,11 +617,22 @@ export function initializeDefaultApp(options?: {
     cursor: new PrismaStorageSweepCursorRepository(prisma),
     listBillableOrganizationIds: () =>
       organizations.listBillableOrganizationIds(),
-    isMeteringEnabled: (organizationId) =>
-      featureFlagService.isEnabled("release_storage_boundary_metering", {
-        distinctId: organizationId,
-        defaultValue: false,
-      }),
+    // Memoized per process (5 min): the sweep checks every billable org each
+    // sealed hour, and an uncached PRODUCT-scope check would hit PostHog
+    // ~200x/hour while the engine is dark.
+    isMeteringEnabled: (() => {
+      const memo = new Map<string, { value: boolean; expiresAt: number }>();
+      return async (organizationId: string) => {
+        const cached = memo.get(organizationId);
+        if (cached && cached.expiresAt > Date.now()) return cached.value;
+        const value = await featureFlagService.isEnabled(
+          "release_storage_boundary_metering",
+          { distinctId: organizationId, defaultValue: false },
+        );
+        memo.set(organizationId, { value, expiresAt: Date.now() + 300_000 });
+        return value;
+      };
+    })(),
     measurement: new BoundaryMeasurementService({
       resolveClickHouseClient: clickhouseEnabled
         ? resolveClickHouseClient
@@ -638,6 +650,7 @@ export function initializeDefaultApp(options?: {
     exits: new BoundaryExitService({ events: storageBoundaryEvents }),
     sampling: new GaugeSamplingService({
       events: storageBoundaryEvents,
+      gauge: new PrismaStorageBillableGaugeRepository(prisma),
       usageHourly: new PrismaStorageUsageHourlyRepository(prisma),
       onDriftAlarm: ({ organizationId, sealedHour, gaugeBytes }) => {
         void withScope(async (scope) => {

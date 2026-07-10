@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { GaugeSamplingService } from "../gaugeSampling.service";
+import { PrismaStorageBillableGaugeRepository } from "../repositories/storage-billable-gauge.prisma.repository";
 import { PrismaStorageBoundaryEventRepository } from "../repositories/storage-boundary-event.prisma.repository";
 import { PrismaStorageUsageHourlyRepository } from "../repositories/storage-usage-hourly.prisma.repository";
 
@@ -20,6 +21,7 @@ function makeFixture() {
   const alarms: { gaugeBytes: bigint }[] = [];
   const service = new GaugeSamplingService({
     events,
+    gauge: new PrismaStorageBillableGaugeRepository(prisma),
     usageHourly,
     onDriftAlarm: (params) => alarms.push(params),
   });

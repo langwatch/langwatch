@@ -82,6 +82,7 @@ describe("StorageCorrectionService", () => {
       const sampled: number[] = [];
       const sampling = new GaugeSamplingService({
         events,
+        gauge,
         usageHourly: new PrismaStorageUsageHourlyRepository(prisma),
         onDriftAlarm: () => {},
       });

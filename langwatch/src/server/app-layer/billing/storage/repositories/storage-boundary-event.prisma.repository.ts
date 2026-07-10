@@ -91,6 +91,18 @@ export class PrismaStorageBoundaryEventRepository
     }));
   }
 
+  async countEventsAfter({
+    organizationId,
+    after,
+  }: {
+    organizationId: string;
+    after: Date;
+  }): Promise<number> {
+    return await this.prisma.storageBoundaryEvent.count({
+      where: { organizationId, occurredAt: { gt: after } },
+    });
+  }
+
   async sumLiveNetGroups({
     organizationId,
     projectId,

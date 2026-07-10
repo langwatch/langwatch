@@ -5,11 +5,10 @@ import type { AppendBoundaryEventInput } from "../repositories/storage-boundary-
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// 2026-07-10 is a Friday; cutoff (−35d) is Friday 2026-06-05 → partition
-// start Sunday 2026-05-31, so only ONE partition is measured (no Sunday
-// final-pass on this date).
+// 2026-07-10 00:20 → whole-day cutoff 2026-06-05 00:00; the newest complete
+// slice is Thursday 2026-06-04 → partition start Sunday 2026-05-31.
 const at = new Date(Date.UTC(2026, 6, 10, 0, 20));
-const cutoffDay = new Date(Date.UTC(2026, 5, 5));
+const expectedSlice = new Date(Date.UTC(2026, 5, 4));
 
 /** Fake CH client returning canned per-table rows. */
 function fakeClient(rowsByTable: Record<string, unknown[]>) {
@@ -69,8 +68,8 @@ describe("BoundaryMeasurementService", () => {
           retentionDays: 63,
           deltaBytes: 1000n,
           partitionKey: "2026-05-31",
-          sliceDate: cutoffDay,
-          occurredAt: new Date(cutoffDay.getTime() + 35 * DAY_MS),
+          sliceDate: expectedSlice,
+          occurredAt: new Date(expectedSlice.getTime() + 35 * DAY_MS),
         }),
       ]);
     });
@@ -147,15 +146,34 @@ describe("BoundaryMeasurementService", () => {
     });
   });
 
-  describe("when the cutoff day is the first day of a new partition", () => {
-    it("also runs the final pass over the previous partition", async () => {
-      // Cutoff day 2026-06-07 is a Sunday → measure its partition AND the
-      // previous one (final pass catching the last day's tail hours).
-      const sundayAt = new Date(Date.UTC(2026, 6, 12, 0, 20));
+  describe("when the sweep runs daily in steady state", () => {
+    it("measures exactly one partition (whole slices, one event per slice)", async () => {
       const { service, queries } = makeService({ rowsByTable: {} });
       await service.measureEntriesForOrg({
         organizationId: "org_1",
-        at: sundayAt,
+        at,
+        sinceDay: new Date(Date.UTC(2026, 6, 9)), // yesterday
+      });
+
+      const starts = new Set(
+        queries.map((q) => (q.query_params.partitionStart as Date).getTime()),
+      );
+      expect([...starts]).toEqual([Date.UTC(2026, 4, 31)]);
+    });
+  });
+
+  describe("when missed days cross a partition boundary", () => {
+    it("measures every partition a missed slice falls into", async () => {
+      // at 2026-07-13: slice = Jun 6 (Sat, partition May 31). Last entry
+      // sweep ran Jul 10 (its cutoff covered through Jun 4) — the missed
+      // slices Jun 4..Jun 6 stay in partition May 31, but running one more
+      // day later (Jul 14 → slice Jun 7, Sunday) must ALSO re-measure the
+      // May 31 partition or its tail would be stranded.
+      const { service, queries } = makeService({ rowsByTable: {} });
+      await service.measureEntriesForOrg({
+        organizationId: "org_1",
+        at: new Date(Date.UTC(2026, 6, 14, 0, 20)),
+        sinceDay: new Date(Date.UTC(2026, 6, 10)),
       });
 
       const starts = new Set(
@@ -181,6 +199,7 @@ describe("BoundaryMeasurementService", () => {
         expect(q.query).toMatch(/TenantId = \{tenantId:String\}/);
         expect(q.query).toMatch(/>= \{partitionStart:DateTime64\(3\)\}/);
         expect(q.query).toMatch(/< \{partitionEnd:DateTime64\(3\)\}/);
+        expect(q.query).toMatch(/< \{cutoff:DateTime64\(3\)\}/);
       }
       expect(
         (queries[0] as any).query_params.partitionEnd.getTime() -

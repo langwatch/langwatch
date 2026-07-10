@@ -80,6 +80,11 @@ export interface StorageBoundaryEventRepository {
     projectId: string;
     partitionKey: string;
   }): Promise<NonExitGroupSum[]>;
+  /** Events effective strictly after `after` — the steady-state sampling fast path's guard. */
+  countEventsAfter(params: {
+    organizationId: string;
+    after: Date;
+  }): Promise<number>;
   /** Live net per slice-group (see LiveNetGroup), optionally scoped to a project. */
   sumLiveNetGroups(params: {
     organizationId: string;

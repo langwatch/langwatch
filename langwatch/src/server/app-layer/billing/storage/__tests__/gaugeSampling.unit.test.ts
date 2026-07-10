@@ -23,7 +23,11 @@ function makeService({
       findAllByOrganization: vi.fn(async () => events as StoredBoundaryEvent[]),
       sumNonExitByPartition: vi.fn(async () => []),
       sumLiveNetGroups: vi.fn(async () => []),
+      // Force the replay path in unit tests — the O(1) fast path is proven
+      // in the integration suite against real repositories.
+      countEventsAfter: vi.fn(async () => 1),
     },
+    gauge: { findByOrganization: vi.fn(async () => null) },
     usageHourly: {
       getLastSampledHour: vi.fn(async () => lastSampled),
       recordHours: vi.fn(async ({ rows }) => {

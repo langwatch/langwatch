@@ -1,5 +1,6 @@
 import { createLogger } from "~/utils/logger/server";
 import { foldBoundaryEvents } from "./gaugeFold";
+import type { StorageBillableGaugeRepository } from "./repositories/storage-billable-gauge.repository";
 import type { StorageBoundaryEventRepository } from "./repositories/storage-boundary-event.repository";
 import type {
   HourlySample,
@@ -27,6 +28,7 @@ export const NEGATIVE_DRIFT_TOLERANCE_BYTES = 100n * 1024n * 1024n; // 100 MiB
 
 export interface GaugeSamplingDeps {
   events: StorageBoundaryEventRepository;
+  gauge: StorageBillableGaugeRepository;
   usageHourly: StorageUsageHourlyRepository;
   /** Drift alarm sink — never auto-corrects, only surfaces (ADR-039 Decision 7). */
   onDriftAlarm: (params: {
@@ -74,6 +76,37 @@ export class GaugeSamplingService {
       firstMs + (SAMPLE_CAP_HOURS_PER_RUN - 1) * MS_PER_HOUR,
     );
 
+    // Steady-state fast path (ADR-039: the gauge row is O(1) for the CURRENT
+    // hour): when exactly one new hour is due and no event is effective
+    // after its boundary, the materialized gauge IS fold-to-H — no replay.
+    if (firstMs === lastMs) {
+      const pending = await this.deps.events.countEventsAfter({
+        organizationId,
+        after: new Date(firstMs),
+      });
+      if (pending === 0) {
+        const row = await this.deps.gauge.findByOrganization({
+          organizationId,
+        });
+        const gaugeBytes = row?.billableBytes ?? 0n;
+        this.alarmIfDrifted({
+          organizationId,
+          sealedHour: new Date(firstMs),
+          gaugeBytes,
+        });
+        await this.deps.usageHourly.recordHours({
+          organizationId,
+          rows: [
+            {
+              sealedHour: new Date(firstMs),
+              megabytes: clampToMegabytes(gaugeBytes),
+            },
+          ],
+        });
+        return;
+      }
+    }
+
     const events = await this.deps.events.findAllByOrganization({
       organizationId,
       upTo: new Date(lastMs),
@@ -98,27 +131,43 @@ export class GaugeSamplingService {
 
       if (gauge < -NEGATIVE_DRIFT_TOLERANCE_BYTES && !alarmed) {
         alarmed = true;
-        logger.error(
-          { organizationId, sealedHour: new Date(hourMs), gaugeBytes: gauge },
-          "ALARM: storage gauge folded below the negative-drift tolerance — " +
-            "sampling clamps to zero; the gauge is NOT auto-corrected",
-        );
-        this.deps.onDriftAlarm({
+        this.alarmIfDrifted({
           organizationId,
           sealedHour: new Date(hourMs),
           gaugeBytes: gauge,
         });
       }
 
-      const megabytes =
-        gauge <= 0n
-          ? 0
-          : Number(
-              (gauge + BigInt(BYTES_PER_MIB) - 1n) / BigInt(BYTES_PER_MIB),
-            );
-      rows.push({ sealedHour: new Date(hourMs), megabytes });
+      rows.push({
+        sealedHour: new Date(hourMs),
+        megabytes: clampToMegabytes(gauge),
+      });
     }
 
     await this.deps.usageHourly.recordHours({ organizationId, rows });
   }
+
+  private alarmIfDrifted({
+    organizationId,
+    sealedHour,
+    gaugeBytes,
+  }: {
+    organizationId: string;
+    sealedHour: Date;
+    gaugeBytes: bigint;
+  }): void {
+    if (gaugeBytes >= -NEGATIVE_DRIFT_TOLERANCE_BYTES) return;
+    logger.error(
+      { organizationId, sealedHour, gaugeBytes },
+      "ALARM: storage gauge folded below the negative-drift tolerance — " +
+        "sampling clamps to zero; the gauge is NOT auto-corrected",
+    );
+    this.deps.onDriftAlarm({ organizationId, sealedHour, gaugeBytes });
+  }
+}
+
+function clampToMegabytes(gaugeBytes: bigint): number {
+  return gaugeBytes <= 0n
+    ? 0
+    : Number((gaugeBytes + BigInt(BYTES_PER_MIB) - 1n) / BigInt(BYTES_PER_MIB));
 }

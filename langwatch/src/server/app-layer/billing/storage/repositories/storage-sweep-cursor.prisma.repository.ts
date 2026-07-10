@@ -48,14 +48,28 @@ export class PrismaStorageSweepCursorRepository
     }
   }
 
-  async claimEntryDay({ day }: { day: Date }): Promise<{ claimed: boolean }> {
+  async claimEntryDay({
+    day,
+  }: {
+    day: Date;
+  }): Promise<{ claimed: boolean; previousDay: Date | null }> {
+    // Read-then-CAS: the update only wins if the cursor still holds the value
+    // we read, so a concurrent claimer can't make us mis-report previousDay.
+    const row = await this.prisma.storageSweepCursor.findUnique({
+      where: { id: CURSOR_ID },
+      select: { lastEntrySweptDay: true },
+    });
+    if (!row) return { claimed: false, previousDay: null };
+
+    const previousDay = row.lastEntrySweptDay;
+    if (previousDay && previousDay.getTime() >= day.getTime()) {
+      return { claimed: false, previousDay };
+    }
+
     const advanced = await this.prisma.storageSweepCursor.updateMany({
-      where: {
-        id: CURSOR_ID,
-        OR: [{ lastEntrySweptDay: null }, { lastEntrySweptDay: { lt: day } }],
-      },
+      where: { id: CURSOR_ID, lastEntrySweptDay: previousDay },
       data: { lastEntrySweptDay: day },
     });
-    return { claimed: advanced.count === 1 };
+    return { claimed: advanced.count === 1, previousDay };
   }
 }

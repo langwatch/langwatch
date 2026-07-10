@@ -255,10 +255,12 @@ export interface OrganizationRepository {
     organizationId: string,
   ): Promise<OrganizationForBilling | null>;
   /**
-   * Every SaaS-billable organization id (SEAT_EVENT pricing, a Stripe
-   * customer, and an active growth subscription) — the population the
-   * ADR-039 storage sweep iterates. Same billable definition as
-   * getOrganizationForBilling, as an enumeration.
+   * Every SaaS-billable organization id — the population the ADR-039
+   * storage sweep iterates. STRICTER than getOrganizationForBilling: it
+   * additionally requires a non-null stripeCustomerId and at least one
+   * active growth subscription (getOrganizationForBilling returns
+   * SEAT_EVENT orgs regardless and lets callers inspect the fields), so
+   * every org this enumerates is reportable, never the other way around.
    */
   listBillableOrganizationIds(): Promise<string[]>;
 

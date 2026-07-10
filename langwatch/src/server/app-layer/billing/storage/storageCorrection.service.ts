@@ -1,7 +1,12 @@
 import type { RetentionCategory } from "~/server/data-retention/retentionPolicy.schema";
 import { BILLABLE_AFTER_DAYS } from "./boundaryCalendar";
-import type { StorageBoundaryEventRepository } from "./repositories/storage-boundary-event.repository";
+import type {
+  AppendBoundaryEventInput,
+  StorageBoundaryEventRepository,
+} from "./repositories/storage-boundary-event.repository";
 import { MS_PER_DAY } from "./sealedHour";
+
+export type EmittedCorrection = AppendBoundaryEventInput;
 
 /**
  * The correction edges (ADR-039 Decision 3). Both work purely from the
@@ -89,7 +94,8 @@ export class StorageCorrectionService {
     /** Retention-change id — 63→91→63 must keep both changes' events distinct. */
     causeId: string;
     at: Date;
-  }): Promise<void> {
+  }): Promise<{ emitted: EmittedCorrection[] }> {
+    const emitted: EmittedCorrection[] = [];
     const groups = await this.deps.events.sumLiveNetGroups({
       organizationId,
       projectId,
@@ -99,7 +105,7 @@ export class StorageCorrectionService {
       if (group.category !== category) continue;
       if (group.retentionDays === newRetentionDays) continue;
 
-      await this.deps.events.append({
+      const reversal = {
         organizationId,
         projectId: group.projectId,
         category,
@@ -110,7 +116,9 @@ export class StorageCorrectionService {
         deltaBytes: -group.netBytes,
         occurredAt: at,
         causeId,
-      });
+      } as const;
+      await this.deps.events.append(reversal);
+      emitted.push(reversal);
 
       const billableUnderNew =
         newRetentionDays === 0 || newRetentionDays > BILLABLE_AFTER_DAYS;
@@ -120,7 +128,7 @@ export class StorageCorrectionService {
           at.getTime();
       if (!billableUnderNew || !stillEntitled) continue;
 
-      await this.deps.events.append({
+      const rebook = {
         organizationId,
         projectId: group.projectId,
         category,
@@ -131,6 +139,37 @@ export class StorageCorrectionService {
         deltaBytes: group.netBytes,
         occurredAt: at,
         causeId,
+      } as const;
+      await this.deps.events.append(rebook);
+      emitted.push(rebook);
+    }
+
+    return { emitted };
+  }
+
+  /**
+   * Undo a reverse-then-emit whose row-relabeling mutation was NEVER
+   * submitted (triggerUpdate threw): append the exact inverse of every
+   * emitted correction, keyed by a rollback cause, so the gauge returns to
+   * matching the untouched rows. This is for the never-applied case only —
+   * a mutation that wedges partway is the audit tier's job, not a rollback.
+   */
+  async rollbackRetentionChange({
+    emitted,
+    causeId,
+    at,
+  }: {
+    emitted: EmittedCorrection[];
+    causeId: string;
+    at: Date;
+  }): Promise<void> {
+    for (const event of emitted) {
+      await this.deps.events.append({
+        ...event,
+        edge: "REVERSAL",
+        deltaBytes: -event.deltaBytes,
+        occurredAt: at,
+        causeId: `${causeId}_rollback`,
       });
     }
   }

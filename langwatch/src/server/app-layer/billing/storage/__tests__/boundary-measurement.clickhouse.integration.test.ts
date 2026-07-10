@@ -4,7 +4,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { startTestContainers } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { BoundaryMeasurementService } from "../boundaryMeasurement.service";
+import { BILLABLE_STORAGE_TABLES } from "../billableTables";
+import {
+  AGE_EXPRESSION_BY_TABLE,
+  BoundaryMeasurementService,
+} from "../boundaryMeasurement.service";
 import { PrismaStorageBillableGaugeRepository } from "../repositories/storage-billable-gauge.prisma.repository";
 import { PrismaStorageBoundaryEventRepository } from "../repositories/storage-boundary-event.prisma.repository";
 import { partitionStartFor } from "../sealedHour";
@@ -76,10 +80,12 @@ describe.skipIf(!hasTestcontainers)("BoundaryMeasurementService", () => {
   let service: BoundaryMeasurementService;
   const gauge = new PrismaStorageBillableGaugeRepository(prisma);
 
-  // Measurement instant: now. The crossing slice is the day 35 days ago.
+  // Measurement instant: now. The newest COMPLETE slice is the day before
+  // the whole-day cutoff (day(at − 35d) − 1) — rows there are measured; rows
+  // on the cutoff day itself are still crossing and measured tomorrow.
   const at = new Date();
   const crossingDay = new Date(
-    Math.floor((at.getTime() - 35 * DAY_MS) / DAY_MS) * DAY_MS,
+    Math.floor((at.getTime() - 35 * DAY_MS) / DAY_MS) * DAY_MS - DAY_MS,
   );
 
   beforeAll(async () => {
@@ -156,6 +162,30 @@ describe.skipIf(!hasTestcontainers)("BoundaryMeasurementService", () => {
       });
       const [row] = await result.json<{ bytes: string }>();
       expect(totalRecorded).toEqual(BigInt(row!.bytes));
+    });
+
+    it("uses an age expression that structurally matches every billable table's partition key", async () => {
+      // Pruning requires the WHERE expression to BE the partition key's
+      // inner expression (toDateTime vs toDateTime64 already bit event_log).
+      // Verified against the live DDL, not our own constants.
+      const result = await client.query({
+        query: `
+          SELECT name, partition_key AS partitionKey
+          FROM system.tables
+          WHERE database = currentDatabase() AND name IN ({tables:Array(String)})
+        `,
+        query_params: { tables: [...BILLABLE_STORAGE_TABLES] },
+        format: "JSONEachRow",
+      });
+      const rows = await result.json<{ name: string; partitionKey: string }>();
+      expect(rows).toHaveLength(BILLABLE_STORAGE_TABLES.length);
+
+      const mismatches = rows.filter(
+        (row) =>
+          row.partitionKey !==
+          `toYearWeek(${AGE_EXPRESSION_BY_TABLE[row.name as keyof typeof AGE_EXPRESSION_BY_TABLE]})`,
+      );
+      expect(mismatches).toEqual([]);
     });
 
     it("prunes to a single partition (EXPLAIN-verified, not just a string test)", async () => {

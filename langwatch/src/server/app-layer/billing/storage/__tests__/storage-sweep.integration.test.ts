@@ -68,7 +68,9 @@ let sweepInstant: Date;
 
 beforeEach(async () => {
   sweepInstant = nextSweepInstant();
-  await prisma.storageSweepCursor.deleteMany({ where: { id: "storage-sweep" } });
+  await prisma.storageSweepCursor.deleteMany({
+    where: { id: "storage-sweep" },
+  });
 });
 
 describe("StorageSweepService", () => {
