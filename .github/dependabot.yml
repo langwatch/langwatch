@@ -5,47 +5,78 @@ version: 2
 # versions younger than that: the package manager would refuse to resolve
 # them and the update run would fail. The cooldowns below keep candidate
 # selection behind the same gate, with one extra day of margin.
+#
+# Update policy:
+#   - Runs weekly (Monday) instead of daily, so version churn arrives as one
+#     predictable batch rather than a daily trickle.
+#   - The three JS packages share one entry via `directories`, and npm version
+#     updates are grouped by dependency name (group-by: dependency-name). A
+#     dependency shared by langwatch, typescript-sdk and mcp-server is bumped
+#     in all of them in a single PR instead of one PR per package.
+#   - uv (python-sdk) and docker non-major version updates are each grouped
+#     into a single PR; github-actions bumps are grouped into a single PR.
+#   - Security updates are intentionally NOT grouped (no group targets
+#     security-updates), so every advisory fix stays an independent,
+#     individually-mergeable PR. Grouped security PRs tend to fail as a unit
+#     when one member cannot resolve, which would block the rest.
 updates:
   - package-ecosystem: "npm"
-    directory: "/langwatch"
+    directories:
+      - "/langwatch"
+      - "/typescript-sdk"
+      - "/mcp-server"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
     open-pull-requests-limit: 50
     cooldown:
       default-days: 8
-
-  - package-ecosystem: "npm"
-    directory: "/typescript-sdk"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
-
-  - package-ecosystem: "npm"
-    directory: "/mcp-server"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 50
-    cooldown:
-      default-days: 8
+    groups:
+      npm-cross-package:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        group-by: dependency-name
 
   - package-ecosystem: "uv"
     directory: "/python-sdk"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
     open-pull-requests-limit: 50
     cooldown:
       default-days: 8
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
     open-pull-requests-limit: 50
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
     open-pull-requests-limit: 50
+    groups:
+      github-actions:
+        patterns:
+          - "*"
