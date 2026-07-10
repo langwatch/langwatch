@@ -322,7 +322,7 @@ export class PipelineRegistry {
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
-      // ADR-039: offload oversized evaluator inputs to durable object storage
+      // ADR-040: offload oversized evaluator inputs to durable object storage
       // before the event is built. ON by default (this bounds the fat-payload
       // class behind the 2026-07-10 outage); the SYSTEM flag
       // ops_evaluation_payload_offload_disabled is the operator kill switch.

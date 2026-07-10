@@ -1,4 +1,4 @@
-# ADR-039: durable stored-object offload for evaluation inputs
+# ADR-040: durable stored-object offload for evaluation inputs
 
 **Date:** 2026-07-10
 

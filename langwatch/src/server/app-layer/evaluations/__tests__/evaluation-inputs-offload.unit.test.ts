@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Unit tests for the evaluation-inputs offload decision, marker roundtrip, and
- * resolve fail-safe (ADR-039). Boundaries under test (the size decision and
+ * resolve fail-safe (ADR-040). Boundaries under test (the size decision and
  * marker shaping) use a fake stored-objects service; only the object-store
  * byte I/O is faked, never the offload logic itself.
  */

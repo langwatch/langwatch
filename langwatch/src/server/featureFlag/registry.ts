@@ -92,7 +92,7 @@ export const FEATURE_FLAGS = [
       "Skips the strict PII redaction pass that calls the external analysis service (Presidio via langevals). The native secrets and essential PII redaction in the ingestion pipeline are unaffected. Emergency operator override to shed analysis-service load.",
     family: "Collector",
   },
-  // Kill switch for the evaluation-inputs offload (ADR-039). The offload is ON
+  // Kill switch for the evaluation-inputs offload (ADR-040). The offload is ON
   // by default: oversized evaluator inputs go to the durable stored-objects
   // service and the event/row carry a bounded marker instead of the full
   // payload. Flipping this ON keeps inputs inline (only the unconditional
@@ -103,7 +103,7 @@ export const FEATURE_FLAGS = [
     scope: "SYSTEM",
     defaultValue: false,
     description:
-      "Disables the oversized evaluator-inputs offload to durable object storage (ADR-039). While on, inputs flow inline and only the unconditional 8 MiB repository cap bounds the ClickHouse row. Emergency operator override for object-storage trouble.",
+      "Disables the oversized evaluator-inputs offload to durable object storage (ADR-040). While on, inputs flow inline and only the unconditional 8 MiB repository cap bounds the ClickHouse row. Emergency operator override for object-storage trouble.",
     family: "Event sourcing",
   },
   // Per-span token estimation kill switches. Hardcoded raw keys before;

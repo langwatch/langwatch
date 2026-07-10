@@ -1,5 +1,5 @@
 /**
- * Durable stored-object offload for oversized evaluation inputs (ADR-039).
+ * Durable stored-object offload for oversized evaluation inputs (ADR-040).
  *
  * A single evaluator `inputs` object (full conversation context, RAG chunks)
  * can reach GB scale for one run. Carrying that verbatim in the evaluation

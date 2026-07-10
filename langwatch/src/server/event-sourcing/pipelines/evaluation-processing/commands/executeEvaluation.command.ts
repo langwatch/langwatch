@@ -58,7 +58,7 @@ export interface ExecuteEvaluationCommandDeps {
   /**
    * Offloads oversized evaluator inputs to durable object storage before the
    * event is built, so `event_log.EventPayload` and the fold stay bounded
-   * (ADR-039). Returns the inputs unchanged (inline) or a stored-object
+   * (ADR-040). Returns the inputs unchanged (inline) or a stored-object
    * marker. Flag-gated and fail-open at the composition root; absent here
    * means today's behavior (inputs flow inline; the repository belt-and-braces
    * cap is the only bound).
@@ -368,7 +368,7 @@ async function emitReported(
   },
   offloadInputs?: ExecuteEvaluationCommandDeps["offloadInputs"],
 ): Promise<EvaluationProcessingEvent[]> {
-  // ADR-039: offload oversized inputs to durable object storage BEFORE the
+  // ADR-040: offload oversized inputs to durable object storage BEFORE the
   // event is created, so the S3 PUT precedes the event_log append (matching
   // the PUT-then-row ordering used by stored-objects) and the event carries
   // only the bounded marker. No-op when the hook is absent (flag off) or when

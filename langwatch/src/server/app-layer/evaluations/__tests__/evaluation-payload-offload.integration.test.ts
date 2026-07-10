@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @integration
  *
- * End-to-end integration for evaluation-inputs offload (ADR-039) against real
+ * End-to-end integration for evaluation-inputs offload (ADR-040) against real
  * infrastructure: a real ClickHouse (local native CH via TEST_CLICKHOUSE_URL,
  * or the CI service container), a real StoredObjectsService backed by a
  * LocalFilesystemDriver on a per-test temp dir, the real event_log repository,

@@ -338,7 +338,7 @@ export class StoredObjectsService {
   }
 
   /**
-   * Returns the storage-accounting byte ledger for a project (ADR-039): the
+   * Returns the storage-accounting byte ledger for a project (ADR-040): the
    * summed `size_bytes` of the project's live stored objects, optionally scoped
    * to one `purpose` (e.g. "evaluation_inputs"). This is the durable-object
    * side of a tenant's storage usage, alongside the ClickHouse row bytes.

@@ -226,7 +226,7 @@ const MONITORED_TABLES = [
   "llm_spans_tokens_usage",
   "evaluations",
   "events",
-  // ADR-039: offloaded evaluator inputs (and other externalized content) live
+  // ADR-040: offloaded evaluator inputs (and other externalized content) live
   // here; monitoring its on-disk footprint surfaces the durable-object cost.
   "stored_objects",
 ];
