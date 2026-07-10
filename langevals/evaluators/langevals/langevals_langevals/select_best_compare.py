@@ -156,12 +156,17 @@ class SelectBestCompareEvaluator(
     ]
 ):
     """
-    Native N-way LLM-as-judge evaluator. Picks the best of 3+ candidate
-    outputs against a golden reference in a single judge call, with
+    Native LLM-as-judge preference evaluator. Picks the best of 2+ candidate
+    outputs against an optional golden reference in a single judge call, with
     deterministic candidate-order shuffling for position-bias mitigation.
+
+    Two candidates is not a special case: this is the single evaluator behind
+    both pairwise and multi-candidate comparisons. The older, two-slot
+    pairwise_compare evaluator is deprecated and kept only so that experiments
+    and monitors created before the merge keep running.
     """
 
-    name = "N-way Compare"
+    name = "Comparison"
     category = "quality"
     env_vars = []
     default_settings = SelectBestCompareSettings()

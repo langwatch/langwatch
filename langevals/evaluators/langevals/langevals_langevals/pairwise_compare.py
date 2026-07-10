@@ -141,9 +141,16 @@ class PairwiseCompareEvaluator(
     Native pairwise LLM-as-judge evaluator. Compare two candidate
     outputs against a golden reference, with optional swap-and-confirm
     position-bias mitigation.
+
+    DEPRECATED. Superseded by select_best_compare ("Comparison"), which
+    judges 2+ candidates in one call. This evaluator is retained, and stays
+    fully runnable, only so that experiments and monitors created before the
+    merge keep working. It is no longer offered when creating something new.
+    Note that it is the only judge with swap-and-confirm; select_best_compare
+    mitigates position bias by deterministic shuffling instead.
     """
 
-    name = "Pairwise Compare"
+    name = "Pairwise Compare (deprecated)"
     category = "quality"
     env_vars = []
     default_settings = PairwiseCompareSettings()
