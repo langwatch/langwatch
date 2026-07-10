@@ -39,3 +39,20 @@ export function checkCompoundLimits(
     checkCompoundLimits(rest, onAllPassed);
   });
 }
+
+/**
+ * Promise-returning variant of {@link checkCompoundLimits} for async/await
+ * call sites. Resolves `true` once every enforcement passes, or `false` as
+ * soon as one is blocked. A blocked check shows its upgrade modal and never
+ * calls back, so the blocked case is detected synchronously via `isAllowed`.
+ */
+export function checkCompoundLimitsAsync(
+  enforcements: EnforcementResult[]
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    checkCompoundLimits(enforcements, () => resolve(true));
+    if (enforcements.some((enforcement) => !enforcement.isAllowed)) {
+      resolve(false);
+    }
+  });
+}
