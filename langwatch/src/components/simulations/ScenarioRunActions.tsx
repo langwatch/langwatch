@@ -114,7 +114,9 @@ export function ScenarioRunActions({
             {dejaViewHref && (
               <Menu.Item
                 value="deja-view"
-                onClick={() => window.open(dejaViewHref, "_blank")}
+                onClick={() =>
+                  window.open(dejaViewHref, "_blank", "noopener,noreferrer")
+                }
               >
                 <HStack gap={2}>
                   <Icon as={ExternalLink} boxSize={3.5} />

@@ -69,7 +69,7 @@ export function RunDetailSection({
           <Box
             as="span"
             marginEnd={2}
-            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {actions}
           </Box>

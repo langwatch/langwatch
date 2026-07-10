@@ -400,7 +400,7 @@ export function ScenarioRunDetailDrawer({
                         _hover={{ color: "fg" }}
                         transition="color 0.12s ease"
                         onClick={() => setExpandAllMessages((v) => !v)}
-                        onKeyDown={(e: React.KeyboardEvent) => {
+                        onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             e.stopPropagation();

@@ -46,10 +46,21 @@ export function RunTurnSeparator({
       width="100%"
       role={hasTrace ? "button" : undefined}
       aria-label={hasTrace ? `View trace for turn ${index}` : undefined}
+      tabIndex={hasTrace ? 0 : undefined}
       cursor={hasTrace ? "pointer" : "default"}
       onClick={
         hasTrace
           ? () => openTraceDetailsDrawer({ traceId, selectedTab: "traceDetails" })
+          : undefined
+      }
+      onKeyDown={
+        hasTrace
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openTraceDetailsDrawer({ traceId, selectedTab: "traceDetails" });
+              }
+            }
           : undefined
       }
       _hover={
