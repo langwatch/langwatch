@@ -384,6 +384,7 @@ export const teamRouter = createTRPCRouter({
               limitType: error.limitType,
               current: error.current,
               max: error.max,
+              resolution: error.resolution,
             })
             .catch(captureException);
 
@@ -394,6 +395,7 @@ export const teamRouter = createTRPCRouter({
               limitType: error.limitType,
               current: error.current,
               max: error.max,
+              resolution: error.resolution,
             },
           });
         }

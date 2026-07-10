@@ -10,7 +10,7 @@ Feature: Plan precedence rank behind the release flag
 
   # --- Flag disabled: today's behavior preserved ---
 
-  @unit @unimplemented
+  @unit
   Scenario: With the flag disabled a valid license still beats an active subscription
     Given the precedence flag is disabled
     And an organization with a valid GROWTH license and an ACTIVE seat-event subscription
@@ -19,35 +19,35 @@ Feature: Plan precedence rank behind the release flag
 
   # --- Flag enabled: the rank applies ---
 
-  @unit @unimplemented
+  @unit
   Scenario: An active subscription outranks a non-ENTERPRISE license
     Given the precedence flag is enabled
     And an organization with a valid GROWTH license and an ACTIVE seat-event subscription
     When the active plan is resolved
     Then the plan comes from the subscription
 
-  @unit @unimplemented
+  @unit
   Scenario: An ENTERPRISE license outranks an active subscription
     Given the precedence flag is enabled
     And an organization with a valid ENTERPRISE license and an ACTIVE seat-event subscription
     When the active plan is resolved
     Then the plan comes from the ENTERPRISE license
 
-  @unit @unimplemented
+  @unit
   Scenario: A non-ENTERPRISE license outranks having no subscription
     Given the precedence flag is enabled
     And an organization with a valid GROWTH license and no subscription
     When the active plan is resolved
     Then the plan comes from the license
 
-  @unit @unimplemented
+  @unit
   Scenario: An expired license never wins the rank
     Given the precedence flag is enabled
     And an organization with an expired ENTERPRISE license and an ACTIVE seat-event subscription
     When the active plan is resolved
     Then the plan comes from the subscription
 
-  @integration @unimplemented
+  @unit
   Scenario: A stale GROWTH license no longer dead-ends the seat purchase flow
     Given the precedence flag is enabled
     And an organization with a valid GROWTH license and an ACTIVE seat-event subscription at its member cap

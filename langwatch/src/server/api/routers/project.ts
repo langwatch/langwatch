@@ -133,6 +133,7 @@ export const projectRouter = createTRPCRouter({
               limitType: error.limitType,
               current: error.current,
               max: error.max,
+              resolution: error.resolution,
             })
             .catch(captureException);
 
@@ -143,6 +144,7 @@ export const projectRouter = createTRPCRouter({
               limitType: error.limitType,
               current: error.current,
               max: error.max,
+              resolution: error.resolution,
             },
           });
         }

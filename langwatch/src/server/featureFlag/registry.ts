@@ -181,6 +181,18 @@ export const FEATURE_FLAGS = [
     description:
       "Opens the Langy in-product assistant. Default off: only LangWatch staff (isLangwatchStaff() — @langwatch.ai email) get Langy out of the box. To open it for a specific project/org/user, flip the flag on via a PostHog rule, an operator-store row via /ops/feature-flags, or RELEASE_LANGY_ENABLED=true for a blanket on. Staff always bypass the flag so a global kill switch still leaves us able to debug.",
   },
+  // ADR-039 Decision 12: kill-switch for the plan-precedence rank change —
+  // the single behavior change for existing orgs in the billing-profile
+  // consolidation. Off = today's license-always-wins; on = ENTERPRISE
+  // license > active subscription > other license > free. Flip only after
+  // the rollout step-3b license audit (see the ADR's Rollout section).
+  {
+    key: "release_billing_precedence_rank",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "ADR-039 plan-precedence rank: an active subscription outranks a non-ENTERPRISE license (fixes the stale-license seat-flow dead-end); an ENTERPRISE license still outranks any subscription. Off preserves license-always-wins.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

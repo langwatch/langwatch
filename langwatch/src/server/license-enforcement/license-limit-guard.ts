@@ -14,12 +14,15 @@ export const LICENSE_LIMIT_ERRORS = {
 } as const;
 
 /**
- * Subscription limits needed for member type limit checks.
+ * Subscription limits needed for member type limit checks. Callers pass the
+ * resolved PlanInfo, which matches structurally — including the derived
+ * billing profile the resolution is read from (ADR-039).
  */
 export interface MemberTypeLimits {
   maxMembers: number;
   maxMembersLite: number;
   overrideAddingLimitations?: boolean;
+  billing?: { memberPolicy: "purchase_seat" | "upgrade" | "hard_cap" };
 }
 
 /**
@@ -40,6 +43,8 @@ export async function assertMemberTypeLimitNotExceeded(
     return;
   }
 
+  const resolution = limits.billing?.memberPolicy ?? "upgrade";
+
   if (changeType === "lite-to-full") {
     const memberCount = await licenseRepo.getMemberCount(organizationId);
     if (memberCount >= limits.maxMembers) {
@@ -49,6 +54,7 @@ export async function assertMemberTypeLimitNotExceeded(
           limitType: "members",
           current: memberCount,
           max: limits.maxMembers,
+          resolution,
         })
         .catch(captureException);
 
@@ -59,6 +65,7 @@ export async function assertMemberTypeLimitNotExceeded(
           limitType: "members",
           current: memberCount,
           max: limits.maxMembers,
+          resolution,
         },
       });
     }
@@ -73,6 +80,7 @@ export async function assertMemberTypeLimitNotExceeded(
           limitType: "membersLite",
           current: liteCount,
           max: limits.maxMembersLite,
+          resolution,
         })
         .catch(captureException);
 
@@ -83,6 +91,7 @@ export async function assertMemberTypeLimitNotExceeded(
           limitType: "membersLite",
           current: liteCount,
           max: limits.maxMembersLite,
+          resolution,
         },
       });
     }

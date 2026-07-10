@@ -351,6 +351,76 @@ describe("UsageLimitService", () => {
       });
     });
 
+    describe("when the denial resolves to a self-serve seat purchase", () => {
+      beforeEach(async () => {
+        await resourceLimitCooldown.delete("org_1:members");
+      });
+
+      /** @scenario A purchase_seat denial produces an info breadcrumb, not an ops page */
+      it("does not send a Slack alert", async () => {
+        const { service, notificationService } = createService();
+
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "members",
+          current: 6,
+          max: 6,
+          resolution: "purchase_seat",
+        });
+
+        expect(
+          notificationService.sendSlackResourceLimitAlert,
+        ).not.toHaveBeenCalled();
+      });
+
+      it("does not consume the cooldown slot", async () => {
+        const { service } = createService();
+
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "members",
+          current: 6,
+          max: 6,
+          resolution: "purchase_seat",
+        });
+
+        expect(await resourceLimitCooldown.get("org_1:members")).toBeUndefined();
+      });
+    });
+
+    describe("when the denial resolves to a hard cap", () => {
+      beforeEach(async () => {
+        await resourceLimitCooldown.delete("org_1:members");
+      });
+
+      /** @scenario A hard_cap denial fires a real ops alert */
+      it("sends the Slack alert identifying the organization and limit", async () => {
+        const { service, organizationService, notificationService } = createService();
+        vi.mocked(organizationService.findWithAdmins).mockResolvedValue(
+          ORG_WITH_ADMIN as never,
+        );
+
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "members",
+          current: 6,
+          max: 6,
+          resolution: "hard_cap",
+        });
+
+        expect(
+          notificationService.sendSlackResourceLimitAlert,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org_1",
+            limitType: "Team Members",
+            current: 6,
+            max: 6,
+          }),
+        );
+      });
+    });
+
     describe("when cooldown is active for the organization and limit type", () => {
       it("suppresses the notification", async () => {
         const { service, notificationService } = createService();

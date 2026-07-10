@@ -293,3 +293,167 @@ describe("createCompositePlanProvider", () => {
     });
   });
 });
+
+describe("createCompositePlanProvider — precedence rank (ADR-039)", () => {
+  const GROWTH_LICENSE_PLAN: PlanInfo = {
+    ...ENTERPRISE_LICENSE_PLAN,
+    type: "GROWTH",
+    name: "Growth",
+    maxMembers: 6,
+  };
+  const SEAT_SUBSCRIPTION_PLAN: PlanInfo = {
+    ...SAAS_PRO_PLAN,
+    type: "GROWTH_SEAT_EUR_MONTHLY",
+    name: "Growth",
+  };
+  const FREE_SAAS_PLAN: PlanInfo = { ...FREE_PLAN };
+
+  function makeProvider({
+    licensePlan,
+    saasPlan,
+    rankEnabled,
+  }: {
+    licensePlan: PlanInfo;
+    saasPlan: PlanInfo;
+    rankEnabled: boolean;
+  }) {
+    return createCompositePlanProvider({
+      licensePlanProvider: {
+        getActivePlan: vi.fn().mockResolvedValue(licensePlan),
+      },
+      saasPlanProvider: { getActivePlan: vi.fn().mockResolvedValue(saasPlan) },
+      isPrecedenceRankEnabled: vi.fn().mockResolvedValue(rankEnabled),
+    });
+  }
+
+  describe("when the precedence flag is disabled", () => {
+    /** @scenario With the flag disabled a valid license still beats an active subscription */
+    it("selects the license over an active subscription", async () => {
+      const provider = makeProvider({
+        licensePlan: GROWTH_LICENSE_PLAN,
+        saasPlan: SEAT_SUBSCRIPTION_PLAN,
+        rankEnabled: false,
+      });
+
+      const plan = await provider.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.planSource).toBe("license");
+    });
+  });
+
+  describe("when the precedence flag is enabled", () => {
+    /** @scenario An active subscription outranks a non-ENTERPRISE license */
+    it("selects the active subscription over a GROWTH license", async () => {
+      const provider = makeProvider({
+        licensePlan: GROWTH_LICENSE_PLAN,
+        saasPlan: SEAT_SUBSCRIPTION_PLAN,
+        rankEnabled: true,
+      });
+
+      const plan = await provider.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.planSource).toBe("subscription");
+      expect(plan.type).toBe("GROWTH_SEAT_EUR_MONTHLY");
+    });
+
+    /** @scenario An ENTERPRISE license outranks an active subscription */
+    it("selects the ENTERPRISE license over an active subscription", async () => {
+      const provider = makeProvider({
+        licensePlan: ENTERPRISE_LICENSE_PLAN,
+        saasPlan: SEAT_SUBSCRIPTION_PLAN,
+        rankEnabled: true,
+      });
+
+      const plan = await provider.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.planSource).toBe("license");
+      expect(plan.type).toBe("ENTERPRISE");
+    });
+
+    /** @scenario A non-ENTERPRISE license outranks having no subscription */
+    it("selects the license when the org has no paid subscription", async () => {
+      const provider = makeProvider({
+        licensePlan: GROWTH_LICENSE_PLAN,
+        saasPlan: FREE_SAAS_PLAN,
+        rankEnabled: true,
+      });
+
+      const plan = await provider.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.planSource).toBe("license");
+      expect(plan.type).toBe("GROWTH");
+    });
+
+    /** @scenario An expired license never wins the rank */
+    it("selects the subscription when the license resolves free (expired)", async () => {
+      const provider = makeProvider({
+        licensePlan: FREE_PLAN,
+        saasPlan: SEAT_SUBSCRIPTION_PLAN,
+        rankEnabled: true,
+      });
+
+      const plan = await provider.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.planSource).toBe("subscription");
+    });
+
+    it("resolves free when neither source is paid", async () => {
+      const provider = makeProvider({
+        licensePlan: FREE_PLAN,
+        saasPlan: FREE_SAAS_PLAN,
+        rankEnabled: true,
+      });
+
+      const plan = await provider.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.planSource).toBe("free");
+      expect(plan.free).toBe(true);
+    });
+  });
+});
+
+describe("createCompositePlanProvider — rank chained through enforcement (ADR-039)", () => {
+  /** @scenario A stale GROWTH license no longer dead-ends the seat purchase flow */
+  it("resolves purchase_seat for a member denial when the rank lets the seat subscription win", async () => {
+    const { PlanProviderService } = await import("../plan-provider");
+    const { LicenseEnforcementService } = await import(
+      "../../../license-enforcement/license-enforcement.service"
+    );
+
+    const growthLicense: PlanInfo = {
+      ...ENTERPRISE_LICENSE_PLAN,
+      type: "GROWTH",
+      name: "Growth",
+      maxMembers: 6,
+    };
+    const seatSubscription: PlanInfo = {
+      ...SAAS_PRO_PLAN,
+      type: "GROWTH_SEAT_EUR_MONTHLY",
+      name: "Growth",
+      maxMembers: 6,
+    };
+
+    const provider = PlanProviderService.create(
+      createCompositePlanProvider({
+        licensePlanProvider: {
+          getActivePlan: vi.fn().mockResolvedValue(growthLicense),
+        },
+        saasPlanProvider: {
+          getActivePlan: vi.fn().mockResolvedValue(seatSubscription),
+        },
+        isPrecedenceRankEnabled: vi.fn().mockResolvedValue(true),
+      }),
+      { isSaaS: true },
+    );
+
+    const repository = {
+      getMemberCount: vi.fn().mockResolvedValue(6),
+    } as never;
+    const enforcement = new LicenseEnforcementService(repository, provider);
+
+    const result = await enforcement.checkLimit("org-1", "members");
+
+    expect(result.allowed).toBe(false);
+    expect(result.resolution).toBe("purchase_seat");
+  });
+});

@@ -517,12 +517,19 @@ export const organizationRouter = createTRPCRouter({
               limitType: error.limitType,
               current: error.current,
               max: error.max,
+              resolution: error.resolution,
             })
             .catch(captureException);
 
           throw new TRPCError({
             code: "FORBIDDEN",
             message: error.message,
+            cause: {
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+              resolution: error.resolution,
+            },
           });
         }
         throw error;
@@ -948,12 +955,19 @@ export const organizationRouter = createTRPCRouter({
               limitType: error.limitType,
               current: error.current,
               max: error.max,
+              resolution: error.resolution,
             })
             .catch(captureException);
 
           throw new TRPCError({
             code: "FORBIDDEN",
             message: error.message,
+            cause: {
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+              resolution: error.resolution,
+            },
           });
         }
         if (error instanceof DuplicateInviteError) {
@@ -1020,12 +1034,19 @@ export const organizationRouter = createTRPCRouter({
               limitType: error.limitType,
               current: error.current,
               max: error.max,
+              resolution: error.resolution,
             })
             .catch(captureException);
 
           throw new TRPCError({
             code: "FORBIDDEN",
             message: error.message,
+            cause: {
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+              resolution: error.resolution,
+            },
           });
         }
         throw error;

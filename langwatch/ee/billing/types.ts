@@ -82,6 +82,12 @@ export type ResourceLimitNotifierInput = {
   limitType: LimitType;
   current: number;
   max: number;
+  /**
+   * How the denied user can resolve the limit (ADR-039 Decision 9).
+   * "purchase_seat" means the customer was shown the self-serve seat flow —
+   * logged as an info breadcrumb, never paged to ops.
+   */
+  resolution?: "purchase_seat" | "upgrade" | "hard_cap";
 };
 
 export type LicensePurchaseNotificationPayload = {

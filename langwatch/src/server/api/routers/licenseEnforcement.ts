@@ -103,6 +103,7 @@ export const licenseEnforcementRouter = createTRPCRouter({
             limitType: input.limitType,
             current: result.current,
             max: result.max,
+            resolution: result.resolution,
           })
           .catch(captureException);
       }

@@ -12,6 +12,7 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag/featureFlag.service";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
@@ -422,6 +423,11 @@ export function initializeDefaultApp(options?: {
             getActivePlan: ({ organizationId }) =>
               getLicenseHandler().getActivePlan(organizationId),
           },
+          isPrecedenceRankEnabled: (organizationId) =>
+            featureFlagService.isEnabled("release_billing_precedence_rank", {
+              distinctId: organizationId,
+              organizationId,
+            }),
         }),
         { isSaaS: true, selfHeal: pricingModelSelfHeal },
       )

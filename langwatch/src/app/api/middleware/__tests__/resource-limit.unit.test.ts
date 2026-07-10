@@ -136,6 +136,15 @@ describe("resourceLimitMiddleware()", () => {
       expect(body.message).toBeDefined();
     });
 
+    /** @scenario Public API limit denial carries the resolution as advisory metadata */
+    it("includes the resolution field in the 403 body", async () => {
+      const app = createTestApp("prompts");
+      const res = await app.request("/", { method: "POST" });
+
+      const body = await res.json();
+      expect(body.resolution).toBe("upgrade");
+    });
+
     it("fires notification asynchronously", async () => {
       const app = createTestApp("prompts");
       await app.request("/", { method: "POST" });

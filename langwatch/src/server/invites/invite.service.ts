@@ -260,6 +260,7 @@ export class InviteService {
       classifyInvitesByMemberType(newInvites, customRoleMap);
 
     if (!subscriptionLimits.overrideAddingLimitations) {
+      const resolution = subscriptionLimits.billing?.memberPolicy ?? "upgrade";
       if (
         currentFullMembers + newFullMembers >
         subscriptionLimits.maxMembers
@@ -267,7 +268,8 @@ export class InviteService {
         throw new LimitExceededError(
           "members",
           currentFullMembers,
-          subscriptionLimits.maxMembers
+          subscriptionLimits.maxMembers,
+          resolution
         );
       }
       if (
@@ -277,7 +279,8 @@ export class InviteService {
         throw new LimitExceededError(
           "membersLite",
           currentMembersLite,
-          subscriptionLimits.maxMembersLite
+          subscriptionLimits.maxMembersLite,
+          resolution
         );
       }
     }
