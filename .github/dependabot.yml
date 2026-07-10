@@ -9,16 +9,28 @@ version: 2
 # Update policy:
 #   - Runs weekly (Monday) instead of daily, so version churn arrives as one
 #     predictable batch rather than a daily trickle.
-#   - The three JS packages share one entry via `directories`, and npm version
-#     updates are grouped by dependency name (group-by: dependency-name). A
-#     dependency shared by langwatch, typescript-sdk and mcp-server is bumped
-#     in all of them in a single PR instead of one PR per package.
-#   - uv (python-sdk) and docker non-major version updates are each grouped
-#     into a single PR; github-actions bumps are grouped into a single PR.
-#   - Security updates are intentionally NOT grouped (no group targets
-#     security-updates), so every advisory fix stays an independent,
-#     individually-mergeable PR. Grouped security PRs tend to fail as a unit
-#     when one member cannot resolve, which would block the rest.
+#   - Coordinated dependency families that release in lockstep (@aws-sdk/*,
+#     @opentelemetry/*, @ai-sdk/*, @copilotkit/*, vitest, react, ...) are each
+#     grouped into ONE PR via `patterns`. Because the three JS packages share
+#     one entry through `directories`, a family (or any shared dependency) is
+#     bumped across langwatch, typescript-sdk and mcp-server together instead
+#     of one PR per package per dependency.
+#   - Everything left over is caught by a `minor-and-patch` group, so the long
+#     tail of trivial version bumps is a single PR. Major bumps of ungrouped
+#     dependencies stay individual for deliberate review.
+#   - Security updates are intentionally handled as fast as possible and are
+#     NOT affected by any of the above throttling:
+#       * `cooldown` applies to version updates only, never to security
+#         updates, so an advisory fix is never delayed by it.
+#       * The weekly `schedule` gates version updates only; security updates
+#         are advisory-triggered and open continuously.
+#       * No group targets `security-updates`, so every advisory fix stays an
+#         independent, individually-mergeable PR that lands as soon as a
+#         patched version is available (grouped security PRs also tend to fail
+#         as a unit when one member cannot resolve, blocking the rest).
+#     The only floor on a security fix is the package managers' own 7-day
+#     minimum-release-age / exclude-newer gate, which is a deliberate
+#     supply-chain safeguard and is intentionally left in place.
 updates:
   - package-ecosystem: "npm"
     directories:
@@ -32,11 +44,59 @@ updates:
     cooldown:
       default-days: 8
     groups:
-      npm-cross-package:
+      ai-sdk:
+        applies-to: version-updates
+        patterns:
+          - "@ai-sdk/*"
+          - "ai"
+      aws-sdk:
+        applies-to: version-updates
+        patterns:
+          - "@aws-sdk/*"
+      opentelemetry:
+        applies-to: version-updates
+        patterns:
+          - "@opentelemetry/*"
+          - "import-in-the-middle"
+      copilotkit:
+        applies-to: version-updates
+        patterns:
+          - "@copilotkit/*"
+      vitest:
+        applies-to: version-updates
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      react:
+        applies-to: version-updates
+        patterns:
+          - "react"
+          - "react-dom"
+          - "react-is"
+      typescript-native-preview:
+        applies-to: version-updates
+        patterns:
+          - "@typescript/native-preview"
+      types:
+        applies-to: version-updates
+        patterns:
+          - "@types/*"
+      anthropic:
+        applies-to: version-updates
+        patterns:
+          - "@anthropic-ai/*"
+      posthog:
+        applies-to: version-updates
+        patterns:
+          - "posthog-js"
+          - "posthog-node"
+      minor-and-patch:
         applies-to: version-updates
         patterns:
           - "*"
-        group-by: dependency-name
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "uv"
     directory: "/python-sdk"
@@ -47,6 +107,15 @@ updates:
     cooldown:
       default-days: 8
     groups:
+      opentelemetry:
+        applies-to: version-updates
+        patterns:
+          - "opentelemetry-*"
+          - "openinference-*"
+      langchain:
+        applies-to: version-updates
+        patterns:
+          - "langchain*"
       minor-and-patch:
         applies-to: version-updates
         patterns:
@@ -78,5 +147,6 @@ updates:
     open-pull-requests-limit: 50
     groups:
       github-actions:
+        applies-to: version-updates
         patterns:
           - "*"
