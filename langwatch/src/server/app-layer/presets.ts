@@ -705,7 +705,7 @@ export function initializeDefaultApp(options?: {
   (globalForApp as any).__scenarioExecutionHandle =
     commands.scenarioExecutionHandle;
 
-  // Langy (ADR-043): conversation reads come from the fold projection; writes
+  // Langy (ADR-046): conversation reads come from the fold projection; writes
   // are dispatched via the langy pipeline commands. No Postgres spine.
   const langyConversations = LangyConversationService.create(
     commands.langy,

@@ -1,6 +1,6 @@
 /**
  * Event and command type constants for the langy-conversation-processing
- * pipeline (ADR-043).
+ * pipeline (ADR-046).
  *
  * A Langy conversation is an event-sourced aggregate: `aggregateId` is the
  * conversationId and `TenantId` is the projectId. Writes are imperative
@@ -25,7 +25,7 @@ export const LANGY_CONVERSATION_EVENT_TYPES = {
   TURN_FINALIZED: "lw.langy_conversation.turn_finalized",
   ARCHIVED: "lw.langy_conversation.conversation_archived",
   // Beyond the prescribed vocabulary — preserves the PATCH rename/share route.
-  // See ADR-043 open question 1.
+  // See ADR-046 open question 1.
   METADATA_UPDATED: "lw.langy_conversation.conversation_metadata_updated",
 } as const;
 
@@ -89,7 +89,7 @@ export const LANGY_CONVERSATION_STATUS = {
 } as const;
 
 /**
- * Ephemeral event classification (proposed direction — see ADR-043).
+ * Ephemeral event classification (proposed direction — see ADR-046).
  *
  * Some events are pure LIVENESS/transport signals: they carry no state the
  * conversation needs after the turn ends, and persisting one per tick (or, in

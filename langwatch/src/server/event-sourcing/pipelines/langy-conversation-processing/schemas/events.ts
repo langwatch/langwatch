@@ -237,7 +237,7 @@ export type LangyTurnFinalizedEvent = z.infer<
 
 /**
  * ConversationArchived — soft-delete. Flips the fold's status/ArchivedAt.
- * No ClickHouse hard-deletion (ADR-043, out of scope).
+ * No ClickHouse hard-deletion (ADR-046, out of scope).
  */
 export const langyConversationArchivedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -257,7 +257,7 @@ export type LangyConversationArchivedEvent = z.infer<
 
 /**
  * ConversationMetadataUpdated — rename and/or share toggle. Beyond the
- * prescribed vocabulary; preserves the PATCH route (ADR-043 open question 1).
+ * prescribed vocabulary; preserves the PATCH route (ADR-046 open question 1).
  * Any field left undefined is unchanged by the fold.
  */
 export const langyConversationMetadataUpdatedEventDataSchema = z.object({

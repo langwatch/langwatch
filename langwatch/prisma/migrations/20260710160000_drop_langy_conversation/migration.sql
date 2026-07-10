@@ -1,4 +1,4 @@
--- ADR-043: the Langy conversation spine moved off Postgres onto the
+-- ADR-046: the Langy conversation spine moved off Postgres onto the
 -- event-sourcing framework. The conversation is now a projection of an event
 -- stream — its spine lives in the ClickHouse `langy_conversations` fold table
 -- and its messages in `langy_messages`. Drop the Postgres model.

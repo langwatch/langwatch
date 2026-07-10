@@ -2,7 +2,7 @@
 -- +goose ENVSUB ON
 
 -- langy_conversations — the conversation SPINE for the in-product Langy
--- assistant, as an event-sourcing fold projection (ADR-043).
+-- assistant, as an event-sourcing fold projection (ADR-046).
 --
 -- This table REPLACES the Postgres `LangyConversation` model. A fold projection
 -- (langyConversationState.foldProjection) writes one row per conversation
@@ -17,7 +17,7 @@
 -- + Version, ReplacingMergeTree(UpdatedAt) for insert-retry / re-fold
 -- idempotency. TenantId = projectId (platform-wide convention). Retention TTL
 -- is intentionally omitted for parity with langy_messages; a Langy retention /
--- erase sweep is a follow-up (ADR-043 open question 3).
+-- erase sweep is a follow-up (ADR-046 open question 3).
 
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.langy_conversations
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.langy_conversations
     -- Lifecycle: active | running | idle | failed | archived.
     Status          LowCardinality(String),
 
-    -- Sharing (preserves the PATCH share surface; ADR-043 open question 1).
+    -- Sharing (preserves the PATCH share surface; ADR-046 open question 1).
     IsShared        Bool                   DEFAULT false,
     SharedAt        Nullable(DateTime64(3)) CODEC(Delta(8), ZSTD(1)),
     SharedById      Nullable(String)       CODEC(ZSTD(1)),

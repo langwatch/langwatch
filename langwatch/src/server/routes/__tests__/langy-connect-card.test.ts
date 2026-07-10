@@ -47,7 +47,7 @@ const featureFlagIsEnabled = vi.fn();
 const getOrProvision = vi.fn();
 const getModelsAllowed = vi.fn();
 
-// The conversation is event-sourced (ADR-043); the route reaches its writers
+// The conversation is event-sourced (ADR-046); the route reaches its writers
 // via getApp().langy. We mock those so the test never needs ClickHouse/Redis,
 // and capture the finalized turn to assert the persisted assistant body is
 // non-error prose.
