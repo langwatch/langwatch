@@ -66,4 +66,4 @@ Feature: Per-tenant rate anomaly detection
     Given tenant "proj_new" has only 3 minutes of activity
     When the AnomalyDetector tick runs
     Then the tenant is skipped this tick
-    And the not-enough-data verdict is cached with a short expiry, well under the baseline's
+    And the not-enough-data verdict is cached with a short expiry, well under the baseline's 1h cache TTL

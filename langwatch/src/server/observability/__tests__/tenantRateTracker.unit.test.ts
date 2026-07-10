@@ -295,7 +295,7 @@ describe("TenantRateTracker", () => {
     const originalSet = redis.set.bind(redis);
     redis.set = async (...args: unknown[]) => {
       setCalls.push(args);
-      return originalSet(...(args as [string, string]));
+      return originalSet(...args);
     };
     const tracker = new TenantRateTracker(redis, () => now);
 
