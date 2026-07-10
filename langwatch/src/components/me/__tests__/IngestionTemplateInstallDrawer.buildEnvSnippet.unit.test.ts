@@ -13,6 +13,20 @@ describe("buildEnvSnippet", () => {
       expect(snippet).toContain("export CLAUDE_CODE_ENABLE_TELEMETRY=1");
     });
 
+    it("enables the enhanced-telemetry beta (unlocks real span tracing)", () => {
+      // The span-tracing signal (scope com.anthropic.claude_code.tracing:
+      // claude_code.llm_request / tool / subagent.spawn) is gated behind
+      // this beta flag. It is the ONLY telemetry carrying agent_id +
+      // parent_agent_id — the per-invocation id + parent link that ties a
+      // model call / tool run to the sub-agent that issued it. Without it
+      // OTEL_TRACES_EXPORTER is a no-op for claude-code, every log arrives
+      // context-less, and the receiver collapses every sub-agent into one
+      // synthesized per-turn trace. Pin it so a refactor can't drop it.
+      expect(snippet).toContain(
+        "export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1",
+      );
+    });
+
     it("recommends OTEL_TRACES_EXPORTER=otlp", () => {
       // Without traces exporter, claude-code never emits spans, every log
       // arrives without trace context, and the fold-skip in
@@ -39,8 +53,9 @@ describe("buildEnvSnippet", () => {
     //                      command, Edit diff, file paths) onto
     //                      tool_decision + tool_result events. Without
     //                      it the receiver gets only sizes-in-bytes.
-    //   TOOL_CONTENT       traces-only + beta tracing — no-op for claude
-    //                      2.x logs path today, set as forward-compat
+    //   TOOL_CONTENT       lifts tool input/output content onto tool
+    //                      span events; active now that the beta
+    //                      tracing flag is on (truncated at 60 KB)
     //   RAW_API_BODIES     emits api_request_body + api_response_body
     //                      events. THIS is the only OTel surface that
     //                      carries the assistant response text.

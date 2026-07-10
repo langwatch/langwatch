@@ -32,23 +32,42 @@ export function buildEnvSnippet(
   const base = `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "claude_code") {
-    // Four claude-code OTel unlock knobs, all ON (rchaves
+    // claude-code OTel unlock knobs, all ON (rchaves
     // "collect all humanly possible"):
+    //   ENHANCED_TELEMETRY_BETA
+    //                      unlocks the real span-tracing signal
+    //                      (scope com.anthropic.claude_code.tracing):
+    //                      claude_code.interaction / llm_request /
+    //                      tool / tool.execution / subagent.spawn
+    //                      spans. These carry agent_id +
+    //                      parent_agent_id — the ONLY telemetry that
+    //                      ties each model call / tool run to the
+    //                      sub-agent that issued it and reconstructs
+    //                      the sub-agent tree. Without this flag,
+    //                      OTEL_TRACES_EXPORTER is a no-op for
+    //                      claude-code (spans are gated behind it),
+    //                      every log arrives context-less, and the
+    //                      receiver has to synthesize spans per turn —
+    //                      collapsing every sub-agent into one giant
+    //                      trace. Join spans->log bodies by request_id.
     //   USER_PROMPTS       lifts user prompt text onto user_prompt
     //   TOOL_DETAILS       lifts tool metadata onto tool_decision/result
     //   TOOL_CONTENT       lifts tool_input (Bash command, Edit diff,
-    //                      file paths) onto tool_decision/result so
-    //                      the trace shows WHAT the tool did
+    //                      file paths) onto tool_decision/result +
+    //                      (with tracing on) tool spans, so the trace
+    //                      shows WHAT the tool did
     //   RAW_API_BODIES     emits api_request_body + api_response_body
     //                      events carrying the FULL JSON of every API
     //                      call: system prompts, rolling message
     //                      history, assistant response text +
     //                      reasoning, tool_use blocks. Only OTel
-    //                      surface that carries assistant text. The
-    //                      langwatch receiver caps oversized bodies
-    //                      to keep the CH merge ceiling safe.
+    //                      surface that carries assistant text (the
+    //                      tracing spans do NOT). The langwatch
+    //                      receiver caps oversized bodies to keep the
+    //                      CH merge ceiling safe.
     return [
       `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+      `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
       `export OTEL_TRACES_EXPORTER=otlp`,
       `export OTEL_LOGS_EXPORTER=otlp`,
       `export OTEL_METRICS_EXPORTER=otlp`,
