@@ -7,10 +7,11 @@ import {
   Text,
   Textarea,
 } from "@chakra-ui/react";
-import { Send, Square } from "lucide-react";
+import { FlaskConical, Send, Square, Waypoints, X } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { ModelSelector } from "~/components/ModelSelector";
+import type { LangyContextChip } from "../stores/langyComposerStore";
 import {
   AI_BG_SUBTLE,
   AI_BORDER,
@@ -39,6 +40,8 @@ export function Composer({
   isBusy,
   disabled,
   canSend,
+  contextChips = [],
+  onRemoveChip,
 }: {
   input: string;
   onInputChange: (v: string) => void;
@@ -52,6 +55,9 @@ export function Composer({
   isBusy: boolean;
   disabled: boolean;
   canSend: boolean;
+  /** Page context (experiment/trace) that rides as removable chips in-composer. */
+  contextChips?: LangyContextChip[];
+  onRemoveChip?: (id: string) => void;
 }) {
   const filled = input.trim().length > 0;
   const [pickerExpanded, setPickerExpanded] = useState(false);
@@ -86,6 +92,20 @@ export function Composer({
         background="bg.surface"
         flexShrink={0}
       >
+        {/* Page context rides as removable chips INSIDE the composer surface,
+            above the input — so "opened this experiment / trace" is visible and
+            dismissible right where you type, not scattered elsewhere. */}
+        {contextChips.length > 0 ? (
+          <HStack gap={1.5} flexWrap="wrap" marginBottom={2}>
+            {contextChips.map((chip) => (
+              <ContextChip
+                key={chip.id}
+                chip={chip}
+                onRemove={() => onRemoveChip?.(chip.id)}
+              />
+            ))}
+          </HStack>
+        ) : null}
         {/* Per-send model picker. Collapsed to a small bubble showing just
             the provider logo; on hover/focus the bubble fluidly expands into
             the full picker. ModelSelector stays mounted — width animation
@@ -280,6 +300,52 @@ export function Composer({
         </Text>
       </Box>
     </>
+  );
+}
+
+function ContextChip({
+  chip,
+  onRemove,
+}: {
+  chip: LangyContextChip;
+  onRemove: () => void;
+}) {
+  const Icon = chip.kind === "experiment" ? FlaskConical : Waypoints;
+  return (
+    <HStack
+      gap={1}
+      paddingLeft={2}
+      paddingRight={1}
+      paddingY={0.5}
+      borderRadius="full"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="orange.emphasized"
+      background="orange.subtle"
+      maxWidth="100%"
+    >
+      <Box color="orange.fg" flexShrink={0}>
+        <Icon size={11} />
+      </Box>
+      <Text textStyle="2xs" color="fg" truncate maxWidth="140px">
+        {chip.label}
+      </Text>
+      <chakra.button
+        type="button"
+        aria-label={`Remove ${chip.label}`}
+        onClick={onRemove}
+        display="grid"
+        placeItems="center"
+        borderRadius="full"
+        width="16px"
+        height="16px"
+        color="fg.muted"
+        flexShrink={0}
+        _hover={{ color: "fg", background: "bg.muted" }}
+      >
+        <X size={11} />
+      </chakra.button>
+    </HStack>
   );
 }
 

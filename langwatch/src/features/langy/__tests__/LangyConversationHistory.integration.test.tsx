@@ -142,7 +142,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import { toaster } from "~/components/ui/toaster";
-import { LangyDrawer } from "../LangySidebar";
+import { LangyDrawer } from "../components/LangyPanel";
 
 // ---------------------------------------------------------------------------
 // Helpers

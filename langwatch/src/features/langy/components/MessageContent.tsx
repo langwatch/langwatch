@@ -15,6 +15,9 @@ import { CONNECT_GITHUB_SENTINEL } from "~/server/services/langy/langySentinels"
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { parseLangyFeedbackDirective } from "../logic/langyFeedbackDirective";
+import { LangyFeedback } from "./LangyFeedback";
+import { StreamingText } from "./StreamingText";
 
 export interface LangyProposal {
   langyProposal: true;
@@ -45,6 +48,9 @@ export function MessageContent({
   onApply,
   onDiscard,
   onConnectedGithub,
+  isStreaming = false,
+  conversationId,
+  showFeedback = false,
 }: {
   message: UIMessage;
   organizationId?: string | null;
@@ -57,6 +63,12 @@ export function MessageContent({
   onApply: (proposalId: string, proposal: LangyProposal) => Promise<void>;
   onDiscard: (proposalId: string) => void;
   onConnectedGithub?: (login: string) => void;
+  /** True for the in-flight assistant turn — streams tokens with blur reveal. */
+  isStreaming?: boolean;
+  /** Active conversation id, so feedback can attach to it. */
+  conversationId?: string | null;
+  /** Show the thumbs feedback affordance under a completed assistant reply. */
+  showFeedback?: boolean;
 }) {
   const isUser = message.role === "user";
   const rawText = message.parts
@@ -76,7 +88,14 @@ export function MessageContent({
   const progress = isUser
     ? { events: [], cleanedText: afterConnectStrip }
     : parseGithubProgressEvents(afterConnectStrip);
-  const text = progress.cleanedText;
+
+  // Strip the hidden [langy:feedback:...] directive: when present, Langy asked
+  // for feedback at a high-signal moment — surface the affordance regardless of
+  // the default throttle, tailored by the sentiment it classified.
+  const feedbackDirective = isUser
+    ? { requested: false, sentiment: undefined, cleanedText: progress.cleanedText }
+    : parseLangyFeedbackDirective(progress.cleanedText);
+  const text = feedbackDirective.cleanedText;
 
   const proposals = extractProposals(message);
   const prLinks = isUser ? [] : extractGithubPrLinks(text);
@@ -113,27 +132,34 @@ export function MessageContent({
     <HStack gap={2} align="flex-start" width="full">
       <SparkleTile size={24} sparkleSize={12} />
       <VStack align="stretch" gap={2.5} flex={1} minWidth={0}>
-        {text && (
-          <Box
-            textStyle="sm"
-            color="fg"
-            lineHeight="1.55"
-            css={{
-              "& p": { margin: 0 },
-              "& p + p": { marginTop: "6px" },
-              "& ul, & ol": { paddingLeft: "18px", margin: "4px 0" },
-              "& code": {
-                fontSize: "12px",
-                padding: "1px 5px",
-                borderRadius: "4px",
-                background: "var(--chakra-colors-bg-subtle)",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-              },
-            }}
-          >
-            <Markdown>{text}</Markdown>
-          </Box>
-        )}
+        {text &&
+          (isStreaming ? (
+            // Live turn: stream tokens with the blur-to-clear word reveal.
+            // Formatting lands once the turn finalizes and Markdown takes over.
+            <Box textStyle="sm" color="fg" lineHeight="1.55">
+              <StreamingText text={text} />
+            </Box>
+          ) : (
+            <Box
+              textStyle="sm"
+              color="fg"
+              lineHeight="1.55"
+              css={{
+                "& p": { margin: 0 },
+                "& p + p": { marginTop: "6px" },
+                "& ul, & ol": { paddingLeft: "18px", margin: "4px 0" },
+                "& code": {
+                  fontSize: "12px",
+                  padding: "1px 5px",
+                  borderRadius: "4px",
+                  background: "var(--chakra-colors-bg-subtle)",
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                },
+              }}
+            >
+              <Markdown>{text}</Markdown>
+            </Box>
+          ))}
         {showConnectCard && organizationId ? (
           <LangyGitHubConnectCard
             organizationId={organizationId}
@@ -160,6 +186,15 @@ export function MessageContent({
             onDiscard={() => onDiscard(id)}
           />
         ))}
+        {(showFeedback || feedbackDirective.requested) &&
+        !isStreaming &&
+        text ? (
+          <LangyFeedback
+            conversationId={conversationId ?? undefined}
+            messageId={message.id}
+            sentiment={feedbackDirective.sentiment}
+          />
+        ) : null}
       </VStack>
     </HStack>
   );

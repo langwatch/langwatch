@@ -14,7 +14,7 @@ import {
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
   LangyDrawer,
-} from "./LangySidebar";
+} from "./components/LangyPanel";
 
 /**
  * Layout route that mounts Langy once per project, above the swapping page.

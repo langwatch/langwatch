@@ -77,7 +77,7 @@ vi.mock("~/experiments-v3/hooks/useLambdaWarmup", () => ({
 // The page registers Langy action handlers via useRegisterLangyHandlers, which
 // calls useLangy() and requires a <LangyProvider>. We don't render the panel
 // here, so stub the hook to a no-op.
-vi.mock("~/components/langy/LangyContext", () => ({
+vi.mock("~/features/langy/LangyContext", () => ({
   useRegisterLangyHandlers: () => undefined,
 }));
 

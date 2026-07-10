@@ -1,7 +1,6 @@
 import { Button, Circle, HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import {
-  AI_BG_HOVER,
   AI_BG_SUBTLE,
   AI_BORDER,
   AI_SHADOW_SOFT,
@@ -88,9 +87,8 @@ function Chip({
       borderColor="border.emphasized"
       bg="bg.subtle"
       _hover={{
-        bg: AI_BG_HOVER,
-        borderColor: AI_BORDER,
-        boxShadow: "0 1px 2px rgba(168, 85, 247, 0.12)",
+        bg: "orange.subtle",
+        borderColor: "orange.emphasized",
       }}
       whiteSpace="nowrap"
     >
