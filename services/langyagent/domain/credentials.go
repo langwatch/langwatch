@@ -1,6 +1,11 @@
 package domain
 
-import "regexp"
+import (
+	"net/url"
+	"regexp"
+	"sort"
+	"strings"
+)
 
 // Credentials is the per-conversation auth bundle the control plane sends in
 // each /chat request. They are NEVER persisted — they live in the worker
@@ -20,6 +25,14 @@ type Credentials struct {
 	Model             string `json:"model,omitempty"`
 	GithubToken       string `json:"githubToken,omitempty"`
 	GithubLogin       string `json:"githubLogin,omitempty"`
+	// EgressAllowlist is the project's per-project Langy egress allow-list
+	// (ADR-043 rung 2), resolved by the control plane's
+	// LangyCredentialService.getEgressAllowlist and threaded through this
+	// envelope. The *presence* of the list is the mode: nil/empty ⇒ the egress
+	// adapter watches but blocks nothing; non-empty ⇒ the adapter restricts
+	// outbound to floor ∪ this list. Bound at worker spawn — a change recycles
+	// the worker (see SignatureOf) so a live worker never runs a stale policy.
+	EgressAllowlist []string `json:"egressAllowlist,omitempty"`
 }
 
 // Complete reports whether the mandatory credential fields are present. The
@@ -45,6 +58,13 @@ func (c Credentials) Complete() bool {
 type CredentialSignature struct {
 	Model         string
 	HasGithubAuth bool
+	// EgressAllowlist is a canonical fingerprint (sorted + newline-joined) of
+	// the project's egress allow-list (ADR-043). Folding it in means a policy
+	// change (the customer edits the list) recycles the worker on its next turn
+	// — the egress adapter is rebuilt with the new list, so a live worker is
+	// never left running under the old policy. A string (not the []string
+	// itself) keeps CredentialSignature comparable with ==.
+	EgressAllowlist string
 }
 
 // SignatureOf derives the comparable signature from a credentials payload.
@@ -52,9 +72,68 @@ type CredentialSignature struct {
 // capability, so a login change without a token must NOT force a recycle.
 func SignatureOf(creds Credentials) CredentialSignature {
 	return CredentialSignature{
-		Model:         creds.Model,
-		HasGithubAuth: creds.GithubToken != "",
+		Model:           creds.Model,
+		HasGithubAuth:   creds.GithubToken != "",
+		EgressAllowlist: canonicalEgressAllowlist(creds.EgressAllowlist),
 	}
+}
+
+// hostPatternPattern validates a normalised egress allow-list entry: an
+// optional single "*." wildcard prefix, then dot-separated [a-z0-9-] labels.
+// Mirrors the control plane's egressHostPatternSchema
+// (LangyCredentialService.ts) so the Go and TS validators agree on what a host
+// pattern is.
+var hostPatternPattern = regexp.MustCompile(`^(\*\.)?([a-z0-9-]+\.)*[a-z0-9-]+$`)
+
+// canonicalEgressAllowlist normalises an allow-list into an order-independent,
+// case-insensitive fingerprint so semantically-equal lists (reordered, mixed
+// case, trailing dots) do not spuriously recycle the worker, while any real
+// membership change does. Entries that are not clean host patterns are DROPPED
+// (defence in depth): the control plane already Zod-validates on write, so this
+// only fires on a drifted or hostile envelope — but the manager still refuses to
+// fold a URL, an authority with a port/userinfo, or a path-traversal like
+// "../../etc" into an allow rule. Kept in step with the Go matcher's
+// normalizeHost in adapters/egress/policy.go.
+func canonicalEgressAllowlist(list []string) string {
+	if len(list) == 0 {
+		return ""
+	}
+	norm := make([]string, 0, len(list))
+	for _, h := range list {
+		if n, ok := normalizeHostPattern(h); ok {
+			norm = append(norm, n)
+		}
+	}
+	if len(norm) == 0 {
+		return ""
+	}
+	sort.Strings(norm)
+	return strings.Join(norm, "\n")
+}
+
+// normalizeHostPattern lowercases + trims an allow-list entry and validates it
+// is a bare host (optionally "*."-wildcarded), returning ("", false) for
+// anything carrying a scheme, path, port, userinfo, query, or path-traversal.
+// It parses the value as the host of a scheme-relative URL — so "evil.com/steal",
+// "host:443", "user@host", and "../../etc" cannot round-trip to a bare host —
+// then charset-checks the result against hostPatternPattern.
+func normalizeHostPattern(raw string) (string, bool) {
+	h := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(raw)), ".")
+	if h == "" {
+		return "", false
+	}
+	base := h
+	if rest, ok := strings.CutPrefix(h, "*."); ok {
+		base = rest
+	}
+	u, err := url.Parse("//" + base)
+	if err != nil || u.Hostname() != base || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+		return "", false
+	}
+	if !hostPatternPattern.MatchString(h) {
+		return "", false
+	}
+	return h, true
 }
 
 // conversationIDPattern restricts conversationId to a filesystem-safe charset
