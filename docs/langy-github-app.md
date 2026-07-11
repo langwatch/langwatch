@@ -115,6 +115,37 @@ can tighten independently), or use a CNI like Cilium that supports FQDN
 egress and add `github.com` + `api.github.com` + `codeload.github.com` to
 the allow-list.
 
+### FQDN egress is enforced at L7 by the per-worker egress adapter (ADR-043)
+
+The primary FQDN enforcement point is **not** NetworkPolicy — it is the
+per-worker **egress adapter**, an outbound forward proxy the worker's tools
+egress through via `HTTPS_PROXY`. It reads the destination FQDN from each
+`CONNECT` authority (with the TLS SNI as a cross-check) and enforces, per
+connection: require-TLS, a per-destination throttle, the per-project **customer
+allow-list** (`Project.langyEgressAllowlist`, threaded through the credentials
+envelope), and an always-on **operator FQDN floor** (`egress.fqdnFloor` in the
+chart — GitHub / gateway / control plane). The effective allow set is
+`floor ∪ customer-list`. This lives at L7 because kernel netfilter is
+unavailable under gVisor (ADR-033), so an FQDN cannot be bounded at L3/L4 in
+this pod. The default posture is **monitor-only**: with no per-project
+allow-list and `egress.enforceFloor: false`, nothing is blocked — the adapter
+watches and flags. See ADR-043 and
+`specs/langy/langy-egress-enforcement.feature`.
+
+**Honest limit — cooperative, not mandatory, in the stock pod.** Within one pod
+netns nothing forces a worker's traffic *through* the loopback proxy: a
+prompt-injected worker can ignore `HTTPS_PROXY` and `connect()` straight to an
+external IP. The adapter is authoritative for cooperating clients and the
+direct-IP bypass is still *observed* (flow-level monitoring), but not blocked.
+Two bypass-proof upgrades enforce the same floor mandatorily:
+
+- **Cilium `toFQDNs`** — set `egress.cilium.enabled: true` (requires the Cilium
+  CNI) to ship a `CiliumNetworkPolicy` that enforces the FQDN floor at the
+  datapath, which a worker cannot bypass.
+- **ADR-033 Fix B per-worker netns** — put each worker in its own network
+  namespace whose only route out is the adapter's veth. Needs `CAP_SYS_ADMIN`;
+  the non-Cilium bypass-proof option.
+
 ## 5. Verify
 
 In a session, ask Langy something like "open a PR on `<a repo you've granted
