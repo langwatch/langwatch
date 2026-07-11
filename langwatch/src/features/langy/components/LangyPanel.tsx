@@ -57,6 +57,7 @@ import {
   useLangyConversations,
 } from "../data/useLangyConversations";
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
+import { useLangyFastStream } from "../hooks/useLangyFastStream";
 import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
 import {
   type LangyContextChip,
@@ -249,6 +250,11 @@ function LangyPanel({
   );
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Stream B (ADR-048): the chat route returns the turn id in `x-langy-turn-id`.
+  // We capture it to open the raw-token fast-path SSE. `setActiveTurnId` is a
+  // stable useState setter, so the transport (memoised once) can close over it.
+  const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
+
   // Filled in below once useLangyConversations runs; the transport's fetch
   // closes over the ref so the transport itself never needs recreating.
   const adoptConversationRef = useRef<(id: string) => void>(() => undefined);
@@ -267,6 +273,11 @@ function LangyPanel({
             "x-langy-conversation-id",
           );
           if (conversationId) adoptConversationRef.current(conversationId);
+          // Capture the turn id for the Stream B fast-path (ADR-048). Available
+          // as soon as the response headers arrive — before body streaming —
+          // so we subscribe during spawn latency and miss no visible tokens.
+          const turnId = response.headers.get("x-langy-turn-id");
+          if (turnId) setActiveTurnId(turnId);
           return response;
         }) as typeof fetch,
       }),
@@ -403,6 +414,8 @@ function LangyPanel({
     setAppliedOutcomes({});
     setDiscardedProposals(new Set());
     setApplyingProposals(new Set());
+    // Drop the fast-path subscription for the abandoned turn (ADR-048).
+    setActiveTurnId(null);
     void stop();
   }, [stop]);
 
@@ -435,6 +448,17 @@ function LangyPanel({
 
   const isBusy = status === "submitted" || status === "streaming";
   const isEmpty = messages.length === 0;
+
+  // Stream B optimistic tokens for the in-flight turn (ADR-048). Enabled only
+  // while a turn is streaming; the hook resets per (conversation, turn). The
+  // text is reconciled against the durable useChat text inside MessageContent,
+  // so a dropped/late token never renders corrupted prose.
+  const { text: optimisticStreamText } = useLangyFastStream({
+    projectId,
+    conversationId: currentConversationId,
+    turnId: activeTurnId,
+    enabled: isBusy,
+  });
 
   const send = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
@@ -669,6 +693,15 @@ function LangyPanel({
                     isBusy &&
                     index === messages.length - 1 &&
                     message.role === "assistant"
+                  }
+                  // Stream B optimistic lead — only for the in-flight assistant
+                  // turn; reconciled against the durable text (ADR-048).
+                  optimisticText={
+                    isBusy &&
+                    index === messages.length - 1 &&
+                    message.role === "assistant"
+                      ? optimisticStreamText
+                      : undefined
                   }
                   showFeedback={
                     !isBusy &&

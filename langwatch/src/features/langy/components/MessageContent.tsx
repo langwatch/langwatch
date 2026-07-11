@@ -19,6 +19,7 @@ import { parseLangyFeedbackDirective } from "../logic/langyFeedbackDirective";
 import { LangyFeedback } from "./LangyFeedback";
 import { LangyToolActivity, toActivityGroups } from "./LangyToolActivity";
 import { StreamingText } from "./StreamingText";
+import { reconcileOptimisticText } from "../logic/langyOptimisticText";
 
 export interface LangyProposal {
   langyProposal: true;
@@ -50,6 +51,7 @@ export function MessageContent({
   onDiscard,
   onConnectedGithub,
   isStreaming = false,
+  optimisticText,
   conversationId,
   showFeedback = false,
 }: {
@@ -66,6 +68,11 @@ export function MessageContent({
   onConnectedGithub?: (login: string) => void;
   /** True for the in-flight assistant turn — streams tokens with blur reveal. */
   isStreaming?: boolean;
+  /**
+   * Stream B optimistic text for the in-flight turn (ADR-048). Reconciled
+   * against the durable text below and only used while streaming.
+   */
+  optimisticText?: string;
   /** Active conversation id, so feedback can attach to it. */
   conversationId?: string | null;
   /** Show the thumbs feedback affordance under a completed assistant reply. */
@@ -98,6 +105,14 @@ export function MessageContent({
     : parseLangyFeedbackDirective(progress.cleanedText);
   const text = feedbackDirective.cleanedText;
 
+  // Stream B optimistic lead (ADR-048): during the live turn the fast per-token
+  // text leads while it is a clean superset of the durable text; otherwise the
+  // durable text. Reconciled once here so the "has content" guard and the render
+  // agree — the optimistic lead shows even before the first durable batch lands.
+  const displayText = isStreaming
+    ? reconcileOptimisticText(text, optimisticText)
+    : text;
+
   const proposals = extractProposals(message);
   const prLinks = isUser ? [] : extractGithubPrLinks(text);
   // Generic CLI/tool-call activity ("Coding", "Analysing traces") for the
@@ -105,7 +120,7 @@ export function MessageContent({
   // still running tools (no prose yet) still surfaces its activity.
   const toolGroups = isUser ? [] : toActivityGroups(message);
   if (
-    !text &&
+    !displayText &&
     proposals.length === 0 &&
     !showConnectCard &&
     prLinks.length === 0 &&
@@ -141,12 +156,14 @@ export function MessageContent({
     <HStack gap={2} align="flex-start" width="full">
       <SparkleTile size={24} sparkleSize={12} />
       <VStack align="stretch" gap={2.5} flex={1} minWidth={0}>
-        {text &&
+        {displayText &&
           (isStreaming ? (
             // Live turn: stream tokens with the blur-to-clear word reveal.
-            // Formatting lands once the turn finalizes and Markdown takes over.
+            // `displayText` is Stream B's fast lead when it cleanly supersets
+            // the durable text, else the durable text (ADR-048). Formatting
+            // lands once the turn finalizes and Markdown takes over.
             <Box textStyle="sm" color="fg" lineHeight="1.55">
-              <StreamingText text={text} />
+              <StreamingText text={displayText} />
             </Box>
           ) : (
             <Box
