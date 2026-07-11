@@ -10,14 +10,7 @@
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { Box, HStack, Text } from "@chakra-ui/react";
-import {
-  Check,
-  GitBranch,
-  GitCommit,
-  GitPullRequest,
-  Loader,
-  Upload,
-} from "lucide-react";
+import { Check } from "lucide-react";
 import type {
   GithubProgressEvent,
   GithubProgressStage,
@@ -26,7 +19,6 @@ import type {
 type Step = {
   stage: GithubProgressStage;
   label: string;
-  icon: React.ReactNode;
 };
 
 // Stages that visibly progress the user-facing card. `cloning` and
@@ -34,11 +26,11 @@ type Step = {
 // `edited` is omitted from the visible track because it fires once per file
 // and would explode the strip; it still lets us mark "branched" complete.
 const TRACK: Step[] = [
-  { stage: "cloned", label: "Clone", icon: <Loader size={12} /> },
-  { stage: "branched", label: "Branch", icon: <GitBranch size={12} /> },
-  { stage: "committed", label: "Commit", icon: <GitCommit size={12} /> },
-  { stage: "pushed", label: "Push", icon: <Upload size={12} /> },
-  { stage: "opened", label: "PR", icon: <GitPullRequest size={12} /> },
+  { stage: "cloned", label: "Clone" },
+  { stage: "branched", label: "Branch" },
+  { stage: "committed", label: "Commit" },
+  { stage: "pushed", label: "Push" },
+  { stage: "opened", label: "PR" },
 ];
 
 export function LangyGitHubProgressCard({
@@ -50,6 +42,12 @@ export function LangyGitHubProgressCard({
   const reached = new Set(events.map((e) => e.stage));
   const latest = events[events.length - 1]?.detail;
   const opened = reached.has("opened");
+  // Single mono label line, e.g. "WORKING ON IT · PUSHING BRANCH…".
+  const label = opened
+    ? "Opened"
+    : latest
+      ? `Working on it · ${latest}`
+      : "Working on it";
 
   return (
     <Box
@@ -59,38 +57,33 @@ export function LangyGitHubProgressCard({
       padding={3}
       background="bg.subtle"
     >
-      <HStack gap={2} marginBottom={2}>
-        <Text
-          textStyle="2xs"
-          fontWeight="600"
-          letterSpacing="0.08em"
-          textTransform="uppercase"
-          color="fg.muted"
-        >
-          {opened ? "Opened" : "Working on it"}
-        </Text>
-        {latest && (
-          <Text textStyle="xs" color="fg.muted" lineHeight={1}>
-            {latest}
-          </Text>
-        )}
-      </HStack>
-      <HStack gap={2} flexWrap="wrap">
+      <Text
+        textStyle="2xs"
+        fontFamily="mono"
+        fontWeight="600"
+        letterSpacing="0.07em"
+        textTransform="uppercase"
+        color="fg.muted"
+        marginBottom={2}
+      >
+        {label}
+      </Text>
+      <HStack gap={1.5} flexWrap="wrap">
         {TRACK.map((step) => {
           const done = isDoneFor(step.stage, reached);
           return (
             <HStack
               key={step.stage}
               gap={1}
-              paddingX={2}
+              paddingX={2.5}
               paddingY={1}
               borderRadius="full"
               borderWidth="1px"
               borderColor={done ? "green.fg" : "border.muted"}
               color={done ? "green.fg" : "fg.muted"}
-              fontSize="xs"
+              textStyle="xs"
             >
-              {done ? <Check size={12} /> : step.icon}
+              {done ? <Check size={12} /> : null}
               <Text>{step.label}</Text>
             </HStack>
           );
