@@ -495,6 +495,25 @@ langyRoute().post("/langy/chat", async (c) => {
     ? `${langyOverride}\n\n${capReachedNote}`
     : langyOverride;
 
+  // ADR-048 resume-on-next-worker: if a prior turn checkpointed on pod shutdown,
+  // it left an opaque, worker-authored resume token on the conversation fold.
+  // Thread it to the fresh worker so it continues from the checkpoint instead of
+  // cold-starting, then consume it once the turn has started (below). The token
+  // is opaque to the control plane — read, forwarded, never interpreted. A read
+  // failure degrades to a cold start; it must never block a new turn.
+  let pendingHandoff: { token: string; turnId: string } | null = null;
+  try {
+    pendingHandoff = await conversationService.getPendingHandoff({
+      projectId,
+      conversationId: conversation.id,
+    });
+  } catch (error) {
+    logger.warn(
+      { error, conversationId: conversation.id },
+      "failed to read pending langy handoff — cold-starting",
+    );
+  }
+
   const handoffStore = createLangyTurnHandoffStore({ redis: connection });
   await handoffStore.stash({
     projectId,
@@ -506,6 +525,7 @@ langyRoute().post("/langy/chat", async (c) => {
     ...(modelOverride ? { modelOverride } : {}),
     credentials,
     permitReserved: permit.reserved,
+    ...(pendingHandoff ? { resumeToken: pendingHandoff.token } : {}),
   });
 
   try {
@@ -518,6 +538,26 @@ langyRoute().post("/langy/chat", async (c) => {
     await releaseReservedPermit();
     logger.error({ error }, "failed to dispatch langy StartAgentTurn");
     return c.json({ error: "Agent request failed" }, { status: 502 });
+  }
+
+  // ADR-048: the resume token is now threaded to the new worker — clear it so it
+  // is consumed exactly once. Keyed on the handed-off turn (idempotent), so a
+  // rare double-read collapses to one durable event. Best-effort: a failure
+  // leaves the token pending for the next turn to re-consume (still idempotent),
+  // and opencode's resume is itself idempotent, so at worst it is applied twice.
+  if (pendingHandoff) {
+    await conversationService
+      .consumeHandoff({
+        projectId,
+        conversationId: conversation.id,
+        turnId: pendingHandoff.turnId,
+      })
+      .catch((error) =>
+        logger.warn(
+          { error, conversationId: conversation.id },
+          "failed to consume langy handoff",
+        ),
+      );
   }
 
   // Attach to the turn's live token stream (tail + follow). Same read path a

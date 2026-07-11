@@ -17,6 +17,7 @@ func clearLangyEnv(t *testing.T) {
 		"LANGY_WORKSPACE_ROOT", "LANGY_UNSAFE_DEV_DISABLE_ISOLATION",
 		"OPENCODE_OTEL_PLUGIN_VERSION", "LOG_LEVEL", "LOG_FORMAT",
 		"OTEL_OTLP_ENDPOINT", "OTEL_SAMPLE_RATIO",
+		"LANGY_SHUTDOWN_HANDOFF_DEADLINE_MS", "LANGY_SHUTDOWN_DRAIN_BUDGET_MS",
 	} {
 		t.Setenv(k, "")
 	}
@@ -164,5 +165,58 @@ func TestLoadConfig_UnsafeDevDisableIsolationRefusedInNonLocalEnvs(t *testing.T)
 				t.Fatalf("expected LoadConfig to refuse LANGY_UNSAFE_DEV_DISABLE_ISOLATION when ENVIRONMENT=%q", env)
 			}
 		})
+	}
+}
+
+func TestLoadConfig_ShutdownHandoffDefaults(t *testing.T) {
+	clearLangyEnv(t)
+	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.ShutdownHandoffDeadline() != 5*time.Second {
+		t.Errorf("ShutdownHandoffDeadline default = %s, want 5s", cfg.ShutdownHandoffDeadline())
+	}
+	if cfg.ShutdownDrainBudget() != 3*time.Second {
+		t.Errorf("ShutdownDrainBudget default = %s, want 3s", cfg.ShutdownDrainBudget())
+	}
+	// The ADR-048 invariant holds for the defaults: handoff + drain (8s) < the
+	// 10s default graceful window.
+	if d := cfg.ShutdownHandoffDeadlineMS + cfg.ShutdownDrainBudgetMS; d >= int64(cfg.Server.GracefulSeconds)*1000 {
+		t.Errorf("defaults violate the ADR-048 deadline math: %d >= %d", d, int64(cfg.Server.GracefulSeconds)*1000)
+	}
+}
+
+// The ADR-048 deadline math is enforced at load: handoff + drain must be
+// strictly less than the graceful window, so the worker-authored checkpoint AND
+// the process-group kill both fit before the graceful deadline (which the
+// operator sizes below terminationGracePeriodSeconds — SIGKILL is uncatchable).
+func TestLoadConfig_ShutdownHandoffDeadlineMathRefused(t *testing.T) {
+	clearLangyEnv(t)
+	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+	// Default graceful window is 10s; 8s handoff + 3s drain = 11s overruns it.
+	t.Setenv("LANGY_SHUTDOWN_HANDOFF_DEADLINE_MS", "8000")
+	t.Setenv("LANGY_SHUTDOWN_DRAIN_BUDGET_MS", "3000")
+
+	if _, err := LoadConfig(context.Background()); err == nil {
+		t.Fatalf("expected LoadConfig to refuse handoff+drain that overrun the graceful window")
+	}
+}
+
+func TestLoadConfig_ShutdownHandoffBudgetsWithinGracefulAccepted(t *testing.T) {
+	clearLangyEnv(t)
+	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+	// 4s handoff + 2s drain = 6s < 10s graceful window.
+	t.Setenv("LANGY_SHUTDOWN_HANDOFF_DEADLINE_MS", "4000")
+	t.Setenv("LANGY_SHUTDOWN_DRAIN_BUDGET_MS", "2000")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.ShutdownHandoffDeadline() != 4*time.Second {
+		t.Errorf("ShutdownHandoffDeadline = %s, want 4s", cfg.ShutdownHandoffDeadline())
 	}
 }

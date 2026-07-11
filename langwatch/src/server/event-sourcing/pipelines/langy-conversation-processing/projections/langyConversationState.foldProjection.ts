@@ -14,6 +14,8 @@ import type {
   LangyAgentTurnFailedEvent,
   LangyAgentTurnStartedEvent,
   LangyConversationArchivedEvent,
+  LangyConversationHandoffConsumedEvent,
+  LangyConversationHandoffPendingEvent,
   LangyConversationMetadataUpdatedEvent,
   LangyMessageSentEvent,
   LangyToolCallCompletedEvent,
@@ -26,6 +28,8 @@ import {
   LangyAgentTurnFailedEventSchema,
   LangyAgentTurnStartedEventSchema,
   LangyConversationArchivedEventSchema,
+  LangyConversationHandoffConsumedEventSchema,
+  LangyConversationHandoffPendingEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
   LangyMessageSentEventSchema,
   LangyToolCallCompletedEventSchema,
@@ -63,6 +67,15 @@ export interface LangyConversationStateData {
    */
   CurrentTurnId: string | null;
   LastError: string | null;
+  /**
+   * ADR-048 shutdown-handoff. When a turn checkpoints on pod termination it
+   * leaves an opaque, worker-authored resume token here; the next turn threads
+   * it to a fresh worker and clears it. Null when there is nothing to resume.
+   * The token is opaque to the pipeline — stored verbatim, only opencode reads
+   * it. PendingHandoffTurnId is the turn that handed off (idempotent consume).
+   */
+  PendingHandoffToken: string | null;
+  PendingHandoffTurnId: string | null;
   ArchivedAt: number | null;
   CreatedAt: number;
   UpdatedAt: number;
@@ -85,6 +98,8 @@ const langyConversationEvents = [
   LangyTurnFinalizedEventSchema,
   LangyConversationArchivedEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
+  LangyConversationHandoffPendingEventSchema,
+  LangyConversationHandoffConsumedEventSchema,
 ] as const;
 
 /**
@@ -132,6 +147,8 @@ export class LangyConversationStateFoldProjection
       LastActivityAt: null,
       CurrentTurnId: null,
       LastError: null,
+      PendingHandoffToken: null,
+      PendingHandoffTurnId: null,
       ArchivedAt: null,
     };
   }
@@ -298,5 +315,39 @@ export class LangyConversationStateFoldProjection
         : null;
     }
     return next;
+  }
+
+  // ADR-048: a turn checkpointed on shutdown. Store the opaque resume token and
+  // the turn it belongs to, CLEAR CurrentTurnId (the turn handed off — it did
+  // not fail), and return the conversation to idle so the next message can pick
+  // the token up. Never un-archives (nextStatus guards it).
+  handleLangyConversationConversationHandoffPending(
+    event: LangyConversationHandoffPendingEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return {
+      ...state,
+      ConversationId: state.ConversationId || event.data.conversationId,
+      Status: this.nextStatus(state, LANGY_CONVERSATION_STATUS.IDLE),
+      CurrentTurnId: null,
+      PendingHandoffToken: event.data.token,
+      PendingHandoffTurnId: event.data.turnId,
+      LastActivityAt: event.occurredAt,
+    };
+  }
+
+  // ADR-048: the next turn threaded the pending token to a fresh worker. Clear
+  // it so it is consumed exactly once. Idempotent on the command, so replaying
+  // this is a no-op on an already-cleared fold.
+  handleLangyConversationConversationHandoffConsumed(
+    event: LangyConversationHandoffConsumedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return {
+      ...state,
+      ConversationId: state.ConversationId || event.data.conversationId,
+      PendingHandoffToken: null,
+      PendingHandoffTurnId: null,
+    };
   }
 }

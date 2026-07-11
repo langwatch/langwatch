@@ -8,6 +8,8 @@ import type {
   LangyAgentRespondedEventData,
   LangyAgentTurnFailedEventData,
   LangyConversationArchivedEventData,
+  LangyConversationHandoffConsumedEventData,
+  LangyConversationHandoffPendingEventData,
   LangyConversationMetadataUpdatedEventData,
   LangyAgentTurnStartedEventData,
   LangyMessagePart,
@@ -210,6 +212,45 @@ export class LangyConversationReadRepository {
     const rows = await result.json<{ ConversationId: string }>();
     return rows.map((r) => r.ConversationId);
   }
+
+  /**
+   * The pending shutdown-handoff token for a conversation, or null when there
+   * is nothing to resume (ADR-048). Point lookup on the (TenantId,
+   * ConversationId) sort key, latest-version via argMax — never FINAL. The token
+   * is opaque here; the caller threads it to a fresh worker and consumes it.
+   */
+  async findPendingHandoff({
+    projectId,
+    conversationId,
+  }: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<{ token: string; turnId: string } | null> {
+    const client = await this.resolver(projectId);
+    const result = await client.query({
+      query: `
+        SELECT
+          argMax(PendingHandoffToken, UpdatedAt) AS PendingHandoffToken,
+          argMax(PendingHandoffTurnId, UpdatedAt) AS PendingHandoffTurnId
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND ConversationId = {conversationId:String}
+        GROUP BY ConversationId
+        HAVING ${LATEST_ARCHIVED_MS} = 0
+      `,
+      query_params: { tenantId: projectId, conversationId },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<{
+      PendingHandoffToken: string | null;
+      PendingHandoffTurnId: string | null;
+    }>();
+    const row = rows[0];
+    if (!row || !row.PendingHandoffToken || !row.PendingHandoffTurnId) {
+      return null;
+    }
+    return { token: row.PendingHandoffToken, turnId: row.PendingHandoffTurnId };
+  }
 }
 
 /** Command dispatchers injected from the event-sourcing pipeline registry. */
@@ -225,6 +266,8 @@ export interface LangyConversationCommands {
   reconcileAgentTurn: Dispatch<LangyTurnFinalizedEventData>;
   archiveConversation: Dispatch<LangyConversationArchivedEventData>;
   updateConversationMetadata: Dispatch<LangyConversationMetadataUpdatedEventData>;
+  recordTurnHandoff: Dispatch<LangyConversationHandoffPendingEventData>;
+  consumeTurnHandoff: Dispatch<LangyConversationHandoffConsumedEventData>;
 }
 
 function newConversationId(): string {
@@ -483,6 +526,68 @@ export class LangyConversationService {
       conversationId,
       turnId,
       error,
+    });
+  }
+
+  /**
+   * The pending shutdown-handoff for a conversation, or null (ADR-048). Read
+   * from the fold; the token is opaque to the control plane.
+   */
+  async getPendingHandoff({
+    projectId,
+    conversationId,
+  }: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<{ token: string; turnId: string } | null> {
+    return this.repository.findPendingHandoff({ projectId, conversationId });
+  }
+
+  /**
+   * Persist an opaque, worker-authored resume token a turn left when it
+   * checkpointed on pod termination (ADR-048): `conversation_handoff_pending`.
+   * Clears the fold's CurrentTurnId (the turn handed off, it did not fail) and
+   * stores the token for the next turn to resume from.
+   */
+  async recordTurnHandoff({
+    projectId,
+    conversationId,
+    turnId,
+    token,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    token: string;
+  }): Promise<void> {
+    await this.commands.recordTurnHandoff({
+      tenantId: projectId,
+      occurredAt: Date.now(),
+      conversationId,
+      turnId,
+      token,
+    });
+  }
+
+  /**
+   * Clear a pending handoff once the next turn has threaded it to a fresh
+   * worker (ADR-048): `conversation_handoff_consumed`. Idempotent on the turn,
+   * so a double-consume collapses to one durable event.
+   */
+  async consumeHandoff({
+    projectId,
+    conversationId,
+    turnId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<void> {
+    await this.commands.consumeTurnHandoff({
+      tenantId: projectId,
+      occurredAt: Date.now(),
+      conversationId,
+      turnId,
     });
   }
 

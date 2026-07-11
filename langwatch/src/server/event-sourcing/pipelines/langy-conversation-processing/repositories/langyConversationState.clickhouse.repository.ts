@@ -40,6 +40,8 @@ interface ClickHouseLangyConversationRecord {
   LastActivityAt: number | null;
   CurrentTurnId: string | null;
   LastError: string | null;
+  PendingHandoffToken: string | null;
+  PendingHandoffTurnId: string | null;
   CreatedAt: number;
   UpdatedAt: number;
   ArchivedAt: number | null;
@@ -62,6 +64,8 @@ interface ClickHouseLangyConversationWriteRecord {
   LastActivityAt: Date | null;
   CurrentTurnId: string | null;
   LastError: string | null;
+  PendingHandoffToken: string | null;
+  PendingHandoffTurnId: string | null;
   CreatedAt: Date;
   UpdatedAt: Date;
   ArchivedAt: Date | null;
@@ -90,6 +94,8 @@ export class LangyConversationStateRepositoryClickHouse<
         record.LastActivityAt === null ? null : Number(record.LastActivityAt),
       CurrentTurnId: record.CurrentTurnId,
       LastError: record.LastError,
+      PendingHandoffToken: record.PendingHandoffToken,
+      PendingHandoffTurnId: record.PendingHandoffTurnId,
       ArchivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
       CreatedAt: Number(record.CreatedAt),
       UpdatedAt: Number(record.UpdatedAt),
@@ -120,6 +126,8 @@ export class LangyConversationStateRepositoryClickHouse<
         data.LastActivityAt != null ? new Date(data.LastActivityAt) : null,
       CurrentTurnId: data.CurrentTurnId,
       LastError: data.LastError,
+      PendingHandoffToken: data.PendingHandoffToken,
+      PendingHandoffTurnId: data.PendingHandoffTurnId,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
       UpdatedAt: new Date(data.UpdatedAt),
       ArchivedAt: data.ArchivedAt != null ? new Date(data.ArchivedAt) : null,
@@ -159,6 +167,8 @@ export class LangyConversationStateRepositoryClickHouse<
             t.MessageCount AS MessageCount,
             if(t.LastActivityAt IS NOT NULL, toUnixTimestamp64Milli(t.LastActivityAt), NULL) AS LastActivityAt,
             t.CurrentTurnId AS CurrentTurnId, t.LastError AS LastError,
+            t.PendingHandoffToken AS PendingHandoffToken,
+            t.PendingHandoffTurnId AS PendingHandoffTurnId,
             toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
             if(t.ArchivedAt IS NOT NULL, toUnixTimestamp64Milli(t.ArchivedAt), NULL) AS ArchivedAt,

@@ -66,6 +66,10 @@ type ChatRequest struct {
 	Prompt         string
 	System         string
 	Credentials    domain.Credentials
+	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a prior
+	// turn that handed off on shutdown. Threaded into PostMessage so opencode
+	// resumes from it; empty on a normal cold start.
+	ResumeToken string
 }
 
 // Chat runs one chat turn: acquire the worker, claim it, post the prompt, and
@@ -146,7 +150,7 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 		errCh <- err
 	}()
 
-	if err := worker.PostMessage(ctx, req.System, req.Prompt); err != nil {
+	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.ResumeToken); err != nil {
 		// Cancel the SSE consumer, then DRAIN it (<-errCh) BEFORE writing any error
 		// event. StreamEvents writes to the same http.ResponseWriter as the sink;
 		// waiting for it to return first avoids a concurrent write on the ndjson

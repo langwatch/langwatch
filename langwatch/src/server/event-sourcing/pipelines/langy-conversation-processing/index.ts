@@ -3,10 +3,12 @@ export type { LangyConversationProcessingPipelineDeps } from "./pipeline";
 
 export {
   ArchiveConversationCommand,
+  ConsumeTurnHandoffCommand,
   FailAgentTurnCommand,
   RecordAgentRespondedCommand,
   RecordToolCallCompletedCommand,
   RecordToolCallStartedCommand,
+  RecordTurnHandoffCommand,
   ReconcileAgentTurnCommand,
   SendMessageCommand,
   StartAgentTurnCommand,

@@ -25,6 +25,12 @@ export const LANGY_CONVERSATION_EVENT_TYPES = {
   // Beyond the prescribed vocabulary — preserves the PATCH rename/share route.
   // See ADR-046 open question 1.
   METADATA_UPDATED: "lw.langy_conversation.conversation_metadata_updated",
+  // ADR-048 shutdown-handoff: a turn checkpointed on pod termination and left an
+  // opaque, worker-authored resume token for the next turn to pick up
+  // (CONVERSATION_HANDOFF_PENDING); the next turn threaded it to a fresh worker
+  // and cleared it (CONVERSATION_HANDOFF_CONSUMED).
+  CONVERSATION_HANDOFF_PENDING: "lw.langy_conversation.conversation_handoff_pending",
+  CONVERSATION_HANDOFF_CONSUMED: "lw.langy_conversation.conversation_handoff_consumed",
 } as const;
 
 export const LANGY_CONVERSATION_PROCESSING_EVENT_TYPES = [
@@ -38,6 +44,8 @@ export const LANGY_CONVERSATION_PROCESSING_EVENT_TYPES = [
   LANGY_CONVERSATION_EVENT_TYPES.TURN_FINALIZED,
   LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED,
   LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED,
+  LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
+  LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED,
 ] as const;
 
 export type LangyConversationProcessingEventType =
@@ -88,6 +96,9 @@ export const LANGY_CONVERSATION_COMMAND_TYPES = {
   RECONCILE_AGENT_TURN: "lw.langy_conversation.reconcile_agent_turn",
   ARCHIVE: "lw.langy_conversation.archive_conversation",
   UPDATE_METADATA: "lw.langy_conversation.update_metadata",
+  // ADR-048 shutdown-handoff write surface.
+  RECORD_TURN_HANDOFF: "lw.langy_conversation.record_turn_handoff",
+  CONSUME_TURN_HANDOFF: "lw.langy_conversation.consume_turn_handoff",
 } as const;
 
 export const LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES = [
@@ -100,6 +111,8 @@ export const LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES = [
   LANGY_CONVERSATION_COMMAND_TYPES.RECONCILE_AGENT_TURN,
   LANGY_CONVERSATION_COMMAND_TYPES.ARCHIVE,
   LANGY_CONVERSATION_COMMAND_TYPES.UPDATE_METADATA,
+  LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TURN_HANDOFF,
+  LANGY_CONVERSATION_COMMAND_TYPES.CONSUME_TURN_HANDOFF,
 ] as const;
 
 export type LangyConversationProcessingCommandType =
@@ -133,6 +146,8 @@ export const LANGY_CONVERSATION_EVENT_VERSIONS = {
   TURN_FINALIZED: "2026-07-10",
   ARCHIVED: "2026-07-10",
   METADATA_UPDATED: "2026-07-10",
+  CONVERSATION_HANDOFF_PENDING: "2026-07-11",
+  CONVERSATION_HANDOFF_CONSUMED: "2026-07-11",
 } as const;
 
 /**

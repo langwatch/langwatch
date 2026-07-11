@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
@@ -26,16 +27,18 @@ func (f *fakePool) Acquire(_ context.Context, _ string, _ domain.Credentials) (W
 	}
 	return f.worker, nil
 }
-func (f *fakePool) Status() (int, int)            { return 0, 0 }
-func (f *fakePool) KillSessionVanished(id string) { f.killed = append(f.killed, id) }
-func (f *fakePool) StartReaper()                  {}
-func (f *fakePool) Shutdown()                     {}
+func (f *fakePool) Status() (int, int)                         { return 0, 0 }
+func (f *fakePool) KillSessionVanished(id string)              { f.killed = append(f.killed, id) }
+func (f *fakePool) StartReaper()                               {}
+func (f *fakePool) ShutdownHandoff(context.Context, time.Time) {}
+func (f *fakePool) Shutdown()                                  {}
 
 type fakeWorker struct {
 	claimOK          bool
 	claimed          int
 	released         int
 	postErr          error
+	gotResumeToken   string
 	streamErr        error
 	streamWrites     bool // write one event on the stream (happy path)
 	blockUntilCancel bool // wait for ctx cancellation before returning (post-error path)
@@ -44,7 +47,8 @@ type fakeWorker struct {
 func (w *fakeWorker) Claim() bool { w.claimed++; return w.claimOK }
 func (w *fakeWorker) Release()    { w.released++ }
 func (w *fakeWorker) Touch()      {}
-func (w *fakeWorker) PostMessage(_ context.Context, _, _ string) error {
+func (w *fakeWorker) PostMessage(_ context.Context, _, _, resumeToken string) error {
+	w.gotResumeToken = resumeToken
 	return w.postErr
 }
 func (w *fakeWorker) StreamEvents(ctx context.Context, sink ChatSink) error {

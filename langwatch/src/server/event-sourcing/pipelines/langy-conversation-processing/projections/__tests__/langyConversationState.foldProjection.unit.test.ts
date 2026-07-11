@@ -226,4 +226,77 @@ describe("LangyConversationStateFoldProjection", () => {
       expect(state).not.toHaveProperty("LastHeartbeatAt");
     });
   });
+
+  describe("given an agent turn in progress that hands off on shutdown (ADR-048)", () => {
+    const started = fold.apply(
+      fold.apply(fold.init(), messageSent({}, 1000)),
+      event(
+        "AGENT_TURN_STARTED",
+        LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_STARTED,
+        { turnId: "turn-1" },
+        1500,
+      ),
+    );
+
+    const handedOff = fold.apply(
+      started,
+      event(
+        "CONVERSATION_HANDOFF_PENDING",
+        LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_PENDING,
+        { turnId: "turn-1", token: "opaque-resume-token" },
+        1800,
+      ),
+    );
+
+    describe("when the turn checkpoints and hands off", () => {
+      it("stores the pending token, clears the in-flight turn, and returns to idle", () => {
+        expect(handedOff.PendingHandoffToken).toBe("opaque-resume-token");
+        expect(handedOff.PendingHandoffTurnId).toBe("turn-1");
+        expect(handedOff.CurrentTurnId).toBeNull();
+        expect(handedOff.Status).toBe(LANGY_CONVERSATION_STATUS.IDLE);
+      });
+
+      it("does not record the turn as failed (a handoff is not a failure)", () => {
+        expect(handedOff.Status).not.toBe(LANGY_CONVERSATION_STATUS.FAILED);
+        expect(handedOff.LastError).toBeNull();
+      });
+    });
+
+    describe("when the next turn consumes the pending handoff", () => {
+      const consumed = fold.apply(
+        handedOff,
+        event(
+          "CONVERSATION_HANDOFF_CONSUMED",
+          LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED,
+          { turnId: "turn-1" },
+          2000,
+        ),
+      );
+
+      it("clears the pending token", () => {
+        expect(consumed.PendingHandoffToken).toBeNull();
+        expect(consumed.PendingHandoffTurnId).toBeNull();
+      });
+
+      it("consuming again is a no-op on an already-cleared fold (idempotent)", () => {
+        const consumedTwice = fold.apply(
+          consumed,
+          event(
+            "CONVERSATION_HANDOFF_CONSUMED",
+            LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED,
+            { turnId: "turn-1" },
+            2100,
+          ),
+        );
+        expect(consumedTwice.PendingHandoffToken).toBeNull();
+        expect(consumedTwice.PendingHandoffTurnId).toBeNull();
+      });
+    });
+
+    it("a fresh conversation has no pending handoff", () => {
+      const init = fold.init();
+      expect(init.PendingHandoffToken).toBeNull();
+      expect(init.PendingHandoffTurnId).toBeNull();
+    });
+  });
 });

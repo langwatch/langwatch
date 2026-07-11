@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -19,10 +20,10 @@ import (
 
 type stubWorker struct{ claimOK bool }
 
-func (w *stubWorker) Claim() bool                                       { return w.claimOK }
-func (w *stubWorker) Release()                                          {}
-func (w *stubWorker) Touch()                                            {}
-func (w *stubWorker) PostMessage(context.Context, string, string) error { return nil }
+func (w *stubWorker) Claim() bool                                               { return w.claimOK }
+func (w *stubWorker) Release()                                                  {}
+func (w *stubWorker) Touch()                                                    {}
+func (w *stubWorker) PostMessage(context.Context, string, string, string) error { return nil }
 func (w *stubWorker) StreamEvents(_ context.Context, sink app.ChatSink) error {
 	_, _ = sink.Write([]byte("{\"type\":\"message.part.delta\"}\n"))
 	return nil
@@ -39,10 +40,11 @@ func (p *stubPool) Acquire(context.Context, string, domain.Credentials) (app.Wor
 	}
 	return p.worker, nil
 }
-func (p *stubPool) Status() (int, int)         { return 2, 20 }
-func (p *stubPool) KillSessionVanished(string) {}
-func (p *stubPool) StartReaper()               {}
-func (p *stubPool) Shutdown()                  {}
+func (p *stubPool) Status() (int, int)                         { return 2, 20 }
+func (p *stubPool) KillSessionVanished(string)                 {}
+func (p *stubPool) StartReaper()                               {}
+func (p *stubPool) ShutdownHandoff(context.Context, time.Time) {}
+func (p *stubPool) Shutdown()                                  {}
 
 const internalSecret = "test-internal-secret"
 
