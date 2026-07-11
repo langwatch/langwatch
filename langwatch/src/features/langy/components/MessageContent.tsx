@@ -1,18 +1,11 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type { UIMessage } from "ai";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";
 import { Markdown } from "~/components/Markdown";
-import {
-  AI_SHADOW,
-  GradientSparkle,
-  MeshGradientLayer,
-  SparkleTile,
-} from "~/features/traces-v2/components/ai/aiBrandVisuals";
-import { extractGithubPrLinks } from "~/server/services/langy/githubPrLinks";
-import { parseGithubProgressEvents } from "~/server/services/langy/githubProgressEvents";
-import { CONNECT_GITHUB_SENTINEL } from "~/server/services/langy/langySentinels";
-import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
+import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
+import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
+import { githubProgressFromToolParts } from "~/server/services/langy/execution/githubCommand";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
 import {
@@ -52,7 +45,6 @@ export function MessageContent({
   applyingProposals,
   onApply,
   onDiscard,
-  onConnectedGithub,
   isStreaming = false,
   optimisticText,
   conversationId,
@@ -68,7 +60,6 @@ export function MessageContent({
   applyingProposals: Set<string>;
   onApply: (proposalId: string, proposal: LangyProposal) => Promise<void>;
   onDiscard: (proposalId: string) => void;
-  onConnectedGithub?: (login: string) => void;
   /** True for the in-flight assistant turn — streams tokens with blur reveal. */
   isStreaming?: boolean;
   /**
@@ -89,23 +80,35 @@ export function MessageContent({
     .map((part) => part.text)
     .join("");
 
-  const showConnectCard = !isUser && rawText.includes(CONNECT_GITHUB_SENTINEL);
-  const afterConnectStrip = showConnectCard
-    ? rawText.split(CONNECT_GITHUB_SENTINEL).join("").trim()
-    : rawText;
+  // The connect card is NOT sniffed out of the assistant's prose any more. A
+  // missing GitHub connection is a structured `langy_github_not_connected` domain
+  // error raised from the tool stream (the control plane sees the agent reach for
+  // `gh` with no token), and LangyPanel renders the card off that. Reading the
+  // model's text for `[langy:connect-github]` meant trusting it to say the magic
+  // words — so it could forget, paraphrase, or say them on a turn that never
+  // touched GitHub.
 
-  // Strip [langy:progress:...] sentinels from the rendered text and surface
-  // them as a steps card above the prose. Skipping for user messages.
-  const progress = isUser
-    ? { events: [], cleanedText: afterConnectStrip }
-    : parseGithubProgressEvents(afterConnectStrip);
+  // The PR-flow progress card, derived from the message's TOOL PARTS — the same
+  // parts the tool cards render from. `git push` IS the push; we no longer ask
+  // the model to print `[langy:progress:pushed]` next to it and then regex the
+  // reply. Two things get better: an errored command no longer marks its step
+  // complete (a rejected push has not pushed), and the card SURVIVES A REFRESH —
+  // the sentinels were stripped before the message was persisted, so it never
+  // used to.
+  const progressEvents = isUser
+    ? []
+    : githubProgressFromToolParts(message.parts);
 
   // Strip the hidden [langy:feedback:...] directive: when present, Langy asked
   // for feedback at a high-signal moment — surface the affordance regardless of
   // the default throttle, tailored by the sentiment it classified.
   const feedbackDirective = isUser
-    ? { requested: false, sentiment: undefined, cleanedText: progress.cleanedText }
-    : parseLangyFeedbackDirective(progress.cleanedText);
+    ? {
+        requested: false,
+        sentiment: undefined,
+        cleanedText: rawText,
+      }
+    : parseLangyFeedbackDirective(rawText);
   const text = feedbackDirective.cleanedText;
 
   // Stream B optimistic lead (ADR-048): during the live turn the fast per-token
@@ -117,18 +120,26 @@ export function MessageContent({
     : text;
 
   const proposals = extractProposals(message);
-  const prLinks = isUser ? [] : extractGithubPrLinks(text);
-  // Tool-call activity for the assistant turn: generic lines ("Coding",
-  // "Analysing traces") AND settled domain-capability cards. Counts toward
-  // "has something to render" so a turn whose only output is a running tool or
-  // a settled capability card (no prose yet) still surfaces it.
+  // The PR cards, read off the message's TOOL PARTS — not scraped from the
+  // model's text. This was the LAST thing in Langy's UI steered by regexing the
+  // assistant's prose: any github.com/…/pull/N URL in the reply drew a card, so
+  // the model could mangle the URL, omit it, or merely MENTION a PR it never
+  // opened and get a card for it. The tool part is written by the control plane
+  // from `gh pr create`'s own stdout, is persisted with the message (so the card
+  // survives a refresh), and skips a `gh pr create` that FAILED — a PR that did
+  // not open must never render as one that did.
+  const prs = isUser ? [] : githubPrsFromToolParts(message.parts);
+  // Tool-call activity for the assistant turn: activity cards, each labelled by
+  // what the call is DOING ("Searching traces", "Using the GitHub skill"), plus
+  // the in-flight and settled domain-capability cards. Counts toward "has
+  // something to render" so a turn whose only output is a running tool or a
+  // settled card (no prose yet) still surfaces it.
   const showsActivity = isUser ? false : hasLangyActivity(message);
   if (
     !displayText &&
     proposals.length === 0 &&
-    !showConnectCard &&
-    prLinks.length === 0 &&
-    progress.events.length === 0 &&
+    prs.length === 0 &&
+    progressEvents.length === 0 &&
     !showsActivity
   )
     return null;
@@ -157,8 +168,10 @@ export function MessageContent({
   }
 
   return (
+    // No avatar. Langy's mark lives on the launcher and above the empty state's
+    // display line — nowhere else in the panel. A 24px logo tile repeated down
+    // every answer was chrome, and at that size the mark was a smudge anyway.
     <HStack gap={2} align="flex-start" width="full">
-      <SparkleTile size={24} sparkleSize={12} />
       <VStack align="stretch" gap={2.5} flex={1} minWidth={0}>
         {displayText &&
           (isStreaming ? (
@@ -190,21 +203,16 @@ export function MessageContent({
               <Markdown>{text}</Markdown>
             </Box>
           ))}
-        {/* Generic CLI/tool-call activity: "Coding", "Analysing traces", and
-            a raw-JSON fallback for tools with no card yet (developer mode
-            exposes the raw view for every tool). Single insertion point;
-            all mapping lives in LangyToolActivity. */}
+        {/* Tool activity, all of it as CARDS: a capability's in-progress shell
+            while it runs and its bespoke card once it settles, and a generic
+            activity card (tool name + what it's doing + the command/path) for
+            everything else. Raw JSON is developer-mode only. Single insertion
+            point; all mapping lives in LangyToolActivity. */}
         <LangyToolActivity message={message} />
-        {showConnectCard && organizationId ? (
-          <LangyGitHubConnectCard
-            organizationId={organizationId}
-            onConnected={onConnectedGithub}
-          />
-        ) : null}
-        {progress.events.length > 0 && (
-          <LangyGitHubProgressCard events={progress.events} />
+        {progressEvents.length > 0 && (
+          <LangyGitHubProgressCard events={progressEvents} />
         )}
-        {prLinks.map((pr) => (
+        {prs.map((pr) => (
           <LangyGitHubPrCard
             key={`${pr.owner}/${pr.repo}#${pr.number}`}
             {...pr}
@@ -250,7 +258,7 @@ export function MessageContent({
   );
 }
 
-function ProposalCard({
+export function ProposalCard({
   proposal,
   appliedOutcome,
   isDiscarded,
@@ -349,7 +357,7 @@ function ProposalCard({
         {isApplied && !destructive ? (
           <Check size={11} />
         ) : (
-          <GradientSparkle size={11} />
+          <Sparkles size={11} />
         )}
         <Text>{overlineLabel}</Text>
       </HStack>
@@ -387,14 +395,14 @@ function ProposalCard({
             alignItems="center"
             justifyContent="center"
             gap={1.5}
-            boxShadow={destructive ? undefined : AI_SHADOW}
+            boxShadow={destructive ? undefined : LANGY_ACTION_SHADOW}
             onClick={onApply}
             disabled={isApplying}
             position="relative"
             overflow="hidden"
           >
             {!destructive && (
-              <MeshGradientLayer borderRadius="md" active={isApplying} />
+              <LangyMeshLayer borderRadius="md" active={isApplying} />
             )}
             <Box
               position="relative"

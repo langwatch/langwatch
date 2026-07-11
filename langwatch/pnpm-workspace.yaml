@@ -2,6 +2,10 @@ packages:
   - .
   - "packages/*"
   - "../mcp-server"
+  # The CLI's card/domain-error contract, shared with typescript-sdk. Source-only
+  # and zod-peer-dep'd, so it compiles against the app's own zod (3.25) via the
+  # `zod/v4` subpath both majors ship.
+  - "../packages/cli-cards"
 
 minimumReleaseAge: 10080
 

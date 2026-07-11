@@ -10,6 +10,7 @@ import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 
 import { LangyProvider, useLangy } from "./LangyContext";
+import { LangyContextTargetLayer } from "./components/LangyContextTargetLayer";
 import {
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
@@ -103,7 +104,10 @@ function LangyShiftedRoot({
   children: ReactNode;
 }) {
   const isOpen = useLangyStore((s) => s.isOpen);
-  const shifted = showLangy && isOpen;
+  const panelMode = useLangyStore((s) => s.panelMode);
+  // Only Sidebar mode reserves room (pushes content left). Floating mode
+  // overlays the page — content stays full width and the card floats over it.
+  const shifted = showLangy && isOpen && panelMode === "sidebar";
   return (
     <>
       <Box
@@ -114,6 +118,11 @@ function LangyShiftedRoot({
         {children}
       </Box>
       {showLangy && <LangySidecarConnected />}
+      {/* Drives "point at things on the page and add them to Langy": follows the
+          pointer, lights up the targets near it, and floats the one "Add to
+          Langy" button over whichever you're hovering. Renders null and attaches
+          no listeners while the panel is closed. */}
+      {showLangy && <LangyContextTargetLayer />}
     </>
   );
 }

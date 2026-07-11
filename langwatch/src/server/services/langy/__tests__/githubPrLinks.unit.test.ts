@@ -10,7 +10,7 @@
  * counter charged for. Pin the behavior here.
  */
 import { describe, expect, it } from "vitest";
-import { extractGithubPrLinks, extractOpenedPrLinks } from "../githubPrLinks";
+import { extractGithubPrLinks } from "../githubPrLinks";
 
 describe("extractGithubPrLinks", () => {
   describe("when the text has no GitHub URLs", () => {
@@ -82,62 +82,16 @@ describe("extractGithubPrLinks", () => {
   });
 });
 
-describe("extractOpenedPrLinks", () => {
-  describe("when an `opened` sentinel matches the PR URL", () => {
-    it("counts that PR", () => {
-      const text = [
-        "[langy:progress:opening_pr:acme/foo]",
-        "[langy:progress:opened:acme/foo#9]",
-        "Opened https://github.com/acme/foo/pull/9 for you.",
-      ].join("\n");
-      expect(extractOpenedPrLinks(text).map((l) => l.number)).toEqual([9]);
-    });
-  });
-
-  describe("when a PR is merely MENTIONED (progress events present, none opened it)", () => {
-    it("does not count it — 'summarize PR #4751' must not burn the cap", () => {
-      const text = [
-        "[langy:progress:cloning:acme/foo]",
-        "Here's a summary of https://github.com/acme/foo/pull/123 as requested.",
-      ].join("\n");
-      expect(extractOpenedPrLinks(text)).toEqual([]);
-    });
-  });
-
-  describe("when the reply has PR URLs but NO progress sentinels at all", () => {
-    // The github.md skill is PINNED in this PR; opened PRs always emit a
-    // `[langy:progress:opened:...]` sentinel. A reply with NO sentinels
-    // therefore represents prose containing a PR URL (a summary, a
-    // reference), NOT an actually-opened PR. Counting these would burn
-    // the daily cap and forge audit rows on a read-only chat — the bug
-    // Sergio caught in 2026-06-30 review round 3.
-    it("returns [] — no sentinels means no PR was actually opened", () => {
-      const text = "Done: https://github.com/acme/foo/pull/5";
-      expect(extractOpenedPrLinks(text)).toEqual([]);
-    });
-  });
-
-  describe("when one PR was opened and another merely referenced", () => {
-    it("counts only the opened one", () => {
-      const text = [
-        "[langy:progress:opened:acme/foo#9]",
-        "Opened https://github.com/acme/foo/pull/9 — similar to",
-        "https://github.com/other/repo/pull/1.",
-      ].join("\n");
-      const out = extractOpenedPrLinks(text);
-      expect(out.map((l) => `${l.owner}/${l.repo}#${l.number}`)).toEqual([
-        "acme/foo#9",
-      ]);
-    });
-  });
-
-  describe("when `opened` fired but its detail is missing (skill drift)", () => {
-    it("falls back to all links rather than undercounting a real PR", () => {
-      const text = [
-        "[langy:progress:opened]",
-        "Opened https://github.com/acme/foo/pull/9.",
-      ].join("\n");
-      expect(extractOpenedPrLinks(text).map((l) => l.number)).toEqual([9]);
-    });
-  });
-});
+/**
+ * `extractOpenedPrLinks` used to live here. It decided which PRs a turn had
+ * OPENED by scanning the model's prose for `[langy:progress:opened:...]`
+ * markers — so the daily PR cap and the `langy.github.pr_opened` audit log
+ * depended on an LLM retyping a URL accurately.
+ *
+ * It is gone. The turn processor now reads the PR straight out of the stdout of
+ * the `gh pr create` that created it. The invariant those tests protected —
+ * "summarize PR #4751" must never burn the cap or forge an audit row — now holds
+ * STRUCTURALLY (a PR merely mentioned in prose was never a command's output), and
+ * is exercised end-to-end in
+ * `services/langy/execution/__tests__/langy-github-progress.unit.test.ts`.
+ */

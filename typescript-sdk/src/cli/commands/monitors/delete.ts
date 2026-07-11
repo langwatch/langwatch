@@ -40,7 +40,7 @@ export const deleteMonitorCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete monitor" });
+    failSpinner({ spinner, error, action: "delete monitor", format: options?.format });
     process.exit(1);
   }
 };

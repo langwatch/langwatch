@@ -31,7 +31,7 @@ export const createEvaluatorCommand = async (
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "create evaluator" });
+    failSpinner({ spinner, error, action: "create evaluator", format: options?.format });
     process.exit(1);
   }
 };

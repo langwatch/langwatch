@@ -74,7 +74,7 @@ export const updateGatewayBudgetCommand = async (
     console.log(`${chalk.bold("Timezone:")} ${budget.timezone ?? chalk.gray("—")}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update gateway budget" });
+    failSpinner({ spinner, error, action: "update gateway budget", format: options?.format });
     process.exit(1);
   }
 };

@@ -16,7 +16,9 @@ import { LangyCapabilityCard } from "./LangyCapabilityCard";
 
 function parseVerdict(output: unknown): string | null {
   const text = extractToolText(output);
-  const verdict = text.match(/\b(passed|failed|success|error|running|pending|completed)\b/i);
+  const verdict = text.match(
+    /\b(passed|failed|success|error|running|pending|completed)\b/i,
+  );
   return verdict ? verdict[1]! : null;
 }
 

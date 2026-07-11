@@ -43,7 +43,7 @@ export const setModelProviderCommand = async (
       console.log(JSON.stringify({ provider, enabled: options.enabled ?? true, defaultModel: options.defaultModel ?? null }, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "configure model provider" });
+    failSpinner({ spinner, error, action: "configure model provider", format: options?.format });
     process.exit(1);
   }
 };

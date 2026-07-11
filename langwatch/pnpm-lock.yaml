@@ -148,6 +148,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.80.0(react@19.2.7))
+      '@langwatch/cli-cards':
+        specifier: workspace:*
+        version: link:../packages/cli-cards
       '@langwatch/ksuid':
         specifier: ^2.0.2
         version: 2.0.2
@@ -925,6 +928,15 @@ importers:
       typescript-eslint:
         specifier: ^8.55.0
         version: 8.58.1(eslint@10.2.1)(typescript@5.9.3)
+
+  ../packages/cli-cards:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      zod:
+        specifier: ^4.0.14
+        version: 4.4.3
 
 packages:
 
@@ -20621,7 +20633,7 @@ snapshots:
       ora: 5.4.1
       prompts: 2.4.2
       xksuid: 0.0.4
-      zod: 4.3.6
+      zod: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
@@ -20658,7 +20670,7 @@ snapshots:
       ora: 5.4.1
       prompts: 2.4.2
       xksuid: 0.0.4
-      zod: 4.3.6
+      zod: 4.4.3
     transitivePeerDependencies:
       - supports-color
 

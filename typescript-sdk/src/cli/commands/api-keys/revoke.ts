@@ -27,7 +27,7 @@ export const revokeApiKeyCommand = async (
     console.log(chalk.gray("API key has been revoked and can no longer be used."));
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "revoke API key" });
+    failSpinner({ spinner, error, action: "revoke API key", format: options?.format });
     process.exit(1);
   }
 };

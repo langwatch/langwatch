@@ -49,7 +49,7 @@ export const getAnnotationCommand = async (id: string, options?: { format?: stri
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch annotation" });
+    failSpinner({ spinner, error, action: "fetch annotation", format: options?.format });
     process.exit(1);
   }
 };

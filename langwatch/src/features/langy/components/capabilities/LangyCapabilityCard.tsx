@@ -75,7 +75,8 @@ function toneOverline(
       return { color: "red.fg", Icon: Trash2 };
     case "read":
     default:
-      return { color: "fg.muted", Icon: SURFACE_ICON[surface] };
+      // paper/35 — a read is the quietest thing a card can be.
+      return { color: "fg.subtle", Icon: SURFACE_ICON[surface] };
   }
 }
 
@@ -113,17 +114,26 @@ export function LangyCapabilityCard({
       borderWidth="1px"
       borderStyle="solid"
       borderColor={tone === "removed" ? "red.emphasized" : "border.muted"}
-      borderRadius="14px"
+      borderRadius="langyCard"
       background="bg.subtle"
+      // `none`, on both grounds — see langyTheme.ts. The homepage's dark
+      // sections contain no shadow at all; a card is separated from its ground
+      // by a hairline and a few percent of white, and nothing else. Four
+      // shadowed cards stacked in one turn read as a deck of trading cards.
+      boxShadow="langyCard"
       paddingX="15px"
       paddingY="14px"
       role="group"
     >
+      {/* The site's overline is `text-[10px] uppercase tracking-[0.03em]` at
+          `text-paper/40` — MEDIUM weight and loose-ish tracking, not a bold
+          all-caps stamp. 700-weight at 0.07em was shouting a category name at
+          the reader before they got to the content. */}
       <HStack
         gap={1.5}
         textStyle="2xs"
-        fontWeight="700"
-        letterSpacing="0.07em"
+        fontWeight="500"
+        letterSpacing="0.03em"
         textTransform="uppercase"
         color={color}
       >

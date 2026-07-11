@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
@@ -77,6 +78,70 @@ func validationFieldPath(fe validator.FieldError) string {
 	}
 	return ns
 }
+
+// warmRequest is /chat's body minus the turn: no prompt, no system, no resume
+// token. Everything that feeds the worker's CREDENTIAL SIGNATURE is here and
+// must match the turn that follows, or the worker this spawns is killed and
+// respawned when the real /chat arrives.
+type warmRequest struct {
+	ConversationID string             `json:"conversationId" validate:"required"`
+	Credentials    domain.Credentials `json:"credentials"`
+	ModelOverride  string             `json:"modelOverride,omitempty"`
+}
+
+// warmHandler boots the conversation's worker ahead of the turn.
+//
+// The control plane calls this the instant it knows a turn is coming, and does
+// not wait for the answer. Spawning opencode is the expensive part of a cold
+// turn; doing it in parallel with the rest of the request (persisting the
+// message, reserving the permit, dispatching the command through the event log)
+// takes it off the critical path entirely.
+//
+// Idempotent by construction: it Acquires, and does not Claim or PostMessage, so
+// it can neither start a turn nor duplicate one. Always 202 — a warm that failed
+// is a warm that didn't help, not a request that failed, and the turn behind it
+// reports its own problems.
+func warmHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+		if err != nil {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		var req warmRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		if !domain.IsValidConversationID(req.ConversationID) {
+			herr.WriteHTTP(w, herr.New(ctx, domain.ErrInvalidConversationID, herr.M{"message": "invalid conversationId"}))
+			return
+		}
+
+		creds := req.Credentials
+		// The SAME merge /chat does. The model is part of the credential
+		// signature, so warming without it would spawn a worker the turn then
+		// discards.
+		if mo := strings.TrimSpace(req.ModelOverride); mo != "" {
+			creds.Model = mo
+		}
+
+		// Detach from the request: the caller does not await this, and we must
+		// not abandon a half-spawned worker when it hangs up.
+		go func() {
+			warmCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), warmTimeout)
+			defer cancel()
+			_ = application.Warm(warmCtx, req.ConversationID, creds)
+		}()
+
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+// warmTimeout bounds a detached spawn so a wedged warm cannot leak a goroutine.
+const warmTimeout = 90 * time.Second
 
 // chatHandler is the per-request worker dispatcher. Transport-only: it reads the
 // body (capped at maxBodyBytes), validates inputs, and delegates the turn to the

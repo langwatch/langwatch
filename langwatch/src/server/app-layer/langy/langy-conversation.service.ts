@@ -444,12 +444,16 @@ export class LangyConversationService {
     turnId,
     toolCallId,
     toolName,
+    command,
+    input,
   }: {
     projectId: string;
     conversationId: string;
     turnId: string;
     toolCallId: string;
     toolName: string;
+    command?: string;
+    input?: unknown;
   }): Promise<void> {
     await this.commands.recordToolCallStarted({
       tenantId: projectId,
@@ -458,6 +462,8 @@ export class LangyConversationService {
       turnId,
       toolCallId,
       toolName,
+      ...(command !== undefined ? { command } : {}),
+      ...(input !== undefined ? { input } : {}),
     });
   }
 
@@ -469,6 +475,10 @@ export class LangyConversationService {
     toolCallId,
     toolName,
     isError,
+    command,
+    input,
+    durationMs,
+    errorText,
   }: {
     projectId: string;
     conversationId: string;
@@ -476,6 +486,10 @@ export class LangyConversationService {
     toolCallId: string;
     toolName: string;
     isError?: boolean;
+    command?: string;
+    input?: unknown;
+    durationMs?: number;
+    errorText?: string;
   }): Promise<void> {
     await this.commands.recordToolCallCompleted({
       tenantId: projectId,
@@ -485,6 +499,10 @@ export class LangyConversationService {
       toolCallId,
       toolName,
       ...(isError !== undefined ? { isError } : {}),
+      ...(command !== undefined ? { command } : {}),
+      ...(input !== undefined ? { input } : {}),
+      ...(durationMs !== undefined ? { durationMs } : {}),
+      ...(errorText !== undefined ? { errorText } : {}),
     });
   }
 

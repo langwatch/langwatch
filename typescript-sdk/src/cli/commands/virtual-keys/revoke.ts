@@ -30,7 +30,7 @@ export const revokeVirtualKeyCommand = async (
     }
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "revoke virtual key" });
+    failSpinner({ spinner, error, action: "revoke virtual key", format: options?.format });
     process.exit(1);
   }
 };

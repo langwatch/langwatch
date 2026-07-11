@@ -39,6 +39,8 @@ import {
   reserveLangyGithubPrPermit,
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
+import { getLangWatchTracer } from "langwatch";
+import { context, propagation } from "@opentelemetry/api";
 import { connection } from "~/server/redis";
 import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import { createLangyTurnHandoffStore } from "~/server/services/langy/streaming/langyTurnHandoff";
@@ -57,12 +59,21 @@ import {
   LangyCredentialService,
 } from "~/server/services/langy/LangyCredentialService";
 import { extractTextFromParts } from "~/server/app-layer/langy/langy-message.service";
-import { stripLangySentinels } from "~/server/services/langy/langySentinels";
+import {
+  langyTurnContextSchema,
+  renderLangyTurnContext,
+} from "~/server/services/langy/langyTurnContext.schema";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
+
+// Every phase of a turn's critical path hangs off this tracer. Before it existed
+// the Langy path emitted NO spans at all, so a slow turn could only be explained
+// by inference — the whole point of these spans is that the waterfall replaces
+// the guesswork about where a turn's seconds actually go.
+const tracer = getLangWatchTracer("langwatch.langy.chat");
 
 /**
  * Response body for a HANDLED domain error. Returns ONLY what the client, the
@@ -104,6 +115,40 @@ const chatRequestSchema = z.object({
     )
     .max(200)
     .optional(),
+  /**
+   * Why the client is POSTing (the AI-SDK `DefaultChatTransport` already puts
+   * this on every request body; we simply stopped throwing it away).
+   *
+   *   `submit-message`     — a NEW user message. Persist it, then run the turn.
+   *   `regenerate-message` — RE-DRIVE the last turn. The user's message is
+   *                          ALREADY on record from the send that failed, so
+   *                          recording it again would append a second copy of
+   *                          the same question to the conversation (the fold's
+   *                          MessageCount and the langy_messages projection both
+   *                          count it twice — `recordUserMessage` mints a fresh
+   *                          message id and has no idempotency key).
+   *
+   * This is what makes a retry — manual OR automatic, see
+   * `features/langy/logic/langyRecoveryPolicy.ts` — safe: it re-runs the TURN,
+   * it does not re-post the MESSAGE.
+   */
+  trigger: z
+    .enum(["submit-message", "regenerate-message", "resume-stream"])
+    .optional(),
+  /**
+   * What the user is LOOKING AT — the composer's context chips (the trace they
+   * have open, the rows they ticked, the search they narrowed to).
+   *
+   * This was sent by the client from day one and read by NOBODY: the schema did
+   * not declare it, and a non-strict Zod object silently strips what it does not
+   * know, so every chip was thrown away at the door. The chips were decorative.
+   *
+   * Untrusted input on its way to a model — bounded here (count + string
+   * lengths), sanitised and framed as DATA in `renderLangyPageContext`, and its
+   * `ref`s are never resolved by the control plane. See that module's header for
+   * the prompt-injection and authorisation reasoning.
+   */
+  ...langyTurnContextSchema.shape,
 });
 // Persistence is now event-sourced (ADR-046): the user turn is a `SendMessage`
 // command and the assistant's final answer is a `ReconcileAgentTurn` command
@@ -172,6 +217,8 @@ const langyRoute = () =>
 
 const AGENT_HEALTH_CHECK_TIMEOUT_MS = 3_000;
 const AGENT_CHAT_TIMEOUT_MS = 120_000;
+/** The warm is fire-and-forget; don't let it hold a socket open. */
+const AGENT_WARM_TIMEOUT_MS = 3_000;
 
 // Preflight before reserving a PR permit or calling /chat: a 3s timeout
 // instead of the 120s chat budget, so a fully-down agent fails in seconds
@@ -196,6 +243,76 @@ async function isAgentHealthy(agentUrl: string): Promise<boolean> {
   }
 }
 
+/**
+ * Boot the conversation's worker ahead of the turn (manager `POST /warm`).
+ *
+ * The control plane knows a turn is coming the instant the browser POSTs — long
+ * before the event-sourced dispatch reaches the manager. Warming here takes the
+ * opencode spawn off the critical path: it happens in parallel with the rest of
+ * this request instead of in front of the first token.
+ *
+ * Never awaited, never throws. The turn behind it is unaffected by a warm that
+ * fails, and cannot be duplicated by one that succeeds: `/warm` acquires a worker
+ * but never claims it or posts a message, so it cannot start a turn. The later
+ * `/chat` reuses the same worker because `Pool.Acquire` is keyed by conversation
+ * id and the credential signature matches (the caller warms only once the
+ * credentials are final).
+ */
+async function warmLangyWorker({
+  agentUrl,
+  internalSecret,
+  conversationId,
+  credentials,
+  modelOverride,
+}: {
+  agentUrl: string;
+  internalSecret: string;
+  conversationId: string;
+  credentials: unknown;
+  modelOverride?: string;
+}): Promise<void> {
+  // Its own span, and the one worth staring at: the warm is fire-and-forget, so
+  // the ONLY way to know whether the worker boot actually hides behind the rest
+  // of the turn is to see this span overlap the ones that follow it in the
+  // waterfall. If it instead sits to the right of them, the warm is buying
+  // nothing and the boot is still on the critical path.
+  //
+  // `traceparent` is injected so the Go manager's spawn/boot spans attach to THIS
+  // trace as children rather than surfacing as a disconnected trace with no
+  // explanation of who asked for them.
+  await tracer.withActiveSpan(
+    "langy.chat.warm_worker",
+    { attributes: { "langy.conversation.id": conversationId } },
+    async () => {
+      try {
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${internalSecret}`,
+        };
+        propagation.inject(context.active(), headers);
+
+        const response = await fetch(`${agentUrl}/warm`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            conversationId,
+            credentials,
+            ...(modelOverride ? { modelOverride } : {}),
+          }),
+          signal: AbortSignal.timeout(AGENT_WARM_TIMEOUT_MS),
+        });
+        void response.body?.cancel();
+      } catch (error) {
+        // A cold start is the status quo, not a failure. Debug-level on purpose.
+        logger.debug(
+          { error, conversationId },
+          "langy worker warm failed — cold-starting",
+        );
+      }
+    },
+  );
+}
+
 langyRoute().post("/langy/chat", async (c) => {
   const session = await getServerAuthSession({
     req: c.req.raw as NextRequestShim,
@@ -216,7 +333,13 @@ langyRoute().post("/langy/chat", async (c) => {
     projectId,
     conversationId: requestedConversationId,
     modelOverride,
+    trigger,
+    pageContext,
+    skills,
   } = parsedBody.data;
+  // A regenerate RE-DRIVES the failed turn against the message already on
+  // record. Anything else is a fresh send and persists its user message below.
+  const isRetry = trigger === "regenerate-message";
 
   const agentUrl = process.env.OPENCODE_AGENT_URL;
   if (!agentUrl) {
@@ -237,22 +360,36 @@ langyRoute().post("/langy/chat", async (c) => {
   // can edit prompts but not create triggers still gets Langy; their session key
   // simply can't create triggers. A user who holds none of Langy's permissions
   // is refused when the mint yields an empty set (surfaced as a 409 below).
-  const canUseLangy = await hasProjectPermission(
-    { prisma, session },
-    projectId,
-    "evaluations:view",
+  // ── PHASE 1: THE GATE ─────────────────────────────────────────────────────
+  // Both checks are round trips (Postgres, Redis) and neither depends on the
+  // other, so they wait together. They run BEFORE anything else: a caller who
+  // fails them must not cause us to mint keys or read conversations on their
+  // behalf, and their PRECEDENCE is load-bearing — a forbidden caller gets a 403,
+  // not whatever the rate limiter happened to say.
+  const [permission, rateLimit] = await tracer.withActiveSpan(
+    "langy.chat.phase1_gate",
+    { attributes: { "tenant.id": projectId, "langy.phase": "gate" } },
+    async () =>
+      Promise.allSettled([
+        hasProjectPermission(
+          { prisma, session },
+          projectId,
+          "evaluations:view",
+        ),
+        checkLangyMessageRateLimit({ userId: session.user.id, projectId }),
+      ]),
   );
-  if (!canUseLangy) {
+
+  if (permission.status === "rejected") throw permission.reason;
+  if (!permission.value) {
     return c.json(
       { error: "You do not have permission to use Langy for this project." },
       { status: 403 },
     );
   }
 
-  const rl = await checkLangyMessageRateLimit({
-    userId: session.user.id,
-    projectId,
-  });
+  if (rateLimit.status === "rejected") throw rateLimit.reason;
+  const rl = rateLimit.value;
   if (!rl.allowed) {
     return c.json(
       {
@@ -268,51 +405,85 @@ langyRoute().post("/langy/chat", async (c) => {
     );
   }
 
+  // Resolved only once the gate has passed: a caller who is forbidden or
+  // rate-limited must not cause us to reach for the app layer at all.
   const conversationService = getApp().langy.conversations;
+  const credentialService = LangyCredentialService.create(prisma);
 
-  // Resolve the conversation id (ownership-checked). No write happens here —
-  // the aggregate is created by the first SendMessage command below.
-  let conversation;
-  try {
-    conversation = await conversationService.ensureConversation({
-      projectId,
-      userId: session.user.id,
-      conversationId: requestedConversationId ?? null,
-    });
-  } catch (error) {
-    if (error instanceof LangyConversationNotOwnedError) {
-      return c.json(handledErrorBody(error), { status: 403 });
+  // ── PHASE 2: EVERYTHING THAT NEEDS ONLY THE PROJECT ───────────────────────
+  // Four more independent round trips — the conversation lookup, the model
+  // resolve, the session-key mint and the egress allow-list. Run serially, as
+  // they were, they stacked four RTTs onto the front of every turn before the
+  // agent had even been told a message existed. None depends on another.
+  //
+  // `allSettled`, not `all`: each failure maps to a DIFFERENT status (403 / 409),
+  // and `all` would reject on the first and throw the rest away.
+  const [conversationResult, model, credentialsResult, egressResult] =
+    await tracer.withActiveSpan(
+      "langy.chat.phase2_dependencies",
+      { attributes: { "tenant.id": projectId, "langy.phase": "dependencies" } },
+      async () =>
+        Promise.allSettled([
+          conversationService.ensureConversation({
+            projectId,
+            userId: session.user.id,
+            conversationId: requestedConversationId ?? null,
+          }),
+          getVercelAIModel({ projectId }),
+          credentialService.getOrProvision({ projectId, session }),
+          credentialService.getEgressAllowlist({ projectId }),
+        ]),
+    );
+
+  // The conversation id (ownership-checked). No write happened — the aggregate is
+  // created by the first SendMessage command below.
+  if (conversationResult.status === "rejected") {
+    if (conversationResult.reason instanceof LangyConversationNotOwnedError) {
+      return c.json(handledErrorBody(conversationResult.reason), {
+        status: 403,
+      });
     }
-    throw error;
+    throw conversationResult.reason;
   }
+  const conversation = conversationResult.value;
 
   const lastUserMessage = messages[messages.length - 1];
 
-  try {
-    await getVercelAIModel({ projectId });
-  } catch (error) {
-    // Real error in the server log; surface a generic public message
-    // to the user. `error.message` could leak internals (model-provider
-    // config-store internals, stack details, env hints). Sergio's
-    // 2026-06-30 review round 3.
-    logger.warn({ error, projectId }, "getVercelAIModel failed");
+  if (model.status === "rejected") {
+    // Real error in the server log; surface a generic public message to the
+    // user. `error.message` could leak internals (model-provider config-store
+    // internals, stack details, env hints). Sergio's 2026-06-30 review round 3.
+    logger.warn({ error: model.reason, projectId }, "getVercelAIModel failed");
     return c.json(
       { error: "No model configured for this project." },
       { status: 409 },
     );
   }
 
-  if (lastUserMessage?.role === "user") {
-    // One command: the message_sent event feeds both the conversation fold
-    // (owner/title/count/activity) and the langy_messages map projection.
-    await conversationService.recordUserMessage({
-      projectId,
-      conversationId: conversation.id,
-      userId: session.user.id,
-      parts: lastUserMessage.parts,
-      title: extractTextFromParts(messages[0]?.parts).slice(0, 80) || null,
-    });
-  }
+  // On a RETRY the trailing user message is the SAME one the failed turn already
+  // persisted — re-recording it would duplicate the user's question in the
+  // conversation (a second message_sent event => a second langy_messages row and
+  // a double-counted MessageCount). The turn below still runs against its text,
+  // so the retry re-drives the turn without re-posting the message.
+  //
+  // Kicked off HERE but awaited LATER (just before the turn is dispatched): the
+  // agent does not read this row — it is handed the prompt directly — so
+  // persisting it is not on the critical path to a first token. It runs
+  // alongside the credential mint and the guard reads below. It IS awaited before
+  // `startTurn`, so the ordering that matters still holds: the message is on
+  // record before the turn that answers it exists.
+  const messageRecorded =
+    !isRetry && lastUserMessage?.role === "user"
+      ? conversationService.recordUserMessage({
+          projectId,
+          conversationId: conversation.id,
+          userId: session.user.id,
+          parts: lastUserMessage.parts,
+          title: extractTextFromParts(messages[0]?.parts).slice(0, 80) || null,
+        })
+      : Promise.resolve(null);
+  // Never let this reject unhandled while we do other work.
+  messageRecorded.catch(() => undefined);
 
   const userText = extractTextFromParts(lastUserMessage?.parts);
 
@@ -334,19 +505,32 @@ langyRoute().post("/langy/chat", async (c) => {
     "the result tersely with a relevant LangWatch UI URL when applicable.",
   ].join(" ");
 
-  let credentials;
-  const credentialService = LangyCredentialService.create(prisma);
-  try {
-    credentials = await credentialService.getOrProvision({
+  // ── PHASE 3: THE CONVERSATION-SCOPED READS ────────────────────────────────
+  // These two need the conversation id, so they could not join Phase 2 — but they
+  // do not need each other. The busy-guard status and any pending resume handoff
+  // wait together.
+  const [currentResult, handoffResult] = await Promise.allSettled([
+    conversationService.getById({
+      id: conversation.id,
       projectId,
-      session,
-    });
-  } catch (error) {
-    if (error instanceof LangyCredentialResolutionError) {
-      return c.json({ error: error.message }, { status: 409 });
+      userId: session.user.id,
+    }),
+    conversationService.getPendingHandoff({
+      projectId,
+      conversationId: conversation.id,
+    }),
+  ]);
+
+  if (credentialsResult.status === "rejected") {
+    if (credentialsResult.reason instanceof LangyCredentialResolutionError) {
+      return c.json(
+        { error: credentialsResult.reason.message },
+        { status: 409 },
+      );
     }
-    throw error;
+    throw credentialsResult.reason;
   }
+  const credentials = credentialsResult.value;
 
   // Resolve the project's Langy egress allow-list (ADR-043) and attach it to
   // the credentials envelope. The presence of the list is the mode: null ⇒ the
@@ -356,19 +540,18 @@ langyRoute().post("/langy/chat", async (c) => {
   // worker spawn (a change recycles the worker on its next turn). A drifted
   // column throws in getEgressAllowlist and fails closed here; surface a 409
   // rather than silently running with enforcement disabled.
-  try {
-    const egressAllowlist = await credentialService.getEgressAllowlist({
-      projectId,
-    });
-    if (egressAllowlist) {
-      credentials.egressAllowlist = egressAllowlist;
-    }
-  } catch (error) {
-    logger.error({ error, projectId }, "failed to resolve Langy egress allow-list");
+  if (egressResult.status === "rejected") {
+    logger.error(
+      { error: egressResult.reason, projectId },
+      "failed to resolve Langy egress allow-list",
+    );
     return c.json(
       { error: "Langy egress policy is misconfigured for this project." },
       { status: 409 },
     );
+  }
+  if (egressResult.value) {
+    credentials.egressAllowlist = egressResult.value;
   }
 
   // Defense in depth: when a `modelOverride` rides in, enforce the project's
@@ -455,13 +638,37 @@ langyRoute().post("/langy/chat", async (c) => {
     delete (credentials as { githubLogin?: string }).githubLogin;
   }
 
+  // ── HIT THE WORKER NOW ────────────────────────────────────────────────────
+  // Credentials are final as of this line — the model is resolved, the egress
+  // allow-list is attached, and the PR-cap decision above has settled whether
+  // GH_TOKEN rides along. Those three ARE the worker's credential signature, so
+  // this is the earliest moment we can warm a worker the turn will actually
+  // reuse. (Warming sooner would spawn one with a different signature, which the
+  // real turn then kills and respawns — slower than not warming at all.)
+  //
+  // Spawning opencode is the expensive half of a cold turn. Everything still
+  // ahead of us — persisting the message, stashing the handoff, dispatching
+  // StartAgentTurn through the event log, the outbox drain, the spawn reactor —
+  // now happens WHILE the subprocess boots instead of before it. By the time the
+  // reactor's /chat lands, Acquire is a map lookup.
+  //
+  // Fire-and-forget, deliberately: the turn does not depend on it. A warm that
+  // fails, times out, or hits capacity simply means the turn cold-starts exactly
+  // as it does today. It cannot duplicate the turn either — /warm Acquires but
+  // never Claims or PostMessages, so it cannot start one.
+  void warmLangyWorker({
+    agentUrl,
+    internalSecret,
+    conversationId: conversation.id,
+    credentials,
+    modelOverride,
+  });
+
   // Busy-guard: one turn in flight per conversation. Replaces the manager's
   // Worker.tryClaim 409 — a turn in flight means the fold status is "running".
-  const current = await conversationService.getById({
-    id: conversation.id,
-    projectId,
-    userId: session.user.id,
-  });
+  // Read in the parallel batch above; a failed read must not block a turn.
+  const current =
+    currentResult.status === "fulfilled" ? currentResult.value : null;
   if (current?.status === LANGY_CONVERSATION_STATUS.RUNNING) {
     await releaseReservedPermit();
     return c.json(
@@ -484,9 +691,18 @@ langyRoute().post("/langy/chat", async (c) => {
   // could fire and find no handoff. The handoff carries the session-scoped
   // credentials + prompt + system; the durable event carries only ids (ADR-044).
   const turnId = crypto.randomUUID();
-  const system = capReachedNote
-    ? `${langyOverride}\n\n${capReachedNote}`
-    : langyOverride;
+  // The system block the worker gets: Langy's role, then (when the user has
+  // context chips up) what they are looking at, then any cap note. The page
+  // context is DATA — `renderLangyPageContext` sanitises it and says so — so it
+  // rides `system` rather than being concatenated into the user's prompt, which
+  // is the same separation the override itself relies on.
+  const system = [
+    langyOverride,
+    renderLangyTurnContext({ pageContext, skills }),
+    capReachedNote,
+  ]
+    .filter((block): block is string => !!block && block.trim().length > 0)
+    .join("\n\n");
 
   // ADR-048 resume-on-next-worker: if a prior turn checkpointed on pod shutdown,
   // it left an opaque, worker-authored resume token on the conversation fold.
@@ -494,18 +710,16 @@ langyRoute().post("/langy/chat", async (c) => {
   // cold-starting, then consume it once the turn has started (below). The token
   // is opaque to the control plane — read, forwarded, never interpreted. A read
   // failure degrades to a cold start; it must never block a new turn.
-  let pendingHandoff: { token: string; turnId: string } | null = null;
-  try {
-    pendingHandoff = await conversationService.getPendingHandoff({
-      projectId,
-      conversationId: conversation.id,
-    });
-  } catch (error) {
+  // Read in the parallel batch above. A failed read degrades to a cold start; it
+  // must never block a new turn.
+  if (handoffResult.status === "rejected") {
     logger.warn(
-      { error, conversationId: conversation.id },
+      { error: handoffResult.reason, conversationId: conversation.id },
       "failed to read pending langy handoff — cold-starting",
     );
   }
+  const pendingHandoff: { token: string; turnId: string } | null =
+    handoffResult.status === "fulfilled" ? handoffResult.value : null;
 
   const handoffStore = createLangyTurnHandoffStore({ redis: connection });
   await handoffStore.stash({
@@ -520,6 +734,18 @@ langyRoute().post("/langy/chat", async (c) => {
     permitReserved: permit.reserved,
     ...(pendingHandoff ? { resumeToken: pendingHandoff.token } : {}),
   });
+
+  // The ordering that MATTERS: the user's message must be on record before the
+  // turn that answers it exists. It has been in flight since well before the
+  // credential mint (see `messageRecorded`), so this await is almost always
+  // already-settled — it buys the invariant without buying the latency.
+  try {
+    await messageRecorded;
+  } catch (error) {
+    await releaseReservedPermit();
+    logger.error({ error }, "failed to record the langy user message");
+    return c.json({ error: "Agent request failed" }, { status: 502 });
+  }
 
   try {
     await conversationService.startTurn({
@@ -591,9 +817,79 @@ function attachTurnStream({
       const textId = crypto.randomUUID();
       writer.write({ type: "text-start", id: textId });
 
+      // Translate the turn's live-edge entries into UI-message parts. Text is the
+      // prose; TOOL entries become real AI-SDK tool parts (so the browser's
+      // existing tool-card renderer draws them, live and identically on reload);
+      // status/progress ride as `data-*` parts; and a terminal `error` entry
+      // becomes a structured error PART carrying the serialized domain error
+      // (`readLangyStreamError` parses it into a calm error card). Previously
+      // everything but `delta` was dropped — tool activity never reached the UI
+      // and a hard failure ended the stream silently.
       const emit = (entry: LangyStreamEntry) => {
-        if (entry.type === "delta") {
-          writer.write({ type: "text-delta", delta: entry.text, id: textId });
+        switch (entry.type) {
+          case "delta":
+            writer.write({ type: "text-delta", delta: entry.text, id: textId });
+            return;
+          case "tool":
+            if (entry.phase === "start") {
+              writer.write({
+                type: "tool-input-available",
+                toolCallId: entry.id,
+                toolName: entry.name,
+                input: entry.input ?? {},
+              });
+              return;
+            }
+            if (entry.isError) {
+              writer.write({
+                type: "tool-output-error",
+                toolCallId: entry.id,
+                errorText: entry.output ?? "Tool call failed",
+              });
+              return;
+            }
+            writer.write({
+              type: "tool-output-available",
+              toolCallId: entry.id,
+              output: entry.output ?? "",
+            });
+            return;
+          case "status":
+            writer.write({
+              type: "data-langy-status",
+              id: "langy-status",
+              data: { status: entry.status },
+            });
+            return;
+          case "progress":
+            writer.write({
+              type: "data-langy-progress",
+              id: "langy-progress",
+              data: {
+                ...(entry.message !== undefined
+                  ? { message: entry.message }
+                  : {}),
+                ...(entry.progress !== undefined
+                  ? { progress: entry.progress }
+                  : {}),
+              },
+            });
+            return;
+          case "milestone":
+            writer.write({
+              type: "data-langy-milestone",
+              data: {
+                kind: entry.kind,
+                ...(entry.detail !== undefined ? { detail: entry.detail } : {}),
+              },
+            });
+            return;
+          case "error":
+            // `entry.error` is the JSON domain error the worker serialized.
+            writer.write({ type: "error", errorText: entry.error });
+            return;
+          default:
+            return;
         }
       };
 
@@ -721,8 +1017,7 @@ function createFastTokenStream({
       let subscription: { close: () => void } | null = null;
       let timeout: ReturnType<typeof setTimeout> | null = null;
 
-      const frame = (payload: string) =>
-        encoder.encode(`data: ${payload}\n\n`);
+      const frame = (payload: string) => encoder.encode(`data: ${payload}\n\n`);
 
       const shutdown = () => {
         if (closed) return;
@@ -797,7 +1092,9 @@ langyRoute().get("/langy/conversations/:id/fast", async (c) => {
     const encoder = new TextEncoder();
     const empty = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ e: 1 })}\n\n`));
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ e: 1 })}\n\n`),
+        );
         controller.close();
       },
     });

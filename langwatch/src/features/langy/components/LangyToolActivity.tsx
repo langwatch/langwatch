@@ -1,28 +1,29 @@
 /**
- * Compact tool-call activity for an assistant turn.
+ * Tool-call activity for an assistant turn. Everything here is a CARD.
  *
  * The Langy worker streams its CLI/tool calls into the assistant message as
- * AI-SDK tool parts (`tool-<name>` / `dynamic-tool`, each with a `state`).
- * This renders them as the reference's `.status` lines: a burst of raw tools
- * collapses into one human activity ("Coding", "Analysing traces") rather than
- * a wall of tool ids, in-flight lines show a pulsing brand dot, and finished
- * ones flip to a green check.
+ * AI-SDK tool parts (`tool-<name>` / `dynamic-tool`, each with a `state`). A
+ * call takes one of three routes, and the routes are exclusive:
  *
- * No-UI-yet + developer mode: a tool call the frontend has no rich mapping for
- * falls back to its raw JSON (name, state, input, output) inline — the "just
- * show the JSON" path. Developer mode (`useLangyDevMode`) exposes that same raw
- * view for the tools that DO have a card, so the whole event stream behind a
- * turn is inspectable. When the backend later drives the UI itself (sending a
- * schema'd descriptor of which component + values to render, rather than the
- * frontend mapping a tool name), that descriptor plugs in where the JSON
- * fallback is today; until then, JSON is the honest fallback.
+ *   1. A call that IS a LangWatch capability is a card for its whole life —
+ *      {@link LangyCapabilityPendingCard} while it runs, the bespoke settled
+ *      card once its output lands. Note "IS", not "is named": a bare `bash`
+ *      running `langwatch trace search` counts, because `partToolName`
+ *      normalises it first. Before that normalisation existed, no CLI call ever
+ *      reached a capability card at all — they all fell through to (2).
+ *   2. Anything else collapses into an ACTIVITY CARD, labelled by what it is
+ *      DOING (`describeToolCall`, read off the call's input) rather than by the
+ *      tool it happens to be. That is the difference between "Searching traces"
+ *      and "Coding", and between "Using the GitHub skill" and "Skill".
+ *   3. A call whose output is a staged proposal belongs to ProposalCard, and
+ *      GitHub git/gh milestones ride LangyGitHubProgressCard — both are
+ *      surfaced elsewhere and skipped here.
+ *
+ * The raw JSON is DEVELOPER MODE ONLY (`useLangyDevMode`) — a normal user never
+ * sees a `{}` affordance, whatever the tool.
  *
  * Kept in its own component (not inside MessageContent) so the shared turn
- * renderer stays a single insertion point. GitHub git/gh milestones ride the
- * separate pill-track (LangyGitHubProgressCard); proposal-producing tool
- * outputs render as their own ProposalCard and are skipped here.
- *
- * Build reference: "Langy — The Full Experience" (GitHub + tool-call mapping).
+ * renderer stays a single insertion point.
  */
 import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
@@ -32,7 +33,15 @@ import { useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
-import { isProposalOutput } from "./capabilities/capabilityRegistry";
+import { langyThinkingShimmerStyles } from "./langyShimmer";
+import { describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
+import {
+  type CapabilityProgress,
+  isProposalOutput,
+  resolveCapability,
+  resolveCapabilityProgress,
+} from "./capabilities/capabilityRegistry";
+import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import {
   type CapabilityToolCall,
   hasCapabilityCard,
@@ -44,31 +53,19 @@ const dotPulse = keyframes`
   50%      { opacity: 0.4; transform: scale(0.72); }
 `;
 
-// A raw tool id maps to the human activity it belongs to; several tools share
-// one `key` so consecutive read/edit/bash calls read as a single "Coding" line.
-type Activity = { key: string; label: string };
-
-const TOOL_ACTIVITY: Record<string, Activity> = {
-  search_traces: { key: "traces", label: "Analysing traces" },
-  get_trace: { key: "traces", label: "Analysing traces" },
-  read: { key: "code", label: "Coding" },
-  write: { key: "code", label: "Coding" },
-  edit: { key: "code", label: "Coding" },
-  multiedit: { key: "code", label: "Coding" },
-  patch: { key: "code", label: "Coding" },
-  bash: { key: "code", label: "Coding" },
-  list: { key: "code", label: "Coding" },
-  glob: { key: "code", label: "Coding" },
-  grep: { key: "code", label: "Coding" },
-  search: { key: "search", label: "Searching" },
-  webfetch: { key: "web", label: "Reading the web" },
-  fetch: { key: "web", label: "Reading the web" },
-  todowrite: { key: "plan", label: "Planning" },
-  todoread: { key: "plan", label: "Planning" },
-  fetch_langwatch_docs: { key: "docs", label: "Reading the docs" },
-  fetch_scenario_docs: { key: "docs", label: "Reading the docs" },
-  discover_schema: { key: "docs", label: "Checking the schema" },
-};
+/**
+ * The old label table lived here. It is gone.
+ *
+ * It mapped a tool's NAME to a word — `bash` → "Coding", and anything unmapped
+ * to a humanised version of its own name, which is how opencode's `skill` tool
+ * produced a card reading "SKILL / Skill". Both were the same mistake: naming
+ * the mechanism where the act belongs. A `bash` running `langwatch trace search`
+ * is not "Coding"; it is searching traces, and the command said so all along.
+ *
+ * Every label now comes from `describeToolCall` (logic/langyToolLabel.ts), which
+ * reads the tool's INPUT — the command, the skill, the path. One mapping, no
+ * per-tool branches in this file.
+ */
 
 type ToolPartLike = {
   type?: string;
@@ -81,7 +78,23 @@ type ToolPartLike = {
 };
 
 // AI-SDK tool states that mean the call has settled (success, error, denied).
-const DONE_STATES = new Set(["output-available", "output-error", "output-denied"]);
+const DONE_STATES = new Set([
+  "output-available",
+  "output-error",
+  "output-denied",
+]);
+
+// A settled call that FAILED. It has no result to draw, so it stays on the
+// honest raw-JSON path rather than pretending to be a card.
+const FAILED_STATES = new Set(["output-error", "output-denied"]);
+
+/**
+ * The concrete thing a call is acting on, pulled off its input.
+ *
+ * (The old `detailForInput` lived here. It is gone: reading the input is now
+ * `describeToolCall`'s job, alongside deciding what the call is CALLED, because
+ * the two answers come from the same field and drifted apart when they didn't.)
+ */
 
 /** A single tool call, kept for the raw / developer-mode JSON view. */
 export type ToolCall = {
@@ -95,20 +108,41 @@ export type ToolCall = {
 
 export type ActivityGroup = {
   key: string;
+  /** What the group is doing, in human words. Never a tool's name. */
   label: string;
+  /** The concrete thing — the command, the file, the skill's purpose. */
+  detail?: string;
   done: boolean;
-  /** False when no TOOL_ACTIVITY mapping exists — render the JSON fallback. */
-  known: boolean;
   calls: ToolCall[];
 };
 
-/** The tool name behind a part: `dynamic-tool` carries it, `tool-<name>` encodes it. */
-function partToolName(part: ToolPartLike): string | undefined {
+/** The raw tool name: `dynamic-tool` carries it, `tool-<name>` encodes it. */
+function rawToolName(part: ToolPartLike): string | undefined {
   const type = part.type;
   if (!type) return undefined;
   if (type === "dynamic-tool") return part.toolName;
   if (type.startsWith("tool-")) return type.slice("tool-".length);
   return undefined;
+}
+
+/**
+ * The name a part should be TREATED as — the single entry point for every
+ * reader below.
+ *
+ * The server's CLI envelope types `bash("langwatch trace search")` as
+ * `langwatch.trace.search`, but only on the durable event; the tool part the
+ * BROWSER receives is still a bare `bash`. So the capability registry never saw
+ * a capability, no capability card ever rendered for a CLI call, and the frame
+ * fell through to a generic activity card labelled "Coding".
+ *
+ * Normalising here fixes all of it at once: a shell call carrying a LangWatch
+ * command becomes the command it is, and every mapping downstream — settled
+ * card, pending card, activity label — lights up on its own.
+ */
+function partToolName(part: ToolPartLike): string | undefined {
+  const raw = rawToolName(part);
+  if (!raw) return undefined;
+  return effectiveToolName(raw, part.input);
 }
 
 /** Shape a part into the minimal call the capability layer reasons about. */
@@ -141,15 +175,49 @@ export function toCapabilityCalls(
   return result;
 }
 
+/** A capability call still in flight — rendered as an in-progress card. */
+export type PendingCapability = {
+  id: string;
+  progress: CapabilityProgress;
+  detail?: string;
+};
+
+/**
+ * The capability calls that are still RUNNING, in first-seen order.
+ *
+ * The complement of {@link toCapabilityCalls}: a capability is a card for its
+ * whole life — pending shell while it runs, settled card once output lands —
+ * so it is never demoted to a generic activity line on the way.
+ */
+export function toPendingCapabilities(message: UIMessage): PendingCapability[] {
+  const pending: PendingCapability[] = [];
+  for (const rawPart of message.parts) {
+    const part = rawPart as ToolPartLike;
+    const name = partToolName(part);
+    if (!name) continue;
+    if (DONE_STATES.has(part.state ?? "")) continue;
+    const progress = resolveCapabilityProgress(name);
+    if (!progress) continue;
+    pending.push({
+      id: part.toolCallId ?? `${name}:${pending.length}`,
+      progress,
+      detail: describeToolCall({ name, input: part.input }).detail,
+    });
+  }
+  return pending;
+}
+
 /**
  * True when a message has anything for LangyToolActivity to render — an
- * activity line OR a capability card. MessageContent uses this in its
- * "is there anything to show?" guard so a turn whose only output is a settled
- * capability card (no prose, no proposal) still renders.
+ * activity card, an in-flight capability, or a settled capability card.
+ * MessageContent uses this in its "is there anything to show?" guard so a turn
+ * whose only output is a card (no prose, no proposal) still renders.
  */
 export function hasLangyActivity(message: UIMessage): boolean {
   return (
-    toCapabilityCalls(message).length > 0 || toActivityGroups(message).length > 0
+    toCapabilityCalls(message).length > 0 ||
+    toPendingCapabilities(message).length > 0 ||
+    toActivityGroups(message).length > 0
   );
 }
 
@@ -167,14 +235,20 @@ export function toActivityGroups(message: UIMessage): ActivityGroup[] {
     const name = partToolName(part);
     if (!name) continue;
 
-    // A tool call whose output is a staged proposal renders as a ProposalCard,
-    // and one whose name maps to a settled domain card renders as that card —
-    // both are surfaced elsewhere, so skip them here to avoid double-surfacing.
+    // A tool call whose output is a staged proposal renders as a ProposalCard.
     if (isProposalOutput(part.output)) continue;
-    if (hasCapabilityCard(partToCall(part, name))) continue;
+    // A call whose name maps to a capability is a CARD for its whole life —
+    // the pending shell while it runs, the bespoke card once it settles. Only a
+    // failed one falls back here (there is no result to draw, so raw JSON is
+    // the honest answer).
+    const failed = FAILED_STATES.has(part.state ?? "");
+    if (resolveCapability(name) !== null && !failed) continue;
 
-    const mapped = TOOL_ACTIVITY[name];
-    const key = mapped?.key ?? `tool:${name}`;
+    // What this call is DOING — read from its input, not its type. `bash`
+    // running `langwatch trace search` says "Searching traces"; the `skill` tool
+    // says which skill and what it is for. Never "Coding", never "Skill".
+    const described = describeToolCall({ name, input: part.input });
+    const key = described.key;
     const done = DONE_STATES.has(part.state ?? "");
     const call: ToolCall = {
       toolCallId: part.toolCallId,
@@ -187,16 +261,19 @@ export function toActivityGroups(message: UIMessage): ActivityGroup[] {
 
     const existing = byKey.get(key);
     if (existing) {
-      // Any still-running call in the group keeps the whole group pending.
+      // Any still-running call in the group keeps the whole group pending. The
+      // LATEST call's detail wins — a group of file edits should name the file
+      // being edited now, not the first one it touched.
       existing.done = existing.done && done;
+      existing.detail = described.detail ?? existing.detail;
       existing.calls.push(call);
     } else {
       order.push(key);
       byKey.set(key, {
         key,
-        label: mapped?.label ?? humanizeTool(name),
+        label: described.title,
+        detail: described.detail,
         done,
-        known: !!mapped,
         calls: [call],
       });
     }
@@ -209,19 +286,35 @@ export function LangyToolActivity({ message }: { message: UIMessage }) {
   const [devMode] = useLangyDevMode();
   const groups = toActivityGroups(message);
   const capabilityCalls = toCapabilityCalls(message);
-  if (groups.length === 0 && capabilityCalls.length === 0) return null;
+  const pending = toPendingCapabilities(message);
+  if (
+    groups.length === 0 &&
+    capabilityCalls.length === 0 &&
+    pending.length === 0
+  ) {
+    return null;
+  }
 
   return (
     <VStack align="stretch" gap={2} aria-label="Langy activity">
       {groups.length > 0 ? (
-        <VStack align="stretch" gap={1.5} role="list">
+        <VStack align="stretch" gap={2} role="list">
           {groups.map((group) => (
-            <ActivityRow key={group.key} group={group} devMode={devMode} />
+            <ActivityCard key={group.key} group={group} devMode={devMode} />
           ))}
         </VStack>
       ) : null}
       {capabilityCalls.map(({ id, call }) => (
         <CapabilityCardRow key={id} call={call} devMode={devMode} />
+      ))}
+      {pending.map(({ id, progress, detail }) => (
+        <LangyCapabilityPendingCard
+          key={id}
+          surface={progress.surface}
+          overline={progress.overline}
+          headline={progress.headline}
+          detail={detail}
+        />
       ))}
     </VStack>
   );
@@ -246,7 +339,10 @@ function CapabilityCardRow({
         <LangyCapabilityRenderer call={call} />
         {devMode ? (
           <Box position="absolute" top={2} right={2}>
-            <Tooltip content={open ? "Hide raw data" : "Show raw data"} showArrow>
+            <Tooltip
+              content={open ? "Hide raw data" : "Show raw data"}
+              showArrow
+            >
               <IconButton
                 size="2xs"
                 variant="ghost"
@@ -275,7 +371,59 @@ function CapabilityCardRow({
   );
 }
 
-function ActivityRow({
+/** The distinct tool names in a group, as the card's mono overline. */
+function groupToolNames(group: ActivityGroup): string {
+  const seen: string[] = [];
+  for (const call of group.calls) {
+    if (!seen.includes(call.name)) seen.push(call.name);
+  }
+  return seen.slice(0, 3).join(" · ");
+}
+
+/**
+ * The card's overline: a CATEGORY, not a tool name.
+ *
+ * It used to print the raw tool names — which is how a card came to be headed
+ * "SKILL" with a body that also just said "Skill". The category comes off the
+ * group key, which `describeToolCall` already derived from the call's intent.
+ */
+function groupCategory(group: ActivityGroup): string {
+  const [head] = group.key.split(":");
+  switch (head) {
+    case "skill":
+      return "Skill";
+    case "github":
+      return "GitHub";
+    case "shell":
+      return "Command";
+    case "files":
+      return "Files";
+    case "web":
+      return "Web";
+    case "plan":
+      return "Plan";
+    case "task":
+      return "Task";
+    default:
+      // `tool:<name>` — an unmapped tool. Its own name is the honest category.
+      return groupToolNames(group);
+  }
+}
+
+/**
+ * One activity group, as a CARD.
+ *
+ * It used to be naked text — a bare word ("Coding") floating in the message
+ * column with a `{}` blob of raw tool JSON hanging off it, shown to everyone.
+ * Now it speaks the same card language as every capability: the tool/skill NAME
+ * on the overline, the activity as the title, and the concrete thing being done
+ * (the command, the path, the pattern) underneath in mono.
+ *
+ * The raw payload is DEVELOPER MODE ONLY — there is no `{}` affordance at all
+ * for a normal user, whichever tool it is. An unmapped tool is not a licence to
+ * dump JSON in someone's chat; its name and its input are the honest answer.
+ */
+function ActivityCard({
   group,
   devMode,
 }: {
@@ -283,17 +431,30 @@ function ActivityRow({
   devMode: boolean;
 }) {
   const reduce = useReducedMotion();
-  // Unmapped tools have no card, so the raw JSON IS their UI — start it open.
-  // Mapped tools only get the raw toggle in developer mode, collapsed.
-  const [open, setOpen] = useState(!group.known);
-  const canInspect = devMode || !group.known;
+  const [open, setOpen] = useState(false);
+  const detail = group.detail;
+  const shimmer = reduce
+    ? { ...langyThinkingShimmerStyles, animation: "none" }
+    : langyThinkingShimmerStyles;
 
   return (
-    <VStack align="stretch" gap={1} role="listitem">
-      <HStack gap={2} align="center">
+    <VStack
+      align="stretch"
+      gap={2}
+      role="listitem"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      borderRadius="langyCard"
+      background="bg.subtle"
+      boxShadow="langyCard"
+      paddingX="15px"
+      paddingY="12px"
+    >
+      <HStack gap={1.5} align="center">
         {group.done ? (
-          <Box color="green.fg" display="flex">
-            <Check size={12} />
+          <Box color="green.fg" display="flex" flexShrink={0}>
+            <Check size={11} />
           </Box>
         ) : (
           <Box
@@ -310,15 +471,18 @@ function ActivityRow({
           />
         )}
         <Text
-          textStyle="xs"
-          color={group.done ? "fg.muted" : "fg"}
-          fontWeight={group.done ? "400" : "500"}
+          textStyle="2xs"
+          fontWeight="500"
+          letterSpacing="0.03em"
+          textTransform="uppercase"
+          color="fg.subtle"
+          truncate
           flex={1}
           minWidth={0}
         >
-          {group.label}
+          {groupCategory(group)}
         </Text>
-        {canInspect ? (
+        {devMode ? (
           <Tooltip content={open ? "Hide raw data" : "Show raw data"} showArrow>
             <IconButton
               size="2xs"
@@ -333,8 +497,25 @@ function ActivityRow({
           </Tooltip>
         ) : null}
       </HStack>
-      {canInspect && open ? (
-        <VStack align="stretch" gap={1} paddingLeft="20px">
+
+      <Box
+        textStyle="sm"
+        fontWeight="640"
+        lineHeight="1.3"
+        color={group.done ? "fg" : undefined}
+        css={group.done ? undefined : shimmer}
+      >
+        {group.done ? group.label : `${group.label}…`}
+      </Box>
+
+      {detail ? (
+        <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate>
+          {detail}
+        </Text>
+      ) : null}
+
+      {devMode && open ? (
+        <VStack align="stretch" gap={1}>
           {group.calls.map((call, index) => (
             <RawCallJson key={call.toolCallId ?? index} call={call} />
           ))}

@@ -67,7 +67,7 @@ export const updateWorkflowCommand = async (
     console.log(`  ${chalk.gray("Description:")} ${workflow.description ?? chalk.gray("—")}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update workflow" });
+    failSpinner({ spinner, error, action: "update workflow", format: options?.format });
     process.exit(1);
   }
 };

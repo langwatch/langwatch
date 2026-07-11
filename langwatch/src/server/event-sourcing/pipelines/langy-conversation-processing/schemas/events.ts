@@ -53,14 +53,28 @@ export type LangyAgentTurnStartedEvent = z.infer<
 >;
 
 /**
- * ToolCallStarted — PR3 seam. The agent began a tool call during a turn.
- * Recorded as a meaningful transition (not a token) and treated as liveness.
+ * ToolCallStarted — the agent began a tool call during a turn. Recorded as a
+ * meaningful transition (not a token) and treated as liveness.
+ *
+ * It carries WHAT THE CALL IS DOING, not merely that one happened. A tool name
+ * on its own is close to worthless here: half of Langy's calls are `bash`, and
+ * "the agent ran bash" answers nothing you would ever ask of an event log. The
+ * command is the identity of the call — the thing you search for, the thing you
+ * reproduce, the thing that tells you `bash` was really a trace search.
+ *
+ * `command` is the shell command when the tool is a shell (the overwhelmingly
+ * common case, and the one worth having a first-class field for). `input` keeps
+ * the full argument object for every other tool. Both are optional because a
+ * frame that never surfaced its arguments must still be recordable — an event we
+ * refuse to write is strictly worse than one that is missing a field.
  */
 export const langyToolCallStartedEventDataSchema = z.object({
   conversationId: z.string(),
   turnId: z.string(),
   toolCallId: z.string(),
   toolName: z.string(),
+  command: z.string().optional(),
+  input: z.unknown().optional(),
 });
 export type LangyToolCallStartedEventData = z.infer<
   typeof langyToolCallStartedEventDataSchema
@@ -76,7 +90,17 @@ export type LangyToolCallStartedEvent = z.infer<
 >;
 
 /**
- * ToolCallCompleted — PR3 seam. A tool call the agent started has returned.
+ * ToolCallCompleted — a tool call the agent started has returned.
+ *
+ * Self-describing, exactly like its `started` twin: it repeats the `command` so
+ * that ONE event answers "what ran, and how did it go?" without a join back to
+ * the start. Debugging a turn is reading a list of these, and a list that says
+ * only `bash → isError: true` sends you hunting for the other half.
+ *
+ * `durationMs` is what turns the log into something you can find a slow call in
+ * — the CLI spawn alone has been measured in the hundreds of milliseconds, and
+ * you cannot chase that without a number. `errorText` keeps the failure itself,
+ * truncated, rather than a bare boolean that tells you a thing broke but not why.
  */
 export const langyToolCallCompletedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -84,6 +108,10 @@ export const langyToolCallCompletedEventDataSchema = z.object({
   toolCallId: z.string(),
   toolName: z.string(),
   isError: z.boolean().optional(),
+  command: z.string().optional(),
+  input: z.unknown().optional(),
+  durationMs: z.number().optional(),
+  errorText: z.string().optional(),
 });
 export type LangyToolCallCompletedEventData = z.infer<
   typeof langyToolCallCompletedEventDataSchema

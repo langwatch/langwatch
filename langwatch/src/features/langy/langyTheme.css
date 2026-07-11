@@ -1,0 +1,296 @@
+/*
+ * Langy's TEXTURE and MOTION layer.
+ *
+ * There is no colour in this file. Every value it composes comes from the Chakra
+ * theme — see `langyTheme.ts`, which declares the `_langy` / `_langyDark`
+ * conditions and hangs Langy's palette off the app's own semantic tokens. What
+ * lives here is the handful of things Chakra has no token for: an @font-face, a
+ * few @keyframes, and four painted textures (grain, signal grid, wash, sheen)
+ * whose gradients are built from `var(--chakra-colors-langy-*)`.
+ *
+ * The split is the point. Colours belong to the design system, where they are
+ * typed, mergeable and shared. A masked fractal-noise overlay does not.
+ */
+
+/* Sentient — the display/heading voice, self-hosted (from the LangWatch site). */
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Extralight.woff2") format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.langy-root {
+  /* The display face. Body stays on the app's sans — Sentient is for the one
+     big line on the empty state, never for chrome. */
+  --langy-font-serif:
+    "Sentient", "Charter", "Source Serif Pro", ui-serif, Georgia, serif;
+
+  /* Langy's identity gradient: the AI mark and the thinking shimmer, and
+     nothing else. Data (bars, progress) is deliberately NOT this — see
+     langyTheme.ts. Assembled here from theme tokens. */
+  --langy-ai-gradient: linear-gradient(
+    100deg,
+    var(--chakra-colors-langy-ai-blue) 0%,
+    var(--chakra-colors-langy-ai-purple) 52%,
+    var(--chakra-colors-langy-ai-orange) 100%
+  );
+}
+
+/* ── Texture: paper gets grain, ink gets the signal grid ──────────────────
+   The two grounds want opposite textures, so they get one each rather than
+   both stacked.
+
+   LIGHT — paper grain. A fractal-noise tile that MULTIPLIES (the site's
+   setting): the noise darkens the cream just enough to kill the flat-digital
+   look.
+
+   DARK — the signal grid, lifted from the marketing site's `.dark-signal-grid`
+   (72px cells, 1px lines, and a `to right` mask that fades it out by 82%). It
+   is the faint technical texture under the homepage's dark sections, and it is
+   what makes an ink ground read as a wireframe rather than as a hole. Grain is
+   switched OFF on ink: multiply against near-black is a no-op anyway, and grain
+   plus grid is two textures fighting.
+
+   The site masks the grid on one axis only. In a 468px column that would leave
+   it running under the message text, so a second mask is intersected in: it also
+   fades out vertically before the composer. The grid ends up reading exactly
+   where it should — the empty upper-left field of the panel — and nowhere near
+   the thing you are trying to read. */
+.langy-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.022;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+.langy-signal-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: none;
+  opacity: 0.65;
+  background-image:
+    linear-gradient(var(--chakra-colors-langy-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--chakra-colors-langy-grid) 1px, transparent 1px);
+  background-size: 72px 72px;
+  -webkit-mask-image:
+    linear-gradient(to right, black, transparent 82%),
+    linear-gradient(to bottom, black 45%, transparent 88%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, black, transparent 82%),
+    linear-gradient(to bottom, black 45%, transparent 88%);
+  mask-composite: intersect;
+}
+
+.dark .langy-grain,
+:root.dark .langy-grain {
+  display: none;
+}
+.dark .langy-signal-grid,
+:root.dark .langy-signal-grid {
+  display: block;
+}
+
+/* ── Composer "thinking" sheen ────────────────────────────────────────────
+   While a turn is in flight the composer grows a 1px gradient ring with a soft
+   highlight travelling along it.
+
+   An overlay sibling covers the composer card's border box, is filled with the
+   identity gradient, then MASKED down to just its 1px padding ring
+   (`mask-composite: exclude` subtracts the content box from the full box,
+   leaving the frame). Only the ring ever paints, so the moving
+   `background-position` repaints a hairline, not the card — no layout, no
+   compositing of the card's subtree, no jank. A rotating conic-gradient behind
+   the card would repaint a full card-sized layer every frame and needs
+   `@property` for the angle; this is cheaper and works everywhere.
+
+   Restraint is the point: the gradient is mostly TRANSPARENT — one soft band
+   crossing an otherwise invisible ring, once every 3.6s. A sheen, not a racing
+   stripe. */
+.langy-composer-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 1px;
+  opacity: 0.45;
+  background-image: linear-gradient(
+    100deg,
+    transparent 0%,
+    transparent 34%,
+    var(--chakra-colors-langy-ai-blue) 43%,
+    var(--chakra-colors-langy-ai-purple) 50%,
+    var(--chakra-colors-langy-ai-orange) 57%,
+    transparent 66%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-position: 200% 50%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: langy-border-sheen 3.6s linear infinite;
+}
+
+/* ── Indeterminate bar (in-progress capability card) ──────────────────────
+   A travelling highlight on a 2px rail: it says "running" without claiming to
+   know how far along it is.
+
+   DATA IS NOT THE IDENTITY GRADIENT. The homepage's Langy section runs its
+   scenario bars as a `white/10` track with a `brand-300/70` fill — one warm
+   colour, no gradient, settling to moss or rust. Bars, progress and read-outs
+   speak that language; the blue→purple→orange gradient is reserved for the mark
+   and the thinking line. */
+.langy-pending-bar {
+  height: 2px;
+  border-radius: 999px;
+  background-color: var(--chakra-colors-langy-bar-track);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 30%,
+    var(--chakra-colors-langy-bar-fill) 45%,
+    var(--chakra-colors-langy-bar-fill) 55%,
+    transparent 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-position: 200% 50%;
+  animation: langy-border-sheen 2.4s linear infinite;
+}
+
+/* ── Ambient wash ─────────────────────────────────────────────────────────
+   The site's `WarpAccent` shader, dialled down to an impression.
+
+   The homepage backs its dark sections with a WebGL mesh whose dark palette is
+   `[ink-950, #1e3a8a, #5b8def, #c97b3a, #b85240]`, anchored to the RIGHT and
+   masked so it fades out to the left, keeping the text side dark
+   (`linear-gradient(to left, black 0%, black 30%, rgba(0,0,0,0.5) 56%,
+   transparent 84%)`). We are not shipping a shader into a chat panel, so this
+   is the same recipe as static radial gradients: the same stops, the same
+   right-anchoring, the same left-fade — so the text column stays clean.
+
+   It is CONDITIONAL (see LangyPanel): present on the empty state and while a
+   turn is in flight, faded out once a conversation is under way. It lives
+   BEHIND the scroller and outside it, so it never scrolls and never repaints on
+   scroll. The user has rejected a loud wash twice; this one is deliberately at
+   the edge of perceptible. */
+.langy-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(
+      ellipse 70% 55% at 100% 22%,
+      rgba(91, 141, 239, 0.22) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 60% 45% at 100% 62%,
+      rgba(201, 123, 58, 0.18) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 55% 40% at 92% 100%,
+      rgba(184, 82, 64, 0.14) 0%,
+      transparent 58%
+    );
+  filter: blur(50px);
+  -webkit-mask-image: linear-gradient(
+    to left,
+    black 0%,
+    black 30%,
+    rgba(0, 0, 0, 0.5) 56%,
+    transparent 84%
+  );
+  mask-image: linear-gradient(
+    to left,
+    black 0%,
+    black 30%,
+    rgba(0, 0, 0, 0.5) 56%,
+    transparent 84%
+  );
+  animation: langy-mesh-drift 26s ease-in-out infinite;
+  background-size: 180% 180%;
+}
+
+/* ── Motion ───────────────────────────────────────────────────────────────
+   `mesh-drift` slides an oversized gradient across a surface so a fill breathes
+   instead of sitting flat. `border-sheen` walks a highlight along a frame or a
+   rail, using the site's shimmer geometry (200%-wide, 200% → -200%). The text
+   shimmer's keyframes live with the shimmer, in langyShimmer.ts. */
+@keyframes langy-mesh-drift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes langy-border-sheen {
+  from {
+    background-position: 200% 50%;
+  }
+  to {
+    background-position: -200% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .langy-root .langy-mesh,
+  .langy-root .langy-grain,
+  .langy-wash {
+    animation: none !important;
+  }
+  /* No travelling highlight — the ring and the rail settle into a flat, quiet
+     tint, so "working" still reads without anything moving. */
+  .langy-composer-sheen,
+  .langy-pending-bar {
+    animation: none !important;
+    background-image: var(--langy-ai-gradient);
+    background-size: 100% 100%;
+    opacity: 0.28;
+  }
+}

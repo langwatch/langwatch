@@ -6,15 +6,18 @@
 import {
   createSystem,
   defaultConfig,
+  defineConfig,
   defineRecipe,
   defineSlotRecipe,
+  mergeConfigs,
 } from "@chakra-ui/react";
 import { colorSystem } from "../components/ui/color-mode";
+import { langyThemeConfig } from "../features/langy/langyTheme";
 
 // Inter font loaded via CSS @import in globals.scss (no more next/font/google)
 const interFontFamily = "'Inter', sans-serif";
 
-export const system = createSystem(defaultConfig, {
+const appConfig = defineConfig({
   globalCss: {
     body: {
       background: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
@@ -37,7 +40,8 @@ export const system = createSystem(defaultConfig, {
     },
     "[data-line][data-highlight]::after, [data-line][data-diff]::after": {
       borderInlineStartColor: "#ED8926 !important",
-      background: 'color-mix(in srgb, var(--chakra-colors-orange-emphasized) 20%, transparent) !important',
+      background:
+        "color-mix(in srgb, var(--chakra-colors-orange-emphasized) 20%, transparent) !important",
     },
   },
   theme: {
@@ -1230,6 +1234,26 @@ export const system = createSystem(defaultConfig, {
     },
   },
 });
+
+/**
+ * The app's system, plus Langy's.
+ *
+ * Langy is a distinct surface inside LangWatch (warm paper, ink, the brand's own
+ * ramp) and it carries its own palette — but as a THEME, not a stylesheet of
+ * `--chakra-colors-*` overrides. It declares two custom conditions
+ * (`_langy` / `_langyDark`, scoped to `.langy-root`) and hangs its values off
+ * the SAME semantic tokens the rest of the app uses.
+ *
+ * `mergeConfigs` is what makes that safe: it deep-merges Langy's condition keys
+ * INTO the app's existing token definitions rather than replacing them, so
+ * `bg.surface` keeps its `_light` / `_dark` values everywhere and simply gains a
+ * `_langy` / `_langyDark` pair that only applies inside the panel. Nothing
+ * outside `.langy-root` changes.
+ */
+export const system = createSystem(
+  defaultConfig,
+  mergeConfigs(appConfig, langyThemeConfig),
+);
 
 // The LangWatch app shell (providers, routing, NProgress) has moved to:
 // - src/AppProviders.tsx (provider hierarchy)

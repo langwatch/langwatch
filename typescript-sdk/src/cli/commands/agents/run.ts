@@ -71,7 +71,7 @@ export const runAgentCommand = async (
         console.log();
       }
     } catch (error) {
-      failSpinner({ spinner: runSpinner, error, action: "call HTTP agent" });
+      failSpinner({ spinner: runSpinner, error, action: "call HTTP agent", format: options?.format });
       process.exit(1);
     }
   } else {

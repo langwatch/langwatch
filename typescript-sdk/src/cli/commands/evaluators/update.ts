@@ -51,7 +51,7 @@ export const updateEvaluatorCommand = async (
     if (error instanceof SyntaxError) {
       updateSpinner.fail(chalk.red("--settings must be valid JSON"));
     } else {
-      failSpinner({ spinner: updateSpinner, error, action: "update evaluator" });
+      failSpinner({ spinner: updateSpinner, error, action: "update evaluator", format: options?.format });
     }
     process.exit(1);
   }

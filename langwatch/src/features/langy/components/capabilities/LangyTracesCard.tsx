@@ -1,10 +1,15 @@
 /**
- * Traces capability card (`search_traces`, `get_trace`).
+ * Traces capability card (`langwatch.trace.search` / `langwatch.trace.get`).
  *
  * A trace search renders a row list — one row per matched trace, each linking
  * to that trace — under a "Found N traces" header. A single-trace lookup
  * renders a one-trace summary. Both are reads: no Apply, just the results and
  * the "Open in Traces" deep link.
+ *
+ * The CLI runs its reads with `--format json`, so what lands here is the
+ * structured document (`{ traces: [...], pagination: { totalHits } }`), read
+ * through `cliResultDocument`. The markdown-digest parse below it is the older
+ * MCP transport's shape, kept so a conversation recorded under it still replays.
  */
 import { Text, VStack } from "@chakra-ui/react";
 import {
@@ -14,6 +19,10 @@ import {
   summaryLines,
   type CapabilityCardInput,
 } from "./capabilityRegistry";
+// `asJsonDocument` is the shared CLI contract's, not the panel's — the CLI and the
+// panel agree on what a result document IS in exactly one place.
+import { asJsonDocument } from "@langwatch/cli-cards";
+import { collectionOf, textValue, totalOf } from "./cliResultDocument";
 import { CapabilityRow, LangyCapabilityCard } from "./LangyCapabilityCard";
 
 interface ParsedTrace {
@@ -21,10 +30,83 @@ interface ParsedTrace {
   snippet?: string;
 }
 
+const SNIPPET_MAX = 120;
+
+function truncate(text: string, max: number): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`;
+}
+
+/** A trace row's id, however the API spelled it. */
+function traceIdOf(row: unknown): string | null {
+  if (!row || typeof row !== "object") return null;
+  const record = row as Record<string, unknown>;
+  for (const key of ["trace_id", "traceId", "id"]) {
+    const value = record[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return null;
+}
+
+/**
+ * The CLI's trace-search document. Null when the output is not one, so the
+ * caller falls back to the digest parse. An EMPTY list is a real answer
+ * ("nothing matched"), not a miss — which is why this returns `{ traces: [] }`
+ * rather than null in that case.
+ */
+function parseTracesJson(
+  output: unknown,
+): { total: number | null; traces: ParsedTrace[] } | null {
+  const document = asJsonDocument(output);
+  if (!document) return null;
+
+  const rows = collectionOf(document);
+  if (!rows) return null;
+
+  const traces: ParsedTrace[] = [];
+  for (const row of rows) {
+    const id = traceIdOf(row);
+    if (!id) continue;
+    const snippet = textValue((row as Record<string, unknown>).input);
+    traces.push({
+      id,
+      ...(snippet ? { snippet: truncate(snippet, SNIPPET_MAX) } : {}),
+    });
+  }
+
+  return { total: totalOf(document) ?? traces.length, traces };
+}
+
+/** The lines a single-trace document is worth summarising with. */
+function singleTraceLines(output: unknown): string[] | null {
+  const document = asJsonDocument(output);
+  if (!document || !traceIdOf(document)) return null;
+
+  const record = document as Record<string, unknown>;
+  const error = record.error;
+  const errorMessage =
+    error && typeof error === "object"
+      ? textValue((error as { message?: unknown }).message)
+      : textValue(error);
+
+  const lines = [
+    textValue(record.input),
+    textValue(record.output),
+    errorMessage,
+  ]
+    .filter((line): line is string => !!line)
+    .map((line) => truncate(line, SNIPPET_MAX * 2));
+
+  return lines.length > 0 ? lines : null;
+}
+
 function parseTraces(output: unknown): {
   total: number | null;
   traces: ParsedTrace[];
 } {
+  const structured = parseTracesJson(output);
+  if (structured) return structured;
+
   const text = extractToolText(output);
   const totalMatch = text.match(/Found\s+([\d,]+)\s+traces/i);
   const total = totalMatch ? Number(totalMatch[1]!.replace(/,/g, "")) : null;
@@ -52,7 +134,7 @@ export function LangyTracesCard({
 
   if (isSingle) {
     const id = extractPrimaryId(input, output);
-    const lines = summaryLines(output, 4);
+    const lines = singleTraceLines(output) ?? summaryLines(output, 4);
     return (
       <LangyCapabilityCard
         tone="read"

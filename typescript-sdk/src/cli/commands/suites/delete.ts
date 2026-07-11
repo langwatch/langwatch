@@ -21,7 +21,7 @@ export const deleteSuiteCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete suite" });
+    failSpinner({ spinner, error, action: "delete suite", format: options?.format });
     process.exit(1);
   }
 };

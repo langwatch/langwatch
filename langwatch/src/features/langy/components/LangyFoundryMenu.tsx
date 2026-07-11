@@ -33,7 +33,10 @@ export function LangyFoundryMenu() {
 
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }}>
-      <Tooltip content="The Foundry — forge sample traces & conversations" showArrow>
+      <Tooltip
+        content="The Foundry — forge sample traces & conversations"
+        showArrow
+      >
         <TriggerAnchor>
           <Menu.Trigger asChild>
             <IconButton
@@ -49,7 +52,7 @@ export function LangyFoundryMenu() {
       </Tooltip>
       <Menu.Content
         minWidth="240px"
-        // Liquid-glass — matches RecentChatsMenu / LangyGitHubMenu so the header
+        // Liquid-glass — matches RecentChatsMenu so the header
         // dropdowns read as one material.
         background="bg.panel/70"
         borderWidth="1px"
