@@ -72,6 +72,7 @@ import {
   type PinCategory,
   renderPinPills,
 } from "./PinStrip";
+import { SyntheticTraceBadge } from "./SyntheticTraceBadge";
 import { ThreadProgressIndicator } from "./ThreadProgressIndicator";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
 import { useRetainedTraceHeader } from "./useRetainedTraceHeader";
@@ -979,6 +980,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             titleIsFallback={titleIsFallback}
           />
           <StatusChip trace={trace} statusColor={statusColor} />
+          <SyntheticTraceBadge attributes={trace.attributes} />
           {conversationContext.total > 1 && (
             <ThreadProgressIndicator
               position={conversationContext.position}
