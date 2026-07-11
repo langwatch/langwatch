@@ -1577,13 +1577,21 @@ export const tracesV2Router = createTRPCRouter({
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
+      // Free-plan teaser window: records older than the plan cutoff have their
+      // content withheld regardless of the viewer's captured-content
+      // permission, exactly as the sibling span reads teaser-redact pre-cutoff
+      // spans (`applyVisibilityGate`). Without this the raw-log read would
+      // surface older-than-window prompts / responses the span reads hide.
+      const visibilityCutoffMs = await getVisibilityCutoffMsForProject(
+        input.projectId,
+      );
       const rows = await app.traces.logRecords.getLogsByTraceId(
         input.projectId,
         input.traceId,
         input.occurredAtMs,
       );
       return rows.map((row) =>
-        redactTraceLogContent(
+        gateTraceLogVisibility(
           {
             spanId: row.spanId,
             timeUnixMs: row.timeUnixMs,
@@ -1594,6 +1602,7 @@ export const tracesV2Router = createTRPCRouter({
             scopeVersion: row.scopeVersion,
           },
           protections,
+          visibilityCutoffMs,
         ),
       );
     }),
@@ -1708,4 +1717,38 @@ export function redactTraceLogContent(
         ? (protections.capturedOutputVisibleTo ?? null)
         : null,
   };
+}
+
+/**
+ * Apply BOTH gates to one trace-correlated log record: the free-plan teaser
+ * window and the viewer's captured-content permission.
+ *
+ * A record older than the plan `visibilityCutoffMs` has its captured content
+ * withheld regardless of the viewer's permission — a plan gate, not an audience
+ * gate, so it offers no "visible to …" label (there is no group that can see
+ * it, only a plan upgrade). This mirrors the sibling span reads, which
+ * teaser-redact pre-cutoff spans via `applyVisibilityGate`. Post-cutoff records
+ * (and every record when `visibilityCutoffMs` is null — a paid plan with no
+ * window) fall through to the viewer's real captured-input / captured-output
+ * visibility. Fails closed: a pre-cutoff record is gated as if no captured
+ * content were visible.
+ */
+export function gateTraceLogVisibility(
+  row: TraceLogRecordDto,
+  protections: {
+    canSeeCapturedInput?: boolean | null;
+    canSeeCapturedOutput?: boolean | null;
+    capturedInputVisibleTo?: string | null;
+    capturedOutputVisibleTo?: string | null;
+  },
+  visibilityCutoffMs: number | null,
+): TraceLogRecordDto {
+  const isBeforeCutoff =
+    visibilityCutoffMs !== null && row.timeUnixMs < visibilityCutoffMs;
+  return redactTraceLogContent(
+    row,
+    isBeforeCutoff
+      ? { canSeeCapturedInput: false, canSeeCapturedOutput: false }
+      : protections,
+  );
 }
