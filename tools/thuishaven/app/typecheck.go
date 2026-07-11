@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -32,11 +33,17 @@ func (o *Orchestrator) Typecheck(ctx context.Context, lwDir string, extraArgs []
 	}
 	shell := "pnpm typecheck"
 	for _, a := range extraArgs {
-		shell += " " + a
+		shell += " " + shellQuote(a)
 	}
 	rl := domain.DefaultTypecheckReapLimits()
 	if maxRSSOverrideMB > 0 {
 		rl.MaxRSSBytes = int64(maxRSSOverrideMB) << 20
 	}
 	return o.sup.RunOnceBounded(ctx, "typecheck", lwDir, shell, nil, ReapLimits(rl))
+}
+
+// shellQuote single-quotes s for safe interpolation into a `bash -lc` string,
+// escaping any embedded single quotes.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
 }

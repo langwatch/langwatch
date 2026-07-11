@@ -36,7 +36,7 @@ export function havenHmrGate(options?: {
   const BURST_SETTLE_MS = options?.burstSettleMs ?? 500; // quiet time before the coalesced reload fires
   const MAX_GATE_MS = 60_000; // never hold longer than this, whatever the marker says
   let server: ViteDevServer | undefined;
-  let owedReload = false;
+  let isReloadOwed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let lastUpdateAt = 0;
 
@@ -51,7 +51,7 @@ export function havenHmrGate(options?: {
   }
 
   function flush(): void {
-    owedReload = false;
+    isReloadOwed = false;
     if (timer) {
       clearTimeout(timer);
       timer = undefined;
@@ -60,7 +60,7 @@ export function havenHmrGate(options?: {
   }
 
   function scheduleFlush(delayMs: number): void {
-    owedReload = true;
+    isReloadOwed = true;
     if (timer) clearTimeout(timer);
     timer = setTimeout(flush, delayMs);
   }
@@ -88,7 +88,7 @@ export function havenHmrGate(options?: {
       if (sinceLast > BURST_GAP_MS) {
         // Isolated update, not part of a rapid burst — let it straight through.
         // (If a burst's trailing timer somehow hadn't fired yet, catch up first.)
-        if (owedReload) flush();
+        if (isReloadOwed) flush();
         return ctx.modules;
       }
 

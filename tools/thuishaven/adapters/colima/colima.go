@@ -50,10 +50,10 @@ func (r *Runtime) Ensure(ctx context.Context) (dockerHost string, err error) {
 		return "", fmt.Errorf("colima is not installed — `brew install colima docker` (haven runs the observability stack on colima, not Docker Desktop)")
 	}
 
-	found, isRunning := r.profileState(ctx)
+	isFound, isRunning := r.profileState(ctx)
 	switch {
 	case isRunning:
-	case found:
+	case isFound:
 		// Exists but stopped: start it as-is. Passing --cpu/--memory here would
 		// silently resize a VM someone else sized on purpose.
 		if err := r.run(ctx, "start", "-p", r.profile); err != nil {
@@ -73,7 +73,7 @@ func (r *Runtime) Ensure(ctx context.Context) (dockerHost string, err error) {
 }
 
 // profileState reports whether the profile exists and whether it is running.
-func (r *Runtime) profileState(ctx context.Context) (found, isRunning bool) {
+func (r *Runtime) profileState(ctx context.Context) (isFound, isRunning bool) {
 	out, err := exec.CommandContext(ctx, "colima", "list", "--json").Output()
 	if err != nil {
 		return false, false

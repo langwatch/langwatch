@@ -134,12 +134,14 @@ Two ways, both wired by `make observability-connect`:
 
 1. **gcx CLI** — Grafana's official CLI. `connect` runs `gcx login local
    --server http://localhost:3000 --token <token>`. Then:
+
    ```bash
    gcx logs query '{service_name="langwatch-backend"}' --since 15m
    gcx metrics query 'process_runtime_go_goroutines' --since 15m
    gcx traces query '{ .service.name = "langwatch-ai-gateway" }' --since 15m
    gcx datasources list
    ```
+
 2. **Grafana skills** — the `grafana-lgtm` / `grafana-core` / `grafana-datasources`
    plugins (`claude plugin marketplace add grafana/skills`) give the agent
    task-level knowledge for LogQL/PromQL/TraceQL and dashboards.

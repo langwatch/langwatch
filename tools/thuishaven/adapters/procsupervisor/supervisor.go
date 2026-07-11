@@ -156,7 +156,10 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 				return
 			}
 			c.logln("exited — restarting in 1s")
-			time.Sleep(time.Second)
+			select {
+			case <-ctx.Done():
+			case <-time.After(time.Second):
+			}
 		}
 	}
 }

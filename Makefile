@@ -125,9 +125,10 @@ service-watch:
 # THUISHAVEN — hostname-based local dev via portless (ADR-048)
 # =============================================================================
 # `haven` (built from cmd/haven) gives every worktree's services stable
-# hostnames — app|api|gateway|nlp.<slug>.langwatch.localhost — so multiple
-# worktrees never fight over ports. `pnpm dev` routes through it automatically
-# once the portless proxy is installed. Dashboard: https://langwatch.localhost
+# hostnames — app|gateway|nlp.<slug>.langwatch.localhost (API lives at
+# app.<slug>.../api) — so multiple worktrees never fight over ports. `pnpm dev`
+# routes through it automatically once the portless proxy is installed.
+# Dashboard: https://langwatch.localhost
 
 HAVEN_PKG = ./cmd/haven
 HAVEN = $$(command -v haven || echo "go run $(HAVEN_PKG)")

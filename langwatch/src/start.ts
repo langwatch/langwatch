@@ -144,7 +144,8 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // Prod: Single server on PORT (default 5560) serves API routes + static files.
   const basePort = parseInt(process.env.PORT ?? "5560");
   // In portless (haven) mode the API binds an ephemeral loopback port that
-  // portless maps `api.<slug>.langwatch.localhost` onto; otherwise PORT+1000.
+  // Vite proxies `/api` to under the app origin (`app.<slug>.../api`);
+  // otherwise PORT+1000.
   const port = process.env.LANGWATCH_API_PORT
     ? parseInt(process.env.LANGWATCH_API_PORT)
     : dev

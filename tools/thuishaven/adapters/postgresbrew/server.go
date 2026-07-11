@@ -50,7 +50,7 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("brew is not installed — haven manages Postgres via `brew services` (install: https://brew.sh)")
 	}
 
-	if running, _ := runningPostgresFormula(ctx); !running {
+	if isRunning, _ := runningPostgresFormula(ctx); !isRunning {
 		if err := s.start(ctx); err != nil {
 			return 0, err
 		}
@@ -181,7 +181,7 @@ func (s *Server) Running() bool {
 // invocation started (or that was already running) isn't remembered in s.
 func (s *Server) Health(ctx context.Context) (bool, string) {
 	formula := s.formula
-	if running, active := runningPostgresFormula(ctx); running {
+	if isRunning, active := runningPostgresFormula(ctx); isRunning {
 		formula = active
 	}
 	if !s.ready(ctx) {

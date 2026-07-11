@@ -22,8 +22,9 @@ type Server struct {
 	port    int
 }
 
-// New builds a Server. formula/port default to domain.DefaultRedisFormula /
-// domain.DefaultRedisPort when empty/zero.
+// New builds a Server for the given formula/port as-is; defaulting to
+// domain.DefaultRedisFormula / domain.DefaultRedisPort happens at the
+// composition root (cmd/root.go), not here.
 func New(formula string, port int) *Server {
 	return &Server{formula: formula, port: port}
 }

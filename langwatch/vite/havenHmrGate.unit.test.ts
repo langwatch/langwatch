@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -63,8 +63,7 @@ describe("havenHmrGate", () => {
   });
 
   describe("when an explicit haven hmr on marker is active", () => {
-    it("gates even a single isolated update until the marker's TTL lifts", async () => {
-      const { writeFileSync } = await import("fs");
+    it("gates even a single isolated update until the marker's TTL lifts", () => {
       const markerPath = path.join(dir, ".haven-hmr-gate");
       writeFileSync(markerPath, String(Date.now() + 1000));
 

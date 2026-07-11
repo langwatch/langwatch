@@ -24,8 +24,10 @@ If no feature file exists for your task, create one before writing code.
 Stop juggling ports. `pnpm dev` routes through **`haven`** (the Go orchestrator in
 `tools/thuishaven`, binary `cmd/haven`), which gives every worktree's services a
 stable hostname via the [portless](https://github.com/vercel-labs/portless) proxy —
-`app|api|gateway|nlp.<slug>.langwatch.localhost`, where `<slug>` is a random
-per-worktree name (e.g. `happy-tiger`). `.localhost` resolves to loopback natively,
+`app|gateway|nlp.<slug>.langwatch.localhost`, where `<slug>` is the worktree's own
+directory name, sanitised (a checkout at `.../worktrees/portless` is the `portless`
+stack). The app and its API share one origin — open `app.<slug>...` for the UI,
+hit `app.<slug>.../api` for the API. `.localhost` resolves to loopback natively,
 so there is no `/etc/hosts`, DNS, or sudo for name resolution, and two worktrees
 can never collide.
 
