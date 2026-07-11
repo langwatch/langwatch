@@ -1,7 +1,6 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
-import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { createLogger } from "~/utils/logger/server";
 import { createTenantId } from "../../../domain/tenantId";
 import type {
@@ -16,7 +15,10 @@ import {
 } from "../../../outbox/payload";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ReactorContext } from "../../../reactors/reactor.types";
-import { NOTIFY_TRIGGER_ACTIONS } from "../../shared/triggerActionDispatch";
+import {
+  NOTIFY_TRIGGER_ACTIONS,
+  triggerReadsEvaluations,
+} from "../../shared/triggerActionDispatch";
 import type { EvaluationProcessingEvent } from "../schemas/events";
 import {
   isEvaluationCompletedEvent,
@@ -102,15 +104,16 @@ export function createEvaluationAlertTriggerReactor(
         await deps.triggers.getActiveTraceTriggersForProject(tenantId);
       if (triggers.length === 0) return [];
 
-      // Restrict to persist-class triggers with evaluation filters.
-      // NOTIFY-class triggers with evaluation filters are owned by
-      // `evaluationAlertTriggerNotifyOutbox.reactor.ts`. Pre-filtering
-      // here skips the cross-pipeline fold read when the only matching
-      // triggers are notify-class.
-      const candidates = triggers.filter((t) => {
-        const { hasEvaluationFilters } = classifyTriggerFilters(t.filters);
-        return hasEvaluationFilters && !NOTIFY_TRIGGER_ACTIONS.has(t.action);
-      });
+      // Restrict to persist-class triggers whose subject reads evaluations —
+      // legacy evaluation filters OR an ADR-043 filterQuery referencing an
+      // evaluator field. NOTIFY-class such triggers are owned by
+      // `evaluationAlertTriggerNotifyOutbox.reactor.ts`. Pre-filtering here
+      // skips the cross-pipeline fold read when the only matching triggers are
+      // notify-class.
+      const candidates = triggers.filter(
+        (t) =>
+          triggerReadsEvaluations(t) && !NOTIFY_TRIGGER_ACTIONS.has(t.action),
+      );
       if (candidates.length === 0) return [];
 
       // Cross-pipeline read: settle re-reads the fold itself, but we

@@ -2,6 +2,10 @@ import { TriggerAction } from "@prisma/client";
 import { createHash } from "crypto";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import {
+  evaluateQueryInMemory,
+  queryNeeds,
+} from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
@@ -300,33 +304,69 @@ async function handleSettle(
     return;
   }
 
-  const { traceFilters, evaluationFilters, hasEvaluationFilters } =
-    classifyTriggerFilters(trigger.filters);
-
-  const events = triggerFiltersReferenceEvents(traceFilters)
-    ? await deps.deriveEvents({
-        tenantId: projectId,
-        traceId,
-        occurredAtMs: foldState.occurredAt,
-        foldVersion: foldState.spanCount,
+  // ADR-043: a trace-subject automation carries a liqe `filterQuery` and is
+  // matched in-memory against the settled fold state — never a per-trace
+  // ClickHouse round-trip. Only the auxiliary collections the query references
+  // (queryNeeds) are loaded, and anything unevaluable at dispatch fails the
+  // query closed. A legacy trigger (filterQuery == null) keeps the structured
+  // `filters` path below.
+  if (trigger.filterQuery != null) {
+    const needs = queryNeeds(trigger.filterQuery);
+    const evaluations = needs.has("evaluations")
+      ? await deps.evaluationRuns.findByTraceId(projectId, traceId)
+      : null;
+    const events = needs.has("events")
+      ? await deps.deriveEvents({
+          tenantId: projectId,
+          traceId,
+          occurredAtMs: foldState.occurredAt,
+          foldVersion: foldState.spanCount,
+        })
+      : null;
+    // Spans aren't derived at dispatch time yet; the evaluator fails span-scoped
+    // fields closed on its own, so `spans` stays null.
+    if (
+      !evaluateQueryInMemory(trigger.filterQuery, {
+        summary: foldState,
+        evaluations,
+        events,
+        spans: null,
       })
-    : null;
-  const traceData = buildPreconditionTraceDataFromFoldState(foldState, events);
-
-  if (
-    Object.keys(traceFilters).length > 0 &&
-    !matchesTriggerFilters(traceData, traceFilters)
-  ) {
-    return;
-  }
-
-  if (hasEvaluationFilters) {
-    const allEvaluations = await deps.evaluationRuns.findByTraceId(
-      projectId,
-      traceId,
-    );
-    if (!matchesEvaluationFilters(allEvaluations, evaluationFilters)) {
+    ) {
       return;
+    }
+  } else {
+    const { traceFilters, evaluationFilters, hasEvaluationFilters } =
+      classifyTriggerFilters(trigger.filters);
+
+    const events = triggerFiltersReferenceEvents(traceFilters)
+      ? await deps.deriveEvents({
+          tenantId: projectId,
+          traceId,
+          occurredAtMs: foldState.occurredAt,
+          foldVersion: foldState.spanCount,
+        })
+      : null;
+    const traceData = buildPreconditionTraceDataFromFoldState(
+      foldState,
+      events,
+    );
+
+    if (
+      Object.keys(traceFilters).length > 0 &&
+      !matchesTriggerFilters(traceData, traceFilters)
+    ) {
+      return;
+    }
+
+    if (hasEvaluationFilters) {
+      const allEvaluations = await deps.evaluationRuns.findByTraceId(
+        projectId,
+        traceId,
+      );
+      if (!matchesEvaluationFilters(allEvaluations, evaluationFilters)) {
+        return;
+      }
     }
   }
 

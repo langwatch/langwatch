@@ -969,3 +969,97 @@ describe("createOutboxDispatcher persist class (ADR-035)", () => {
     });
   });
 });
+
+// ADR-043: a trace-subject automation carries a liqe `filterQuery`, which the
+// settle stage matches in-memory against fold state instead of the structured
+// `filters`. Only the auxiliary collections the query references are loaded,
+// and anything unevaluable at dispatch fails the whole query closed.
+describe("createOutboxDispatcher settle stage — filterQuery (ADR-043)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function makeSettlePayload(
+    overrides: Partial<SettleStagePayload> = {},
+  ): SettleStagePayload {
+    return makePersistSettlePayload({ actionClass: "notify", ...overrides });
+  }
+
+  describe("when the query matches the settled fold", () => {
+    it("re-enqueues a cadence without touching the legacy filters", async () => {
+      const deps = makeDeps(makeTrigger({ filterQuery: "topic:t1" }));
+      deps.traceSummaryStore.get.mockResolvedValue({
+        ...makePersistFold(),
+        topicId: "t1",
+      });
+      const dispatcher = createOutboxDispatcher(deps);
+
+      await dispatcher.process(makeSettlePayload());
+
+      expect(deps.enqueueCadence).toHaveBeenCalledTimes(1);
+      // Summary-only query — no auxiliary collection loaded.
+      expect(deps.evaluationRuns.findByTraceId).not.toHaveBeenCalled();
+      expect(deps.deriveEvents).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the query does not match the settled fold", () => {
+    it("enqueues no cadence", async () => {
+      const deps = makeDeps(makeTrigger({ filterQuery: "topic:t1" }));
+      deps.traceSummaryStore.get.mockResolvedValue({
+        ...makePersistFold(),
+        topicId: "t2",
+      });
+      const dispatcher = createOutboxDispatcher(deps);
+
+      await dispatcher.process(makeSettlePayload());
+
+      expect(deps.enqueueCadence).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the query references an unevaluable field", () => {
+    it("fails closed (size can't be read from the fold) and enqueues nothing", async () => {
+      const deps = makeDeps(makeTrigger({ filterQuery: "size:100" }));
+      deps.traceSummaryStore.get.mockResolvedValue(makePersistFold());
+      const dispatcher = createOutboxDispatcher(deps);
+
+      await dispatcher.process(makeSettlePayload());
+
+      expect(deps.enqueueCadence).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the query reads evaluations", () => {
+    it("loads only the evaluations collection (queryNeeds-gated) and matches", async () => {
+      const deps = makeDeps(
+        makeTrigger({ filterQuery: "evaluatorVerdict:pass" }),
+      );
+      deps.traceSummaryStore.get.mockResolvedValue(makePersistFold());
+      deps.evaluationRuns.findByTraceId.mockResolvedValue([
+        { status: "processed", passed: true } as any,
+      ]);
+      const dispatcher = createOutboxDispatcher(deps);
+
+      await dispatcher.process(makeSettlePayload());
+
+      expect(deps.evaluationRuns.findByTraceId).toHaveBeenCalledTimes(1);
+      // The query doesn't reference events, so they stay unloaded.
+      expect(deps.deriveEvents).not.toHaveBeenCalled();
+      expect(deps.enqueueCadence).toHaveBeenCalledTimes(1);
+    });
+
+    it("fails closed when the referenced evaluation has not landed yet", async () => {
+      const deps = makeDeps(
+        makeTrigger({ filterQuery: "evaluatorVerdict:pass" }),
+      );
+      deps.traceSummaryStore.get.mockResolvedValue(makePersistFold());
+      deps.evaluationRuns.findByTraceId.mockResolvedValue([]);
+      const dispatcher = createOutboxDispatcher(deps);
+
+      await dispatcher.process(makeSettlePayload());
+
+      expect(deps.enqueueCadence).not.toHaveBeenCalled();
+    });
+  });
+});
