@@ -136,3 +136,7 @@ langwatch/e2e/langy/scenario-logs/
 
 # Dev server logs
 server.log
+
+# thuishaven (portless local dev)
+.langwatch-slug
+/bin/haven
