@@ -689,7 +689,8 @@ export const automationRouter = createTRPCRouter({
         filters: triggerFiltersSchema,
         /** ADR-043 Subject facet: the Traces-V2 liqe query the automation is
          *  about. When set, it supersedes `filters` (persisted as `{}`) and the
-         *  dispatcher evaluates it in-memory. Trace-subject automations only. */
+         *  dispatcher evaluates it in-memory. Trace-subject automations, plus
+         *  trace-query REPORTS — where it scopes the traces the report sends. */
         filterQuery: z.string().nullable().optional(),
         customGraphId: z.string().nullable().optional(),
         /** Graph-threshold-alert rule. Present iff this is a graph alert
@@ -921,7 +922,12 @@ export const automationRouter = createTRPCRouter({
           action: built.action,
           triggerKind: TriggerKind.REPORT,
           filters: built.filters,
-          filterQuery: null,
+          // A trace-query report sends the traces matching the author's Subject
+          // query — without this the report would only ever send the newest
+          // traces in the window. A graph/dashboard report has no trace query,
+          // so the column is cleared (a source change can't strand a stale one).
+          filterQuery:
+            input.report.source.kind === "traceQuery" ? filterQuery : null,
           actionParams: built.actionParams,
           slackTemplateType: input.templates.slackTemplateType ?? null,
           slackTemplate: input.templates.slackTemplate ?? null,

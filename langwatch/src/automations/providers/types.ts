@@ -204,6 +204,12 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
   };
   /** Template strings contributed to the save payload (`templates`). */
   templatesFromSlice(slice: S): TemplateDraft;
+  /** Render options the PREVIEW must mirror so it shows what will really be
+   *  delivered. Slack only renders the modern blocks (charts, tables, alert
+   *  banners) over a bot connection — without this the preview would show a
+   *  chart that the webhook is going to strip, or hide one the bot will send.
+   *  Omit when the provider's preview needs no delivery-specific options. */
+  previewOptions?(slice: S): { allowGatedBlocks?: boolean };
 }
 
 /** The "server" definition (`server.ts`). Stage A keeps this minimal —

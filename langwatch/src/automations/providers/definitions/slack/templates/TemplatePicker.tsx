@@ -14,6 +14,7 @@ import type { SlackDeliveryMethod } from "../shared";
 import {
   type DraftCadence,
   pickDefaultSlackBlockKitTemplateId,
+  type ReportTemplateSource,
   type SlackBlockKitTemplateKind,
   type SlackBlockKitTemplateOption,
   templateOptionsFor,
@@ -27,6 +28,11 @@ interface Props {
   /** Trace automations and graph alerts render against different variable
    *  sets, so the picker only offers layouts built for the draft's kind. */
   kind: SlackBlockKitTemplateKind;
+  /** For a report: what it sends. Only layouts that can render that source's
+   *  data are offered — a chart layout has nothing to plot for a trace-query
+   *  report. A dashboard needs no layout at all, so the form owner does not
+   *  render the picker for it. */
+  reportSource?: ReportTemplateSource;
   /** The chosen delivery method. Templates that lead with a modern block
    *  (`gatedBlock`) render in full only on a bot connection, so on a webhook
    *  they show but can't be picked. */
@@ -42,37 +48,54 @@ interface Props {
   onSelectOtherCadence: (option: SlackBlockKitTemplateOption) => void;
 }
 
+function introFor({
+  kind,
+  cadence,
+  reportSource,
+}: Pick<Props, "kind" | "cadence" | "reportSource">): string {
+  if (kind === "report") {
+    return reportSource === "customGraph"
+      ? "Your report sends a graph, so every layout plots it. The thumbnail shows structure, not the final look."
+      : "Your report sends the traces that match, so every layout lists them. The thumbnail shows structure, not the final look.";
+  }
+  if (kind === "graphAlert") {
+    return "Each layout sends one message when the alert fires. The thumbnail shows structure, not the final look.";
+  }
+  return cadence === "digest"
+    ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout — the thumbnail shows structure, not the final look."
+    : "Each matching trace sends its own message. Pick a starting layout — the thumbnail shows structure, not the final look.";
+}
+
 export function SlackBlockKitTemplatePicker({
   cadence,
   kind,
+  reportSource,
   deliveryMethod,
   hasEvaluationFilter,
   currentSource,
   onSelect,
   onSelectOtherCadence,
 }: Props) {
-  const options = templateOptionsFor({ cadence, kind });
+  const options = templateOptionsFor({ cadence, kind, reportSource });
   const otherCadence: DraftCadence =
     cadence === "digest" ? "immediate" : "digest";
   const otherOptions = templateOptionsFor({
     cadence: otherCadence,
     kind,
+    reportSource,
   }).filter((opt) => opt.cadenceFit !== "both");
   const [otherOpen, setOtherOpen] = useState(false);
   const defaultId = pickDefaultSlackBlockKitTemplateId({
     cadence,
     hasEvaluationFilter,
     kind,
+    reportSource,
   });
 
   return (
     <Stack gap={2} align="stretch">
       <Text textStyle="xs" color="fg.muted">
-        {kind === "graphAlert"
-          ? "Each layout sends one message when the alert fires. The thumbnail shows structure, not the final look."
-          : cadence === "digest"
-            ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout — the thumbnail shows structure, not the final look."
-            : "Each matching trace sends its own message. Pick a starting layout — the thumbnail shows structure, not the final look."}
+        {introFor({ kind, cadence, reportSource })}
       </Text>
       <SimpleGrid
         columns={{ base: 2, md: Math.min(options.length, 3) }}

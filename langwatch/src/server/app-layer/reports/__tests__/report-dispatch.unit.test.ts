@@ -2,6 +2,10 @@ import type { Project, Trigger } from "@prisma/client";
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
+import type {
+  ReportChart,
+  ReportTraceRow,
+} from "~/shared/templating/templateContext";
 import {
   dispatchScheduledReport,
   type ReportDispatchDeps,
@@ -12,6 +16,43 @@ const PROJECT: Project = {
   name: "Acme",
   slug: "acme",
 } as unknown as Project;
+
+function makeTraceRow(overrides: Partial<ReportTraceRow> = {}): ReportTraceRow {
+  return {
+    traceId: "trace-abc",
+    url: "https://app.langwatch.ai/acme/messages/trace-abc",
+    timestamp: "2026-07-13T08:00:00.000Z",
+    input: "first input",
+    output: "first output",
+    model: "gpt-5-mini",
+    status: "error",
+    costUsd: 0.0241,
+    durationMs: 1834,
+    ...overrides,
+  };
+}
+
+function makeChart(overrides: Partial<ReportChart> = {}): ReportChart {
+  return {
+    id: "graph-9",
+    title: "Errors per hour",
+    type: "line",
+    categories: ["09:00", "10:00"],
+    series: [
+      {
+        name: "Errors",
+        data: [
+          { label: "09:00", value: 3 },
+          { label: "10:00", value: 7 },
+        ],
+      },
+    ],
+    segments: [],
+    total: 10,
+    isEmpty: false,
+    ...overrides,
+  };
+}
 
 function makeReportTrigger(overrides: Partial<Trigger> = {}): Trigger {
   return {
@@ -26,6 +67,7 @@ function makeReportTrigger(overrides: Partial<Trigger> = {}): Trigger {
     slackTemplate: null,
     emailSubjectTemplate: null,
     emailBodyTemplate: null,
+    filterQuery: null,
     actionParams: {
       source: { kind: "traceQuery", filters: {}, topN: 5 },
       schedule: { cron: "0 9 * * 1", timezone: "UTC" },
@@ -37,23 +79,26 @@ function makeReportTrigger(overrides: Partial<Trigger> = {}): Trigger {
 
 function makeDeps(
   trigger: Trigger | null,
-  opts: { rows?: string[] } = {},
+  opts: { traces?: ReportTraceRow[]; charts?: ReportChart[] } = {},
 ): {
   deps: ReportDispatchDeps;
   sendEmail: ReturnType<typeof vi.fn>;
   sendSlack: ReturnType<typeof vi.fn>;
   sendSlackBot: ReturnType<typeof vi.fn>;
-  listTraceRows: ReturnType<typeof vi.fn>;
+  listReportTraces: ReturnType<typeof vi.fn>;
+  loadReportCharts: ReturnType<typeof vi.fn>;
 } {
   const sendEmail = vi.fn(async () => undefined);
   const sendSlack = vi.fn(async () => undefined);
   const sendSlackBot = vi.fn(async () => undefined);
-  const listTraceRows = vi.fn(async () => opts.rows ?? []);
+  const listReportTraces = vi.fn(async () => opts.traces ?? []);
+  const loadReportCharts = vi.fn(async () => opts.charts ?? []);
   return {
     sendEmail,
     sendSlack,
     sendSlackBot,
-    listTraceRows,
+    listReportTraces,
+    loadReportCharts,
     deps: {
       loadTrigger: vi.fn(async () => trigger),
       loadProject: vi.fn(async () => PROJECT),
@@ -62,8 +107,10 @@ function makeDeps(
       sendSlackBot:
         sendSlackBot as unknown as ReportDispatchDeps["sendSlackBot"],
       filterSuppressedRecipients: vi.fn(async ({ emails }) => emails),
-      listTraceRows:
-        listTraceRows as unknown as ReportDispatchDeps["listTraceRows"],
+      listReportTraces:
+        listReportTraces as unknown as ReportDispatchDeps["listReportTraces"],
+      loadReportCharts:
+        loadReportCharts as unknown as ReportDispatchDeps["loadReportCharts"],
       baseHost: "https://app.langwatch.ai",
     },
   };
@@ -108,18 +155,22 @@ describe("dispatchScheduledReport", () => {
   });
 
   describe("given a traceQuery report is due", () => {
-    it("queries the schedule window and renders the returned rows into Slack", async () => {
-      const { deps, sendSlack, listTraceRows } = makeDeps(
+    it("queries the schedule window and renders the matching traces into Slack", async () => {
+      const { deps, sendSlack, listReportTraces } = makeDeps(
         makeReportTrigger(),
-        { rows: ["trace-abc — first input", "trace-def — second input"] },
+        {
+          traces: [
+            makeTraceRow(),
+            makeTraceRow({ traceId: "trace-def", input: "second input" }),
+          ],
+        },
       );
 
       await dispatchScheduledReport({ deps, fire });
 
-      expect(listTraceRows).toHaveBeenCalledTimes(1);
-      const args = listTraceRows.mock.calls[0]![0];
+      expect(listReportTraces).toHaveBeenCalledTimes(1);
+      const args = listReportTraces.mock.calls[0]![0];
       expect(args.projectId).toBe("proj-1");
-      expect(args.filters).toEqual({});
       expect(args.limit).toBe(5);
       // Weekly cron "0 9 * * 1" → trailing 7-day window ending at the slot.
       const slot = fire.slot.getTime();
@@ -131,27 +182,89 @@ describe("dispatchScheduledReport", () => {
       expect(payload).toContain("first input");
       expect(payload).toContain("trace-def");
     });
+
+    describe("when the author wrote a search query", () => {
+      it("scopes the report to it, so 'top matching traces' actually matches", async () => {
+        const { deps, listReportTraces } = makeDeps(
+          makeReportTrigger({
+            filterQuery: 'status:error AND model:"gpt-5-mini"',
+          } as Partial<Trigger>),
+        );
+
+        await dispatchScheduledReport({ deps, fire });
+
+        expect(listReportTraces.mock.calls[0]![0].query).toBe(
+          'status:error AND model:"gpt-5-mini"',
+        );
+      });
+    });
+
+    describe("when the author wrote no query", () => {
+      it("passes an empty query, meaning the whole window", async () => {
+        const { deps, listReportTraces } = makeDeps(makeReportTrigger());
+        await dispatchScheduledReport({ deps, fire });
+        expect(listReportTraces.mock.calls[0]![0].query).toBe("");
+      });
+    });
+
+    describe("when nothing matched", () => {
+      it("still delivers, saying there was nothing to show", async () => {
+        const { deps, sendSlack } = makeDeps(makeReportTrigger(), {
+          traces: [],
+        });
+        await dispatchScheduledReport({ deps, fire });
+        expect(sendSlack).toHaveBeenCalledTimes(1);
+        const payload = JSON.stringify(sendSlack.mock.calls[0]![0].payload);
+        expect(payload).toContain("Weekly errors");
+      });
+    });
   });
 
   describe("given a customGraph report is due", () => {
-    it("sends without querying trace rows and renders no row lines", async () => {
-      const { deps, sendSlack, listTraceRows } = makeDeps(
+    it("loads the graph's charts instead of traces", async () => {
+      const { deps, sendSlack, listReportTraces, loadReportCharts } = makeDeps(
         makeReportTrigger({
+          slackTemplateType: "block_kit",
           actionParams: {
             source: { kind: "customGraph", customGraphId: "graph-9" },
             schedule: { cron: "0 7 * * *", timezone: "UTC" },
             slackWebhook: "https://hooks.slack.com/services/x",
           },
         } as Partial<Trigger>),
+        { charts: [makeChart()] },
       );
 
       await dispatchScheduledReport({ deps, fire });
 
-      expect(listTraceRows).not.toHaveBeenCalled();
+      expect(listReportTraces).not.toHaveBeenCalled();
+      expect(loadReportCharts).toHaveBeenCalledTimes(1);
+      expect(loadReportCharts.mock.calls[0]![0].source).toEqual({
+        kind: "customGraph",
+        customGraphId: "graph-9",
+      });
       expect(sendSlack).toHaveBeenCalledTimes(1);
-      const payload = JSON.stringify(sendSlack.mock.calls[0]![0].payload);
-      // The row bullet ("•") only appears when rows are present.
-      expect(payload).not.toContain("•");
+    });
+  });
+
+  describe("given a dashboard report is due", () => {
+    it("loads every panel on the dashboard", async () => {
+      const { deps, loadReportCharts } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "dashboard", dashboardId: "dash-1" },
+            schedule: { cron: "0 7 * * *", timezone: "UTC" },
+            slackWebhook: "https://hooks.slack.com/services/x",
+          },
+        } as Partial<Trigger>),
+        { charts: [makeChart(), makeChart({ id: "graph-10" })] },
+      );
+
+      await dispatchScheduledReport({ deps, fire });
+
+      expect(loadReportCharts.mock.calls[0]![0].source).toEqual({
+        kind: "dashboard",
+        dashboardId: "dash-1",
+      });
     });
   });
 

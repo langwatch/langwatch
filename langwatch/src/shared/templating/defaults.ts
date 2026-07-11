@@ -246,8 +246,13 @@ export const TRACE_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
 /**
  * ADR-042: default templates for a SCHEDULED REPORT. Reads as "here is your
  * {source} for {period}" — `report.sourceLabel`, `report.scheduleLabel`,
- * `rows` (prerendered table lines), `viewUrl`. Rendered through the same
- * Liquid pipeline; per-trigger custom templates still override.
+ * `viewUrl`, plus the report's data: `traces` for a trace-query report,
+ * `charts` for a graph or dashboard one. Rendered through the same Liquid
+ * pipeline; per-trigger custom templates still override.
+ *
+ * These are the FALLBACK, so they must say something useful for any source —
+ * hence both branches. The gallery layouts (`templates/report_*.liquid`) are
+ * what a report normally renders with, and those are source-specific.
  */
 export const DEFAULT_REPORT_EMAIL_SUBJECT_TEMPLATE =
   "[Report] {{ trigger.name }} — {{ report.scheduleLabel }}";
@@ -255,14 +260,18 @@ export const DEFAULT_REPORT_EMAIL_SUBJECT_TEMPLATE =
 export const DEFAULT_REPORT_EMAIL_BODY_TEMPLATE = `# {{ trigger.name }}
 
 {{ report.sourceLabel }} · {{ report.scheduleLabel }}.
-{% if rows.size > 0 %}
-{% for row in rows %}- {{ row }}
+{% if report.isEmpty %}
+Nothing to show for this period.
+{% else %}{% for t in traces %}- [{{ t.traceId }}]({{ t.url }}) — {{ t.input }} _({{ t.model }} · \${{ t.costUsd | round: 4 }} · {{ t.durationMs | round: 0 }} ms)_
+{% endfor %}{% for chart in charts %}- **{{ chart.title }}** — {% if chart.isEmpty %}no data{% else %}{{ chart.total | round: 2 }}{% endif %}
 {% endfor %}{% endif %}
 [View in LangWatch ↗]({{ viewUrl }})`;
 
 export const DEFAULT_REPORT_SLACK_TEMPLATE = `:bar_chart: *{{ trigger.name | mrkdwn_escape }}*
-{{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}{% if rows.size > 0 %}
-{% for row in rows %}• {{ row | mrkdwn_escape }}
+{{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}{% if report.isEmpty %}
+_Nothing to show for this period._{% else %}
+{% for t in traces %}• <{{ t.url }}|{{ t.traceId }}> {{ t.input | mrkdwn_escape }}
+{% endfor %}{% for chart in charts %}• *{{ chart.title | mrkdwn_escape }}* — {% if chart.isEmpty %}_no data_{% else %}{{ chart.total | round: 2 }}{% endif %}
 {% endfor %}{% endif %}
 <{{ viewUrl }}|View in LangWatch>`;
 
@@ -276,15 +285,21 @@ export const DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE = `[
     "type": "section",
     "text": { "type": "mrkdwn", "text": {{ _sub | json }} }
   },
-  {%- if rows.size > 0 -%}
-  {%- capture _rows -%}{% for row in rows %}• {{ row | mrkdwn_escape }}
+  {%- if report.isEmpty -%}
+  {
+    "type": "section",
+    "text": { "type": "mrkdwn", "text": "_Nothing to show for this period._" }
+  },
+  {%- else -%}
+  {%- capture _rows -%}{% for t in traces %}• <{{ t.url }}|{{ t.traceId }}> {{ t.input | mrkdwn_escape }}
+{% endfor %}{% for chart in charts %}• *{{ chart.title | mrkdwn_escape }}* — {% if chart.isEmpty %}_no data_{% else %}{{ chart.total | round: 2 }}{% endif %}
 {% endfor %}{%- endcapture -%}
-  ,{
+  {
     "type": "section",
     "text": { "type": "mrkdwn", "text": {{ _rows | json }} }
-  }
+  },
   {%- endif -%}
-  ,{
+  {
     "type": "context",
     "elements": [{ "type": "mrkdwn", "text": {{ viewUrl | prepend: "<" | append: "|View in LangWatch>" | json }} }]
   }

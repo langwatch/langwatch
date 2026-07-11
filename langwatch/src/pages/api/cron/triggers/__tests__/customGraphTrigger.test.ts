@@ -1,10 +1,8 @@
 import { type Project, type Trigger, TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimeseriesBucket } from "~/server/analytics/types";
-import {
-  processCustomGraphTrigger,
-  sumMetricAcrossGroups,
-} from "../customGraphTrigger";
+import { sumMetricAcrossGroups } from "~/server/app-layer/analytics/series-points";
+import { processCustomGraphTrigger } from "../customGraphTrigger";
 
 const { mockGetTimeseries } = vi.hoisted(() => ({
   mockGetTimeseries: vi.fn(),

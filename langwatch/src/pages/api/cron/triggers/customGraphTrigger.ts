@@ -9,12 +9,10 @@ import type {
   SeriesInputType,
   TimeseriesInputType,
 } from "~/server/analytics/registry";
-import type {
-  TimeseriesBucket,
-  TimeseriesResult,
-} from "~/server/analytics/types";
+import type { TimeseriesResult } from "~/server/analytics/types";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
+import { sumMetricAcrossGroups } from "~/server/app-layer/analytics/series-points";
 import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -303,42 +301,6 @@ export const processCustomGraphTrigger = async (
       message: error instanceof Error ? error.message : "Unknown error",
     };
   }
-};
-
-/**
- * Sum a metric across all groups in a grouped timeseries bucket.
- *
- * Grouped buckets nest values as:
- *   { [groupBy]: { [groupKey]: { [seriesKey]: number } } }
- *
- * Returns undefined when no group contains the metric so the
- * bucket is excluded from aggregation rather than counted as 0.
- */
-export const sumMetricAcrossGroups = (
-  entry: TimeseriesBucket,
-  groupBy: string,
-  seriesKey: string,
-): number | undefined => {
-  const groupData = entry[groupBy];
-  if (
-    typeof groupData !== "object" ||
-    groupData === null ||
-    Array.isArray(groupData)
-  ) {
-    return undefined;
-  }
-
-  const groups = groupData as Record<string, Record<string, number>>;
-  let sum = 0;
-  let found = false;
-  for (const metrics of Object.values(groups)) {
-    const value = metrics[seriesKey];
-    if (typeof value === "number") {
-      found = true;
-      sum += value;
-    }
-  }
-  return found ? sum : undefined;
 };
 
 const calculateCurrentValue = (

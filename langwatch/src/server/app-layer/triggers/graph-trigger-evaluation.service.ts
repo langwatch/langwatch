@@ -29,7 +29,6 @@
 
 import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
-import { sumMetricAcrossGroups } from "~/pages/api/cron/triggers/customGraphTrigger";
 import type { ActionParams } from "~/pages/api/cron/triggers/types";
 import { decryptSlackBotToken } from "~/automations/providers/definitions/slack/secret";
 import {
@@ -37,14 +36,15 @@ import {
   slackDeliveryMethodOf,
 } from "~/automations/providers/definitions/slack/shared";
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
+import {
+  aggregateSeriesValues,
+  extractSeriesPoints,
+} from "~/server/app-layer/analytics/series-points";
 import type {
   SeriesInputType,
   TimeseriesInputType,
 } from "~/server/analytics/registry";
-import type {
-  TimeseriesBucket,
-  TimeseriesResult,
-} from "~/server/analytics/types";
+import type { TimeseriesResult } from "~/server/analytics/types";
 import type {
   GraphAlertDispatchInput,
   GraphAlertDispatchResult,
@@ -468,55 +468,3 @@ function noteIfNoData(operator: string, threshold: number): string | undefined {
     : undefined;
 }
 
-/**
- * Read one series' per-bucket values out of a timeseries period, keyed by
- * the `buildSeriesName` result-bucket encoding. Buckets missing the key
- * contribute 0 — same behaviour as cron's `calculateCurrentValue` loop
- * (src/pages/api/cron/triggers/customGraphTrigger.ts:340-382), split out
- * here so the same points also feed the template context's `history`.
- */
-function extractSeriesPoints(
-  dataPoints: TimeseriesBucket[],
-  bucketKey: string,
-  groupBy?: string,
-): Array<{ timestamp: string; value: number }> {
-  const points: Array<{ timestamp: string; value: number }> = [];
-  for (const entry of dataPoints) {
-    const timestamp = entry.date;
-    const direct = entry[bucketKey];
-    if (typeof direct === "number") {
-      points.push({ timestamp, value: direct });
-      continue;
-    }
-    if (groupBy) {
-      const grouped = sumMetricAcrossGroups(entry, groupBy, bucketKey);
-      if (typeof grouped === "number") {
-        points.push({ timestamp, value: grouped });
-        continue;
-      }
-    }
-    points.push({ timestamp, value: 0 });
-  }
-  return points;
-}
-
-/**
- * Cron-parity window aggregation: additive aggregations sum across
- * buckets; everything else averages. `bucketCount` (the raw period
- * length) preserves the cron's "no buckets at all → 0" behaviour.
- */
-function aggregateSeriesValues(
-  values: number[],
-  aggregation: string,
-  bucketCount: number,
-): number {
-  if (bucketCount === 0 || values.length === 0) return 0;
-  if (
-    aggregation === "cardinality" ||
-    aggregation === "terms" ||
-    aggregation === "count"
-  ) {
-    return values.reduce((a, b) => a + b, 0);
-  }
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}

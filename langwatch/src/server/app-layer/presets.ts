@@ -52,8 +52,11 @@ import {
 } from "./scheduler/scheduled-job.repository";
 import { schedulerRegistry } from "./scheduler/scheduler.registry";
 import { SchedulerService } from "./scheduler/scheduler.service";
+import { getAnalyticsService } from "./analytics";
+import { loadReportCharts } from "./reports/report-chart.service";
 import { dispatchScheduledReport } from "./reports/report-dispatch";
-import { formatTraceReportRow } from "./reports/trace-report-row";
+import { toReportTraceRow } from "./reports/trace-report-row";
+import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./triggers/report.builder";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
@@ -736,17 +739,21 @@ export function initializeDefaultApp(options?: {
                 triggerId,
                 emails,
               }),
-            // Render the top-N traces in the report window as compact row
-            // lines via the shared TraceListService. `filters` are carried on
-            // the contract but not yet applied to the SQL: the only
-            // filters-object → SQL builder (`generateClickHouseFilterConditions`)
-            // emits `ts.`-aliased conditions for a JOIN context, which are
-            // invalid against getList's unaliased `trace_summaries` bare-column
-            // `filterWhere` (and unsafe to alias-strip because of its correlated
-            // EXISTS subqueries). Until a bare-column object→filterWhere
-            // converter lands, rows are window-scoped real traces (newest
-            // first), not filter-scoped.
-            listTraceRows: async ({ projectId, from, to, limit }) => {
+            // The top-N traces matching the report's Subject query over its
+            // window, via the shared TraceListService. The ADR-043 filter DSL
+            // compiles the author's query straight into the bare-column
+            // `filterWhere` getList takes, so a "top matching traces" report
+            // finally matches on what the author asked for. (The older
+            // filters-OBJECT builder could not: it emits `ts.`-aliased
+            // conditions for a JOIN context, invalid here.)
+            listReportTraces: async ({
+              projectId,
+              projectSlug,
+              query,
+              from,
+              to,
+              limit,
+            }) => {
               const page = await traceList.getList({
                 tenantId: projectId,
                 timeRange: { from, to },
@@ -754,9 +761,35 @@ export function initializeDefaultApp(options?: {
                 page: 1,
                 pageSize: limit,
                 visibilityCutoffMs: null,
+                filterWhere:
+                  translateFilterToClickHouse(query, projectId, { from, to }) ??
+                  undefined,
               });
-              return page.items.map(formatTraceReportRow);
+              const projectUrl = `${config.baseHost ?? env.BASE_HOST}/${projectSlug}`;
+              return page.items.map((item) =>
+                toReportTraceRow({ item, projectUrl }),
+              );
             },
+            loadReportCharts: ({ projectId, source, from, to }) =>
+              loadReportCharts({
+                deps: {
+                  loadCustomGraph: ({ projectId, customGraphId }) =>
+                    prisma.customGraph.findFirst({
+                      where: { id: customGraphId, projectId },
+                    }),
+                  loadDashboardGraphs: ({ projectId, dashboardId }) =>
+                    prisma.customGraph.findMany({
+                      where: { dashboardId, projectId },
+                      orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
+                    }),
+                  getTimeseries: (input) =>
+                    getAnalyticsService().getTimeseries(input),
+                },
+                source,
+                projectId,
+                from,
+                to,
+              }),
             baseHost: config.baseHost ?? env.BASE_HOST,
           },
           fire,

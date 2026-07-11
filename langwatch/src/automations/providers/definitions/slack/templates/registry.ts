@@ -12,6 +12,9 @@ import graphAlertHistoryTableSource from "./graph_alert_history_table.liquid?raw
 import graphAlertNoDataSource from "./graph_alert_no_data.liquid?raw";
 import graphAlertOneLinerSource from "./graph_alert_one_liner.liquid?raw";
 import graphAlertResolvedSource from "./graph_alert_resolved.liquid?raw";
+import reportChartSource from "./report_chart.liquid?raw";
+import reportChartCardSource from "./report_chart_card.liquid?raw";
+import reportDashboardSource from "./report_dashboard.liquid?raw";
 import reportDigestSource from "./report_digest.liquid?raw";
 import reportSummaryCardSource from "./report_summary_card.liquid?raw";
 import reportTableSource from "./report_table.liquid?raw";
@@ -32,6 +35,9 @@ import {
   GraphAlertNoDataWireframe,
   GraphAlertOneLinerWireframe,
   GraphAlertResolvedWireframe,
+  ReportChartCardWireframe,
+  ReportChartWireframe,
+  ReportDashboardWireframe,
   ReportDigestWireframe,
   ReportSummaryCardWireframe,
   ReportTableWireframe,
@@ -58,7 +64,10 @@ export type SlackBlockKitTemplateId =
   | "graph_alert_history_table"
   | "report_digest"
   | "report_summary_card"
-  | "report_table";
+  | "report_table"
+  | "report_chart"
+  | "report_chart_card"
+  | "report_dashboard";
 
 export type SlackBlockKitTemplateCadenceFit = "immediate" | "digest" | "both";
 
@@ -68,6 +77,9 @@ export type SlackBlockKitTemplateCadenceFit = "immediate" | "digest" | "both";
  *  empty against another kind's variables, so pickers only ever offer
  *  matching-kind layouts. (`trace` = Automation, `graphAlert` = Alert.) */
 export type SlackBlockKitTemplateKind = "trace" | "graphAlert" | "report";
+
+/** What a report sends — the same discriminator the report source carries. */
+export type ReportTemplateSource = "traceQuery" | "customGraph" | "dashboard";
 
 export interface SlackBlockKitTemplateOption {
   id: SlackBlockKitTemplateId;
@@ -79,6 +91,15 @@ export interface SlackBlockKitTemplateOption {
   deliveryNote: string;
   cadenceFit: SlackBlockKitTemplateCadenceFit;
   kind: SlackBlockKitTemplateKind;
+  /** `report` layouts only: the report sources whose data this layout renders.
+   *  A chart layout has nothing to plot for a trace-query report, and a table
+   *  of traces has no rows for a graph report — so a layout is only ever
+   *  offered for the sources it can actually fill. */
+  reportSources?: ReportTemplateSource[];
+  /** The layout a source maps STRAIGHT onto, with nothing for the author to
+   *  pick. A dashboard is already a set of panels; it becomes a set of charts.
+   *  Auto layouts are used as the default but never listed in the gallery. */
+  autoFor?: ReportTemplateSource;
   recommendedForEvaluationFilter?: true;
   /** When set, this template LEADS with a modern block (`alert`,
    *  `data_visualization`, `data_table`) that a real Slack incoming webhook
@@ -286,38 +307,86 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     Wireframe: GraphAlertHistoryTableWireframe,
   },
   {
-    id: "report_digest",
-    displayName: "Report — digest",
-    emoji: "📊",
-    tagline: "The report's source, schedule, and results as a list.",
+    id: "report_table",
+    displayName: "Table of traces",
+    emoji: "🧮",
+    tagline:
+      "Every matching trace as a row: input, model, cost, and duration.",
     deliveryNote: "1 message per report",
     cadenceFit: "both",
     kind: "report",
+    reportSources: ["traceQuery"],
+    gatedBlock: "data_table",
+    source: reportTableSource,
+    Wireframe: ReportTableWireframe,
+  },
+  {
+    id: "report_digest",
+    displayName: "List of traces",
+    emoji: "📊",
+    tagline:
+      "One line per matching trace, with its model, cost, and duration beneath.",
+    deliveryNote: "1 message per report",
+    cadenceFit: "both",
+    kind: "report",
+    reportSources: ["traceQuery"],
     source: reportDigestSource,
     Wireframe: ReportDigestWireframe,
   },
   {
     id: "report_summary_card",
-    displayName: "Report — card",
+    displayName: "Summary card",
     emoji: "🗂️",
-    tagline: "A summary card with the report's source, schedule, and top result.",
+    tagline:
+      "A card with the trace count and total cost, then the traces listed.",
     deliveryNote: "1 message per report",
     cadenceFit: "both",
     kind: "report",
+    reportSources: ["traceQuery"],
     source: reportSummaryCardSource,
     Wireframe: ReportSummaryCardWireframe,
   },
   {
-    id: "report_table",
-    displayName: "Report — table",
-    emoji: "🧮",
-    tagline: "The report's results as a single-column grid.",
+    id: "report_chart",
+    displayName: "Chart",
+    emoji: "📈",
+    tagline: "The graph plotted over the period, with its headline value.",
     deliveryNote: "1 message per report",
     cadenceFit: "both",
     kind: "report",
-    gatedBlock: "data_table",
-    source: reportTableSource,
-    Wireframe: ReportTableWireframe,
+    reportSources: ["customGraph"],
+    gatedBlock: "data_visualization",
+    source: reportChartSource,
+    Wireframe: ReportChartWireframe,
+  },
+  {
+    id: "report_chart_card",
+    displayName: "Chart card",
+    emoji: "🗂️",
+    tagline: "A card leading with the headline value, then the chart.",
+    deliveryNote: "1 message per report",
+    cadenceFit: "both",
+    kind: "report",
+    reportSources: ["customGraph"],
+    gatedBlock: "data_visualization",
+    source: reportChartCardSource,
+    Wireframe: ReportChartCardWireframe,
+  },
+  {
+    id: "report_dashboard",
+    displayName: "Dashboard panels",
+    emoji: "🧭",
+    tagline: "Every panel on the dashboard, each as its own chart.",
+    deliveryNote: "1 message per report",
+    cadenceFit: "both",
+    kind: "report",
+    reportSources: ["dashboard"],
+    // A dashboard IS its panels — there is no layout decision to make, so this
+    // is applied automatically and never offered in the gallery.
+    autoFor: "dashboard",
+    gatedBlock: "data_visualization",
+    source: reportDashboardSource,
+    Wireframe: ReportDashboardWireframe,
   },
 ];
 
@@ -327,35 +396,63 @@ export function pickDefaultSlackBlockKitTemplateId({
   cadence,
   hasEvaluationFilter,
   kind,
+  reportSource,
 }: {
   cadence: DraftCadence;
   hasEvaluationFilter: boolean;
   kind: SlackBlockKitTemplateKind;
+  reportSource?: ReportTemplateSource;
 }): SlackBlockKitTemplateId {
-  if (kind === "report") return "report_digest";
+  if (kind === "report") {
+    if (reportSource === "dashboard") return "report_dashboard";
+    if (reportSource === "customGraph") return "report_chart";
+    return "report_table";
+  }
   if (kind === "graphAlert") return "graph_alert_compact";
   if (cadence === "digest") return "digest_inline_rich";
   if (hasEvaluationFilter) return "eval_failure_detailed";
   return "trace_alert_compact";
 }
 
+/**
+ * True when the report's source maps straight onto one layout and there is
+ * nothing for the author to choose — the picker hides the gallery entirely.
+ */
+export function reportSourceIsAutoLayout(
+  reportSource: ReportTemplateSource | undefined,
+): boolean {
+  return SLACK_BLOCK_KIT_TEMPLATES.some(
+    (opt) => opt.autoFor !== undefined && opt.autoFor === reportSource,
+  );
+}
+
 export function templateOptionsFor({
   cadence,
   kind,
+  reportSource,
 }: {
   cadence: DraftCadence;
   kind: SlackBlockKitTemplateKind;
+  /** For report drafts: only layouts that can render THIS source's data are
+   *  offered. A chart layout has no series to plot for a trace-query report;
+   *  a table of traces has no rows for a graph report. */
+  reportSource?: ReportTemplateSource;
 }): SlackBlockKitTemplateOption[] {
-  return SLACK_BLOCK_KIT_TEMPLATES.filter(
-    (opt) =>
-      // Every matching-kind, matching-cadence layout is offered — including the
-      // modern-block templates. Their hero block degrades gracefully on
-      // delivery (filterBlockKit strips it to the allowlisted fallback), so a
-      // picked template always delivers a useful message even before the block
-      // is verified for the incoming-webhook surface.
-      opt.kind === kind &&
-      (opt.cadenceFit === "both" || opt.cadenceFit === cadence),
-  );
+  return SLACK_BLOCK_KIT_TEMPLATES.filter((opt) => {
+    // Every matching-kind, matching-cadence layout is offered — including the
+    // modern-block templates. Their hero block degrades gracefully on
+    // delivery (filterBlockKit strips it to the allowlisted fallback), so a
+    // picked template always delivers a useful message even before the block
+    // is verified for the incoming-webhook surface.
+    if (opt.kind !== kind) return false;
+    if (opt.cadenceFit !== "both" && opt.cadenceFit !== cadence) return false;
+    if (kind !== "report") return true;
+    // An auto layout is applied for its source, not chosen from a gallery.
+    if (opt.autoFor !== undefined) return false;
+    return reportSource !== undefined
+      ? (opt.reportSources ?? []).includes(reportSource)
+      : true;
+  });
 }
 
 export function findTemplateOptionBySource(

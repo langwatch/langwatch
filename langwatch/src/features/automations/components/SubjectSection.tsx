@@ -212,19 +212,35 @@ function ReportSubject() {
       </Field.Root>
 
       {report.sourceKind === "traceQuery" ? (
-        <Field.Root>
-          <Field.Label>How many rows</Field.Label>
-          <Input
-            type="number"
-            value={report.topN}
-            onChange={(e) =>
-              dispatch({
-                type: "SET_REPORT",
-                value: { ...report, topN: Number(e.target.value) || 5 },
-              })
-            }
-          />
-        </Field.Root>
+        <>
+          {/* Without this, a "top matching traces" report has no way to say
+              WHICH traces it matches — it would just send the newest ones. */}
+          <Field.Root>
+            <Field.Label>Which traces</Field.Label>
+            <TraceQuerySubject
+              query={draft.filterQuery ?? ""}
+              onChange={(value) =>
+                dispatch({ type: "SET_FILTER_QUERY", value })
+              }
+              cadence={draft.notificationCadence}
+              batches
+              purpose="report"
+            />
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>How many rows</Field.Label>
+            <Input
+              type="number"
+              value={report.topN}
+              onChange={(e) =>
+                dispatch({
+                  type: "SET_REPORT",
+                  value: { ...report, topN: Number(e.target.value) || 5 },
+                })
+              }
+            />
+          </Field.Root>
+        </>
       ) : report.sourceKind === "customGraph" ? (
         <Field.Root invalid={report.customGraphId === null}>
           <Field.Label>Custom graph</Field.Label>
@@ -356,11 +372,16 @@ function TraceQuerySubject({
   onChange,
   cadence,
   batches,
+  /** A report runs on a schedule and sends the traces that matched in the
+   *  window, so it reads as "which traces go in the report", and the per-trace
+   *  firing-rate estimate ("about 6 times a day") does not apply to it. */
+  purpose = "automation",
 }: {
   query: string;
   onChange: (value: string) => void;
   cadence: NotificationCadence;
   batches: boolean;
+  purpose?: "automation" | "report";
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
@@ -395,8 +416,9 @@ function TraceQuerySubject({
   return (
     <VStack align="stretch" gap={3}>
       <Text textStyle="xs" color="fg.muted">
-        The automation fires on every incoming trace that matches this search
-        query — the same one you use in the traces view.
+        {purpose === "report"
+          ? "The report sends the traces that match this search query — the same one you use in the traces view. Leave it empty to send the most recent traces."
+          : "The automation fires on every incoming trace that matches this search query — the same one you use in the traces view."}
       </Text>
       <QueryFilterInput
         value={query}
@@ -426,6 +448,7 @@ function TraceQuerySubject({
         sample={preview.data?.items ?? []}
         cadence={cadence}
         batches={batches}
+        showFiringRate={purpose === "automation"}
       />
     </VStack>
   );
@@ -440,6 +463,7 @@ function TracePreview({
   sample,
   cadence,
   batches,
+  showFiringRate,
 }: {
   trimmed: string;
   loading: boolean;
@@ -448,6 +472,7 @@ function TracePreview({
   sample: PreviewTrace[];
   cadence: NotificationCadence;
   batches: boolean;
+  showFiringRate: boolean;
 }) {
   if (trimmed.length === 0) {
     return (
@@ -487,7 +512,7 @@ function TracePreview({
                 totalHits === 1 ? "trace" : "traces"
               } matched in the last 7 days`}
         </Text>
-        {totalHits !== null && totalHits > 0 ? (
+        {showFiringRate && totalHits !== null && totalHits > 0 ? (
           <Text textStyle="xs" color="fg.muted" paddingTop={0.5}>
             {estimateFiringRate({
               matchesLast7Days: totalHits,

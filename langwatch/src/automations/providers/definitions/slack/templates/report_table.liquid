@@ -2,12 +2,15 @@
 {{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}
 {%- endcapture -%}
 {%- capture _table_rows -%}
-{%- for row in rows limit: 30 -%}
-,[ { "type": "raw_text", "text": {{ row | default: "—" | append: "" | json }} } ]
+{%- for t in traces limit: 30 -%}
+{%- capture _cost -%}${{ t.costUsd | round: 4 }}{%- endcapture -%}
+{%- capture _dur -%}{{ t.durationMs | round: 0 }} ms{%- endcapture -%}
+{%- capture _what -%}{{ t.input | default: t.traceId }}{%- endcapture -%}
+,[ { "type": "raw_text", "text": {{ _what | truncate: 80 | json }} }, { "type": "raw_text", "text": {{ t.model | default: "—" | truncate: 28 | json }} }, { "type": "raw_number", "value": {{ t.costUsd }}, "text": {{ _cost | json }} }, { "type": "raw_number", "value": {{ t.durationMs }}, "text": {{ _dur | json }} } ]
 {%- endfor -%}
 {%- endcapture -%}
-{%- capture _rows_md -%}
-{% for row in rows %}• {{ row | mrkdwn_escape }}{% unless forloop.last %}
+{%- capture _fallback -%}
+{% for t in traces limit: 10 %}• <{{ t.url }}|`{{ t.traceId | truncate: 10 }}`> {{ t.input | truncate: 70 | mrkdwn_escape }}{% unless forloop.last %}
 {% endunless %}{% endfor %}
 {%- endcapture -%}
 {%- capture _view -%}
@@ -16,12 +19,14 @@
 [
   { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | prepend: "📊 " | truncate: 140 | json }}, "emoji": true } },
   { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _sub | json }} }] }
-  {%- if rows != empty -%}
+  {%- if report.isEmpty -%}
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": "_Nothing matched in this window._" } }
+  {%- else -%}
   ,{ "type": "data_table", "caption": {{ report.sourceLabel | truncate: 120 | json }}, "rows": [
-    [ { "type": "raw_text", "text": "Result" } ]
+    [ { "type": "raw_text", "text": "Trace" }, { "type": "raw_text", "text": "Model" }, { "type": "raw_text", "text": "Cost" }, { "type": "raw_text", "text": "Duration" } ]
     {{ _table_rows }}
   ] }
-  ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _rows_md | json }} } }
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _fallback | json }} } }
   {%- endif -%}
   ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _view | json }} }] }
 ]

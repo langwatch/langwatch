@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   pickDefaultSlackBlockKitTemplateId,
+  reportSourceIsAutoLayout,
   SLACK_BLOCK_KIT_TEMPLATES,
   templateOptionsFor,
 } from "../registry";
@@ -84,35 +85,108 @@ describe("slack Block Kit template registry", () => {
   });
 
   describe("when filtering options for a report draft", () => {
-    it("surfaces the report templates at either cadence", () => {
+    describe("when the report sends matching traces", () => {
+      it("offers only layouts that render the traces", () => {
+        const options = templateOptionsFor({
+          cadence: "immediate",
+          kind: "report",
+          reportSource: "traceQuery",
+        });
+        expect(options.map((o) => o.id)).toEqual([
+          "report_table",
+          "report_digest",
+          "report_summary_card",
+        ]);
+      });
+    });
+
+    describe("when the report sends a custom graph", () => {
+      it("offers only chart layouts — a table of traces has no rows to show", () => {
+        const options = templateOptionsFor({
+          cadence: "immediate",
+          kind: "report",
+          reportSource: "customGraph",
+        });
+        expect(options.map((o) => o.id)).toEqual([
+          "report_chart",
+          "report_chart_card",
+        ]);
+      });
+    });
+
+    describe("when the report sends a dashboard", () => {
+      it("offers no layouts at all — the panels map straight to the message", () => {
+        expect(
+          templateOptionsFor({
+            cadence: "immediate",
+            kind: "report",
+            reportSource: "dashboard",
+          }),
+        ).toEqual([]);
+        expect(reportSourceIsAutoLayout("dashboard")).toBe(true);
+        expect(reportSourceIsAutoLayout("customGraph")).toBe(false);
+        expect(reportSourceIsAutoLayout("traceQuery")).toBe(false);
+      });
+    });
+
+    it("offers the same layouts at either cadence — a report runs on a schedule", () => {
       const immediate = templateOptionsFor({
         cadence: "immediate",
         kind: "report",
+        reportSource: "traceQuery",
       });
-      const digest = templateOptionsFor({ cadence: "digest", kind: "report" });
-      expect(immediate.map((o) => o.id)).toEqual([
-        "report_digest",
-        "report_summary_card",
-        "report_table",
-      ]);
+      const digest = templateOptionsFor({
+        cadence: "digest",
+        kind: "report",
+        reportSource: "traceQuery",
+      });
       expect(digest.map((o) => o.id)).toEqual(immediate.map((o) => o.id));
     });
   });
 
   describe("given the modern-block templates (ADR-041 Phase 3)", () => {
     it("surfaces every gated template in a picker view (none are hidden)", () => {
-      const gated = SLACK_BLOCK_KIT_TEMPLATES.filter((t) => t.gatedBlock);
+      // An auto layout is applied for its source rather than chosen, so it is
+      // deliberately absent from every gallery — it is the one exception.
+      const gated = SLACK_BLOCK_KIT_TEMPLATES.filter(
+        (t) => t.gatedBlock && t.autoFor === undefined,
+      );
       const surfaced = new Set(
         [
           ...templateOptionsFor({ cadence: "immediate", kind: "graphAlert" }),
           ...templateOptionsFor({ cadence: "digest", kind: "graphAlert" }),
           ...templateOptionsFor({ cadence: "immediate", kind: "trace" }),
           ...templateOptionsFor({ cadence: "digest", kind: "trace" }),
-          ...templateOptionsFor({ cadence: "immediate", kind: "report" }),
+          ...templateOptionsFor({
+            cadence: "immediate",
+            kind: "report",
+            reportSource: "traceQuery",
+          }),
+          ...templateOptionsFor({
+            cadence: "immediate",
+            kind: "report",
+            reportSource: "customGraph",
+          }),
         ].map((o) => o.id),
       );
       for (const template of gated) {
         expect(surfaced.has(template.id)).toBe(true);
+      }
+    });
+
+    it("keeps every auto layout out of the galleries", () => {
+      const auto = SLACK_BLOCK_KIT_TEMPLATES.filter(
+        (t) => t.autoFor !== undefined,
+      );
+      expect(auto.length).toBeGreaterThan(0);
+      for (const template of auto) {
+        expect(
+          templateOptionsFor({
+            cadence: "immediate",
+            kind: "report",
+            reportSource: template.autoFor,
+          }),
+        ).toEqual([]);
       }
     });
   });
@@ -168,29 +242,54 @@ describe("slack Block Kit template registry", () => {
       ).toBe("digest_inline_rich");
     });
 
-    it("picks the report digest for report drafts", () => {
-      expect(
-        pickDefaultSlackBlockKitTemplateId({
-          cadence: "digest",
-          hasEvaluationFilter: false,
-          kind: "report",
-        }),
-      ).toBe("report_digest");
+    describe("when the draft is a report", () => {
+      it("picks the layout that fits what the report sends", () => {
+        const pick = (reportSource: "traceQuery" | "customGraph" | "dashboard") =>
+          pickDefaultSlackBlockKitTemplateId({
+            cadence: "digest",
+            hasEvaluationFilter: false,
+            kind: "report",
+            reportSource,
+          });
+        expect(pick("traceQuery")).toBe("report_table");
+        expect(pick("customGraph")).toBe("report_chart");
+        expect(pick("dashboard")).toBe("report_dashboard");
+      });
     });
 
-    it("defaults to a template that delivers fully (never a gated one)", () => {
+    it("defaults a trace or alert draft to a template that delivers fully (never a gated one)", () => {
+      // Trace and alert drafts always have a non-gated layout that renders in
+      // full on a webhook, so the default must be one of them.
       const cases = [
         { cadence: "immediate", kind: "trace", hasEvaluationFilter: false },
         { cadence: "immediate", kind: "trace", hasEvaluationFilter: true },
         { cadence: "digest", kind: "trace", hasEvaluationFilter: false },
         { cadence: "immediate", kind: "graphAlert", hasEvaluationFilter: false },
-        { cadence: "digest", kind: "report", hasEvaluationFilter: false },
       ] as const;
       for (const c of cases) {
         const id = pickDefaultSlackBlockKitTemplateId(c);
         const option = SLACK_BLOCK_KIT_TEMPLATES.find((t) => t.id === id);
         expect(option?.gatedBlock).toBeUndefined();
       }
+    });
+
+    describe("when a report's content has no ungated way to render it", () => {
+      it("still defaults to the layout that shows the data", () => {
+        // A chart report's default HAS to be a chart — there is no non-gated
+        // chart block. New Slack connections are bot-only (webhooks are
+        // legacy), and on a webhook the block is stripped and the message
+        // degrades to its headline fallback rather than failing, so leading
+        // with the real layout is right. The parity suite pins that every one
+        // of these survives the allowlist non-empty.
+        const id = pickDefaultSlackBlockKitTemplateId({
+          cadence: "digest",
+          hasEvaluationFilter: false,
+          kind: "report",
+          reportSource: "customGraph",
+        });
+        const option = SLACK_BLOCK_KIT_TEMPLATES.find((t) => t.id === id);
+        expect(option?.gatedBlock).toBe("data_visualization");
+      });
     });
   });
 });

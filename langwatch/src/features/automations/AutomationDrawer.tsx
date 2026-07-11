@@ -30,7 +30,10 @@ import {
   sanitizeTriggerFilters,
   type TriggerFilterValue,
 } from "~/server/filters/types";
-import { ALERT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
+import {
+  ALERT_TRIGGER_DEFAULTS,
+  REPORT_TRIGGER_DEFAULTS,
+} from "~/shared/templating/defaults";
 import {
   EXAMPLE_MATCHES,
   TEMPLATE_VARIABLES,
@@ -39,8 +42,10 @@ import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import { renderTriggerSlack } from "~/shared/templating/renderSlack";
 import {
   buildExampleGraphAlertTemplateContext,
+  buildExampleReportTemplateContext,
   buildTemplateContext,
   type GraphAlertTemplateContext,
+  type ReportTemplateContext,
   type TemplateContext,
 } from "~/shared/templating/templateContext";
 import { api } from "~/utils/api";
@@ -62,6 +67,7 @@ import {
   templatesFromDraft,
 } from "./logic/draftReducer";
 import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
+import { REPORT_TEMPLATE_VARIABLES } from "./editors/reportVariables";
 import { explainDomainError, readDomainError } from "./logic/errorExplainer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
@@ -181,6 +187,7 @@ export function AutomationDrawer({
   const conditionsSet = useConditionsSet();
   const configComplete = useConfigComplete();
   const isGraphAlert = draft.source === "customGraph";
+  const isReport = draft.source === "report";
   // Single source of truth for every heading / button / toast noun. Treat a
   // graph-prefilled create as an alert from the first paint so the title
   // doesn't flash "Add automation" before the prefill effect lands.
@@ -481,8 +488,25 @@ export function AutomationDrawer({
     seededNameFromGraph.current = true;
   }, [automationId, prefilledGraphId, graphName, dispatch]);
   const previewContext = useMemo<
-    TemplateContext | GraphAlertTemplateContext
+    TemplateContext | GraphAlertTemplateContext | ReportTemplateContext
   >(() => {
+    if (isReport) {
+      // Report-shaped example data, so the preview shows the traces or the
+      // chart the report will really send — not an empty trace-shaped message.
+      return buildExampleReportTemplateContext({
+        baseHost:
+          typeof window !== "undefined"
+            ? window.location.origin
+            : "https://app.langwatch.ai",
+        project: {
+          name: project?.name ?? "Project",
+          slug: project?.slug ?? "project",
+        },
+        trigger: { name: draft.name || "Example report" },
+        sourceKind: draft.report.sourceKind,
+        chartTitles: graphName ? [graphName] : undefined,
+      });
+    }
     if (isGraphAlert) {
       // Alert-shaped example context + the draft's actual rule, so the
       // preview shows what a real fire renders — not the trace shape.
@@ -519,6 +543,7 @@ export function AutomationDrawer({
   }, [
     exampleContext,
     isGraphAlert,
+    isReport,
     graphName,
     seriesLabel,
     project?.name,
@@ -526,6 +551,7 @@ export function AutomationDrawer({
     draft.name,
     draft.alertType,
     draft.graphAlert,
+    draft.report.sourceKind,
   ]);
 
   useEffect(() => {
@@ -535,6 +561,22 @@ export function AutomationDrawer({
     }
     const token = ++previewToken.current;
     const templates = templatesFromDraft(draft);
+    // A report renders against the report defaults, an alert against the alert
+    // defaults — otherwise the preview shows a message the dispatcher would
+    // never send.
+    const previewDefaults = isGraphAlert
+      ? ALERT_TRIGGER_DEFAULTS
+      : isReport
+        ? REPORT_TRIGGER_DEFAULTS
+        : undefined;
+    // Mirror the provider's delivery rules (Slack: modern blocks render only
+    // over a bot connection) so the preview never promises more than the
+    // configured channel will deliver.
+    const entry = draft.action ? CLIENT_PROVIDERS[draft.action] : undefined;
+    const renderOptions =
+      entry && isNotifyEntry(entry) && entry.client.previewOptions
+        ? entry.client.previewOptions(draft.slices[draft.action!] as never)
+        : {};
     void (async () => {
       try {
         if (channel === "email") {
@@ -542,7 +584,7 @@ export function AutomationDrawer({
             subjectTemplate: templates.emailSubjectTemplate,
             bodyTemplate: templates.emailBodyTemplate,
             context: previewContext,
-            defaults: isGraphAlert ? ALERT_TRIGGER_DEFAULTS : undefined,
+            defaults: previewDefaults,
           });
           if (token === previewToken.current) {
             setPreview({
@@ -564,7 +606,8 @@ export function AutomationDrawer({
                   : null,
             template: templates.slackTemplate,
             context: previewContext,
-            defaults: isGraphAlert ? ALERT_TRIGGER_DEFAULTS : undefined,
+            defaults: previewDefaults,
+            allowGatedBlocks: renderOptions.allowGatedBlocks ?? false,
           });
           if (token === previewToken.current) {
             setPreview({
@@ -582,7 +625,15 @@ export function AutomationDrawer({
         if (token === previewToken.current) setPreview(undefined);
       }
     })();
-  }, [channel, section, draft.action, draft.slices, previewContext, isGraphAlert]);
+  }, [
+    channel,
+    section,
+    draft.action,
+    draft.slices,
+    previewContext,
+    isGraphAlert,
+    isReport,
+  ]);
 
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
@@ -748,10 +799,15 @@ export function AutomationDrawer({
       projectId,
       organizationId: organization?.id,
       teamSlug: team?.slug,
-      // Alert templates render against the alert context — autocomplete,
-      // hover, and the unknown-variable check follow the same list.
-      variables: isGraphAlert ? ALERT_TEMPLATE_VARIABLES : TEMPLATE_VARIABLES,
-      example: exampleContext,
+      // Each source renders against its OWN context — autocomplete, hover, and
+      // the unknown-variable check all follow the matching list, so a report
+      // never offers `match.trace.*` variables that would render empty.
+      variables: isReport
+        ? REPORT_TEMPLATE_VARIABLES
+        : isGraphAlert
+          ? ALERT_TEMPLATE_VARIABLES
+          : TEMPLATE_VARIABLES,
+      example: previewContext,
       preview,
       // Synchronous render — there is never a loading state to show.
       previewLoading: false,
@@ -779,7 +835,9 @@ export function AutomationDrawer({
       projectId,
       organization?.id,
       team?.slug,
-      exampleContext,
+      previewContext,
+      isGraphAlert,
+      isReport,
       preview,
       cadenceMode,
       draft.notificationCadence,

@@ -16,7 +16,11 @@ import {
   renderTriggerSlack,
   type SlackTemplateType,
 } from "~/shared/templating/renderSlack";
-import { buildReportTemplateContext } from "~/shared/templating/templateContext";
+import {
+  buildReportTemplateContext,
+  type ReportChart,
+  type ReportTraceRow,
+} from "~/shared/templating/templateContext";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:report-dispatch");
@@ -36,19 +40,31 @@ export interface ReportDispatchDeps {
     emails: string[];
   }) => Promise<string[]>;
   /**
-   * Query the top-N matching traces over the report's schedule window and
-   * return them as prerendered row lines (e.g. `"<traceId> — <input snippet>"`)
-   * capped for length and safe to `mrkdwn_escape`. Injected by the composition
-   * root so this module stays free of the trace-list service and its ClickHouse
-   * plumbing. Only called for `traceQuery` report sources.
+   * The top-N traces matching the report's search query over its schedule
+   * window, newest first, as typed rows. Injected by the composition root so
+   * this module stays free of the trace-list service and its ClickHouse
+   * plumbing. Only called for `traceQuery` report sources. An empty `query`
+   * means "everything in the window".
    */
-  listTraceRows(params: {
+  listReportTraces(params: {
     projectId: string;
-    filters: Record<string, unknown>;
+    /** Deep-links each row back to the trace. */
+    projectSlug: string;
+    query: string;
     from: number;
     to: number;
     limit: number;
-  }): Promise<string[]>;
+  }): Promise<ReportTraceRow[]>;
+  /**
+   * The report's charts — one per panel — over its schedule window. Only
+   * called for `customGraph` / `dashboard` report sources.
+   */
+  loadReportCharts(params: {
+    projectId: string;
+    source: ReportSource;
+    from: number;
+    to: number;
+  }): Promise<ReportChart[]>;
   baseHost: string;
 }
 
@@ -105,13 +121,12 @@ function scheduleLabel(cron: string, timezone: string): string {
 
 /**
  * ADR-042 Phase 3c: the scheduler's report handler. When a report's
- * `ScheduledJob` comes due, load the trigger, render its content, and dispatch
- * via the SAME notify pipeline alerts use (`renderTriggerEmail` /
+ * `ScheduledJob` comes due, load the trigger, fetch the data its source
+ * promises (matching traces, or the series behind each chart panel), and
+ * dispatch via the SAME notify pipeline alerts use (`renderTriggerEmail` /
  * `renderTriggerSlack` + the rendered-form senders), against
- * `REPORT_TRIGGER_DEFAULTS`. Data rows (a trace-query table, charts) are
- * enriched in later phases — this phase delivers the report summary + a deep
- * link on schedule. Registered on `schedulerRegistry` for the `reportTrigger`
- * target type.
+ * `REPORT_TRIGGER_DEFAULTS`. Registered on `schedulerRegistry` for the
+ * `reportTrigger` target type.
  */
 export async function dispatchScheduledReport({
   deps,
@@ -149,20 +164,32 @@ export async function dispatchScheduledReport({
     slackWebhook?: string;
   };
 
-  // Trace-query reports render REAL rows: the top-N matching traces over the
-  // window `[slot - windowMs, slot]`, where windowMs tracks the cron cadence.
-  // customGraph/dashboard sources stay rows-free (charts are a later phase) —
-  // they still ship the summary + deep link.
-  let rows: string[] = [];
+  // Every report carries its DATA, not just a link to it, over the window
+  // `[slot - windowMs, slot]` (windowMs tracks the cron cadence). A trace-query
+  // report sends the traces matching its search query; a graph or dashboard
+  // report sends the plotted series of each panel.
+  const to = fire.slot.getTime();
+  const from = to - reportWindowMs(report.schedule.cron);
+
+  let traces: ReportTraceRow[] = [];
+  let charts: ReportChart[] = [];
   if (report.source.kind === "traceQuery") {
-    const to = fire.slot.getTime();
-    const from = to - reportWindowMs(report.schedule.cron);
-    rows = await deps.listTraceRows({
+    traces = await deps.listReportTraces({
       projectId: fire.projectId,
-      filters: report.source.filters,
+      projectSlug: project.slug,
+      // The Subject facet (ADR-043) — the same search query the author writes
+      // and previews in the drawer. Empty means the whole window.
+      query: trigger.filterQuery ?? "",
       from,
       to,
       limit: report.source.topN,
+    });
+  } else {
+    charts = await deps.loadReportCharts({
+      projectId: fire.projectId,
+      source: report.source,
+      from,
+      to,
     });
   }
 
@@ -174,9 +201,11 @@ export async function dispatchScheduledReport({
         report.schedule.cron,
         report.schedule.timezone,
       ),
+      sourceKind: report.source.kind,
     },
     viewUrl: viewUrl(report.source, deps.baseHost, project.slug),
-    rows,
+    traces,
+    charts,
     occurredAt: fire.slot,
     project: { id: project.id, name: project.name, slug: project.slug },
     baseHost: deps.baseHost,

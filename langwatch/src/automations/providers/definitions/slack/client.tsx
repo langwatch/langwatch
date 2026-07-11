@@ -52,7 +52,12 @@ import {
   type SlackPreview,
   type SlackTemplateType,
 } from "./shared";
-import { findTemplateOptionBySource } from "./templates/registry";
+import {
+  findTemplateOptionBySource,
+  pickDefaultSlackBlockKitTemplateId,
+  reportSourceIsAutoLayout,
+  SLACK_BLOCK_KIT_TEMPLATES,
+} from "./templates/registry";
 import { SlackBlockKitTemplatePicker } from "./templates/TemplatePicker";
 
 interface FieldDraft {
@@ -328,6 +333,17 @@ function templatesFromSlice(slice: SlackSlice) {
   };
 }
 
+/**
+ * The preview must render under the SAME rules delivery will. A webhook strips
+ * the modern blocks (chart / table / alert banner) and the message degrades to
+ * its fallback; a bot connection renders them. Previewing a chart the webhook
+ * is about to strip — or hiding one the bot will happily send — is the fastest
+ * way to make the editor feel like it is lying.
+ */
+function previewOptions(slice: SlackSlice) {
+  return { allowGatedBlocks: slice.deliveryMethod === "bot" };
+}
+
 function SlackConfigForm({
   slice,
   onChange,
@@ -339,6 +355,8 @@ function SlackConfigForm({
   // rendered message disagree.
   const isGraphAlert = ctx.sourceKind === "graphAlert";
   const isReport = ctx.sourceKind === "report";
+  // A dashboard report maps straight onto its panels — no layout to pick.
+  const autoLayout = isReport && reportSourceIsAutoLayout(ctx.reportSourceKind);
   // The editor must seed the same default dispatch renders for this kind —
   // otherwise the shown template and the sent message disagree.
   const templateDefault = isBlockKit
@@ -375,6 +393,10 @@ function SlackConfigForm({
   // template on a graph alert, or vice versa), the source would render
   // empty/first-match-only bodies. Reset to the framework default so the
   // editor shows a template that fits the new draft.
+  //
+  // A report's CONTENT source counts the same way: a chart layout has no series
+  // to plot once the report switches to matching traces, and a table of traces
+  // has no rows once it switches to a graph.
   useEffect(() => {
     if (slice.template.usingDefault) return;
     const preset = findTemplateOptionBySource(slice.template.value);
@@ -382,10 +404,42 @@ function SlackConfigForm({
     const cadenceMismatch =
       preset.cadenceFit !== "both" && preset.cadenceFit !== ctx.cadenceMode;
     const kindMismatch = preset.kind !== ctx.sourceKind;
-    if (!cadenceMismatch && !kindMismatch) return;
+    const reportSourceMismatch =
+      preset.kind === "report" &&
+      ctx.reportSourceKind !== undefined &&
+      !(preset.reportSources ?? []).includes(ctx.reportSourceKind);
+    if (!cadenceMismatch && !kindMismatch && !reportSourceMismatch) return;
     onChange({ ...slice, template: EMPTY_FIELD });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx.cadenceMode, ctx.sourceKind]);
+  }, [ctx.cadenceMode, ctx.sourceKind, ctx.reportSourceKind]);
+
+  // A report's layout FOLLOWS its content source — a dashboard has no layout
+  // decision to make at all. So rather than leaving the template column null
+  // and relying on a framework default that can't know the source, seed the
+  // matching layout concretely. What the author sees here is then exactly what
+  // is stored and sent.
+  useEffect(() => {
+    if (!isReport || !isBlockKit || !slice.template.usingDefault) return;
+    const id = pickDefaultSlackBlockKitTemplateId({
+      cadence: ctx.cadenceMode,
+      hasEvaluationFilter: ctx.hasEvaluationFilter,
+      kind: "report",
+      reportSource: ctx.reportSourceKind,
+    });
+    const option = SLACK_BLOCK_KIT_TEMPLATES.find((opt) => opt.id === id);
+    if (!option) return;
+    onChange({
+      ...slice,
+      template: { value: option.source, usingDefault: false },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isReport,
+    isBlockKit,
+    slice.template.usingDefault,
+    ctx.reportSourceKind,
+    ctx.cadenceMode,
+  ]);
 
   const usePlainText = () =>
     onChange({ ...slice, templateType: "string", template: EMPTY_FIELD });
@@ -478,32 +532,43 @@ function SlackConfigForm({
         // author picks a ready-made layout and sees a preview; the plain
         // text and code escape hatches sit below as opt-ins.
         <VStack align="stretch" gap={3}>
-          <SlackBlockKitTemplatePicker
-            cadence={ctx.cadenceMode}
-            kind={ctx.sourceKind}
-            deliveryMethod={slice.deliveryMethod}
-            hasEvaluationFilter={ctx.hasEvaluationFilter}
-            currentSource={templateValue}
-            onSelect={(option) =>
-              onChange({
-                ...slice,
-                template: { value: option.source, usingDefault: false },
-              })
-            }
-            onSelectOtherCadence={(option) => {
-              // Cross-cadence pick: switch the cadence alongside the template
-              // so the author doesn't have to round-trip via the Cadence
-              // section. Both land in the same batch, so the cadence-mismatch
-              // reset effect above sees a consistent pair and leaves it alone.
-              ctx.setNotificationCadence(
-                option.cadenceFit === "digest" ? "5min_digest" : "immediate",
-              );
-              onChange({
-                ...slice,
-                template: { value: option.source, usingDefault: false },
-              });
-            }}
-          />
+          {autoLayout ? (
+            // A dashboard IS its panels — there is no layout to choose, so the
+            // gallery would be a menu of one. It maps straight to the message.
+            <Text textStyle="xs" color="fg.muted">
+              Every panel on the dashboard is sent as its own chart. There's
+              nothing to lay out — you can still edit the message below.
+            </Text>
+          ) : (
+            <SlackBlockKitTemplatePicker
+              cadence={ctx.cadenceMode}
+              kind={ctx.sourceKind}
+              reportSource={ctx.reportSourceKind}
+              deliveryMethod={slice.deliveryMethod}
+              hasEvaluationFilter={ctx.hasEvaluationFilter}
+              currentSource={templateValue}
+              onSelect={(option) =>
+                onChange({
+                  ...slice,
+                  template: { value: option.source, usingDefault: false },
+                })
+              }
+              onSelectOtherCadence={(option) => {
+                // Cross-cadence pick: switch the cadence alongside the template
+                // so the author doesn't have to round-trip via the Cadence
+                // section. Both land in the same batch, so the cadence-mismatch
+                // reset effect above sees a consistent pair and leaves it
+                // alone.
+                ctx.setNotificationCadence(
+                  option.cadenceFit === "digest" ? "5min_digest" : "immediate",
+                );
+                onChange({
+                  ...slice,
+                  template: { value: option.source, usingDefault: false },
+                });
+              }}
+            />
+          )}
           {slackPreview ? (
             <CompactSlackPreview payload={slackPreview.payload} />
           ) : null}
@@ -808,6 +873,7 @@ const client: NotifyClientDef<SlackSlice, SlackPreview> = {
   toActionParams,
   testFireTarget,
   templatesFromSlice,
+  previewOptions,
   ConfigForm: SlackConfigForm,
 };
 

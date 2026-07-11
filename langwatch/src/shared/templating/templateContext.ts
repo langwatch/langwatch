@@ -497,28 +497,254 @@ export function buildTemplateContext({
 }
 
 
+/** What a report sends. Mirrors the `ReportSource` discriminator so a template
+ *  can branch on it without the dispatcher pre-rendering the decision. */
+export type ReportSourceKind = "traceQuery" | "customGraph" | "dashboard";
+
+/**
+ * One trace in a trace-query report. Typed rather than pre-formatted: a table
+ * template puts `costUsd` / `durationMs` into NUMERIC Block Kit cells
+ * (`raw_number`), which Slack right-aligns and formats, and which a string row
+ * can never become.
+ */
+export interface ReportTraceRow {
+  traceId: string;
+  /** Deep link to this trace. */
+  url: string;
+  timestamp: string;
+  /** Whitespace-collapsed, length-capped input preview. */
+  input: string;
+  output: string;
+  /** Comma-joined model list, or "" when the trace recorded none. */
+  model: string;
+  status: "ok" | "error" | "warning";
+  costUsd: number;
+  durationMs: number;
+}
+
+export interface ReportChartPoint {
+  label: string;
+  value: number;
+}
+
+export interface ReportChartSeries {
+  name: string;
+  data: ReportChartPoint[];
+}
+
+/**
+ * One panel of a report: a custom graph's series over the report window,
+ * already shaped for a Block Kit `data_visualization` block. A dashboard
+ * report carries one of these per panel; a custom-graph report carries one.
+ */
+export interface ReportChart {
+  id: string;
+  title: string;
+  /** The four chart types Slack renders. The graph's own type is mapped onto
+   *  the nearest of these (e.g. stacked_bar → bar, donnut → pie). */
+  type: "line" | "bar" | "area" | "pie";
+  /** X-axis labels (the window's time buckets). Empty for a pie. */
+  categories: string[];
+  /** Empty for a pie — a pie carries `segments` instead. */
+  series: ReportChartSeries[];
+  /** Pie segments (one per group). Empty for every other chart type. */
+  segments: ReportChartPoint[];
+  /** Headline value of the primary series across the window, aggregated the
+   *  way the series itself aggregates (counts sum, everything else averages). */
+  total: number;
+  /** True when the graph returned no data points for the window. */
+  isEmpty: boolean;
+}
+
 /**
  * Template-variable contract for a SCHEDULED REPORT (ADR-042). A report is
  * schedule-triggered — it reads as "here is your {source} for {period}",
  * distinct from both the trace-iteration shape and the alert-threshold shape.
- * The dispatcher derives `sourceLabel` / `scheduleLabel` / `viewUrl` from the
- * report's source + schedule and hands them in; rows (a trace-query table) are
- * passed as prerendered lines so the context stays render-pure.
+ *
+ * The report's DATA is structured (`traces`, `charts`), not pre-rendered, so a
+ * template can build a real table or chart block from it. `rows` is the older
+ * pre-formatted line-per-trace surface, kept because saved custom templates
+ * iterate it; it is derived from `traces`, never a separate fetch.
  */
 export interface ReportTemplateContext {
   trigger: { id: string; name: string; editUrl: string };
   report: {
-    /** Human source description, e.g. "Top 5 errored traces". */
+    /** Human source description, e.g. "Top 5 matching traces". */
     sourceLabel: string;
     /** Human schedule description, e.g. "every Monday at 09:00 (UTC)". */
     scheduleLabel: string;
+    /** Which of the three sources this report sends. */
+    sourceKind: ReportSourceKind;
+    /** True when the report found nothing for its window — no matching traces,
+     *  or every chart came back without data points. Templates lead with a
+     *  "nothing to show" line rather than rendering an empty table. */
+    isEmpty: boolean;
   };
   /** Deep link to view the report's underlying data (traces / graph / board). */
   viewUrl: string;
-  /** Optional prerendered rows (trace-query table lines). */
+  /** The matching traces. Empty for graph and dashboard reports. */
+  traces: ReportTraceRow[];
+  /** The report's charts — one per panel. Empty for trace-query reports. */
+  charts: ReportChart[];
+  /** Legacy pre-rendered line per trace (`"<id> — <input>"`), derived from
+   *  `traces`. Saved templates iterate this; new ones should use `traces`. */
   rows: string[];
   occurredAt: string;
   project: { id: string; name: string; slug: string; url: string };
+}
+
+/** Max chars of the input/output snippet carried into a report row. */
+const REPORT_SNIPPET_MAX = 120;
+
+/** Whitespace-collapse and length-cap a trace preview for a report row. */
+export function reportSnippet(
+  value: string | null | undefined,
+  max: number = REPORT_SNIPPET_MAX,
+): string {
+  const collapsed = (value ?? "").replace(/\s+/g, " ").trim();
+  if (collapsed.length <= max) return collapsed;
+  return `${collapsed.slice(0, max - 1)}…`;
+}
+
+/**
+ * The legacy `rows` line for one trace (`"<traceId> — <input snippet>"`).
+ * Templates pipe rows through `mrkdwn_escape`, so this deliberately does no
+ * escaping of its own. Falls back to the bare trace id when the trace carries
+ * no input preview (e.g. teaser-redacted by the visibility window).
+ */
+export function formatReportRowLine(row: ReportTraceRow): string {
+  return row.input ? `${row.traceId} — ${row.input}` : row.traceId;
+}
+
+/**
+ * Example report context for the drawer's live preview and its
+ * unknown-variable check. Without this, a report preview renders against the
+ * TRACE context — every report variable resolves empty and the author sees a
+ * blank message. The example data mirrors the shape the source really produces:
+ * a trace-query report gets traces, a graph or dashboard report gets charts.
+ */
+export function buildExampleReportTemplateContext({
+  baseHost,
+  project,
+  trigger,
+  sourceKind,
+  sourceLabel,
+  scheduleLabel,
+  chartTitles,
+}: {
+  baseHost: string;
+  project: { id?: string; name: string; slug: string };
+  trigger?: { id?: string; name?: string };
+  sourceKind: ReportSourceKind;
+  sourceLabel?: string;
+  scheduleLabel?: string;
+  /** Real panel names when the author has already picked a graph/dashboard. */
+  chartTitles?: string[];
+}): ReportTemplateContext {
+  const occurredAt = new Date();
+  const projectSlug = project.slug;
+  const exampleTraces: ReportTraceRow[] =
+    sourceKind === "traceQuery"
+      ? [
+          {
+            traceId: "trace_a1b2c3",
+            input: "Summarize the Q3 earnings call.",
+            output: "Revenue grew 12% year over year.",
+            model: "gpt-5-mini",
+            status: "error",
+            costUsd: 0.0241,
+            durationMs: 1834,
+          },
+          {
+            traceId: "trace_d4e5f6",
+            input: "What is our refund policy for annual plans?",
+            output: "Annual plans are refundable within 30 days.",
+            model: "gpt-5-mini",
+            status: "ok",
+            costUsd: 0.0102,
+            durationMs: 920,
+          },
+          {
+            traceId: "trace_g7h8i9",
+            input: "Draft a reply to the escalation from Acme.",
+            output: "Hi — thanks for flagging this…",
+            model: "claude-opus-4-8",
+            status: "warning",
+            costUsd: 0.0518,
+            durationMs: 3120,
+          },
+        ].map((trace, index) => ({
+          ...trace,
+          url: `${baseHost}/${projectSlug}/messages/${trace.traceId}`,
+          timestamp: new Date(
+            occurredAt.getTime() - (index + 1) * 60 * 60 * 1000,
+          ).toISOString(),
+          status: trace.status as ReportTraceRow["status"],
+        }))
+      : [];
+
+  const titles =
+    chartTitles && chartTitles.length > 0
+      ? chartTitles
+      : sourceKind === "dashboard"
+        ? ["Traces per hour", "Cost by model"]
+        : ["Traces per hour"];
+  const exampleCharts: ReportChart[] =
+    sourceKind === "traceQuery"
+      ? []
+      : titles.slice(0, 8).map((title, index) => {
+          const categories = ["09:00", "10:00", "11:00", "12:00", "13:00"];
+          const values = [12, 18, 9, 24, 16].map((v) => v + index * 3);
+          return {
+            id: `example-graph-${index}`,
+            title,
+            type: "line" as const,
+            categories,
+            series: [
+              {
+                name: title,
+                data: categories.map((label, i) => ({
+                  label,
+                  value: values[i] ?? 0,
+                })),
+              },
+            ],
+            segments: [],
+            total: values.reduce((a, b) => a + b, 0),
+            isEmpty: false,
+          };
+        });
+
+  return buildReportTemplateContext({
+    trigger: {
+      id: trigger?.id ?? "example-trigger",
+      name: trigger?.name ?? "Example report",
+    },
+    report: {
+      sourceKind,
+      sourceLabel:
+        sourceLabel ??
+        (sourceKind === "traceQuery"
+          ? "Top 5 matching traces"
+          : sourceKind === "dashboard"
+            ? "Dashboard"
+            : "Custom graph"),
+      scheduleLabel: scheduleLabel ?? "every Monday at 09:00 (UTC)",
+    },
+    viewUrl:
+      sourceKind === "traceQuery"
+        ? `${baseHost}/${projectSlug}/messages`
+        : `${baseHost}/${projectSlug}/analytics`,
+    traces: exampleTraces,
+    charts: exampleCharts,
+    occurredAt,
+    project: {
+      id: project.id ?? "example-project",
+      name: project.name,
+      slug: projectSlug,
+    },
+    baseHost,
+  });
 }
 
 /** Pure builder for the report template context (ADR-042). */
@@ -526,20 +752,32 @@ export function buildReportTemplateContext({
   trigger,
   report,
   viewUrl,
-  rows = [],
+  traces = [],
+  charts = [],
   occurredAt,
   project,
   baseHost,
 }: {
   trigger: { id: string; name: string };
-  report: { sourceLabel: string; scheduleLabel: string };
+  report: {
+    sourceLabel: string;
+    scheduleLabel: string;
+    sourceKind: ReportSourceKind;
+  };
   viewUrl: string;
-  rows?: string[];
+  traces?: ReportTraceRow[];
+  charts?: ReportChart[];
   occurredAt: Date;
   project: { id: string; name: string; slug: string };
   baseHost: string;
 }): ReportTemplateContext {
   const projectUrl = `${baseHost}/${project.slug}`;
+  // A trace report is empty when nothing matched; a chart report is empty when
+  // it has no charts at all, or every chart came back without data points.
+  const isEmpty =
+    report.sourceKind === "traceQuery"
+      ? traces.length === 0
+      : charts.length === 0 || charts.every((chart) => chart.isEmpty);
   return {
     trigger: {
       id: trigger.id,
@@ -549,9 +787,13 @@ export function buildReportTemplateContext({
     report: {
       sourceLabel: report.sourceLabel,
       scheduleLabel: report.scheduleLabel,
+      sourceKind: report.sourceKind,
+      isEmpty,
     },
     viewUrl,
-    rows,
+    traces,
+    charts,
+    rows: traces.map(formatReportRowLine),
     occurredAt: occurredAt.toISOString(),
     project: {
       id: project.id,

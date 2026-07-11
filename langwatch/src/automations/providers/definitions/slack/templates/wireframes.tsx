@@ -311,3 +311,23 @@ export function ReportSummaryCardWireframe() {
 export function ReportTableWireframe() {
   return <WireStack rows={["header", "context", "table", "context"]} />;
 }
+
+export function ReportChartWireframe() {
+  return (
+    <WireStack rows={["header", "context", "chart", "section", "context"]} />
+  );
+}
+
+export function ReportChartCardWireframe() {
+  return <WireStack rows={["card", "chart", "context"]} />;
+}
+
+// A dashboard report renders one chart per panel — the wireframe shows the
+// repetition, which is the whole point of the layout.
+export function ReportDashboardWireframe() {
+  return (
+    <WireStack
+      rows={["header", "context", "chart", "chart", "section", "context"]}
+    />
+  );
+}

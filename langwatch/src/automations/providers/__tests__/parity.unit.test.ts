@@ -14,7 +14,10 @@ import {
   CLIENT_PROVIDERS,
   NOTIFY_PROVIDERS,
 } from "../client";
-import { SLACK_BLOCK_KIT_TEMPLATES } from "../definitions/slack/templates/registry";
+import {
+  SLACK_BLOCK_KIT_TEMPLATES,
+  type SlackBlockKitTemplateOption,
+} from "../definitions/slack/templates/registry";
 import { SERVER_PROVIDERS } from "../server";
 
 /**
@@ -121,31 +124,122 @@ describe("provider registry parity", () => {
       ...graphAlertBase,
       reason: reasonForTemplate(id),
     });
-    const reportContext = buildReportTemplateContext({
+    // A report layout only ever renders against the source it is offered for,
+    // so each one is exercised with THAT source's data — a chart layout gets
+    // charts, a trace layout gets traces. Feeding a chart layout the trace
+    // context would prove nothing about whether it can plot.
+    const reportTraceContext = buildReportTemplateContext({
       trigger: { id: "rep_1", name: "Weekly error report" },
       report: {
-        sourceLabel: "Top 5 errored traces",
+        sourceLabel: "Top 5 matching traces",
         scheduleLabel: "every Monday at 09:00 (UTC)",
+        sourceKind: "traceQuery",
       },
       viewUrl: "https://app.langwatch.ai/acme/messages",
-      rows: [
-        "trace_a · 502 upstream timeout",
-        "trace_b · tool call failed",
-        "trace_c · empty completion",
+      traces: [
+        {
+          traceId: "trace_a",
+          url: "https://app.langwatch.ai/acme/messages/trace_a",
+          timestamp: "2026-01-05T08:30:00.000Z",
+          input: "502 upstream timeout",
+          output: "",
+          model: "gpt-5-mini",
+          status: "error",
+          costUsd: 0.0241,
+          durationMs: 1834,
+        },
+        {
+          traceId: "trace_b",
+          url: "https://app.langwatch.ai/acme/messages/trace_b",
+          timestamp: "2026-01-05T08:45:00.000Z",
+          input: "tool call failed",
+          output: "",
+          model: "gpt-5-mini",
+          status: "error",
+          costUsd: 0.0102,
+          durationMs: 920,
+        },
       ],
       occurredAt: new Date("2026-01-05T09:00:00Z"),
       project: { id: "p1", name: "Acme", slug: "acme" },
       baseHost: "https://app.langwatch.ai",
     });
+    const reportChartContext = (sourceKind: "customGraph" | "dashboard") =>
+      buildReportTemplateContext({
+        trigger: { id: "rep_2", name: "Weekly latency report" },
+        report: {
+          sourceLabel: sourceKind === "dashboard" ? "Dashboard" : "Custom graph",
+          scheduleLabel: "every Monday at 09:00 (UTC)",
+          sourceKind,
+        },
+        viewUrl: "https://app.langwatch.ai/acme/analytics",
+        charts: [
+          {
+            id: "graph_1",
+            title: "Errors per hour",
+            type: "line",
+            categories: ["09:00", "10:00", "11:00"],
+            series: [
+              {
+                name: "Errors",
+                data: [
+                  { label: "09:00", value: 3 },
+                  { label: "10:00", value: 7 },
+                  { label: "11:00", value: 2 },
+                ],
+              },
+            ],
+            segments: [],
+            total: 12,
+            isEmpty: false,
+          },
+          {
+            id: "graph_2",
+            title: "Cost by model",
+            type: "pie",
+            categories: [],
+            series: [],
+            segments: [
+              { label: "gpt-5-mini", value: 4.2 },
+              { label: "claude-opus-4-8", value: 1.8 },
+            ],
+            total: 6,
+            isEmpty: false,
+          },
+        ],
+        occurredAt: new Date("2026-01-05T09:00:00Z"),
+        project: { id: "p1", name: "Acme", slug: "acme" },
+        baseHost: "https://app.langwatch.ai",
+      });
+    const contextForReport = (
+      template: SlackBlockKitTemplateOption,
+    ): Record<string, unknown> => {
+      const sources = template.reportSources ?? [];
+      if (sources.includes("dashboard")) {
+        return reportChartContext("dashboard") as unknown as Record<
+          string,
+          unknown
+        >;
+      }
+      if (sources.includes("customGraph")) {
+        return reportChartContext("customGraph") as unknown as Record<
+          string,
+          unknown
+        >;
+      }
+      return reportTraceContext as unknown as Record<string, unknown>;
+    };
     const contextForTemplate = (
-      kind: string,
-      id: string,
+      template: SlackBlockKitTemplateOption,
       cadence: "immediate" | "digest",
     ): Record<string, unknown> =>
-      kind === "graphAlert"
-        ? (graphAlertContextFor(id) as unknown as Record<string, unknown>)
-        : kind === "report"
-          ? (reportContext as unknown as Record<string, unknown>)
+      template.kind === "graphAlert"
+        ? (graphAlertContextFor(template.id) as unknown as Record<
+            string,
+            unknown
+          >)
+        : template.kind === "report"
+          ? contextForReport(template)
           : (contextsByCadence[cadence] as unknown as Record<string, unknown>);
 
     describe("when each template renders against the example context for its kind and cadence", () => {
@@ -157,11 +251,7 @@ describe("provider registry parity", () => {
             ? (["immediate", "digest"] as const)
             : ([template.cadenceFit] as const);
         for (const cadence of cadences) {
-          const context = contextForTemplate(
-            template.kind,
-            template.id,
-            cadence,
-          );
+          const context = contextForTemplate(template, cadence);
           const { output } = await renderLiquid({
             template: template.source,
             context: context as unknown as Record<string, unknown>,
@@ -247,8 +337,17 @@ describe("provider registry parity", () => {
       digest_table: () =>
         digestTraceContext as unknown as Record<string, unknown>,
       report_summary_card: () =>
-        reportContext as unknown as Record<string, unknown>,
-      report_table: () => reportContext as unknown as Record<string, unknown>,
+        reportTraceContext as unknown as Record<string, unknown>,
+      report_table: () =>
+        reportTraceContext as unknown as Record<string, unknown>,
+      report_digest: () =>
+        reportTraceContext as unknown as Record<string, unknown>,
+      report_chart: () =>
+        reportChartContext("customGraph") as unknown as Record<string, unknown>,
+      report_chart_card: () =>
+        reportChartContext("customGraph") as unknown as Record<string, unknown>,
+      report_dashboard: () =>
+        reportChartContext("dashboard") as unknown as Record<string, unknown>,
     };
 
     describe("when a modern-suite template (ADR-041) renders against a complete example", () => {

@@ -1,0 +1,48 @@
+{%- assign chart = charts | first -%}
+{%- capture _sub -%}
+{{ report.scheduleLabel }}
+{%- endcapture -%}
+{%- capture _body -%}
+{%- if report.isEmpty -%}
+No data for this period.
+{%- else -%}
+*{{ chart.total | round: 2 }}* · {{ chart.title | truncate: 60 | mrkdwn_escape }}
+{%- endif -%}
+{%- endcapture -%}
+{%- capture _chart_json -%}
+{%- if chart.type == "pie" -%}
+{ "type": "pie", "segments": [
+{%- for seg in chart.segments limit: 8 -%}
+{% unless forloop.first %},{% endunless %}{ "label": {{ seg.label | truncate: 40 | json }}, "value": {{ seg.value }} }
+{%- endfor -%}
+] }
+{%- else -%}
+{ "type": {{ chart.type | json }}, "series": [
+{%- for s in chart.series limit: 5 -%}
+{% unless forloop.first %},{% endunless %}{ "name": {{ s.name | truncate: 20 | json }}, "data": [
+{%- for p in s.data limit: 20 -%}
+{% unless forloop.first %},{% endunless %}{ "label": {{ p.label | json }}, "value": {{ p.value }} }
+{%- endfor -%}
+] }
+{%- endfor -%}
+], "axis_config": { "categories": [
+{%- for c in chart.categories limit: 20 -%}
+{% unless forloop.first %},{% endunless %}{{ c | json }}
+{%- endfor -%}
+], "x_label": "Time", "y_label": {{ chart.title | truncate: 50 | json }} } }
+{%- endif -%}
+{%- endcapture -%}
+{%- capture _view -%}
+<{{ viewUrl }}|Open in LangWatch ↗> · {{ occurredAt | date: "%b %d, %H:%M" }}
+{%- endcapture -%}
+[
+  { "type": "card",
+    "title": { "type": "mrkdwn", "text": {{ trigger.name | prepend: "📈 " | truncate: 150 | json }} },
+    "subtitle": { "type": "mrkdwn", "text": {{ _sub | truncate: 150 | json }} },
+    "body": { "type": "mrkdwn", "text": {{ _body | json }} }
+  }
+  {%- unless report.isEmpty -%}
+  ,{ "type": "data_visualization", "block_id": "report_chart", "title": {{ chart.title | truncate: 50 | json }}, "chart": {{ _chart_json }} }
+  {%- endunless -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _view | json }} }] }
+]
