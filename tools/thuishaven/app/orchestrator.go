@@ -19,15 +19,15 @@ type Orchestrator struct {
 	sup   Supervisor
 	sys   System
 	ch    ClickHouse
+	obs   Observability
 	hyg   Hygiene
 	sem   Semaphore
 	log   *zap.Logger
 }
 
-// New builds an Orchestrator from its injected dependencies. ch may be nil when
-// ClickHouse management is disabled.
-func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, hyg Hygiene, sem Semaphore, log *zap.Logger) *Orchestrator {
-	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, hyg: hyg, sem: sem, log: log}
+// New builds an Orchestrator from its injected dependencies.
+func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, obs Observability, hyg Hygiene, sem Semaphore, log *zap.Logger) *Orchestrator {
+	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, obs: obs, hyg: hyg, sem: sem, log: log}
 }
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).
@@ -102,6 +102,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if shouldManageCH {
 		o.ensureClickHouse(ctx, &st)
 	}
+	o.linkObservability(ctx, &st)
 	st.UpdatedAt = o.sys.Now()
 	if err := o.store.WriteOverlay(p.LwDir, st); err != nil {
 		return domain.Stack{}, nil, err

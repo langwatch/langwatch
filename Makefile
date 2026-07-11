@@ -30,10 +30,11 @@ help:
 	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
 	@echo ""
 	@echo "  Local observability (logs/traces/metrics → Grafana for agent debugging):"
-	@echo "    make observability                  start the LGTM stack (OTLP :4318, Grafana :3000)"
-	@echo "    make observability-connect          wire .env at the collector + register the Grafana MCP"
+	@echo "    make observability                  start the LGTM stack on colima, capped (OTLP :4318, Grafana :3000)"
+	@echo "    make observability-connect          mint a Grafana token + register the Grafana MCP"
 	@echo "    make observability-logs             tail the stack logs"
 	@echo "    make observability-down             stop the stack (discards all telemetry)"
+	@echo "    (once it is up, every 'pnpm dev' stack exports to it, tagged by worktree)"
 	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
 	@echo "    make down                           stop all services"
 	@echo "    make test-scripts                   run bats unit tests under scripts/__tests__/"
@@ -65,11 +66,6 @@ include boxd.mk
 # App is volume-mounted for hot reload.
 
 COMPOSE = docker compose -f compose.dev.yml
-
-# Local observability stack — the `otel-lgtm` service in compose.dev.yml under
-# the optional `observability` profile. Targeted by service name so it comes
-# up/down without touching the rest of the dev stack.
-OBS_COMPOSE = docker compose -f compose.dev.yml
 
 # Sources scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
 # NEXTAUTH_URL / BASE_HOST exports to the compose-derived APP_PORT (default
@@ -161,45 +157,40 @@ portless-down:
 	@$(HAVEN) down
 
 # =============================================================================
-# LOCAL OBSERVABILITY STACK (compose.dev.yml, `observability` profile)
+# LOCAL OBSERVABILITY STACK (owned by haven — one capped container on colima)
 # =============================================================================
-# A lightweight, ephemeral OTLP Collector + Loki + Tempo + Prometheus + Grafana
-# for reading local logs/traces/metrics — including from an agent over the
-# Grafana MCP. See dev/docs/best_practices/local-observability.md and
+# An ephemeral OTLP Collector + Loki + Tempo + Prometheus + Grafana for reading
+# local logs/traces/metrics — including from an agent over the Grafana MCP.
+#
+# haven owns the lifecycle (it is not a compose service): it runs the bundle on
+# colima rather than Docker Desktop, so the VM has an explicit ceiling, and it
+# caps the container's memory/CPU/pids/logs and Prometheus's retention. Once the
+# stack is up, every `pnpm dev` stack exports to it automatically, tagged
+# langwatch.worktree=<slug> — no .env surgery. See
+# dev/docs/best_practices/local-observability.md and
 # dev/docs/adr/042-local-observability-stack.md.
 
-# Start the stack and wait until Grafana is healthy.
+# Start the stack (starts colima if needed) and wait until Grafana is healthy.
 observability:
-	$(OBS_COMPOSE) --profile observability up -d otel-lgtm
-	@echo "Waiting for Grafana to become healthy..."
-	@for i in $$(seq 1 30); do \
-		if curl -sf -o /dev/null http://localhost:$${LW_OBS_GRAFANA_PORT:-3000}/api/health; then \
-			echo "Grafana ready → http://localhost:$${LW_OBS_GRAFANA_PORT:-3000}  (anonymous Admin, or admin/admin)"; \
-			echo "OTLP collector → http://localhost:$${LW_OBS_OTLP_HTTP_PORT:-4318}"; \
-			echo "Next: make observability-connect   # point .env at it + register the Grafana MCP"; \
-			exit 0; \
-		fi; \
-		sleep 2; \
-	done; \
-	echo "Grafana did not become healthy in time — check 'make observability-logs'." >&2; exit 1
+	@$(HAVEN) observability up
 
-# Point langwatch/.env at the collector + mint a Grafana token + register the
-# grafana-local MCP server. Idempotent; backs up .env first.
+# Mint a Grafana service-account token + register the grafana-local MCP server so
+# an agent can query the stack. Idempotent.
 observability-connect:
 	@bash scripts/observability/connect.sh
 
 # Tail the stack logs.
 observability-logs:
-	$(OBS_COMPOSE) logs -f otel-lgtm
+	@docker logs -f langwatch-otel-lgtm
 
-# Show the stack status.
+# Show the stack status (also covered by `make portless-doctor`).
 observability-status:
-	$(OBS_COMPOSE) ps otel-lgtm
+	@$(HAVEN) observability status
 
-# Stop ONLY the observability stack (never the rest of the dev stack). Data is
-# ephemeral, so this discards all collected telemetry.
+# Stop ONLY the observability stack (never the rest of the dev stack). The stack
+# keeps no volume, so this discards all collected telemetry by design.
 observability-down:
-	$(OBS_COMPOSE) rm -sf otel-lgtm
+	@$(HAVEN) observability down
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`
 # (interactive) or `./scripts/dev.sh <preset>` directly. Preset list:

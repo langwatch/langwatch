@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // ensureDaemon guarantees a single machine-wide daemon is running, spawning one
@@ -59,7 +61,7 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 	p := o.cfg.Naming.Project
 	_ = o.proxy.Register(p, "", port)           // langwatch.localhost (dashboard)
 	_ = o.proxy.Register("telemetry", "", port) // telemetry.langwatch.localhost (fan-out)
-	o.refreshObservability()
+	o.refreshObservability(ctx)
 	defer func() {
 		o.proxy.Remove(p, "")
 		o.proxy.Remove("telemetry", "")
@@ -108,7 +110,7 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				o.store.RemoveStack(s.Slug)
 				o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
 			}
-			o.refreshObservability()
+			o.refreshObservability(ctx)
 			o.reapClickHouse()
 		}
 	}
@@ -127,14 +129,17 @@ func (o *Orchestrator) reapClickHouse() {
 	}
 }
 
-// refreshObservability points observability.langwatch.localhost at the local
-// Grafana LGTM stack whenever it is listening.
-func (o *Orchestrator) refreshObservability() {
-	p := o.cfg.ObservabilityPort
-	if p == 0 {
-		p = 3000
+// refreshObservability keeps observability.langwatch.localhost pointed at the
+// LGTM stack for as long as it is answering. The daemon re-checks on every cycle
+// rather than once at boot, because the stack can be brought up and torn down
+// (`haven observability up|down`) long after the daemon started.
+func (o *Orchestrator) refreshObservability(ctx context.Context) {
+	if o.obs == nil {
+		return
 	}
-	if o.sys.PortInUse(p) {
-		_ = o.proxy.Register("observability", "", p)
+	if o.obs.IsRunning(ctx) {
+		o.routeObservability()
+		return
 	}
+	o.proxy.Remove(domain.ObservabilityService, "")
 }

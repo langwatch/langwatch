@@ -67,7 +67,34 @@ func (s Stack) OverlayEnv() []string {
 	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" {
 		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://127.0.0.1:%d/%s", s.ClickHouseHTTPPort, s.ClickHouseDatabase))
 	}
+	env = append(env, s.observabilityEnv()...)
 	return env
+}
+
+// observabilityEnv wires this stack into the shared LGTM collector — the whole
+// point of haven owning the observability stack. Because haven already knows the
+// slug, telemetry is tagged with it automatically: an agent debugging this
+// worktree filters Grafana to langwatch.worktree="<slug>" and sees only its own
+// logs, traces and metrics, even with a dozen worktrees sharing the collector.
+//
+// Emitted only when the stack is actually up, so a contributor who never starts
+// it exports nothing and pays nothing. Console log level is deliberately NOT set
+// here: the overlay overrides .env, and silently muting someone's terminal is not
+// a decision haven gets to make. Set LOG_CONSOLE_LEVEL=warn in .env to get the
+// quiet-terminal, full-detail-in-Grafana split.
+func (s Stack) observabilityEnv() []string {
+	if s.ObservabilityOTLPPort == 0 {
+		return nil
+	}
+	otlp := fmt.Sprintf("http://127.0.0.1:%d", s.ObservabilityOTLPPort)
+	return []string{
+		"OTEL_EXPORTER_OTLP_ENDPOINT=" + otlp,   // TS: traces + logs + metrics
+		"OTEL_DEBUG_COLLECTOR_ENDPOINT=" + otlp, // Go: dual-export, additive to the product trace path
+		"PINO_OTEL_ENABLED=true",
+		"OTEL_METRICS_ENABLED=true",
+		"LOG_OTEL_LEVEL=debug",
+		"OTEL_RESOURCE_ATTRIBUTES=" + ObservabilityWorktreeAttr + "=" + s.Slug,
+	}
 }
 
 // OverlayFile renders the .env.portless file body (header + OverlayEnv).

@@ -39,6 +39,12 @@ COMMANDS
                   database per slug). Subcommands: status | up | url | stop |
                   drop [--all]. "haven clickhouse url" prints this stack's
                   CLICKHOUSE_URL; "drop" gives you a fresh, correctly-counted DB.
+    observability Manage the shared LGTM stack (OTLP collector -> Loki + Tempo +
+                  Prometheus, with Grafana over all three) that every worktree's
+                  logs, traces and metrics land in. Subcommands: status | up |
+                  down. Runs as one resource-capped container on colima. Once it
+                  is up, every stack you start exports to it automatically,
+                  tagged langwatch.worktree=<slug>. Alias: obs.
     seed          Reseed this stack's database (fresh DB on demand).
     prune [--yes] Reclaim regenerable disk (node_modules, dist, .vite, caches)
                   from worktrees that are neither up nor dirty. Dry-run without
@@ -75,7 +81,16 @@ ENVIRONMENT
     LANGWATCH_LOCAL_API_KEY      Stable local dev API key haven seeds + injects
                                  (default sk-lw-local-development-key) — every
                                  worktree and agent authenticates with the same key.
-    LANGWATCH_OBSERVABILITY_PORT Grafana port to route (default 3000).
+    LANGWATCH_HAVEN_OBS=1        Have "up" start the observability stack too. Off
+                                 by default: haven links to a collector that is
+                                 already running, but won't spend 2 GiB standing
+                                 one up on every pnpm dev.
+    HAVEN_COLIMA_PROFILE=name    colima profile the stack runs on (default:
+                                 default). A profile haven creates is capped; one
+                                 that already exists is never resized.
+    HAVEN_OBS_IMAGE=<image>      Override the pinned LGTM bundle image.
+    LW_OBS_GRAFANA_PORT=3000     Grafana port (also LW_OBS_OTLP_HTTP_PORT=4318,
+                                 LW_OBS_OTLP_GRPC_PORT=4317).
     PORTLESS=0                   Bypass portless entirely (legacy PORT scheme).
     HAVEN_AGENT=1                Plain, colourless, redraw-free output (also on
                                  with --agent, NO_COLOR, or a non-terminal stdout)

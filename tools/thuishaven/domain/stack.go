@@ -31,6 +31,11 @@ type Stack struct {
 	WorkerMetricsPort  int    `json:"workerMetricsPort"`
 	ClickHouseHTTPPort int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
 	ClickHouseDatabase string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
+	// ObservabilityOTLPPort is the shared LGTM collector's OTLP/HTTP port when the
+	// stack is up, and 0 when it is not. Non-zero is what makes OverlayEnv emit the
+	// OTel wiring, so a worktree exports its logs/traces/metrics the moment the
+	// stack exists and stays silent when it does not.
+	ObservabilityOTLPPort int `json:"observabilityOtlpPort,omitempty"`
 	// LocalAPIKey is the stable, deterministic local dev API key haven seeds and
 	// injects, so every worktree (and every agent) authenticates with the same key.
 	LocalAPIKey string `json:"localApiKey"`

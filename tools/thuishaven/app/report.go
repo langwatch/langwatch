@@ -57,13 +57,12 @@ func (o *Orchestrator) Doctor() error {
 	scheme, port := o.proxy.Endpoint()
 	url := func(svc string) string { return o.cfg.Naming.URL(svc, "", scheme, port) }
 	info, daemonUp := o.store.Daemon()
-	obsPort := o.cfg.ObservabilityPort
-	if obsPort == 0 {
-		obsPort = 3000
-	}
 	fmt.Printf("%s portless proxy running (%s on :%d)\n", ok(o.proxy.Running()), scheme, port)
 	fmt.Printf("%s haven daemon (pid %d) -> %s\n", ok(daemonUp && o.sys.ProcessAlive(info.PID)), info.PID, url(o.cfg.Naming.Project))
-	fmt.Printf("%s grafana observability on :%d -> %s\n", ok(o.sys.PortInUse(obsPort)), obsPort, url("observability"))
+	if o.obs != nil {
+		obsOK, detail := o.obs.Health(context.Background())
+		fmt.Printf("%s observability — %s -> %s\n", ok(obsOK), detail, url(domain.ObservabilityService))
+	}
 	if o.ch != nil && o.cfg.ShouldManageClickHouse {
 		chOK, detail := o.ch.Health(context.Background())
 		fmt.Printf("%s managed clickhouse — %s\n", ok(chOK), detail)
