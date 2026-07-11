@@ -15,9 +15,13 @@
  * computedOutput is the extracted text, not the raw wrapper.
  */
 import { describe, expect, it } from "vitest";
-import { TraceIOAccumulationService } from "../trace-io-accumulation.service";
+import {
+  extractIOFromLogRecord,
+  TraceIOAccumulationService,
+} from "../trace-io-accumulation.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "../../../schemas/spans";
+import type { LogRecordReceivedEventData } from "../../../schemas/events";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 
 function emptyState(): TraceSummaryData {
@@ -235,6 +239,69 @@ describe("TraceIOAccumulationService — claude utility spans", () => {
       });
 
       expect(result.computedOutput).toBe("echo 'test otlp 4'");
+    });
+  });
+});
+
+/**
+ * Claude Code's log events each name their OWN content key — there is no shared
+ * `body` convention (https://code.claude.com/docs/en/monitoring-usage):
+ *
+ *   user_prompt        -> prompt
+ *   assistant_response -> response
+ *   api_response_body  -> body
+ *
+ * Without OTEL_LOG_RAW_API_BODIES there is no `api_response_body` at all and the
+ * reply arrives on `assistant_response`. The fold read only the former, so a
+ * trace ingested on that LIGHT path had a NULL output — the list showed the
+ * prompt and nothing coming back.
+ */
+describe("extractIOFromLogRecord — claude_code content keys", () => {
+  const CLAUDE_SCOPE = "com.anthropic.claude_code.events";
+
+  function logRecord(attributes: Record<string, unknown>) {
+    return {
+      scopeName: CLAUDE_SCOPE,
+      body: "",
+      attributes,
+    } as unknown as LogRecordReceivedEventData;
+  }
+
+  describe("given the light path (no raw API bodies)", () => {
+    it("lifts the assistant's reply off assistant_response's `response`", () => {
+      const io = extractIOFromLogRecord(
+        logRecord({
+          "event.name": "assistant_response",
+          response: "Here is the summary.",
+          query_source: "repl_main_thread",
+        }),
+      );
+
+      expect(io.output).toBe("Here is the summary.");
+    });
+
+    it("lifts the user's prompt off user_prompt's `prompt`", () => {
+      const io = extractIOFromLogRecord(
+        logRecord({ "event.name": "user_prompt", prompt: "summarise the repo" }),
+      );
+
+      expect(io.input).toBe("summarise the repo");
+    });
+  });
+
+  describe("given a non-conversational utility reply", () => {
+    // ComputedOutput is last-write-wins, so a session-title or autosuggest
+    // reply must never clobber the real one.
+    it("does not let it become the trace's output", () => {
+      const io = extractIOFromLogRecord(
+        logRecord({
+          "event.name": "assistant_response",
+          response: "Fix the failing test",
+          query_source: "generate_session_title",
+        }),
+      );
+
+      expect(io.output).toBeNull();
     });
   });
 });
