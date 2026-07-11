@@ -18,7 +18,7 @@
  *     drain, the chat-route service-boundary mocks)
  *
  * BOUNDARY NOTES (read by the reviewer):
- *   - Scenarios 4 & 7 describe the worker process (services/langy-agent/
+ *   - Scenarios 4 & 7 describe the worker process (services/langyagent/
  *     server.js) wiping its home dir and the idle reaper deleting the clone.
  *     server.js is plain Node, not a module this TS suite can import, so we
  *     assert the contract the *control plane* owns: the TS layer never
@@ -877,7 +877,7 @@ vi.mock("~/server/redis", () => ({
 // ===========================================================================
 // SCENARIOS 4 & 7 — token never persists / lives only until the reaper.
 //
-// The worker-side filesystem wipe (services/langy-agent/server.js) is plain
+// The worker-side filesystem wipe (services/langyagent/server.js) is plain
 // Node and not importable here; it is covered where it lives. The CONTRACT
 // the TS control plane owns and that backs both scenarios:
 //   - the ONLY thing kept at rest is the ENCRYPTED refresh token; the access

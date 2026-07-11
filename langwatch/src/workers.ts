@@ -128,7 +128,7 @@ void verifyRedisReady().then(async () => {
 
     // Langy turn executor (ADR-044): an in-process pool late-bound into the
     // spawnAgent reactor (runIn: ["worker"]). Mirrors the scenario block above.
-    // The pool calls the Go langy-agent manager, bridges its NDJSON to the Redis
+    // The pool calls the Go langyagent manager, bridges its NDJSON to the Redis
     // token buffer, and drives durable milestones + finalize. The processor also
     // boots the liveness reconcile sweep (deploy-survival backstop).
     const { getLangySpawnAgentHandle } = await import(
