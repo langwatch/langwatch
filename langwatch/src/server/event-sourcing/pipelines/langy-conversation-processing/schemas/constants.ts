@@ -70,15 +70,6 @@ export const LANGY_EPHEMERAL_SIGNAL_TYPES = {
   PROGRESS_REPORTED: "lw.langy_conversation.progress_reported",
 } as const;
 
-export const LANGY_EPHEMERAL_EVENT_TYPES = [
-  LANGY_EPHEMERAL_SIGNAL_TYPES.STATUS_REPORTED,
-  LANGY_EPHEMERAL_SIGNAL_TYPES.PROGRESS_REPORTED,
-] as const;
-
-export function isEphemeralLangyConversationEventType(type: string): boolean {
-  return (LANGY_EPHEMERAL_EVENT_TYPES as readonly string[]).includes(type);
-}
-
 /**
  * DURABLE command type identifiers. Ephemeral signals are NOT commands — they
  * are published to the Redis buffer, not dispatched through the pipeline.
