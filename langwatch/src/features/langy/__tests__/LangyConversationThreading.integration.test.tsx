@@ -132,7 +132,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import { LangyDrawer } from "../components/LangyPanel";
+import { LangySidecar } from "../components/LangyPanel";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -193,7 +193,7 @@ function installFetchMock(conversations: ApiConversation[]): Mock {
 }
 
 function renderPanel() {
-  return render(<LangyDrawer isOpen={true} onOpenChange={() => undefined} />, {
+  return render(<LangySidecar isOpen={true} onOpenChange={() => undefined} />, {
     wrapper: Wrapper,
   });
 }
