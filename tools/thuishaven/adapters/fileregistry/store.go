@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
@@ -92,6 +93,32 @@ func (s *Store) WriteSlugCache(worktreeDir, slug string) error {
 func (s *Store) WriteOverlay(lwDir string, st domain.Stack) error {
 	return os.WriteFile(filepath.Join(lwDir, ".env.portless"), []byte(st.OverlayFile()), 0o644)
 }
+
+// hmrGatePath is the worktree-local marker the Vite HMR-gate plugin reads.
+func (s *Store) hmrGatePath(lwDir string) string {
+	return filepath.Join(lwDir, ".haven-hmr-gate")
+}
+
+// WriteHMRGate writes the gate expiry (unix-ms) so Vite defers HMR until then.
+func (s *Store) WriteHMRGate(lwDir string, expiryUnixMs int64) error {
+	return os.WriteFile(s.hmrGatePath(lwDir), []byte(strconv.FormatInt(expiryUnixMs, 10)+"\n"), 0o644)
+}
+
+// ReadHMRGate reads the gate expiry (unix-ms); ok is false when no gate is set.
+func (s *Store) ReadHMRGate(lwDir string) (int64, bool) {
+	b, err := os.ReadFile(s.hmrGatePath(lwDir))
+	if err != nil {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// ClearHMRGate removes the marker so HMR resumes immediately.
+func (s *Store) ClearHMRGate(lwDir string) { _ = os.Remove(s.hmrGatePath(lwDir)) }
 
 // SaveDaemon / Daemon / ClearDaemon manage the singleton daemon record.
 func (s *Store) SaveDaemon(info app.DaemonInfo) error {

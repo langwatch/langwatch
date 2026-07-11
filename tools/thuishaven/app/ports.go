@@ -31,6 +31,10 @@ type Store interface {
 	ReadSlugCache(worktreeDir string) (string, bool)
 	WriteSlugCache(worktreeDir, slug string) error
 	WriteOverlay(lwDir string, st domain.Stack) error
+	// HMR gate marker (worktree-local): expiry in unix-ms; 0/absent means no gate.
+	WriteHMRGate(lwDir string, expiryUnixMs int64) error
+	ReadHMRGate(lwDir string) (int64, bool)
+	ClearHMRGate(lwDir string)
 	SaveDaemon(DaemonInfo) error
 	Daemon() (DaemonInfo, bool)
 	ClearDaemon()
