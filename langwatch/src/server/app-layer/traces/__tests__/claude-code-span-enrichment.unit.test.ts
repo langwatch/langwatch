@@ -187,6 +187,106 @@ describe("computeClaudeSpanEnrichment", () => {
     });
   });
 
+  describe("given two CONCURRENT sub-agents sharing one query_source (known-fragile positional input pairing)", () => {
+    /**
+     * Residual limitation, characterized deliberately. Input logs
+     * (`api_request_body` / `user_prompt`) carry NO `request_id`, so input can
+     * only be paired positionally: the Nth span (array/call order) to the Nth
+     * body (time order). That holds for ONE sequential agent. Two concurrent
+     * sub-agents emitting under the SAME `query_source` interleave in a single
+     * group, so when the span array order and the body time order disagree, span
+     * i pairs with the OTHER agent's body i — input is mis-attributed.
+     *
+     * This is accepted: output and cost still join EXACTLY by `request_id`
+     * (asserted below), only the input transcript can cross; and real Claude
+     * Code sub-agents each carry a distinct `query_source`, which isolates them
+     * into separate groups (see the two-query_sources test above). This test
+     * pins the behavior so a future correlation fix has a red-to-green target.
+     */
+    it("joins output/cost exactly by request_id but can cross the positional input", () => {
+      const REQ_A = "req_agentA";
+      const REQ_B = "req_agentB";
+      // Array/call order: agent A's span first, then agent B's.
+      const spans: ClaudeSpanRef[] = [
+        { spanId: "span-A", requestId: REQ_A, querySource: REPL },
+        { spanId: "span-B", requestId: REQ_B, querySource: REPL },
+      ];
+      const logs: ClaudeContentLog[] = [
+        // Agent B's request body lands FIRST in time (its model call started
+        // earlier under concurrency), so body time order is [B, A] — the
+        // reverse of the span array order.
+        {
+          eventName: "api_request_body",
+          requestId: null,
+          querySource: REPL,
+          timeUnixMs: 100,
+          body: requestBody({ userText: "AGENT_B_PROMPT" }),
+        },
+        {
+          eventName: "api_request_body",
+          requestId: null,
+          querySource: REPL,
+          timeUnixMs: 200,
+          body: requestBody({ userText: "AGENT_A_PROMPT" }),
+        },
+        // Output + cost carry request_id, so they join exactly regardless of order.
+        {
+          eventName: "api_request",
+          requestId: REQ_A,
+          querySource: REPL,
+          timeUnixMs: 205,
+          body: null,
+          costUsd: 0.03,
+        },
+        {
+          eventName: "api_response_body",
+          requestId: REQ_A,
+          querySource: REPL,
+          timeUnixMs: 210,
+          body: responseBody("ANSWER_A"),
+        },
+        {
+          eventName: "api_request",
+          requestId: REQ_B,
+          querySource: REPL,
+          timeUnixMs: 105,
+          body: null,
+          costUsd: 0.07,
+        },
+        {
+          eventName: "api_response_body",
+          requestId: REQ_B,
+          querySource: REPL,
+          timeUnixMs: 110,
+          body: responseBody("ANSWER_B"),
+        },
+      ];
+
+      const result = computeClaudeSpanEnrichment({ spans, logs });
+
+      // Output + cost: EXACT by request_id — never crossed.
+      expect((result.get("span-A")?.output as { value: string }).value).toBe(
+        "ANSWER_A",
+      );
+      expect(result.get("span-A")?.cost).toBe(0.03);
+      expect((result.get("span-B")?.output as { value: string }).value).toBe(
+        "ANSWER_B",
+      );
+      expect(result.get("span-B")?.cost).toBe(0.07);
+
+      // Input: POSITIONAL — span-A (array index 0) pairs with the earliest body
+      // (agent B's), so the transcript crosses. Documented limitation.
+      const inputOf = (spanId: string): string =>
+        (
+          result.get(spanId)?.input as { value: Array<{ content: string }> }
+        ).value
+          .map((m) => m.content)
+          .join(" ");
+      expect(inputOf("span-A")).toContain("AGENT_B_PROMPT");
+      expect(inputOf("span-B")).toContain("AGENT_A_PROMPT");
+    });
+  });
+
   describe("given the request body is truncated (unparseable JSON)", () => {
     it("falls back to the user_prompt text for the span input", () => {
       const spans: ClaudeSpanRef[] = [

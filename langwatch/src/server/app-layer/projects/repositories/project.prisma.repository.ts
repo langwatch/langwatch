@@ -30,23 +30,6 @@ export class PrismaProjectRepository implements ProjectRepository {
     await this.prisma.project.update({ where: { id }, data });
   }
 
-  async getClaudeCodeEnhancedTelemetry(id: string): Promise<boolean> {
-    const project = await this.prisma.project.findUnique({
-      where: { id },
-      select: { claudeCodeEnhancedTelemetry: true },
-    });
-    return project?.claudeCodeEnhancedTelemetry ?? false;
-  }
-
-  async setClaudeCodeEnhancedTelemetry(id: string): Promise<void> {
-    // updateMany (not update) so a missing project is a no-op rather than a
-    // throw — the gate reactor fires best-effort and swallows errors anyway.
-    await this.prisma.project.updateMany({
-      where: { id },
-      data: { claudeCodeEnhancedTelemetry: true },
-    });
-  }
-
   async getWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {
     const project = await this.prisma.project.findUnique({
       where: { id },

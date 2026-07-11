@@ -12,11 +12,6 @@ import {
   normalizeOtlpAttributeMap,
   TraceRequestUtils,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import {
-  CLAUDE_CODE_KIND_ATTR,
-  CLAUDE_CODE_PII_ATTR,
-  claudeCodeLogKind,
-} from "./claude-code-log-events";
 import { synthesizeTraceContext } from "./synthesize-trace-context";
 
 /**
@@ -34,25 +29,7 @@ const SYNTHETIC_SPAN_ATTR = "langwatch.span.synthetic";
 
 export interface LogRequestCollectionDeps {
   recordLog: (data: RecordLogCommandData) => Promise<void>;
-  /**
-   * Resolves the project's Claude Code enhanced-telemetry gate (plan §4.1 /
-   * C0). When it returns true the project sends real tracing spans, so content
-   * logs must NOT be marked for synthesis (see the marking site below).
-   * Optional — omitted (e.g. the Null preset) means "always false", preserving
-   * legacy marking behavior. Looked up at most once per short-TTL window per
-   * project, never per log record.
-   */
-  isEnhancedTelemetryEnabled?: (tenantId: string) => Promise<boolean>;
 }
-
-/**
- * Short in-memory TTL for the per-project enhanced-telemetry gate. The flag is
- * write-once and terminal, so a stale `false` only costs at most this long of
- * extra double-counting on a brand-new project (already-accepted, bounded,
- * self-healing latency per the plan); a stale `true` never happens (the flag
- * never flips back).
- */
-const ENHANCED_TELEMETRY_CACHE_TTL_MS = 30_000;
 
 export class LogRequestCollectionService {
   private readonly tracer = getLangWatchTracer(
@@ -62,43 +39,7 @@ export class LogRequestCollectionService {
     "langwatch:trace-processing:log-ingestion",
   );
 
-  /** Per-tenant TTL cache so the gate lookup never hits Postgres per record. */
-  private readonly enhancedTelemetryCache = new Map<
-    string,
-    { value: boolean; expiresAt: number }
-  >();
-
   constructor(private readonly deps: LogRequestCollectionDeps) {}
-
-  /**
-   * Reads the project's enhanced-telemetry gate through a short-TTL cache.
-   * Called once per OTLP log request (not per record); on a cache miss it
-   * makes a single project lookup and memoizes the result. Fails open to
-   * `false` (legacy marking) so a lookup error never drops a log.
-   */
-  private async isEnhancedTelemetryEnabled(tenantId: string): Promise<boolean> {
-    if (!this.deps.isEnhancedTelemetryEnabled) return false;
-
-    const now = Date.now();
-    const cached = this.enhancedTelemetryCache.get(tenantId);
-    if (cached && cached.expiresAt > now) return cached.value;
-
-    let value = false;
-    try {
-      value = await this.deps.isEnhancedTelemetryEnabled(tenantId);
-    } catch (error) {
-      this.logger.warn(
-        { tenantId, error },
-        "Failed to read Claude Code enhanced-telemetry gate — defaulting to false (legacy marking)",
-      );
-      value = false;
-    }
-    this.enhancedTelemetryCache.set(tenantId, {
-      value,
-      expiresAt: now + ENHANCED_TELEMETRY_CACHE_TTL_MS,
-    });
-    return value;
-  }
 
   async handleOtlpLogRequest({
     tenantId,
@@ -122,17 +63,8 @@ export class LogRequestCollectionService {
         let collectedCount = 0;
         let droppedCount = 0;
         let failedCount = 0;
-        let claudeMarkedCount = 0;
 
         const redaction = piiRedactionLevelSchema.parse(piiRedactionLevel);
-
-        // Per-project gate (plan §4.1 / C0): looked up ONCE per request (the
-        // tenant is fixed for the whole batch), so no per-record Postgres hit.
-        // When on, the project sends real Claude Code tracing spans and content
-        // logs must be left unmarked (no synthesis → no double-count → normal
-        // retention).
-        const enhancedTelemetryEnabled =
-          await this.isEnhancedTelemetryEnabled(tenantId);
 
         for (const resourceLog of logRequest.resourceLogs ?? []) {
           if (!resourceLog?.scopeLogs) continue;
@@ -209,33 +141,11 @@ export class LogRequestCollectionService {
                     )
                   : Date.now();
 
-                // claude_code events the span fold consumes (model calls, tool
-                // calls, the user prompt) are SAVED here, marked so the
-                // claudeCodeSpanSync reactor can fold the WHOLE turn's logs into
-                // spans (the cross-batch join the per-batch receiver can't do)
-                // and the trace read path can hide the raw rows that became
-                // spans. The event payload rides the `body` attribute, already
-                // in logAttrs. Everything else (hooks, plugins, mcp) stays an
-                // unmarked, visible log.
-                const claudeKind = claudeCodeLogKind(
-                  scopeName,
-                  logAttrs["event.name"],
-                );
-                // Both markings can apply: a synthesized claude_code
-                // model-call carries the kind marker AND the synthetic
-                // trace marker.
+                // Every log record is recorded as-is; the event payload rides
+                // the `body` attribute, already in logAttrs. The only
+                // attributes the receiver adds are the synthetic-id markers
+                // below.
                 const attributes: Record<string, string> = { ...logAttrs };
-                // Skip the synthesis marker for enhanced-telemetry projects:
-                // they already send real tracing spans, so marking would
-                // double-count (real span + synthesized span) and pin the log
-                // to 1-day claude retention. Leaving it unmarked kills the
-                // synthesis fold's input and reverts the log to normal
-                // retention. The record itself is still stored below.
-                if (claudeKind && !enhancedTelemetryEnabled) {
-                  attributes[CLAUDE_CODE_KIND_ATTR] = claudeKind;
-                  attributes[CLAUDE_CODE_PII_ATTR] = redaction;
-                  claudeMarkedCount++;
-                }
                 // A minted trace_id badges the whole trace synthetic (and
                 // records which correlation key grouped it). A real trace_id
                 // with only an invented span_id badges just the span — never
@@ -279,13 +189,10 @@ export class LogRequestCollectionService {
           }
         }
 
-        // The marked claude_code logs are folded into spans asynchronously by
-        // the claudeCodeSpanSync reactor (over the whole turn), not here — the
-        // receiver only appends, holding no cross-batch state.
+        // The receiver only appends log records, holding no cross-batch state.
         span.setAttribute("logs.ingestion.successes", collectedCount);
         span.setAttribute("logs.ingestion.drops", droppedCount);
         span.setAttribute("logs.ingestion.failures", failedCount);
-        span.setAttribute("logs.ingestion.claude_code_marked", claudeMarkedCount);
       },
     );
   }

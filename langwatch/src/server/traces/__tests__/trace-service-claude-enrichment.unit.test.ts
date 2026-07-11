@@ -17,14 +17,22 @@ import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/
 import type { Span, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 
-const { mockGetTracesWithSpans } = vi.hoisted(() => ({
+const {
+  mockGetTracesWithSpans,
+  mockGetTracesByThreadId,
+  mockGetTracesWithSpansByThreadIds,
+} = vi.hoisted(() => ({
   mockGetTracesWithSpans: vi.fn(),
+  mockGetTracesByThreadId: vi.fn(),
+  mockGetTracesWithSpansByThreadIds: vi.fn(),
 }));
 
 vi.mock("../clickhouse-trace.service", () => ({
   ClickHouseTraceService: Object.assign(vi.fn(), {
     create: () => ({
       getTracesWithSpans: mockGetTracesWithSpans,
+      getTracesByThreadId: mockGetTracesByThreadId,
+      getTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
       resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
     }),
   }),
@@ -234,6 +242,129 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       const trace = await service.getById(PROJECT_ID, TRACE_ID, protections);
 
       expect(trace?.spans?.[0]?.input ?? null).toBeNull();
+    });
+  });
+});
+
+/**
+ * G1: enrichment must also reach the multi-trace read paths (evals, export,
+ * legacy thread reads), not just `getById`. Each of these methods returns whole
+ * spans that exports + evaluators read, so a coding-agent trace fetched through
+ * them must be enriched the same way, and a non-coding-agent trace must never
+ * trigger a log read.
+ */
+describe("TraceService — multi-trace read enrichment", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const enrichedInput = { type: "text", value: "summarise the repo" };
+  const enrichedOutput = { type: "text", value: "Here is the summary." };
+
+  describe("getTracesWithSpans", () => {
+    it("enriches a coding-agent trace with input, output, and cost", async () => {
+      mockGetTracesWithSpans.mockResolvedValue([
+        makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan()] }),
+      ]);
+      const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
+      const service = makeService(getLogs);
+
+      const traces = await service.getTracesWithSpans(
+        PROJECT_ID,
+        [TRACE_ID],
+        protections,
+      );
+
+      expect(traces[0]?.spans?.[0]?.input).toEqual(enrichedInput);
+      expect(traces[0]?.spans?.[0]?.output).toEqual(enrichedOutput);
+      expect(traces[0]?.spans?.[0]?.metrics?.cost).toBe(0.0421);
+      expect(getLogs).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not read logs for a non-coding-agent trace", async () => {
+      mockGetTracesWithSpans.mockResolvedValue([
+        makeTrace({ origin: "application", spans: [claudeLlmSpan()] }),
+      ]);
+      const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
+      const service = makeService(getLogs);
+
+      const traces = await service.getTracesWithSpans(
+        PROJECT_ID,
+        [TRACE_ID],
+        protections,
+      );
+
+      expect(getLogs).not.toHaveBeenCalled();
+      expect(traces[0]?.spans?.[0]?.input ?? null).toBeNull();
+    });
+  });
+
+  describe("getTracesByThreadId", () => {
+    it("enriches a coding-agent trace returned for the thread", async () => {
+      mockGetTracesByThreadId.mockResolvedValue([
+        makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan()] }),
+      ]);
+      const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
+      const service = makeService(getLogs);
+
+      const traces = await service.getTracesByThreadId(
+        PROJECT_ID,
+        "thread-1",
+        protections,
+      );
+
+      expect(traces[0]?.spans?.[0]?.input).toEqual(enrichedInput);
+      expect(traces[0]?.spans?.[0]?.metrics?.cost).toBe(0.0421);
+    });
+
+    it("does not read logs for a non-coding-agent trace", async () => {
+      mockGetTracesByThreadId.mockResolvedValue([
+        makeTrace({ origin: "application", spans: [claudeLlmSpan()] }),
+      ]);
+      const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
+      const service = makeService(getLogs);
+
+      await service.getTracesByThreadId(PROJECT_ID, "thread-1", protections);
+
+      expect(getLogs).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getTracesWithSpansByThreadIds", () => {
+    it("enriches each coding-agent trace, reading logs per trace", async () => {
+      mockGetTracesWithSpansByThreadIds.mockResolvedValue([
+        makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan()] }),
+        makeTrace({ origin: "application", spans: [claudeLlmSpan()] }),
+      ]);
+      const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
+      const service = makeService(getLogs);
+
+      const traces = await service.getTracesWithSpansByThreadIds(
+        PROJECT_ID,
+        ["thread-1"],
+        protections,
+      );
+
+      // Only the coding-agent trace is enriched; only its log read happens.
+      expect(traces[0]?.spans?.[0]?.input).toEqual(enrichedInput);
+      expect(traces[1]?.spans?.[0]?.input ?? null).toBeNull();
+      expect(getLogs).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not read logs when no trace is coding-agent origin", async () => {
+      mockGetTracesWithSpansByThreadIds.mockResolvedValue([
+        makeTrace({ origin: "application", spans: [claudeLlmSpan()] }),
+      ]);
+      const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
+      const service = makeService(getLogs);
+
+      await service.getTracesWithSpansByThreadIds(
+        PROJECT_ID,
+        ["thread-1"],
+        protections,
+      );
+
+      expect(getLogs).not.toHaveBeenCalled();
     });
   });
 });

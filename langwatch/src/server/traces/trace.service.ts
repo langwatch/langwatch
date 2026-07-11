@@ -305,6 +305,28 @@ export class TraceService {
   }
 
   /**
+   * Batch sibling of {@link enrichCodingAgentTrace} for the multi-trace read
+   * paths (evals, export, legacy thread reads). Enriches each coding-agent trace
+   * in the array with its own lazy, time-capped log read (reads run in parallel);
+   * every non-coding-agent trace short-circuits inside `enrichCodingAgentTrace`
+   * and pays nothing. The upfront origin check skips even the `Promise.all`
+   * allocation on the common all-non-coding-agent page, so a project that never
+   * uses a coding assistant never touches the log store. Best-effort per trace.
+   */
+  private async enrichCodingAgentTraces(
+    projectId: string,
+    traces: Trace[],
+  ): Promise<Trace[]> {
+    const hasCodingAgentTrace = traces.some(
+      (trace) => trace.metadata?.["langwatch.origin"] === CODING_AGENT_ORIGIN,
+    );
+    if (!hasCodingAgentTrace) return traces;
+    return Promise.all(
+      traces.map((trace) => this.enrichCodingAgentTrace(projectId, trace)),
+    );
+  }
+
+  /**
    * Read-time Claude Code content enrichment for coding-agent-origin traces.
    * The real `llm_request` spans carry tokens / `request_id` but no message
    * content and no cost — both live in the trace's OTLP log records. When the
@@ -374,13 +396,14 @@ export class TraceService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async () => {
-        return this.clickHouseService.getTracesWithSpans(
+        const traces = await this.clickHouseService.getTracesWithSpans(
           projectId,
           traceIds,
           protections,
           occurredAt,
           { resolveBlobs: opts?.full },
         );
+        return this.enrichCodingAgentTraces(projectId, traces);
       },
     );
   }
@@ -402,11 +425,12 @@ export class TraceService {
       "TraceService.getTracesByThreadId",
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
       async () => {
-        return this.clickHouseService.getTracesByThreadId(
+        const traces = await this.clickHouseService.getTracesByThreadId(
           projectId,
           threadId,
           protections,
         );
+        return this.enrichCodingAgentTraces(projectId, traces);
       },
     );
   }
@@ -525,12 +549,14 @@ export class TraceService {
         },
       },
       async () => {
-        return this.clickHouseService.getTracesWithSpansByThreadIds(
-          projectId,
-          threadIds,
-          protections,
-          { resolveBlobs: opts?.full },
-        );
+        const traces =
+          await this.clickHouseService.getTracesWithSpansByThreadIds(
+            projectId,
+            threadIds,
+            protections,
+            { resolveBlobs: opts?.full },
+          );
+        return this.enrichCodingAgentTraces(projectId, traces);
       },
     );
   }
