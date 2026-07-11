@@ -1563,6 +1563,37 @@ export const tracesV2Router = createTRPCRouter({
     }),
 
   /**
+   * The pre-folded coding-agent session rollup for one trace (ADR-040).
+   *
+   * Returns null for an ordinary LLM trace — the fold writes no row for those,
+   * so null is the normal answer rather than an error, and the caller simply
+   * doesn't offer the Session view.
+   *
+   * Unlike the sibling span / log reads this needs NO content redaction: the row
+   * is counters, bounded sets and ids by construction. It carries no prompt, no
+   * reply and no tool output, so there is nothing here for the data-privacy
+   * policy to gate. (If that ever stops being true, this comment is the thing
+   * that has to change first.)
+   */
+  codingAgentSession: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...spanReadHintShape,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input }) => {
+      const app = getApp();
+      return app.traces.codingAgentSessions.getByTraceId({
+        projectId: input.projectId,
+        traceId: input.traceId,
+        startedAtMs: input.occurredAtMs,
+      });
+    }),
+
+  /**
    * Every log record correlated to one trace (generic — not Claude-specific).
    * Logs key by traceId (to spans only via `request_id`), so this is a
    * trace-level read: the raw-log inspector renders untruncated bodies on

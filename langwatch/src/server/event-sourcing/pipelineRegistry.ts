@@ -35,6 +35,7 @@ import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
+import type { CodingAgentSessionRepository } from "../app-layer/traces/repositories/coding-agent-session.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
@@ -198,6 +199,8 @@ export interface PipelineRepositories {
   evaluationAnalyticsRollup: EvaluationAnalyticsRollupRepository;
   /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
   evaluationAnalytics: EvaluationAnalyticsRepository;
+  /** ADR-040: per-session coding-agent rollup repository. */
+  codingAgentSession: CodingAgentSessionRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
 }
 

@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { LogRecordReceivedEventData } from "../../../schemas/events";
-import type { NormalizedSpan } from "../../../schemas/spans";
+import { NormalizedStatusCode, type NormalizedSpan } from "../../../schemas/spans";
 import type { MetricRecordReceivedEventData } from "../../../schemas/events";
 import {
   applyLogToCodingAgentSession,
@@ -20,6 +20,7 @@ import {
   type CodingAgentSessionData,
   createInitCodingAgentSession,
   isCodingAgentMetric,
+  parseMcpToolName,
   isCodingAgentSession,
   meanTtftMs,
 } from "../coding-agent-session.derivation";
@@ -27,7 +28,17 @@ import {
 function span(
   name: string,
   spanAttributes: Record<string, unknown> = {},
-  over: { startTimeUnixMs?: number; endTimeUnixMs?: number; statusCode?: string } = {},
+  // `statusCode` is the OTLP numeric enum, NOT a string. It was typed as
+  // `string` here and the fixture fed `"error"` — a value production never
+  // emits — while the `as unknown as NormalizedSpan` cast silenced the error
+  // that would have said so. The tests passed; the fold marked every failed tool
+  // as successful. Type it properly so the fixture cannot drift from reality
+  // again.
+  over: {
+    startTimeUnixMs?: number;
+    endTimeUnixMs?: number;
+    statusCode?: NormalizedStatusCode;
+  } = {},
 ): NormalizedSpan {
   return {
     name,
@@ -52,7 +63,7 @@ function tool(
     {
       startTimeUnixMs: startedAtMs,
       endTimeUnixMs: startedAtMs + (over.durationMs ?? 0),
-      statusCode: over.failed ? "error" : undefined,
+      statusCode: over.failed ? NormalizedStatusCode.ERROR : undefined,
     },
   );
 }
@@ -645,5 +656,60 @@ describe("counting sub-agents from what is actually emitted", () => {
 
     expect(state.subAgents).toBe(1);
     expect(state.modelCalls).toBe(3);
+  });
+});
+
+describe("MCP servers, read off the tool name", () => {
+  /**
+   * Regression: real sessions that had plainly called an MCP server reported
+   * using none.
+   *
+   * The derivation only looked at `mcp_server.name` / `mcp_tool.name`
+   * attributes, and Claude Code does not put them on the tool span. The name
+   * itself is what arrives — `mcp__claude-in-chrome__tabs_context_mcp` — so the
+   * name is what we parse. (This exact tool name is lifted from a live session.)
+   */
+  it("names the server and the tool from a real MCP tool span", () => {
+    const state = applySpanToCodingAgentSession({
+      state: createInitCodingAgentSession(),
+      span: tool("mcp__claude-in-chrome__tabs_context_mcp", 1000),
+    });
+
+    expect(state.mcpServers).toEqual(["claude-in-chrome"]);
+    expect(state.mcpTools).toEqual(["tabs_context_mcp"]);
+  });
+
+  it("leaves an ordinary built-in tool alone", () => {
+    const state = applySpanToCodingAgentSession({
+      state: createInitCodingAgentSession(),
+      span: tool("Bash", 1000),
+    });
+
+    expect(state.mcpServers).toEqual([]);
+    expect(state.mcpTools).toEqual([]);
+  });
+});
+
+describe("parseMcpToolName", () => {
+  it("splits server from tool", () => {
+    expect(parseMcpToolName("mcp__notion__search")).toEqual({
+      server: "notion",
+      tool: "search",
+    });
+  });
+
+  it("keeps the rest of the name when the tool itself contains the separator", () => {
+    expect(parseMcpToolName("mcp__srv__a__b")).toEqual({
+      server: "srv",
+      tool: "a__b",
+    });
+  });
+
+  it("refuses names it cannot trust rather than inventing an empty server", () => {
+    expect(parseMcpToolName("Bash")).toBeNull();
+    expect(parseMcpToolName("mcp__onlyserver")).toBeNull();
+    expect(parseMcpToolName("mcp____tool")).toBeNull();
+    expect(parseMcpToolName("mcp__srv__")).toBeNull();
+    expect(parseMcpToolName(null)).toBeNull();
   });
 });

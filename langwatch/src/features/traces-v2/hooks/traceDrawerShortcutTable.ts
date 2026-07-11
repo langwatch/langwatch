@@ -2,6 +2,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import { isTerminalOrigin } from "../utils/terminalOrigin";
 import type { useDrawerStore } from "../stores/drawerStore";
 import type { useTraceDrawerNavigation } from "./useTraceDrawerNavigation";
 
@@ -192,6 +193,33 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     description: "Conversation view",
     guard: ({ trace }) => Boolean(trace.conversationId),
     run: ({ store }) => store.setViewMode("conversation"),
+  },
+  // Session + Terminal exist only for coding-agent traces, so both are guarded
+  // on the same signal the tabs are (`isTerminalOrigin`) — an unguarded S would
+  // strand an ordinary LLM trace on a mode it has no tab for.
+  {
+    matchKeys: ["s", "S"],
+    displayKeys: ["S"],
+    group: "View",
+    description: "Session overview",
+    guard: ({ trace }) =>
+      isTerminalOrigin({
+        serviceName: trace.serviceName,
+        origin: trace.origin,
+      }),
+    run: ({ store }) => store.setViewMode("session"),
+  },
+  {
+    matchKeys: ["e", "E"],
+    displayKeys: ["E"],
+    group: "View",
+    description: "Terminal replay",
+    guard: ({ trace }) =>
+      isTerminalOrigin({
+        serviceName: trace.serviceName,
+        origin: trace.origin,
+      }),
+    run: ({ store }) => store.setViewMode("terminal"),
   },
   {
     matchKeys: ["m", "M"],

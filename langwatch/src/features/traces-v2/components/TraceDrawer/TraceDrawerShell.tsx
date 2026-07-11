@@ -21,6 +21,7 @@ import { PaneLayout } from "./panes/PaneLayout";
 import { ResizeRail } from "./panes/ResizeRail";
 import { usePaneLayout } from "./panes/usePaneLayout";
 import { ScenarioRoleProvider } from "./scenarioRoles";
+import { SessionTab } from "./sessionView";
 import { TerminalTab } from "./terminalView";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
 import { TraceDrawerSkeleton } from "./TraceDrawerSkeleton";
@@ -287,7 +288,20 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                         )
                       }
                     >
-                      {viewMode === "terminal" ? (
+                      {viewMode === "session" ? (
+                        <IsolatedErrorBoundary
+                          scope="Couldn't render session overview"
+                          resetKeys={[trace.traceId]}
+                        >
+                          <Box flex={1} minHeight={0}>
+                            <SessionTab
+                              projectId={project?.id ?? ""}
+                              traceId={trace.traceId}
+                              occurredAtMs={trace.timestamp}
+                            />
+                          </Box>
+                        </IsolatedErrorBoundary>
+                      ) : viewMode === "terminal" ? (
                         <IsolatedErrorBoundary
                           scope="Couldn't render terminal session"
                           resetKeys={[trace.traceId]}

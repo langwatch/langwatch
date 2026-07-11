@@ -1,5 +1,5 @@
 import type { LogRecordReceivedEventData } from "../../schemas/events";
-import type { NormalizedSpan } from "../../schemas/spans";
+import { NormalizedStatusCode, type NormalizedSpan } from "../../schemas/spans";
 
 /**
  * What a coding-agent interaction actually DID, folded onto the trace.
@@ -285,7 +285,10 @@ export function accumulateCodeAgentSummaryFromSpan({
           attributes,
           name: toolName,
           startedAtMs: span.startTimeUnixMs,
-          failed: span.statusCode === "error",
+          // The numeric OTLP enum, not the string "error" — see the note in
+          // coding-agent-session.derivation.ts. Comparing to a string silently
+          // marked every step as successful.
+          failed: span.statusCode === NormalizedStatusCode.ERROR,
         }),
       );
     }
@@ -323,7 +326,7 @@ export function accumulateCodeAgentSummaryFromSpan({
     );
   }
 
-  if (span.statusCode === "error") {
+  if (span.statusCode === NormalizedStatusCode.ERROR) {
     Object.assign(next, bump(attributes, CODE_AGENT_ATTRS.FAILED_TOOLS));
   }
 

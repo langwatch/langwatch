@@ -32,6 +32,7 @@ import type { LogRecordStorageService } from "./traces/log-record-storage.servic
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import type { MetricRecordStorageService } from "./traces/metric-record-storage.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
+import type { CodingAgentSessionService } from "./traces/coding-agent-session.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceListService } from "./traces/trace-list.service";
@@ -66,6 +67,7 @@ export interface AppDependencies {
     summary: TraceSummaryService;
     list: TraceListService;
     spans: SpanStorageService;
+    codingAgentSessions: CodingAgentSessionService;
     logRecords: LogRecordStorageService;
     metricRecords: MetricRecordStorageService;
     collection: TraceRequestCollectionService;

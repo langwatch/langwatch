@@ -2,7 +2,7 @@ import type {
   LogRecordReceivedEventData,
   MetricRecordReceivedEventData,
 } from "../../schemas/events";
-import type { NormalizedSpan } from "../../schemas/spans";
+import { NormalizedStatusCode, type NormalizedSpan } from "../../schemas/spans";
 import type {
   CodingAgentSessionData,
   SessionStep,
@@ -408,7 +408,12 @@ export function applySpanToCodingAgentSession({
 
   const next = withIdentity(state, attrs);
   const toolName = str(attrs.tool_name);
-  const failed = span.statusCode === "error";
+  // NOT `=== "error"`. `statusCode` is the OTLP numeric enum, so comparing it to
+  // a string is always false — which is exactly what it did: every tool folded as
+  // successful, `failedTools` stayed 0 on sessions that plainly had failures, and
+  // every step in the sequence was marked `failed: false`. Silent, because a
+  // comparison that can never be true throws nothing.
+  const failed = span.statusCode === NormalizedStatusCode.ERROR;
   const toolMs = num(attrs.duration_ms) || durationMs;
 
   const withTool: CodingAgentSessionData = {
@@ -454,14 +459,40 @@ export function applySpanToCodingAgentSession({
   const skillName = str(attrs.skill_name);
   if (skillName !== null) withTool.skills = addTo(next.skills, skillName);
 
-  const mcpServer = str(attrs["mcp_server.name"]);
+  // An MCP call announces itself in its NAME — `mcp__<server>__<tool>` — and that
+  // is the signal that actually arrives. Reading only the `mcp_server.name` /
+  // `mcp_tool.name` attributes found nothing on real sessions: a session that had
+  // plainly called an MCP server reported using none, because the agent doesn't
+  // emit those attributes on the tool span. So parse the name first and treat the
+  // attributes as a bonus for agents that DO send them.
+  const fromName = parseMcpToolName(toolName);
+  const mcpServer = str(attrs["mcp_server.name"]) ?? fromName?.server ?? null;
   if (mcpServer !== null) {
     withTool.mcpServers = addTo(next.mcpServers, mcpServer);
   }
-  const mcpTool = str(attrs["mcp_tool.name"]);
+  const mcpTool = str(attrs["mcp_tool.name"]) ?? fromName?.tool ?? null;
   if (mcpTool !== null) withTool.mcpTools = addTo(next.mcpTools, mcpTool);
 
   return withTool;
+}
+
+/** `mcp__<server>__<tool>` — the convention every MCP tool name follows. */
+const MCP_TOOL_PREFIX = "mcp__";
+const MCP_NAME_SEPARATOR = "__";
+
+export function parseMcpToolName(
+  toolName: string | null,
+): { server: string; tool: string } | null {
+  if (toolName === null || !toolName.startsWith(MCP_TOOL_PREFIX)) return null;
+  const rest = toolName.slice(MCP_TOOL_PREFIX.length);
+  const separator = rest.indexOf(MCP_NAME_SEPARATOR);
+  // A server with no tool after it (or an empty server) is not a name we can
+  // trust — leave it out rather than inventing an empty server.
+  if (separator <= 0) return null;
+  const server = rest.slice(0, separator);
+  const tool = rest.slice(separator + MCP_NAME_SEPARATOR.length);
+  if (tool.length === 0) return null;
+  return { server, tool };
 }
 
 /**

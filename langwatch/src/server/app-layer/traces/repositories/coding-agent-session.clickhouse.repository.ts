@@ -253,7 +253,9 @@ export class CodingAgentSessionClickHouseRepository
     for (const { row } of entries) {
       if (row.tenantId !== tenantId) {
         throw new SecurityError(
+          "CodingAgentSessionClickHouseRepository.upsertBatch",
           "coding agent session batch spans multiple tenants",
+          tenantId,
         );
       }
     }

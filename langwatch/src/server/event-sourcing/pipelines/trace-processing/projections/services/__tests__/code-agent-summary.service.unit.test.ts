@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { LogRecordReceivedEventData } from "../../../schemas/events";
-import type { NormalizedSpan } from "../../../schemas/spans";
+import { NormalizedStatusCode, type NormalizedSpan } from "../../../schemas/spans";
 import {
   accumulateCodeAgentSummaryFromLog,
   accumulateCodeAgentSummaryFromSpan,
@@ -24,7 +24,7 @@ function span(name: string, spanAttributes: Record<string, string> = {}) {
 function toolSpan(
   toolName: string,
   startTimeUnixMs: number,
-  statusCode: string | null = null,
+  statusCode: NormalizedStatusCode | null = null,
 ) {
   return {
     name: "claude_code.tool",
@@ -43,7 +43,7 @@ function stepNames(attributes: Record<string, string>): string[] {
 function spanWithStatus(
   name: string,
   spanAttributes: Record<string, string>,
-  statusCode: string,
+  statusCode: NormalizedStatusCode,
 ) {
   return { name, spanAttributes, statusCode } as unknown as NormalizedSpan;
 }
@@ -237,7 +237,11 @@ describe("the work an interaction did", () => {
     it("counts it, so a broken interaction is visible without opening it", () => {
       const attributes = foldAll({
         spans: [
-          spanWithStatus("claude_code.tool", { tool_name: "Bash" }, "error"),
+          spanWithStatus(
+            "claude_code.tool",
+            { tool_name: "Bash" },
+            NormalizedStatusCode.ERROR,
+          ),
           span("claude_code.tool", { tool_name: "Bash" }),
         ],
       });
@@ -322,7 +326,7 @@ describe("the ORDER things happened", () => {
       const attributes = foldAll({
         spans: [
           toolSpan("Read", 1000),
-          toolSpan("Bash", 2000, "error"),
+          toolSpan("Bash", 2000, NormalizedStatusCode.ERROR),
           toolSpan("Edit", 3000),
         ],
       });
