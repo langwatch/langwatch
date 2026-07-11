@@ -71,7 +71,6 @@ func TestRedisDBInRange(t *testing.T) {
 	}
 }
 
-
 func TestOverlayCollapsesApiIntoAppOrigin(t *testing.T) {
 	n := DefaultNaming("localhost")
 	st := Stack{
@@ -132,9 +131,9 @@ func TestOverlayEmitsClickHouseURLOnlyWhenManaged(t *testing.T) {
 
 func TestDatabaseForSlugIsAValidIdentifier(t *testing.T) {
 	cases := map[string]string{
-		"happy-tiger":     "lw_happy_tiger",
-		"zesty-yak-cove":  "lw_zesty_yak_cove",
-		"brave-otter":     "lw_brave_otter",
+		"happy-tiger":    "lw_happy_tiger",
+		"zesty-yak-cove": "lw_zesty_yak_cove",
+		"brave-otter":    "lw_brave_otter",
 	}
 	for slug, want := range cases {
 		if got := DatabaseForSlug(slug); got != want {
@@ -155,7 +154,9 @@ func indexByte(s string, b byte) int {
 	return -1
 }
 
-func hasKey(lines []string, key string) bool { return valueOf(lines, key) != "" || keyPresent(lines, key) }
+func hasKey(lines []string, key string) bool {
+	return valueOf(lines, key) != "" || keyPresent(lines, key)
+}
 
 func keyPresent(lines []string, key string) bool {
 	for _, l := range lines {

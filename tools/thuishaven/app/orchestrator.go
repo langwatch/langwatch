@@ -18,12 +18,14 @@ type Orchestrator struct {
 	store Store
 	sup   Supervisor
 	sys   System
+	ch    ClickHouse
 	log   *zap.Logger
 }
 
-// New builds an Orchestrator from its injected dependencies.
-func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, log *zap.Logger) *Orchestrator {
-	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, log: log}
+// New builds an Orchestrator from its injected dependencies. ch may be nil when
+// ClickHouse management is disabled.
+func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, log *zap.Logger) *Orchestrator {
+	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, log: log}
 }
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).
@@ -52,8 +54,11 @@ func (o *Orchestrator) resolveSlug(p UpParams) (string, error) {
 
 // provision resolves the slug, allocates ports, registers the hostnames, writes
 // the overlay + registry entry, and starts the heartbeat. It returns the stack
-// and a cleanup that deregisters the routes and drops the registry entry.
-func (o *Orchestrator) provision(ctx context.Context, p UpParams) (domain.Stack, func(), error) {
+// and a cleanup that deregisters the routes and drops the registry entry. When
+// manageCH is set it also ensures the shared ClickHouse server + this stack's
+// database before the overlay is written, so CLICKHOUSE_URL is in the overlay and
+// the printed stack from the very first line.
+func (o *Orchestrator) provision(ctx context.Context, p UpParams, manageCH bool) (domain.Stack, func(), error) {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return domain.Stack{}, nil, err
@@ -82,6 +87,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams) (domain.Stack,
 		if err := o.proxy.Register(s.Name, slug, s.Port); err != nil {
 			o.log.Warn("alias registration failed", zap.String("host", s.Hostname), zap.Error(err))
 		}
+	}
+	if manageCH {
+		o.ensureClickHouse(ctx, &st)
 	}
 	st.UpdatedAt = o.sys.Now()
 	if err := o.store.WriteOverlay(p.LwDir, st); err != nil {
@@ -128,7 +136,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		return fmt.Errorf("portless proxy is not running — run `make portless-setup` once to route by hostname")
 	}
 	o.ensureDaemon(p.WorktreeDir)
-	st, cleanup, err := o.provision(ctx, p)
+	st, cleanup, err := o.provision(ctx, p, true)
 	if err != nil {
 		return err
 	}
@@ -158,7 +166,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 // dashboard -> routing chain is exercised without Postgres/ClickHouse/Redis.
 func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports []int)) error {
 	o.ensureDaemon(p.WorktreeDir)
-	st, cleanup, err := o.provision(ctx, p)
+	st, cleanup, err := o.provision(ctx, p, false)
 	if err != nil {
 		return err
 	}
@@ -173,8 +181,10 @@ func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports [
 }
 
 // Down tears the current worktree's routes + registry entry down without needing
-// the launcher process (useful after a crash).
-func (o *Orchestrator) Down(p UpParams) error {
+// the launcher process (useful after a crash). Unless keepDB is set it also drops
+// this stack's ClickHouse database — the "give me a fresh DB" affordance — so the
+// next `up` re-runs migrations into a clean, correctly-counted schema.
+func (o *Orchestrator) Down(ctx context.Context, p UpParams, keepDB bool) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
@@ -182,9 +192,50 @@ func (o *Orchestrator) Down(p UpParams) error {
 	for _, r := range domain.PerWorktreeServices {
 		o.proxy.Remove(r.Name, slug)
 	}
+	o.proxy.Remove(domain.ClickHouseService, slug)
+	if o.ch != nil && o.cfg.ManageClickHouse && !keepDB {
+		db := domain.DatabaseForSlug(slug)
+		if err := o.ch.DropDatabase(ctx, db); err != nil {
+			o.log.Warn("could not drop clickhouse database", zap.String("db", db), zap.Error(err))
+		} else {
+			fmt.Printf("dropped clickhouse database %q\n", db)
+		}
+	}
 	o.store.RemoveStack(slug)
 	fmt.Printf("stack %q torn down\n", slug)
 	return nil
+}
+
+// ensureClickHouse starts the shared managed clickhouse-server (if not already
+// up), creates this stack's isolated database, registers the always-resolving
+// clickhouse.<slug> route, and records the endpoint on the stack so OverlayEnv
+// emits CLICKHOUSE_URL. Failures are non-fatal: haven warns and leaves the app to
+// fall back to whatever CLICKHOUSE_URL is pinned in .env.
+func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
+	if o.ch == nil || !o.cfg.ManageClickHouse {
+		return
+	}
+	port, err := o.ch.Ensure(ctx)
+	if err != nil {
+		o.log.Warn("clickhouse unavailable — falling back to .env CLICKHOUSE_URL", zap.Error(err))
+		return
+	}
+	db := domain.DatabaseForSlug(st.Slug)
+	if err := o.ch.EnsureDatabase(ctx, db); err != nil {
+		o.log.Warn("could not create clickhouse database", zap.String("db", db), zap.Error(err))
+		return
+	}
+	st.ClickHouseHTTPPort = port
+	st.ClickHouseDatabase = db
+	scheme, pport := o.proxy.Endpoint()
+	st.Services = append(st.Services, domain.Service{
+		Name: domain.ClickHouseService, Role: "ClickHouse (this stack's DB)", Port: port,
+		Hostname: o.cfg.Naming.Hostname(domain.ClickHouseService, st.Slug),
+		URL:      o.cfg.Naming.URL(domain.ClickHouseService, st.Slug, scheme, pport),
+	})
+	if err := o.proxy.Register(domain.ClickHouseService, st.Slug, port); err != nil {
+		o.log.Warn("clickhouse alias registration failed", zap.Error(err))
+	}
 }
 
 // Seed reseeds the current stack's database — the "give me a fresh DB" affordance.

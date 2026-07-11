@@ -32,7 +32,12 @@ COMMANDS
                   hostnames, start + supervise the stack. (What pnpm dev runs.)
     watch         Live TUI of every running stack + service health (bare 'haven'
                   in a terminal does the same). --agent gives a plain snapshot.
-    down          Tear this worktree's routes + registry entry down.
+    down          Tear this worktree's routes + registry entry down, and drop this
+                  stack's ClickHouse database (pass --keep-db to keep it).
+    clickhouse    Manage the shared native ClickHouse (haven runs one server, one
+                  database per slug). Subcommands: status | up | url | stop |
+                  drop [--all]. "haven clickhouse url" prints this stack's
+                  CLICKHOUSE_URL; "drop" gives you a fresh, correctly-counted DB.
     seed          Reseed this stack's database (fresh DB on demand).
     list [--json] Show every running stack: slug, branch, worktree, hostnames.
     doctor        Check proxy / daemon / observability / stack health.
@@ -49,6 +54,10 @@ ENVIRONMENT
     START_WORKERS=false          Do not start background workers.
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
+    LANGWATCH_HAVEN_CH=0         Do not manage ClickHouse (use .env CLICKHOUSE_URL).
+    LANGWATCH_HAVEN_CH_STOP_IDLE=1  Daemon stops the CH server when no stacks run.
+    LANGWATCH_HAVEN_CH_MAX_MEMORY   CH server memory ceiling in bytes (default 4GiB).
+    CLICKHOUSE_BIN=/path/clickhouse  Override the clickhouse binary location.
     LANGWATCH_OBSERVABILITY_PORT Grafana port to route (default 3000).
     PORTLESS=0                   Bypass portless entirely (legacy PORT scheme).
     HAVEN_AGENT=1                Plain, colourless, redraw-free output (also on

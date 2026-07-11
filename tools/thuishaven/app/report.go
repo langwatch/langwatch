@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -63,6 +64,10 @@ func (o *Orchestrator) Doctor() error {
 	fmt.Printf("%s portless proxy running (%s on :%d)\n", ok(o.proxy.Running()), scheme, port)
 	fmt.Printf("%s haven daemon (pid %d) -> %s\n", ok(daemonUp && o.sys.ProcessAlive(info.PID)), info.PID, url(o.cfg.Naming.Project))
 	fmt.Printf("%s grafana observability on :%d -> %s\n", ok(o.sys.PortInUse(obsPort)), obsPort, url("observability"))
+	if o.ch != nil && o.cfg.ManageClickHouse {
+		chOK, detail := o.ch.Health(context.Background())
+		fmt.Printf("%s managed clickhouse — %s\n", ok(chOK), detail)
+	}
 	fmt.Printf("     stacks running: %d   tld: .%s\n", len(o.store.Stacks()), o.cfg.Naming.TLD)
 	return nil
 }
