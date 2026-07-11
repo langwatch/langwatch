@@ -17,15 +17,21 @@ import {
   BarChart3,
   Bot,
   Check,
+  Cpu,
   Database,
   FileText,
   FlaskConical,
+  FolderKanban,
+  Key,
+  KeyRound,
   LayoutDashboard,
   MessagesSquare,
   type LucideIcon,
   ShieldCheck,
+  Tag,
   Trash2,
   Waypoints,
+  Workflow,
   Zap,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -47,6 +53,12 @@ const SURFACE_ICON: Record<CapabilitySurface, LucideIcon> = {
   simulations: MessagesSquare,
   agents: Bot,
   automations: Zap,
+  workflows: Workflow,
+  annotations: Tag,
+  secrets: KeyRound,
+  projects: FolderKanban,
+  apiKeys: Key,
+  modelProviders: Cpu,
 };
 
 // Overline colour + icon per tone. `read` leans on the surface icon; the
