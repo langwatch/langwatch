@@ -2,6 +2,7 @@ import { Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
 import { buildTerminalStepsFromSpans } from "./buildStepsFromSpans";
+import { deriveSessionEvents } from "./sessionEvents";
 import { indexToolSpansByUseId } from "./toolSpans";
 import { TERMINAL_TOKENS } from "./palette";
 import { TerminalView } from "./TerminalView";
@@ -48,6 +49,18 @@ export function TerminalTab({
     () => (query.data ? buildTerminalStepsFromSpans(query.data) : []),
     [query.data],
   );
+  // A trace is spans AND logs. The logs carry what the spans cannot: a tool the
+  // user DENIED (which produces no span at all), API errors and their retries, a
+  // mid-session compaction. Read them so the session shows its real moments.
+  const logsQuery = api.tracesV2.traceLogs.useQuery(
+    { projectId, traceId, occurredAtMs },
+    { refetchOnWindowFocus: false, staleTime: 60_000 },
+  );
+  const sessionEvents = useMemo(
+    () => deriveSessionEvents(logsQuery.data ?? []),
+    [logsQuery.data],
+  );
+
   const toolSpans = useMemo(
     () =>
       indexToolSpansByUseId({
@@ -90,5 +103,12 @@ export function TerminalTab({
     );
   }
 
-  return <TerminalView steps={steps} toolSpans={toolSpans} meta={{ cwd }} />;
+  return (
+    <TerminalView
+      steps={steps}
+      toolSpans={toolSpans}
+      sessionEvents={sessionEvents}
+      meta={{ cwd }}
+    />
+  );
 }
