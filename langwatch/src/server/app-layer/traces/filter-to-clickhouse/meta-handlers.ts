@@ -1,10 +1,17 @@
 import type { TagToken } from "liqe";
 import { FilterParseError } from "../errors";
+import {
+  type FieldDef,
+  type InMemoryTrace,
+  UNSUPPORTED,
+  type Unsupported,
+} from "./field-def";
 import { boundedSubquery, scenarioRunSubquery } from "./subqueries";
 import {
   extractStringValue,
-  type FieldHandler,
+  likeMatch,
   nextParam,
+  parseJsonStringArray,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   type TranslationContext,
   validateValueLength,
@@ -69,6 +76,10 @@ function stripTraceAttributePrefix(value: string): string | null {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// trace / traceId
+// ---------------------------------------------------------------------------
+
 function translateTraceId(
   tag: TagToken,
   negated: boolean,
@@ -85,15 +96,21 @@ function translateTraceId(
   return wrap(`TraceId = {${p}:String}`, negated);
 }
 
-function makeScenarioColumnHandler(column: string): FieldHandler {
-  return (tag, negated, ctx) => {
+const TRACE_ID_DEF: FieldDef = {
+  toClickHouse: translateTraceId,
+  evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
-    validateValueLength(value);
-    const p = nextParam(ctx, column);
-    ctx.params[p] = value;
-    return wrap(scenarioRunSubquery(`${column} = {${p}:String}`), negated);
-  };
-}
+    const id = trace.summary.traceId;
+    const matched = value.includes("*")
+      ? likeMatch(id, value)
+      : id === value;
+    return negated ? !matched : matched;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// has / none — existence categories
+// ---------------------------------------------------------------------------
 
 function translateExistence(
   tag: TagToken,
@@ -181,11 +198,91 @@ function translateExistence(
   }
 }
 
-export const META_HANDLERS: Record<string, FieldHandler> = {
-  has: (tag, negated, ctx) => translateExistence(tag, negated, ctx),
-  none: (tag, negated, ctx) => translateExistence(tag, !negated, ctx),
+/**
+ * Which auxiliary collection a `has:<value>` / `none:<value>` reads, or `null`
+ * when it's answered from the trace summary alone. `has` is value-polymorphic
+ * so it carries no static `FieldDef.needs`; `queryNeeds` consults this instead.
+ */
+export function existenceNeeds(value: string): "evaluations" | "events" | null {
+  if (value === "eval") return "evaluations";
+  if (value === "feedback") return "events";
+  return null;
+}
 
-  eval: (tag, negated, ctx) => {
+function evaluateExistence(
+  tag: TagToken,
+  negated: boolean,
+  trace: InMemoryTrace,
+): boolean | Unsupported {
+  const value = extractStringValue(tag);
+  const attrs = trace.summary.attributes;
+  const polarise = (present: boolean) => (negated ? !present : present);
+
+  const traceAttrKey = stripTraceAttributePrefix(value);
+  if (traceAttrKey !== null) {
+    // Empty key throws on the SQL side (422) — fail closed here.
+    if (!traceAttrKey) return UNSUPPORTED;
+    return polarise((attrs[traceAttrKey] ?? "") !== "");
+  }
+
+  switch (value) {
+    case "error":
+      return polarise(trace.summary.containsErrorStatus);
+    case "eval":
+      if (trace.evaluations == null) return UNSUPPORTED;
+      return polarise(trace.evaluations.length > 0);
+    case "feedback":
+      if (trace.events == null) return UNSUPPORTED;
+      return polarise(trace.events.some((e) => e.name === "user_feedback"));
+    case "annotation":
+      return polarise(trace.summary.annotationIds.length > 0);
+    case "conversation":
+      return polarise((attrs["gen_ai.conversation.id"] ?? "") !== "");
+    case "user":
+      return polarise((attrs["langwatch.user_id"] ?? "") !== "");
+    case "customer":
+      return polarise((attrs["langwatch.customer_id"] ?? "") !== "");
+    case "topic":
+      return polarise((trace.summary.topicId ?? "") !== "");
+    case "subtopic":
+      return polarise((trace.summary.subTopicId ?? "") !== "");
+    case "label": {
+      const raw = attrs["langwatch.labels"] ?? "";
+      return polarise(raw !== "" && raw !== "[]");
+    }
+    case "model":
+      return polarise(trace.summary.models.length > 0);
+    case "service":
+      return polarise((attrs["service.name"] ?? "") !== "");
+    case "traceName":
+      return polarise((trace.summary.traceName ?? "") !== "");
+    case "rootSpanType":
+      return polarise((trace.summary.rootSpanType ?? "") !== "");
+    default:
+      // Unknown value throws on the SQL side — fail closed here.
+      return UNSUPPORTED;
+  }
+}
+
+const HAS_DEF: FieldDef = {
+  toClickHouse: (tag, negated, ctx) => translateExistence(tag, negated, ctx),
+  evaluateInMemory: (tag, negated, trace) =>
+    evaluateExistence(tag, negated, trace),
+};
+
+const NONE_DEF: FieldDef = {
+  toClickHouse: (tag, negated, ctx) => translateExistence(tag, !negated, ctx),
+  evaluateInMemory: (tag, negated, trace) =>
+    evaluateExistence(tag, !negated, trace),
+};
+
+// ---------------------------------------------------------------------------
+// eval / event / prompt
+// ---------------------------------------------------------------------------
+
+const EVAL_DEF: FieldDef = {
+  needs: "evaluations",
+  toClickHouse: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
     const p = nextParam(ctx, "evaluatorName");
@@ -199,8 +296,17 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
       negated,
     );
   },
+  evaluateInMemory: (tag, negated, trace) => {
+    if (trace.evaluations == null) return UNSUPPORTED;
+    const value = extractStringValue(tag);
+    const matched = trace.evaluations.some((e) => e.evaluatorName === value);
+    return negated ? !matched : matched;
+  },
+};
 
-  event: (tag, negated, ctx) => {
+const EVENT_DEF: FieldDef = {
+  needs: "events",
+  toClickHouse: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
     const p = nextParam(ctx, "eventName");
@@ -214,16 +320,20 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
       negated,
     );
   },
+  evaluateInMemory: (tag, negated, trace) => {
+    if (trace.events == null) return UNSUPPORTED;
+    const value = extractStringValue(tag);
+    const matched = trace.events.some((e) => e.name === value);
+    return negated ? !matched : matched;
+  },
+};
 
-  trace: (tag, negated, ctx) => translateTraceId(tag, negated, ctx),
-  traceId: (tag, negated, ctx) => translateTraceId(tag, negated, ctx),
-
-  // Prompt IDs are hoisted onto trace_summaries as a JSON array string in
-  // `Attributes['langwatch.prompt_ids']` — every prompt referenced anywhere
-  // in the trace ends up there. We parse it to Array(String) and check
-  // membership; ClickHouse caches the JSONExtract per granule so this is
-  // cheap relative to the rest of the WHERE.
-  prompt: (tag, negated, ctx) => {
+// Prompt IDs are hoisted onto trace_summaries as a JSON array string in
+// `Attributes['langwatch.prompt_ids']` — every prompt referenced anywhere in
+// the trace ends up there. The SQL parses it to Array(String) and checks
+// membership; in memory `parseJsonStringArray` does the same.
+const PROMPT_DEF: FieldDef = {
+  toClickHouse: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
     const p = nextParam(ctx, "promptId");
@@ -233,19 +343,27 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
       negated,
     );
   },
+  evaluateInMemory: (tag, negated, trace) => {
+    const value = extractStringValue(tag);
+    const promptIds =
+      parseJsonStringArray(trace.summary.attributes["langwatch.prompt_ids"]) ??
+      [];
+    const matched = promptIds.includes(value);
+    return negated ? !matched : matched;
+  },
+};
 
-  spanId: (tag, negated, ctx) => {
+// span-level id lookup translates to a cross-table subquery; deriving spans at
+// dispatch time is a later phase, so it can't be positively evaluated yet.
+const SPAN_ID_DEF: FieldDef = {
+  toClickHouse: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
     const p = nextParam(ctx, "spanId");
     if (value.includes("*")) {
       ctx.params[p] = value.replace(/\*/g, "%");
       return wrap(
-        boundedSubquery(
-          "stored_spans",
-          "StartTime",
-          `SpanId LIKE {${p}:String}`,
-        ),
+        boundedSubquery("stored_spans", "StartTime", `SpanId LIKE {${p}:String}`),
         negated,
       );
     }
@@ -255,21 +373,47 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
       negated,
     );
   },
+  evaluateInMemory: () => UNSUPPORTED,
+};
 
-  // Direct match on the hoisted attribute. No join.
-  scenarioRun: (tag, negated, ctx) => {
+// ---------------------------------------------------------------------------
+// scenario fields
+// ---------------------------------------------------------------------------
+
+// Direct match on the hoisted attribute. No join.
+const SCENARIO_RUN_DEF: FieldDef = {
+  toClickHouse: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
     const p = nextParam(ctx, "scenarioRunId");
     ctx.params[p] = value;
     return wrap(`Attributes['scenario.run_id'] = {${p}:String}`, negated);
   },
+  evaluateInMemory: (tag, negated, trace) => {
+    const value = extractStringValue(tag);
+    const matched =
+      (trace.summary.attributes["scenario.run_id"] ?? "") === value;
+    return negated ? !matched : matched;
+  },
+};
 
-  scenario: makeScenarioColumnHandler("ScenarioId"),
-  scenarioSet: makeScenarioColumnHandler("ScenarioSetId"),
-  scenarioBatch: makeScenarioColumnHandler("BatchRunId"),
+// scenario dimensions resolve through a `simulation_runs` subquery, a table the
+// in-memory trace doesn't carry — fail closed for now.
+function scenarioColumnDef(column: string): FieldDef {
+  return {
+    toClickHouse: (tag, negated, ctx) => {
+      const value = extractStringValue(tag);
+      validateValueLength(value);
+      const p = nextParam(ctx, column);
+      ctx.params[p] = value;
+      return wrap(scenarioRunSubquery(`${column} = {${p}:String}`), negated);
+    },
+    evaluateInMemory: () => UNSUPPORTED,
+  };
+}
 
-  scenarioVerdict: (tag, negated, ctx) => {
+const SCENARIO_VERDICT_DEF: FieldDef = {
+  toClickHouse: (tag, negated, ctx) => {
     const raw = extractStringValue(tag);
     validateValueLength(raw);
     const mapped = SCENARIO_VERDICT_BY_LABEL[raw.toLowerCase()];
@@ -282,8 +426,11 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
     ctx.params[p] = mapped;
     return wrap(scenarioRunSubquery(`Verdict = {${p}:String}`), negated);
   },
+  evaluateInMemory: () => UNSUPPORTED,
+};
 
-  scenarioStatus: (tag, negated, ctx) => {
+const SCENARIO_STATUS_DEF: FieldDef = {
+  toClickHouse: (tag, negated, ctx) => {
     const raw = extractStringValue(tag);
     validateValueLength(raw);
     const mapped = SCENARIO_STATUS_BY_LABEL[raw.toLowerCase()];
@@ -296,4 +443,22 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
     ctx.params[p] = mapped;
     return wrap(scenarioRunSubquery(`Status = {${p}:String}`), negated);
   },
+  evaluateInMemory: () => UNSUPPORTED,
 };
+
+export const META_FIELD_DEFS = {
+  has: HAS_DEF,
+  none: NONE_DEF,
+  eval: EVAL_DEF,
+  event: EVENT_DEF,
+  trace: TRACE_ID_DEF,
+  traceId: TRACE_ID_DEF,
+  prompt: PROMPT_DEF,
+  spanId: SPAN_ID_DEF,
+  scenarioRun: SCENARIO_RUN_DEF,
+  scenario: scenarioColumnDef("ScenarioId"),
+  scenarioSet: scenarioColumnDef("ScenarioSetId"),
+  scenarioBatch: scenarioColumnDef("BatchRunId"),
+  scenarioVerdict: SCENARIO_VERDICT_DEF,
+  scenarioStatus: SCENARIO_STATUS_DEF,
+} satisfies Record<string, FieldDef>;

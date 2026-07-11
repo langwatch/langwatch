@@ -23,7 +23,7 @@ import {
   wrap,
 } from "./value-helpers";
 
-const MAX_NODE_COUNT = 20;
+export const MAX_NODE_COUNT = 20;
 const MAX_PARAM_COUNT = 50;
 
 /**
@@ -31,7 +31,7 @@ const MAX_PARAM_COUNT = 50;
  * `]`/`)` before a boolean) which its own parser then rejects. Normalise the
  * incoming query so older saved URLs and external callers don't 422.
  */
-function normalizeQuery(s: string): string {
+export function normalizeQuery(s: string): string {
   return s
     .replace(/([\]\)])(?=(?:AND|OR|NOT)\b)/gi, "$1 ")
     .replace(/[ \t]{2,}/g, " ")
