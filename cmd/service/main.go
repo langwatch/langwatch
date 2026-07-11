@@ -6,11 +6,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	aigateway "github.com/langwatch/langwatch/services/aigateway/cmd"
 	langyagent "github.com/langwatch/langwatch/services/langyagent/cmd"
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo/cmd"
@@ -23,20 +25,36 @@ var Version = "dev"
 type ServiceBoot func(ctx context.Context, args []string) error
 
 var services = map[string]ServiceBoot{
-	"aigateway":   aigateway.Root,
+	"aigateway":  aigateway.Root,
 	"langyagent": langyagent.Root,
-	"nlpgo":       nlpgo.Root,
+	"nlpgo":      nlpgo.Root,
 }
 
 func main() {
 	os.Exit(run(os.Args))
 }
 
-func run(args []string) int {
+func run(args []string) (code int) {
 	ctx := context.Background()
 	logger := clog.New(ctx, clog.Config{Level: "info"})
 	ctx = clog.Set(ctx, logger)
-	defer clog.HandlePanic(ctx, false)
+	// A panic on the main goroutine must exit non-zero: recover here (so the
+	// process logs a clean panic instead of a raw runtime crash) and set the
+	// named return to 1 so os.Exit reflects the failure to the orchestrator.
+	defer func() {
+		if r := recover(); r != nil {
+			clog.LogPanic(ctx, r)
+			// Ship buffered telemetry before the process exits — a fatal panic
+			// otherwise loses the BatchSpanProcessor's queued spans/metrics.
+			// Bounded so a stuck collector can't hang the exit. SIGKILL / OOM
+			// remain uncatchable; this covers the fatal panic the process DID
+			// observe.
+			flushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			otelsetup.ForceFlushGlobal(flushCtx)
+			cancel()
+			code = 1
+		}
+	}()
 
 	args = args[1:]
 	if len(args) == 0 {
