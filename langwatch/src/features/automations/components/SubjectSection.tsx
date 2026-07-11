@@ -20,9 +20,13 @@ import {
   type TriggerFilterValue,
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
+import { formatCost, formatDuration } from "~/features/traces-v2/utils/formatters";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
+import type { NotificationCadence } from "~/automations/cadences";
 import {
   filterQueryIsSet,
   filtersAreSet,
+  isNotifyAction,
   type ReportSourceKind,
 } from "../logic/draftReducer";
 import { estimateFiringRate } from "../logic/firingRate";
@@ -312,9 +316,30 @@ function TraceSubject() {
     <TraceQuerySubject
       query={draft.filterQuery ?? ""}
       onChange={(value) => dispatch({ type: "SET_FILTER_QUERY", value })}
+      cadence={draft.notificationCadence}
+      // Persist actions (dataset / annotation writes) fire per match; only
+      // notify actions batch on the digest cadence.
+      batches={isNotifyAction(draft)}
     />
   );
 }
+
+/** One matched trace in the preview: the fields the richer rows render. */
+interface PreviewTrace {
+  traceId: string;
+  name: string;
+  timestamp: number;
+  status: "ok" | "error" | "warning";
+  models: string[];
+  totalCost: number;
+  durationMs: number;
+}
+
+const STATUS_DOT_COLOR: Record<PreviewTrace["status"], string> = {
+  ok: "green.solid",
+  error: "red.solid",
+  warning: "orange.solid",
+};
 
 const PREVIEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const PREVIEW_SORT = { columnId: "time", direction: "desc" as const };
@@ -329,9 +354,13 @@ const QUERY_DEBOUNCE_MS = 400;
 function TraceQuerySubject({
   query,
   onChange,
+  cadence,
+  batches,
 }: {
   query: string;
   onChange: (value: string) => void;
+  cadence: NotificationCadence;
+  batches: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
@@ -399,6 +428,8 @@ function TraceQuerySubject({
         error={preview.error?.message ?? null}
         totalHits={preview.data?.totalHits ?? null}
         sample={preview.data?.items ?? []}
+        cadence={cadence}
+        batches={batches}
       />
     </VStack>
   );
@@ -411,12 +442,16 @@ function TracePreview({
   error,
   totalHits,
   sample,
+  cadence,
+  batches,
 }: {
   trimmed: string;
   loading: boolean;
   error: string | null;
   totalHits: number | null;
-  sample: Array<{ traceId: string; name?: string | null }>;
+  sample: PreviewTrace[];
+  cadence: NotificationCadence;
+  batches: boolean;
 }) {
   if (trimmed.length === 0) {
     return (
@@ -445,36 +480,80 @@ function TracePreview({
       borderWidth="1px"
       borderColor="border"
       borderRadius="md"
-      padding={3}
+      overflow="hidden"
       bg="bg.subtle"
     >
-      <Text textStyle="sm" fontWeight="medium">
-        {totalHits === 0
-          ? "No traces matched in the last 7 days"
-          : `${totalHits?.toLocaleString()} ${
-              totalHits === 1 ? "trace" : "traces"
-            } matched in the last 7 days`}
-      </Text>
-      {totalHits !== null && totalHits > 0 ? (
-        <Text textStyle="xs" color="fg.muted" paddingTop={0.5}>
-          {estimateFiringRate(totalHits)}
+      <Box padding={3} borderBottomWidth={sample.length > 0 ? "1px" : "0"} borderColor="border">
+        <Text textStyle="sm" fontWeight="medium">
+          {totalHits === 0
+            ? "No traces matched in the last 7 days"
+            : `${totalHits?.toLocaleString()} ${
+                totalHits === 1 ? "trace" : "traces"
+              } matched in the last 7 days`}
         </Text>
-      ) : null}
+        {totalHits !== null && totalHits > 0 ? (
+          <Text textStyle="xs" color="fg.muted" paddingTop={0.5}>
+            {estimateFiringRate({
+              matchesLast7Days: totalHits,
+              cadence,
+              batches,
+            })}
+          </Text>
+        ) : null}
+      </Box>
       {sample.length > 0 ? (
-        <VStack align="stretch" gap={0.5} paddingTop={2}>
+        <VStack
+          align="stretch"
+          gap={0}
+          separator={<Box height="1px" bg="border" />}
+        >
           {sample.map((t) => (
-            <Text
-              key={t.traceId}
-              textStyle="xs"
-              color="fg.muted"
-              truncate
-              fontFamily="mono"
-            >
-              {t.name || t.traceId}
-            </Text>
+            <PreviewTraceRow key={t.traceId} trace={t} />
           ))}
         </VStack>
       ) : null}
     </Box>
+  );
+}
+
+/** A single matched trace: status dot · name · model · cost · time ago. */
+function PreviewTraceRow({ trace }: { trace: PreviewTrace }) {
+  const model = trace.models[0];
+  const extraModels = trace.models.length - 1;
+  return (
+    <HStack gap={2} paddingX={3} paddingY={1.5} _hover={{ bg: "bg.muted" }}>
+      <Box
+        boxSize={2}
+        borderRadius="full"
+        bg={STATUS_DOT_COLOR[trace.status]}
+        flexShrink={0}
+      />
+      <Text textStyle="xs" truncate flex={1} minWidth={0}>
+        {trace.name || trace.traceId}
+      </Text>
+      {model ? (
+        <Text textStyle="xs" color="fg.muted" flexShrink={0}>
+          {model}
+          {extraModels > 0 ? ` +${extraModels}` : ""}
+        </Text>
+      ) : null}
+      {trace.totalCost > 0 ? (
+        <Text textStyle="xs" color="fg.muted" flexShrink={0}>
+          {formatCost(trace.totalCost)}
+        </Text>
+      ) : null}
+      <Text textStyle="xs" color="fg.muted" flexShrink={0}>
+        {formatDuration(trace.durationMs)}
+      </Text>
+      <Text
+        textStyle="xs"
+        color="fg.subtle"
+        flexShrink={0}
+        minWidth="3.5rem"
+        textAlign="right"
+      >
+        {formatTimeAgoCompact(trace.timestamp)}
+      </Text>
+    </HStack>
   );
 }
