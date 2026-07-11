@@ -125,3 +125,40 @@ describe("buildTerminalStepsFromSpans", () => {
     });
   });
 });
+
+/**
+ * A Claude Code turn can spawn sub-agents (the Agent/Task tool), each running
+ * its OWN conversation with its own rolling history. "The last model call
+ * carries the whole turn" therefore holds per AGENT, not per trace — reading the
+ * trace's last llm_request would hand back a sub-agent's transcript and pass it
+ * off as the turn.
+ */
+describe("given a turn that spawned a sub-agent", () => {
+  it("renders the MAIN thread's transcript, not the sub-agent's", () => {
+    const mainCall = llmRequestSpan({
+      spanId: "main-1",
+      startTimeMs: 1000,
+      input: [{ role: "user", content: "fix the failing test" }],
+      output: "Fixed it.",
+    });
+    // The sub-agent's call finishes LAST, so a per-trace "final call" wins here.
+    const subAgentCall = {
+      ...llmRequestSpan({
+        spanId: "sub-1",
+        startTimeMs: 5000,
+        input: [{ role: "user", content: "search the codebase for foo" }],
+        output: "Found foo in bar.ts",
+      }),
+      params: { agent_id: "agent_abc" },
+    } as SpanDetail;
+
+    const steps = buildTerminalStepsFromSpans([mainCall, subAgentCall]);
+
+    const text = steps
+      .flatMap((s) => s.turn.blocks)
+      .map((b) => ("text" in b ? b.text : ""))
+      .join(" ");
+    expect(text).toContain("fix the failing test");
+    expect(text).not.toContain("search the codebase for foo");
+  });
+});
