@@ -5,13 +5,14 @@ package cmd
 // of truth for what the tool can do. Keep it copy-pasteable.
 const helpText = `thuishaven (haven) — LangWatch local-dev orchestrator, your apps' home port.
 
-Every worktree gets a random slug (e.g. happy-tiger). Its services are reachable
-by hostname through the portless proxy — no ports to juggle, no collisions:
+Each worktree's slug is its own directory name, sanitised (e.g. a checkout at
+.../worktrees/portless is the "portless" stack). Its services are reachable by
+hostname through the portless proxy — predictable, no ports to juggle:
 
-    app.happy-tiger.langwatch.localhost         App — the UI, and its API at /api
-    gateway.happy-tiger.langwatch.localhost     AI Gateway (Go)
-    nlp.happy-tiger.langwatch.localhost         NLP engine (Go)
-    clickhouse.happy-tiger.langwatch.localhost  ClickHouse (this stack's own DB)
+    app.portless.langwatch.localhost         App — the UI, and its API at /api
+    gateway.portless.langwatch.localhost     AI Gateway (Go)
+    nlp.portless.langwatch.localhost         NLP engine (Go)
+    clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB)
 
 The app and its API share ONE origin: open app.<slug>.langwatch.localhost for the
 UI and hit app.<slug>.langwatch.localhost/api for the API — one URL, not two.
@@ -46,7 +47,8 @@ COMMANDS
     help          This text.
 
 ENVIRONMENT
-    LANGWATCH_SLUG=<slug>        Pin this worktree's slug (else derived+cached).
+    LANGWATCH_SLUG=<slug>        Pin this worktree's slug (else the sanitised
+                                 worktree directory name, cached).
     LANGWATCH_LOCAL_TLD=test     Use a different TLD (default: localhost).
     LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
     LANGWATCH_SKIP_NLP=1         Do not start the NLP engine.
