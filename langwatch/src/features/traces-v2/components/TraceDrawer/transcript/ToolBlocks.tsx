@@ -1,6 +1,11 @@
 import { Box, chakra, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { type ReactNode, useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuWrench } from "react-icons/lu";
+import { hasAnsi } from "../../../utils/ansi/ansi";
+// Direct file import (not the barrel) so we don't pull TerminalView -> transcript
+// back into transcript and form an import cycle. TerminalOutput has no
+// transcript dependency of its own.
+import { TerminalOutput } from "../terminalView/TerminalOutput";
 import { toolResultBodyToString, tryPrettyJson } from "./parsing";
 import type { ChatMessage } from "./types";
 
@@ -102,6 +107,11 @@ export function ToolPairCard({
     [result],
   );
   const prettyResult = useMemo(() => tryPrettyJson(resultBody), [resultBody]);
+  // ANSI escape codes only ever show up in real terminal/tool output (Bash,
+  // test runners, build tools). When they do, render the coloured terminal
+  // screen instead of dumping raw escape sequences into a <pre>. Plain output
+  // is unaffected — `hasAnsi` is false for it, so the render is unchanged.
+  const resultHasAnsi = useMemo(() => hasAnsi(resultBody), [resultBody]);
   const isError = result?.isError === true;
 
   return (
@@ -225,19 +235,27 @@ export function ToolPairCard({
               label={isError ? "Error" : "Result"}
               tone={isError ? "error" : "default"}
             >
-              <Box
-                as="pre"
-                textStyle="2xs"
-                fontFamily="mono"
-                color="fg"
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-                margin={0}
-                maxHeight="600px"
-                overflow="auto"
-              >
-                {prettyResult || "—"}
-              </Box>
+              {resultHasAnsi ? (
+                <TerminalOutput
+                  text={resultBody}
+                  isError={isError}
+                  maxHeight="600px"
+                />
+              ) : (
+                <Box
+                  as="pre"
+                  textStyle="2xs"
+                  fontFamily="mono"
+                  color="fg"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                  margin={0}
+                  maxHeight="600px"
+                  overflow="auto"
+                >
+                  {prettyResult || "—"}
+                </Box>
+              )}
             </ToolPairSection>
           )}
         </VStack>
