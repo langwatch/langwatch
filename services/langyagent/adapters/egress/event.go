@@ -57,10 +57,7 @@ type egressEvent struct {
 // egressMonitor is the rung-0 flag sink (ADR-043). The enforcing adapter calls
 // record() on every per-CONNECT decision so enforcement and monitoring are the
 // same event. The default is logEgressMonitor (pod log); an operator wiring a
-// richer attributed-telemetry sink injects it at NewEnforcingGuard time. This is
-// a distinct surface from the ADR-044 MonitoringGuard/InstrumentedRoundTripper,
-// which observes the MANAGER's own outbound transport rather than per-worker
-// forward-proxy flows.
+// richer attributed-telemetry sink injects it at NewEnforcingGuard time.
 type egressMonitor interface {
 	record(egressEvent)
 }

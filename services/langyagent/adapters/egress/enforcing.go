@@ -77,10 +77,4 @@ func (g *EnforcingGuard) PrepareWorker(_ context.Context, w WorkerContext) (Work
 	}, nil
 }
 
-// ReleaseWorker is a no-op: the per-worker proxy is torn down via the returned
-// WorkerEgress.Close (stored on the Worker), not from conversation-keyed guard
-// state, so a kill-then-respawn on the same conversation cannot close the
-// replacement's proxy.
-func (g *EnforcingGuard) ReleaseWorker(_ context.Context, _ string) {}
-
 var _ Guard = (*EnforcingGuard)(nil)

@@ -1,15 +1,13 @@
 // Package egress is the per-worker egress seam and its implementations. The
-// pool consults a Guard around a worker's lifecycle: PrepareWorker runs before
-// the opencode subprocess starts (it sets up this worker's egress policy and
-// returns the loopback forward-proxy the worker's HTTPS_PROXY must point at, and
-// may fail the spawn closed), and ReleaseWorker runs when the worker is torn
-// down (guard-owned bookkeeping / observation cleanup).
+// pool consults a Guard before a worker's opencode subprocess starts:
+// PrepareWorker sets up this worker's egress policy and returns the loopback
+// forward-proxy the worker's HTTPS_PROXY must point at, and may fail the spawn
+// closed. Per-worker teardown rides the returned WorkerEgress.Close, not the
+// guard.
 //
-// Three implementations live here:
+// Two implementations live here:
 //   - PassThrough: no-op, no proxy — the worker egresses direct, exactly as
 //     before (used in tests / partial wiring).
-//   - MonitoringGuard (monitor.go): ADR-044 observe-only — per-worker spans, no
-//     proxy, never blocks.
 //   - EnforcingGuard (enforcing.go): ADR-043 enforcement — a per-worker outbound
 //     forward proxy (adapter.go) that require-TLS / throttles / applies the
 //     floor ∪ allow-list policy / SNI-cross-checks every CONNECT, monitor-first.
@@ -64,9 +62,6 @@ type Guard interface {
 	// returns the handle (proxy port + teardown) the pool threads into the
 	// worker env and stores for teardown. An error fails the spawn closed.
 	PrepareWorker(ctx context.Context, w WorkerContext) (WorkerEgress, error)
-	// ReleaseWorker is the guard's own teardown hook (observe-only cleanup). The
-	// per-worker proxy is torn down via WorkerEgress.Close, not here.
-	ReleaseWorker(ctx context.Context, conversationID string)
 }
 
 // PassThrough is the no-op Guard: it runs no proxy and changes no behaviour —
@@ -81,9 +76,6 @@ func NewPassThrough() PassThrough { return PassThrough{} }
 func (PassThrough) PrepareWorker(_ context.Context, _ WorkerContext) (WorkerEgress, error) {
 	return WorkerEgress{}, nil
 }
-
-// ReleaseWorker is a no-op.
-func (PassThrough) ReleaseWorker(_ context.Context, _ string) {}
 
 // Ensure PassThrough satisfies Guard at compile time.
 var _ Guard = PassThrough{}

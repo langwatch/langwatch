@@ -589,11 +589,10 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	}
 	defer func() {
 		if !success {
-			// we.Close tears down THIS worker's forward proxy; ReleaseWorker fires
-			// the guard's observe-only release hook. Both nil-safe / idempotent and
-			// only run on a failed spawn — on success the live Worker owns `we`.
+			// we.Close tears down THIS worker's forward proxy. Nil-safe /
+			// idempotent and only run on a failed spawn — on success the live
+			// Worker owns `we`.
 			we.Close()
-			p.egress.ReleaseWorker(ctx, conversationID)
 		}
 	}()
 
@@ -839,16 +838,12 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 			)
 		}
 	}
-	// Egress teardown runs OUTSIDE the pool lock: a real PR4 guard may perform
-	// network/monitoring I/O here, which must never stall the pool. It is not
-	// part of the home-dir race, so ordering after the unlock is correct.
-	// Close is the per-worker forward-proxy teardown (identity-guarded above so a
-	// replacement's proxy is never closed); ReleaseWorker is the guard's own
-	// observe-only hook. Both are idempotent / nil-safe.
+	// Egress teardown runs OUTSIDE the pool lock: tearing down a forward proxy
+	// may perform network I/O, which must never stall the pool. It is not part
+	// of the home-dir race, so ordering after the unlock is correct. Close is the
+	// per-worker forward-proxy teardown (identity-guarded above so a
+	// replacement's proxy is never closed); idempotent / nil-safe.
 	egressToClose.Close()
-	if shouldWipe {
-		p.egress.ReleaseWorker(p.baseCtx, conversationID)
-	}
 }
 
 // kill terminates a worker and cleans its home. The exit-watcher goroutine in
