@@ -30,12 +30,17 @@ export { useLangyFeedback } from "./data/useLangyFeedback";
 
 export { useLangyFreshness } from "./hooks/useLangyFreshness";
 export { useLangyTurnSignals } from "./hooks/useLangyTurnSignals";
+export type {
+  LangyTurnSignals,
+  LangyTurnMetric,
+} from "./hooks/useLangyTurnSignals";
 
 export { LangyError } from "./components/LangyError";
 export { LangyFeedback } from "./components/LangyFeedback";
 export { NumberTicker } from "./components/NumberTicker";
 export { StreamingText } from "./components/StreamingText";
 export { StreamingStatusLine } from "./components/StreamingStatusLine";
+export { StreamingStatCard } from "./components/StreamingStatCard";
 
 export {
   explainLangyError,

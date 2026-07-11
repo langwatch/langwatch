@@ -56,7 +56,7 @@ export function StreamingText({ text }: { text: string }) {
             key={index}
             display="inline-block"
             whiteSpace="pre"
-            initial={{ opacity: 0, filter: "blur(6px)", y: 4 }}
+            initial={{ opacity: 0, filter: "blur(6px)", y: 5 }}
             animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
             transition={{ ...REVEAL_SPRING, delay }}
           >

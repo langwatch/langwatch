@@ -548,6 +548,15 @@ function LangyPanel({
 
   // Granular streaming state (PR3 transport seam) + domain-error rendering.
   const turnSignals = useLangyTurnSignals(currentConversationId);
+  // Once the turn reports live status / progress / metrics we show the detailed
+  // streaming block (brand-dot status, statcard, mesh progress) and retire the
+  // generic shimmer thinking indicator — they're the two halves of one moment,
+  // never both at once. Until the PR3 transport lands, no signal arrives and the
+  // shimmer covers the whole "working" gap.
+  const hasTurnDetail =
+    !!turnSignals.status ||
+    turnSignals.progress !== null ||
+    (turnSignals.metrics?.length ?? 0) > 0;
   const turnError = useMemo(() => {
     if (!error) return null;
     // The stream now carries a serialized domain error; fall back to a calm
@@ -674,16 +683,21 @@ function LangyPanel({
                 />
               ))}
               {isBusy ? (
-                <>
-                  {/* Granular streaming states (PR3 transport); renders null
-                      until status/progress arrive, so the shimmer indicator
-                      covers the gap. */}
+                hasTurnDetail ? (
+                  // Detailed streaming block: brand-dot status, rolling-number
+                  // statcard, and the mesh progress bar — driven by the live
+                  // turn signals (PR3 transport).
                   <StreamingStatusLine
                     status={turnSignals.status}
                     progress={turnSignals.progress}
+                    metrics={turnSignals.metrics}
+                    segment={turnSignals.segment}
                   />
+                ) : (
+                  // No live detail yet — the shimmer thinking indicator covers
+                  // the gap between send and the first token / signal.
                   <ThinkingIndicator messages={messages} />
-                </>
+                )
               ) : null}
               {turnError ? (
                 <LangyError presentation={turnError} onAction={onErrorAction} />
