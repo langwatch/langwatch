@@ -10,6 +10,10 @@ import {
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
 import { enrichCodingAgentSpansFromLogs } from "~/server/app-layer/traces/claude-code-log-enrichment";
+import {
+  buildCodingAgentTranscript,
+  type CodingAgentTranscript,
+} from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
@@ -726,6 +730,98 @@ const sortSchema = z.object({
 // Router
 // ---------------------------------------------------------------------------
 
+/**
+ * Load one trace's spans, enriched and REDACTED.
+ *
+ * Extracted so `spansFull` and `codingAgentTranscript` cannot drift apart. The
+ * transcript endpoint returning content that had skipped this pass would be a way
+ * around the data-privacy policy the span reads enforce, so there is exactly one
+ * way in.
+ */
+async function loadProtectedSpansFull({
+  input,
+  ctx,
+}: {
+  input: { projectId: string; traceId: string; occurredAtMs?: number };
+  ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
+}): Promise<SpanDetail[]> {
+  const app = getApp();
+  const protections = await getUserProtectionsForProject(ctx as never, {
+    projectId: input.projectId,
+  });
+  const storedSpans = await app.traces.spans.getSpansByTraceId({
+    tenantId: input.projectId,
+    traceId: input.traceId,
+    visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
+    ...occurredAtFromInput(input),
+  });
+  // Claude Code's real `llm_request` spans carry tokens + `request_id` but NO
+  // message content and NO cost — both live in the trace's OTLP log records.
+  // Join them on BEFORE protections run, so the joined content goes through the
+  // same redaction pass as any other span content rather than bypassing it.
+  const spans = await enrichCodingAgentSpansFromLogs({
+    logRecords: app.traces.logRecords,
+    tenantId: input.projectId,
+    traceId: input.traceId,
+    spans: storedSpans,
+    occurredAtMs: input.occurredAtMs,
+  });
+
+  const redactions = buildSpanContentRedactions(spans, protections);
+  return spans.map((span) => {
+    const detail = mapSpanToDetail(
+      applySpanProtections(span, protections, redactions),
+      [],
+    );
+    const redacted = redactV2Content(detail, protections);
+    const detailParams = detail.params as Record<string, unknown> | null;
+    redacted.contentPrivacy = buildContentPrivacy(
+      protections,
+      readDroppedFromParams(detailParams),
+    );
+    redacted.piiAnalysisIncomplete = readPiiIncompleteFromParams(detailParams);
+    redacted.restrictedAttributes = protections.restrictedAttributes ?? null;
+    return redacted;
+  });
+}
+
+/** Load one trace's log records, gated by the viewer's visibility exactly as `traceLogs` does. */
+async function loadProtectedTraceLogs({
+  input,
+  ctx,
+}: {
+  input: { projectId: string; traceId: string; occurredAtMs?: number };
+  ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
+}): Promise<TraceLogRecordDto[]> {
+  const app = getApp();
+  const protections = await getUserProtectionsForProject(ctx as never, {
+    projectId: input.projectId,
+  });
+  const visibilityCutoffMs = await getVisibilityCutoffMsForProject(
+    input.projectId,
+  );
+  const rows = await app.traces.logRecords.getLogsByTraceId(
+    input.projectId,
+    input.traceId,
+    input.occurredAtMs,
+  );
+  return rows.map((row) =>
+    gateTraceLogVisibility(
+      {
+        spanId: row.spanId,
+        timeUnixMs: row.timeUnixMs,
+        body: row.body,
+        attributes: row.attributes,
+        resourceAttributes: row.resourceAttributes,
+        scopeName: row.scopeName,
+        scopeVersion: row.scopeVersion,
+      },
+      protections,
+      visibilityCutoffMs,
+    ),
+  );
+}
+
 export const tracesV2Router = createTRPCRouter({
   list: protectedProcedure
     .input(
@@ -1322,49 +1418,43 @@ export const tracesV2Router = createTRPCRouter({
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }): Promise<SpanDetail[]> => {
-      const app = getApp();
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-      const storedSpans = await app.traces.spans.getSpansByTraceId({
-        tenantId: input.projectId,
-        traceId: input.traceId,
-        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-          input.projectId,
-        ),
-        ...occurredAtFromInput(input),
-      });
-      // Claude Code's real `llm_request` spans carry tokens + `request_id` but
-      // NO message content and NO cost — both live in the trace's OTLP log
-      // records. Join them on before protections run, so the joined content
-      // goes through the same redaction pass as any other span content rather
-      // than bypassing it.
-      const spans = await enrichCodingAgentSpansFromLogs({
-        logRecords: app.traces.logRecords,
-        tenantId: input.projectId,
-        traceId: input.traceId,
-        spans: storedSpans,
-        occurredAtMs: input.occurredAtMs,
-      });
-      // Span-level protections first (category visibility, restricted custom
-      // attributes, hidden content scrubbed out of params), then the DTO pass.
-      const redactions = buildSpanContentRedactions(spans, protections);
-      return spans.map((span) => {
-        const detail = mapSpanToDetail(
-          applySpanProtections(span, protections, redactions),
-          [],
-        );
-        const redacted = redactV2Content(detail, protections);
-        const detailParams = detail.params as Record<string, unknown> | null;
-        redacted.contentPrivacy = buildContentPrivacy(
-          protections,
-          readDroppedFromParams(detailParams),
-        );
-        redacted.piiAnalysisIncomplete =
-          readPiiIncompleteFromParams(detailParams);
-        redacted.restrictedAttributes =
-          protections.restrictedAttributes ?? null;
-        return redacted;
+      return loadProtectedSpansFull({ input, ctx });
+    }),
+
+  /**
+   * The coding-agent TRANSCRIPT for one trace — what the agent did, in order.
+   *
+   * The Terminal view used to assemble this in the browser out of three modules.
+   * It lives here now because a transcript is not a rendering concern: the CLI
+   * wants it, an MCP server wants it, and an export wants it, and none of them
+   * are going to run React to get one. One derivation, one answer.
+   *
+   * Reads spans AND logs through the same loaders the sibling endpoints use, so
+   * its content has been through the identical redaction pass — a transcript
+   * endpoint that did its own reads would be a way around the data-privacy
+   * policy, which is precisely why it does not.
+   */
+  codingAgentTranscript: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...spanReadHintShape,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input, ctx }): Promise<CodingAgentTranscript> => {
+      const [spans, logs] = await Promise.all([
+        loadProtectedSpansFull({ input, ctx }),
+        loadProtectedTraceLogs({ input, ctx }),
+      ]);
+
+      return buildCodingAgentTranscript({
+        spans,
+        logs: logs.map((row) => ({
+          timestampMs: row.timeUnixMs,
+          attributes: (row.attributes ?? {}) as Record<string, unknown>,
+        })),
       });
     }),
 
@@ -1617,38 +1707,10 @@ export const tracesV2Router = createTRPCRouter({
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }): Promise<TraceLogRecordDto[]> => {
-      const app = getApp();
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-      // Free-plan teaser window: records older than the plan cutoff have their
-      // content withheld regardless of the viewer's captured-content
-      // permission, exactly as the sibling span reads teaser-redact pre-cutoff
-      // spans (`applyVisibilityGate`). Without this the raw-log read would
-      // surface older-than-window prompts / responses the span reads hide.
-      const visibilityCutoffMs = await getVisibilityCutoffMsForProject(
-        input.projectId,
-      );
-      const rows = await app.traces.logRecords.getLogsByTraceId(
-        input.projectId,
-        input.traceId,
-        input.occurredAtMs,
-      );
-      return rows.map((row) =>
-        gateTraceLogVisibility(
-          {
-            spanId: row.spanId,
-            timeUnixMs: row.timeUnixMs,
-            body: row.body,
-            attributes: row.attributes,
-            resourceAttributes: row.resourceAttributes,
-            scopeName: row.scopeName,
-            scopeVersion: row.scopeVersion,
-          },
-          protections,
-          visibilityCutoffMs,
-        ),
-      );
+      // The free-plan teaser window and the viewer's captured-content
+      // permissions are both applied inside the loader, which the transcript
+      // endpoint shares — so the two reads cannot diverge on what they hide.
+      return loadProtectedTraceLogs({ input, ctx });
     }),
 });
 
