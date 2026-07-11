@@ -28,7 +28,7 @@ import {
   revokeLangySessionApiKey,
 } from "~/server/services/langy/langyApiKey";
 import { env } from "~/env.mjs";
-import { hasProjectPermission } from "~/server/api/rbac";
+import { hasProjectPermission, isDemoProjectId } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
@@ -410,6 +410,16 @@ langyRoute().post("/langy/chat", async (c) => {
     pageContext,
     skills,
   } = parsedBody.data;
+  // Langy is not available on the public demo project. `evaluations:view` is
+  // granted to every authenticated user there, so without this anyone could
+  // drive a turn on the demo — reads are gated the same way on the REST + tRPC
+  // surfaces (isDemoProjectId).
+  if (isDemoProjectId(projectId)) {
+    return c.json(
+      { error: "Langy is not available on the demo project." },
+      { status: 403 },
+    );
+  }
   // A regenerate RE-DRIVES the failed turn against the message already on
   // record. Anything else is a fresh send and persists its user message below.
   const isRetry = trigger === "regenerate-message";
@@ -1353,8 +1363,7 @@ async function requireSessionAndPermission(
   // but per-user chat conversations on it should not be. Recurring #3323
   // trap — feature surfaces that look read-only-public still need to gate
   // user-owned data inside them.
-  const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
-  if (demoId && projectId === demoId) {
+  if (isDemoProjectId(projectId)) {
     return {
       error: c.json(
         { error: "Langy is not available on the demo project." },

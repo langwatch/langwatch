@@ -1516,19 +1516,28 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
   "playground:view",
 ];
 
+/**
+ * Whether `projectId` is the public demo project. The demo grants
+ * `DEMO_VIEW_PERMISSIONS` to every authenticated user (see `isDemoProject`), so a
+ * surface that must NOT be reachable there at all — e.g. the per-user Langy chat,
+ * whose conversations belong to whoever actually used Langy on the demo — gates
+ * on this directly instead of on the permission check that the demo silently
+ * grants.
+ */
+export function isDemoProjectId(
+  projectId: string | null | undefined,
+): boolean {
+  if (!projectId) return false;
+  // Prefer dynamic process.env in tests; fall back to validated env.
+  const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
+  return !!demoId && projectId === demoId;
+}
+
 export function isDemoProject(
   projectId: string,
   permission: Permission,
 ): boolean {
-  if (!projectId || projectId !== env.DEMO_PROJECT_ID) {
-    // Prefer dynamic process.env in tests; fall back to env.DEMO_PROJECT_ID
-    const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
-    if (!demoId || projectId !== demoId) {
-      return false;
-    }
-  }
-
-  return DEMO_VIEW_PERMISSIONS.includes(permission);
+  return isDemoProjectId(projectId) && DEMO_VIEW_PERMISSIONS.includes(permission);
 }
 
 // ============================================================================
