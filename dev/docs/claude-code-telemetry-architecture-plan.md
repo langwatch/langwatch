@@ -84,12 +84,16 @@ path stays only as the pre-flip / non-beta fallback.
 - Files: new `reactors/claudeCodeEnhancedTelemetryGate.reactor.ts` + `pipeline.ts` registration; `log-request-collection.service.ts` (read flag); Prisma `Project` flag column + migration.
 - Tests: reactor sets flag on tracing scope only; ingest skips marking when flag set (→ no synth, normal retention) and still marks when unset (fallback).
 
-### C1 — Logs read API *(dashboard frontend join + raw inspector)*
-- **Repository** `getClaudeContentLogsByTrace(tenantId, traceId, occurredAtMs?)` → `StoredLogRecordRow[]` for `event.name ∈ {api_request_body, api_response_body, user_prompt, assistant_response}` under the claude scope. Mirror `getMarkedClaudeCodeLogsByTrace`'s partition-key time-cap + IN-tuple dedup; **not** filtered on `CLAUDE_CODE_KIND_ATTR` (post-gate they're unmarked); origin-gated + lazy.
-- **Service** `LogRecordStorageService.getContentLogsByTraceId`.
-- **tRPC** `tracesV2.claudeContentLogs` (protectedProcedure, input `{projectId, traceId}`) returning the logs (body included) for the frontend.
+### C1 — Logs read API *(dashboard frontend join + raw inspector)* — GENERIC, not claude-specific
+The API surface is generic (`traceLogs`) — logs correlate at the **trace** level, and
+other emitters (Spring AI, codex, gemini) also produce correlated logs. Not `spanLogs`
+(logs key by traceId, to spans only via `request_id`).
+- **Repository** `getLogsByTraceId(tenantId, traceId, occurredAtMs?)` → `StoredLogRecordRow[]` (body included). Mirror `getMarkedClaudeCodeLogsByTrace`'s partition-key time-cap + IN-tuple dedup; **not** filtered on `CLAUDE_CODE_KIND_ATTR` (post-gate they're unmarked); lazy. May accept an event-name filter for the content subset.
+- **Service** `LogRecordStorageService.getLogsByTraceId`.
+- **tRPC** `tracesV2.traceLogs` (protectedProcedure, `{projectId, traceId}`) returning the trace's log records (body included) for the frontend.
 - Files: `repositories/log-record-storage.repository.ts` (+ CH + Null impls), `log-record-storage.service.ts`, `api/routers/tracesV2.ts`.
-- Tests: repo returns content logs for a trace, time-capped; excludes non-claude; unit for the service.
+- **Correlation (validated in local Loki):** content logs carry the real `trace_id` as OTLP metadata → `getLogsByTraceId(traceId)` finds them directly. Their own `span_id` is the **parent interaction** span, not the `llm_request` — so span-level joins use `request_id` (on `assistant_response`/`api_response_body`), positional for input. Session-lifecycle events (`permission_mode_changed`, `hook_registered`) have no `trace_id` — not needed for enrichment.
+- Tests: repo returns a trace's logs, time-capped; unit for the service.
 
 ### C2 — Backend enrichment on legacy `TraceService` *(exports/REST/legacy/evals)*
 - **Pure fn** `enrichSpansWithClaudeLogContent({ spans, logs }): Span[]` in a new `claude-code-span-enrichment.ts`, **capped** via `capPayloadString`, idempotent, no-op for non-claude spans. Two content paths:
