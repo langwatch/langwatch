@@ -36,6 +36,10 @@ import {
   traceNameChangedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
+import {
+  accumulateClaudeSummaryFromLog,
+  accumulateClaudeSummaryFromSpan,
+} from "./services/claude-code-summary.service";
 import { accumulateInteractionSummary } from "./services/interaction-summary.service";
 import {
   SpanTimingService,
@@ -222,6 +226,13 @@ export function applySpanToSummary({
   Object.assign(
     attributes,
     accumulateInteractionSummary({ attributes, span }),
+  );
+  // Claude-specific facts you cannot get from a prompt/reply pair — above all
+  // the final stop_reason, since a reply cut off by max_tokens is a truncation,
+  // not an answer, and would otherwise render as though the agent finished.
+  Object.assign(
+    attributes,
+    accumulateClaudeSummaryFromSpan({ attributes, span }),
   );
 
   const newModels = spanCostService.extractModelsFromSpan(span);
@@ -487,6 +498,17 @@ export class TraceSummaryFoldProjection
       state.attributes["langwatch.reserved.input_is_fallback"] === "true";
     const currentOutputIsFallback =
       state.attributes["langwatch.reserved.output_is_fallback"] === "true";
+
+    // Claude splits its facts across signals: the slash command that opened the
+    // interaction, a mid-interaction compaction, a failed-and-retried model call
+    // exist ONLY as logs — no span carries them.
+    Object.assign(
+      mergedAttributes,
+      accumulateClaudeSummaryFromLog({
+        attributes: mergedAttributes,
+        data: event.data,
+      }),
+    );
 
     const logIO = extractIOFromLogRecord(event.data);
 
