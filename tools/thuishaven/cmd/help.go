@@ -45,6 +45,8 @@ COMMANDS
                   --yes. Also prunes orphaned git worktree admin entries.
     typecheck     Run "pnpm typecheck" under a machine-wide slot so parallel tsgo
                   runs across worktrees don't exhaust RAM (args forwarded).
+    hmr on|off    AI-gated HMR: "on [--ttl 30s]" defers Vite reloads while an
+                  agent edits (a human's browser isn't thrashed); "off" resumes.
     list [--json] Show every running stack: slug, branch, worktree, hostnames.
     doctor        Check proxy / daemon / observability / stack health.
     daemon        Run the singleton daemon (auto-spawned by up; rarely by hand).

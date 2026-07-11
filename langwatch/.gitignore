@@ -101,3 +101,6 @@ screenshot-*.png
 
 # thuishaven (portless local dev)
 .env.portless
+
+# haven AI-gated HMR marker
+.haven-hmr-gate

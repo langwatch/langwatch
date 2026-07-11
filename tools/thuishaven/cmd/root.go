@@ -112,6 +112,8 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		return orch.Prune(ctx, worktree, hasFlag(rest, "--yes"))
 	case "typecheck", "tc":
 		return orch.Typecheck(ctx, lwDir, rest, envInt("HAVEN_TYPECHECK_SLOTS", 0))
+	case "hmr":
+		return orch.RunHMR(ctx, lwDir, rest)
 	case "seed":
 		return orch.Seed(ctx, params)
 	case "list", "ls", "status":
