@@ -27,6 +27,7 @@ function createTrigger(
     message: "",
     customGraphId: null,
     notificationCadence: "immediate",
+    filterQuery: null,
     traceDebounceMs: 45_000,
     templates: {
       slackTemplateType: null,

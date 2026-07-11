@@ -60,6 +60,7 @@ function makeTrigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary {
     message: "",
     customGraphId: null,
     notificationCadence: "immediate",
+    filterQuery: null,
     traceDebounceMs: 30000,
     templates: {
       slackTemplateType: null,

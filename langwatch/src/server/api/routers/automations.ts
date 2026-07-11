@@ -13,6 +13,7 @@ import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
 import { actionParamsSchemaFor } from "~/automations/providers/server";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
+import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import {
   InvalidEmailRecipientError,
   MissingAnnotatorError,
@@ -582,6 +583,10 @@ export const automationRouter = createTRPCRouter({
         action: z.nativeEnum(TriggerAction),
         alertType: z.nativeEnum(AlertType).nullable().optional(),
         filters: triggerFiltersSchema,
+        /** ADR-043 Subject facet: the Traces-V2 liqe query the automation is
+         *  about. When set, it supersedes `filters` (persisted as `{}`) and the
+         *  dispatcher evaluates it in-memory. Trace-subject automations only. */
+        filterQuery: z.string().nullable().optional(),
         customGraphId: z.string().nullable().optional(),
         /** Graph-threshold-alert rule. Present iff this is a graph alert
          *  (`customGraphId` set); merged into `actionParams` before persist
@@ -696,6 +701,31 @@ export const automationRouter = createTRPCRouter({
         throw toTemplateTRPCError(err);
       }
 
+      // ADR-043 Subject facet: normalise + validate the trace-filter query
+      // before persisting. Empty/whitespace collapses to null (the legacy
+      // `filters` path). A non-empty query is dry-run through the compiler so a
+      // malformed query is rejected here with author feedback rather than
+      // silently failing closed (matching nothing) at dispatch time.
+      const filterQuery =
+        input.filterQuery && input.filterQuery.trim() !== ""
+          ? input.filterQuery.trim()
+          : null;
+      if (filterQuery !== null) {
+        try {
+          translateFilterToClickHouse(filterQuery, input.projectId, {
+            from: 0,
+            to: 0,
+          });
+        } catch (err) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Invalid trace filter: ${
+              err instanceof Error ? err.message : "could not parse the query"
+            }`,
+          });
+        }
+      }
+
       // Annotation-queue dispatch attributes created queue items to a user
       // and skips the action when `createdByUserId` is absent. The drawer's
       // provider slice doesn't carry it, so stamp the caller here — same as
@@ -740,6 +770,9 @@ export const automationRouter = createTRPCRouter({
           triggerKind: TriggerKind.ALERT,
           alertType: built.alertType,
           filters: built.filters,
+          // Graph alerts never carry a trace-filter query; clear it so a kind
+          // conversion can't leave a stale one behind.
+          filterQuery: null,
           customGraphId: built.customGraphId,
           actionParams: built.actionParams,
           slackTemplateType: input.templates.slackTemplateType ?? null,
@@ -760,6 +793,7 @@ export const automationRouter = createTRPCRouter({
           action: built.action,
           triggerKind: TriggerKind.REPORT,
           filters: built.filters,
+          filterQuery: null,
           actionParams: built.actionParams,
           slackTemplateType: input.templates.slackTemplateType ?? null,
           slackTemplate: input.templates.slackTemplate ?? null,
@@ -772,7 +806,11 @@ export const automationRouter = createTRPCRouter({
           action: input.action,
           triggerKind: TriggerKind.AUTOMATION,
           alertType: input.alertType ?? null,
-          filters: JSON.stringify(input.filters),
+          // A trace-subject automation supersedes the structured `filters` with
+          // its liqe query; persist an empty `{}` so the legacy matcher is a
+          // no-op and the dispatcher reads `filterQuery` instead.
+          filters: filterQuery !== null ? "{}" : JSON.stringify(input.filters),
+          filterQuery,
           customGraphId: input.customGraphId ?? null,
           actionParams: actionParams as Prisma.InputJsonValue,
           slackTemplateType: input.templates.slackTemplateType ?? null,

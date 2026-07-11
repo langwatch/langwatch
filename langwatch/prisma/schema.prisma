@@ -766,7 +766,15 @@ model Trigger {
   // customGraphId; REPORT is set by the scheduled-report upsert path.
   triggerKind   TriggerKind   @default(AUTOMATION)
   actionParams  Json
+  // Legacy structured filter object (FilterField -> values). Retained for
+  // back-compat; new trace-subject automations author `filterQuery` instead
+  // and persist `filters` as an empty `{}`.
   filters       Json
+  // ADR-043 Subject facet: the Traces-V2 liqe query string that defines which
+  // traces this automation is about. NULL = legacy `filters`-driven trigger.
+  // Evaluated in-memory against fold state at dispatch (never per-trace CH),
+  // fail-closed on any unevaluable field.
+  filterQuery   String?
   lastRunAt     Float         @default(0)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt

@@ -19,6 +19,7 @@ function makeSummary(
     message: null,
     customGraphId: null,
     notificationCadence: "immediate",
+    filterQuery: null,
     traceDebounceMs: 30000,
     templates: {
       slackTemplateType: null,

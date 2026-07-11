@@ -40,6 +40,7 @@ function makeGraphTrigger(id: string): TriggerSummary {
     message: null,
     customGraphId: `graph-${id}`,
     notificationCadence: "immediate",
+    filterQuery: null,
     traceDebounceMs: 30_000,
     templates: {
       slackTemplateType: null,

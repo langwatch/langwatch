@@ -9,6 +9,10 @@ export interface TriggerSummary {
   action: TriggerAction;
   actionParams: unknown;
   filters: TriggerFilters;
+  /** ADR-043 Subject facet: the Traces-V2 liqe query the automation is about.
+   *  NULL = legacy `filters`-driven trigger; when set, the dispatcher evaluates
+   *  it in-memory against fold state and ignores `filters`. */
+  filterQuery: string | null;
   alertType: AlertType | null;
   message: string | null;
   customGraphId: string | null;

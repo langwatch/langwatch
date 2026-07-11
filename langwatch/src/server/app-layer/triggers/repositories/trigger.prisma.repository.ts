@@ -24,6 +24,7 @@ export class PrismaTriggerRepository implements TriggerRepository {
         action: true,
         actionParams: true,
         filters: true,
+        filterQuery: true,
         alertType: true,
         message: true,
         customGraphId: true,
