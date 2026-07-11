@@ -4,10 +4,12 @@ import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   ArchiveConversationCommand,
+  ConsumeTurnHandoffCommand,
   FailAgentTurnCommand,
   RecordAgentRespondedCommand,
   RecordToolCallCompletedCommand,
   RecordToolCallStartedCommand,
+  RecordTurnHandoffCommand,
   ReconcileAgentTurnCommand,
   SendMessageCommand,
   StartAgentTurnCommand,
@@ -118,5 +120,7 @@ export function createLangyConversationProcessingPipeline(
     .withCommand("reconcileAgentTurn", ReconcileAgentTurnCommand)
     .withCommand("archiveConversation", ArchiveConversationCommand)
     .withCommand("updateConversationMetadata", UpdateConversationMetadataCommand)
+    .withCommand("recordTurnHandoff", RecordTurnHandoffCommand)
+    .withCommand("consumeTurnHandoff", ConsumeTurnHandoffCommand)
     .build();
 }

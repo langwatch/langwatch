@@ -33,6 +33,12 @@ type chatRequest struct {
 	// checks its own `validate:"required"` fields (see domain.Credentials).
 	Credentials   domain.Credentials `json:"credentials"`
 	ModelOverride string             `json:"modelOverride,omitempty"`
+	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a
+	// prior turn that handed off on shutdown. The control plane sets it on the
+	// next turn's /chat body when it found a pending handoff for the
+	// conversation; the manager forwards it verbatim into the worker, never
+	// parsing it. Absent ⇒ a normal cold start.
+	ResumeToken string `json:"resumeToken,omitempty"`
 }
 
 // validateChatRequest checks the decoded body against its `validate` tags. On
@@ -128,6 +134,7 @@ func chatHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 			Prompt:         req.Prompt,
 			System:         req.System,
 			Credentials:    creds,
+			ResumeToken:    req.ResumeToken,
 		}, sink); err != nil {
 			// Pre-stream failures only (e.g. conversation-busy → 409). Once the
 			// stream has begun, the app writes error events into the sink and

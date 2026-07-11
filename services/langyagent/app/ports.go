@@ -7,6 +7,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -23,6 +24,12 @@ type WorkerPool interface {
 	KillSessionVanished(conversationID string)
 	// StartReaper begins the idle-worker sweep.
 	StartReaper()
+	// ShutdownHandoff (ADR-048) is the pre-drain SIGTERM step: it notifies each
+	// live worker that shutdown is imminent (so opencode checkpoints the
+	// in-flight turn and emits a terminal handoff frame) and waits, bounded by
+	// deadline, for those turns to quiesce. Runs BEFORE Shutdown so the handoff
+	// frames reach the control plane before the process-group kill.
+	ShutdownHandoff(ctx context.Context, deadline time.Time)
 	// Shutdown tears down every worker.
 	Shutdown()
 }
@@ -37,8 +44,10 @@ type Worker interface {
 	Release()
 	// Touch resets the idle timer.
 	Touch()
-	// PostMessage queues the turn on the worker's opencode session.
-	PostMessage(ctx context.Context, system, prompt string) error
+	// PostMessage queues the turn on the worker's opencode session. resumeToken
+	// (ADR-048) carries an opaque prior-turn checkpoint to resume from; empty on
+	// a cold start.
+	PostMessage(ctx context.Context, system, prompt, resumeToken string) error
 	// StreamEvents forwards this session's opencode events into sink until a
 	// terminal event or ctx cancellation.
 	StreamEvents(ctx context.Context, sink ChatSink) error

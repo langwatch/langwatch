@@ -33,6 +33,14 @@ export interface LangyTurnHandoff {
    * route (a Redis-down reserve returns `reserved: false`).
    */
   permitReserved: boolean;
+  /**
+   * ADR-048 shutdown-handoff: an opaque, worker-authored resume token from a
+   * prior turn that checkpointed on pod termination. Set by the route when it
+   * found a pending handoff on the conversation fold; `runTurn` threads it onto
+   * the manager /chat body so opencode resumes from the checkpoint instead of a
+   * cold start. Absent on a normal turn.
+   */
+  resumeToken?: string;
 }
 
 /** Minimal Redis surface. Injected so unit tests need no live server. */

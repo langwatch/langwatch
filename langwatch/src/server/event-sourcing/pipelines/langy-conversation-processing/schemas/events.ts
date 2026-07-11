@@ -241,6 +241,58 @@ export type LangyConversationMetadataUpdatedEvent = z.infer<
 >;
 
 /**
+ * ConversationHandoffPending (ADR-048) — a turn checkpointed on pod termination
+ * and left an opaque, worker-authored resume token. The fold stores the token
+ * (PendingHandoffToken/PendingHandoffTurnId), clears CurrentTurnId (the turn
+ * handed off, it did not fail), and returns the conversation to idle. The token
+ * is OPAQUE to the pipeline — persisted verbatim, only opencode authors and
+ * consumes it.
+ */
+export const langyConversationHandoffPendingEventDataSchema = z.object({
+  conversationId: z.string(),
+  turnId: z.string(),
+  token: z.string(),
+});
+export type LangyConversationHandoffPendingEventData = z.infer<
+  typeof langyConversationHandoffPendingEventDataSchema
+>;
+
+export const LangyConversationHandoffPendingEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING),
+  version: z.literal(
+    LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_PENDING,
+  ),
+  data: langyConversationHandoffPendingEventDataSchema,
+});
+export type LangyConversationHandoffPendingEvent = z.infer<
+  typeof LangyConversationHandoffPendingEventSchema
+>;
+
+/**
+ * ConversationHandoffConsumed (ADR-048) — the next turn threaded the pending
+ * resume token to a fresh worker and cleared it from the fold. Idempotency on
+ * the command collapses a double-consume to a single event.
+ */
+export const langyConversationHandoffConsumedEventDataSchema = z.object({
+  conversationId: z.string(),
+  turnId: z.string(),
+});
+export type LangyConversationHandoffConsumedEventData = z.infer<
+  typeof langyConversationHandoffConsumedEventDataSchema
+>;
+
+export const LangyConversationHandoffConsumedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED),
+  version: z.literal(
+    LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED,
+  ),
+  data: langyConversationHandoffConsumedEventDataSchema,
+});
+export type LangyConversationHandoffConsumedEvent = z.infer<
+  typeof LangyConversationHandoffConsumedEventSchema
+>;
+
+/**
  * Union of all langy-conversation-processing event types.
  */
 export type LangyConversationProcessingEvent =
@@ -253,7 +305,9 @@ export type LangyConversationProcessingEvent =
   | LangyAgentTurnFailedEvent
   | LangyTurnFinalizedEvent
   | LangyConversationArchivedEvent
-  | LangyConversationMetadataUpdatedEvent;
+  | LangyConversationMetadataUpdatedEvent
+  | LangyConversationHandoffPendingEvent
+  | LangyConversationHandoffConsumedEvent;
 
 export {
   isLangyMessageSentEvent,
@@ -266,4 +320,6 @@ export {
   isLangyTurnFinalizedEvent,
   isLangyConversationArchivedEvent,
   isLangyConversationMetadataUpdatedEvent,
+  isLangyConversationHandoffPendingEvent,
+  isLangyConversationHandoffConsumedEvent,
 } from "./typeGuards";

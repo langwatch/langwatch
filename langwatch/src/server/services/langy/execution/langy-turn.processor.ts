@@ -79,17 +79,30 @@ export interface RunTurnDeps {
  */
 function parseAgentLine(
   line: string,
-): { delta?: string; error?: string } | null {
+): { delta?: string; error?: string; handoff?: string } | null {
   if (!line.trim()) return null;
   try {
     const event = JSON.parse(line) as {
       type?: string;
       error?: string;
+      token?: string;
       part?: { type?: string; text?: string };
-      properties?: { field?: string; delta?: string };
+      properties?: { field?: string; delta?: string; token?: string };
     };
     if (event.type === "error") {
       return { error: event.error || "agent error" };
+    }
+    // ADR-048: a terminal handoff frame carries an opaque resume token the
+    // worker authored when it checkpointed on manager shutdown. Empty string is
+    // still a handoff (the turn ended for handoff), just with nothing to resume.
+    if (event.type === "handoff") {
+      const token =
+        typeof event.token === "string"
+          ? event.token
+          : typeof event.properties?.token === "string"
+            ? event.properties.token
+            : "";
+      return { handoff: token };
     }
     if (event.type === "text" && event.part?.text) {
       return { delta: event.part.text };
@@ -122,6 +135,7 @@ export async function runTurn(
     system,
     modelOverride,
     credentials,
+    resumeToken,
   } = job;
   const doFetch = deps.fetchImpl ?? fetch;
   const turnLogger = logger.child({ projectId, conversationId, turnId });
@@ -186,6 +200,8 @@ export async function runTurn(
         system,
         credentials,
         ...(modelOverride ? { modelOverride } : {}),
+        // ADR-048: resume from a prior turn's checkpoint if one is pending.
+        ...(resumeToken ? { resumeToken } : {}),
       }),
       signal: AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
     });
@@ -199,12 +215,19 @@ export async function runTurn(
     const decoder = new TextDecoder();
     let buffer = "";
     let hardError: string | null = null;
+    let handoffToken: string | null = null;
 
     const handleLine = async (line: string) => {
       const parsed = parseAgentLine(line);
       if (!parsed) return;
       if (parsed.error) {
         hardError = parsed.error;
+        return;
+      }
+      if (parsed.handoff !== undefined) {
+        // ADR-048: the turn checkpointed on manager shutdown. Capture the opaque
+        // resume token; the stream ends on this terminal frame.
+        handoffToken = parsed.handoff;
         return;
       }
       if (parsed.delta) {
@@ -232,6 +255,36 @@ export async function runTurn(
 
     if (hardError) {
       throw new Error(hardError);
+    }
+
+    if (handoffToken !== null) {
+      // ADR-048: the worker handed off mid-turn on pod shutdown. Persist the
+      // opaque resume token durably (conversation_handoff_pending) so the next
+      // turn resumes from the checkpoint. Do NOT finalize — the turn did not
+      // complete; recordTurnHandoff clears the fold's CurrentTurnId so the
+      // conversation is not left "running".
+      await deps.conversations.recordTurnHandoff({
+        projectId,
+        conversationId,
+        turnId,
+        token: handoffToken,
+      });
+      await deps.buffer.markEnd({ conversationId, turnId });
+      // The turn paused for handoff — return the reserved PR permit so the pause
+      // does not burn the user's daily slot; the resumed turn re-reserves its
+      // own. Same release-only-if-reserved latch as the failure path (a Redis-
+      // down reserve returns reserved:false and must not walk the counter down).
+      if (job.permitReserved) {
+        await releaseLangyGithubPrPermit({ userId: job.actorUserId }).catch(
+          (releaseError) =>
+            turnLogger.warn(
+              { releaseError },
+              "failed to release PR permit on handoff",
+            ),
+        );
+      }
+      turnLogger.info("langy turn handed off — checkpoint persisted for resume");
+      return;
     }
 
     // Terminal: the whole final answer is the durable source of truth; tokens

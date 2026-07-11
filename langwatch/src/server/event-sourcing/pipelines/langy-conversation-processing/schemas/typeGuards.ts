@@ -7,6 +7,8 @@ import type {
   LangyConversationArchivedEvent,
   LangyConversationMetadataUpdatedEvent,
   LangyConversationProcessingEvent,
+  LangyConversationHandoffPendingEvent,
+  LangyConversationHandoffConsumedEvent,
   LangyMessageSentEvent,
   LangyToolCallCompletedEvent,
   LangyToolCallStartedEvent,
@@ -71,4 +73,20 @@ export function isLangyConversationMetadataUpdatedEvent(
   event: LangyConversationProcessingEvent,
 ): event is LangyConversationMetadataUpdatedEvent {
   return event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED;
+}
+
+export function isLangyConversationHandoffPendingEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyConversationHandoffPendingEvent {
+  return (
+    event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING
+  );
+}
+
+export function isLangyConversationHandoffConsumedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyConversationHandoffConsumedEvent {
+  return (
+    event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED
+  );
 }

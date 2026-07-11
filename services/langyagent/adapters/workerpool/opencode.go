@@ -29,6 +29,12 @@ var terminalEventTypes = map[string]struct{}{
 	"session.idle":      {},
 	"session.completed": {},
 	"error":             {},
+	// ADR-048: opencode emits a terminal `handoff` frame carrying an opaque
+	// resume token when it checkpoints on a shutdown-imminent notice. Treating
+	// it as terminal lets the in-flight turn's StreamEvents forward the frame to
+	// the sink (and thence to the control plane over the open /chat response)
+	// and return cleanly, exactly like any other terminal event.
+	"handoff": {},
 }
 
 // errAuthProbeUnreachable marks a transport-level failure of the auth
@@ -285,8 +291,9 @@ func createOpenCodeSession(ctx context.Context, port int, bearerToken string) (s
 // postMessage queues a turn for the worker. 204/2xx → success. 404 means the
 // session vanished (rare; surfaces as domain.ErrSessionNotFound so the
 // orchestrator can recycle the worker). baseURL is the worker's precomputed
-// "http://127.0.0.1:<port>" so no per-turn Sprintf is needed.
-func postMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, userText string) error {
+// "http://127.0.0.1:<port>" so no per-turn Sprintf is needed. resumeToken
+// (ADR-048) rides the payload when resuming a prior turn's checkpoint.
+func postMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, userText, resumeToken string) error {
 	type part struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
@@ -294,9 +301,16 @@ func postMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, u
 	payload := struct {
 		Parts  []part `json:"parts"`
 		System string `json:"system,omitempty"`
+		// ResumeToken (ADR-048) is the opaque, worker-authored checkpoint from a
+		// prior turn that handed off on shutdown. Present only when the control
+		// plane found a pending handoff for this conversation; opencode restores
+		// "done so far" from it instead of cold-starting. Opaque to the manager —
+		// forwarded verbatim, never parsed. omitempty ⇒ a normal cold start.
+		ResumeToken string `json:"resumeToken,omitempty"`
 	}{
-		Parts:  []part{{Type: "text", Text: userText}},
-		System: system,
+		Parts:       []part{{Type: "text", Text: userText}},
+		System:      system,
+		ResumeToken: resumeToken,
 	}
 	body, _ := json.Marshal(payload)
 	url := baseURL + "/session/" + sessionID + "/prompt_async"
@@ -320,6 +334,58 @@ func postMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, u
 		return fmt.Errorf("post message: %d %s", resp.StatusCode, string(b))
 	}
 	return nil
+}
+
+// notifyShutdownImminent POSTs a shutdown-imminent notice to the worker's
+// opencode control API (ADR-048), telling it to checkpoint the in-flight turn
+// and emit a terminal `handoff` frame before the manager kills its process
+// group. `deadline` is the absolute wall-clock instant (unix millis) the worker
+// must checkpoint before — strictly inside the graceful window (see the ADR-048
+// deadline math). Best-effort: a non-2xx or transport error is returned to the
+// caller, which logs and proceeds with the drain (a worker that cannot be
+// notified simply cold-starts on its next turn, today's behaviour). opencode is
+// expected to answer 2xx/204; a 404 means the session already vanished.
+func notifyShutdownImminent(ctx context.Context, baseURL, bearerToken, sessionID string, deadline time.Time) error {
+	body := bytes.NewBufferString(fmt.Sprintf(`{"deadline":%d}`, deadline.UnixMilli()))
+	url := baseURL + "/session/" + sessionID + "/shutdown_imminent"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	addBearer(req, bearerToken)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 && resp.StatusCode != http.StatusNoContent {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("shutdown_imminent: %d %s", resp.StatusCode, string(b))
+	}
+	return nil
+}
+
+// extractHandoffToken pulls the opaque resume token out of a decoded `handoff`
+// ndjson frame (ADR-048). The token is opaque to the manager — this exists only
+// so tests (and any future manager-side bookkeeping) can assert the frame shape;
+// the token itself is never interpreted here, only on the control plane (which
+// persists it) and in opencode (which authors and consumes it). Tolerates the
+// bare `token` field and a nested `properties.token`, mirroring the
+// session-id shape-tolerance in eventBelongsToSession.
+func extractHandoffToken(event map[string]any) (string, bool) {
+	if typ, _ := event["type"].(string); typ != "handoff" {
+		return "", false
+	}
+	if v, _ := event["token"].(string); v != "" {
+		return v, true
+	}
+	if props, _ := event["properties"].(map[string]any); props != nil {
+		if v, _ := props["token"].(string); v != "" {
+			return v, true
+		}
+	}
+	return "", true
 }
 
 // streamSessionEvents tails /event from the worker and forwards every event

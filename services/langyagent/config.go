@@ -76,6 +76,21 @@ type Config struct {
 	// non-IP-literal host as unexpected; operators should set the real hosts.
 	EgressAllowedHosts string `env:"LANGY_EGRESS_ALLOWED_HOSTS"`
 
+	// ShutdownHandoffDeadlineMS (ADR-048) is the wall-clock budget the manager
+	// gives each live worker to checkpoint on SIGTERM before the process-group
+	// kill. The `deadline` posted to a worker is now + this. MUST leave room for
+	// the drain: LoadConfig fails closed if
+	// ShutdownHandoffDeadlineMS + ShutdownDrainBudgetMS >= GracefulSeconds*1000
+	// (see the ADR-048 deadline math — SIGKILL is uncatchable, so the whole
+	// handoff+drain must fit inside the graceful window, which the operator sizes
+	// below the pod terminationGracePeriodSeconds).
+	ShutdownHandoffDeadlineMS int64 `env:"LANGY_SHUTDOWN_HANDOFF_DEADLINE_MS" validate:"gte=0"`
+	// ShutdownDrainBudgetMS (ADR-048) is the time reserved AFTER the handoff for
+	// the worker-pool drain (per-worker SIGINT -> 2s grace -> SIGKILL, authproxy
+	// teardown, margin). Subtracted from the graceful window so the handoff
+	// deadline can never eat the drain budget out from under the kill.
+	ShutdownDrainBudgetMS int64 `env:"LANGY_SHUTDOWN_DRAIN_BUDGET_MS" validate:"gte=0"`
+
 	// WorkspaceRoot is the shared-templates directory the pod entrypoint seeds
 	// with AGENTS.md and skills/ (see entrypoint.sh). setupWorkerHome reads
 	// ${WorkspaceRoot}/AGENTS.md and symlinks ${WorkspaceRoot}/skills into each
@@ -125,6 +140,11 @@ const (
 	// prompt + credentials, never large-context LLM payloads.
 	defaultMaxBodyBytes      = 1_000_000
 	defaultOTelPluginVersion = "1.0.0"
+	// ADR-048 shutdown-handoff budgets (ms). Defaults sum to 8s, comfortably
+	// under the 10s default graceful window; the operator sizes
+	// terminationGracePeriodSeconds above the graceful window.
+	defaultShutdownHandoffDeadlineMS = 5_000
+	defaultShutdownDrainBudgetMS     = 3_000
 )
 
 func defaultConfig() Config {
@@ -135,14 +155,16 @@ func defaultConfig() Config {
 			GracefulSeconds:     defaultGracefulSeconds,
 			MaxRequestBodyBytes: defaultMaxBodyBytes,
 		},
-		MaxWorkers:         defaultMaxWorkers,
-		WorkerIdleMS:       defaultWorkerIdleMS,
-		ReadinessTimeoutMS: defaultReadinessTimeoutMS,
-		SessionsRoot:       defaultSessionsRoot,
-		WorkspaceRoot:      defaultWorkspaceRoot,
-		OTelPluginVersion:  defaultOTelPluginVersion,
-		OpenCodeBinaryPath: "opencode",
-		reaperInterval:     defaultReaperInterval,
+		MaxWorkers:                defaultMaxWorkers,
+		WorkerIdleMS:              defaultWorkerIdleMS,
+		ReadinessTimeoutMS:        defaultReadinessTimeoutMS,
+		SessionsRoot:              defaultSessionsRoot,
+		WorkspaceRoot:             defaultWorkspaceRoot,
+		OTelPluginVersion:         defaultOTelPluginVersion,
+		OpenCodeBinaryPath:        "opencode",
+		ShutdownHandoffDeadlineMS: defaultShutdownHandoffDeadlineMS,
+		ShutdownDrainBudgetMS:     defaultShutdownDrainBudgetMS,
+		reaperInterval:            defaultReaperInterval,
 		OTel: config.OTel{
 			SampleRatio: 1.0, // overridden to 0.1 for non-local in LoadConfig
 		},
@@ -176,6 +198,19 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, fmt.Errorf(
 			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION cannot be enabled when ENVIRONMENT=%q — per-worker isolation may only be disabled in local development",
 			cfg.Environment,
+		)
+	}
+	// ADR-048 deadline math: the handoff budget plus the drain budget must fit
+	// strictly inside the graceful shutdown window, so the worker-authored
+	// checkpoint AND the process-group kill that follows both complete before the
+	// graceful deadline — which the operator in turn sizes below the pod's
+	// terminationGracePeriodSeconds (SIGKILL is uncatchable). A config that
+	// violates this would post a `deadline` the worker cannot meet before the kill.
+	gracefulMS := int64(cfg.Server.GracefulSeconds) * 1000
+	if gracefulMS > 0 && cfg.ShutdownHandoffDeadlineMS+cfg.ShutdownDrainBudgetMS >= gracefulMS {
+		return Config{}, fmt.Errorf(
+			"LANGY_SHUTDOWN_HANDOFF_DEADLINE_MS (%d) + LANGY_SHUTDOWN_DRAIN_BUDGET_MS (%d) must be < the graceful shutdown window (%d ms) — see ADR-048 deadline math",
+			cfg.ShutdownHandoffDeadlineMS, cfg.ShutdownDrainBudgetMS, gracefulMS,
 		)
 	}
 	return cfg, nil
@@ -212,4 +247,16 @@ func (c Config) ReaperInterval() time.Duration {
 		return defaultReaperInterval
 	}
 	return c.reaperInterval
+}
+
+// ShutdownHandoffDeadline is the budget a live worker gets to checkpoint on
+// SIGTERM before the process-group kill (ADR-048).
+func (c Config) ShutdownHandoffDeadline() time.Duration {
+	return time.Duration(c.ShutdownHandoffDeadlineMS) * time.Millisecond
+}
+
+// ShutdownDrainBudget is the time reserved after the handoff for the worker
+// drain (ADR-048).
+func (c Config) ShutdownDrainBudget() time.Duration {
+	return time.Duration(c.ShutdownDrainBudgetMS) * time.Millisecond
 }

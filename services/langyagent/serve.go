@@ -68,21 +68,50 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 			application.Pool().Shutdown()
 		}),
 		lifecycle.ListenServer("http", srv),
-		// Registered LAST so it stops FIRST (shutdown is reverse-order): on
-		// SIGTERM, force-flush buffered telemetry BEFORE the potentially-slow
-		// worker drain, so a grace period later cut short by SIGKILL still ships
-		// what we already have. ForceFlushGlobal flushes the manager's tracer
-		// provider, the internal tee (registered on the same global provider), and
-		// the meter provider. The normal full Shutdown of "otel"/"langy-internal-
-		// tee" (registered first) still runs LAST for the final flush + close.
-		// HONEST LIMIT: SIGKILL / OOM are uncatchable — this early flush plus the
-		// short BatchScheduledDelay narrow the loss window, they are not a
-		// zero-loss guarantee. Bounded so a dead collector can't eat the grace
-		// budget out from under the worker drain.
+		// otel-early-flush (PR3, ADR-044): on SIGTERM, force-flush buffered
+		// telemetry BEFORE the worker drain so a grace period later cut short by
+		// SIGKILL still ships what we already have. Registered BEFORE the handoff
+		// Closer below so it stops AFTER it (reverse-order). ForceFlushGlobal
+		// flushes the tracer provider, the internal tee, and the meter provider;
+		// the full Shutdown of "otel"/"langy-internal-tee" (registered first) still
+		// runs LAST. HONEST LIMIT: SIGKILL / OOM are uncatchable — this narrows the
+		// loss window, it is not a zero-loss guarantee. Bounded so a dead collector
+		// can't eat the grace budget out from under the worker drain.
 		lifecycle.Closer("otel-early-flush", func(ctx context.Context) error {
 			flushCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 			defer cancel()
 			otelsetup.ForceFlushGlobal(flushCtx)
+			return nil
+		}),
+		// ADR-048 shutdown-handoff. Registered LAST so it stops FIRST on SIGTERM
+		// (reverse-order): before the http listener drains and well before the
+		// worker-pool process-group kill, notify each live worker that shutdown is
+		// imminent so opencode checkpoints the in-flight turn and emits a terminal
+		// `handoff` frame. The frame flows out over the still-open /chat response
+		// (ListenServer keeps in-flight requests alive via WithoutCancel) to the
+		// control plane, which persists the resume token.
+		//
+		// COMPOSES WITH THE EARLY-FLUSH ABOVE: both are pre-drain SIGTERM steps.
+		// Stop order is handoff -> early-flush -> http -> worker-pool (this one is
+		// registered after early-flush, so it stops first). Neither depends on the
+		// other; both must finish before the worker drain. Its goroutines are
+		// panic-guarded with clog.Go (PR3), so a panic mid-shutdown can't crash
+		// the process before the drain.
+		//
+		// The deadline is capped to always leave the drain its budget before the
+		// graceful window closes (deadline < gracefulDeadline - drainBudget),
+		// which holds regardless of any lifecycle drain-delay already consumed —
+		// the honest ADR-048 math (graceful < terminationGracePeriodSeconds, so
+		// deadline < TGP - drainBudget; SIGKILL is still uncatchable).
+		lifecycle.Closer("langy-shutdown-handoff", func(ctx context.Context) error {
+			deadline := time.Now().Add(cfg.ShutdownHandoffDeadline())
+			if dl, ok := ctx.Deadline(); ok {
+				latest := dl.Add(-cfg.ShutdownDrainBudget())
+				if deadline.After(latest) {
+					deadline = latest
+				}
+			}
+			application.Pool().ShutdownHandoff(ctx, deadline)
 			return nil
 		}),
 	)
