@@ -78,6 +78,10 @@ jobs:
         working-directory: langwatch
         run: pnpm typecheck
 
+      - name: Run typecheck (tests)
+        working-directory: langwatch
+        run: pnpm run typecheck:tests
+
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
