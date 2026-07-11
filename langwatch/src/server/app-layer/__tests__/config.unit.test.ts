@@ -31,6 +31,7 @@ describe("roleRunsWorkers", () => {
   });
 
   describe("given every ProcessRole variant", () => {
+    /** @scenario roleRunsWorkers treats worker and all as worker-hosting roles */
     it("treats exactly worker and all as worker-hosting roles", () => {
       const roles: ProcessRole[] = ["web", "worker", "migration", "all"];
       const hosting = roles.filter(roleRunsWorkers);

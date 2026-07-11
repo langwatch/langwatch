@@ -366,7 +366,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
   // Assigned by the in-process worker boot below. Declared here so the
   // shutdown handler can drain it, and so the boot can run *after* the signal
-  // handlers are installed (a SIGTERM during worker boot still drains cleanly).
+  // handlers are installed (a SIGTERM while workers are still booting hits
+  // `workerHandle?.shutdown()` as a no-op — the process still exits cleanly,
+  // it just doesn't wait for the still-booting workers to drain).
   let workerHandle: WorkerHandle | undefined;
 
   // Graceful shutdown
@@ -421,9 +423,11 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
   // In-process worker stack (dev opt-in via WORKERS_IN_PROCESS=1). Booted last —
   // after the server is listening AND the shutdown handlers are installed — so
-  // the UI comes up even if the workers are slow to start, and a SIGTERM during
-  // the boot await still drains via the handler above. A boot failure is logged
-  // and the web server keeps running (only the background jobs won't run).
+  // the UI comes up even if the workers are slow to start. `workerHandle` isn't
+  // assigned until this await resolves, so a SIGTERM during the boot still lets
+  // the process exit cleanly; it just won't drain workers that are still
+  // mid-boot. A boot failure is logged and the web server keeps running (only
+  // the background jobs won't run).
   if (inProcessWorkers) {
     logger.info("WORKERS_IN_PROCESS=1 — hosting the worker stack in-process");
     try {

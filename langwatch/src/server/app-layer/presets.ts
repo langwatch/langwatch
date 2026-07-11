@@ -604,10 +604,12 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
-  // Outbox stack: worker-only consumer loop. The send-side handle is wired
-  // into the EventSourcing runtime below (passed to `new EventSourcing`), so
-  // its `.withOutbox` reactors can enqueue settle payloads. Web processes
-  // don't build this (no settle traffic; no consumer to drain).
+  // Outbox stack: the consumer loop for roles where roleRunsWorkers() is true
+  // ("worker" and the in-process dev "all" role). The send-side handle is
+  // wired into the EventSourcing runtime below (passed to `new
+  // EventSourcing`), so its `.withOutbox` reactors can enqueue settle
+  // payloads. Web processes don't build this (no settle traffic; no consumer
+  // to drain).
   const outbox =
     roleRunsWorkers(config.processRole)
       ? buildOutboxRuntime({
@@ -638,9 +640,10 @@ export function initializeDefaultApp(options?: {
     outbox,
   });
 
-  // Heartbeat scheduler (ADR-034 Phase 4): worker-only periodic source of
-  // outbox enqueues for the cases the event-driven outbox path
-  // STRUCTURALLY cannot reach (no-data detection, resolve-when-traffic-stops).
+  // Heartbeat scheduler (ADR-034 Phase 4): for roles where roleRunsWorkers()
+  // is true, a periodic source of outbox enqueues for the cases the
+  // event-driven outbox path STRUCTURALLY cannot reach (no-data detection,
+  // resolve-when-traffic-stops).
   // Registrations live in `outboxHeartbeatRegistry` (process-singleton);
   // the scheduler routes every tick's `decide` result through the same
   // `dispatchOutboxEnqueues` helper `adaptOutboxReactor` uses, so one

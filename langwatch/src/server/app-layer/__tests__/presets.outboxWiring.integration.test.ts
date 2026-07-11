@@ -96,6 +96,7 @@ describe("presets outbox wiring", () => {
   });
 
   describe("when the app is initialized as all (in-process dev mode)", () => {
+    /** @scenario the in-process app wires the outbox exactly like a dedicated worker */
     it("wires the outbox exactly like a worker (no drop-warnings)", async () => {
       await resetApp();
       vi.clearAllMocks();

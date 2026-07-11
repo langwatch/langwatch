@@ -5,8 +5,8 @@ export type ProcessRole = "web" | "worker" | "migration" | "all";
 
 /**
  * Roles that run the background worker stack: the event-sourcing consumers,
- * the outbox drainer, the heartbeat scheduler, and the BullMQ / GroupQueue
- * workers booted in `startWorkers()`.
+ * the outbox drainer, the heartbeat scheduler, and the GroupQueue workers
+ * booted in `startWorkers()`.
  *
  * - `"worker"` — the dedicated worker deployment (prod + the default dev
  *   second process).

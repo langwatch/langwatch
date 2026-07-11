@@ -26,40 +26,11 @@ export interface StartWorkersOptions {
   startMetricsServer?: boolean;
 }
 
-/**
- * Boots the background worker stack: ingestion pullers, topic clustering,
- * ClickHouse storage-stats collection, the scenario executor pool, the
- * enqueue-rate anomaly detector, the governance spend-spike detector, the
- * self-hosted usage-stats telemetry, and (optionally) the Prometheus metrics
- * HTTP server.
- *
- * Assumes the App has ALREADY been initialized by the caller with a
- * worker-capable role — `initializeWorkerApp()` for the standalone deployment,
- * or `initializeInProcessApp()` for the dev single-process mode. Registers NO
- * process signal handlers: the caller owns the process lifecycle and invokes
- * the returned `shutdown()` on teardown.
- *
- * The worker/queue/app modules below construct Redis-connecting
- * `QueueWithFallback` instances (or otherwise touch Redis) at module load, and
- * the app graph must evaluate only after `setEnvironment()` has run in the
- * entrypoint. They are therefore imported dynamically — a top-level static
- * `import` is hoisted above the entrypoint's `setEnvironment()` call and breaks
- * env loading. Keep them as `await import()` for that reason.
- */
-export async function startWorkers(
-  options?: StartWorkersOptions,
-): Promise<WorkerHandle> {
-  const startMetricsServer = options?.startMetricsServer ?? true;
+type ShutdownHandles = Array<() => Promise<void> | void>;
 
-  // Resources that hold OS-level handles — child processes, sockets, timers,
-  // Redis subscribers — and must be released on shutdown. Populated as each
-  // worker boots below.
-  const shutdownHandles: Array<() => Promise<void> | void> = [];
-
-  await verifyRedisReady();
-
-  // Fail fast if the database is unreachable — better to fail the boot loudly
-  // than to come up green and have every job fail individually.
+// Fail fast if the database is unreachable — better to fail the boot loudly
+// than to come up green and have every job fail individually.
+async function verifyDatabaseReady(): Promise<void> {
   const { prisma } = await import("~/server/db");
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -68,7 +39,11 @@ export async function startWorkers(
     logger.fatal({ error }, "database unreachable at boot");
     throw error;
   }
+}
 
+async function bootIngestionPuller(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
   const { startIngestionPullerWorker } = await import(
     "@ee/governance/services/pullers/pullerWorker"
   );
@@ -81,7 +56,11 @@ export async function startWorkers(
   }
   await scheduleIngestionPullers();
   logger.info("ingestion puller worker ready");
+}
 
+async function bootTopicClustering(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
   const { startTopicClusteringWorker } = await import(
     "~/server/topicClustering/topicClusteringWorker"
   );
@@ -90,8 +69,12 @@ export async function startWorkers(
     shutdownHandles.push(() => topicClusteringWorker.close());
   }
   logger.info("topic clustering worker ready");
+}
 
-  // ClickHouse storage-stats collection (feeds the Ops storage metrics).
+// ClickHouse storage-stats collection (feeds the Ops storage metrics).
+async function bootStorageStatsCollection(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
   const { getSharedClickHouseClient } = await import(
     "~/server/clickhouse/clickhouseClient"
   );
@@ -103,10 +86,14 @@ export async function startWorkers(
     shutdownHandles.push(() => stopStorageStatsCollection());
     logger.info("storage stats collection ready");
   }
+}
 
-  // Scenario simulation executor: an in-process pool late-bound into the
-  // scenarioExecution reactor (runIn: ["worker"]). Without this the reactor
-  // fires with no pool wired and simulations never execute.
+// Scenario simulation executor: an in-process pool late-bound into the
+// scenarioExecution reactor (runIn: ["worker"]). Without this the reactor
+// fires with no pool wired and simulations never execute.
+async function bootScenarioProcessor(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
   const { getScenarioExecutionHandle } = await import(
     "~/server/app-layer/presets"
   );
@@ -128,9 +115,13 @@ export async function startWorkers(
     shutdownHandles.push(() => scenarioProcessor.close());
   }
   logger.info("scenario processor ready");
+}
 
-  // Per-tenant enqueue-rate anomaly detector (surfaces runaway tenants on
-  // the Ops page).
+// Per-tenant enqueue-rate anomaly detector (surfaces runaway tenants on
+// the Ops page).
+async function bootAnomalyWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
   const { startAnomalyWorker } = await import(
     "~/server/observability/anomalyWorker"
   );
@@ -139,66 +130,123 @@ export async function startWorkers(
     shutdownHandles.push(() => anomalyWorker.stop());
     logger.info("anomaly worker ready");
   }
+}
 
-  // Governance spend-spike anomaly evaluation: a 5-minute tick that
-  // evaluates admin-authored spend_spike rules and persists AnomalyAlert
-  // rows (specs/ai-gateway/governance/anomaly-detection.feature).
+// Governance spend-spike anomaly evaluation: a 5-minute tick that
+// evaluates admin-authored spend_spike rules and persists AnomalyAlert
+// rows (specs/ai-gateway/governance/anomaly-detection.feature).
+async function bootSpendSpikeAnomalyWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
   const { startSpendSpikeAnomalyWorker } = await import(
     "@ee/governance/services/spendSpikeAnomalyWorker"
   );
   const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker();
   shutdownHandles.push(() => spendSpikeAnomalyWorker.stop());
   logger.info("spend spike anomaly worker ready");
+}
 
-  // Self-hosted daily usage telemetry (no-op on SaaS or when
-  // DISABLE_USAGE_STATS is set).
+// Self-hosted daily usage telemetry (no-op on SaaS or when
+// DISABLE_USAGE_STATS is set).
+async function bootUsageStatsWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
   const { startUsageStatsWorker } = await import("~/server/usageStatsWorker");
   const usageStatsWorker = startUsageStatsWorker();
   if (usageStatsWorker) {
     shutdownHandles.push(() => usageStatsWorker.stop());
     logger.info("usage stats worker ready");
   }
+}
 
-  if (startMetricsServer) {
-    // Expose the worker process's prom-client registry over HTTP so the web
-    // process can scrape it at GET /workers/metrics (proxied in start.ts). In
-    // the in-process dev mode this is skipped — the web server serves the same
-    // (shared) registry at /metrics directly.
-    const { getWorkerMetricsPort, isMetricsAuthorized } = await import(
-      "~/server/metrics"
-    );
-    const metricsPort = getWorkerMetricsPort();
-    const metricsServer = http.createServer((req, res) => {
-      if (req.url !== "/metrics") {
-        res.writeHead(404).end();
+// Expose the worker process's prom-client registry over HTTP so the web
+// process can scrape it at GET /workers/metrics (proxied in start.ts). In
+// the in-process dev mode this is skipped — the web server serves the same
+// (shared) registry at /metrics directly.
+async function bootMetricsServer(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { getWorkerMetricsPort, isMetricsAuthorized } = await import(
+    "~/server/metrics"
+  );
+  const metricsPort = getWorkerMetricsPort();
+  const metricsServer = http.createServer((req, res) => {
+    if (req.url !== "/metrics") {
+      res.writeHead(404).end();
+      return;
+    }
+    try {
+      if (!isMetricsAuthorized(req)) {
+        res.writeHead(401).end();
         return;
       }
-      try {
-        if (!isMetricsAuthorized(req)) {
-          res.writeHead(401).end();
-          return;
-        }
-      } catch (error) {
-        // Fail closed when METRICS_API_KEY is unset in production.
-        logger.error({ error }, "worker metrics auth misconfigured");
+    } catch (error) {
+      // Fail closed when METRICS_API_KEY is unset in production.
+      logger.error({ error }, "worker metrics auth misconfigured");
+      res.writeHead(500).end();
+      return;
+    }
+    res.setHeader("Content-Type", register.contentType);
+    register
+      .metrics()
+      .then((metrics) => res.end(metrics))
+      .catch((error) => {
+        logger.error({ error }, "error getting worker metrics");
         res.writeHead(500).end();
-        return;
-      }
-      res.setHeader("Content-Type", register.contentType);
-      register
-        .metrics()
-        .then((metrics) => res.end(metrics))
-        .catch((error) => {
-          logger.error({ error }, "error getting worker metrics");
-          res.writeHead(500).end();
-        });
-    });
-    metricsServer.listen(metricsPort, () => {
-      logger.info(`worker metrics server listening on port ${metricsPort}`);
-    });
-    shutdownHandles.push(
-      () => new Promise<void>((resolve) => metricsServer.close(() => resolve())),
-    );
+      });
+  });
+  metricsServer.listen(metricsPort, () => {
+    logger.info(`worker metrics server listening on port ${metricsPort}`);
+  });
+  shutdownHandles.push(
+    () => new Promise<void>((resolve) => metricsServer.close(() => resolve())),
+  );
+}
+
+/**
+ * Boots the background worker stack: ingestion pullers, topic clustering,
+ * ClickHouse storage-stats collection, the scenario executor pool, the
+ * enqueue-rate anomaly detector, the governance spend-spike detector, the
+ * self-hosted usage-stats telemetry, and (optionally) the Prometheus metrics
+ * HTTP server.
+ *
+ * Assumes the App has ALREADY been initialized by the caller with a
+ * worker-capable role — `initializeWorkerApp()` for the standalone deployment,
+ * or `initializeInProcessApp()` for the dev single-process mode. Registers NO
+ * process signal handlers: the caller owns the process lifecycle and invokes
+ * the returned `shutdown()` on teardown.
+ *
+ * Each boot stage below is a small helper that lazily imports its own
+ * dependencies and pushes its own teardown onto `shutdownHandles`. The
+ * worker/queue/app modules construct Redis-connecting `QueueWithFallback`
+ * instances (or otherwise touch Redis) at module load, and the app graph must
+ * evaluate only after `setEnvironment()` has run in the entrypoint. A
+ * top-level static `import` is hoisted above the entrypoint's
+ * `setEnvironment()` call and breaks env loading — keep every helper's
+ * imports as `await import()` for that reason.
+ */
+export async function startWorkers(
+  options?: StartWorkersOptions,
+): Promise<WorkerHandle> {
+  const startMetricsServer = options?.startMetricsServer ?? true;
+
+  // Resources that hold OS-level handles — child processes, sockets, timers,
+  // Redis subscribers — and must be released on shutdown. Populated as each
+  // worker boots below.
+  const shutdownHandles: ShutdownHandles = [];
+
+  await verifyRedisReady();
+  await verifyDatabaseReady();
+
+  await bootIngestionPuller(shutdownHandles);
+  await bootTopicClustering(shutdownHandles);
+  await bootStorageStatsCollection(shutdownHandles);
+  await bootScenarioProcessor(shutdownHandles);
+  await bootAnomalyWorker(shutdownHandles);
+  await bootSpendSpikeAnomalyWorker(shutdownHandles);
+  await bootUsageStatsWorker(shutdownHandles);
+  if (startMetricsServer) {
+    await bootMetricsServer(shutdownHandles);
   }
 
   return {
