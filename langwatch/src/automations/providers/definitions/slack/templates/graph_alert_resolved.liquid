@@ -1,12 +1,6 @@
-{%- comment -%}
-  Lifecycle-aware alert card keyed on `reason`. When the metric recovers
-  (`heartbeat-resolve`) it leads with a ✅ "Recovered" framing and a was→now
-  value transition, instead of re-firing the breach alarm — closing the
-  alarm-fatigue gap where recovery masqueraded as a breach. The block skeleton
-  is FIXED (header, section, fields, context, context); only the captured
-  content branches on reason, so the JSON is always well-formed and non-empty
-  whichever reason arrives. Needs no new allowlist blocks.
-{%- endcomment -%}
+{%- capture _level -%}
+{%- if reason == "heartbeat-resolve" -%}success{%- elsif reason == "heartbeat-absence" -%}warning{%- else -%}error{%- endif -%}
+{%- endcapture -%}
 {%- capture _header -%}
 {% if reason == "heartbeat-resolve" %}✅ Recovered: {{ trigger.name }}{% elsif reason == "heartbeat-absence" %}🔇 No data: {{ trigger.name }}{% else %}🚨 {{ trigger.name }}{% endif %}
 {%- endcapture -%}
@@ -28,6 +22,7 @@
 <{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>
 {%- endcapture -%}
 [
+  { "type": "alert", "level": {{ _level | json }}, "text": { "type": "mrkdwn", "text": {{ _lead | truncate: 190 | json }} } },
   { "type": "header", "text": { "type": "plain_text", "text": {{ _header | truncate: 140 | json }}, "emoji": true } },
   { "type": "section", "text": { "type": "mrkdwn", "text": {{ _lead | json }} } },
   { "type": "section", "fields": [

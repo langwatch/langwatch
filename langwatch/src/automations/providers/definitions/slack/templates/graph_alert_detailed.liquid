@@ -11,15 +11,18 @@
 *Current value*
 {{ currentValue }}{% if previousValue != nil %} (was {{ previousValue }}){% endif %}
 {%- endcapture -%}
-{%- capture _history_lines -%}
-{%- for point in history reversed limit: 8 -%}
-`{{ point.timestamp | date: "%H:%M" }}`  {{ point.value }}{% unless forloop.last %}
-{% endunless %}
+{%- capture _points -%}
+{%- for point in history limit: 20 -%}
+{% unless forloop.first %},{% endunless %}{ "label": {{ point.timestamp | date: "%H:%M" | json }}, "value": {{ point.value }} }
 {%- endfor -%}
 {%- endcapture -%}
-{%- capture _history_block -%}
-*Recent values*
-{{ _history_lines }}
+{%- capture _categories -%}
+{%- for point in history limit: 20 -%}
+{% unless forloop.first %},{% endunless %}{{ point.timestamp | date: "%H:%M" | json }}
+{%- endfor -%}
+{%- endcapture -%}
+{%- capture _recent -%}
+Recent: {% for point in history reversed limit: 8 %}`{{ point.timestamp | date: "%H:%M" }}` {{ point.value }}{% unless forloop.last %} · {% endunless %}{% endfor %}
 {%- endcapture -%}
 {%- capture _links -%}
 <{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>
@@ -34,12 +37,9 @@
   {%- if reason == "heartbeat-absence" -%}
   ,{ "type": "section", "text": { "type": "mrkdwn", "text": "_No qualifying data was seen in the window._" } }
   {%- endif -%}
-  {%- if sparkline != "" -%}
-  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ sparkline | prepend: "Trend: `" | append: "`" | json }} }] }
-  {%- endif -%}
   {%- if history != empty -%}
-  ,{ "type": "divider" }
-  ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _history_block | json }} } }
+  ,{ "type": "data_visualization", "block_id": "metric_trend", "title": {{ metric.label | truncate: 50 | json }}, "chart": { "type": "area", "series": [{ "name": {{ metric.label | truncate: 20 | json }}, "data": [ {{ _points }} ] }], "axis_config": { "categories": [ {{ _categories }} ], "x_label": "Time", "y_label": {{ metric.label | truncate: 50 | json }} } } }
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _recent | json }} }] }
   {%- endif -%}
   ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _links | json }} }] }
 ]

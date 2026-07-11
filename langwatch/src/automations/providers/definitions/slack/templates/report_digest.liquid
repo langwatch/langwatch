@@ -1,0 +1,18 @@
+{%- capture _sub -%}
+{{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}
+{%- endcapture -%}
+{%- capture _rows_md -%}
+{% for row in rows %}• {{ row | mrkdwn_escape }}{% unless forloop.last %}
+{% endunless %}{% endfor %}
+{%- endcapture -%}
+{%- capture _view -%}
+<{{ viewUrl }}|View in LangWatch ↗> · {{ occurredAt | date: "%b %d, %H:%M" }}
+{%- endcapture -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | prepend: "📊 " | truncate: 140 | json }}, "emoji": true } },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _sub | json }} }] }
+  {%- if rows != empty -%}
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _rows_md | json }} } }
+  {%- endif -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _view | json }} }] }
+]

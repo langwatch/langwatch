@@ -1,14 +1,3 @@
-{%- comment -%}
-  Alert history as a Time | Value grid — the tabular alternative to the unicode
-  sparkline and the mrkdwn history lines of graph_alert_detailed.
-
-  GATED (ADR-041 Phase 3): the `table` block's incoming-webhook delivery is
-  unverified, so `table` is intentionally NOT on the Block Kit allowlist yet.
-  Until a delivery probe passes, filterBlockKit strips the table and this
-  template degrades to a valid header + fields + link card. Registered behind
-  `deliveryProbe: "table"` so the picker withholds it until then. `raw_text`
-  cells are plain text (numbers coerced to strings, JSON-encoded).
-{%- endcomment -%}
 {%- capture _emoji -%}{% if trigger.alertType == 'INFO' %}ℹ️{% elsif trigger.alertType == 'CRITICAL' %}🔴{% else %}🚨{% endif %}{%- endcapture -%}
 {%- capture _metric_field -%}
 *Metric*
@@ -26,9 +15,12 @@
 {%- for point in history reversed limit: 20 -%}
 ,[
   { "type": "raw_text", "text": {{ point.timestamp | date: "%H:%M" | json }} },
-  { "type": "raw_text", "text": {{ point.value | append: "" | json }} }
+  { "type": "raw_number", "value": {{ point.value }}, "text": {{ point.value | append: "" | json }} }
 ]
 {%- endfor -%}
+{%- endcapture -%}
+{%- capture _recent -%}
+Recent: {% for point in history reversed limit: 8 %}`{{ point.timestamp | date: "%H:%M" }}` {{ point.value }}{% unless forloop.last %} · {% endunless %}{% endfor %}
 {%- endcapture -%}
 {%- capture _links -%}
 <{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>
@@ -39,13 +31,16 @@
     { "type": "mrkdwn", "text": {{ _metric_field | json }} },
     { "type": "mrkdwn", "text": {{ _condition_field | json }} },
     { "type": "mrkdwn", "text": {{ _value_field | json }} }
-  ] },
-  { "type": "table", "rows": [
+  ] }
+  {%- if history != empty -%}
+  ,{ "type": "data_table", "caption": {{ metric.label | truncate: 60 | prepend: "Recent values — " | json }}, "rows": [
     [
       { "type": "raw_text", "text": "Time" },
       { "type": "raw_text", "text": "Value" }
     ]
     {{ _rows }}
-  ] },
-  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _links | json }} }] }
+  ] }
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _recent | json }} }] }
+  {%- endif -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _links | json }} }] }
 ]

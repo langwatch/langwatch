@@ -5,6 +5,7 @@ import { renderLiquid } from "~/shared/templating/engine";
 import { EXAMPLE_MATCHES } from "~/shared/templating/exampleContext";
 import {
   buildExampleGraphAlertTemplateContext,
+  buildReportTemplateContext,
   buildTemplateContext,
   type GraphAlertTemplateContext,
 } from "~/shared/templating/templateContext";
@@ -120,6 +121,32 @@ describe("provider registry parity", () => {
       ...graphAlertBase,
       reason: reasonForTemplate(id),
     });
+    const reportContext = buildReportTemplateContext({
+      trigger: { id: "rep_1", name: "Weekly error report" },
+      report: {
+        sourceLabel: "Top 5 errored traces",
+        scheduleLabel: "every Monday at 09:00 (UTC)",
+      },
+      viewUrl: "https://app.langwatch.ai/acme/messages",
+      rows: [
+        "trace_a · 502 upstream timeout",
+        "trace_b · tool call failed",
+        "trace_c · empty completion",
+      ],
+      occurredAt: new Date("2026-01-05T09:00:00Z"),
+      project: { id: "p1", name: "Acme", slug: "acme" },
+      baseHost: "https://app.langwatch.ai",
+    });
+    const contextForTemplate = (
+      kind: string,
+      id: string,
+      cadence: "immediate" | "digest",
+    ): Record<string, unknown> =>
+      kind === "graphAlert"
+        ? (graphAlertContextFor(id) as unknown as Record<string, unknown>)
+        : kind === "report"
+          ? (reportContext as unknown as Record<string, unknown>)
+          : (contextsByCadence[cadence] as unknown as Record<string, unknown>);
 
     describe("when each template renders against the example context for its kind and cadence", () => {
       it.each(
@@ -130,10 +157,11 @@ describe("provider registry parity", () => {
             ? (["immediate", "digest"] as const)
             : ([template.cadenceFit] as const);
         for (const cadence of cadences) {
-          const context =
-            template.kind === "graphAlert"
-              ? graphAlertContextFor(template.id)
-              : contextsByCadence[cadence];
+          const context = contextForTemplate(
+            template.kind,
+            template.id,
+            cadence,
+          );
           const { output } = await renderLiquid({
             template: template.source,
             context: context as unknown as Record<string, unknown>,
@@ -191,6 +219,11 @@ describe("provider registry parity", () => {
       },
     });
     const modernExamples: Record<string, () => Record<string, unknown>> = {
+      graph_alert_detailed: () =>
+        graphAlertContextFor("graph_alert_detailed") as unknown as Record<
+          string,
+          unknown
+        >,
       graph_alert_resolved: () =>
         graphAlertContextFor("graph_alert_resolved") as unknown as Record<
           string,
@@ -209,8 +242,13 @@ describe("provider registry parity", () => {
         richTraceContext as unknown as Record<string, unknown>,
       eval_failure_rich: () =>
         richTraceContext as unknown as Record<string, unknown>,
+      digest_evaluator_rollup: () =>
+        digestTraceContext as unknown as Record<string, unknown>,
       digest_table: () =>
         digestTraceContext as unknown as Record<string, unknown>,
+      report_summary_card: () =>
+        reportContext as unknown as Record<string, unknown>,
+      report_table: () => reportContext as unknown as Record<string, unknown>,
     };
 
     describe("when a modern-suite template (ADR-041) renders against a complete example", () => {
@@ -228,11 +266,18 @@ describe("provider registry parity", () => {
           expect(blocks.length).toBeGreaterThan(0);
           // No dangling references — the author (or preview) sees a clean bill.
           expect(missingVariables).toEqual([]);
-          // Every template survives the allowlist non-empty: rich_text passes
-          // through, and the gated table templates degrade to their
-          // surrounding header/section/context blocks.
+          // Every modern template survives the allowlist non-empty: the gated
+          // hero block (alert / card / data_visualization / data_table) is
+          // stripped by default, and the template degrades to its surrounding
+          // allowlisted header / section / rich_text / context fallback.
           const survivors = filterBlockKit(blocks);
           expect(survivors.length).toBeGreaterThan(0);
+          // The gated hero is indeed dropped on the default (webhook) path.
+          if (template!.gatedBlock) {
+            expect(
+              survivors.some((b) => b.type === template!.gatedBlock),
+            ).toBe(false);
+          }
         },
       );
     });

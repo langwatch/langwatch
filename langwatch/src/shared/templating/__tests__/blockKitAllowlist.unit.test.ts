@@ -235,4 +235,287 @@ describe("filterBlockKit", () => {
       expect(item?.elements).toEqual([{ type: "text", text: "item" }]);
     });
   });
+
+  // ADR-041 Phase 3 — the modern blocks (`alert`, `card`, `data_visualization`,
+  // `data_table`). Their incoming-webhook delivery is UNVERIFIED, so they are
+  // dropped by default (graceful degradation) and only sanitised-and-kept when
+  // the caller has confirmed the surface renders them (`allowGatedBlocks`).
+  describe("when gated modern blocks are present with default options", () => {
+    it("drops alert / card / data_visualization / data_table, keeps allowlisted siblings", () => {
+      const blocks = filterBlockKit([
+        { type: "alert", level: "error", text: { type: "mrkdwn", text: "x" } },
+        { type: "card", title: { type: "mrkdwn", text: "t" } },
+        {
+          type: "data_visualization",
+          title: "T",
+          chart: { type: "pie", segments: [{ label: "a", value: 1 }] },
+        },
+        {
+          type: "data_table",
+          caption: "c",
+          rows: [
+            [{ type: "raw_text", text: "H" }],
+            [{ type: "raw_text", text: "v" }],
+          ],
+        },
+        { type: "section", text: { type: "mrkdwn", text: "keep me" } },
+      ]);
+      expect(blocks.map((b) => b.type)).toEqual(["section"]);
+    });
+  });
+
+  describe("when a template's gated hero is filtered but a fallback follows", () => {
+    it("degrades to the allowlisted fallback so the message is never empty", () => {
+      const blocks = filterBlockKit([
+        { type: "card", title: { type: "mrkdwn", text: "Summary" } },
+        { type: "section", text: { type: "mrkdwn", text: "*Name* · detail" } },
+        { type: "context", elements: [{ type: "mrkdwn", text: "footer" }] },
+      ]);
+      expect(blocks.map((b) => b.type)).toEqual(["section", "context"]);
+      expect(blocks.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when gated blocks are allowed (delivery probe passed)", () => {
+    describe("given an alert block", () => {
+      it("keeps a valid alert and normalises the level", () => {
+        const [block] = filterBlockKit(
+          [
+            {
+              type: "alert",
+              level: "success",
+              text: { type: "mrkdwn", text: "Recovered" },
+            },
+          ],
+          { allowGatedBlocks: true },
+        );
+        expect(block).toEqual({
+          type: "alert",
+          level: "success",
+          text: { type: "mrkdwn", text: "Recovered" },
+        });
+      });
+
+      it("drops an out-of-range level (Slack defaults it) but keeps the block", () => {
+        const [block] = filterBlockKit(
+          [
+            {
+              type: "alert",
+              level: "catastrophic",
+              text: { type: "mrkdwn", text: "hi" },
+            },
+          ],
+          { allowGatedBlocks: true },
+        );
+        expect(block?.level).toBeUndefined();
+        expect(block?.type).toBe("alert");
+      });
+
+      it("drops an alert whose text is missing or malformed", () => {
+        const blocks = filterBlockKit(
+          [
+            { type: "alert", level: "info" },
+            { type: "alert", text: "not-a-text-object" },
+          ],
+          { allowGatedBlocks: true },
+        );
+        expect(blocks).toEqual([]);
+      });
+    });
+
+    describe("given a card block", () => {
+      it("strips the fetch-on-render icon and the callback actions, keeps text", () => {
+        const [block] = filterBlockKit(
+          [
+            {
+              type: "card",
+              icon: { type: "image", image_url: "https://tracker/p.png" },
+              hero_image: { image_url: "https://tracker/hero.png" },
+              title: { type: "mrkdwn", text: "Deploy #42" },
+              body: { type: "mrkdwn", text: "succeeded" },
+              actions: [{ type: "button", action_id: "ack", text: "Ack" }],
+            },
+          ],
+          { allowGatedBlocks: true },
+        );
+        expect(block).toEqual({
+          type: "card",
+          title: { type: "mrkdwn", text: "Deploy #42" },
+          body: { type: "mrkdwn", text: "succeeded" },
+        });
+        expect(block?.icon).toBeUndefined();
+        expect(block?.hero_image).toBeUndefined();
+        expect(block?.actions).toBeUndefined();
+      });
+
+      it("drops a card that has no title or body left after sanitising", () => {
+        const blocks = filterBlockKit(
+          [
+            {
+              type: "card",
+              icon: { type: "image", image_url: "https://tracker/p.png" },
+              actions: [{ type: "button", url: "https://x", text: "Go" }],
+            },
+          ],
+          { allowGatedBlocks: true },
+        );
+        expect(blocks).toEqual([]);
+      });
+    });
+
+    describe("given a data_visualization block", () => {
+      it("keeps a valid pie chart and drops non-positive / malformed segments", () => {
+        const [block] = filterBlockKit(
+          [
+            {
+              type: "data_visualization",
+              title: "Matches by evaluator",
+              chart: {
+                type: "pie",
+                segments: [
+                  { label: "Relevancy", value: 3 },
+                  { label: "Toxicity", value: 0 },
+                  { label: "NoValue" },
+                  { label: 7, value: 2 },
+                ],
+              },
+            },
+          ],
+          { allowGatedBlocks: true },
+        );
+        const chart = block?.chart as Record<string, unknown>;
+        expect(chart.type).toBe("pie");
+        expect(chart.segments).toEqual([
+          { label: "Relevancy", value: 3 },
+          { label: "7", value: 2 },
+        ]);
+      });
+
+      it("keeps a line chart with series + axis_config and caps points", () => {
+        const data = Array.from({ length: 25 }, (_, i) => ({
+          label: `t${i}`,
+          value: i,
+        }));
+        const [block] = filterBlockKit(
+          [
+            {
+              type: "data_visualization",
+              title: "Trend",
+              chart: {
+                type: "line",
+                series: [{ name: "latency", data }],
+                axis_config: {
+                  categories: data.map((d) => d.label),
+                  x_label: "Time",
+                  y_label: "ms",
+                },
+              },
+            },
+          ],
+          { allowGatedBlocks: true },
+        );
+        const chart = block?.chart as Record<string, unknown>;
+        const series = chart.series as Record<string, unknown>[];
+        expect((series[0]!.data as unknown[]).length).toBe(20);
+      });
+
+      it("drops a chart with an unknown chart type or no usable data", () => {
+        const blocks = filterBlockKit(
+          [
+            { type: "data_visualization", title: "x", chart: { type: "radar" } },
+            {
+              type: "data_visualization",
+              title: "y",
+              chart: { type: "pie", segments: [] },
+            },
+          ],
+          { allowGatedBlocks: true },
+        );
+        expect(blocks).toEqual([]);
+      });
+    });
+
+    describe("given a data_table block", () => {
+      it("keeps raw_text / raw_number cells and normalises row width", () => {
+        const [block] = filterBlockKit(
+          [
+            {
+              type: "data_table",
+              caption: "Recent values",
+              rows: [
+                [
+                  { type: "raw_text", text: "Time" },
+                  { type: "raw_text", text: "Value" },
+                ],
+                [
+                  { type: "raw_text", text: "10:00" },
+                  { type: "raw_number", value: 12, text: "12" },
+                ],
+                // Short row — the missing cell is padded so widths stay equal.
+                [{ type: "raw_text", text: "10:05" }],
+              ],
+            },
+          ],
+          { allowGatedBlocks: true },
+        );
+        const rows = block?.rows as Record<string, unknown>[][];
+        expect(rows).toHaveLength(3);
+        expect(rows.every((r) => r.length === 2)).toBe(true);
+        expect(rows[2]![1]).toEqual({ type: "raw_text", text: "—" });
+      });
+
+      it("sanitises a rich_text cell, stripping an image element", () => {
+        const [block] = filterBlockKit(
+          [
+            {
+              type: "data_table",
+              caption: "c",
+              rows: [
+                [{ type: "raw_text", text: "Link" }],
+                [
+                  {
+                    type: "rich_text",
+                    elements: [
+                      {
+                        type: "rich_text_section",
+                        elements: [
+                          {
+                            type: "link",
+                            url: "https://app.langwatch.ai/t",
+                            text: "View",
+                          },
+                          { type: "channel", channel_id: "C1" },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              ],
+            },
+          ],
+          { allowGatedBlocks: true },
+        );
+        const rows = block?.rows as Record<string, unknown>[][];
+        const cell = rows[1]![0] as Record<string, unknown>;
+        const section = (cell.elements as Record<string, unknown>[])[0];
+        expect(section?.elements).toEqual([
+          { type: "link", url: "https://app.langwatch.ai/t", text: "View" },
+        ]);
+      });
+
+      it("drops a table with fewer than a header plus one data row", () => {
+        const blocks = filterBlockKit(
+          [
+            {
+              type: "data_table",
+              caption: "c",
+              rows: [[{ type: "raw_text", text: "only header" }]],
+            },
+          ],
+          { allowGatedBlocks: true },
+        );
+        expect(blocks).toEqual([]);
+      });
+    });
+  });
 });

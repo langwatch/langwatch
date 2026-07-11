@@ -1,24 +1,16 @@
-{%- comment -%}
-  Rich trace card. Renders Input and Output as native rich_text_quote sub-blocks
-  inside a single `rich_text` block — the native quoting primitive that replaces
-  the "## User" markdown-block hack in trace_alert_compact.
-
-  Escaping: a rich_text `text` element is a PLAIN string (Slack never parses
-  mrkdwn inside it), so `| json` alone is the correct and sufficient escaping —
-  it JSON-encodes the value and no markup forging is possible by construction.
-  mrkdwn_escape is DELIBERATELY NOT applied to these text elements; it would
-  double-escape a surface that never parses mrkdwn (turning `<` into a literal
-  `&lt;`). The mrkdwn context blocks (eval line, footer) keep mrkdwn_escape on
-  user-controlled fields as usual. Truncate runs before json so the char budget
-  counts visible characters.
-{%- endcomment -%}
-{%- capture _header_text -%}
-{% if match.evaluation.passed == false %}🛑 {% else %}🔔 {% endif %}{{ trigger.name }}
+{%- capture _title -%}
+{% if match.evaluation.passed == false %}🛑 {% else %}🔔 {% endif %}{{ trigger.name | mrkdwn_escape }}
 {%- endcapture -%}
-{%- capture _ctx_eval -%}
-{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" | mrkdwn_escape }}*{% if match.evaluation.score != null %} `{{ match.evaluation.score }}`{% endif %}{% if match.evaluation.label %} · {{ match.evaluation.label | mrkdwn_escape }}{% endif %}{% if match.evaluation.passed == false %} · *failed*{% elsif match.evaluation.passed == true %} · *passed*{% endif %}{%- endif -%}
-{%- if match.evaluation and trigger.alertType %} · {% endif -%}
-{%- if trigger.alertType %}_{{ trigger.alertType }}_{%- endif -%}
+{%- capture _subtitle -%}
+{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" | mrkdwn_escape }}*{% if match.evaluation.score != null %} `{{ match.evaluation.score }}`{% endif %}{% if match.evaluation.passed == false %} · failed{% elsif match.evaluation.passed == true %} · passed{% endif %}{%- else -%}Matched trace{%- endif -%}
+{%- if trigger.alertType %} · {{ trigger.alertType }}{% endif -%}
+{%- endcapture -%}
+{%- assign _snippet_src = match.trace.input | default: match.trace.output -%}
+{%- capture _card_body -%}
+{{ _snippet_src | truncate: 190 | mrkdwn_escape }}
+{%- endcapture -%}
+{%- capture _lead -%}
+*{{ trigger.name | mrkdwn_escape }}*{% if match.evaluation %} · {{ match.evaluation.evaluatorName | default: "Evaluation" | mrkdwn_escape }} `{{ match.evaluation.score | default: "—" }}`{% endif %}
 {%- endcapture -%}
 {%- capture _footer -%}
 `{{ match.trace.id | truncate: 12 }}`{% if match.trace.metadata.model %} · {{ match.trace.metadata.model | mrkdwn_escape }}{% endif %}{% if match.trace.metadata.duration_ms %} · {{ match.trace.metadata.duration_ms }}ms{% endif %}{% if match.trace.metadata.cost %} · ${{ match.trace.metadata.cost }}{% endif %} · <{{ match.trace.url }}|View trace ↗>
@@ -37,10 +29,14 @@
 {%- endif -%}
 {%- endcapture -%}
 [
-  { "type": "header", "text": { "type": "plain_text", "text": {{ _header_text | truncate: 140 | json }}, "emoji": true } }
-  {%- if _ctx_eval != "" -%}
-  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _ctx_eval | json }} }] }
-  {%- endif -%}
+  { "type": "card",
+    "title": { "type": "mrkdwn", "text": {{ _title | truncate: 150 | json }} },
+    "subtitle": { "type": "mrkdwn", "text": {{ _subtitle | truncate: 150 | json }} }
+    {%- if _card_body != "" -%}
+    ,"body": { "type": "mrkdwn", "text": {{ _card_body | json }} }
+    {%- endif -%}
+  },
+  { "type": "section", "text": { "type": "mrkdwn", "text": {{ _lead | json }} } }
   {%- if _rt_body != "" -%}
   ,{ "type": "rich_text", "elements": [ {{ _rt_body }} ] }
   {%- endif -%}

@@ -1,0 +1,27 @@
+{%- capture _sub -%}
+{{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}
+{%- endcapture -%}
+{%- capture _body -%}
+{{ rows | first | default: report.sourceLabel | truncate: 190 | mrkdwn_escape }}
+{%- endcapture -%}
+{%- capture _rows_md -%}
+{% for row in rows %}• {{ row | mrkdwn_escape }}{% unless forloop.last %}
+{% endunless %}{% endfor %}
+{%- endcapture -%}
+{%- capture _view -%}
+<{{ viewUrl }}|View in LangWatch ↗> · {{ occurredAt | date: "%b %d, %H:%M" }}
+{%- endcapture -%}
+[
+  { "type": "card",
+    "title": { "type": "mrkdwn", "text": {{ trigger.name | prepend: "📊 " | truncate: 150 | json }} },
+    "subtitle": { "type": "mrkdwn", "text": {{ _sub | truncate: 150 | json }} }
+    {%- if _body != "" -%}
+    ,"body": { "type": "mrkdwn", "text": {{ _body | json }} }
+    {%- endif -%}
+  },
+  { "type": "section", "text": { "type": "mrkdwn", "text": {{ trigger.name | mrkdwn_escape | prepend: "*" | append: "*" | json }} } }
+  {%- if rows != empty -%}
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _rows_md | json }} } }
+  {%- endif -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _view | json }} }] }
+]

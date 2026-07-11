@@ -5,11 +5,13 @@ import {
   templateOptionsFor,
 } from "../registry";
 
+const GATED_BLOCKS = ["alert", "card", "data_visualization", "data_table"];
+
 describe("slack Block Kit template registry", () => {
   describe("given the bundled template set", () => {
     it("stamps a kind on every template", () => {
       for (const template of SLACK_BLOCK_KIT_TEMPLATES) {
-        expect(["trace", "graphAlert"]).toContain(template.kind);
+        expect(["trace", "graphAlert", "report"]).toContain(template.kind);
       }
     });
 
@@ -20,6 +22,14 @@ describe("slack Block Kit template registry", () => {
       expect(alertTemplates.length).toBeGreaterThan(0);
       for (const template of alertTemplates) {
         expect(template.cadenceFit).toBe("immediate");
+      }
+    });
+
+    it("names a valid modern block on every gated template", () => {
+      const gated = SLACK_BLOCK_KIT_TEMPLATES.filter((t) => t.gatedBlock);
+      expect(gated.length).toBeGreaterThan(0);
+      for (const template of gated) {
+        expect(GATED_BLOCKS).toContain(template.gatedBlock);
       }
     });
   });
@@ -37,18 +47,19 @@ describe("slack Block Kit template registry", () => {
       }
     });
 
-    it("returns only trace digest templates for the digest cadence", () => {
+    it("returns every trace digest template for the digest cadence", () => {
       const options = templateOptionsFor({ cadence: "digest", kind: "trace" });
       expect(options.map((o) => o.id)).toEqual([
         "digest_compact",
         "digest_evaluator_rollup",
         "digest_inline_rich",
+        "digest_table",
       ]);
     });
   });
 
   describe("when filtering options for a graph-alert draft", () => {
-    it("returns only graph-alert templates (excluding delivery-probe-gated ones)", () => {
+    it("returns every graph-alert template, including the modern-block ones", () => {
       const options = templateOptionsFor({
         cadence: "immediate",
         kind: "graphAlert",
@@ -59,6 +70,7 @@ describe("slack Block Kit template registry", () => {
         "graph_alert_one_liner",
         "graph_alert_resolved",
         "graph_alert_no_data",
+        "graph_alert_history_table",
       ]);
     });
 
@@ -71,24 +83,36 @@ describe("slack Block Kit template registry", () => {
     });
   });
 
-  describe("given delivery-probe-gated templates (ADR-041 Phase 3)", () => {
-    it("registers the gated table templates but withholds them from every picker view", () => {
-      const gated = SLACK_BLOCK_KIT_TEMPLATES.filter((t) => t.deliveryProbe);
-      expect(gated.map((t) => t.id).sort()).toEqual([
-        "digest_table",
-        "graph_alert_history_table",
+  describe("when filtering options for a report draft", () => {
+    it("surfaces the report templates at either cadence", () => {
+      const immediate = templateOptionsFor({
+        cadence: "immediate",
+        kind: "report",
+      });
+      const digest = templateOptionsFor({ cadence: "digest", kind: "report" });
+      expect(immediate.map((o) => o.id)).toEqual([
+        "report_digest",
+        "report_summary_card",
+        "report_table",
       ]);
+      expect(digest.map((o) => o.id)).toEqual(immediate.map((o) => o.id));
+    });
+  });
 
+  describe("given the modern-block templates (ADR-041 Phase 3)", () => {
+    it("surfaces every gated template in a picker view (none are hidden)", () => {
+      const gated = SLACK_BLOCK_KIT_TEMPLATES.filter((t) => t.gatedBlock);
       const surfaced = new Set(
         [
           ...templateOptionsFor({ cadence: "immediate", kind: "graphAlert" }),
           ...templateOptionsFor({ cadence: "digest", kind: "graphAlert" }),
           ...templateOptionsFor({ cadence: "immediate", kind: "trace" }),
           ...templateOptionsFor({ cadence: "digest", kind: "trace" }),
+          ...templateOptionsFor({ cadence: "immediate", kind: "report" }),
         ].map((o) => o.id),
       );
       for (const template of gated) {
-        expect(surfaced.has(template.id)).toBe(false);
+        expect(surfaced.has(template.id)).toBe(true);
       }
     });
   });
@@ -142,6 +166,31 @@ describe("slack Block Kit template registry", () => {
           kind: "trace",
         }),
       ).toBe("digest_inline_rich");
+    });
+
+    it("picks the report digest for report drafts", () => {
+      expect(
+        pickDefaultSlackBlockKitTemplateId({
+          cadence: "digest",
+          hasEvaluationFilter: false,
+          kind: "report",
+        }),
+      ).toBe("report_digest");
+    });
+
+    it("defaults to a template that delivers fully (never a gated one)", () => {
+      const cases = [
+        { cadence: "immediate", kind: "trace", hasEvaluationFilter: false },
+        { cadence: "immediate", kind: "trace", hasEvaluationFilter: true },
+        { cadence: "digest", kind: "trace", hasEvaluationFilter: false },
+        { cadence: "immediate", kind: "graphAlert", hasEvaluationFilter: false },
+        { cadence: "digest", kind: "report", hasEvaluationFilter: false },
+      ] as const;
+      for (const c of cases) {
+        const id = pickDefaultSlackBlockKitTemplateId(c);
+        const option = SLACK_BLOCK_KIT_TEMPLATES.find((t) => t.id === id);
+        expect(option?.gatedBlock).toBeUndefined();
+      }
     });
   });
 });

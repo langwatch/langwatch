@@ -1,21 +1,15 @@
-{%- comment -%}
-  Eval-failure detail (rich) — the rich_text upgrade of eval_failure_detailed.
-  Names the failing evaluator, then quotes Input and Output via native
-  rich_text_quote sub-blocks. When Output looks like a structured payload (its
-  first non-space character is { or [) it renders as rich_text_preformatted
-  (a code block) instead of a quote.
-
-  Escaping: rich_text `text` elements are plain strings, so `| json` alone is the
-  correct escaping and mrkdwn_escape is intentionally NOT applied to them. The
-  mrkdwn context/eval blocks keep mrkdwn_escape on user-controlled fields.
-{%- endcomment -%}
+{%- capture _level -%}
+{%- if match.evaluation.passed == false -%}error{%- elsif match.evaluation.passed == true -%}success{%- else -%}warning{%- endif -%}
+{%- endcapture -%}
+{%- capture _alert_text -%}
+{%- if match.evaluation -%}*{{ match.evaluation.evaluatorName | default: "Evaluation" | mrkdwn_escape }}*{% if match.evaluation.passed == false %} failed{% elsif match.evaluation.passed == true %} passed{% endif %}{% if match.evaluation.score != null %} · score {{ match.evaluation.score }}{% endif %}{% if match.evaluation.label %} · {{ match.evaluation.label | mrkdwn_escape }}{% endif %}{%- else -%}Evaluation result for {{ trigger.name | mrkdwn_escape }}{%- endif -%}
+{%- endcapture -%}
 {%- capture _header_text -%}
 {% if match.evaluation.passed == false %}🛑 {% else %}🔔 {% endif %}{{ trigger.name }}
 {%- endcapture -%}
 {%- capture _ctx_eval -%}
-{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" | mrkdwn_escape }}* `{{ match.evaluation.score | default: "—" }}`{% if match.evaluation.label %} · {{ match.evaluation.label | mrkdwn_escape }}{% endif %}{% if match.evaluation.passed == false %} · *failed*{% elsif match.evaluation.passed == true %} · *passed*{% endif %}{%- endif -%}
-{%- if match.evaluation and trigger.alertType %} · {% endif -%}
-{%- if trigger.alertType %}_{{ trigger.alertType }}_{%- endif -%}
+{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" | mrkdwn_escape }}* `{{ match.evaluation.score | default: "—" }}`{% if match.evaluation.passed == false %} · *failed*{% elsif match.evaluation.passed == true %} · *passed*{% endif %}{%- endif -%}
+{%- if trigger.alertType %} · _{{ trigger.alertType }}_{% endif -%}
 {%- endcapture -%}
 {%- capture _footer -%}
 `{{ match.trace.id | truncate: 12 }}` · <{{ match.trace.url }}|View trace ↗>
@@ -39,6 +33,7 @@
 {%- endif -%}
 {%- endcapture -%}
 [
+  { "type": "alert", "level": {{ _level | json }}, "text": { "type": "mrkdwn", "text": {{ _alert_text | truncate: 190 | json }} } },
   { "type": "header", "text": { "type": "plain_text", "text": {{ _header_text | truncate: 140 | json }}, "emoji": true } }
   {%- if _ctx_eval != "" -%}
   ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _ctx_eval | json }} }] }

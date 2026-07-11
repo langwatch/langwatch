@@ -1,11 +1,6 @@
-{%- comment -%}
-  No-data heartbeat card keyed on `reason == "heartbeat-absence"`. Leads with a
-  🔇 "No data" framing so a silent metric reads as absence — not a breach — and
-  stops the :rotating_light: alarm firing when nothing was seen. The block
-  skeleton is FIXED (header, section, context, context); only the captured
-  content branches on reason, so the JSON stays well-formed for every reason.
-  Needs no new allowlist blocks.
-{%- endcomment -%}
+{%- capture _level -%}
+{%- if reason == "heartbeat-absence" -%}warning{%- elsif reason == "heartbeat-resolve" -%}success{%- else -%}error{%- endif -%}
+{%- endcapture -%}
 {%- capture _header -%}
 {% if reason == "heartbeat-absence" %}🔇 No data: {{ trigger.name }}{% elsif reason == "heartbeat-resolve" %}✅ Recovered: {{ trigger.name }}{% else %}🚨 {{ trigger.name }}{% endif %}
 {%- endcapture -%}
@@ -19,6 +14,7 @@ Expected *{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} {{ c
 <{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>
 {%- endcapture -%}
 [
+  { "type": "alert", "level": {{ _level | json }}, "text": { "type": "mrkdwn", "text": {{ _lead | truncate: 190 | json }} } },
   { "type": "header", "text": { "type": "plain_text", "text": {{ _header | truncate: 140 | json }}, "emoji": true } },
   { "type": "section", "text": { "type": "mrkdwn", "text": {{ _lead | json }} } },
   { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _detail | json }} }] },
