@@ -268,15 +268,27 @@ export function accumulateCodeAgentSummaryFromSpan({
     tools[toolName] = (tools[toolName] ?? 0) + 1;
     next[CODE_AGENT_ATTRS.TOOLS] = JSON.stringify(tools);
 
-    Object.assign(
-      next,
-      appendStep({
-        attributes,
-        name: toolName,
-        startedAtMs: span.startTimeUnixMs,
-        failed: span.statusCode === "error",
-      }),
-    );
+    // Only the MAIN thread's steps go in the sequence. A sub-agent runs its own
+    // conversation — it can do twenty reads of its own — and splicing those
+    // inline would read as though the main thread did them, destroying the very
+    // hierarchy that makes the sequence legible. The sub-agent's work is already
+    // represented by the step that SPAWNED it (the Task/Agent tool call), and
+    // its detail is one level down, in the drawer.
+    //
+    // `agent_id` is absent on the main thread and present on every sub-agent
+    // span, so it is exactly the discriminator we need.
+    const isSubAgentStep = str(span.spanAttributes.agent_id) !== null;
+    if (!isSubAgentStep) {
+      Object.assign(
+        next,
+        appendStep({
+          attributes,
+          name: toolName,
+          startedAtMs: span.startTimeUnixMs,
+          failed: span.statusCode === "error",
+        }),
+      );
+    }
   }
 
   // `file_path` only rides the span when tool details are on; without them we

@@ -36,9 +36,19 @@ const ATTRS = {
 /** A failed step is stored with a trailing `!` so it reads in sequence. */
 const FAILED_STEP_SUFFIX = "!";
 
-/** One thing the agent did, in the order it did it. */
+/**
+ * One thing the agent did, in the order it did it.
+ *
+ * A RUN of the same tool back-to-back is one step with a count: an agent that
+ * reads eight files in a row did one thing eight times, and spelling that out as
+ * `Read › Read › Read › …` buries the shape of the interaction under repetition.
+ * `Read ×8 › Bash` says the same thing and leaves room for what came next.
+ */
 export interface CodeAgentStep {
   name: string;
+  /** How many times it ran back-to-back. 1 for a single run. */
+  count: number;
+  /** True when any run in this batch failed. */
   failed: boolean;
 }
 
@@ -96,28 +106,45 @@ function list(attributes: Record<string, string>, key: string): string[] {
   }
 }
 
-/** The ordered steps: `[[startedAtMs, "Bash!"], ...]` → `{name, failed}`. */
+/**
+ * The ordered steps: `[[startedAtMs, "Bash!"], ...]`, with back-to-back runs of
+ * the same tool BATCHED into one step with a count.
+ *
+ * Batching only ever collapses ADJACENT runs, never re-orders or regroups across
+ * the sequence — `Read Read Bash Read` stays `Read ×2 › Bash › Read`, because
+ * the second visit to Read after a Bash is a different beat of the story (it
+ * checked, ran, checked again) and merging it into the first would erase that.
+ */
 function steps(attributes: Record<string, string>): CodeAgentStep[] {
   const raw = attributes[ATTRS.STEPS];
   if (!raw) return [];
+
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (s): s is [number, string] =>
-          Array.isArray(s) && typeof s[1] === "string",
-      )
-      .map(([, label]) => {
-        const failed = label.endsWith(FAILED_STEP_SUFFIX);
-        return {
-          name: failed ? label.slice(0, -1) : label,
-          failed,
-        };
-      });
+    parsed = JSON.parse(raw);
   } catch {
     return [];
   }
+  if (!Array.isArray(parsed)) return [];
+
+  const batched: CodeAgentStep[] = [];
+  for (const entry of parsed) {
+    if (!Array.isArray(entry) || typeof entry[1] !== "string") continue;
+    const label: string = entry[1];
+    const failed = label.endsWith(FAILED_STEP_SUFFIX);
+    const name = failed ? label.slice(0, -1) : label;
+
+    const previous = batched[batched.length - 1];
+    if (previous && previous.name === name) {
+      previous.count += 1;
+      // A batch is failed if ANY run in it failed — a run of five tests where
+      // the third broke is not a clean run.
+      previous.failed = previous.failed || failed;
+      continue;
+    }
+    batched.push({ name, count: 1, failed });
+  }
+  return batched;
 }
 
 /** `{"Bash":5,"Edit":3}` → most-used first. */
