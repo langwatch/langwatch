@@ -7,10 +7,15 @@ import (
 
 func TestPassThrough_PrepareWorkerIsNoOp(t *testing.T) {
 	g := NewPassThrough()
-	if err := g.PrepareWorker(context.Background(), WorkerContext{ConversationID: "c", UID: 2000}); err != nil {
+	we, err := g.PrepareWorker(context.Background(), WorkerContext{ConversationID: "c", UID: 2000})
+	if err != nil {
 		t.Fatalf("pass-through PrepareWorker must never error, got %v", err)
 	}
-	// ReleaseWorker must not panic.
+	if we.ProxyPort != 0 {
+		t.Fatalf("pass-through must run no proxy, got ProxyPort=%d", we.ProxyPort)
+	}
+	// Close + ReleaseWorker must not panic.
+	we.Close()
 	g.ReleaseWorker(context.Background(), "c")
 }
 

@@ -171,9 +171,9 @@ func NewMonitoringGuard(cfg Config) *MonitoringGuard {
 	return &MonitoringGuard{cfg: cfg, tracer: otel.Tracer(instrumentationName)}
 }
 
-// PrepareWorker records the worker starting. Observe-only: returns nil so the
-// spawn is never failed closed in PR3.
-func (g *MonitoringGuard) PrepareWorker(ctx context.Context, w WorkerContext) error {
+// PrepareWorker records the worker starting. Observe-only: it runs no proxy
+// (returns a zero WorkerEgress) and never fails the spawn closed.
+func (g *MonitoringGuard) PrepareWorker(ctx context.Context, w WorkerContext) (WorkerEgress, error) {
 	_, span := g.tracer.Start(ctx, "langy.egress.worker.prepare",
 		trace.WithAttributes(
 			attribute.String("langy.conversation.id", w.ConversationID),
@@ -181,7 +181,7 @@ func (g *MonitoringGuard) PrepareWorker(ctx context.Context, w WorkerContext) er
 		),
 	)
 	span.End()
-	return nil
+	return WorkerEgress{}, nil
 }
 
 // ReleaseWorker records the worker being torn down.

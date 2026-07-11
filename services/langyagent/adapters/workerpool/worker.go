@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -44,7 +46,14 @@ type Worker struct {
 	baseURL string
 	// authProxy fronts opencode with bearer-token auth. Shutdown on worker exit
 	// so the externally-advertised port frees up.
-	authProxy         *authProxy
+	authProxy *authProxy
+	// egress is the per-worker OUTBOUND egress handle (ADR-043) returned by the
+	// egress guard's PrepareWorker: it carries the loopback forward-proxy port
+	// the worker's HTTPS_PROXY points at (0 when the guard runs no proxy) and a
+	// Close that tears the proxy down. Closed on every teardown path (kill /
+	// exit / spawn failure), exactly like authProxy, so it never outlives the
+	// worker or leaks across a recycle.
+	egress            egress.WorkerEgress
 	openCodeSessionID string
 	cmd               *exec.Cmd
 	uid               uint32
@@ -358,7 +367,17 @@ func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials,
 // the filtered inherited env plus per-worker credentials and the per-worker
 // OPENCODE_SERVER_PASSWORD. Pure and side-effect free — factored out of
 // spawnOpenCode so it's unit-testable without spawning a real subprocess.
-func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials, openCodePassword string) []string {
+//
+// egressPort is the loopback port of THIS worker's egress adapter (ADR-043),
+// 0 when the guard runs no proxy. When set, it is injected as HTTPS_PROXY/
+// HTTP_PROXY so the worker's tools (`gh`, `git`, `npm`, `curl`, `pip`) egress
+// THROUGH the adapter, which enforces the require-TLS / throttle / allow-list /
+// FQDN-floor rungs. The in-cluster control-plane + gateway hosts and loopback
+// are put in NO_PROXY so the MCP server's LangWatch-API calls and opencode's
+// LLM traffic go direct (they have their own explicit NetworkPolicy egress
+// rules; routing them through the per-worker proxy would add a hop and expose
+// LLM streaming to the throttle).
+func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials, openCodePassword string, egressPort int) []string {
 	env := filterSensitiveEnv()
 	env = append(env,
 		"HOME="+workerHome,
@@ -390,7 +409,60 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 			"GITHUB_LOGIN="+creds.GithubLogin,
 		)
 	}
+	if egressPort > 0 {
+		proxyURL := fmt.Sprintf("http://127.0.0.1:%d", egressPort)
+		noProxy := noProxyHosts(creds)
+		env = append(env,
+			// Lower- and upper-case both: `gh`/`git`/`curl` read the lower-case
+			// forms, some Go/Node tooling the upper-case ones.
+			"HTTPS_PROXY="+proxyURL,
+			"https_proxy="+proxyURL,
+			"HTTP_PROXY="+proxyURL,
+			"http_proxy="+proxyURL,
+			"NO_PROXY="+noProxy,
+			"no_proxy="+noProxy,
+		)
+	}
 	return env
+}
+
+// noProxyHosts is the NO_PROXY list for a worker: loopback plus the in-cluster
+// control-plane and gateway hosts, which egress via their own explicit
+// NetworkPolicy rules and must NOT be funnelled through the per-worker egress
+// adapter (ADR-043: "loopback and the in-cluster control-plane/gateway paths
+// are unaffected").
+func noProxyHosts(creds domain.Credentials) string {
+	hosts := []string{"127.0.0.1", "localhost", "::1"}
+	seen := map[string]struct{}{"127.0.0.1": {}, "localhost": {}, "::1": {}}
+	for _, raw := range []string{creds.LangwatchEndpoint, creds.GatewayBaseURL} {
+		h := hostFromURL(raw)
+		if h == "" {
+			continue
+		}
+		if _, dup := seen[h]; dup {
+			continue
+		}
+		seen[h] = struct{}{}
+		hosts = append(hosts, h)
+	}
+	return strings.Join(hosts, ",")
+}
+
+// hostFromURL extracts the bare hostname from a URL, tolerating a value with no
+// scheme. Returns "" when nothing host-like can be parsed.
+func hostFromURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "//" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
 }
 
 // workerSysProcAttr builds the SysProcAttr for the opencode subprocess. Normally
@@ -442,12 +514,13 @@ func spawnOpenCode(
 	port int,
 	creds domain.Credentials,
 	openCodePassword string,
+	egressPort int,
 	disableIsolation bool,
 ) (*exec.Cmd, error) {
 	cmd := exec.CommandContext(ctx, openCodeBinaryPath,
 		"serve", "--port", strconv.Itoa(port), "--hostname", "127.0.0.1",
 	)
-	cmd.Env = buildWorkerEnv(conversationID, workerHome, creds, openCodePassword)
+	cmd.Env = buildWorkerEnv(conversationID, workerHome, creds, openCodePassword, egressPort)
 	cmd.Dir = workerHome
 	// Discard opencode's stdout/stderr. opencode emits LLM completions, tool
 	// outputs (env dumps, file contents), and the raw user prompt — all of which

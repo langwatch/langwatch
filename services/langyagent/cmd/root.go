@@ -31,10 +31,11 @@ func Root(ctx context.Context, _ []string) error {
 		return err
 	}
 
-	// The egress adapter (ADR-044 part 5): observe-only monitoring that flags
-	// suspicious worker egress and NEVER blocks. PR4's enforcement swaps in
-	// behind the same Manager seam (startEgressAdapter / Manager.egressAdapterConfig).
-	mgr := startEgressAdapter(cfg, deps.Telemetry)
+	// The egress guard (ADR-043): per-worker outbound forward-proxy enforcement
+	// (require-TLS / throttle / floor ∪ allow-list / SNI cross-check), monitor-
+	// first. Stock posture is monitor-only until an operator/customer opts in.
+	// The pool consults it around each worker's lifecycle behind this seam.
+	mgr := startEgressAdapter(cfg, deps.Logger)
 
 	// The worker pool is the driven adapter. It wipes SESSIONS_ROOT before
 	// accepting traffic and binds worker subprocesses to the pool-lifetime

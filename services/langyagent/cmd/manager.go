@@ -3,40 +3,38 @@ package cmd
 import (
 	"strings"
 
+	"go.uber.org/zap"
+
 	langyagent "github.com/langwatch/langwatch/services/langyagent"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
-	"github.com/langwatch/langwatch/services/langyagent/telemetry"
 )
 
-// Manager owns the composed egress adapter (ADR-044 part 5). It holds the
-// resolved scorer bounds (egressAdapterConfig) and the guard the pool consults,
-// so PR4's egress ENFORCEMENT can swap in behind this seam — read/extend the
-// config and replace the guard — without re-plumbing the composition root.
+// Manager owns the composed egress guard (ADR-043 enforcement). It holds the
+// per-worker egress guard the pool consults, built from the operator egress
+// posture in Config. Keeping it behind this seam lets the composition root wire
+// the pool without knowing which guard implementation is in force.
 type Manager struct {
-	egressAdapterConfig egress.Config
-	egressGuard         egress.Guard
+	egressGuard egress.Guard
 }
 
 // EgressGuard is the per-worker egress seam the worker pool consults.
 func (m *Manager) EgressGuard() egress.Guard { return m.egressGuard }
 
-// EgressConfig exposes the resolved scorer bounds (the allowlist + thresholds).
-// PR4 reads/extends these to tune enforcement against real flagged traffic.
-func (m *Manager) EgressConfig() egress.Config { return m.egressAdapterConfig }
-
-// startEgressAdapter builds the OBSERVE-ONLY egress adapter from config: a
-// monitoring guard that flags (never blocks) suspicious egress. PR4 slots
-// enforcement in behind the same Manager seam. The telemetry handle is accepted
-// so PR4 can hang enforcement counters off the same meter without changing the
-// signature.
-func startEgressAdapter(cfg langyagent.Config, _ *telemetry.Telemetry) *Manager {
-	ec := egress.DefaultConfig()
-	if hosts := parseHostList(cfg.EgressAllowedHosts); len(hosts) > 0 {
-		ec.AllowedHosts = hosts
-	}
+// startEgressAdapter builds the ADR-043 ENFORCING egress guard from config: a
+// per-worker outbound forward proxy that require-TLS / throttles / applies the
+// operator floor ∪ per-project allow-list / SNI-cross-checks every CONNECT,
+// monitor-first. The stock posture is monitor-only (no floor enforcement and no
+// per-project customer list) until an operator flips EgressEnforceFloor or a
+// customer sets an allow-list — see the Config defaults and ADR-043.
+func startEgressAdapter(cfg langyagent.Config, logger *zap.Logger) *Manager {
 	return &Manager{
-		egressAdapterConfig: ec,
-		egressGuard:         egress.NewMonitoringGuard(ec),
+		egressGuard: egress.NewEnforcingGuard(egress.EnforcingConfig{
+			Floor:         parseHostList(cfg.EgressFqdnFloor),
+			RequireTLS:    cfg.EgressRequireTLS,
+			EnforceFloor:  cfg.EgressEnforceFloor,
+			SNICrossCheck: cfg.EgressSNICrossCheck,
+			Logger:        logger,
+		}),
 	}
 }
 
