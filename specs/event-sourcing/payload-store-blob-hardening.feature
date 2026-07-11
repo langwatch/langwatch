@@ -131,10 +131,10 @@ Feature: GroupQueue blob-handling hardening
   # (~1.9 GB, ~90% of Redis growth). The transfer now happens INSIDE the stage
   # eval, atomic with the displacement it accounts for.
   @integration @track4
-  Scenario: A dedup squash transfers the hold inside the stage eval
+  Scenario: A dedup squash leaves no phantom hold and reclaims only unreferenced blobs
     Given a staged offloaded job with a dedup id
     When a second send with the same dedup id squashes it in place
-    Then the replacement's hold is added and the displaced hold removed in the same stage eval
+    Then the replacement's hold is added and the displaced hold is removed
     And a displaced blob with no remaining holders is reclaimed immediately
 
   @integration @track4
@@ -217,7 +217,10 @@ Feature: GroupQueue blob-handling hardening
   # Track 4 — atomic transfer
   #   AC4.1 atomic retry transfer     -> A retry transfers the hold ... in a single atomic step
   #   AC4.2 no reclaim on partial     -> A partial failure during the transfer cannot reclaim a referenced blob
-  #   AC4.3 squash transfer           -> A dedup squash transfers the hold without dropping a shared blob
+  #   AC4.3 squash transfer           -> A dedup squash leaves no phantom hold and reclaims only unreferenced blobs
+  #   AC4.4 squash chain              -> A squash chain never leaves a phantom hold
+  #   AC4.5 discard on replace-off    -> A squash that keeps the stored payload acquires no hold for the discarded value
+  #   AC4.6 discard post-dispatch     -> A post-dispatch survive-dispatch squash acquires no hold for the discarded value
   # Track 5 — tamper / tenancy
   #   AC5.1 re-mint on read           -> The read location is re-minted from (projectId, hash) ...
   #   AC5.2 tamper cannot cross tenant-> A tampered ref cannot read another tenant's blob
@@ -225,6 +228,6 @@ Feature: GroupQueue blob-handling hardening
   # Track 6 — cluster-slot guard
   #   AC6.1 reject hash-tag-less name -> A queue name without a Redis hash tag is rejected at construction
   #
-  # Count: 16 behavioral ACs -> 16 scenarios. Streaming (the original AC1.2) was
+  # Count: 19 behavioral ACs -> 19 scenarios. Streaming (the original AC1.2) was
   # dropped in implementation — the cap is the memory bound (ADR-030 §1).
   # ===========================================================================

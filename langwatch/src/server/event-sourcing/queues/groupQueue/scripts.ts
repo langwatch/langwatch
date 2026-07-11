@@ -558,8 +558,10 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       -- the eval can reorder against a concurrent squash of the same dedup id
       -- and leave a phantom hold (the 2026-07-09 leak). Without replace the
       -- NEW value we were just handed is the one discarded; it was never
-      -- staged, so no hold may be recorded for it and its blob is left to the
-      -- TTL backstop (or to the holders of jobs sharing its content).
+      -- staged, so no hold may be recorded for it: a discarded GQ1 blob
+      -- (uniquely owned by this value) is unlinked directly, while a GQ2 blob
+      -- is content-addressed and left to the holders of jobs sharing its
+      -- content, or to the TTL backstop.
       local orphanedValue = jobDataJson
       local reclaimS3 = 0
       if shouldExtend == 1 then
@@ -585,8 +587,9 @@ if dedupId ~= "" and dedupTtlMs > 0 then
     -- Already dispatched. Default: the dedup key is stale, clean it up and let a
     -- new job stage (the historical TOCTOU behavior). When shouldSurviveDispatch is
     -- set, HONOR the still-alive TTL instead — squash the new job and report its
-    -- payload as the orphaned value (same {0, orphanedValue} shape the in-staging
-    -- squash returns) so a late re-trigger after dispatch cannot re-run it (#3912).
+    -- payload as the orphaned value (same {code, orphanedValue, reclaimS3}
+    -- three-element shape the in-staging squash returns, reclaimS3 always 0
+    -- here) so a late re-trigger after dispatch cannot re-run it (#3912).
     -- The discarded value was never staged: no hold is recorded for it, and a
     -- GQ1 blob (uniquely owned by this value) is reclaimed here.
     if shouldSurviveDispatch == 1 then

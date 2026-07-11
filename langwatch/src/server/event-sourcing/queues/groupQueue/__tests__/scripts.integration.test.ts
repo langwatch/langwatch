@@ -719,22 +719,40 @@ describe("GroupStagingScripts", () => {
         return `GQ2|${Buffer.byteLength(header)}|${header}`;
       }
 
-      function holderKey(hash: string, projectId = TENANT) {
+      function holderKey({
+        hash,
+        projectId = TENANT,
+      }: {
+        hash: string;
+        projectId?: string;
+      }) {
         return `${keyPrefix()}blobholders:${projectId}/${hash}`;
       }
 
-      function blobKey(hash: string, projectId = TENANT) {
+      function blobKey({
+        hash,
+        projectId = TENANT,
+      }: {
+        hash: string;
+        projectId?: string;
+      }) {
         return `${keyPrefix()}blob:${projectId}/${hash}`;
       }
 
       /** Simulates the producer's blob write + hold acquire for a staged value. */
-      async function seedBlobAndHold(hash: string, token: string) {
-        await redis.set(blobKey(hash), "gzipped-bytes");
-        await redis.sadd(holderKey(hash), token);
+      async function seedBlobAndHold({
+        hash,
+        token,
+      }: {
+        hash: string;
+        token: string;
+      }) {
+        await redis.set(blobKey({ hash }), "gzipped-bytes");
+        await redis.sadd(holderKey({ hash }), token);
       }
 
       describe("when a replace squash displaces a staged GQ2 value", () => {
-        /** @scenario "A dedup squash transfers the hold inside the stage eval" */
+        /** @scenario "A dedup squash leaves no phantom hold and reclaims only unreferenced blobs" */
         it("adds the replacement's hold, drops the displaced one, and reclaims its blob in the eval", async () => {
           const oldValue = gq2Value({ hash: "h1", token: "t1" });
           await scripts.stage(
@@ -746,8 +764,8 @@ describe("GroupStagingScripts", () => {
               jobDataJson: oldValue,
             }),
           );
-          await seedBlobAndHold("h1", "t1");
-          await redis.set(blobKey("h2"), "gzipped-bytes");
+          await seedBlobAndHold({ hash: "h1", token: "t1" });
+          await redis.set(blobKey({ hash: "h2" }), "gzipped-bytes");
 
           const { isNew, orphanedValue, reclaimS3 } = await scripts.stage(
             makeJob({
@@ -763,10 +781,10 @@ describe("GroupStagingScripts", () => {
           expect(orphanedValue).toBe(oldValue);
           expect(reclaimS3).toBe(false);
           // Replacement holds its blob; the displaced hold and blob are gone.
-          expect(await redis.smembers(holderKey("h2"))).toEqual(["t2"]);
-          expect(await redis.ttl(holderKey("h2"))).toBeGreaterThan(0);
-          expect(await redis.exists(holderKey("h1"))).toBe(0);
-          expect(await redis.exists(blobKey("h1"))).toBe(0);
+          expect(await redis.smembers(holderKey({ hash: "h2" }))).toEqual(["t2"]);
+          expect(await redis.ttl(holderKey({ hash: "h2" }))).toBeGreaterThan(0);
+          expect(await redis.exists(holderKey({ hash: "h1" }))).toBe(0);
+          expect(await redis.exists(blobKey({ hash: "h1" }))).toBe(0);
         });
 
         it("keeps a displaced blob other stages still hold", async () => {
@@ -780,9 +798,9 @@ describe("GroupStagingScripts", () => {
               jobDataJson: shared,
             }),
           );
-          await seedBlobAndHold("h-shared", "t1");
+          await seedBlobAndHold({ hash: "h-shared", token: "t1" });
           // A second staged occupancy (another group) holds the same content.
-          await redis.sadd(holderKey("h-shared"), "t-other");
+          await redis.sadd(holderKey({ hash: "h-shared" }), "t-other");
 
           await scripts.stage(
             makeJob({
@@ -795,10 +813,10 @@ describe("GroupStagingScripts", () => {
           );
 
           // t1 released, t-other still holds — the blob must survive.
-          expect(await redis.smembers(holderKey("h-shared"))).toEqual([
+          expect(await redis.smembers(holderKey({ hash: "h-shared" }))).toEqual([
             "t-other",
           ]);
-          expect(await redis.exists(blobKey("h-shared"))).toBe(1);
+          expect(await redis.exists(blobKey({ hash: "h-shared" }))).toBe(1);
         });
 
         it("reports an s3-tier displaced blob for out-of-band deletion", async () => {
@@ -812,7 +830,7 @@ describe("GroupStagingScripts", () => {
               jobDataJson: oldValue,
             }),
           );
-          await redis.sadd(holderKey("h-s3"), "t1");
+          await redis.sadd(holderKey({ hash: "h-s3" }), "t1");
 
           const { orphanedValue, reclaimS3 } = await scripts.stage(
             makeJob({
@@ -828,7 +846,7 @@ describe("GroupStagingScripts", () => {
           // is told to delete the object.
           expect(orphanedValue).toBe(oldValue);
           expect(reclaimS3).toBe(true);
-          expect(await redis.exists(holderKey("h-s3"))).toBe(0);
+          expect(await redis.exists(holderKey({ hash: "h-s3" }))).toBe(0);
         });
 
         it("UNLINKs a displaced GQ1 blob directly (mixed-format rollout)", async () => {
@@ -856,7 +874,7 @@ describe("GroupStagingScripts", () => {
           );
 
           expect(await redis.exists(`${keyPrefix()}blob:legacy-id`)).toBe(0);
-          expect(await redis.smembers(holderKey("h2"))).toEqual(["t2"]);
+          expect(await redis.smembers(holderKey({ hash: "h2" }))).toEqual(["t2"]);
         });
       });
 
@@ -872,13 +890,13 @@ describe("GroupStagingScripts", () => {
               jobDataJson: gq2Value({ hash: "h1", token: "t1" }),
             }),
           );
-          await seedBlobAndHold("h1", "t1");
+          await seedBlobAndHold({ hash: "h1", token: "t1" });
 
           for (const [hash, token] of [
             ["h2", "t2"],
             ["h3", "t3"],
           ] as const) {
-            await redis.set(blobKey(hash), "gzipped-bytes");
+            await redis.set(blobKey({ hash }), "gzipped-bytes");
             await scripts.stage(
               makeJob({
                 stagedJobId: `j-${hash}`,
@@ -890,12 +908,12 @@ describe("GroupStagingScripts", () => {
             );
           }
 
-          expect(await redis.smembers(holderKey("h3"))).toEqual(["t3"]);
-          expect(await redis.exists(holderKey("h1"))).toBe(0);
-          expect(await redis.exists(holderKey("h2"))).toBe(0);
-          expect(await redis.exists(blobKey("h1"))).toBe(0);
-          expect(await redis.exists(blobKey("h2"))).toBe(0);
-          expect(await redis.exists(blobKey("h3"))).toBe(1);
+          expect(await redis.smembers(holderKey({ hash: "h3" }))).toEqual(["t3"]);
+          expect(await redis.exists(holderKey({ hash: "h1" }))).toBe(0);
+          expect(await redis.exists(holderKey({ hash: "h2" }))).toBe(0);
+          expect(await redis.exists(blobKey({ hash: "h1" }))).toBe(0);
+          expect(await redis.exists(blobKey({ hash: "h2" }))).toBe(0);
+          expect(await redis.exists(blobKey({ hash: "h3" }))).toBe(1);
         });
       });
 
@@ -914,7 +932,7 @@ describe("GroupStagingScripts", () => {
               shouldReplace: false,
             }),
           );
-          await seedBlobAndHold("h-kept", "t-kept");
+          await seedBlobAndHold({ hash: "h-kept", token: "t-kept" });
 
           const discarded = gq2Value({ hash: "h-disc", token: "t-disc" });
           const { orphanedValue, reclaimS3 } = await scripts.stage(
@@ -933,8 +951,8 @@ describe("GroupStagingScripts", () => {
           // the old code self-transferred and minted a phantom hold here.
           expect(orphanedValue).toBe(discarded);
           expect(reclaimS3).toBe(false);
-          expect(await redis.smembers(holderKey("h-kept"))).toEqual(["t-kept"]);
-          expect(await redis.exists(holderKey("h-disc"))).toBe(0);
+          expect(await redis.smembers(holderKey({ hash: "h-kept" }))).toEqual(["t-kept"]);
+          expect(await redis.exists(holderKey({ hash: "h-disc" }))).toBe(0);
         });
       });
 
@@ -973,7 +991,7 @@ describe("GroupStagingScripts", () => {
           expect(isNew).toBe(false);
           expect(orphanedValue).toBe(late);
           expect(reclaimS3).toBe(false);
-          expect(await redis.exists(holderKey("h-late"))).toBe(0);
+          expect(await redis.exists(holderKey({ hash: "h-late" }))).toBe(0);
         });
       });
 
@@ -993,8 +1011,8 @@ describe("GroupStagingScripts", () => {
               jobDataJson: foreign,
             }),
           );
-          await redis.set(blobKey("h-foreign", "project-other"), "bytes");
-          await redis.sadd(holderKey("h-foreign", "project-other"), "t-foreign");
+          await redis.set(blobKey({ hash: "h-foreign", projectId: "project-other" }), "bytes");
+          await redis.sadd(holderKey({ hash: "h-foreign", projectId: "project-other" }), "t-foreign");
 
           await scripts.stage(
             makeJob({
@@ -1009,9 +1027,9 @@ describe("GroupStagingScripts", () => {
           // Mirror of the TS release guard (ADR-030 §5): never touch a hold
           // whose ref is not this group's tenant.
           expect(
-            await redis.smembers(holderKey("h-foreign", "project-other")),
+            await redis.smembers(holderKey({ hash: "h-foreign", projectId: "project-other" })),
           ).toEqual(["t-foreign"]);
-          expect(await redis.exists(blobKey("h-foreign", "project-other"))).toBe(
+          expect(await redis.exists(blobKey({ hash: "h-foreign", projectId: "project-other" }))).toBe(
             1,
           );
         });
@@ -1029,7 +1047,7 @@ describe("GroupStagingScripts", () => {
               jobDataJson: oldS3,
             }),
           );
-          await redis.sadd(holderKey("hb-s3"), "tb1");
+          await redis.sadd(holderKey({ hash: "hb-s3" }), "tb1");
 
           const { orphanedValues, reclaimS3Flags } = await scripts.stageBatch([
             makeJob({
@@ -1050,11 +1068,11 @@ describe("GroupStagingScripts", () => {
 
           expect(orphanedValues).toEqual([oldS3, ""]);
           expect(reclaimS3Flags).toEqual([true, false]);
-          expect(await redis.smembers(holderKey("hb2"))).toEqual(["tb2"]);
-          expect(await redis.exists(holderKey("hb-s3"))).toBe(0);
+          expect(await redis.smembers(holderKey({ hash: "hb2" }))).toEqual(["tb2"]);
+          expect(await redis.exists(holderKey({ hash: "hb-s3" }))).toBe(0);
           // Entry 1 was a fresh stage: its hold is the PRODUCER's to acquire,
           // not the eval's.
-          expect(await redis.exists(holderKey("hb3"))).toBe(0);
+          expect(await redis.exists(holderKey({ hash: "hb3" }))).toBe(0);
         });
       });
     });

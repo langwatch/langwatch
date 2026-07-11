@@ -424,9 +424,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     //   - a genuine new stage, whose hold the eval doesn't manage — acquire it
     //     now. When the squash DISCARDED the new value instead (replace off,
     //     or a post-dispatch survive-dispatch squash: orphanedValue equals
-    //     jobDataJson), it was never staged and gets no hold; its blob is
-    //     covered by the TTL backstop or by the holders of staged jobs sharing
-    //     its content.
+    //     jobDataJson), it was never staged and gets no hold: a discarded GQ1
+    //     blob (uniquely owned by this value) was already UNLINKed directly
+    //     inside the eval, while a GQ2 blob is content-addressed and left to
+    //     the holders of staged jobs sharing its content, or to the TTL
+    //     backstop.
     if (orphanedValue) {
       if (reclaimS3) {
         this.blobLifecycle.reclaimOrphanedS3({ value: orphanedValue, groupId });

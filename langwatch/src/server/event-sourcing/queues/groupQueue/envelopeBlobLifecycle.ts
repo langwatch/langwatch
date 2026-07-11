@@ -312,6 +312,8 @@ export class EnvelopeBlobLifecycle {
     if (hold.ref.projectId !== this.projectIdFor(groupId)) return;
     void this.tieredBlobs.delete(hold.ref).catch((err: unknown) => {
       gqBlobReclaimS3FailuresTotal.inc({ queue_name: this.queueName });
+      // Tenant-attributed (never a bare hash, never the bucket): every blob
+      // log line carries the owning projectId so logs can't cross tenants.
       logger.warn(
         {
           projectId: hold.ref.projectId,
