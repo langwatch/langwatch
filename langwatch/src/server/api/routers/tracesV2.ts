@@ -1556,6 +1556,12 @@ export const tracesV2Router = createTRPCRouter({
    * demand, and the dashboard frontend join composes span content client-side
    * from these logs. `occurredAtMs` is threaded as a `TimeUnixMs`
    * partition-pruning hint like the sibling span reads.
+   *
+   * These records carry raw captured content (prompts / responses) in their
+   * `body`, so — exactly like the sibling span reads — the read is gated behind
+   * the viewer's captured-input / captured-output visibility via
+   * {@link redactTraceLogContent}, or the raw-log procedure would be a bypass of
+   * the data-privacy policy the span endpoints enforce.
    */
   traceLogs: protectedProcedure
     .input(
@@ -1566,22 +1572,30 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<TraceLogRecordDto[]> => {
+    .query(async ({ input, ctx }): Promise<TraceLogRecordDto[]> => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const rows = await app.traces.logRecords.getLogsByTraceId(
         input.projectId,
         input.traceId,
         input.occurredAtMs,
       );
-      return rows.map((row) => ({
-        spanId: row.spanId,
-        timeUnixMs: row.timeUnixMs,
-        body: row.body,
-        attributes: row.attributes,
-        resourceAttributes: row.resourceAttributes,
-        scopeName: row.scopeName,
-        scopeVersion: row.scopeVersion,
-      }));
+      return rows.map((row) =>
+        redactTraceLogContent(
+          {
+            spanId: row.spanId,
+            timeUnixMs: row.timeUnixMs,
+            body: row.body,
+            attributes: row.attributes,
+            resourceAttributes: row.resourceAttributes,
+            scopeName: row.scopeName,
+            scopeVersion: row.scopeVersion,
+          },
+          protections,
+        ),
+      );
     }),
 });
 
@@ -1598,4 +1612,100 @@ export interface TraceLogRecordDto {
   resourceAttributes: Record<string, string>;
   scopeName: string;
   scopeVersion: string | null;
+  /**
+   * True when this record carried captured content the viewer may not see, so
+   * the content `body` (top-level and the `body` attribute) was withheld. The
+   * UI renders the redacted placeholder, mirroring the span endpoints'
+   * `inputRedacted` / `outputRedacted`.
+   */
+  bodyRedacted?: boolean;
+  /** Audience label naming who CAN see the withheld content, when restricted. */
+  bodyVisibleTo?: string | null;
+}
+
+/** The log-record attribute carrying the emitter's raw content payload. */
+const LOG_CONTENT_BODY_ATTR = "body";
+/** The log-record attribute carrying the emitter's event name. */
+const LOG_EVENT_NAME_ATTR = "event.name";
+
+/**
+ * Log `event.name` values whose `body` is captured INPUT content — the user's
+ * prompt or the model-call request payload. Gated behind captured-input
+ * visibility. Mirrors the input events the read-path Claude enrichment joins.
+ */
+const LOG_INPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
+  "user_prompt",
+  "api_request_body",
+]);
+
+/**
+ * Log `event.name` values whose `body` is captured OUTPUT content — the
+ * assistant's reply or the model-call response payload. Gated behind
+ * captured-output visibility.
+ */
+const LOG_OUTPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
+  "assistant_response",
+  "api_response_body",
+]);
+
+/**
+ * Enforce captured-content visibility on one trace-correlated log record before
+ * it leaves the API. The raw log records carry prompt / response content in
+ * their content `body` (the top-level OTLP body for content-of-record emitters,
+ * and the `body` attribute for the claude_code events), so this procedure must
+ * gate that content behind the SAME `canSeeCapturedInput` / `canSeeCapturedOutput`
+ * visibility the sibling span endpoints enforce — otherwise the raw-log read is
+ * a redaction bypass.
+ *
+ * Input-category events gate on input visibility, output-category events on
+ * output visibility, and any UNCLASSIFIED record that still carries a content
+ * body fails closed (both visibilities required). Only the content body is
+ * withheld: event name, `request_id`, `cost_usd`, `query_source` and every
+ * other metadata attribute (and cost, governed by its own permission) pass
+ * through untouched, so a structural record like the `api_request` cost anchor
+ * is returned intact.
+ */
+export function redactTraceLogContent(
+  row: TraceLogRecordDto,
+  protections: {
+    canSeeCapturedInput?: boolean | null;
+    canSeeCapturedOutput?: boolean | null;
+    capturedInputVisibleTo?: string | null;
+    capturedOutputVisibleTo?: string | null;
+  },
+): TraceLogRecordDto {
+  const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
+  const attrBody = row.attributes[LOG_CONTENT_BODY_ATTR];
+  const hasAttrContent = typeof attrBody === "string" && attrBody.length > 0;
+  // The top-level OTLP body is content only when it is NOT merely echoing the
+  // event-name marker (claude_code stamps the marker there; a generic
+  // content-of-record emitter puts the record's content there).
+  const topBodyIsContent = row.body.length > 0 && row.body !== eventName;
+  if (!hasAttrContent && !topBodyIsContent) return row;
+
+  const isInput = LOG_INPUT_CONTENT_EVENTS.has(eventName);
+  const isOutput = LOG_OUTPUT_CONTENT_EVENTS.has(eventName);
+  const canSeeInput = protections.canSeeCapturedInput === true;
+  const canSeeOutput = protections.canSeeCapturedOutput === true;
+  const hidden = isInput
+    ? !canSeeInput
+    : isOutput
+      ? !canSeeOutput
+      : // Unclassified content record — reveal only to a viewer allowed BOTH.
+        !(canSeeInput && canSeeOutput);
+  if (!hidden) return row;
+
+  const attributes = { ...row.attributes };
+  if (hasAttrContent) delete attributes[LOG_CONTENT_BODY_ATTR];
+  return {
+    ...row,
+    body: topBodyIsContent ? "" : row.body,
+    attributes,
+    bodyRedacted: true,
+    bodyVisibleTo: isInput
+      ? (protections.capturedInputVisibleTo ?? null)
+      : isOutput
+        ? (protections.capturedOutputVisibleTo ?? null)
+        : null,
+  };
 }

@@ -749,11 +749,6 @@ export function initializeDefaultApp(options?: {
   const logCollection = traced(
     new LogRequestCollectionService({
       recordLog: commands.traces.recordLog,
-      // C0 gate: content logs stop being marked for synthesis once the project
-      // sends real Claude Code tracing spans (flipped by the
-      // claudeCodeEnhancedTelemetryGate reactor). The service caches this.
-      isEnhancedTelemetryEnabled: (tenantId) =>
-        projects.hasClaudeCodeEnhancedTelemetry(tenantId),
     }),
     "LogRequestCollectionService",
   );

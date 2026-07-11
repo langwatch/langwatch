@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
-import { CLAUDE_CODE_KIND_ATTR } from "../../claude-code-log-events";
 import { LogRecordStorageClickHouseRepository } from "../log-record-storage.clickhouse.repository";
+
+// Legacy attribute key the ingest path used to stamp on claude_code content
+// logs. The marking is gone; this key is asserted here only to pin that the
+// read path never filters on it.
+const LEGACY_CLAUDE_KIND_ATTR = "langwatch.claude_code.kind";
 
 const makeRecord = (
   over: Partial<NormalizedLogRecord> = {},
@@ -62,7 +66,7 @@ describe("LogRecordStorageClickHouseRepository.insertLogRecord", () => {
       const { repo, insert } = repoCapturingInsert();
 
       await repo.insertLogRecord(
-        makeRecord({ attributes: { [CLAUDE_CODE_KIND_ATTR]: "model" } }),
+        makeRecord({ attributes: { [LEGACY_CLAUDE_KIND_ATTR]: "model" } }),
       );
 
       expect(insertedRow(insert)._retention_days).toBe(
@@ -74,7 +78,7 @@ describe("LogRecordStorageClickHouseRepository.insertLogRecord", () => {
       const { repo, insert } = repoCapturingInsert();
 
       await repo.insertLogRecord(
-        makeRecord({ attributes: { [CLAUDE_CODE_KIND_ATTR]: "tool" } }),
+        makeRecord({ attributes: { [LEGACY_CLAUDE_KIND_ATTR]: "tool" } }),
         308,
       );
 
@@ -159,7 +163,7 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
       expect(sql).toContain("Body");
       expect(sql).toContain("Attributes");
       // The generic read must NOT re-introduce the retired claude-kind filter.
-      expect(sql).not.toContain(CLAUDE_CODE_KIND_ATTR);
+      expect(sql).not.toContain(LEGACY_CLAUDE_KIND_ATTR);
       expect(sql).not.toMatch(/Attributes\[\{kindKey/);
       expect(query_params.tenantId).toBe("project_test");
       expect(query_params.traceId).toBe("trace-1");

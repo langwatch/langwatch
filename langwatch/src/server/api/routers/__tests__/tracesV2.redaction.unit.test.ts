@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ContentCategory } from "~/server/data-privacy/dataPrivacy.types";
 import type { CategoryVisibility } from "~/server/traces/protections";
-import { buildContentPrivacy, redactV2Content } from "../tracesV2";
+import {
+  buildContentPrivacy,
+  redactTraceLogContent,
+  redactV2Content,
+  type TraceLogRecordDto,
+} from "../tracesV2";
 
 const visible: CategoryVisibility = { canSee: true, restrictVisibleTo: null };
 
@@ -327,5 +332,128 @@ describe("buildContentPrivacy", () => {
       new Set(["system"]),
     );
     expect(privacy.system.state).toBe("dropped");
+  });
+});
+
+/**
+ * R2 security gap: the `traceLogs` procedure returned raw log bodies (captured
+ * prompts / responses) with NO content-privacy enforcement, unlike the sibling
+ * span endpoints. `redactTraceLogContent` closes that — a viewer without
+ * captured-input / captured-output visibility must not read the raw content
+ * through this procedure.
+ */
+describe("redactTraceLogContent", () => {
+  function logRow(
+    attributes: Record<string, string>,
+    body = attributes["event.name"] ?? "",
+  ): TraceLogRecordDto {
+    return {
+      spanId: "77bb432be48046f6",
+      timeUnixMs: 100,
+      body,
+      attributes,
+      resourceAttributes: { "langwatch.origin": "coding_agent" },
+      scopeName: "com.anthropic.claude_code.events",
+      scopeVersion: null,
+    };
+  }
+
+  const userPrompt = logRow({
+    "event.name": "user_prompt",
+    query_source: "repl_main_thread",
+    body: "summarise the private repo",
+  });
+  const assistantResponse = logRow({
+    "event.name": "assistant_response",
+    request_id: "req_1",
+    query_source: "repl_main_thread",
+    body: "Here is the secret summary.",
+  });
+
+  describe("given a viewer without captured-content visibility", () => {
+    const blind = { canSeeCapturedInput: false, canSeeCapturedOutput: false };
+
+    it("withholds the input prompt body", () => {
+      const out = redactTraceLogContent(userPrompt, blind);
+
+      expect(out.attributes.body).toBeUndefined();
+      expect(out.bodyRedacted).toBe(true);
+      expect(JSON.stringify(out)).not.toContain("summarise the private repo");
+    });
+
+    it("withholds the output response body", () => {
+      const out = redactTraceLogContent(assistantResponse, blind);
+
+      expect(out.attributes.body).toBeUndefined();
+      expect(out.bodyRedacted).toBe(true);
+      expect(JSON.stringify(out)).not.toContain("Here is the secret summary.");
+    });
+
+    it("keeps the record's metadata (event name, request id, cost)", () => {
+      const anchor = logRow({
+        "event.name": "api_request",
+        request_id: "req_1",
+        cost_usd: "0.0421",
+      });
+
+      const out = redactTraceLogContent(anchor, blind);
+
+      // The cost anchor carries no content body, so it passes through intact —
+      // cost is governed by its own permission, not captured-content visibility.
+      expect(out.attributes.cost_usd).toBe("0.0421");
+      expect(out.attributes["event.name"]).toBe("api_request");
+      expect(out.bodyRedacted).toBeUndefined();
+    });
+
+    it("carries the restrict audience label for a restricted input", () => {
+      const out = redactTraceLogContent(userPrompt, {
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+        capturedInputVisibleTo: "Admins, Security group",
+      });
+
+      expect(out.bodyVisibleTo).toBe("Admins, Security group");
+    });
+
+    it("fails closed on an unclassified content-of-record body", () => {
+      // A generic emitter with content in the top-level body and no event.name.
+      const generic = logRow({ some_attr: "x" }, "raw secret content");
+
+      const out = redactTraceLogContent(generic, blind);
+
+      expect(out.body).toBe("");
+      expect(out.bodyRedacted).toBe(true);
+    });
+  });
+
+  describe("given a viewer with full captured-content visibility", () => {
+    const full = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
+
+    it("returns the input body unchanged", () => {
+      const out = redactTraceLogContent(userPrompt, full);
+
+      expect(out.attributes.body).toBe("summarise the private repo");
+      expect(out.bodyRedacted).toBeUndefined();
+    });
+
+    it("returns the output body unchanged", () => {
+      const out = redactTraceLogContent(assistantResponse, full);
+
+      expect(out.attributes.body).toBe("Here is the secret summary.");
+      expect(out.bodyRedacted).toBeUndefined();
+    });
+  });
+
+  describe("given input is visible but output is not", () => {
+    const inputOnly = { canSeeCapturedInput: true, canSeeCapturedOutput: false };
+
+    it("reveals the input prompt but withholds the output response", () => {
+      expect(redactTraceLogContent(userPrompt, inputOnly).attributes.body).toBe(
+        "summarise the private repo",
+      );
+      expect(
+        redactTraceLogContent(assistantResponse, inputOnly).attributes.body,
+      ).toBeUndefined();
+    });
   });
 });

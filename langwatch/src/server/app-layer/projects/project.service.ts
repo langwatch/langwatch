@@ -209,20 +209,6 @@ export class ProjectService {
     return this.repo.updateMetadata(input);
   }
 
-  /**
-   * Whether the project has been observed sending real Claude Code tracing
-   * spans (enhanced telemetry). While true, log ingest stops marking content
-   * logs for synthesis — see the claudeCodeEnhancedTelemetryGate reactor.
-   */
-  async hasClaudeCodeEnhancedTelemetry(projectId: string): Promise<boolean> {
-    return this.repo.getClaudeCodeEnhancedTelemetry(projectId);
-  }
-
-  /** Flips the enhanced-telemetry gate on (write-once, idempotent). */
-  async enableClaudeCodeEnhancedTelemetry(projectId: string): Promise<void> {
-    return this.repo.setClaudeCodeEnhancedTelemetry(projectId);
-  }
-
   async searchByQuery(params: {
     query: string;
     organizationId?: string;

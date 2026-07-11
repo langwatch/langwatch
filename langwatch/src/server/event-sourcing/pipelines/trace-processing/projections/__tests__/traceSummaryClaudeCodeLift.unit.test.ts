@@ -4,16 +4,16 @@
  * `codex.conversation_starts`), and the gemini / gen_ai.* defensive lift.
  *
  * The claude_code model-call triplet (api_request / api_request_body /
- * api_response_body) is trapped at ingest and converted into a gen_ai span
- * (see claude-code-log-events.unit.test.ts) — it NO LONGER lifts model /
- * cost / tokens / output through the log fold. The "does NOT lift a converted
- * api_request" case below pins that: even if one ever reached the log path it
- * must be a no-op so cost/tokens can never be double-counted.
+ * api_response_body) is stored as plain log records but the log fold does NOT
+ * lift model / cost / tokens / output off them. The "does NOT lift an
+ * api_request" case below pins that: reaching the log fold must be a no-op so
+ * cost/tokens can never be double-counted against the real gateway gen_ai
+ * spans.
  *
  * The top-level column mirror (langwatch.* lift -> Models /
  * TotalPromptTokenCount / TotalCompletionTokenCount) stays live for the
  * log-path emitters and is exercised here through codex.sse_event. Claude's
- * cost/tokens now mirror onto the top-level columns via the SPAN fold
+ * cost/tokens mirror onto the top-level columns via the SPAN fold
  * (computeSpanCost + accumulateTokens), covered in the converter + service
  * tests.
  */
@@ -107,11 +107,11 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
     });
   });
 
-  describe("when a converted model-call event reaches the log fold", () => {
+  describe("when a model-call event reaches the log fold", () => {
     it("does NOT lift model/cost/tokens off an api_request (no double-count)", () => {
-      // api_request is converted to a span at ingest and never reaches the
-      // log path; if one ever did, the fold must NOT re-lift its cost/tokens
-      // — that would double-count against the span fold's contribution.
+      // api_request is stored as a plain log record; the fold must NOT re-lift
+      // its cost/tokens — that would double-count against the real gateway
+      // gen_ai span's contribution.
       const projection = makeProjection();
       const state = createInitState();
       const after = projection.handleTraceLogRecordReceived(

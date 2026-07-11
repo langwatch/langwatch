@@ -85,6 +85,29 @@ const traceNameResolutionService = new TraceNameResolutionService();
  * handful of traces accumulate tens of thousands of spans (reused trace_id,
  * runaway loops); deriving every one pays unbounded cost for no added value.
  * Past the cap we only keep counting so the true magnitude stays visible.
+ *
+ * Claude Code caveat (enhanced telemetry): the native tracer groups a whole
+ * session — and, until sub-agents are split into their own traces, every
+ * sub-agent's spans too — under one traceId, so a long session can exceed 512
+ * `llm_request` spans. Because derivation (including the cost/token
+ * accumulation in `applySpanToSummary`) is skipped past the cap, such a session
+ * UNDER-COUNTS its cost/tokens: they freeze at the first MAX_PROCESSED_SPANS
+ * spans. This is a deliberate trade-off, not a bug — and we keep the cap rather
+ * than raise it, for two reasons:
+ *   1. It is a real safeguard against pathological traces; raising it globally
+ *      re-exposes every emitter to the runaway-trace cost it exists to bound.
+ *   2. There is no CHEAP way to make the cost/token SUMS accurate past the cap.
+ *      The cap does not merely bound an array the sums are independent of — it
+ *      short-circuits the whole per-span pipeline, and the tokens only exist in
+ *      CANONICAL form (`gen_ai.usage.*`) AFTER `normalizeSpanReceived` runs the
+ *      full canonicalisation registry (claude emits bare `input_tokens`). So
+ *      accumulating usage past the cap would mean normalizing every span —
+ *      exactly the unbounded cost the cap prevents.
+ * The correct fix is structural (plan C6, native trace linking): split
+ * sub-agents into their own traces via `parent_of` / `agent_id` so each trace
+ * stays well under the cap and no session's usage is truncated. Until then the
+ * under-count is documented and pinned by
+ * traceSummaryClaudeCodeEnhancedTelemetry.unit.test.ts.
  */
 export const MAX_PROCESSED_SPANS = 512;
 
@@ -368,7 +391,9 @@ export class TraceSummaryFoldProjection
   ): TraceSummaryData {
     // Past the processing cap, keep counting but skip the expensive
     // normalization + derivation — a runaway trace cannot keep growing the
-    // fold cost. Derived fields stay frozen at the first MAX_PROCESSED_SPANS.
+    // fold cost. Derived fields stay frozen at the first MAX_PROCESSED_SPANS,
+    // which for a >512-span Claude session means its cost/tokens under-count
+    // (documented trade-off; see the MAX_PROCESSED_SPANS docblock + C6).
     if (state.spanCount >= MAX_PROCESSED_SPANS) {
       return { ...state, spanCount: state.spanCount + 1 };
     }

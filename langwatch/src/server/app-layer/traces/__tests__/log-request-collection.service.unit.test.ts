@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { RecordLogCommandData } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import {
-  CLAUDE_CODE_KIND_ATTR,
-  CLAUDE_CODE_PII_ATTR,
-} from "../claude-code-log-events";
 import { LogRequestCollectionService } from "../log-request-collection.service";
 
 function makeService() {
@@ -383,16 +379,21 @@ describe("LogRequestCollectionService", () => {
     });
   });
 
-  describe("when claude_code events the span fold consumes are ingested", () => {
+  describe("when claude_code content events are ingested", () => {
     /**
-     * The model-call events (api_request / api_request_body /
-     * api_response_body), the tool events (tool_decision / tool_result), and
-     * the user_prompt are SAVED as log records, marked with
-     * `langwatch.claude_code.kind` so the claudeCodeSpanSync reactor folds the
-     * whole turn's logs into spans. The receiver only appends — it no longer
-     * synthesizes spans inline. The detailed span shape lives in the
-     * converter's own unit test; these cases assert the service-level routing.
+     * Claude Code emits its model calls (api_request / api_request_body /
+     * api_response_body), tool events (tool_decision / tool_result), and the
+     * user_prompt as OTLP log records. The receiver stores them verbatim — it
+     * does not classify or mark them (the old synthesis marking + fold are
+     * gone). trace/span ids are still synthesized so the records correlate;
+     * the only attributes the receiver adds are the synthetic-id markers.
+     * These cases assert the service-level routing.
      */
+    // The legacy marker keys the receiver used to stamp — now stamped by no
+    // one. Asserted here only to pin their absence.
+    const LEGACY_KIND_ATTR = "langwatch.claude_code.kind";
+    const LEGACY_PII_ATTR = "langwatch.claude_code.pii";
+
     const scopeLogs = (records: Array<Record<string, any>>) => ({
       resourceLogs: [
         {
@@ -426,7 +427,7 @@ describe("LogRequestCollectionService", () => {
       ],
     });
 
-    it("saves a model-call event marked kind=model, not as an inline span", async () => {
+    it("stores a model-call event as a plain log with its event attributes", async () => {
       const { service, recordLog } = makeService();
 
       await service.handleOtlpLogRequest({
@@ -438,14 +439,13 @@ describe("LogRequestCollectionService", () => {
       expect(recordLog).toHaveBeenCalledTimes(1);
       const data = recordLog.mock.calls[0]![0]!;
       expect(data.traceId).toMatch(/^[0-9a-f]{32}$/);
-      expect(data.attributes[CLAUDE_CODE_KIND_ATTR]).toBe("model");
-      // The PII level is carried so the reactor redacts the derived span at
-      // the same level, and the payload + model survive for the fold.
-      expect(data.attributes[CLAUDE_CODE_PII_ATTR]).toBe("ESSENTIAL");
       expect(data.attributes.model).toBe("claude-opus-4-7");
+      // No synthesis markers are added — the receiver only records logs.
+      expect(data.attributes[LEGACY_KIND_ATTR]).toBeUndefined();
+      expect(data.attributes[LEGACY_PII_ATTR]).toBeUndefined();
     });
 
-    it("marks the user_prompt as kind=turn and a tool_result as kind=tool", async () => {
+    it("stores user_prompt and tool_result as plain, unmarked logs", async () => {
       const { service, recordLog } = makeService();
 
       await service.handleOtlpLogRequest({
@@ -475,17 +475,13 @@ describe("LogRequestCollectionService", () => {
       });
 
       expect(recordLog).toHaveBeenCalledTimes(2);
-      const byEvent = Object.fromEntries(
-        recordLog.mock.calls.map((c) => [
-          c[0]!.attributes["event.name"],
-          c[0]!.attributes[CLAUDE_CODE_KIND_ATTR],
-        ]),
-      );
-      expect(byEvent.user_prompt).toBe("turn");
-      expect(byEvent.tool_result).toBe("tool");
+      for (const [call] of recordLog.mock.calls) {
+        expect(call!.attributes[LEGACY_KIND_ATTR]).toBeUndefined();
+        expect(call!.attributes[LEGACY_PII_ATTR]).toBeUndefined();
+      }
     });
 
-    it("leaves lifecycle events (hooks, plugins, mcp) as unmarked visible logs", async () => {
+    it("stores lifecycle events (hooks, plugins, mcp) as plain logs", async () => {
       const { service, recordLog } = makeService();
 
       await service.handleOtlpLogRequest({
@@ -508,11 +504,10 @@ describe("LogRequestCollectionService", () => {
       const hook = recordLog.mock.calls.find(
         (c) => c[0]!.attributes["event.name"] === "hook_registered",
       )![0]!;
-      // Not consumed by the fold -> no marker, stays a normal log row.
-      expect(hook.attributes[CLAUDE_CODE_KIND_ATTR]).toBeUndefined();
+      expect(hook.attributes[LEGACY_KIND_ATTR]).toBeUndefined();
     });
 
-    it("is idempotent: the same marked log yields the same ids on re-ingest", async () => {
+    it("is idempotent: the same log yields the same ids on re-ingest", async () => {
       const { service, recordLog } = makeService();
       const batch = scopeLogs([apiRequest("1", "req_c")]);
       await service.handleOtlpLogRequest({
@@ -528,118 +523,6 @@ describe("LogRequestCollectionService", () => {
       const [c1, c2] = recordLog.mock.calls;
       expect(c1![0]!.spanId).toBe(c2![0]!.spanId);
       expect(c1![0]!.traceId).toBe(c2![0]!.traceId);
-    });
-  });
-
-  describe("when the project's enhanced-telemetry gate is on", () => {
-    /**
-     * Plan §4.1 / C0. Once a project sends real Claude Code tracing spans, the
-     * gate reactor flips its flag; from then on ingest must NOT stamp
-     * `langwatch.claude_code.kind` on content logs. Unmarked ⇒ the synthesis
-     * fold finds nothing to fold (no double-count) and the log falls through to
-     * normal project retention. The record is still stored, just unmarked.
-     */
-    const scopeLogs = (records: Array<Record<string, any>>) => ({
-      resourceLogs: [
-        {
-          resource: { attributes: [] },
-          scopeLogs: [
-            {
-              scope: {
-                name: "com.anthropic.claude_code.events",
-                version: "2.1.162",
-              },
-              logRecords: records,
-            },
-          ],
-        },
-      ],
-    });
-
-    const apiRequest = () => ({
-      timeUnixNano: "1700000001000000000",
-      body: { stringValue: "claude_code.api_request" },
-      attributes: [
-        { key: "event.name", value: { stringValue: "api_request" } },
-        { key: "session.id", value: { stringValue: "sess_conv" } },
-        { key: "prompt.id", value: { stringValue: "p_1" } },
-        { key: "request_id", value: { stringValue: "req_a" } },
-        { key: "query_source", value: { stringValue: "repl_main_thread" } },
-      ],
-    });
-
-    function makeGatedService(enabled: boolean) {
-      const recordLog = vi.fn<(data: RecordLogCommandData) => Promise<void>>(
-        () => Promise.resolve(),
-      );
-      const isEnhancedTelemetryEnabled = vi.fn(async () => enabled);
-      const service = new LogRequestCollectionService({
-        recordLog,
-        isEnhancedTelemetryEnabled,
-      });
-      return { service, recordLog, isEnhancedTelemetryEnabled };
-    }
-
-    it("records the log unmarked (no kind / pii markers) when the gate is on", async () => {
-      const { service, recordLog } = makeGatedService(true);
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_gated",
-        logRequest: scopeLogs([apiRequest()]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-
-      expect(recordLog).toHaveBeenCalledTimes(1);
-      const data = recordLog.mock.calls[0]![0]!;
-      // Still stored, still carries its own event attributes...
-      expect(data.attributes["event.name"]).toBe("api_request");
-      // ...but NOT the synthesis markers.
-      expect(data.attributes[CLAUDE_CODE_KIND_ATTR]).toBeUndefined();
-      expect(data.attributes[CLAUDE_CODE_PII_ATTR]).toBeUndefined();
-    });
-
-    it("still marks the log when the gate is off (fallback behavior preserved)", async () => {
-      const { service, recordLog } = makeGatedService(false);
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_ungated",
-        logRequest: scopeLogs([apiRequest()]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-
-      const data = recordLog.mock.calls[0]![0]!;
-      expect(data.attributes[CLAUDE_CODE_KIND_ATTR]).toBe("model");
-      expect(data.attributes[CLAUDE_CODE_PII_ATTR]).toBe("ESSENTIAL");
-    });
-
-    it("looks up the gate once per request, not per record", async () => {
-      const { service, isEnhancedTelemetryEnabled } = makeGatedService(true);
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_gated",
-        logRequest: scopeLogs([apiRequest(), apiRequest(), apiRequest()]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-
-      expect(isEnhancedTelemetryEnabled).toHaveBeenCalledTimes(1);
-    });
-
-    it("caches the gate across requests within the TTL window", async () => {
-      const { service, isEnhancedTelemetryEnabled } = makeGatedService(true);
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_gated",
-        logRequest: scopeLogs([apiRequest()]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      await service.handleOtlpLogRequest({
-        tenantId: "project_gated",
-        logRequest: scopeLogs([apiRequest()]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-
-      // Second request is served from the cache — no extra lookup.
-      expect(isEnhancedTelemetryEnabled).toHaveBeenCalledTimes(1);
     });
   });
 
