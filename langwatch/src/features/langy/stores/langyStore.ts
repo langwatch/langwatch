@@ -195,8 +195,6 @@ interface LangyState {
   closeCardGallery: () => void;
 
   // Resets
-  /** Wipe per-conversation transient state (proposals + optimistic + turn). */
-  resetActiveConversationState: () => void;
   /** Full reset when the active project changes (the store is a singleton). */
   resetForProject: () => void;
 }
@@ -346,7 +344,6 @@ export const useLangyStore = create<LangyState>()(
         set((state) => ({ cardGalleryOpen: !state.cardGalleryOpen })),
       closeCardGallery: () => set({ cardGalleryOpen: false }),
 
-      resetActiveConversationState: () => set(emptyConversationState()),
       resetForProject: () =>
         set({
           activeConversationId: null,

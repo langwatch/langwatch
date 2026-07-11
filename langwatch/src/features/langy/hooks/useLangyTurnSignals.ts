@@ -35,7 +35,7 @@ export interface LangyTurnSignals {
  * routed through a TTL'd Redis buffer transport that lands in PR3, along with
  * the resume-after-refresh token-tail replay. Until that transport is wired,
  * this hook returns no live status/progress/metrics (the shimmer
- * ThinkingIndicator covers the gap) and `isCatchingUp: false`. Keeping the seam
+ * LangyThinkingLine covers the gap) and `isCatchingUp: false`. Keeping the seam
  * here means the panel, StreamingStatusLine and StreamingStatCard consume a
  * stable shape now and light up when PR3 lands — no UI change required at that
  * point.

@@ -24,7 +24,6 @@ export {
 
 export { useLangyConversationList } from "./data/useLangyConversationList";
 export { useLangyConversationListQuery } from "./data/useLangyConversationListQuery";
-export { useLangyConversationDetail } from "./data/useLangyConversationDetail";
 export { useLangyMessages } from "./data/useLangyMessages";
 export { useLangyFeedback } from "./data/useLangyFeedback";
 
