@@ -127,7 +127,6 @@ func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIK
 	tracer := otelapi.Tracer(tracerName)
 	attrs := studioRequestAttrs(req)
 	attrs = append(attrs, attribute.String("langwatch.span.type", spanType))
-	//nolint:spancheck // caller (executeSyncHandler) defers span.End() on the returned span.
 	ctx, span := tracer.Start(ctx, spanName,
 		trace.WithSpanKind(trace.SpanKindServer),
 		trace.WithAttributes(attrs...),
@@ -138,7 +137,7 @@ func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIK
 	if sc := span.SpanContext(); sc.IsValid() {
 		ctx = clog.With(ctx, zap.String(clog.FieldSpanID, sc.SpanID().String()))
 	}
-	return ctx, span //nolint:spancheck // caller (executeSyncHandler) defers span.End() on the returned span.
+	return ctx, span
 }
 
 func studioRequestAttrs(req *app.WorkflowRequest) []attribute.KeyValue {
