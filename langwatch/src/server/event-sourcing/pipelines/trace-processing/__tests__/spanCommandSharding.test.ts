@@ -61,6 +61,7 @@ function buildTraceDeps(
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
+    codingAgentSessionStore: store,
     originGateReactor: reactorStub("originGate"),
     evaluationTriggerReactor: reactorStub("evaluationTrigger"),
     customEvaluationSyncReactor: reactorStub("customEvaluationSync"),

@@ -162,6 +162,7 @@ import { NullTraceListRepository } from "./traces/repositories/trace-list.reposi
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
+import { CodingAgentSessionService } from "./traces/coding-agent-session.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
 import {
@@ -769,6 +770,13 @@ export function initializeDefaultApp(options?: {
     summary: traceSummary,
     list: traceList,
     spans: spanStorage,
+    // Reads the row the coding-agent fold already wrote (ADR-040) — same
+    // repository instance the projection writes through, so the read side
+    // cannot drift onto a different table than the write side.
+    codingAgentSessions: traced(
+      new CodingAgentSessionService(repositories.codingAgentSession),
+      "CodingAgentSessionService",
+    ),
     logRecords: logRecordStorage,
     metricRecords: metricRecordStorage,
     collection: traceCollection,
@@ -968,6 +976,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         spans: traced(
           new SpanStorageService(new NullSpanStorageRepository()),
           "SpanStorageService",
+        ),
+        codingAgentSessions: traced(
+          new CodingAgentSessionService(new NullCodingAgentSessionRepository()),
+          "CodingAgentSessionService",
         ),
         logRecords: traced(
           new LogRecordStorageService(new NullLogRecordStorageRepository()),

@@ -208,13 +208,30 @@ export function ModeSwitch({
         be noise.
       */}
       {showTerminal && (
-        <ModeTab
-          label="Terminal"
-          shortcut="M"
-          active={viewMode === "terminal"}
-          onClick={() => onViewModeChange("terminal")}
-          presence={presenceFor("terminal")}
-        />
+        <>
+          {/*
+            Session before Terminal: it answers "what happened, what did it cost,
+            what went wrong" in one screen, which is what someone opening a
+            coding-agent trace wants first. Terminal is the replay you go to once
+            you know which moment you're looking for.
+          */}
+          <ModeTab
+            label="Session"
+            shortcut="S"
+            active={viewMode === "session"}
+            onClick={() => onViewModeChange("session")}
+            presence={presenceFor("session")}
+          />
+          <ModeTab
+            label="Terminal"
+            // NOT M — that's Maximize. The tab advertised a shortcut that did
+            // something else entirely, which is worse than having none.
+            shortcut="E"
+            active={viewMode === "terminal"}
+            onClick={() => onViewModeChange("terminal")}
+            presence={presenceFor("terminal")}
+          />
+        </>
       )}
       {turnLabel && viewMode === "trace" && (
         <Text textStyle="xs" color="fg.muted" marginLeft="auto">

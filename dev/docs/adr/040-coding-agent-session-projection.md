@@ -90,6 +90,31 @@ scales with the session's length. This is the same invariant that made removing
 `MAX_PROCESSED_SPANS` safe, and it is the invariant that keeps a 20,000-span
 session from growing the fold unboundedly.
 
+## Known limitation: metrics never reach a per-trace fold
+
+Verified against 30 days of live data: **every Claude Code metric arrives with an
+empty `TraceId`** (1,867 of 1,867). The metrics are SESSION-scoped, not
+trace-scoped — the agent reports `lines_of_code.count`, `commit.count`,
+`pull_request.count`, `code_edit_tool.decision` and `active_time.total` against
+`session.id`, with no trace to hang them on.
+
+This fold is keyed by `traceId`, so those records can never be routed to it. The
+metric-folding code in the derivation is therefore correct but **unreachable**,
+and the corresponding row fields (`linesAdded`, `linesRemoved`, `commits`,
+`pullRequests`, `editsAccepted`, `editsRejected`, `activeTime*`) are always zero.
+The UI hides them at zero, so it does not lie — but it cannot report them either.
+
+Fixing it means keying the outcome rollup on `session.id` rather than `traceId`
+(either a second projection, or a session-keyed sibling table joined at read
+time). That is a design change, not a patch, and is deliberately left out of this
+ADR rather than shipped as a stat block that silently always reads zero.
+
+The same shape explains why `mcp_server_connection` logs cannot feed this fold:
+they land on a session's STARTUP trace, which contains no model calls and no tool
+runs, so no session row is written for it at all. MCP usage is instead derived
+from the tool NAME (`mcp__<server>__<tool>`), which is the signal that actually
+arrives inside the working trace.
+
 ## Alternatives considered
 
 - **Keep joining at read time.** Rejected: three consumers, three joins, guaranteed
