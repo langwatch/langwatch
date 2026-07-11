@@ -2,6 +2,7 @@ import { Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
 import { buildTerminalStepsFromSpans } from "./buildStepsFromSpans";
+import { indexToolSpansByUseId } from "./toolSpans";
 import { TERMINAL_TOKENS } from "./palette";
 import { TerminalView } from "./TerminalView";
 
@@ -33,10 +34,27 @@ export function TerminalTab({
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
+  // The tools' real I/O rides on `tool.output` span events (Bash stdout, a
+  // file's content, Edit's structured patch), which `spansFull` doesn't carry.
+  // Fetched alongside rather than blocking on: the transcript already has a
+  // usable echo of each result, so the screen renders without this and sharpens
+  // when it lands.
+  const eventsQuery = api.tracesV2.traceEvents.useQuery(
+    { projectId, traceId, occurredAtMs },
+    { refetchOnWindowFocus: false, staleTime: 60_000 },
+  );
 
   const steps = useMemo(
     () => (query.data ? buildTerminalStepsFromSpans(query.data) : []),
     [query.data],
+  );
+  const toolSpans = useMemo(
+    () =>
+      indexToolSpansByUseId({
+        spans: query.data ?? [],
+        events: eventsQuery.data ?? [],
+      }),
+    [query.data, eventsQuery.data],
   );
 
   if (query.isLoading) {
@@ -72,5 +90,5 @@ export function TerminalTab({
     );
   }
 
-  return <TerminalView steps={steps} meta={{ cwd }} />;
+  return <TerminalView steps={steps} toolSpans={toolSpans} meta={{ cwd }} />;
 }
