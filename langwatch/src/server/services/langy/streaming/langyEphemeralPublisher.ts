@@ -1,8 +1,7 @@
 /**
- * Redis implementation of the PR2 `LangyEphemeralPublisher` seam (ADR-044).
+ * Redis implementation of the `LangyEphemeralPublisher` seam (ADR-044).
  *
- * PR2 shipped the interface + a `NoopLangyEphemeralPublisher` default. This is
- * the live transport: ephemeral status/progress signals are written to the
+ * This is the live transport: ephemeral status/progress signals are written to the
  * per-turn Redis stream (the same stream the token deltas ride), never to the
  * event log. A signal without a `turnId` cannot be placed on a turn stream, so
  * it is dropped — ephemeral signals are best-effort by definition, and the PR3

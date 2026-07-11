@@ -56,6 +56,9 @@ import {
   type LangyStreamEntry,
 } from "~/server/services/langy/streaming/langyTokenBuffer";
 import { subscribeFastTokens } from "~/server/services/langy/streaming/langyFastStream";
+// The turn budget lives with the turn error taxonomy (the processor aborts on
+// it, and this route's attach dies at the same value); imported, not re-declared.
+import { AGENT_CHAT_TIMEOUT_MS } from "~/server/services/langy/execution/langy-turn-errors";
 import type { DomainError } from "~/server/app-layer/domain-error";
 import {
   LangyConversationNotFoundError,
@@ -223,7 +226,6 @@ const langyRoute = () =>
   secured.access(handlerManagedAuth(LANGY_HANDLER_AUTH_REASON));
 
 const AGENT_HEALTH_CHECK_TIMEOUT_MS = 3_000;
-const AGENT_CHAT_TIMEOUT_MS = 120_000;
 /** The warm is fire-and-forget; don't let it hold a socket open. */
 const AGENT_WARM_TIMEOUT_MS = 3_000;
 /**

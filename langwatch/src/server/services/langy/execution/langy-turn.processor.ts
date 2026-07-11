@@ -35,6 +35,7 @@ import {
 import type { LangyConversationService } from "~/server/app-layer/langy/langy-conversation.service";
 import { LANGY_LIVENESS } from "../streaming/langy.streaming.constants";
 import { RedisLangyEphemeralPublisher } from "../streaming/langyEphemeralPublisher";
+import type { LangyEphemeralPublisher } from "~/server/event-sourcing/pipelines/langy-conversation-processing/ephemeral";
 import {
   createLangyTokenBuffer,
   LangyTokenBuffer,
@@ -91,6 +92,34 @@ const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Return a turn's up-front GitHub-PR permit, but ONLY if it was actually
+ * reserved. The release-only-if-`permitReserved` latch is load-bearing: a
+ * Redis-down reserve returns `reserved:false`, and DECRing that would walk the
+ * shared daily counter negative (the erosion-via-blip cap-bypass). Best-effort —
+ * a release failure warns and is swallowed so it never masks the turn's outcome.
+ * `context` names the path releasing (handoff / failure / drain). The failure,
+ * handoff and drain paths all release the same way; this is that one way.
+ */
+async function releasePermitIfReserved({
+  job,
+  log,
+  context,
+}: {
+  job: LangyTurnJobData;
+  log: Pick<typeof logger, "warn">;
+  context: string;
+}): Promise<void> {
+  if (!job.permitReserved) return;
+  await releaseLangyGithubPrPermit({ userId: job.actorUserId }).catch(
+    (releaseError) =>
+      log.warn(
+        { releaseError, turnId: job.turnId },
+        `failed to release PR permit on ${context}`,
+      ),
+  );
+}
+
+/**
  * Langy reaches LangWatch through the `langwatch` CLI, which opencode runs in
  * its `bash` tool — so a trace search arrives as an opaque shell command. This
  * decodes it back into the typed capability before anything is recorded.
@@ -99,7 +128,7 @@ const cliEnvelope = LangyCliEnvelopeService.create();
 
 export interface RunTurnDeps {
   conversations: LangyConversationService;
-  ephemeral: RedisLangyEphemeralPublisher;
+  ephemeral: LangyEphemeralPublisher;
   buffer: LangyTokenBuffer;
   /**
    * Stream B (ADR-048): raw opencode tokens are fanned onto an ephemeral
@@ -736,18 +765,8 @@ export async function runTurn(
       });
       await deps.buffer.markEnd({ conversationId, turnId });
       // The turn paused for handoff — return the reserved PR permit so the pause
-      // does not burn the user's daily slot; the resumed turn re-reserves its
-      // own. Same release-only-if-reserved latch as the failure path (a Redis-
-      // down reserve returns reserved:false and must not walk the counter down).
-      if (job.permitReserved) {
-        await releaseLangyGithubPrPermit({ userId: job.actorUserId }).catch(
-          (releaseError) =>
-            turnLogger.warn(
-              { releaseError },
-              "failed to release PR permit on handoff",
-            ),
-        );
-      }
+      // does not burn the user's daily slot; the resumed turn re-reserves its own.
+      await releasePermitIfReserved({ job, log: turnLogger, context: "handoff" });
       turnLogger.info(
         "langy turn handed off — checkpoint persisted for resume",
       );
@@ -829,12 +848,7 @@ export async function runTurn(
       .catch(() => undefined);
     // A failed turn opened no PR — return the reserved permit so a read-only /
     // failed chat doesn't burn the user's daily slot.
-    if (job.permitReserved) {
-      await releaseLangyGithubPrPermit({ userId: job.actorUserId }).catch(
-        (releaseError) =>
-          turnLogger.warn({ releaseError }, "failed to release PR permit"),
-      );
-    }
+    await releasePermitIfReserved({ job, log: turnLogger, context: "failure" });
   } finally {
     clearInterval(heartbeat);
   }
@@ -994,19 +1008,9 @@ export async function startLangyTurnProcessor(
         // Return the reserved PR permit, exactly as the failure and handoff
         // paths in runTurn do. A drained turn opened no PR, and the turn the
         // browser retries reserves its OWN permit — without this release, every
-        // deploy-interrupted turn silently ate one of the user's daily slots,
-        // and the auto-retry would eat a second on top. Same
-        // release-only-if-`permitReserved` latch (a Redis-down reserve returns
-        // reserved:false, and DECRing that walks the shared counter negative).
-        if (job.permitReserved) {
-          await releaseLangyGithubPrPermit({ userId: job.actorUserId }).catch(
-            (releaseError) =>
-              logger.warn(
-                { releaseError, turnId: job.turnId },
-                "failed to release PR permit on drain",
-              ),
-          );
-        }
+        // deploy-interrupted turn silently ate one of the user's daily slots, and
+        // the auto-retry would eat a second on top.
+        await releasePermitIfReserved({ job, log: logger, context: "drain" });
       });
     },
   };
