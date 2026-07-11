@@ -25,11 +25,17 @@ require (
 	github.com/tidwall/sjson v1.2.5
 	go.opentelemetry.io/collector/component v1.57.0
 	go.opentelemetry.io/collector/pdata v1.57.0
+	go.opentelemetry.io/contrib/bridges/otelzap v0.18.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
+	go.opentelemetry.io/contrib/instrumentation/runtime v0.68.0
 	go.opentelemetry.io/otel v1.43.0
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.19.0
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0
 	go.opentelemetry.io/otel/sdk v1.43.0
+	go.opentelemetry.io/otel/sdk/log v0.19.0
+	go.opentelemetry.io/otel/sdk/metric v1.43.0
 	go.opentelemetry.io/otel/trace v1.43.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/time v0.15.0
@@ -121,6 +127,7 @@ require (
 	go.opentelemetry.io/collector/client v1.57.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.57.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.151.0 // indirect
+	go.opentelemetry.io/otel/log v0.19.0 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.starlark.net v0.0.0-20260102030733-3fee463870c9 // indirect
