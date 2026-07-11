@@ -65,6 +65,9 @@ const TOOL_ACTIVITY: Record<string, Activity> = {
   fetch: { key: "web", label: "Reading the web" },
   todowrite: { key: "plan", label: "Planning" },
   todoread: { key: "plan", label: "Planning" },
+  fetch_langwatch_docs: { key: "docs", label: "Reading the docs" },
+  fetch_scenario_docs: { key: "docs", label: "Reading the docs" },
+  discover_schema: { key: "docs", label: "Checking the schema" },
 };
 
 type ToolPartLike = {
