@@ -27,7 +27,8 @@ func (s *Store) registryDir() string          { return filepath.Join(s.home, "re
 func (s *Store) stackPath(slug string) string { return filepath.Join(s.registryDir(), slug+".json") }
 func (s *Store) daemonPath() string           { return filepath.Join(s.home, "haven.json") }
 
-// SaveStack persists one stack's registry entry.
+// SaveStack persists one stack's registry entry. Mode 0o600: the entry carries
+// LocalAPIKey, so it must not be world-readable.
 func (s *Store) SaveStack(st domain.Stack) error {
 	if err := os.MkdirAll(s.registryDir(), 0o755); err != nil {
 		return err
@@ -36,7 +37,7 @@ func (s *Store) SaveStack(st domain.Stack) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.stackPath(st.Slug), append(b, '\n'), 0o644)
+	return os.WriteFile(s.stackPath(st.Slug), append(b, '\n'), 0o600)
 }
 
 // RemoveStack drops a stack's registry entry.
@@ -89,9 +90,10 @@ func (s *Store) WriteSlugCache(worktreeDir, slug string) error {
 	return os.WriteFile(filepath.Join(worktreeDir, ".langwatch-slug"), []byte(slug+"\n"), 0o644)
 }
 
-// WriteOverlay writes langwatch/.env.portless.
+// WriteOverlay writes langwatch/.env.portless. Mode 0o600: it carries
+// LANGWATCH_API_KEY, so it must not be world-readable.
 func (s *Store) WriteOverlay(lwDir string, st domain.Stack) error {
-	return os.WriteFile(filepath.Join(lwDir, ".env.portless"), []byte(st.OverlayFile()), 0o644)
+	return os.WriteFile(filepath.Join(lwDir, ".env.portless"), []byte(st.OverlayFile()), 0o600)
 }
 
 // hmrGatePath is the worktree-local marker the Vite HMR-gate plugin reads.

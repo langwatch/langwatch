@@ -11,9 +11,9 @@ var palette = []string{"32", "34", "33", "35", "36", "31", "92", "94"}
 
 // goServiceShell picks `make service` (go run) or `make service-watch` (air) for
 // a Go service — the "run vs watch" decision the orchestrator owns.
-func goServiceShell(repoRoot, svc string, watch bool) string {
+func goServiceShell(repoRoot, svc string, shouldWatch bool) string {
 	target := "service"
-	if watch {
+	if shouldWatch {
 		target = "service-watch"
 	}
 	return fmt.Sprintf("make -C %q %s svc=%s", repoRoot, target, svc)
@@ -43,21 +43,21 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir str
 		Shell: "pnpm run start:app",
 		Env:   append(append([]string{}, base...), "NODE_ENV=development"),
 	})
-	if !opts.SkipGateway {
+	if !opts.ShouldSkipGateway {
 		out = append(out, Child{
 			Name: "gateway", Dir: opts.RepoRoot, Color: palette[2],
-			Shell: goServiceShell(opts.RepoRoot, "aigateway", opts.GoWatch),
+			Shell: goServiceShell(opts.RepoRoot, "aigateway", opts.ShouldGoWatch),
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("gateway"))),
 		})
 	}
-	if !opts.SkipNLP {
+	if !opts.ShouldSkipNLP {
 		out = append(out, Child{
 			Name: "nlp", Dir: opts.RepoRoot, Color: palette[4],
-			Shell: goServiceShell(opts.RepoRoot, "nlpgo", opts.GoWatch),
+			Shell: goServiceShell(opts.RepoRoot, "nlpgo", opts.ShouldGoWatch),
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("nlp"))),
 		})
 	}
-	if opts.StartWorkers {
+	if opts.ShouldStartWorkers {
 		out = append(out, Child{
 			Name: "workers", Dir: lwDir, Color: palette[5],
 			Shell: "pnpm run start:workers",

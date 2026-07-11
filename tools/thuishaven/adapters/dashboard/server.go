@@ -60,10 +60,50 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, renderHTML(s.stacks(), s.sharedURL))
 }
 
+// registryStack mirrors domain.Stack for the unauthenticated /api/registry
+// response, dropping LocalAPIKey — any local process can hit this endpoint, and
+// the dev API key must not leak to it.
+type registryStack struct {
+	Slug               string           `json:"slug"`
+	WorktreeDir        string           `json:"worktreeDir"`
+	Branch             string           `json:"branch"`
+	LauncherPID        int              `json:"launcherPid"`
+	RedisDB            int              `json:"redisDb"`
+	APIPort            int              `json:"apiPort"`
+	WorkerMetricsPort  int              `json:"workerMetricsPort"`
+	ClickHouseHTTPPort int              `json:"clickhouseHttpPort"`
+	ClickHouseDatabase string           `json:"clickhouseDatabase"`
+	Baseline           bool             `json:"baseline,omitempty"`
+	Services           []domain.Service `json:"services"`
+	UpdatedAt          time.Time        `json:"updatedAt"`
+}
+
+func toRegistryStack(st domain.Stack) registryStack {
+	return registryStack{
+		Slug:               st.Slug,
+		WorktreeDir:        st.WorktreeDir,
+		Branch:             st.Branch,
+		LauncherPID:        st.LauncherPID,
+		RedisDB:            st.RedisDB,
+		APIPort:            st.APIPort,
+		WorkerMetricsPort:  st.WorkerMetricsPort,
+		ClickHouseHTTPPort: st.ClickHouseHTTPPort,
+		ClickHouseDatabase: st.ClickHouseDatabase,
+		Baseline:           st.IsBaseline,
+		Services:           st.Services,
+		UpdatedAt:          st.UpdatedAt,
+	}
+}
+
 func (s *Server) handleRegistry(w http.ResponseWriter, _ *http.Request) {
+	stacks := s.stacks()
+	out := make([]registryStack, len(stacks))
+	for i, st := range stacks {
+		out[i] = toRegistryStack(st)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"stacks":        s.stacks(),
+		"stacks":        out,
 		"dashboard":     s.sharedURL("langwatch"),
 		"observability": s.sharedURL("observability"),
 		"telemetry":     s.sharedURL("telemetry"),

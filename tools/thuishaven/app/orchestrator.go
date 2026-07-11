@@ -36,7 +36,7 @@ type UpParams struct {
 	LwDir        string
 	Branch       string
 	ExplicitSlug string // from LANGWATCH_SLUG; wins over the derived/cached slug
-	Baseline     bool   // this stack is the shared default others fall back to
+	IsBaseline   bool   // this stack is the shared default others fall back to
 }
 
 // resolveSlug applies the precedence: explicit > cache > derived (then cached).
@@ -58,10 +58,10 @@ func (o *Orchestrator) resolveSlug(p UpParams) (string, error) {
 // provision resolves the slug, allocates ports, registers the hostnames, writes
 // the overlay + registry entry, and starts the heartbeat. It returns the stack
 // and a cleanup that deregisters the routes and drops the registry entry. When
-// manageCH is set it also ensures the shared ClickHouse server + this stack's
+// shouldManageCH is set it also ensures the shared ClickHouse server + this stack's
 // database before the overlay is written, so CLICKHOUSE_URL is in the overlay and
 // the printed stack from the very first line.
-func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptions, manageCH bool) (domain.Stack, func(), error) {
+func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptions, shouldManageCH bool) (domain.Stack, func(), error) {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return domain.Stack{}, nil, err
@@ -76,7 +76,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	st := domain.Stack{
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
 		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
-		APIPort: ports[3], WorkerMetricsPort: ports[4], LocalAPIKey: o.cfg.LocalAPIKey, Baseline: p.Baseline,
+		APIPort: ports[3], WorkerMetricsPort: ports[4], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
@@ -89,7 +89,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// defined. The app is always local.
 		if !runsLocally(r.Name, opts) {
 			if bp, ok := o.baselinePort(r.Name); ok {
-				svc.Port, svc.Fallback = bp, true
+				svc.Port, svc.IsFallback = bp, true
 			}
 		}
 		st.Services = append(st.Services, svc)
@@ -99,7 +99,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 			}
 		}
 	}
-	if manageCH {
+	if shouldManageCH {
 		o.ensureClickHouse(ctx, &st)
 	}
 	st.UpdatedAt = o.sys.Now()
@@ -194,10 +194,10 @@ func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports [
 }
 
 // Down tears the current worktree's routes + registry entry down without needing
-// the launcher process (useful after a crash). Unless keepDB is set it also drops
+// the launcher process (useful after a crash). Unless shouldKeepDB is set it also drops
 // this stack's ClickHouse database — the "give me a fresh DB" affordance — so the
 // next `up` re-runs migrations into a clean, correctly-counted schema.
-func (o *Orchestrator) Down(ctx context.Context, p UpParams, keepDB bool) error {
+func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldKeepDB bool) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
@@ -206,7 +206,7 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, keepDB bool) error 
 		o.proxy.Remove(r.Name, slug)
 	}
 	o.proxy.Remove(domain.ClickHouseService, slug)
-	if o.ch != nil && o.cfg.ManageClickHouse && !keepDB {
+	if o.ch != nil && o.cfg.ShouldManageClickHouse && !shouldKeepDB {
 		db := domain.DatabaseForSlug(slug)
 		if err := o.ch.DropDatabase(ctx, db); err != nil {
 			o.log.Warn("could not drop clickhouse database", zap.String("db", db), zap.Error(err))
@@ -225,7 +225,7 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, keepDB bool) error 
 // emits CLICKHOUSE_URL. Failures are non-fatal: haven warns and leaves the app to
 // fall back to whatever CLICKHOUSE_URL is pinned in .env.
 func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
-	if o.ch == nil || !o.cfg.ManageClickHouse {
+	if o.ch == nil || !o.cfg.ShouldManageClickHouse {
 		return
 	}
 	port, err := o.ch.Ensure(ctx)
@@ -261,9 +261,9 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams) error {
 func runsLocally(name string, opts PlanOptions) bool {
 	switch name {
 	case "gateway":
-		return !opts.SkipGateway
+		return !opts.ShouldSkipGateway
 	case "nlp":
-		return !opts.SkipNLP
+		return !opts.ShouldSkipNLP
 	default:
 		return true
 	}
@@ -278,7 +278,7 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 	fmt.Printf("\n  thuishaven: stack %q  (redis db %d)\n", st.Slug, st.RedisDB)
 	for _, s := range st.Services {
 		target := fmt.Sprintf("127.0.0.1:%d", s.Port)
-		if s.Fallback {
+		if s.IsFallback {
 			target = fmt.Sprintf("baseline :%d", s.Port)
 		}
 		fmt.Printf("    %-10s %s  ->  %s\n", s.Name, s.URL, target)

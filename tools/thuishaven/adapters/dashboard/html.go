@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"fmt"
+	"html"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -23,13 +24,13 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string) string {
 		for _, svc := range s.Services {
 			rows.WriteString(fmt.Sprintf(
 				`<tr><td class="svc">%s</td><td><a href="%s">%s</a></td><td class="dim">127.0.0.1:%d</td></tr>`,
-				svc.Name, svc.URL, svc.Hostname, svc.Port))
+				html.EscapeString(svc.Name), html.EscapeString(svc.URL), html.EscapeString(svc.Hostname), svc.Port))
 			// The API shares app's origin — show it as a sub-row so the single URL
 			// is unmistakable (no separate api.<slug> hostname).
 			if svc.Name == "app" && s.APIPort != 0 {
 				rows.WriteString(fmt.Sprintf(
 					`<tr><td class="svc dim">└ api</td><td><a href="%s/api">%s/api</a></td><td class="dim">127.0.0.1:%d</td></tr>`,
-					svc.URL, svc.Hostname, s.APIPort))
+					html.EscapeString(svc.URL), html.EscapeString(svc.Hostname), s.APIPort))
 			}
 		}
 		cards.WriteString(fmt.Sprintf(`
@@ -38,7 +39,7 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string) string {
         <div class="meta"><span>branch <code>%s</code></span><span>redis db <code>%d</code></span></div>
         <div class="dir">%s</div>
         <table>%s</table>
-      </section>`, s.Slug, dot, dot, s.Branch, s.RedisDB, s.WorktreeDir, rows.String()))
+      </section>`, html.EscapeString(s.Slug), dot, dot, html.EscapeString(s.Branch), s.RedisDB, html.EscapeString(s.WorktreeDir), rows.String()))
 	}
 	return fmt.Sprintf(pageTemplate,
 		cards.String(),

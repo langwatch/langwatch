@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"path/filepath"
@@ -27,7 +27,7 @@ func DeriveSlug(worktreeDir string, taken map[string]bool) string {
 	if !taken[base] {
 		return base
 	}
-	h := sha1.Sum([]byte(worktreeDir))
+	h := sha256.Sum256([]byte(worktreeDir))
 	return base + "-" + hex.EncodeToString(h[:2])
 }
 

@@ -12,8 +12,10 @@ import (
 // the verification harness drives (start a server, mint a per-slug URL, list
 // databases) without booting the whole stack.
 func (o *Orchestrator) RunClickHouse(ctx context.Context, p UpParams, args []string) error {
-	if o.ch == nil {
-		return fmt.Errorf("clickhouse management is disabled (set LANGWATCH_HAVEN_CH=1)")
+	// The adapter is always constructed, so a nil check would never fire — whether
+	// haven manages ClickHouse is a config decision, not a wiring one.
+	if !o.cfg.ShouldManageClickHouse {
+		return fmt.Errorf("clickhouse management is disabled (LANGWATCH_HAVEN_CH=0)")
 	}
 	sub := "status"
 	rest := args
@@ -38,18 +40,28 @@ func (o *Orchestrator) RunClickHouse(ctx context.Context, p UpParams, args []str
 	}
 }
 
-// clickHouseUp ensures the shared server and this stack's database exist.
-func (o *Orchestrator) clickHouseUp(ctx context.Context, p UpParams) error {
+// ensureStackDatabase resolves the slug, starts the shared server if needed, and
+// creates this stack's database — the common prelude of `up` and `url`.
+func (o *Orchestrator) ensureStackDatabase(ctx context.Context, p UpParams) (port int, database string, err error) {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
-		return err
+		return 0, "", err
 	}
-	port, err := o.ch.Ensure(ctx)
+	port, err = o.ch.Ensure(ctx)
 	if err != nil {
-		return err
+		return 0, "", err
 	}
-	db := domain.DatabaseForSlug(slug)
-	if err := o.ch.EnsureDatabase(ctx, db); err != nil {
+	database = domain.DatabaseForSlug(slug)
+	if err := o.ch.EnsureDatabase(ctx, database); err != nil {
+		return 0, "", err
+	}
+	return port, database, nil
+}
+
+// clickHouseUp ensures the shared server and this stack's database exist.
+func (o *Orchestrator) clickHouseUp(ctx context.Context, p UpParams) error {
+	port, db, err := o.ensureStackDatabase(ctx, p)
+	if err != nil {
 		return err
 	}
 	fmt.Printf("managed clickhouse up on :%d — database %q ready\n", port, db)
@@ -59,16 +71,8 @@ func (o *Orchestrator) clickHouseUp(ctx context.Context, p UpParams) error {
 // clickHouseURL ensures the server + database and prints this stack's
 // CLICKHOUSE_URL — the value haven writes into the overlay, useful by hand.
 func (o *Orchestrator) clickHouseURL(ctx context.Context, p UpParams) error {
-	slug, err := o.resolveSlug(p)
+	port, db, err := o.ensureStackDatabase(ctx, p)
 	if err != nil {
-		return err
-	}
-	port, err := o.ch.Ensure(ctx)
-	if err != nil {
-		return err
-	}
-	db := domain.DatabaseForSlug(slug)
-	if err := o.ch.EnsureDatabase(ctx, db); err != nil {
 		return err
 	}
 	fmt.Printf("http://127.0.0.1:%d/%s\n", port, db)

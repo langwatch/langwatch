@@ -12,10 +12,10 @@ import (
 
 // Prune reclaims regenerable local-dev disk (node_modules + build caches) from
 // worktrees that are safe to touch — neither up nor dirty. It is dry-run by
-// default; only act=true removes anything. It never deletes a worktree, only its
+// default; only shouldAct=true removes anything. It never deletes a worktree, only its
 // artefacts, and it always skips a worktree that is running or has uncommitted
 // changes. It also prunes orphaned git worktree admin entries (always safe).
-func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, act bool) error {
+func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct bool) error {
 	if o.hyg == nil {
 		return fmt.Errorf("hygiene adapter not wired")
 	}
@@ -45,7 +45,7 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, act bool) err
 			if size, ok := o.hyg.DirSize(p); ok {
 				wtBytes += size
 				hits = append(hits, rel)
-				if act {
+				if shouldAct {
 					if err := o.hyg.Remove(p); err != nil {
 						o.log.Warn("prune: remove failed", zapErr(err))
 					}
@@ -58,7 +58,7 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, act bool) err
 		total += wtBytes
 		reclaimed++
 		verb := "would reclaim"
-		if act {
+		if shouldAct {
 			verb = "reclaimed    "
 		}
 		fmt.Printf("  %s %-30s %8s  %v\n", verb, filepath.Base(wt.Dir), humanBytes(wtBytes), hits)
@@ -67,7 +67,7 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, act bool) err
 	o.hyg.PruneGitWorktrees(repoRoot)
 
 	fmt.Printf("\n%d worktree(s) with reclaimable disk, %d skipped (up/dirty).\n", reclaimed, skipped)
-	if act {
+	if shouldAct {
 		fmt.Printf("Reclaimed ~%s.\n", humanBytes(total))
 	} else {
 		fmt.Printf("Would reclaim ~%s. Re-run with --yes to act.\n", humanBytes(total))

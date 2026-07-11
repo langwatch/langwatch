@@ -17,7 +17,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -27,6 +26,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/netports"
 )
 
 // Server is the host-process-backed implementation of app.ClickHouse.
@@ -106,7 +107,7 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 
 	ep, ok := s.readEndpoint()
 	if !ok {
-		ports, err := freePorts(2)
+		ports, err := netports.Free(2)
 		if err != nil {
 			return 0, err
 		}
@@ -334,27 +335,6 @@ func (s *Server) writeConfig(ep endpoint) error {
 	}
 	users := fmt.Sprintf(usersTemplate, s.maxMemory/2)
 	return os.WriteFile(s.usersPath(), []byte(users), 0o644)
-}
-
-// freePorts grabs n distinct free loopback TCP ports.
-func freePorts(n int) ([]int, error) {
-	var ports []int
-	var held []net.Listener
-	for i := 0; i < n; i++ {
-		l, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			for _, h := range held {
-				_ = h.Close()
-			}
-			return nil, err
-		}
-		held = append(held, l)
-		ports = append(ports, l.Addr().(*net.TCPAddr).Port)
-	}
-	for _, h := range held {
-		_ = h.Close()
-	}
-	return ports, nil
 }
 
 // quoteIdent backtick-quotes a ClickHouse identifier. haven only ever passes
