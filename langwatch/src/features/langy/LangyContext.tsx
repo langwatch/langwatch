@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import type { ProposalHandlers } from "./components/MessageContent";
+import type { LangyContextChip } from "./stores/langyComposerStore";
 
 interface LangyContextValue {
   isOpen: boolean;
@@ -26,6 +27,15 @@ interface LangyContextValue {
     opts?: { experimentSlug?: string },
   ) => void;
   clearHandlers: () => void;
+  /**
+   * Precise page-context chips a page has declared (see
+   * `useRegisterLangyPageContext`). Most context is derived from the route by
+   * `useLangyPageContext`; this is the escape hatch for context the URL can't
+   * express (a selected prompt / dashboard with its human name).
+   */
+  pageContext: LangyContextChip[];
+  registerPageContext: (items: LangyContextChip[]) => void;
+  clearPageContext: () => void;
 }
 
 const LangyContext = createContext<LangyContextValue | null>(null);
@@ -34,6 +44,7 @@ export function LangyProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const proposalHandlersRef = useRef<ProposalHandlers>({});
   const [experimentSlug, setExperimentSlug] = useState<string | undefined>();
+  const [pageContext, setPageContext] = useState<LangyContextChip[]>([]);
 
   const registerHandlers = useCallback(
     (handlers: ProposalHandlers, opts?: { experimentSlug?: string }) => {
@@ -48,6 +59,14 @@ export function LangyProvider({ children }: { children: ReactNode }) {
     setExperimentSlug(undefined);
   }, []);
 
+  const registerPageContext = useCallback((items: LangyContextChip[]) => {
+    setPageContext(items);
+  }, []);
+
+  const clearPageContext = useCallback(() => {
+    setPageContext([]);
+  }, []);
+
   const value = useMemo<LangyContextValue>(
     () => ({
       isOpen,
@@ -56,8 +75,19 @@ export function LangyProvider({ children }: { children: ReactNode }) {
       experimentSlug,
       registerHandlers,
       clearHandlers,
+      pageContext,
+      registerPageContext,
+      clearPageContext,
     }),
-    [isOpen, experimentSlug, registerHandlers, clearHandlers],
+    [
+      isOpen,
+      experimentSlug,
+      registerHandlers,
+      clearHandlers,
+      pageContext,
+      registerPageContext,
+      clearPageContext,
+    ],
   );
 
   return (
@@ -88,4 +118,22 @@ export function useRegisterLangyHandlers(
     registerHandlers(handlers, { experimentSlug: slug });
     return () => clearHandlers();
   }, [handlers, slug, registerHandlers, clearHandlers]);
+}
+
+/**
+ * Optional hook for pages to declare precise Langy context the route can't
+ * express — a selected prompt or dashboard with its human name. Registers on
+ * mount, clears on unmount, so the chip follows the page. Route-derivable
+ * context (experiment / trace / dataset) needs no call: `useLangyPageContext`
+ * reads it from the URL.
+ */
+export function useRegisterLangyPageContext(items: LangyContextChip[]) {
+  const { registerPageContext, clearPageContext } = useLangy();
+  // Serialize so a fresh array literal with the same content doesn't re-run.
+  const key = JSON.stringify(items);
+  useEffect(() => {
+    registerPageContext(items);
+    return () => clearPageContext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, registerPageContext, clearPageContext]);
 }

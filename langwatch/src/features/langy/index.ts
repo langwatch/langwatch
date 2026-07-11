@@ -19,6 +19,7 @@ export {
   LangyProvider,
   useLangy,
   useRegisterLangyHandlers,
+  useRegisterLangyPageContext,
 } from "./LangyContext";
 
 export { useLangyConversationList } from "./data/useLangyConversationList";

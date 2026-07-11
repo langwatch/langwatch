@@ -1,10 +1,35 @@
 import { Box, chakra, HStack, Separator, Text, Textarea } from "@chakra-ui/react";
-import { FlaskConical, Send, Square, Waypoints, X } from "lucide-react";
+import {
+  Database,
+  FileText,
+  FlaskConical,
+  FolderKanban,
+  LayoutDashboard,
+  type LucideIcon,
+  MessagesSquare,
+  Plus,
+  Send,
+  Square,
+  Waypoints,
+  X,
+} from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { ModelSelector } from "~/components/ModelSelector";
+import { Menu } from "~/components/ui/menu";
 import { useTypewriterPlaceholder } from "~/features/traces-v2/components/ai/useTypewriterPlaceholder";
 import type { LangyContextChip } from "../stores/langyComposerStore";
+
+// Icon per context kind, so a chip reads as its resource at a glance.
+const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
+  project: FolderKanban,
+  experiment: FlaskConical,
+  trace: Waypoints,
+  prompt: FileText,
+  dataset: Database,
+  dashboard: LayoutDashboard,
+  scenario: MessagesSquare,
+};
 
 const COMPOSER_PLACEHOLDER_EXAMPLES = [
   "Ask Langy or describe what you want…",
@@ -27,6 +52,8 @@ export function Composer({
   canSend,
   contextChips = [],
   onRemoveChip,
+  addableChips = [],
+  onAddChip,
 }: {
   input: string;
   onInputChange: (v: string) => void;
@@ -43,6 +70,9 @@ export function Composer({
   /** Page context (experiment/trace) that rides as removable chips in-composer. */
   contextChips?: LangyContextChip[];
   onRemoveChip?: (id: string) => void;
+  /** Dismissed context the "+ context" control can add back. */
+  addableChips?: LangyContextChip[];
+  onAddChip?: (id: string) => void;
 }) {
   const [focused, setFocused] = useState(false);
   const filled = input.trim().length > 0;
@@ -73,8 +103,9 @@ export function Composer({
         >
           {/* Page context rides as removable chips INSIDE the composer surface,
               above the input — so "opened this experiment / trace" is visible
-              and dismissible right where you type. */}
-          {contextChips.length > 0 ? (
+              and dismissible right where you type. The "+ context" control adds
+              back anything you dismissed. */}
+          {contextChips.length > 0 || addableChips.length > 0 ? (
             <HStack gap={1.5} flexWrap="wrap" paddingX={3} paddingTop={3}>
               {contextChips.map((chip) => (
                 <ContextChip
@@ -83,6 +114,12 @@ export function Composer({
                   onRemove={() => onRemoveChip?.(chip.id)}
                 />
               ))}
+              {addableChips.length > 0 ? (
+                <ContextAddMenu
+                  addableChips={addableChips}
+                  onAddChip={onAddChip}
+                />
+              ) : null}
             </HStack>
           ) : null}
 
@@ -178,7 +215,7 @@ function ContextChip({
   chip: LangyContextChip;
   onRemove: () => void;
 }) {
-  const Icon = chip.kind === "experiment" ? FlaskConical : Waypoints;
+  const Icon = CONTEXT_ICON[chip.kind] ?? Waypoints;
   return (
     <HStack
       gap={1}
@@ -214,6 +251,67 @@ function ContextChip({
         <X size={11} />
       </chakra.button>
     </HStack>
+  );
+}
+
+/**
+ * "+ context" control: a small pill that opens a menu of context the user
+ * dismissed, so removed chips can be added back. Only rendered when there's
+ * something to add (see the caller).
+ */
+function ContextAddMenu({
+  addableChips,
+  onAddChip,
+}: {
+  addableChips: LangyContextChip[];
+  onAddChip?: (id: string) => void;
+}) {
+  return (
+    <Menu.Root positioning={{ placement: "bottom-start" }}>
+      <Menu.Trigger asChild>
+        <chakra.button
+          type="button"
+          aria-label="Add context"
+          display="inline-flex"
+          alignItems="center"
+          gap={1}
+          paddingLeft={2}
+          paddingRight={2.5}
+          paddingY={0.5}
+          borderRadius="full"
+          borderWidth="1px"
+          borderStyle="dashed"
+          borderColor="border.emphasized"
+          background="transparent"
+          color="fg.muted"
+          _hover={{ borderColor: "orange.emphasized", color: "fg" }}
+        >
+          <Plus size={11} />
+          <Text textStyle="2xs">context</Text>
+        </chakra.button>
+      </Menu.Trigger>
+      <Menu.Content minWidth="200px">
+        {addableChips.map((chip) => {
+          const Icon = CONTEXT_ICON[chip.kind] ?? Waypoints;
+          return (
+            <Menu.Item
+              key={chip.id}
+              value={chip.id}
+              onClick={() => onAddChip?.(chip.id)}
+            >
+              <HStack gap={2}>
+                <Box color="orange.fg" display="grid" placeItems="center">
+                  <Icon size={12} />
+                </Box>
+                <Text textStyle="xs" truncate>
+                  {chip.label}
+                </Text>
+              </HStack>
+            </Menu.Item>
+          );
+        })}
+      </Menu.Content>
+    </Menu.Root>
   );
 }
 
