@@ -3,6 +3,10 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { definePipeline } from "../../";
 import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import {
+  CodingAgentSessionFoldProjection,
+  type CodingAgentSessionState,
+} from "./projections/codingAgentSession.foldProjection";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
@@ -51,6 +55,7 @@ export interface TraceProcessingPipelineDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** ADR-034 Phase 2: slim per-trace fold writer (silent dual-tap, no read path). */
   traceAnalyticsStore: FoldProjectionStore<TraceAnalyticsData>;
+  codingAgentSessionStore: FoldProjectionStore<CodingAgentSessionState>;
   originGateReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   evaluationTriggerReactor: ReactorDefinition<
     TraceProcessingEvent,
@@ -163,6 +168,16 @@ export function createTraceProcessingPipeline(
       "traceAnalytics",
       new TraceAnalyticsFoldProjection({
         store: deps.traceAnalyticsStore,
+      }),
+    )
+    // ADR-040. Folds spans, logs AND metrics into one row per coding-agent
+    // session. Every trace flows through it, but only a coding agent's writes a
+    // row — the store gates on the fold having actually seen a model call or a
+    // tool run, so an ordinary LLM trace costs a name comparison and nothing more.
+    .withFoldProjection(
+      "codingAgentSession",
+      new CodingAgentSessionFoldProjection({
+        store: deps.codingAgentSessionStore,
       }),
     )
     .withMapProjection(

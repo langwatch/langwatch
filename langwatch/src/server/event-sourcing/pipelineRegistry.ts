@@ -104,6 +104,8 @@ import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
+import { CodingAgentSessionStore } from "./pipelines/trace-processing/projections/codingAgentSession.store";
+import type { CodingAgentSessionState } from "./pipelines/trace-processing/projections/codingAgentSession.foldProjection";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
@@ -495,6 +497,17 @@ export class PipelineRegistry {
         traceAnalyticsStore: this.cached<TraceAnalyticsData>(
           new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
           "trace_analytics",
+        ),
+        // ADR-040. Same shape as the slim fold above: the row is an aggregate,
+        // not a copy, so its store's get() returns null and the Redis cache is
+        // the only warm read path. On a miss the fold's refoldOnStoreMiss
+        // rebuilds from the event log — without this wrapper every event would
+        // trigger a full re-fold.
+        codingAgentSessionStore: this.cached<CodingAgentSessionState>(
+          new CodingAgentSessionStore(
+            this.deps.repositories.codingAgentSession,
+          ),
+          "coding_agent_sessions",
         ),
         logRecordAppendStore: new LogRecordAppendStore(
           this.deps.repositories.logRecordStorage,

@@ -75,6 +75,34 @@ const CLAUDE = {
   },
 } as const;
 
+/**
+ * The span names this derivation reads. Exported so the fold can decide whether
+ * a span is worth DECODING at all.
+ *
+ * This matters more than it looks: every trace in the project flows through this
+ * fold, and normalizing a span runs the whole canonicalisation registry. Without
+ * a check on the RAW name, an ordinary chat trace would pay that cost on every
+ * span just to discover, at the end, that it is not a coding agent. The gate
+ * turns that into one set lookup.
+ */
+export const CODING_AGENT_SPAN_NAMES: ReadonlySet<string> = new Set([
+  CLAUDE.SPAN.LLM_REQUEST,
+  CLAUDE.SPAN.TOOL,
+  CLAUDE.SPAN.TOOL_EXECUTION,
+  CLAUDE.SPAN.BLOCKED_ON_USER,
+  CLAUDE.SPAN.SUBAGENT_SPAWN,
+]);
+
+/** The instrumentation scope a coding agent's log events arrive under. */
+export const CODING_AGENT_LOG_SCOPES: ReadonlySet<string> = new Set([
+  "com.anthropic.claude_code.events",
+]);
+
+/** Metric names a coding agent emits. */
+export function isCodingAgentMetric(metricName: string): boolean {
+  return metricName.startsWith("claude_code.");
+}
+
 /** HTTP 429 — the one failure worth telling apart from every other failure. */
 const RATE_LIMIT_STATUS = "429";
 

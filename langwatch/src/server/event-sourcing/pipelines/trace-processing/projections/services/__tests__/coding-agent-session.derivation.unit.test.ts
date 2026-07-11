@@ -15,8 +15,11 @@ import {
   applyMetricToCodingAgentSession,
   applySpanToCodingAgentSession,
   cacheHitRate,
+  CODING_AGENT_LOG_SCOPES,
+  CODING_AGENT_SPAN_NAMES,
   type CodingAgentSessionData,
   createInitCodingAgentSession,
+  isCodingAgentMetric,
   isCodingAgentSession,
   meanTtftMs,
 } from "../coding-agent-session.derivation";
@@ -563,5 +566,46 @@ describe("pointers to the heavy data", () => {
     // The LAST call's id — the pointer to the body that ended the session.
     expect(state.finalRequestId).toBe("req_last");
     expect(JSON.stringify(state)).not.toContain("prompt_text");
+  });
+});
+
+describe("the gate: a trace that is not a coding agent must cost nothing", () => {
+  // Every trace in the project flows through this fold. Without a check on the
+  // RAW span name, an ordinary chat trace would run the whole canonicalisation
+  // registry on every one of its spans only to discover, at the end, that it is
+  // not a coding agent.
+  it("does not recognise an ordinary LLM span", () => {
+    expect(CODING_AGENT_SPAN_NAMES.has("openai.chat")).toBe(false);
+    expect(CODING_AGENT_SPAN_NAMES.has("llm")).toBe(false);
+    expect(CODING_AGENT_SPAN_NAMES.has("claude_code.llm_request")).toBe(true);
+    expect(CODING_AGENT_SPAN_NAMES.has("claude_code.tool")).toBe(true);
+  });
+
+  it("does not read a Spring AI or Codex log through the Claude adapter", () => {
+    expect(
+      CODING_AGENT_LOG_SCOPES.has("com.anthropic.claude_code.events"),
+    ).toBe(true);
+    expect(CODING_AGENT_LOG_SCOPES.has("codex_cli_rs")).toBe(false);
+    expect(
+      CODING_AGENT_LOG_SCOPES.has(
+        "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores metrics that are not the agent's", () => {
+    expect(isCodingAgentMetric("claude_code.commit.count")).toBe(true);
+    expect(isCodingAgentMetric("gen_ai.client.token.usage")).toBe(false);
+  });
+
+  it("never marks a non-agent trace as a session", () => {
+    const state = fold([
+      { span: span("openai.chat", { model: "gpt-5-mini" }) },
+      { span: span("llm", { "gen_ai.usage.input_tokens": 500 }) },
+    ]);
+
+    expect(isCodingAgentSession(state)).toBe(false);
+    expect(state.agent).toBeNull();
+    expect(state.modelCalls).toBe(0);
   });
 });

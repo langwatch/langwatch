@@ -153,6 +153,8 @@ import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
+import { CodingAgentSessionClickHouseRepository } from "./traces/repositories/coding-agent-session.clickhouse.repository";
+import { NullCodingAgentSessionRepository } from "./traces/repositories/coding-agent-session.repository";
 import { NullTraceAnalyticsRepository } from "./traces/repositories/trace-analytics.repository";
 import { TraceAnalyticsRollupClickHouseRepository } from "./traces/repositories/trace-analytics-rollup.clickhouse.repository";
 import { NullTraceAnalyticsRollupRepository } from "./traces/repositories/trace-analytics-rollup.repository";
@@ -566,6 +568,9 @@ export function initializeDefaultApp(options?: {
     traceAnalytics: clickhouseEnabled
       ? new TraceAnalyticsClickHouseRepository(resolveClickHouseClient)
       : new NullTraceAnalyticsRepository(),
+    codingAgentSession: clickhouseEnabled
+      ? new CodingAgentSessionClickHouseRepository(resolveClickHouseClient)
+      : new NullCodingAgentSessionRepository(),
     evaluationAnalyticsRollup: clickhouseEnabled
       ? new EvaluationAnalyticsRollupClickHouseRepository(
           resolveClickHouseClient,
