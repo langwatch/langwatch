@@ -2,9 +2,14 @@ import { Box, Grid, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/codingAgentSession.foldProjection";
+import type { CodingAgentSession } from "~/server/app-layer/traces/coding-agent-session-merge";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { formatCost } from "../../../utils/formatters";
+import {
+  contextHealthBand,
+  contextWindowCeiling,
+  type ContextHealthTone,
+} from "./contextHealth";
 import {
   deriveSessionSignals,
   formatCompact,
@@ -28,7 +33,7 @@ import { deriveTokenTimeline, findCacheRebuilds } from "./tokenTimeline";
  */
 
 interface SessionViewProps {
-  session: CodingAgentSessionRow;
+  session: CodingAgentSession;
   /**
    * The session's transcript entries, for the per-call token timeline. The
    * fold above is a bounded aggregate (ADR-040) — it has the SUM of cache
@@ -61,6 +66,18 @@ export function SessionView({ session, entries }: SessionViewProps) {
         */}
         {signals.length > 0 && <Signals signals={signals} />}
 
+        {/*
+          Cache health, then what it reached for — promoted above the
+          replay/timing sections below them. Someone opening this tab wants
+          "was this session healthy and what did it use" before "what order
+          did it do things in".
+        */}
+        <CacheHealth session={session} />
+
+        <Extensions session={session} />
+
+        <ContextNoise session={session} />
+
         {tokenTimeline.length > 0 && (
           <Section title="Where the tokens went">
             <TokenTimelineChart points={tokenTimeline} rebuilds={cacheRebuilds} />
@@ -84,18 +101,13 @@ export function SessionView({ session, entries }: SessionViewProps) {
           </Section>
         )}
 
-        <Extensions session={session} />
-
         <Outcome session={session} />
       </VStack>
     </Box>
   );
 }
 
-function Headline({ session }: { session: CodingAgentSessionRow }) {
-  const wasted = session.cacheCreationTokens;
-  const reused = session.cacheReadTokens;
-
+function Headline({ session }: { session: CodingAgentSession }) {
   return (
     <VStack align="stretch" gap={3}>
       <HStack gap={2} flexWrap="wrap">
@@ -105,6 +117,14 @@ function Headline({ session }: { session: CodingAgentSessionRow }) {
           <MetaChip key={model}>{model}</MetaChip>
         ))}
         {session.entrypoint && <MetaChip>{session.entrypoint}</MetaChip>}
+        {/* Most sessions are one trace — Claude Code's own tracer groups a
+            whole run under one traceId. When it isn't (a context compaction,
+            a `/clear`, or the session simply outliving its own limit and
+            continuing), say so rather than silently showing only the trace
+            that happened to be open. */}
+        {session.traceIds.length > 1 && (
+          <MetaChip>{`spans ${session.traceIds.length} traces`}</MetaChip>
+        )}
       </HStack>
 
       <Grid
@@ -119,22 +139,6 @@ function Headline({ session }: { session: CodingAgentSessionRow }) {
           <Stat label="Sub-agents" value={String(session.subAgents)} />
         )}
         <Stat label="Files touched" value={String(session.filesTouched.length)} />
-        {/*
-          Reused vs rebuilt, side by side — because that comparison IS the number.
-          A big cache-read count is the session working as intended; a big rebuild
-          count next to it is the session paying twice for the same context.
-        */}
-        <Stat
-          label="Context reused"
-          value={formatCompact(reused)}
-          hint="Tokens served from the cache. These bill at a fraction of fresh input — the more the better."
-        />
-        <Stat
-          label="Context rebuilt"
-          value={formatCompact(wasted)}
-          hint="Tokens spent writing the cache again. Rebuilding costs MORE per token than fresh input, so this is the number to keep small."
-          tone={wasted > 0 && reused > 0 && wasted / reused >= 0.25 ? "warning" : undefined}
-        />
       </Grid>
     </VStack>
   );
@@ -251,7 +255,7 @@ function Steps({ steps }: { steps: [string, number, boolean][] }) {
  * human sat there waiting to approve something. That last bar is pure friction —
  * the agent was idle and so was the person.
  */
-function TimeBreakdown({ session }: { session: CodingAgentSessionRow }) {
+function TimeBreakdown({ session }: { session: CodingAgentSession }) {
   const bars = [
     { label: "Thinking", ms: session.modelCallMs, color: "blue.solid" },
     { label: "Running tools", ms: session.toolMs, color: "green.solid" },
@@ -268,7 +272,7 @@ function TimeBreakdown({ session }: { session: CodingAgentSessionRow }) {
   if (total === 0) {
     return (
       <Text textStyle="xs" color="fg.muted">
-        No timing was reported for this session.
+        No timing was reported for this run.
       </Text>
     );
   }
@@ -365,18 +369,104 @@ function ToolTable({
 }
 
 /**
+ * How the context held up — promoted out of the headline grid because a raw
+ * "context rebuilt: 318k" number means nothing without what it's measured
+ * against. Peak context is banded against the same reliability curve
+ * currently discussed for long-context coding-agent sessions (see
+ * contextHealth.ts); cache misses and the single worst rebuild turn "it
+ * rebuilt the cache" into "it happened N times, worst case M tokens".
+ */
+function CacheHealth({ session }: { session: CodingAgentSession }) {
+  const ceiling = contextWindowCeiling(session.models);
+  const ratio = session.peakContextTokens / ceiling;
+  const band = contextHealthBand(ratio);
+  const rebuildTone: ContextHealthTone =
+    session.cacheRebuildCount === 0
+      ? "success"
+      : session.cacheRebuildCount <= 2
+        ? "warning"
+        : "danger";
+
+  return (
+    <Section title="Cache health">
+      <VStack align="stretch" gap={2}>
+        <Grid templateColumns="repeat(auto-fit, minmax(140px, 1fr))" gap={3}>
+          <Stat
+            label="Peak context"
+            value={formatCompact(session.peakContextTokens)}
+            hint={`${Math.round(ratio * 100)}% of the ${formatCompact(ceiling)}-token window — ${band.label.toLowerCase()}, per the current reliability guidance for long-context sessions.`}
+            tone={session.peakContextTokens > 0 ? band.tone : undefined}
+          />
+          <Stat
+            label="Cache misses"
+            value={String(session.cacheRebuildCount)}
+            hint="Model calls that re-created most of the context instead of reading it from cache. A cache WRITE costs more per token than a read, so this is the session paying twice for the same tokens."
+            tone={rebuildTone}
+          />
+          <Stat
+            label="Context reused"
+            value={formatCompact(session.cacheReadTokens)}
+            hint="Tokens served from the cache across the whole session. These bill at a fraction of fresh input — the more the better."
+          />
+          <Stat
+            label="Context rebuilt"
+            value={formatCompact(session.cacheCreationTokens)}
+            hint="Tokens spent writing the cache again, summed across the whole session."
+          />
+        </Grid>
+        {session.largestCacheRebuildTokens > 0 && (
+          <Text textStyle="xs" color="fg.muted">
+            Biggest single rebuild: {formatCompact(session.largestCacheRebuildTokens)}{" "}
+            tokens re-sent instead of being reused from cache.
+          </Text>
+        )}
+      </VStack>
+    </Section>
+  );
+}
+
+/**
+ * Claude Code's own signal that the context got noisy enough to act on — a
+ * compaction is the CLI deciding older detail had to be summarised away to
+ * keep going. A more concrete "how noisy was this" proxy than an invented
+ * ratio: it's the agent's own judgement call, not ours. Renders nothing for
+ * the common case of a session that never needed one.
+ */
+function ContextNoise({ session }: { session: CodingAgentSession }) {
+  if (session.compactions === 0) return null;
+
+  return (
+    <Section title="Context noise">
+      <VStack align="stretch" gap={1}>
+        <Text textStyle="sm" color="fg">
+          Compacted {session.compactions}× —{" "}
+          {formatCompact(session.compactionTokensBefore)} →{" "}
+          {formatCompact(session.compactionTokensAfter)} tokens.
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
+          Older detail gets summarised away once the context outgrows the
+          window. Anything the agent forgot after this point, it forgot here.
+        </Text>
+      </VStack>
+    </Section>
+  );
+}
+
+/**
  * What the session reached for beyond its built-in tools. Empty for most
  * sessions, and when it isn't, this is usually the interesting part: an MCP
  * server that got used once, a skill that fired, a sub-agent type nobody knew
  * was running.
  */
-function Extensions({ session }: { session: CodingAgentSessionRow }) {
+function Extensions({ session }: { session: CodingAgentSession }) {
+  // Skills lead — "which skills did you use" is the first thing anyone asks
+  // about a session, ahead of which MCP servers or sub-agents it reached for.
   const groups = [
+    { label: "Skills", values: session.skills },
+    { label: "Sub-agents", values: session.subAgentTypes },
+    { label: "Commands", values: session.slashCommands },
     { label: "MCP servers", values: session.mcpServers },
     { label: "MCP tools", values: session.mcpTools },
-    { label: "Skills", values: session.skills },
-    { label: "Commands", values: session.slashCommands },
-    { label: "Sub-agents", values: session.subAgentTypes },
   ].filter((group) => group.values.length > 0);
 
   if (groups.length === 0) return null;
@@ -408,7 +498,7 @@ function Extensions({ session }: { session: CodingAgentSessionRow }) {
 }
 
 /** What actually came out of the session — the only part anyone keeps. */
-function Outcome({ session }: { session: CodingAgentSessionRow }) {
+function Outcome({ session }: { session: CodingAgentSession }) {
   const hasCode = session.linesAdded > 0 || session.linesRemoved > 0;
   const hasReview = session.editsAccepted > 0 || session.editsRejected > 0;
 
@@ -482,6 +572,17 @@ function Section({
   );
 }
 
+/** Border / background / text colour for a toned Stat — one place, so Cache health and Context noise read consistently with the existing warning-only stats. */
+const STAT_TONE_COLORS: Record<
+  ContextHealthTone,
+  { border: string; bg: string; fg: string }
+> = {
+  success: { border: "green.solid/30", bg: "green.solid/8", fg: "green.fg" },
+  info: { border: "border", bg: "bg.subtle", fg: "fg" },
+  warning: { border: "yellow.solid/30", bg: "yellow.solid/8", fg: "yellow.fg" },
+  danger: { border: "red.solid/30", bg: "red.solid/8", fg: "red.fg" },
+};
+
 function Stat({
   label,
   value,
@@ -495,22 +596,23 @@ function Stat({
   hint?: string;
   emphasis?: boolean;
   compact?: boolean;
-  tone?: "warning";
+  tone?: ContextHealthTone;
 }) {
+  const colors = tone ? STAT_TONE_COLORS[tone] : null;
   const body = (
     <VStack
       align="start"
       gap={0}
       padding={compact ? 0 : 3}
       borderWidth={compact ? 0 : "1px"}
-      borderColor={tone === "warning" ? "yellow.solid/30" : "border"}
+      borderColor={colors?.border ?? "border"}
       borderRadius="md"
-      bg={compact ? undefined : tone === "warning" ? "yellow.solid/8" : "bg.subtle"}
+      bg={compact ? undefined : (colors?.bg ?? "bg.subtle")}
     >
       <Text
         textStyle={emphasis ? "xl" : "lg"}
         fontWeight="semibold"
-        color={tone === "warning" ? "yellow.fg" : "fg"}
+        color={colors?.fg ?? "fg"}
         lineHeight="1.2"
       >
         {value}

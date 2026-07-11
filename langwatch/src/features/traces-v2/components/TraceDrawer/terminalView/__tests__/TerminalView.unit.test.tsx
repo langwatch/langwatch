@@ -161,14 +161,79 @@ describe("TerminalView", () => {
       expect(screen.getByText("$0.06")).toBeInTheDocument();
     });
 
-    it("shows a scrub position at the last visible beat by default", () => {
+    it("shows the step count at the last visible beat by default", () => {
       renderView();
       expect(screen.getByText("step 4/4")).toBeInTheDocument();
     });
 
-    it("renders a timeline slider when there is more than one visible beat", () => {
+    it("has no drag-to-scrub control — scrolling is the only way to travel through it", () => {
       renderView();
-      expect(screen.getByRole("slider")).toBeInTheDocument();
+      expect(screen.queryByRole("slider")).toBeNull();
+    });
+  });
+
+  describe("given the context grew into a bigger size band", () => {
+    it("notes the band crossing once, at the next visible beat", () => {
+      const growingEntries: TranscriptEntry[] = [
+        {
+          kind: "model_call",
+          atMs: 1000,
+          model: "claude-opus-4",
+          tokens: 50_000,
+          costUsd: 0.5,
+          durationMs: 400,
+          spanId: "llm-1",
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadTokens: 20_000,
+          cacheCreationTokens: 30_000,
+        },
+        { kind: "assistant_message", atMs: 1500, text: "On it.", model: "claude-opus-4" },
+      ];
+      renderView({ entries: growingEntries });
+      expect(screen.getByText("Context growing: 50.0K tok")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a call that rebuilt the cache instead of reusing it", () => {
+    it("flags it as a dead site with the tokens re-sent and what was cached", () => {
+      const rebuildEntries: TranscriptEntry[] = [
+        {
+          kind: "model_call",
+          atMs: 1000,
+          model: "claude-opus-4",
+          tokens: 10_000,
+          costUsd: 0.1,
+          durationMs: 400,
+          spanId: "llm-1",
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 10_000,
+        },
+        { kind: "assistant_message", atMs: 1200, text: "Reading the repo.", model: "claude-opus-4" },
+        {
+          kind: "model_call",
+          atMs: 2000,
+          model: "claude-opus-4",
+          tokens: 6_000,
+          costUsd: 0.08,
+          durationMs: 400,
+          spanId: "llm-2",
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadTokens: 0,
+          // >=1000 tokens AND >=50% of the 10k the previous call had cached.
+          cacheCreationTokens: 6_000,
+        },
+        { kind: "assistant_message", atMs: 2200, text: "Continuing.", model: "claude-opus-4" },
+      ];
+      renderView({ entries: rebuildEntries });
+      expect(
+        screen.getByText(
+          "Cache rebuilt: 6.0K tok re-sent instead of reusing 10.0K tok cached",
+        ),
+      ).toBeInTheDocument();
     });
   });
 });

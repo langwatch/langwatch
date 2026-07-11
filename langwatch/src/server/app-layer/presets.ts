@@ -772,9 +772,33 @@ export function initializeDefaultApp(options?: {
     spans: spanStorage,
     // Reads the row the coding-agent fold already wrote (ADR-040) — same
     // repository instance the projection writes through, so the read side
-    // cannot drift onto a different table than the write side.
+    // cannot drift onto a different table than the write side. Conversation
+    // membership (a session can span more than one trace) is answered by
+    // the SAME `gen_ai.conversation.id` lookup `conversationContext` uses —
+    // `traceList` is already built above, in scope in this closure.
     codingAgentSessions: traced(
-      new CodingAgentSessionService(repositories.codingAgentSession),
+      new CodingAgentSessionService(repositories.codingAgentSession, {
+        listConversationTraces: async ({ tenantId, conversationId }) => {
+          const page = await traceList.getList({
+            tenantId,
+            timeRange: {
+              from: Date.now() - 365 * 24 * 60 * 60 * 1000,
+              to: Date.now(),
+            },
+            sort: { columnId: "time", direction: "asc" },
+            page: 1,
+            pageSize: 200,
+            filterWhere: {
+              sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
+              params: { threadConversationId: conversationId },
+            },
+          });
+          return page.items.map((item) => ({
+            traceId: item.traceId,
+            startedAtMs: item.timestamp,
+          }));
+        },
+      }),
       "CodingAgentSessionService",
     ),
     logRecords: logRecordStorage,

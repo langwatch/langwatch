@@ -168,14 +168,17 @@ export function ModeSwitch({
   return (
     <HStack paddingX={4} gap={4} align="center">
       {/*
-        Tab order: Summary | Trace | Conversation. Summary leads because
-        it's the friendlier default for non-engineering users who just want
-        I/O + metadata at a glance; Trace sits middle for the waterfall +
-        span detail workflow; Conversation comes last and gates on
-        `hasConversation`. The previous order put Trace first to match the
-        store default — surfacing Summary instead lets the
-        last-used-mode persistence (see `drawerStore.lastModeChosen`)
-        carry observability-first users straight back to where they were.
+        Tab order: Summary | Trace | [Session | Terminal] | Conversation.
+        Summary leads because it's the friendlier default for non-engineering
+        users who just want I/O + metadata at a glance; Trace sits middle for
+        the waterfall + span detail workflow. On a coding-agent trace, Session
+        and Terminal are what you open the drawer FOR — the raw conversation
+        transcript is the fallback view once you already know what happened,
+        so it moves after them rather than sitting between Trace and Session.
+        The previous order put Trace first to match the store default —
+        surfacing Summary instead lets the last-used-mode persistence (see
+        `drawerStore.lastModeChosen`) carry observability-first users straight
+        back to where they were.
       */}
       <ModeTab
         label="Summary"
@@ -191,15 +194,6 @@ export function ModeSwitch({
         onClick={() => onViewModeChange("trace")}
         presence={presenceFor("trace")}
       />
-      <ModeTab
-        label="Conversation"
-        shortcut="C"
-        active={viewMode === "conversation"}
-        disabled={conversationDisabled}
-        disabledReason={conversationDisabledReason}
-        onClick={() => onViewModeChange("conversation")}
-        presence={presenceFor("conversation")}
-      />
       {/*
         Terminal only exists for coding-agent traces (Claude Code and friends):
         it replays the turn the way the CLI drew it. A normal LLM trace has no
@@ -210,14 +204,16 @@ export function ModeSwitch({
       {showTerminal && (
         <>
           {/*
-            Session before Terminal: it answers "what happened, what did it cost,
-            what went wrong" in one screen, which is what someone opening a
-            coding-agent trace wants first. Terminal is the replay you go to once
-            you know which moment you're looking for.
+            "Usage" (not "Session" — that word already means the agent's own
+            process/session id elsewhere in this UI, and reads as jargon here)
+            before Terminal: it answers "what happened, what did it cost, what
+            went wrong" in one screen, which is what someone opening a
+            coding-agent trace wants first. Terminal is the replay you go to
+            once you know which moment you're looking for.
           */}
           <ModeTab
-            label="Session"
-            shortcut="S"
+            label="Usage"
+            shortcut="U"
             active={viewMode === "session"}
             onClick={() => onViewModeChange("session")}
             presence={presenceFor("session")}
@@ -233,6 +229,15 @@ export function ModeSwitch({
           />
         </>
       )}
+      <ModeTab
+        label="Conversation"
+        shortcut="C"
+        active={viewMode === "conversation"}
+        disabled={conversationDisabled}
+        disabledReason={conversationDisabledReason}
+        onClick={() => onViewModeChange("conversation")}
+        presence={presenceFor("conversation")}
+      />
       {turnLabel && viewMode === "trace" && (
         <Text textStyle="xs" color="fg.muted" marginLeft="auto">
           {turnLabel}

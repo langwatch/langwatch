@@ -1,32 +1,31 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo, useMemo } from "react";
 import { computeLineDiff, type DiffLine, diffStat } from "./diff";
-import { TERMINAL_TOKENS } from "./palette";
+import { DIFF_TOKENS, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./palette";
 
 interface TerminalDiffProps {
   /** File contents before the edit. Empty for a freshly written file. */
   oldText: string;
   /** File contents after the edit. */
   newText: string;
-  /** Path shown in the diff header. */
+  /** Path shown above the diff. */
   filePath?: string;
-  maxHeight?: string;
 }
 
 /**
- * Claude Code-style code diff: removed lines tinted red, added lines tinted
- * green, context dimmed, each with its line number and a `+`/`-`/` ` gutter.
- * Recreates the diff block Claude Code prints after an Edit/Write so the
- * terminal view shows what actually changed, not a raw JSON tool result.
+ * Claude Code-style code diff: removed lines on a full-width red block,
+ * added lines on a full-width green block, context dimmed, each with its
+ * line number and a `+`/`-`/` ` gutter — the same block a real diff pager
+ * draws, not a card with a border around it.
  *
- * Colours come from Chakra's semantic `green.*`/`red.*` tokens, so the diff
- * stays legible and on-brand in both light and dark themes.
+ * Used only when no real structured patch is available (see
+ * {@link TerminalPatch}, the primary path) — this one synthesizes a diff
+ * from the Edit tool's own `old_string`/`new_string`.
  */
 export const TerminalDiff = memo(function TerminalDiff({
   oldText,
   newText,
   filePath,
-  maxHeight = "480px",
 }: TerminalDiffProps) {
   const lines = useMemo(
     () => computeLineDiff(oldText, newText),
@@ -35,53 +34,27 @@ export const TerminalDiff = memo(function TerminalDiff({
   const stat = useMemo(() => diffStat(lines), [lines]);
 
   return (
-    <Box
-      borderRadius="md"
-      borderWidth="1px"
-      borderColor={TERMINAL_TOKENS.border}
-      bg={TERMINAL_TOKENS.screenBg}
-      overflow="hidden"
-    >
-      <HStack
-        gap={2}
-        paddingX={2.5}
-        paddingY={1}
-        borderBottomWidth="1px"
-        borderBottomColor={TERMINAL_TOKENS.border}
-        bg={TERMINAL_TOKENS.frameBg}
-      >
+    <Box>
+      <HStack gap={2} paddingBottom={1}>
         {filePath && (
           <Text
-            textStyle="2xs"
-            fontFamily="mono"
+            fontFamily={TERMINAL_FONT_STACK}
+            fontSize="13px"
             color={TERMINAL_TOKENS.faint}
             truncate
-            flex={1}
             minWidth={0}
           >
             {filePath}
           </Text>
         )}
-        <Box flex={filePath ? undefined : 1} />
-        <HStack gap={1.5} flexShrink={0}>
-          <Text textStyle="2xs" fontFamily="mono" color="green.fg">
-            +{stat.added}
-          </Text>
-          <Text textStyle="2xs" fontFamily="mono" color="red.fg">
-            -{stat.removed}
-          </Text>
-        </HStack>
+        <Text fontFamily={TERMINAL_FONT_STACK} fontSize="13px" color={DIFF_TOKENS.addFg} flexShrink={0}>
+          +{stat.added}
+        </Text>
+        <Text fontFamily={TERMINAL_FONT_STACK} fontSize="13px" color={DIFF_TOKENS.removeFg} flexShrink={0}>
+          -{stat.removed}
+        </Text>
       </HStack>
-      <Box
-        as="pre"
-        margin={0}
-        maxHeight={maxHeight}
-        overflow="auto"
-        fontFamily="mono"
-        fontSize="12px"
-        lineHeight="1.5"
-        userSelect="text"
-      >
+      <Box as="pre" margin={0} fontFamily={TERMINAL_FONT_STACK} fontSize="13px" lineHeight="1.5" userSelect="text">
         {lines.map((line, index) => (
           <DiffRow key={index} line={line} />
         ))}
@@ -93,24 +66,17 @@ export const TerminalDiff = memo(function TerminalDiff({
 function DiffRow({ line }: { line: DiffLine }) {
   const isAdd = line.kind === "add";
   const isRemove = line.kind === "remove";
-  const bg = isAdd ? "green.subtle" : isRemove ? "red.subtle" : undefined;
+  const bg = isAdd ? DIFF_TOKENS.addBg : isRemove ? DIFF_TOKENS.removeBg : undefined;
   const gutterColor = isAdd
-    ? "green.fg"
+    ? DIFF_TOKENS.addFg
     : isRemove
-      ? "red.fg"
+      ? DIFF_TOKENS.removeFg
       : TERMINAL_TOKENS.faint;
   const sign = isAdd ? "+" : isRemove ? "-" : " ";
   const lineNo = isAdd ? line.newLineNo : line.oldLineNo;
 
   return (
-    <HStack
-      as="span"
-      display="flex"
-      gap={0}
-      align="stretch"
-      bg={bg}
-      paddingX={1}
-    >
+    <HStack as="span" display="flex" gap={0} align="stretch" bg={bg}>
       <Text
         as="span"
         color={TERMINAL_TOKENS.faint}

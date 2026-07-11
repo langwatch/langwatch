@@ -1,15 +1,24 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
-import { SimpleSlider } from "~/components/ui/slider";
 import {
   abbreviateModel,
   formatCost,
   formatDuration,
   formatTokens,
 } from "../../../utils/formatters";
+import { findCacheRebuilds } from "../sessionView/tokenTimeline";
 import { toolResultBodyToString } from "../transcript";
-import { CLAUDE_MARK_GRADIENT, TERMINAL_TOKENS } from "./palette";
+import { CLAUDE_MARK_GRADIENT, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./palette";
+import { SyntaxHighlightedCode } from "./SyntaxHighlightedCode";
 import { TerminalDiff } from "./TerminalDiff";
 import { TerminalOutput } from "./TerminalOutput";
 import { TerminalPatch } from "./TerminalPatch";
@@ -46,8 +55,8 @@ const GLYPH = {
 
 /** Everything on the screen is one monospace size — a terminal has one font. */
 const CELL = {
-  fontFamily: "mono",
-  fontSize: "12px",
+  fontFamily: TERMINAL_FONT_STACK,
+  fontSize: "13px",
   lineHeight: "1.55",
 } as const;
 
@@ -57,6 +66,94 @@ const CELL = {
  * character so it reads as shaded rather than flat.
  */
 const MARK_ROWS = [" ▐▛███▜▌", "▝▜█████▛▘", "  ▘▘ ▝▝ "] as const;
+
+/** How close to the true bottom counts as "at the bottom", in pixels. */
+const NEAR_BOTTOM_PX = 32;
+
+/**
+ * Context-size bands for the "heatmap" note — a growing context costs more
+ * per call (nothing is free once it's past the cache), so crossing into a
+ * bigger band is worth a line, but every single model call is not. Ratio
+ * matches `TokenTimelineChart`'s own bands so the two views agree on what
+ * counts as "big".
+ */
+const CONTEXT_HEAT_BANDS = [
+  { minTokens: 150_000, color: TERMINAL_TOKENS.red, label: "large" },
+  { minTokens: 50_000, color: TERMINAL_TOKENS.yellow, label: "growing" },
+] as const;
+
+function contextHeatBand(
+  contextTokens: number,
+): (typeof CONTEXT_HEAT_BANDS)[number] | null {
+  return CONTEXT_HEAT_BANDS.find((band) => contextTokens >= band.minTokens) ?? null;
+}
+
+/** A note inserted into the transcript at a model call, not a beat of its own. */
+type ContextMarker =
+  | { kind: "heat"; atMs: number; contextTokens: number; color: string; label: string }
+  | { kind: "deadSite"; atMs: number; cacheCreationTokens: number; previousContextTokens: number };
+
+/**
+ * Where the context grew into a new size band, and where a cache rebuild
+ * ("dead site" — the session paid to re-send context it already had cached)
+ * happened. Keyed by the fullIndex of the NEXT visible entry after the model
+ * call that triggered it, since `model_call` entries themselves render
+ * nothing — see {@link TerminalView}'s `visibleIndices`.
+ *
+ * Band crossings only (not every call) so a long session gets a small
+ * handful of "context is getting big" notes rather than one after every
+ * single turn. Dead sites always show — `findCacheRebuilds` is already
+ * gated to genuine rebuilds (≥1000 tokens, ≥50% of the prior context), so
+ * it doesn't need the same restraint.
+ */
+function buildContextMarkers(
+  entries: TranscriptEntry[],
+  visibleIndices: readonly number[],
+): Map<number, ContextMarker[]> {
+  const visibleSet = new Set(visibleIndices);
+  const rebuildsByAtMs = new Map(
+    findCacheRebuilds(entries).map((rebuild) => [rebuild.atMs, rebuild]),
+  );
+
+  const markers = new Map<number, ContextMarker[]>();
+  let pending: ContextMarker[] = [];
+  let lastBandLabel: string | null = null;
+
+  entries.forEach((entry, fullIndex) => {
+    if (entry.kind === "model_call") {
+      const rebuild = rebuildsByAtMs.get(entry.atMs);
+      if (rebuild) {
+        pending.push({
+          kind: "deadSite",
+          atMs: entry.atMs,
+          cacheCreationTokens: rebuild.cacheCreationTokens,
+          previousContextTokens: rebuild.previousContextTokens,
+        });
+      }
+
+      const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
+      const band = contextHeatBand(contextTokens);
+      if (band && band.label !== lastBandLabel) {
+        pending.push({
+          kind: "heat",
+          atMs: entry.atMs,
+          contextTokens,
+          color: band.color,
+          label: band.label,
+        });
+      }
+      lastBandLabel = band?.label ?? lastBandLabel;
+      return;
+    }
+
+    if (pending.length > 0 && visibleSet.has(fullIndex)) {
+      markers.set(fullIndex, pending);
+      pending = [];
+    }
+  });
+
+  return markers;
+}
 
 interface TerminalViewProps {
   /** The whole session, in the order it happened — spans AND logs, agent-neutral. */
@@ -83,8 +180,13 @@ interface TerminalViewProps {
  * monospace size. Adding chrome around it makes it read as a screenshot of a
  * terminal rather than as the session itself.
  *
- * A timeline scrubber replays the session beat by beat, ticking the running
- * token + cost totals up as you travel through it.
+ * There is no drag-to-scrub control — a real terminal doesn't have one. The
+ * whole session is always on screen; scrolling through it IS the time
+ * travel, and the bottom bar's running totals track whatever beat is
+ * currently at the bottom of the viewport. New output pulls the screen down
+ * with it only while already caught up at the bottom, exactly like `tail -f`
+ * — scroll up to read history and it stays put, with a "Jump to bottom"
+ * affordance to snap back.
  */
 export const TerminalView = memo(function TerminalView({
   entries,
@@ -94,8 +196,7 @@ export const TerminalView = memo(function TerminalView({
 }: TerminalViewProps) {
   const timeline = useMemo(() => buildEntryTimeline(entries), [entries]);
 
-  // `model_call` entries carry economics for the HUD but render nothing —
-  // the scrubber steps through the VISIBLE beats only.
+  // `model_call` entries carry economics for the HUD but render nothing.
   const visibleIndices = useMemo(
     () =>
       entries.reduce<number[]>((acc, entry, index) => {
@@ -104,28 +205,73 @@ export const TerminalView = memo(function TerminalView({
       }, []),
     [entries],
   );
-  const lastReveal = Math.max(0, visibleIndices.length - 1);
-  const [revealIndex, setRevealIndex] = useState(lastReveal);
-
-  // Keep the reveal index valid if the entry list changes underneath us, and
-  // snap to the newest beat when new entries arrive.
-  useEffect(() => {
-    setRevealIndex(lastReveal);
-  }, [lastReveal]);
-
-  const revealedFullIndex = visibleIndices[revealIndex] ?? -1;
-  const point = timeline[revealedFullIndex];
-  const modelAtReveal = useMemo(
-    () => modelAt(entries, revealedFullIndex) ?? banner?.model ?? null,
-    [entries, revealedFullIndex, banner?.model],
+  const lastVisibleFullIndex = visibleIndices[visibleIndices.length - 1] ?? -1;
+  const contextMarkers = useMemo(
+    () => buildContextMarkers(entries, visibleIndices),
+    [entries, visibleIndices],
   );
 
-  // Follow the newest revealed beat as the scrubber moves.
   const screenRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const setRowRef = useCallback((fullIndex: number, node: HTMLDivElement | null) => {
+    if (node) rowRefs.current.set(fullIndex, node);
+    else rowRefs.current.delete(fullIndex);
+  }, []);
+
+  const [atBottom, setAtBottom] = useState(true);
+  const [trackedFullIndex, setTrackedFullIndex] = useState(lastVisibleFullIndex);
+
+  // Re-derive which beat is "at the bottom of the viewport" from the DOM —
+  // rows are laid out in order, so the last one whose top hasn't scrolled
+  // past the viewport's bottom edge is the one currently in view there.
+  const syncToScroll = useCallback(() => {
     const el = screenRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [revealIndex]);
+    if (!el) return;
+    const viewportBottom = el.scrollTop + el.clientHeight;
+    setAtBottom(el.scrollHeight - viewportBottom <= NEAR_BOTTOM_PX);
+
+    let best = visibleIndices[0] ?? -1;
+    for (const fullIndex of visibleIndices) {
+      const node = rowRefs.current.get(fullIndex);
+      if (!node || node.offsetTop > viewportBottom) break;
+      best = fullIndex;
+    }
+    setTrackedFullIndex(best);
+  }, [visibleIndices]);
+
+  // New output arrives while the reader is caught up at the bottom: follow
+  // it down, the way a real terminal does. Scrolled up reading history: stay
+  // put — the point of the affordance below is that this is a choice, not
+  // something the screen fights you on.
+  const prevEntryCountRef = useRef(entries.length);
+  useEffect(() => {
+    const grew = entries.length > prevEntryCountRef.current;
+    prevEntryCountRef.current = entries.length;
+    const el = screenRef.current;
+    if (!el) return;
+    if (grew && atBottom) {
+      el.scrollTop = el.scrollHeight;
+    }
+    syncToScroll();
+    // Only re-run when the entry count changes — `syncToScroll`/`atBottom`
+    // would otherwise re-fire this on every scroll frame.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries.length]);
+
+  const jumpToBottom = useCallback(() => {
+    const el = screenRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    setAtBottom(true);
+    setTrackedFullIndex(lastVisibleFullIndex);
+  }, [lastVisibleFullIndex]);
+
+  const point = timeline[trackedFullIndex];
+  const modelAtScroll = useMemo(
+    () => modelAt(entries, trackedFullIndex) ?? banner?.model ?? null,
+    [entries, trackedFullIndex, banner?.model],
+  );
+  const trackedStep = Math.max(0, visibleIndices.indexOf(trackedFullIndex)) + 1;
 
   if (entries.length === 0) {
     return (
@@ -143,7 +289,7 @@ export const TerminalView = memo(function TerminalView({
   }
 
   return (
-    <VStack align="stretch" gap={0} height="full" minHeight={0}>
+    <VStack align="stretch" gap={0} height="full" minHeight={0} position="relative">
       <Box
         ref={screenRef}
         flex={1}
@@ -151,29 +297,34 @@ export const TerminalView = memo(function TerminalView({
         overflow="auto"
         bg={TERMINAL_TOKENS.screenBg}
         color={TERMINAL_TOKENS.screenFg}
-        paddingX={4}
-        paddingY={3}
+        paddingX={3}
+        paddingY={2}
+        onScroll={syncToScroll}
       >
         <VStack align="stretch" gap={2.5}>
           <TerminalBanner banner={banner} />
-          {visibleIndices.slice(0, revealIndex + 1).map((fullIndex) => (
-            <EntryLine
-              key={fullIndex}
-              entry={entries[fullIndex]!}
-              toolSpans={toolSpans}
-            />
+          {visibleIndices.map((fullIndex) => (
+            <Fragment key={fullIndex}>
+              {contextMarkers.get(fullIndex)?.map((marker, i) => (
+                <ContextMarkerLine key={`${fullIndex}-marker-${i}`} marker={marker} />
+              ))}
+              <Box ref={(node) => setRowRef(fullIndex, node)}>
+                <EntryLine entry={entries[fullIndex]!} toolSpans={toolSpans} />
+              </Box>
+            </Fragment>
           ))}
         </VStack>
       </Box>
 
+      {!atBottom && <JumpToBottomPill onClick={jumpToBottom} />}
+
       <StatusLine
         stepCount={visibleIndices.length}
-        revealIndex={revealIndex}
-        onScrub={setRevealIndex}
+        currentStep={trackedStep}
         tokens={point?.cumulativeTokens ?? 0}
         costUsd={point?.cumulativeCostUsd ?? 0}
         elapsedMs={point?.elapsedMs ?? 0}
-        model={modelAtReveal}
+        model={modelAtScroll}
         sessionName={sessionName}
       />
     </VStack>
@@ -188,6 +339,31 @@ function modelAt(entries: TranscriptEntry[], fullIndex: number): string | null {
     if (entry?.kind === "assistant_message" && entry.model) return entry.model;
   }
   return null;
+}
+
+/**
+ * Floating over the screen, the same affordance Claude Code shows once
+ * you've scrolled away from live output — plain text on a solid block, the
+ * same inverse-video idiom a terminal uses to highlight a line, not a
+ * rounded button with a drop shadow.
+ */
+function JumpToBottomPill({ onClick }: { onClick: () => void }) {
+  return (
+    <Box position="absolute" bottom="44px" left="50%" transform="translateX(-50%)" zIndex={1}>
+      <Text
+        as="button"
+        onClick={onClick}
+        {...CELL}
+        color={TERMINAL_TOKENS.faint}
+        bg={TERMINAL_TOKENS.frameBg}
+        paddingX={2}
+        cursor="pointer"
+        _hover={{ color: TERMINAL_TOKENS.screenFg }}
+      >
+        Jump to bottom (click) ↓
+      </Text>
+    </Box>
+  );
 }
 
 function TerminalBanner({ banner }: { banner?: SessionBanner }) {
@@ -265,12 +441,12 @@ function EntryLine({
   }
 }
 
-/** The user's prompt: `❯ what they typed`. */
+/** The user's prompt: `❯ what they typed`. Sets itself apart with the caret's colour, the same way the CLI does — not a background panel. */
 function PromptLine({ text }: { text: string | null }) {
   if (!text?.trim()) return null;
   return (
-    <HStack align="flex-start" gap={2} paddingTop={1}>
-      <Glyph char={GLYPH.caret} color="blue.fg" bold />
+    <HStack align="flex-start" gap={2}>
+      <Glyph char={GLYPH.caret} color={TERMINAL_TOKENS.blue} bold />
       <Text
         {...CELL}
         whiteSpace="pre-wrap"
@@ -345,21 +521,22 @@ function ToolCall({
   return (
     <VStack align="stretch" gap={0.5}>
       <HStack align="flex-start" gap={2}>
-        <Glyph char={GLYPH.bullet} color={isError ? "red.fg" : TERMINAL_TOKENS.faint} />
-        <Text {...CELL} color={TERMINAL_TOKENS.screenFg} flex={1} minWidth={0}>
-          <Text as="span" fontWeight="bold">
+        <Glyph char={GLYPH.bullet} color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.faint} />
+        {/* One flowing block, not nested spans with their own box — nesting
+            `fontWeight="bold"` on an inline child was giving a wrapped
+            second line extra indent from its own inline-block layout. */}
+        <Text
+          {...CELL}
+          color={TERMINAL_TOKENS.screenFg}
+          flex={1}
+          minWidth={0}
+          wordBreak="break-word"
+        >
+          <Text as="span" fontWeight="bold" color={TERMINAL_TOKENS.screenFg}>
             {name}
           </Text>
-          {arg ? (
-            <Text as="span" color={TERMINAL_TOKENS.faint}>
-              {`(${truncateArg(arg)})`}
-            </Text>
-          ) : null}
-          {entry.agentId !== null && (
-            <Text as="span" color={TERMINAL_TOKENS.faint}>
-              {" · sub-agent"}
-            </Text>
-          )}
+          {arg ? `(${truncateArg(arg)})` : ""}
+          {entry.agentId !== null && " · sub-agent"}
         </Text>
         {ran !== null && ran.durationMs > 0 && (
           <Text {...CELL} color={TERMINAL_TOKENS.faint} flexShrink={0}>
@@ -377,10 +554,15 @@ function ToolCall({
             newText={synthesizedDiff.newText}
             filePath={synthesizedDiff.filePath}
           />
+        ) : // A real file with a real extension gets a real editor's syntax
+        // highlighting — Bash stdout isn't code in any one language, so
+        // only Read/Write's own `content` field (never `output`) qualifies.
+        ran?.content && ran.filePath ? (
+          <SyntaxHighlightedCode code={ran.content} filePath={ran.filePath} />
         ) : ranOutput !== null ? (
-          <TerminalOutput text={ranOutput} isError={isError} maxHeight="360px" />
+          <TerminalOutput text={ranOutput} isError={isError} />
         ) : transcriptOutput !== null && transcriptOutput.trim() !== "" ? (
-          <TerminalOutput text={transcriptOutput} isError={isError} maxHeight="360px" />
+          <TerminalOutput text={transcriptOutput} isError={isError} />
         ) : (
           <Text {...CELL} color={TERMINAL_TOKENS.faint}>
             (no output)
@@ -405,8 +587,8 @@ function RejectedLine({
   const verb = reason === "user_abort" ? "aborted" : "denied";
   return (
     <HStack align="flex-start" gap={2}>
-      <Glyph char={GLYPH.denied} color="red.fg" />
-      <Text {...CELL} color="red.fg" flex={1} minWidth={0}>
+      <Glyph char={GLYPH.denied} color={TERMINAL_TOKENS.red} />
+      <Text {...CELL} color={TERMINAL_TOKENS.red} flex={1} minWidth={0}>
         {`${name ?? "A tool call"} — ${verb} by the user, never ran`}
       </Text>
     </HStack>
@@ -426,7 +608,7 @@ function NoteLine({
   text: string;
 }) {
   const color =
-    level === "error" ? "red.fg" : level === "warning" ? "yellow.fg" : TERMINAL_TOKENS.faint;
+    level === "error" ? TERMINAL_TOKENS.red : level === "warning" ? TERMINAL_TOKENS.yellow : TERMINAL_TOKENS.faint;
   return (
     <HStack align="flex-start" gap={2}>
       <Glyph char={level === "error" ? GLYPH.bullet : GLYPH.note} color={color} />
@@ -437,10 +619,42 @@ function NoteLine({
   );
 }
 
-/** The `⎿` elbow row: a result, indented under the call it belongs to. */
+/**
+ * A note for a context-size band crossing ("heat") or a cache rebuild ("dead
+ * site" — the session paid to re-send context it already had cached). Same
+ * glyph-plus-text shape as {@link NoteLine}; text only, no background tint —
+ * the colour carries the signal, not a panel behind it.
+ */
+function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
+  const [color, text] =
+    marker.kind === "deadSite"
+      ? [
+          TERMINAL_TOKENS.red,
+          `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tok re-sent instead of reusing ${formatTokens(marker.previousContextTokens)} tok cached`,
+        ]
+      : [marker.color, `Context ${marker.label}: ${formatTokens(marker.contextTokens)} tok`];
+  return (
+    <HStack align="flex-start" gap={2}>
+      <Glyph char={GLYPH.note} color={color} />
+      <Text {...CELL} color={color} flex={1} minWidth={0} wordBreak="break-word">
+        {text}
+      </Text>
+    </HStack>
+  );
+}
+
+/**
+ * The `⎿` elbow row: a result, indented under the call it belongs to. The
+ * indent is two literal space characters, not `paddingLeft` — the same
+ * gutter convention as {@link Glyph}, so it reads as real leading whitespace
+ * rather than a CSS nudge.
+ */
 function ResultLine({ children }: { children: React.ReactNode }) {
   return (
-    <HStack align="flex-start" gap={2} paddingLeft={4}>
+    <HStack align="flex-start" gap={2}>
+      <Text {...CELL} whiteSpace="pre" flexShrink={0} userSelect="none" aria-hidden>
+        {"  "}
+      </Text>
       <Glyph char={GLYPH.elbow} color={TERMINAL_TOKENS.faint} />
       <Box flex={1} minWidth={0}>
         {children}
@@ -477,16 +691,51 @@ function Glyph({
 }
 
 /**
- * The bottom status line — the CLI's own idiom (`⏵⏵ auto mode on · …`), doing
- * real work here: it's the scrubber, it names the session where Claude Code
- * would show your input, and it reports what the session had cost by the beat
- * you're parked on. Fixed to the bottom of the pane — it does not scroll away
- * with the transcript above it.
+ * A box drawn with the actual Unicode box-drawing glyphs a terminal would
+ * use (`╭─╮│╰─╯`), not a CSS border standing in for one. The horizontal
+ * rules are a long run of `─` clipped by `overflow: hidden` rather than a
+ * fixed character count, so the glyph itself — not a div — is what fills the
+ * row at any container width.
+ */
+function AsciiBox({ children }: { children: React.ReactNode }) {
+  const rule = "─".repeat(400);
+  return (
+    <VStack align="stretch" gap={0} color={TERMINAL_TOKENS.border}>
+      <HStack gap={0} overflow="hidden">
+        <Text {...CELL} flexShrink={0} aria-hidden>╭</Text>
+        <Text {...CELL} overflow="hidden" whiteSpace="nowrap" flex={1} aria-hidden>{rule}</Text>
+        <Text {...CELL} flexShrink={0} aria-hidden>╮</Text>
+      </HStack>
+      <HStack gap={0} align="stretch">
+        <Text {...CELL} flexShrink={0} aria-hidden>│</Text>
+        <Text {...CELL} whiteSpace="pre" flexShrink={0} aria-hidden> </Text>
+        <Box flex={1} minWidth={0} color={TERMINAL_TOKENS.screenFg}>
+          {children}
+        </Box>
+        <Text {...CELL} whiteSpace="pre" flexShrink={0} aria-hidden> </Text>
+        <Text {...CELL} flexShrink={0} aria-hidden>│</Text>
+      </HStack>
+      <HStack gap={0} overflow="hidden">
+        <Text {...CELL} flexShrink={0} aria-hidden>╰</Text>
+        <Text {...CELL} overflow="hidden" whiteSpace="nowrap" flex={1} aria-hidden>{rule}</Text>
+        <Text {...CELL} flexShrink={0} aria-hidden>╯</Text>
+      </HStack>
+    </VStack>
+  );
+}
+
+/**
+ * The bottom bar — Claude Code's own idiom: a box-drawn input bar (the
+ * session's name standing in for what you'd type) with a thin status line
+ * underneath it (`⏵⏵ …`). Reports what the session had cost by the beat
+ * currently scrolled to the bottom of the viewport — no drag control,
+ * scrolling IS the time travel. Fixed to the bottom of the pane, both the
+ * box and the line under it — neither scrolls away with the transcript
+ * above.
  */
 function StatusLine({
   stepCount,
-  revealIndex,
-  onScrub,
+  currentStep,
   tokens,
   costUsd,
   elapsedMs,
@@ -494,59 +743,42 @@ function StatusLine({
   sessionName,
 }: {
   stepCount: number;
-  revealIndex: number;
-  onScrub: (index: number) => void;
+  currentStep: number;
   tokens: number;
   costUsd: number;
   elapsedMs: number;
   model?: string | null;
   sessionName?: string | null;
 }) {
-  const scrubbable = stepCount > 1;
   return (
     <VStack
       align="stretch"
       gap={1.5}
-      paddingX={4}
+      paddingX={3}
       paddingY={2}
-      borderTopWidth="1px"
-      borderColor={TERMINAL_TOKENS.border}
-      bg={TERMINAL_TOKENS.frameBg}
+      // Same surface as the screen above, not a separate panel — the box's
+      // own `╭─╮` rule is what marks the boundary, not a CSS border on top of it.
+      bg={TERMINAL_TOKENS.screenBg}
       flexShrink={0}
     >
-      {scrubbable && (
-        // Chakra's Slider.Root doesn't take `aria-label` (it lands on the thumb
-        // via the hidden input), so the accessible name goes on the group.
-        <Box role="group" aria-label="Scrub session timeline">
-          <SimpleSlider
-            size="sm"
-            min={0}
-            max={stepCount - 1}
-            step={1}
-            value={[revealIndex]}
-            onValueChange={(details) => {
-              const next = details.value[0];
-              if (typeof next === "number") onScrub(next);
-            }}
-          />
-        </Box>
-      )}
+      <AsciiBox>
+        <HStack gap={2}>
+          <Text {...CELL} color={TERMINAL_TOKENS.blue} fontWeight="bold" flexShrink={0} aria-hidden>
+            ❯
+          </Text>
+          <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate minWidth={0} flex={1}>
+            {sessionName ?? "Untitled session"}
+          </Text>
+        </HStack>
+      </AsciiBox>
+
       <HStack gap={2} justify="space-between" flexWrap="wrap">
         <HStack gap={2} minWidth={0}>
           <Text {...CELL} color={TERMINAL_TOKENS.accent} flexShrink={0} aria-hidden>
             ⏵⏵
           </Text>
-          <Text
-            {...CELL}
-            color={TERMINAL_TOKENS.screenFg}
-            fontWeight="medium"
-            truncate
-            minWidth={0}
-          >
-            {sessionName ?? "Untitled session"}
-          </Text>
           <Text {...CELL} color={TERMINAL_TOKENS.faint} flexShrink={0}>
-            {`step ${Math.min(revealIndex + 1, stepCount)}/${stepCount}`}
+            {`step ${currentStep}/${stepCount}`}
           </Text>
         </HStack>
         <HStack gap={3} flexWrap="wrap" justify="flex-end">

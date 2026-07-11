@@ -1,125 +1,70 @@
-import { Box, chakra, HStack, Icon, Text } from "@chakra-ui/react";
-import { Check, Copy } from "lucide-react";
-import { memo, useCallback, useMemo } from "react";
+import { Box, Text } from "@chakra-ui/react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
 import { stripAnsi } from "../../../utils/ansi/ansi";
 import { AnsiText } from "./AnsiText";
-import { TERMINAL_TOKENS } from "./palette";
+import { TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./palette";
+
+/** How many lines show before the output collapses — the same handful Claude Code itself shows. */
+const COLLAPSE_AT_LINES = 6;
 
 interface TerminalOutputProps {
   /** Raw tool/command output, possibly carrying ANSI escape codes. */
   text: string;
-  /**
-   * Optional header label, e.g. the command that produced this output
-   * (`git status`) or a stream name (`stdout`). Omit for a bare screen.
-   */
-  label?: string;
-  /** Tint the frame to signal a failed command / error stream. */
+  /** Tint the text to signal a failed command / error stream. */
   isError?: boolean;
-  /** Cap the body height and scroll past it. Defaults to a comfortable window. */
-  maxHeight?: string;
 }
 
 /**
- * Renders a single block of terminal output: a monospace "screen" where ANSI
- * escape codes are parsed into real colours instead of shown as noise. The
- * text is selectable (drag-select copies the clean, de-ANSI'd text) and a
- * hover copy button lifts the whole block at once — the two ways Claude Code
- * lets you lift terminal output.
+ * Renders a block of terminal output as plain monospace text — no card, no
+ * border, no header bar. Claude Code doesn't draw a "results panel" around a
+ * command's output; it just prints it, and a long run collapses to a
+ * handful of lines with a fold marker rather than a scrollbar.
  *
- * This is presentational: mount it only when the surrounding trace is terminal
- * origin (see `utils/terminalOrigin.ts`). It doesn't decide that itself.
+ * The text is selectable (drag-select copies the clean, de-ANSI'd text) and
+ * a click on the block (outside a drag-selection) copies it whole — the two
+ * ways Claude Code lets you lift terminal output, without a visible button
+ * for either.
  */
 export const TerminalOutput = memo(function TerminalOutput({
   text,
-  label,
   isError = false,
-  maxHeight = "480px",
 }: TerminalOutputProps) {
-  const { copied, copy } = useCopyToClipboard();
-  // Copy the clean text, never the escape codes — what you see is what you get.
+  const [expanded, setExpanded] = useState(false);
+  const { copy } = useCopyToClipboard();
   const plain = useMemo(() => stripAnsi(text), [text]);
-  const handleCopy = useCallback(() => copy(plain), [copy, plain]);
-  // Click-to-copy the whole block — but only when the user hasn't dragged a
-  // selection, so hand-selecting a snippet still copies just that snippet.
-  const handleScreenClick = useCallback(() => {
+
+  const lines = useMemo(() => text.split("\n"), [text]);
+  const hiddenLineCount = lines.length - COLLAPSE_AT_LINES;
+  const isCollapsible = hiddenLineCount > 0;
+  const visibleText =
+    isCollapsible && !expanded ? lines.slice(0, COLLAPSE_AT_LINES).join("\n") : text;
+
+  const handleClick = useCallback(() => {
     const selection = window.getSelection?.();
     if (selection && selection.toString().length > 0) return;
     copy(plain);
   }, [copy, plain]);
 
   return (
-    <Box
-      role="group"
-      position="relative"
-      borderRadius="md"
-      borderWidth="1px"
-      borderColor={isError ? "red.muted" : TERMINAL_TOKENS.border}
-      bg={TERMINAL_TOKENS.screenBg}
-      color={TERMINAL_TOKENS.screenFg}
-      overflow="hidden"
-    >
-      {/* Header bar always renders — it carries the copy button, with the
-          optional command/stream label on the left. */}
-      <HStack
-        gap={2}
-        paddingX={2.5}
-        paddingY={1}
-        borderBottomWidth={label ? "1px" : 0}
-        borderBottomColor={TERMINAL_TOKENS.border}
-        bg={TERMINAL_TOKENS.frameBg}
-        minHeight="26px"
-      >
-        {label && (
-          <Text
-            textStyle="2xs"
-            fontFamily="mono"
-            color={isError ? "red.fg" : TERMINAL_TOKENS.faint}
-            truncate
-            flex={1}
-            minWidth={0}
-          >
-            {label}
-          </Text>
-        )}
-        <Box flex={label ? undefined : 1} />
-        {/* Copy button: visible on hover/focus, always reachable by keyboard. */}
-        <chakra.button
-          type="button"
-          aria-label="Copy output"
-          display="flex"
-          alignItems="center"
-          gap={1}
-          paddingX={1.5}
-          paddingY={0.5}
-          borderRadius="sm"
+    <Box color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.screenFg} cursor="text" onClick={handleClick}>
+      <AnsiText text={visibleText} />
+      {isCollapsible && (
+        <Text
+          fontFamily={TERMINAL_FONT_STACK}
+          fontSize="13px"
           color={TERMINAL_TOKENS.faint}
-          opacity={0}
-          _groupHover={{ opacity: 1 }}
-          _focusVisible={{
-            opacity: 1,
-            outline: "2px solid",
-            outlineColor: "blue.focusRing",
+          cursor="pointer"
+          userSelect="none"
+          _hover={{ color: TERMINAL_TOKENS.screenFg }}
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded((value) => !value);
           }}
-          _hover={{ bg: "bg.muted", color: "fg" }}
-          transition="opacity 0.12s ease, background 0.12s ease"
-          onClick={handleCopy}
         >
-          <Icon as={copied ? Check : Copy} boxSize="12px" />
-          <Text textStyle="2xs">{copied ? "Copied" : "Copy"}</Text>
-        </chakra.button>
-      </HStack>
-      <Box
-        paddingX={3}
-        paddingY={2}
-        maxHeight={maxHeight}
-        overflow="auto"
-        // Click anywhere on the screen to copy the whole block — unless the
-        // user has hand-selected a snippet, in which case their selection wins.
-        onClick={handleScreenClick}
-      >
-        <AnsiText text={text} />
-      </Box>
+          {expanded ? "▲ show less" : `… +${hiddenLineCount} lines (click to expand)`}
+        </Text>
+      )}
     </Box>
   );
 });

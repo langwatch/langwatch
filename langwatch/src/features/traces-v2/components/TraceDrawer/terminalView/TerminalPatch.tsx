@@ -1,11 +1,11 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo } from "react";
-import { TERMINAL_TOKENS } from "./palette";
+import { DIFF_TOKENS, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./palette";
 import type { PatchHunk } from "./toolSpans";
 
 const CELL = {
-  fontFamily: "mono",
-  fontSize: "12px",
+  fontFamily: TERMINAL_FONT_STACK,
+  fontSize: "13px",
   lineHeight: "1.55",
 } as const;
 
@@ -43,12 +43,12 @@ export const TerminalPatch = memo(function TerminalPatch({
           </Text>
         )}
         {added > 0 && (
-          <Text {...CELL} color="green.fg" flexShrink={0}>
+          <Text {...CELL} color={DIFF_TOKENS.addFg} flexShrink={0}>
             {`+${added}`}
           </Text>
         )}
         {removed > 0 && (
-          <Text {...CELL} color="red.fg" flexShrink={0}>
+          <Text {...CELL} color={DIFF_TOKENS.removeFg} flexShrink={0}>
             {`-${removed}`}
           </Text>
         )}
@@ -105,7 +105,15 @@ function PatchLine({
   const isRemove = line.startsWith("-");
 
   return (
-    <HStack gap={2} align="flex-start" width="max-content" minWidth="full">
+    <HStack
+      gap={2}
+      align="flex-start"
+      width="max-content"
+      minWidth="full"
+      // Full-width, saturated — the same block a real diff pager draws, not
+      // a subtle tint clinging to the text.
+      bg={isAdd ? DIFF_TOKENS.addBg : isRemove ? DIFF_TOKENS.removeBg : undefined}
+    >
       <Text
         {...CELL}
         color={TERMINAL_TOKENS.faint}
@@ -121,10 +129,12 @@ function PatchLine({
         {...CELL}
         whiteSpace="pre"
         flex={1}
-        paddingX={1}
-        bg={isAdd ? "green.subtle" : isRemove ? "red.subtle" : undefined}
         color={
-          isAdd ? "green.fg" : isRemove ? "red.fg" : TERMINAL_TOKENS.screenFg
+          isAdd
+            ? DIFF_TOKENS.addFg
+            : isRemove
+              ? DIFF_TOKENS.removeFg
+              : TERMINAL_TOKENS.screenFg
         }
       >
         {line}

@@ -54,6 +54,13 @@ export const GROUP_ROW_HEIGHT = 36;
 export const INDENT_PX = 20;
 export const MIN_TREE_WIDTH = 200;
 export const DEFAULT_TREE_PCT = 0.38;
+/**
+ * Below this drawer width, the timeline/flame-graph panel is dropped
+ * entirely and the span list takes the full width — the list is normally
+ * more useful, and a narrow timeline pane (bars a few px wide, a divider,
+ * truncated labels) is not.
+ */
+export const COLLAPSE_TIMELINE_BELOW_PX = 638;
 export const MIN_BAR_PX = 3;
 export const BAR_HEIGHT = 14;
 export const SIBLING_GROUP_THRESHOLD = 5;

@@ -1670,6 +1670,12 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
+        // A coding-agent SESSION isn't always one trace — a run that crosses
+        // a compaction or outlives its own session limit produces more than
+        // one, sharing this conversationId. The drawer already has it (the
+        // same id `conversationContext` uses); omit it to read just this one
+        // trace.
+        conversationId: z.string().optional(),
         ...spanReadHintShape,
       }),
     )
@@ -1680,6 +1686,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
         traceId: input.traceId,
         startedAtMs: input.occurredAtMs,
+        conversationId: input.conversationId,
       });
     }),
 

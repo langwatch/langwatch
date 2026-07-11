@@ -25,7 +25,7 @@ import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
-import { summarizeLogEvent } from "./logSummary";
+import { logEventTone, summarizeLogEvent } from "./logSummary";
 import { SectionFocusGlow } from "./SectionFocusGlow";
 import { useAutoOpenSections } from "./sectionPresence";
 import { UnmappedCostSuggestion } from "./UnmappedCostSuggestion";
@@ -267,6 +267,7 @@ export function SpanAccordions({
                             timestampMs={log.timeUnixMs}
                             anchorMs={span.startTimeMs}
                             attributes={attributes}
+                            tone={logEventTone(log)}
                           />
                         );
                       })}

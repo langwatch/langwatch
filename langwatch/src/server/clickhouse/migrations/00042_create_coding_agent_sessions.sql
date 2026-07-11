@@ -136,6 +136,17 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.coding_agent_sessions
     Compactions UInt32 CODEC(ZSTD(1)),
     CompactionTokensBefore UInt64 CODEC(ZSTD(1)),
     CompactionTokensAfter UInt64 CODEC(ZSTD(1)),
+    -- The biggest SINGLE call's context (CacheRead + CacheCreation for that
+    -- one call) — how big the context window got, at its worst. Distinct
+    -- from CacheReadTokens/CacheCreationTokens above, which are cumulative
+    -- sums across every call and answer a cost question, not this one.
+    PeakContextTokens UInt64 CODEC(ZSTD(1)),
+    -- How many calls re-created most of the context instead of reading it
+    -- from cache. Same threshold sessionView/tokenTimeline.ts's
+    -- findCacheRebuilds uses client-side.
+    CacheRebuildCount UInt32 CODEC(ZSTD(1)),
+    -- The single worst rebuild's CacheCreationTokens.
+    LargestCacheRebuildTokens UInt64 CODEC(ZSTD(1)),
 
     -- ── What went wrong ───────────────────────────────────────────────────
     FailedTools UInt32 CODEC(ZSTD(1)),

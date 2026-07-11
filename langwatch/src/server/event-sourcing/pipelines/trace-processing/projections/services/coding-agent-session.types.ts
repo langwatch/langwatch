@@ -121,6 +121,31 @@ export interface CodingAgentSessionData {
   compactions: number;
   compactionTokensBefore: number;
   compactionTokensAfter: number;
+  /**
+   * The biggest single model call's context (`cacheReadTokens +
+   * cacheCreationTokens` for that ONE call) — "how big did the context
+   * window get", as distinct from `cacheReadTokens`/`cacheCreationTokens`
+   * above, which are cumulative sums across every call and answer a cost
+   * question, not a context-size one.
+   */
+  peakContextTokens: number;
+  /**
+   * How many model calls re-created most of the context instead of reading
+   * it from cache — a cache write costs MORE per token than a read, so this
+   * is the session paying twice for the same tokens. Same threshold
+   * `sessionView/tokenTimeline.ts`'s `findCacheRebuilds` uses client-side,
+   * computed here at fold time so it survives across a session's traces.
+   */
+  cacheRebuildCount: number;
+  /** The single biggest rebuild's `cacheCreationTokens` — the worst offender. */
+  largestCacheRebuildTokens: number;
+  /**
+   * Bookkeeping only, not projected to the row: the previous model call's
+   * context size, needed to tell whether the NEXT call rebuilt it. Read by
+   * arrival order like the rest of this fold's per-call state — spans can
+   * arrive slightly out of order, so this is an approximation, not a ledger.
+   */
+  previousCallContextTokens: number;
 
   // ── What went wrong ───────────────────────────────────────────────────
   failedTools: number;

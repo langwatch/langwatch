@@ -1,8 +1,8 @@
 /**
- * Claude Code Extractor (log side)
+ * Claude Code Extractor
  *
- * Handles: the `user_prompt` log event of Anthropic Claude Code's native
- * OpenTelemetry log records (scope `com.anthropic.claude_code.events`),
+ * Log side handles: the `user_prompt` log event of Anthropic Claude Code's
+ * native OpenTelemetry log records (scope `com.anthropic.claude_code.events`),
  * lifting the user-typed prompt onto `langwatch.input` so the trace
  * summary headline input is populated. It is the only claude_code event
  * this extractor lifts; the model-call events (`api_request`,
@@ -18,8 +18,18 @@
  *                         OTEL_LOG_USER_PROMPTS=1)
  * - langwatch.thread.id  (user_prompt — from session.id)
  *
- * Span-side `apply()` is a no-op — claude_code traffic that comes through
- * the gateway arrives as gen_ai.* spans handled by GenAIExtractor.
+ * Span side handles: Claude Code's native `claude_code.llm_request` span.
+ * This is the CLI's own OTel exporter, a different wire than gateway-proxied
+ * traffic — the gateway re-emits gen_ai.* semconv spans (GenAIExtractor's
+ * job), but the CLI's native span carries model/token usage under bare,
+ * un-prefixed attribute names (`model`, `input_tokens`, `output_tokens`,
+ * `cache_read_tokens`, `cache_creation_tokens`). Nothing lifted these onto
+ * canonical gen_ai.usage.* attributes before, so SpanCostService (which only
+ * reads the canonical names) saw no tokens for a native Claude Code trace —
+ * trace.totalCost / totalPromptTokenCount / totalCompletionTokenCount came up
+ * empty everywhere that reads canonical attrs (trace list, drawer header,
+ * cost tooltips), even though the coding-agent-specific session/terminal
+ * derivations (which read the bare names directly) were unaffected.
  *
  * The body-parsing helpers (extractAssistantTextFromResponseBody,
  * extractAssistantOutputFromResponseBody, buildInputMessagesFromRequestBody)
@@ -32,6 +42,8 @@
 
 import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
 
+import { ATTR_KEYS } from "./_constants";
+import { asNumber } from "./_guards";
 import type {
   CanonicalAttributesExtractor,
   ExtractorContext,
@@ -41,6 +53,9 @@ import type {
 const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "com.anthropic.claude_code.events",
 ]);
+
+/** The CLI's own native model-call span — see the span-side doc above. */
+const LLM_REQUEST_SPAN_NAME = "claude_code.llm_request";
 
 /**
  * Claude Code emits an `api_response_body` event for EVERY model call it
@@ -84,9 +99,40 @@ const asString = (raw: unknown): string | null =>
 export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
   readonly id = "claude-code";
 
-  apply(_ctx: ExtractorContext): void {
-    // Path A claude_code traffic comes through the gateway as gen_ai.*
-    // spans; the GenAIExtractor handles that side. Nothing to do here.
+  apply(ctx: ExtractorContext): void {
+    // Gateway-proxied claude_code traffic already arrives as gen_ai.* spans
+    // (GenAIExtractor's job) — only the CLI's own native span needs lifting.
+    if (ctx.span.name !== LLM_REQUEST_SPAN_NAME) return;
+
+    const attrs = ctx.bag.attrs;
+    let fired = false;
+
+    const liftNumber = (rawKey: string, canonicalKey: string) => {
+      const n = asNumber(attrs.get(rawKey));
+      if (n !== null && n > 0) {
+        ctx.setAttrIfAbsent(canonicalKey, n);
+        fired = true;
+      }
+    };
+
+    liftNumber("input_tokens", ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS);
+    liftNumber("output_tokens", ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
+    liftNumber(
+      "cache_read_tokens",
+      ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+    );
+    liftNumber(
+      "cache_creation_tokens",
+      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+    );
+
+    const model = attrs.get("model");
+    if (typeof model === "string" && model.length > 0) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_REQUEST_MODEL, model);
+      fired = true;
+    }
+
+    if (fired) ctx.recordRule("claude-code/llm_request");
   }
 
   applyLog(ctx: LogExtractorContext): void {

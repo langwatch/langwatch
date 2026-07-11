@@ -13,14 +13,15 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/codingAgentSession.foldProjection";
+import type { CodingAgentSession } from "~/server/app-layer/traces/coding-agent-session-merge";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { SessionView } from "../SessionView";
 
 /** Straight from ClickHouse. Do not tidy. */
-const REAL_SESSION: CodingAgentSessionRow = {
+const REAL_SESSION: CodingAgentSession = {
   tenantId: "project_1",
   traceId: "1e7dbf01553db533b9709651db7d14b6",
+  traceIds: ["1e7dbf01553db533b9709651db7d14b6"],
   version: "2026-07-11",
   startedAtMs: 1_752_000_000_000,
   agent: "claude-code",
@@ -82,6 +83,9 @@ const REAL_SESSION: CodingAgentSessionRow = {
   compactions: 0,
   compactionTokensBefore: 0,
   compactionTokensAfter: 0,
+  peakContextTokens: 0,
+  cacheRebuildCount: 0,
+  largestCacheRebuildTokens: 0,
   failedTools: 4,
   errorTypes: { "Error:ENOENT": 3, ShellError: 1 },
   apiErrors: 0,
@@ -112,7 +116,7 @@ const REAL_SESSION: CodingAgentSessionRow = {
 };
 
 function renderSession(
-  over: Partial<CodingAgentSessionRow> = {},
+  over: Partial<CodingAgentSession> = {},
   entries?: TranscriptEntry[],
 ) {
   return render(
@@ -189,6 +193,22 @@ describe("SessionView", () => {
     });
   });
 
+  describe("given a session that spans more than one trace", () => {
+    it("says so, rather than silently showing only the trace that was open", () => {
+      renderSession({
+        traceIds: ["trace-a", "trace-b", "trace-c"],
+      });
+      expect(screen.getByText("spans 3 traces")).toBeTruthy();
+    });
+  });
+
+  describe("given a session that is just the one trace", () => {
+    it("shows no multi-trace note — the common case stays quiet", () => {
+      renderSession();
+      expect(screen.queryByText(/spans \d+ traces/)).toBeNull();
+    });
+  });
+
   describe("given no transcript entries", () => {
     it("omits the token timeline rather than showing an empty chart", () => {
       renderSession();
@@ -232,6 +252,66 @@ describe("SessionView", () => {
 
       expect(screen.getByText("Where the tokens went")).toBeTruthy();
       expect(screen.getByText(/after "start over on this"/)).toBeTruthy();
+    });
+  });
+
+  describe("given a session with cache-health data", () => {
+    it("shows the peak context, cache miss count, and the biggest single rebuild", () => {
+      renderSession({
+        peakContextTokens: 620_000,
+        cacheRebuildCount: 3,
+        largestCacheRebuildTokens: 60_000,
+      });
+
+      expect(screen.getByText("Cache health")).toBeTruthy();
+      expect(screen.getByText("620k")).toBeTruthy();
+      expect(screen.getByText("3")).toBeTruthy();
+      expect(
+        screen.getByText(
+          /Biggest single rebuild: 60k tokens re-sent instead of being reused from cache\./,
+        ),
+      ).toBeTruthy();
+    });
+
+    it("omits the biggest-rebuild callout when there were no rebuilds", () => {
+      renderSession({ cacheRebuildCount: 0, largestCacheRebuildTokens: 0 });
+
+      expect(screen.queryByText(/Biggest single rebuild/)).toBeNull();
+    });
+  });
+
+  describe("given a session that was never compacted", () => {
+    it("omits the Context noise section rather than showing a zero", () => {
+      renderSession();
+      expect(screen.queryByText("Context noise")).toBeNull();
+    });
+  });
+
+  describe("given a session that was compacted", () => {
+    it("reports how many times and the before/after token counts", () => {
+      renderSession({
+        compactions: 2,
+        compactionTokensBefore: 180_000,
+        compactionTokensAfter: 40_000,
+      });
+
+      expect(screen.getByText("Context noise")).toBeTruthy();
+      expect(screen.getByText("Compacted 2× — 180k → 40k tokens.")).toBeTruthy();
+    });
+  });
+
+  describe("given a session that used a skill", () => {
+    it("lists Skills ahead of MCP servers in what it reached for", () => {
+      renderSession({ skills: ["code-review"] });
+
+      const skillsLabel = screen.getByText("Skills");
+      const mcpLabel = screen.getByText("MCP servers");
+      // DOCUMENT_POSITION_FOLLOWING means skillsLabel comes BEFORE mcpLabel.
+      expect(
+        skillsLabel.compareDocumentPosition(mcpLabel) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(screen.getByText("code-review")).toBeTruthy();
     });
   });
 });

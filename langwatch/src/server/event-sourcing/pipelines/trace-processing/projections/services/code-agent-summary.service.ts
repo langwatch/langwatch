@@ -1,3 +1,4 @@
+import { extractAssistantTextFromResponseBody } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
 import type { LogRecordReceivedEventData } from "../../schemas/events";
 import { NormalizedStatusCode, type NormalizedSpan } from "../../schemas/spans";
 
@@ -379,4 +380,41 @@ export function accumulateCodeAgentSummaryFromLog({
   }
 
   return {};
+}
+
+/** The query_source Claude Code stamps on its dedicated title-generation call. */
+const GENERATE_TITLE_QUERY_SOURCE = "generate_session_title";
+
+/**
+ * The haiku-generated session title, when this log record is the response to
+ * Claude Code's dedicated `generate_session_title` model call — a plain-text
+ * summary of the conversation the CLI itself would show as the session name.
+ *
+ * The response body is the usual Messages API envelope; its assistant TEXT is
+ * itself a `{"title": "..."}` JSON string, not the title directly, so this
+ * unwraps twice. Returns null for every other log record (including every
+ * OTHER `api_response_body`, e.g. the real conversational replies) so a
+ * non-title-generating trace pays one attribute comparison and nothing else.
+ */
+export function deriveCodeAgentSessionTitle(
+  attrs: Record<string, unknown>,
+): string | null {
+  if (str(attrs["event.name"]) !== "api_response_body") return null;
+  if (str(attrs.query_source) !== GENERATE_TITLE_QUERY_SOURCE) return null;
+
+  const text = extractAssistantTextFromResponseBody(attrs.body);
+  if (text === null) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(text);
+    const title =
+      parsed && typeof parsed === "object"
+        ? (parsed as { title?: unknown }).title
+        : undefined;
+    return typeof title === "string" && title.trim().length > 0
+      ? title.trim()
+      : null;
+  } catch {
+    return null;
+  }
 }

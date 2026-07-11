@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TraceLogRecordDto } from "~/server/api/routers/tracesV2";
-import { summarizeLogEvent } from "../logSummary";
+import { logEventTone, summarizeLogEvent } from "../logSummary";
 
 function log(attributes: Record<string, string>): TraceLogRecordDto {
   return {
@@ -67,5 +67,51 @@ describe("summarizeLogEvent", () => {
     it("returns null", () => {
       expect(summarizeLogEvent(log({}))).toBeNull();
     });
+  });
+});
+
+describe("logEventTone", () => {
+  it("flags a denied tool call as danger", () => {
+    expect(
+      logEventTone(
+        log({ "event.name": "tool_decision", decision: "reject", tool_name: "Bash" }),
+      ),
+    ).toBe("danger");
+  });
+
+  it("leaves an approved tool call neutral", () => {
+    expect(
+      logEventTone(
+        log({ "event.name": "tool_decision", decision: "accept", tool_name: "Read" }),
+      ),
+    ).toBe("neutral");
+  });
+
+  it("flags a failed tool result as danger", () => {
+    expect(
+      logEventTone(
+        log({ "event.name": "tool_result", tool_name: "Bash", error_type: "timeout" }),
+      ),
+    ).toBe("danger");
+  });
+
+  it("leaves a successful tool result neutral", () => {
+    expect(
+      logEventTone(log({ "event.name": "tool_result", tool_name: "Read" })),
+    ).toBe("neutral");
+  });
+
+  it("flags an api_error as danger", () => {
+    expect(logEventTone(log({ "event.name": "api_error" }))).toBe("danger");
+  });
+
+  it("flags a model refusal as warning", () => {
+    expect(logEventTone(log({ "event.name": "api_refusal" }))).toBe("warning");
+  });
+
+  it("is neutral for an event we don't recognise", () => {
+    expect(logEventTone(log({ "event.name": "some_future_event" }))).toBe(
+      "neutral",
+    );
   });
 });

@@ -7,27 +7,39 @@ interface SessionTabProps {
   traceId: string;
   /** Partition-pruning hint — without it the read scans every partition. */
   occurredAtMs?: number;
+  /**
+   * The trace's conversation id. A coding-agent SESSION isn't always one
+   * trace — passing this lets the read merge every trace that shares it
+   * (the same id `conversationContext` uses) instead of showing only
+   * whichever trace happens to be open.
+   */
+  conversationId?: string | null;
 }
 
 /**
  * The Session tab's data boundary.
  *
- * One point read of one pre-folded row (ADR-040). The aggregation already
- * happened at ingest, which is the whole reason the projection exists — the
- * alternative is every reader (the app, the CLI, the MCP server) re-walking
- * hundreds of spans to count the same things.
+ * A point read of the pre-folded row(s) (ADR-040) for every trace in this
+ * session, merged. The aggregation WITHIN a trace already happened at
+ * ingest, which is the whole reason the projection exists — the alternative
+ * is every reader (the app, the CLI, the MCP server) re-walking hundreds of
+ * spans to count the same things.
  */
 export function SessionTab({
   projectId,
   traceId,
   occurredAtMs,
+  conversationId,
 }: SessionTabProps) {
   const query = api.tracesV2.codingAgentSession.useQuery(
-    { projectId, traceId, occurredAtMs },
+    { projectId, traceId, occurredAtMs, conversationId: conversationId ?? undefined },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
-  // Shares its cache key with the Terminal tab's own read, so switching tabs
-  // on a session already opened once costs nothing extra.
+  // The token timeline reflects the trace currently open, not (yet) every
+  // trace the merged session above spans — stitching a transcript across
+  // sibling traces is a reasonable follow-up, not done here. Shares its
+  // cache key with the Terminal tab's own read, so switching tabs on a
+  // session already opened once costs nothing extra.
   const transcriptQuery = api.tracesV2.codingAgentTranscript.useQuery(
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000, enabled: !!query.data },
@@ -39,7 +51,7 @@ export function SessionTab({
     return (
       <Centered>
         <Text textStyle="sm" color="fg.error">
-          Couldn&apos;t load this session
+          Couldn&apos;t load usage for this trace
         </Text>
       </Centered>
     );
@@ -54,10 +66,10 @@ export function SessionTab({
       <Centered>
         <VStack gap={1}>
           <Text textStyle="sm" color="fg.muted">
-            No session summary yet
+            No usage summary yet
           </Text>
           <Text textStyle="xs" color="fg.subtle">
-            It appears shortly after the session finishes.
+            It appears shortly after the run finishes.
           </Text>
         </VStack>
       </Centered>

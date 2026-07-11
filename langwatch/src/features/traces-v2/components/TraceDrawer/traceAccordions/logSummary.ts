@@ -88,3 +88,33 @@ function formatCount(raw: string): string {
   if (!Number.isFinite(n)) return raw;
   return n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
 }
+
+export type LogEventTone = "danger" | "warning" | "neutral";
+
+/**
+ * A quick-glance outcome colour for a coding-agent log event — the same tone
+ * vocabulary SessionView's Signals use elsewhere in this drawer. Lets a
+ * denied tool call or a failed result read at a glance in the Logs section
+ * instead of requiring a read through the attribute table underneath.
+ */
+export function logEventTone(log: TraceLogRecordDto): LogEventTone {
+  const event = normalizeEventName(log.attributes["event.name"]);
+  if (event === null) return "neutral";
+  switch (event) {
+    case "tool_decision":
+      return log.attributes.decision === "accept" ? "neutral" : "danger";
+    case "tool_result":
+      return log.attributes.error_type || log.attributes.success === "false"
+        ? "danger"
+        : "neutral";
+    case "api_error":
+    case "session_error":
+    case "internal_error":
+    case "retries_exhausted":
+      return "danger";
+    case "api_refusal":
+      return "warning";
+    default:
+      return "neutral";
+  }
+}
