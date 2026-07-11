@@ -16,7 +16,7 @@ const SCOPE = "com.anthropic.claude_code.events";
 describe("ClaudeCodeExtractor.applyLog", () => {
   // The model-call events (api_request / api_request_body / api_response_body)
   // are trapped at ingest and converted to a gen_ai span by
-  // claude-code-log-to-span.ts — they never reach this log extractor. The only
+  // claude-code-log-events.ts — they never reach this log extractor. The only
   // claude_code event the log side lifts is user_prompt.
 
   it("lifts the user-typed prompt onto langwatch.input from a user_prompt event", () => {

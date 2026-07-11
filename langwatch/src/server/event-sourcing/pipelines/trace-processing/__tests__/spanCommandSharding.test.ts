@@ -76,7 +76,6 @@ function buildTraceDeps(
       "graphTriggerEvaluation",
     ),
     spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
-    claudeCodeSpanSyncReactor: reactorStub("claudeCodeSpanSync"),
     ...overrides,
   };
 }

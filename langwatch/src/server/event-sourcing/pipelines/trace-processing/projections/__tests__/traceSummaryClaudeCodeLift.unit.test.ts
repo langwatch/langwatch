@@ -5,7 +5,7 @@
  *
  * The claude_code model-call triplet (api_request / api_request_body /
  * api_response_body) is trapped at ingest and converted into a gen_ai span
- * (see claude-code-log-to-span.unit.test.ts) — it NO LONGER lifts model /
+ * (see claude-code-log-events.unit.test.ts) — it NO LONGER lifts model /
  * cost / tokens / output through the log fold. The "does NOT lift a converted
  * api_request" case below pins that: even if one ever reached the log path it
  * must be a no-op so cost/tokens can never be double-counted.

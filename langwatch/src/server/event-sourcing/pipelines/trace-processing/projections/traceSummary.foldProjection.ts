@@ -423,6 +423,24 @@ export class TraceSummaryFoldProjection
       logCount + 1,
     );
 
+    // Standalone log emitters that never sent trace context (an OTLP logs
+    // exporter with no traces exporter) have their TRACE id minted at
+    // ingestion so their records still group into one trace. The receiver
+    // stamps langwatch.trace.synthetic + langwatch.trace.derived_from on
+    // those records; carry them onto the trace summary so the read path can
+    // mark the trace as grouped by LangWatch. Only the TRACE-level marker is
+    // carried: a real trace can contain a single context-less record whose
+    // SPAN id we minted (langwatch.span.synthetic) while its trace id is real,
+    // and that must never make the whole trace read as synthetic.
+    if (event.data.attributes["langwatch.trace.synthetic"] === "true") {
+      mergedAttributes["langwatch.trace.synthetic"] = "true";
+      const derivedFrom =
+        event.data.attributes["langwatch.trace.derived_from"];
+      if (derivedFrom) {
+        mergedAttributes["langwatch.trace.derived_from"] = derivedFrom;
+      }
+    }
+
     let computedInput = state.computedInput;
     let computedOutput = state.computedOutput;
     let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
