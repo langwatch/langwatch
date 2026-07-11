@@ -9,12 +9,16 @@
 import { describe, expect, it } from "vitest";
 import type { LogRecordReceivedEventData } from "../../../schemas/events";
 import type { NormalizedSpan } from "../../../schemas/spans";
+import type { MetricRecordReceivedEventData } from "../../../schemas/events";
 import {
   applyLogToCodingAgentSession,
+  applyMetricToCodingAgentSession,
   applySpanToCodingAgentSession,
+  cacheHitRate,
   type CodingAgentSessionData,
   createInitCodingAgentSession,
   isCodingAgentSession,
+  meanTtftMs,
 } from "../coding-agent-session.derivation";
 
 function span(
@@ -54,15 +58,29 @@ function log(attributes: Record<string, string>): LogRecordReceivedEventData {
   return { attributes } as unknown as LogRecordReceivedEventData;
 }
 
-type Item = { span: NormalizedSpan } | { log: LogRecordReceivedEventData };
+function metric(
+  metricName: string,
+  value: number,
+  attributes: Record<string, string> = {},
+): MetricRecordReceivedEventData {
+  return { metricName, value, attributes } as unknown as MetricRecordReceivedEventData;
+}
+
+type Item =
+  | { span: NormalizedSpan }
+  | { log: LogRecordReceivedEventData }
+  | { metric: MetricRecordReceivedEventData };
 
 function fold(items: Item[]): CodingAgentSessionData {
   let state = createInitCodingAgentSession();
   for (const item of items) {
-    state =
-      "span" in item
-        ? applySpanToCodingAgentSession({ state, span: item.span })
-        : applyLogToCodingAgentSession({ state, data: item.log });
+    if ("span" in item) {
+      state = applySpanToCodingAgentSession({ state, span: item.span });
+    } else if ("log" in item) {
+      state = applyLogToCodingAgentSession({ state, data: item.log });
+    } else {
+      state = applyMetricToCodingAgentSession({ state, data: item.metric });
+    }
   }
   return state;
 }
@@ -329,5 +347,221 @@ describe("coding agent session", () => {
       expect(isCodingAgentSession(state)).toBe(false);
       expect(state.agent).toBeNull();
     });
+  });
+});
+
+describe("the economics", () => {
+  it("separates cache reads from cache CREATION, and reports the hit rate", () => {
+    // For a coding agent the expensive mistake is cache invalidation, not raw
+    // tokens: a cache read is billed at a fraction of fresh input, while a cache
+    // WRITE costs more than it. A session re-creating its cache is burning money
+    // in a way raw token counts do not show.
+    const state = fold([
+      {
+        span: span("claude_code.llm_request", {
+          input_tokens: 100,
+          output_tokens: 50,
+          cache_read_tokens: 900,
+          cache_creation_tokens: 200,
+        }),
+      },
+      { log: log({ "event.name": "api_request", cost_usd: "0.42" }) },
+    ]);
+
+    expect(state.cacheReadTokens).toBe(900);
+    expect(state.cacheCreationTokens).toBe(200);
+    expect(state.costUsd).toBeCloseTo(0.42);
+    // 900 / (900 + 200 + 100)
+    expect(cacheHitRate(state)).toBeCloseTo(0.75);
+  });
+
+  it("takes the authoritative cost from the logs, which no span carries", () => {
+    const state = fold([
+      { log: log({ "event.name": "api_request", cost_usd: "0.10" }) },
+      { log: log({ "event.name": "api_request", cost_usd: "0.05" }) },
+    ]);
+
+    expect(state.costUsd).toBeCloseTo(0.15);
+  });
+});
+
+describe("time", () => {
+  it("reports the mean time to first token as a foldable sum and count", () => {
+    const state = fold([
+      { span: span("claude_code.llm_request", { ttft_ms: 400 }) },
+      { span: span("claude_code.llm_request", { ttft_ms: 800 }) },
+    ]);
+
+    expect(meanTtftMs(state)).toBe(600);
+  });
+
+  it("records how long a HUMAN sat waiting to approve a tool", () => {
+    // Pure friction: the agent was idle and so was the person. Nothing else in
+    // the telemetry surfaces it.
+    const state = fold([
+      { span: span("claude_code.tool.blocked_on_user", { duration_ms: 12_000 }) },
+      { span: span("claude_code.tool.blocked_on_user", { duration_ms: 3_000 }) },
+    ]);
+
+    expect(state.blockedOnUserMs).toBe(15_000);
+  });
+});
+
+describe("context pressure", () => {
+  it("measures the bytes of tool OUTPUT fed back into the context", () => {
+    // The usual cause of a session bloating its way into a compaction.
+    const state = fold([
+      {
+        log: log({
+          "event.name": "tool_result",
+          tool_result_size_bytes: "40000",
+          tool_input_size_bytes: "500",
+          success: "true",
+        }),
+      },
+    ]);
+
+    expect(state.toolResultBytes).toBe(40_000);
+    expect(state.toolInputBytes).toBe(500);
+  });
+
+  it("classifies tool failures by their error type", () => {
+    const state = fold([
+      {
+        log: log({
+          "event.name": "tool_result",
+          success: "false",
+          error_type: "Error:ENOENT",
+        }),
+      },
+      {
+        log: log({
+          "event.name": "tool_result",
+          success: "false",
+          error_type: "Error:ENOENT",
+        }),
+      },
+      {
+        log: log({
+          "event.name": "tool_result",
+          success: "false",
+          error_type: "ShellError",
+        }),
+      },
+    ]);
+
+    expect(state.errorTypes).toEqual({ "Error:ENOENT": 2, ShellError: 1 });
+  });
+});
+
+describe("the guardrails", () => {
+  it("counts the hooks that actually BLOCKED an action", () => {
+    const state = fold([
+      {
+        log: log({
+          "event.name": "hook_execution_complete",
+          num_blocking: "1",
+          num_cancelled: "2",
+          total_duration_ms: "350",
+        }),
+      },
+    ]);
+
+    expect(state.hooksBlocked).toBe(1);
+    expect(state.hooksCancelled).toBe(2);
+    expect(state.hookMs).toBe(350);
+  });
+
+  it("counts every widening of what the agent was allowed to do", () => {
+    const state = fold([
+      { log: log({ "event.name": "permission_mode_changed", to_mode: "acceptEdits" }) },
+      { log: log({ "event.name": "permission_mode_changed", to_mode: "bypassPermissions" }) },
+    ]);
+
+    expect(state.permissionChanges).toBe(2);
+    expect(state.permissionMode).toBe("bypassPermissions");
+  });
+
+  it("does not count a server-side fallback hop as a refusal the user saw", () => {
+    // The API already retried it on another model, so the human never saw it.
+    // Counting it would overstate how often the agent refused them.
+    const state = fold([
+      { log: log({ "event.name": "api_refusal", server_fallback_hop: "true" }) },
+      { log: log({ "event.name": "api_refusal", category: "cyber" }) },
+    ]);
+
+    expect(state.refusals).toBe(1);
+    expect(state.refusalCategories).toEqual(["cyber"]);
+  });
+});
+
+describe("what came out of it (metrics)", () => {
+  // The metrics are the ONLY signal that says what the session produced. A
+  // summary from spans and logs alone can say the agent ran 192 tools and cannot
+  // say whether anything came of it.
+  it("records lines changed, commits and pull requests", () => {
+    const state = fold([
+      { metric: metric("claude_code.lines_of_code.count", 120, { type: "added" }) },
+      { metric: metric("claude_code.lines_of_code.count", 30, { type: "removed" }) },
+      { metric: metric("claude_code.commit.count", 2) },
+      { metric: metric("claude_code.pull_request.count", 1) },
+    ]);
+
+    expect(state.linesAdded).toBe(120);
+    expect(state.linesRemoved).toBe(30);
+    expect(state.commits).toBe(2);
+    expect(state.pullRequests).toBe(1);
+  });
+
+  it("records whether the human accepted the edits, and in what languages", () => {
+    const state = fold([
+      {
+        metric: metric("claude_code.code_edit_tool.decision", 1, {
+          decision: "accept",
+          language: "TypeScript",
+        }),
+      },
+      {
+        metric: metric("claude_code.code_edit_tool.decision", 1, {
+          decision: "reject",
+          language: "Python",
+        }),
+      },
+    ]);
+
+    expect(state.editsAccepted).toBe(1);
+    expect(state.editsRejected).toBe(1);
+    expect(state.languagesEdited).toEqual(["TypeScript", "Python"]);
+  });
+
+  it("splits active time between the human and the agent", () => {
+    const state = fold([
+      { metric: metric("claude_code.active_time.total", 300, { type: "user" }) },
+      { metric: metric("claude_code.active_time.total", 900, { type: "cli" }) },
+    ]);
+
+    expect(state.activeTimeUserSec).toBe(300);
+    expect(state.activeTimeCliSec).toBe(900);
+  });
+});
+
+describe("pointers to the heavy data", () => {
+  it("keeps ids, and measures the text without carrying it", () => {
+    // The projection is an aggregate, not a copy: request_id reaches the exact
+    // response body, session.id reaches the rest of the run. No content.
+    const state = fold([
+      { log: log({ "event.name": "user_prompt", prompt_length: "412", "session.id": "sess-1" }) },
+      { log: log({ "event.name": "assistant_response", response_length: "1800" }) },
+      { span: span("claude_code.llm_request", { request_id: "req_first" }) },
+      { span: span("claude_code.llm_request", { request_id: "req_last" }) },
+    ]);
+
+    expect(state.sessionId).toBe("sess-1");
+    expect(state.prompts).toBe(1);
+    expect(state.promptChars).toBe(412);
+    expect(state.responseChars).toBe(1800);
+    // The LAST call's id — the pointer to the body that ended the session.
+    expect(state.finalRequestId).toBe("req_last");
+    expect(JSON.stringify(state)).not.toContain("prompt_text");
   });
 });
