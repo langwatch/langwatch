@@ -1633,7 +1633,7 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
         <AnimatePresence mode="wait" initial={false}>
           <MotionText
             key={text}
-            fontSize="13px"
+            fontSize="sm"
             fontWeight="500"
             letterSpacing="-0.005em"
             lineHeight="1.5"
