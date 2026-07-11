@@ -215,33 +215,9 @@ secured.hono.use("/langy/*", async (c, next) => {
 const langyRoute = () =>
   secured.access(handlerManagedAuth(LANGY_HANDLER_AUTH_REASON));
 
-const AGENT_HEALTH_CHECK_TIMEOUT_MS = 3_000;
 const AGENT_CHAT_TIMEOUT_MS = 120_000;
 /** The warm is fire-and-forget; don't let it hold a socket open. */
 const AGENT_WARM_TIMEOUT_MS = 3_000;
-
-// Preflight before reserving a PR permit or calling /chat: a 3s timeout
-// instead of the 120s chat budget, so a fully-down agent fails in seconds
-// and never burns a daily PR permit on a dead backend.
-//
-// Deliberately no retry on the /chat call itself: the agent's worker has
-// no idempotency key, and a POST /chat that fails after the agent already
-// started acting on the prompt (5xx or a reset mid-stream) would, on
-// retry, get replayed as a second independent turn against the same
-// worker — risking a duplicate PR. Fixing that properly needs an
-// idempotency mechanism on the agent side; until then, a mid-task failure
-// surfaces to the user instead of being silently retried.
-async function isAgentHealthy(agentUrl: string): Promise<boolean> {
-  try {
-    const response = await fetch(`${agentUrl}/health`, {
-      signal: AbortSignal.timeout(AGENT_HEALTH_CHECK_TIMEOUT_MS),
-    });
-    void response.body?.cancel();
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Boot the conversation's worker ahead of the turn (manager `POST /warm`).
@@ -599,9 +575,14 @@ langyRoute().post("/langy/chat", async (c) => {
     }
   }
 
-  // No more synchronous `isAgentHealthy` preflight: the turn is dispatched
+  // No synchronous health preflight before dispatch: the turn is dispatched
   // asynchronously and the liveness reconcile sweep (ADR-044) recovers a turn
-  // whose worker never comes up, so a preflight round-trip buys nothing.
+  // whose worker never comes up, so a preflight round-trip buys nothing. And
+  // the /chat dispatch is deliberately NOT retried on failure: the worker has
+  // no idempotency key, so a retry after the agent already began acting would
+  // replay as a second independent turn (risking a duplicate PR). Until the
+  // agent side has an idempotency mechanism, a mid-task failure surfaces to
+  // the user rather than being silently retried.
 
   // Per-user daily PR cap, enforced by atomic permit reservation BEFORE we
   // hand the worker a GitHub token. If we're over cap, we strip the token from
