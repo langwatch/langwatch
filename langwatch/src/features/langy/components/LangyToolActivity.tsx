@@ -25,6 +25,7 @@
  * Kept in its own component (not inside MessageContent) so the shared turn
  * renderer stays a single insertion point.
  */
+import { asJsonDocument } from "@langwatch/cli-cards";
 import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import type { UIMessage } from "ai";
@@ -42,6 +43,7 @@ import {
   resolveCapabilityProgress,
 } from "./capabilities/capabilityRegistry";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
+import { collectionOf } from "./capabilities/cliResultDocument";
 import {
   type CapabilityToolCall,
   hasCapabilityCard,
@@ -172,7 +174,56 @@ export function toCapabilityCalls(
     if (!hasCapabilityCard(call)) continue;
     result.push({ id: part.toolCallId ?? `${name}:${result.length}`, call });
   }
-  return result;
+  return selectTraceCards(result);
+}
+
+/** The rows a trace search surfaced — 0 for the empty "nothing matched". */
+function traceRowCount(output: unknown): number {
+  const rows = collectionOf(asJsonDocument(output));
+  return rows ? rows.length : 0;
+}
+
+/**
+ * A trace-sample card is a fact about the TURN — the traces it surfaced — not
+ * about one tool call. But the Analytics skill probes with several
+ * `trace search` calls, most of which legitimately match nothing, and one that
+ * actually answers. Rendered per-call, each empty probe drew its own full
+ * "No traces matched" card, stacked beside (and burying) the search that found
+ * the traces the turn reported.
+ *
+ * So the trace cards collapse to the searches that carry traces: every search
+ * that surfaced rows keeps its card; the empty probes are dropped when any
+ * search answered, and deduped to a single card when none did — a genuine
+ * "nothing matched" still earns one clear answer, never a wall of four. Only
+ * trace searches multiply this way, so every other capability card is untouched.
+ */
+function selectTraceCards(
+  entries: Array<{ id: string; call: CapabilityToolCall }>,
+): Array<{ id: string; call: CapabilityToolCall }> {
+  const isTrace = (call: CapabilityToolCall) =>
+    resolveCapability(call.name)?.render === "traces";
+
+  const traceEntries = entries.filter((e) => isTrace(e.call));
+  if (traceEntries.length <= 1) return entries;
+
+  const answered = new Set(
+    traceEntries
+      .filter((e) => traceRowCount(e.call.output) > 0)
+      .map((e) => e.id),
+  );
+  const anyAnswered = answered.size > 0;
+
+  let keptEmpty = false;
+  return entries.filter((e) => {
+    if (!isTrace(e.call)) return true;
+    if (answered.has(e.id)) return true;
+    // An empty probe beside a search that answered is noise; a stack of empty
+    // probes with no answer collapses to the first, so "nothing matched" is
+    // said once.
+    if (anyAnswered || keptEmpty) return false;
+    keptEmpty = true;
+    return true;
+  });
 }
 
 /** A capability call still in flight — rendered as an in-progress card. */

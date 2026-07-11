@@ -266,6 +266,87 @@ export function LangyCardGallery() {
             },
           )}
         />
+        {/* THE TURN-LEVEL RULE — the two bugs this section exists to pin.
+            The Analytics skill probes with several `trace search` calls, most of
+            which match nothing, plus the one that actually answers ("4 random
+            traces"). Fed through the SAME turn renderer the panel uses, only the
+            answering search earns a card; the empty probes neither bury it (bug 1)
+            nor stack into a wall (bug 2). Every frame is one the agent emits. */}
+        <LangyToolActivity
+          message={toolMessage([
+            {
+              name: "langwatch.trace.search",
+              state: "output-available",
+              input: {
+                command:
+                  "langwatch trace search --query 'status:error' --format json",
+              },
+              output: { traces: [], pagination: { totalHits: 0 } },
+            },
+            {
+              name: "langwatch.trace.search",
+              state: "output-available",
+              input: {
+                command:
+                  "langwatch trace search --query 'latency>5s' --format json",
+              },
+              output: { traces: [], pagination: { totalHits: 0 } },
+            },
+            {
+              name: "langwatch.trace.search",
+              state: "output-available",
+              input: {
+                command: "langwatch trace search --limit 4 --format json",
+              },
+              output: {
+                traces: [
+                  traceFixture({
+                    id: "trace_962a67260db8",
+                    startedAt: TRACE_FIXTURE_NOW - 3 * 60_000,
+                    input: "Summarise this thread for me",
+                    output: "Here's the gist of the conversation…",
+                    totalTimeMs: 16_701,
+                    totalCost: 0.0182,
+                  }),
+                  traceFixture({
+                    id: "trace_fe675be238fe",
+                    startedAt: TRACE_FIXTURE_NOW - 7 * 60_000,
+                    input: "What's the weather in Berlin?",
+                    output: "It's 21°C and clear in Berlin.",
+                    totalTimeMs: 940,
+                    totalCost: 0.0021,
+                  }),
+                  traceFixture({
+                    id: "trace_2917dd709ecc",
+                    startedAt: TRACE_FIXTURE_NOW - 12 * 60_000,
+                    input: "Draft a reply to this email",
+                    output: "Sure — here's a draft you can send.",
+                    totalTimeMs: 3_120,
+                    totalCost: 0.0067,
+                  }),
+                  traceFixture({
+                    id: "trace_780ddf5c44df",
+                    startedAt: TRACE_FIXTURE_NOW - 18 * 60_000,
+                    input: "Translate this paragraph to French",
+                    output: "Voici la traduction…",
+                    totalTimeMs: 2_040,
+                    totalCost: 0.0044,
+                  }),
+                ],
+                pagination: { totalHits: 71 },
+              },
+            },
+            {
+              name: "langwatch.trace.search",
+              state: "output-available",
+              input: {
+                command:
+                  "langwatch trace search --query 'cost>1' --format json",
+              },
+              output: { traces: [], pagination: { totalHits: 0 } },
+            },
+          ])}
+        />
         <LangyCapabilityRenderer
           call={call("langwatch.dataset.list", {
             datasets: [{ id: "ds_1", name: "Golden questions" }],
