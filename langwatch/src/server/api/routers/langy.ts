@@ -191,21 +191,18 @@ export const langyRouter = createTRPCRouter({
   /**
    * Count of conversations touched since a timestamp — the "N new" pill. The
    * client only polls this when the freshness SSE is disconnected (adaptive
-   * backoff), mirroring `tracesV2.newCount`. Derived from the already-bounded
-   * slim list to avoid a second ClickHouse read path.
+   * backoff), mirroring `tracesV2.newCount`. The count derivation lives in the
+   * service (`countSince`), not here — transport only shapes input/output.
    */
   newCount: protectedProcedure
     .input(z.object({ projectId: z.string(), since: z.number() }))
     .use(langyReadGuard())
     .query(async ({ input, ctx }): Promise<{ count: number }> => {
-      const items = await getApp().langy.conversations.getAll({
+      const count = await getApp().langy.conversations.countSince({
         projectId: input.projectId,
         userId: ctx.session.user.id,
-        limit: 100,
+        since: input.since,
       });
-      const count = items.filter(
-        (item) => item.lastActivityAt.getTime() > input.since,
-      ).length;
       return { count };
     }),
 

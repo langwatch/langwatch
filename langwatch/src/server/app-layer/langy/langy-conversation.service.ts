@@ -341,6 +341,26 @@ export class LangyConversationService {
   }
 
   /**
+   * Count the user's conversations touched since `since` (epoch ms) — the "N
+   * new" pill. Deliberately derived from the already-bounded recent list rather
+   * than a second ClickHouse read path: the pill only needs to distinguish
+   * 0 / small-N, and the list is capped at 100. Kept in the service (not the
+   * transport) so the count derivation lives behind the app layer.
+   */
+  async countSince({
+    projectId,
+    userId,
+    since,
+  }: {
+    projectId: string;
+    userId: string;
+    since: number;
+  }): Promise<number> {
+    const items = await this.getAll({ projectId, userId, limit: 100 });
+    return items.filter((item) => item.lastActivityAt.getTime() > since).length;
+  }
+
+  /**
    * Resolve the conversation id for a chat turn. Does NOT write — the aggregate
    * is created by the first `sendMessage`. Verifies ownership against the fold;
    * a stale/archived/unknown id yields a fresh conversation.
