@@ -68,7 +68,16 @@ type sseEvent struct {
 	Properties        struct {
 		SessionID string `json:"sessionID"`
 		SessionId string `json:"sessionId"`
+		// Stream B (ADR-048): a message.part.delta carries the token text in
+		// properties.delta when properties.field=="text". Decoded here so the raw
+		// token fast-path reads the same single sseEvent decode as session routing.
+		Field string `json:"field"`
+		Delta string `json:"delta"`
 	} `json:"properties"`
+	// Part carries the legacy type=="text" token shape (part.text).
+	Part struct {
+		Text string `json:"text"`
+	} `json:"part"`
 }
 
 // addBearer attaches the per-worker bearer token to an outgoing request. Every
@@ -388,6 +397,42 @@ func extractHandoffToken(event map[string]any) (string, bool) {
 	return "", true
 }
 
+// langyTokenFrame is the compact Stream B fast-path frame (ADR-048). It rides
+// the SAME /chat ndjson stream as the full events (Stream A), multiplexed by
+// `type`. The control plane's runTurn peels these off to the ephemeral fast
+// pub/sub channel and ignores them on the durable path (parseAgentLine only
+// matches text/message.part.delta/error, so an unknown `type` is dropped there).
+type langyTokenFrame struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+// langyTokenType is the discriminator the control plane matches on to route a
+// frame to Stream B. Kept as a single source of truth for the wire contract.
+const langyTokenType = "langy.token"
+
+// textDeltaFromEvent extracts the raw token text from an already-decoded
+// opencode event, or reports ok=false when the event is not a text delta. It
+// mirrors the control plane's parseAgentLine (langy-turn.processor.ts) exactly
+// so both ends agree on which opencode shapes are "a token": the current
+// `message.part.delta` (properties.field=="text", properties.delta) and the
+// legacy `type=="text"` (part.text). Reads the typed sseEvent so Stream B rides
+// the SAME single decode as session routing — no per-event map alloc (ADR-044
+// perf). Pure — no I/O — so it is trivially unit-testable.
+func textDeltaFromEvent(ev *sseEvent) (string, bool) {
+	switch ev.Type {
+	case "text":
+		if ev.Part.Text != "" {
+			return ev.Part.Text, true
+		}
+	case "message.part.delta":
+		if ev.Properties.Field == "text" && ev.Properties.Delta != "" {
+			return ev.Properties.Delta, true
+		}
+	}
+	return "", false
+}
+
 // streamSessionEvents tails /event from the worker and forwards every event
 // belonging to sessionID as one ndjson line to w. Returns when a terminal event
 // lands or the context is cancelled. The fetch carries the same ctx so a client
@@ -399,6 +444,12 @@ func extractHandoffToken(event map[string]any) (string, bool) {
 // via the typed sseEvent, and writes each forwarded event through ONE reused
 // scratch buffer — so a whole turn allocates a single write buffer instead of
 // one per event.
+//
+// Stream B (ADR-048): when a forwarded event is a text delta, a compact
+// {"type":"langy.token","text":...} frame is written and flushed FIRST — ahead
+// of the heavy full-event line — so the raw-token fast-path is never queued
+// behind Stream A's payload. That is the only new work per delta (one typed
+// field read + one small write); terminal detection + session routing untouched.
 func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID string, w io.Writer, flush func()) error {
 	url := baseURL + "/event"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -441,6 +492,20 @@ func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID st
 		}
 		if !eventBelongsToSession(&ev, sessionID) {
 			continue
+		}
+		// Stream B fast-path: emit the raw token frame FIRST so time-to-first
+		// token isn't gated on the heavy full-event line behind it. Best-effort —
+		// a write error here means the client is gone, which the full-event write
+		// below detects and returns on.
+		if delta, ok := textDeltaFromEvent(&ev); ok {
+			if frame, mErr := json.Marshal(langyTokenFrame{Type: langyTokenType, Text: delta}); mErr == nil {
+				if _, wErr := w.Write(append(frame, '\n')); wErr != nil {
+					return nil // client disconnect.
+				}
+				if flush != nil {
+					flush()
+				}
+			}
 		}
 		// Forward the payload VERBATIM, newline-terminated. payload aliases the
 		// scanner buffer (valid only until the next Scan); appending into out
