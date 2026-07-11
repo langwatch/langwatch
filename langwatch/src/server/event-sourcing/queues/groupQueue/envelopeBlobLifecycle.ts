@@ -440,7 +440,7 @@ export class EnvelopeBlobLifecycle {
             err instanceof Error ? err.message : String(err),
           ),
         },
-        "S3 blob reclaim failed after holder drop — orphaned until bucket lifecycle sweeps",
+        `S3 blob reclaim failed after ${edge} — orphaned until bucket lifecycle sweeps`,
       );
     }
   }

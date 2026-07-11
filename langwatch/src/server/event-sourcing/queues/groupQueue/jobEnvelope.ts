@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import { gunzip, gzip } from "node:zlib";
 
+import { generate } from "@langwatch/ksuid";
 import type { Logger } from "pino";
 
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
@@ -326,7 +327,7 @@ export async function encodeJobEnvelope({
       // Per-stage hold token: the holder-set member identifying this staged
       // occupancy. Lives in the (inline) header, never in the content-addressed
       // body, so it doesn't perturb the blob hash that collapses the fan-out.
-      const token = randomUUID();
+      const token = generate("holdtoken").toString();
       // The hash the tiered store will key by (it hashes the same raw payload
       // json, so the two derivations can't diverge). Known before the write so
       // the hold can be registered first.
