@@ -1,7 +1,14 @@
+import {
+  type ClickHouseClientResolver,
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
 import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
-import type {
-  LogRecordStorageRepository,
-  StoredLogRecordRow,
+import { LogRecordStorageClickHouseRepository } from "./repositories/log-record-storage.clickhouse.repository";
+import {
+  NullLogRecordStorageRepository,
+  type LogRecordStorageRepository,
+  type StoredLogRecordRow,
 } from "./repositories/log-record-storage.repository";
 
 export class LogRecordStorageService {
@@ -24,4 +31,27 @@ export class LogRecordStorageService {
   ): Promise<StoredLogRecordRow[]> {
     return this.repository.getLogsByTraceId(tenantId, traceId, occurredAtMs);
   }
+}
+
+/**
+ * The default LogRecordStorageService for callers that don't inject one — a
+ * ClickHouse-backed store when CH is enabled, else a no-op. Lives in the app
+ * layer so the legacy `TraceService` can delegate its lazy default here instead
+ * of constructing repositories (and touching CH config) itself.
+ */
+export function createDefaultLogRecordStorageService(): LogRecordStorageService {
+  const resolveClickHouseClient: ClickHouseClientResolver = async (
+    tenantId,
+  ) => {
+    const client = await getClickHouseClientForProject(tenantId);
+    if (!client) {
+      throw new Error(`ClickHouse not available for tenant ${tenantId}`);
+    }
+    return client;
+  };
+  return new LogRecordStorageService(
+    isClickHouseEnabled()
+      ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
+      : new NullLogRecordStorageRepository(),
+  );
 }
