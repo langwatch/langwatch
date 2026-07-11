@@ -1,7 +1,6 @@
 package migrationorder_test
 
 import (
-	"regexp"
 	"slices"
 	"testing"
 
@@ -24,73 +23,88 @@ func TestCheck(t *testing.T) {
 	prisma := setNamed(t, "Prisma")
 
 	tests := []struct {
-		name  string
-		in    migrationorder.Input
-		want  []*regexp.Regexp
-		clean bool
+		name string
+		in   migrationorder.Input
+		want []migrationorder.Finding
 	}{
 		{
-			name: "passes when the added migration sorts after everything on the base branch",
+			name: "a migration numbered above everything on main is in order",
 			in: migrationorder.Input{
 				Set:       clickhouse,
 				Base:      []string{"00040_a.sql", "00041_b.sql"},
 				MergeBase: []string{"00040_a.sql", "00041_b.sql"},
 				Head:      []string{"00040_a.sql", "00041_b.sql", "00042_c.sql"},
 			},
-			clean: true,
 		},
 		{
-			name: "passes when the pull request adds no migrations",
+			name: "a branch that adds no migrations is in order",
 			in: migrationorder.Input{
 				Set:       clickhouse,
 				Base:      []string{"00040_a.sql"},
 				MergeBase: []string{"00040_a.sql"},
 				Head:      []string{"00040_a.sql"},
 			},
-			clean: true,
 		},
 		{
-			name: "passes when merged history is unparseable or duplicated",
+			name: "migrations already on main are not judged, keyless or duplicated",
 			in: migrationorder.Input{
 				Set:       prisma,
 				Base:      []string{"0_init", "20260227120000_one", "20260227120000_two"},
 				MergeBase: []string{"0_init", "20260227120000_one", "20260227120000_two"},
 				Head:      []string{"0_init", "20260227120000_one", "20260227120000_two", "20260301000000_mine"},
 			},
-			clean: true,
 		},
 		{
-			name: "fails when a migration merged first already took the key",
+			name: "a key another branch merged first is reported with a rename",
 			in: migrationorder.Input{
 				Set:       clickhouse,
-				Base:      []string{"00040_a.sql", "00041_merged-first.sql"},
+				Base:      []string{"00040_a.sql", "00041_theirs.sql"},
 				MergeBase: []string{"00040_a.sql"},
-				Head:      []string{"00040_a.sql", "00041_merged-first.sql", "00041_mine.sql"},
+				Head:      []string{"00040_a.sql", "00041_theirs.sql", "00041_mine.sql"},
 			},
-			want: []*regexp.Regexp{regexp.MustCompile(`00041_mine\.sql.*reuses ordering key 41`)},
+			want: []migrationorder.Finding{{
+				Set:     "ClickHouse",
+				Entry:   "00041_mine.sql",
+				Problem: "takes key 41, which 00041_theirs.sql already took on main",
+				Fix: "git mv langwatch/src/server/clickhouse/migrations/00041_mine.sql " +
+					"langwatch/src/server/clickhouse/migrations/00042_mine.sql",
+			}},
 		},
 		{
-			name: "fails when the added migration sorts below the highest on the base branch",
+			name: "a migration numbered below the newest on main is reported with a rename",
 			in: migrationorder.Input{
 				Set:       clickhouse,
 				Base:      []string{"00040_a.sql", "00041_b.sql", "00042_c.sql"},
 				MergeBase: []string{"00040_a.sql"},
 				Head:      []string{"00040_a.sql", "00041_b.sql", "00042_c.sql", "00039_mine.sql"},
 			},
-			want: []*regexp.Regexp{regexp.MustCompile(`00039_mine\.sql.*sorts at or before 42`)},
+			want: []migrationorder.Finding{{
+				Set:     "ClickHouse",
+				Entry:   "00039_mine.sql",
+				Problem: "is numbered below 42, the newest migration on main, so it runs out of order or not at all",
+				Fix: "git mv langwatch/src/server/clickhouse/migrations/00039_mine.sql " +
+					"langwatch/src/server/clickhouse/migrations/00043_mine.sql",
+			}},
 		},
 		{
-			name: "fails when a Prisma migration is timestamped before one already merged",
+			name: "a Prisma migration timestamped before one already merged is renamed to now",
 			in: migrationorder.Input{
 				Set:       prisma,
-				Base:      []string{"20260101000000_old", "20260708150000_merged_later"},
+				Base:      []string{"20260101000000_old", "20260708150000_theirs"},
 				MergeBase: []string{"20260101000000_old"},
-				Head:      []string{"20260101000000_old", "20260708150000_merged_later", "20260702090000_mine"},
+				Head:      []string{"20260101000000_old", "20260708150000_theirs", "20260702090000_mine"},
 			},
-			want: []*regexp.Regexp{regexp.MustCompile(`20260702090000_mine.*sorts at or before 20260708150000`)},
+			want: []migrationorder.Finding{{
+				Set:   "Prisma",
+				Entry: "20260702090000_mine",
+				Problem: "is numbered below 20260708150000, the newest migration on main, " +
+					"so it runs out of order or not at all",
+				Fix: "git mv langwatch/prisma/migrations/20260702090000_mine " +
+					"langwatch/prisma/migrations/$(date -u +%Y%m%d%H%M%S)_mine",
+			}},
 		},
 		{
-			name: "fails when a merged migration is modified",
+			name: "a merged migration that the branch edits is reported with a restore",
 			in: migrationorder.Input{
 				Set:       clickhouse,
 				Base:      []string{"00040_a.sql"},
@@ -98,21 +112,15 @@ func TestCheck(t *testing.T) {
 				Head:      []string{"00040_a.sql"},
 				Touched:   []string{"00040_a.sql"},
 			},
-			want: []*regexp.Regexp{regexp.MustCompile(`00040_a\.sql.*immutable history`)},
+			want: []migrationorder.Finding{{
+				Set:     "ClickHouse",
+				Entry:   "00040_a.sql",
+				Problem: "already merged, and migrations that have run somewhere cannot change",
+				Fix:     "git checkout origin/main -- langwatch/src/server/clickhouse/migrations/00040_a.sql",
+			}},
 		},
 		{
-			name: "fails when a merged migration is deleted",
-			in: migrationorder.Input{
-				Set:       clickhouse,
-				Base:      []string{"00040_a.sql", "00041_b.sql"},
-				MergeBase: []string{"00040_a.sql", "00041_b.sql"},
-				Head:      []string{"00040_a.sql"},
-				Touched:   []string{"00041_b.sql"},
-			},
-			want: []*regexp.Regexp{regexp.MustCompile(`00041_b\.sql.*immutable history`)},
-		},
-		{
-			name: "passes when the pull request edits a migration it introduced itself",
+			name: "editing a migration the branch added itself is in order",
 			in: migrationorder.Input{
 				Set:       clickhouse,
 				Base:      []string{"00040_a.sql"},
@@ -120,47 +128,56 @@ func TestCheck(t *testing.T) {
 				Head:      []string{"00040_a.sql", "00041_mine.sql"},
 				Touched:   []string{"00041_mine.sql"},
 			},
-			clean: true,
 		},
 		{
-			name: "fails when the pull request adds two migrations sharing a key",
+			name: "two migrations in one branch sharing a key are both reported",
 			in: migrationorder.Input{
 				Set:       clickhouse,
 				Base:      []string{"00040_a.sql"},
 				MergeBase: []string{"00040_a.sql"},
 				Head:      []string{"00040_a.sql", "00041_one.sql", "00041_two.sql"},
 			},
-			want: []*regexp.Regexp{
-				regexp.MustCompile(`00041_one\.sql.*00041_two\.sql.*share ordering key 41`),
-				regexp.MustCompile(`00041_two\.sql.*00041_one\.sql.*share ordering key 41`),
+			want: []migrationorder.Finding{
+				{
+					Set:     "ClickHouse",
+					Entry:   "00041_one.sql",
+					Problem: "shares key 41 with another migration in this branch",
+					Fix: "git mv langwatch/src/server/clickhouse/migrations/00041_one.sql " +
+						"langwatch/src/server/clickhouse/migrations/00042_one.sql",
+				},
+				{
+					Set:     "ClickHouse",
+					Entry:   "00041_two.sql",
+					Problem: "shares key 41 with another migration in this branch",
+					Fix: "git mv langwatch/src/server/clickhouse/migrations/00041_two.sql " +
+						"langwatch/src/server/clickhouse/migrations/00043_two.sql",
+				},
 			},
 		},
 		{
-			name: "fails when an added migration has no ordering key",
+			name: "a migration with no ordering key is reported with the naming format",
 			in: migrationorder.Input{
 				Set:  clickhouse,
 				Head: []string{"add-thing.sql"},
 			},
-			want: []*regexp.Regexp{regexp.MustCompile(`add-thing\.sql.*does not start with an ordering key`)},
+			want: []migrationorder.Finding{{
+				Set:     "ClickHouse",
+				Entry:   "add-thing.sql",
+				Problem: "has no ordering key, so it has no place in the sequence — migrations are named NNNNN_name.sql",
+			}},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			errs := migrationorder.Check(test.in)
+			got := migrationorder.Check(test.in)
 
-			if test.clean {
-				if len(errs) > 0 {
-					t.Fatalf("expected no errors, got %v", errs)
-				}
-				return
-			}
-			if len(errs) != len(test.want) {
-				t.Fatalf("expected %d errors, got %d: %v", len(test.want), len(errs), errs)
+			if len(got) != len(test.want) {
+				t.Fatalf("got %d findings, want %d: %+v", len(got), len(test.want), got)
 			}
 			for index, want := range test.want {
-				if !want.MatchString(errs[index]) {
-					t.Errorf("error %d = %q, want match for %s", index, errs[index], want)
+				if got[index] != want {
+					t.Errorf("finding %d:\n got %+v\nwant %+v", index, got[index], want)
 				}
 			}
 		})

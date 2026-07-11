@@ -4,88 +4,124 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 )
 
-// Input is one migration set as it looks from three refs: the tip of the base
-// branch, the pull request head, and the merge base the pull request forked at.
+// Input is one migration set seen from three refs: the tip of the base branch,
+// the branch head, and the merge base the branch forked at.
 type Input struct {
 	Set Set
 	// Base are the entries on the tip of the base branch.
 	Base []string
-	// Head are the entries on the pull request head.
+	// Head are the entries on the branch head.
 	Head []string
-	// MergeBase are the entries that already existed where the branch forked.
+	// MergeBase are the entries that existed where the branch forked.
 	MergeBase []string
-	// Touched are the entries the pull request modified, renamed or deleted.
+	// Touched are the entries the branch modified, renamed or deleted.
 	Touched []string
 }
 
-// Check reports every ordering violation the pull request introduces.
+// Finding is one migration that is out of order, and how to fix it.
+type Finding struct {
+	Set string `json:"set"`
+	// Entry is the migration at fault.
+	Entry string `json:"entry"`
+	// Problem is one plain sentence.
+	Problem string `json:"problem"`
+	// Fix is the shell command that resolves it.
+	Fix string `json:"fix"`
+}
+
+// Check reports the migrations the branch adds that are out of order.
 //
-// Only migrations the pull request adds are judged. What is already on the base
-// branch is history: it predates the naming convention in places, and two merged
-// migrations may even share a key. Neither is this pull request's problem.
-func Check(in Input) []string {
-	var errs []string
+// Only what the branch adds is judged. Migrations already on the base branch are
+// history — some predate the naming convention, and a few share a key — and
+// renumbering them is not on the table.
+func Check(in Input) []Finding {
+	var findings []Finding
 
 	existing := map[string]bool{}
 	for _, entry := range slices.Concat(in.Base, in.MergeBase) {
 		existing[entry] = true
 	}
 
-	touched := slices.Clone(in.Touched)
-	slices.Sort(touched)
-	for _, entry := range touched {
+	for _, entry := range slices.Sorted(slices.Values(in.Touched)) {
 		if existing[entry] {
-			errs = append(errs, fmt.Sprintf(
-				"%s: `%s` already exists on the base branch and was modified, renamed or deleted — "+
-					"applied migrations are immutable history, add a new migration instead",
-				in.Set.Name, entry))
+			findings = append(findings, Finding{
+				Set:     in.Set.Name,
+				Entry:   entry,
+				Problem: "already merged, and migrations that have run somewhere cannot change",
+				Fix:     fmt.Sprintf("git checkout origin/main -- %s/%s", in.Set.Directory, entry),
+			})
 		}
 	}
 
-	baseKeys, highest := keysOf(in.Base, in.Set)
+	taken, highest := keysOf(in.Base, in.Set)
 
-	added := []migration{}
+	var added []migration
 	for _, entry := range slices.Sorted(slices.Values(in.Head)) {
 		if existing[entry] {
 			continue
 		}
 		key, ok := keyOf(entry, in.Set)
 		if !ok {
-			errs = append(errs, fmt.Sprintf(
-				"%s: `%s` does not start with an ordering key — name it `%s`",
-				in.Set.Name, entry, in.Set.Format))
+			findings = append(findings, Finding{
+				Set:     in.Set.Name,
+				Entry:   entry,
+				Problem: fmt.Sprintf("has no ordering key, so it has no place in the sequence — migrations are named %s", in.Set.Format),
+			})
 			continue
 		}
 		added = append(added, migration{entry: entry, key: key})
 	}
 	slices.SortFunc(added, func(a, b migration) int { return int(a.key - b.key) })
 
+	// Suggested keys are handed out above everything in play — the newest on the
+	// base branch and anything this branch already numbered — so a suggestion
+	// never lands on a key that is itself taken, and two clashing migrations get
+	// two different answers.
+	free := highest
 	for _, m := range added {
-		if taken, ok := baseKeys[m.key]; ok {
-			errs = append(errs, fmt.Sprintf(
-				"%s: `%s` reuses ordering key %d, already taken on the base branch by `%s` — renumber it above %d",
-				in.Set.Name, m.entry, m.key, taken, highest))
-			continue
-		}
-		if m.key <= highest {
-			errs = append(errs, fmt.Sprintf(
-				"%s: `%s` sorts at or before %d, the highest migration already on the base branch — "+
-					"renumber it above %d so it runs after everything already merged",
-				in.Set.Name, m.entry, highest, highest))
-			continue
-		}
-		for _, twin := range added {
-			if twin.key == m.key && twin.entry != m.entry {
-				errs = append(errs, fmt.Sprintf(
-					"%s: `%s` and `%s` share ordering key %d — keys must be unique",
-					in.Set.Name, m.entry, twin.entry, m.key))
-			}
+		free = max(free, m.key)
+	}
+	suggest := func(entry string) string {
+		free++
+		_, suffix, _ := strings.Cut(entry, "_")
+		return fmt.Sprintf("git mv %s/%s %s/%s_%s",
+			in.Set.Directory, entry, in.Set.Directory, in.Set.Render(free), suffix)
+	}
+
+	for _, m := range added {
+		twin := slices.ContainsFunc(added, func(other migration) bool {
+			return other.key == m.key && other.entry != m.entry
+		})
+
+		switch {
+		case taken[m.key] != "":
+			findings = append(findings, Finding{
+				Set:     in.Set.Name,
+				Entry:   m.entry,
+				Problem: fmt.Sprintf("takes key %d, which %s already took on main", m.key, taken[m.key]),
+				Fix:     suggest(m.entry),
+			})
+		case m.key < highest:
+			findings = append(findings, Finding{
+				Set:     in.Set.Name,
+				Entry:   m.entry,
+				Problem: fmt.Sprintf("is numbered below %d, the newest migration on main, so it runs out of order or not at all", highest),
+				Fix:     suggest(m.entry),
+			})
+		case twin:
+			findings = append(findings, Finding{
+				Set:     in.Set.Name,
+				Entry:   m.entry,
+				Problem: fmt.Sprintf("shares key %d with another migration in this branch", m.key),
+				Fix:     suggest(m.entry),
+			})
 		}
 	}
 
-	return errs
+	return findings
 }
 
 type migration struct {

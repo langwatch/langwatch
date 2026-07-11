@@ -1,9 +1,5 @@
-// Command migrationorder reports migrations that sort at or before a migration
-// already on the base branch.
-//
-// It is advisory: findings never fail the run, they are surfaced as a comment on
-// the pull request. A non-zero exit means the check itself broke, not that the
-// migrations are wrong.
+// Command migrationorder fails when a branch adds a migration numbered below one
+// that is already on the base branch.
 //
 // Usage: migrationorder [-base origin/main] [-root .] [-json]
 package main
@@ -20,43 +16,39 @@ import (
 func main() {
 	baseRef := flag.String("base", "origin/main", "ref to check the migrations against")
 	root := flag.String("root", ".", "repository root")
-	asJSON := flag.Bool("json", false, "emit findings as JSON on stdout")
+	asJSON := flag.Bool("json", false, "write the findings to stdout as JSON and always exit 0")
 	flag.Parse()
 
-	findings, err := findings(*baseRef, *root)
+	inputs, err := migrationorder.Repo{Root: *root}.Inputs(*baseRef)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(2)
+	}
+
+	findings := []migrationorder.Finding{}
+	for _, input := range inputs {
+		findings = append(findings, migrationorder.Check(input)...)
 	}
 
 	if *asJSON {
 		if err := json.NewEncoder(os.Stdout).Encode(findings); err != nil {
 			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			os.Exit(2)
 		}
 		return
 	}
 
 	if len(findings) == 0 {
-		fmt.Printf("No migration ordering problems against %s\n", *baseRef)
+		fmt.Printf("Migrations are in order against %s.\n", *baseRef)
 		return
 	}
 
-	fmt.Printf("Migration ordering findings against %s:\n", *baseRef)
+	fmt.Fprintf(os.Stderr, "Migrations are out of order against %s.\n", *baseRef)
 	for _, finding := range findings {
-		fmt.Printf("- %s\n", finding)
+		fmt.Fprintf(os.Stderr, "\n%s: %s %s\n", finding.Set, finding.Entry, finding.Problem)
+		if finding.Fix != "" {
+			fmt.Fprintf(os.Stderr, "  fix: %s\n", finding.Fix)
+		}
 	}
-}
-
-func findings(baseRef, root string) ([]string, error) {
-	inputs, err := migrationorder.Repo{Root: root}.Inputs(baseRef)
-	if err != nil {
-		return nil, err
-	}
-
-	findings := []string{}
-	for _, input := range inputs {
-		findings = append(findings, migrationorder.Check(input)...)
-	}
-	return findings, nil
+	os.Exit(1)
 }

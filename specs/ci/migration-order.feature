@@ -1,102 +1,67 @@
-Feature: Migration ordering comment
+Feature: Migration order check
   As a developer
-  I want to be told when my migrations sort behind ones already merged
-  So that a migration I wrote does not silently never run on a deployed database
+  I want a PR to fail when its migrations are numbered below ones already on main
+  So that a migration I wrote cannot merge in an order that stops it ever running
 
   Background:
-    Given migrations are applied in key order
+    Given migrations run in the order their keys sort
     And Prisma migrations are keyed by timestamp and ClickHouse migrations by sequence number
-    And the migration-order workflow runs on pull_request events
-    And it compares the pull request against the current tip of the base branch
-    And it identifies its own comment by the hidden marker "<!-- migration-order -->"
+    And the migration-order workflow compares the PR against the tip of the base branch
+    And only the migrations the PR adds are judged
 
-  Rule: Only what the pull request adds is judged
+  Scenario: Migrations numbered above everything on main pass
+    Given the newest migration on main is numbered 41
+    When the PR adds a migration numbered 42
+    Then the check passes
+    And no comment is posted
 
-    Scenario: A migration added after everything on the base branch is fine
-      Given the base branch's newest migration is numbered 41
-      When the pull request adds a migration numbered 42
-      Then no comment is posted
+  Scenario: A migration numbered below the newest on main fails
+    Given the newest migration on main is numbered 42
+    When the PR adds a migration numbered 39
+    Then the check fails
+    And a comment explains that it is numbered below 42 and would run out of order
+    And the comment gives the git mv that renumbers it above 42
 
-    Scenario: Migrations already merged are not judged
-      Given the base branch carries two migrations that share a key
-      And the base branch carries a migration with no key in its name
-      When the pull request adds no migrations
-      Then no comment is posted
+  Scenario: Two PRs that picked the same number
+    Given a migration numbered 41 merged into main while the PR was open
+    When the PR adds a different migration numbered 41
+    Then the check fails
+    And the comment says the key is already taken on main
 
-  Rule: A migration that sorts behind the base branch is reported
+  Scenario: Two migrations in one PR share a key
+    When the PR adds two migrations numbered 41
+    Then the check fails
+    And each is offered a different free key
 
-    Scenario: The base branch moved ahead while the pull request was open
-      Given the base branch's newest migration is numbered 42
-      When the pull request adds a migration numbered 39
-      Then a comment reports that it sorts at or before 42
-      And the comment says the migration must be renumbered above 42
+  Scenario: A PR changes a migration that already merged
+    Given a migration exists on main
+    When the PR modifies, renames or deletes it
+    Then the check fails
+    And the comment gives the git checkout that restores it
 
-    Scenario: Two open pull requests picked the same number
-      Given a migration numbered 41 has merged into the base branch
-      When the pull request adds a different migration numbered 41
-      Then a comment reports that the key is already taken on the base branch
+  Scenario: A migration is added with no ordering key
+    When the PR adds a migration whose name has no key prefix
+    Then the check fails
+    And the comment gives the expected naming format
 
-    Scenario: A pull request adds two migrations with the same key
-      When the pull request adds two migrations numbered 41
-      Then a comment reports that their keys collide
+  Scenario: Migrations already on main are never judged
+    Given main carries a migration with no key and two that share a key
+    When the PR adds no migrations
+    Then the check passes
 
-    Scenario: A pull request rewrites a merged migration
-      Given a migration exists on the base branch
-      When the pull request modifies, renames or deletes it
-      Then a comment reports that applied migrations are immutable history
+  Scenario: The comment goes away once the migration is renumbered
+    Given a PR carries a migration-order comment
+    When the author applies the rename and pushes
+    Then the check passes
+    And the comment is deleted
 
-    Scenario: A pull request adds a migration with no ordering key
-      When the pull request adds a migration whose name has no key prefix
-      Then a comment reports the expected naming format
+  Scenario: An unchanged finding is not re-posted on every push
+    Given a PR carries a migration-order comment
+    When a new commit leaves the findings unchanged
+    Then the existing comment is left as it is
 
-  Rule: The check advises, it never gates
-
-    Scenario: Findings do not fail the run
-      Given the pull request has migration ordering findings
-      When the workflow runs
-      Then the workflow succeeds
-      And the findings appear only as a comment
-
-    Scenario: The check is not a candidate for branch protection
-      Given the workflow only ever comments
-      Then it is never a required status check
-
-  Rule: The comment does not repeat itself
-
-    Scenario: The same findings are not re-posted on every push
-      Given a pull request already carries a migration-order comment
-      When a new commit is pushed and the findings are unchanged
-      Then the existing comment is left in place
-      And no additional comment is created
-
-    Scenario: Changed findings replace the previous comment
-      Given a pull request already carries a migration-order comment
-      When a new commit changes the findings
-      Then the previous comment is removed
-      And a comment carrying the new findings is posted
-
-    Scenario: Resolved findings remove the comment
-      Given a pull request already carries a migration-order comment
-      When the author renumbers the migration and pushes
-      Then the comment is deleted
-      And no tombstone is left on the thread
-
-  Rule: A reviewer can dismiss findings they disagree with
-
-    Scenario: Reacting with a thumbs down collapses the comment
-      Given a pull request carries a migration-order comment
-      When someone reacts to it with 👎
-      Then the comment collapses to a one-line dismissal on the next run
-      And the findings are not repeated while they stay the same
-
-    Scenario: A dismissal does not carry over to new findings
-      Given a migration-order comment has been dismissed with 👎
-      When a new commit changes the findings
-      Then the new findings are posted as a fresh comment
-
-  Rule: Fork pull requests are skipped
-
-    Scenario: A fork pull request gets no comment
-      Given a pull request is opened from a fork
-      And its token cannot write comments
-      Then the workflow skips rather than failing
+  Scenario: A fork PR still fails, without a comment
+    Given a PR is opened from a fork
+    And its token cannot write comments
+    Then the comment step is skipped
+    And the check still fails with the reason in the job log
