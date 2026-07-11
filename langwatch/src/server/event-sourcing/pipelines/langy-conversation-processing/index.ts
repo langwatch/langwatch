@@ -5,6 +5,7 @@ export {
   ArchiveConversationCommand,
   ConsumeTurnHandoffCommand,
   FailAgentTurnCommand,
+  GenerateConversationTitleCommand,
   RecordAgentRespondedCommand,
   RecordToolCallCompletedCommand,
   RecordToolCallStartedCommand,

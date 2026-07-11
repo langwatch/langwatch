@@ -6,6 +6,7 @@ import {
   ArchiveConversationCommand,
   ConsumeTurnHandoffCommand,
   FailAgentTurnCommand,
+  GenerateConversationTitleCommand,
   RecordAgentRespondedCommand,
   RecordToolCallCompletedCommand,
   RecordToolCallStartedCommand,
@@ -50,6 +51,15 @@ export interface LangyConversationProcessingPipelineDeps {
    * slim tRPC caches (ADR-046). Omitted (no-Redis dev) → no broadcast.
    */
   langyConversationUpdateBroadcastReactor?: ReactorDefinition<
+    LangyConversationProcessingEvent,
+    LangyConversationStateData
+  >;
+  /**
+   * Optional cheap-model title regeneration reactor. Fires on `turn_finalized`
+   * and dispatches `GenerateConversationTitle` when the throttle allows.
+   * Optional so a no-model / test wiring omits it cleanly.
+   */
+  langyTitleGenerationReactor?: ReactorDefinition<
     LangyConversationProcessingEvent,
     LangyConversationStateData
   >;
@@ -127,6 +137,14 @@ export function createLangyConversationProcessingPipeline(
       deps.langyConversationUpdateBroadcastReactor,
     );
   }
+  // Cheap-model title regeneration: fires on turn_finalized, throttled.
+  if (deps.langyTitleGenerationReactor) {
+    builder = builder.withReactor(
+      "langyConversationState",
+      "langyTitleGeneration",
+      deps.langyTitleGenerationReactor,
+    );
+  }
 
   return builder
     .withCommand("sendMessage", SendMessageCommand)
@@ -140,5 +158,6 @@ export function createLangyConversationProcessingPipeline(
     .withCommand("updateConversationMetadata", UpdateConversationMetadataCommand)
     .withCommand("recordTurnHandoff", RecordTurnHandoffCommand)
     .withCommand("consumeTurnHandoff", ConsumeTurnHandoffCommand)
+    .withCommand("generateConversationTitle", GenerateConversationTitleCommand)
     .build();
 }

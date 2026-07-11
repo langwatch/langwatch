@@ -12,11 +12,22 @@ import type {
   ProjectionStoreWriteContext,
 } from "../../../";
 import { createTenantId, EventUtils } from "../../../";
+import {
+  LANGY_TITLE_SOURCE,
+  type LangyTitleSource,
+} from "../schemas/constants";
 import type {
   LangyConversationState,
   LangyConversationStateData,
 } from "../projections/langyConversationState.foldProjection";
 import type { LangyConversationStateRepository } from "./langyConversationState.repository";
+
+/** Narrow a raw ClickHouse string to the title-source union (fallback: derived). */
+function toTitleSource(raw: string | null | undefined): LangyTitleSource {
+  return raw === LANGY_TITLE_SOURCE.AUTO || raw === LANGY_TITLE_SOURCE.USER
+    ? raw
+    : LANGY_TITLE_SOURCE.DERIVED;
+}
 
 const TABLE_NAME = "langy_conversations" as const;
 
@@ -32,6 +43,7 @@ interface ClickHouseLangyConversationRecord {
   Version: string;
   UserId: string;
   Title: string | null;
+  TitleSource: string | null;
   Status: string;
   IsShared: boolean;
   SharedAt: number | null;
@@ -56,6 +68,7 @@ interface ClickHouseLangyConversationWriteRecord {
   Version: string;
   UserId: string;
   Title: string | null;
+  TitleSource: string;
   Status: string;
   IsShared: boolean;
   SharedAt: Date | null;
@@ -85,6 +98,7 @@ export class LangyConversationStateRepositoryClickHouse<
       ConversationId: record.ConversationId,
       UserId: record.UserId,
       Title: record.Title,
+      TitleSource: toTitleSource(record.TitleSource),
       Status: record.Status,
       IsShared: Boolean(record.IsShared),
       SharedAt: record.SharedAt === null ? null : Number(record.SharedAt),
@@ -117,6 +131,7 @@ export class LangyConversationStateRepositoryClickHouse<
       Version: projectionVersion,
       UserId: data.UserId,
       Title: data.Title,
+      TitleSource: data.TitleSource,
       Status: data.Status,
       IsShared: data.IsShared,
       SharedAt: data.SharedAt != null ? new Date(data.SharedAt) : null,
@@ -160,7 +175,8 @@ export class LangyConversationStateRepositoryClickHouse<
           SELECT
             t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
             t.ConversationId AS ConversationId, t.Version AS Version,
-            t.UserId AS UserId, t.Title AS Title, t.Status AS Status,
+            t.UserId AS UserId, t.Title AS Title,
+            t.TitleSource AS TitleSource, t.Status AS Status,
             t.IsShared AS IsShared,
             if(t.SharedAt IS NOT NULL, toUnixTimestamp64Milli(t.SharedAt), NULL) AS SharedAt,
             t.SharedById AS SharedById,

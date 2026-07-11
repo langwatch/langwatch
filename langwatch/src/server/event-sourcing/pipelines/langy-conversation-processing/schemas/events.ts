@@ -293,6 +293,35 @@ export type LangyConversationHandoffConsumedEvent = z.infer<
 >;
 
 /**
+ * ConversationTitleGenerated — a cheap-model auto title produced after a
+ * finalized turn by the langyTitleGeneration reactor. Updates the fold's
+ * `Title` ONLY when `titleSource !== "user"` (a manual rename is sticky), and
+ * marks the fold's title source as `auto`. Carries the model that produced it
+ * for provenance. No message row and no activity bump — it refines metadata,
+ * it is not conversational activity.
+ */
+export const langyConversationTitleGeneratedEventDataSchema = z.object({
+  conversationId: z.string(),
+  title: z.string(),
+  /** Always "auto" today — the human rename path is conversation_metadata_updated. */
+  source: z.literal("auto").default("auto"),
+  /** provider/model id the title was generated with, e.g. "openai/gpt-5-mini". */
+  model: z.string(),
+});
+export type LangyConversationTitleGeneratedEventData = z.infer<
+  typeof langyConversationTitleGeneratedEventDataSchema
+>;
+
+export const LangyConversationTitleGeneratedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TITLE_GENERATED),
+  data: langyConversationTitleGeneratedEventDataSchema,
+});
+export type LangyConversationTitleGeneratedEvent = z.infer<
+  typeof LangyConversationTitleGeneratedEventSchema
+>;
+
+/**
  * Union of all langy-conversation-processing event types.
  */
 export type LangyConversationProcessingEvent =
@@ -307,7 +336,8 @@ export type LangyConversationProcessingEvent =
   | LangyConversationArchivedEvent
   | LangyConversationMetadataUpdatedEvent
   | LangyConversationHandoffPendingEvent
-  | LangyConversationHandoffConsumedEvent;
+  | LangyConversationHandoffConsumedEvent
+  | LangyConversationTitleGeneratedEvent;
 
 export {
   isLangyMessageSentEvent,
@@ -322,4 +352,5 @@ export {
   isLangyConversationMetadataUpdatedEvent,
   isLangyConversationHandoffPendingEvent,
   isLangyConversationHandoffConsumedEvent,
+  isLangyConversationTitleGeneratedEvent,
 } from "./typeGuards";

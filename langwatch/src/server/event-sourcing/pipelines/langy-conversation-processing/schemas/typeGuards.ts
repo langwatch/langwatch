@@ -9,6 +9,7 @@ import type {
   LangyConversationProcessingEvent,
   LangyConversationHandoffPendingEvent,
   LangyConversationHandoffConsumedEvent,
+  LangyConversationTitleGeneratedEvent,
   LangyMessageSentEvent,
   LangyToolCallCompletedEvent,
   LangyToolCallStartedEvent,
@@ -89,4 +90,10 @@ export function isLangyConversationHandoffConsumedEvent(
   return (
     event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED
   );
+}
+
+export function isLangyConversationTitleGeneratedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyConversationTitleGeneratedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED;
 }

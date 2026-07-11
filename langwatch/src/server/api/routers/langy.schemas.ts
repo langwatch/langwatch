@@ -91,6 +91,14 @@ export const langyConversationUpdateSignalSchema = z.object({
   messageCount: z.number().int().nonnegative().optional(),
   lastActivityAtMs: z.number().nullable().optional(),
   isRunning: z.boolean().optional(),
+  /**
+   * Boolean-only hint that this conversation's title changed (auto title or a
+   * manual rename). The title TEXT is never on the wire — the broadcast is
+   * tenant-wide and a conversation is private to its owner — so the client
+   * treats this as "go refetch through the visibility gate" rather than a value
+   * to apply in place.
+   */
+  titleChanged: z.boolean().optional(),
 });
 export type LangyConversationUpdateSignal = z.infer<
   typeof langyConversationUpdateSignalSchema

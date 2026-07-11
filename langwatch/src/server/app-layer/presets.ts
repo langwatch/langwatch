@@ -68,6 +68,7 @@ import {
 } from "../event-sourcing/pipelines/langy-conversation-processing/repositories";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import { LangyMessageService } from "./langy/langy-message.service";
+import { createLangyConversationTitleGenerator } from "./langy/langy-title-generation.service";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import type { SpawnAgentReactorHandle } from "../event-sourcing/pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
 import {
@@ -739,6 +740,14 @@ export function initializeDefaultApp(options?: {
   );
   const langyMessages = LangyMessageService.create();
 
+  // Late-bind the cheap-model title generator into the langyTitleGeneration
+  // reactor (created in the pipeline registry). Kept out of the event-sourcing
+  // layer so it stays free of model-provider + app-layer read deps; the reactor
+  // no-ops until this is wired, and degrades gracefully if it never is.
+  commands.langyTitleGenerationHandle.setGenerator(
+    createLangyConversationTitleGenerator({ messages: langyMessages }),
+  );
+
   const suiteRunService = SuiteRunService.create({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
     startSuiteRun: commands.suiteRuns.startSuiteRun,
@@ -1091,6 +1100,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           updateConversationMetadata: noop,
           recordTurnHandoff: noop,
           consumeTurnHandoff: noop,
+          generateConversationTitle: noop,
         },
         async () => {
           throw new Error("ClickHouse not available in test app");
@@ -1177,6 +1187,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         updateConversationMetadata: noop,
         recordTurnHandoff: noop,
         consumeTurnHandoff: noop,
+        generateConversationTitle: noop,
       } as AppCommands["langy"],
       billing: {
         reportUsageForMonth: noop,
@@ -1202,6 +1213,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           },
         },
         setPool: () => {
+          /* noop */
+        },
+      },
+      langyTitleGenerationHandle: {
+        reactor: {
+          name: "langyTitleGeneration",
+          options: { runIn: ["worker"] },
+          handle: async () => {
+            /* noop */
+          },
+        },
+        setGenerator: () => {
           /* noop */
         },
       },

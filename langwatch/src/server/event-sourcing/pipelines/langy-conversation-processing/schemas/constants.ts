@@ -31,6 +31,10 @@ export const LANGY_CONVERSATION_EVENT_TYPES = {
   // and cleared it (CONVERSATION_HANDOFF_CONSUMED).
   CONVERSATION_HANDOFF_PENDING: "lw.langy_conversation.conversation_handoff_pending",
   CONVERSATION_HANDOFF_CONSUMED: "lw.langy_conversation.conversation_handoff_consumed",
+  // An auto title produced by the cheap-model regeneration reactor. Distinct
+  // from METADATA_UPDATED (a manual, sticky rename): a title_generated event
+  // updates the title ONLY when it has not been set by the user.
+  TITLE_GENERATED: "lw.langy_conversation.conversation_title_generated",
 } as const;
 
 export const LANGY_CONVERSATION_PROCESSING_EVENT_TYPES = [
@@ -46,6 +50,7 @@ export const LANGY_CONVERSATION_PROCESSING_EVENT_TYPES = [
   LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED,
   LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
   LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED,
+  LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED,
 ] as const;
 
 export type LangyConversationProcessingEventType =
@@ -99,6 +104,8 @@ export const LANGY_CONVERSATION_COMMAND_TYPES = {
   // ADR-048 shutdown-handoff write surface.
   RECORD_TURN_HANDOFF: "lw.langy_conversation.record_turn_handoff",
   CONSUME_TURN_HANDOFF: "lw.langy_conversation.consume_turn_handoff",
+  // Dispatched by the cheap-model regeneration reactor (1:1 → title_generated).
+  GENERATE_TITLE: "lw.langy_conversation.generate_conversation_title",
 } as const;
 
 export const LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES = [
@@ -113,6 +120,7 @@ export const LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES = [
   LANGY_CONVERSATION_COMMAND_TYPES.UPDATE_METADATA,
   LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TURN_HANDOFF,
   LANGY_CONVERSATION_COMMAND_TYPES.CONSUME_TURN_HANDOFF,
+  LANGY_CONVERSATION_COMMAND_TYPES.GENERATE_TITLE,
 ] as const;
 
 export type LangyConversationProcessingCommandType =
@@ -133,6 +141,51 @@ export const LANGY_CONVERSATION_STATUS = {
 } as const;
 
 /**
+ * Where the conversation's current title came from. The fold keeps this so both
+ * the fold handlers and the regeneration reactor can enforce the precedence:
+ * a `user` title is sticky and never overridden; an `auto` title may be
+ * refined by a later regeneration; a `derived` placeholder is the first thing
+ * an auto title replaces.
+ */
+export const LANGY_TITLE_SOURCE = {
+  /** First-message placeholder slice (or none yet). */
+  DERIVED: "derived",
+  /** Produced by the cheap-model regeneration reactor. */
+  AUTO: "auto",
+  /** Set by the user via the rename (PATCH) route — sticky. */
+  USER: "user",
+} as const;
+
+export type LangyTitleSource =
+  (typeof LANGY_TITLE_SOURCE)[keyof typeof LANGY_TITLE_SOURCE];
+
+/**
+ * Throttle + shape policy for auto title regeneration (the
+ * langyTitleGeneration reactor). Regenerate once after the first finalized
+ * turn (while the title is still a derived placeholder), then only every N
+ * turns so we do not pay for a title model call on every turn. A per-
+ * conversation dedup window is a cooldown backstop against bursts.
+ */
+export const LANGY_TITLE_GENERATION = {
+  /** Cheap, capable default — the whole point is a low-cost title call. */
+  MODEL: "openai/gpt-5-mini",
+  /** Soft character budget for the generated title. */
+  MAX_TITLE_CHARS: 60,
+  /** Recent messages fed to the title prompt. */
+  PROMPT_MESSAGE_LIMIT: 8,
+  /** Per-message truncation so a long turn cannot blow up the prompt. */
+  PROMPT_CHARS_PER_MESSAGE: 500,
+  /** After the first auto title, only refine every Nth finalized turn. */
+  REGENERATE_EVERY_N_TURNS: 3,
+  /**
+   * Reactor dedup window (ms): collapses repeat regenerations for the same
+   * conversation, and also dedups a redelivered `turn_finalized`. Acts as the
+   * time-based cooldown alongside the every-N-turns count gate.
+   */
+  COOLDOWN_MS: 60_000,
+} as const;
+
+/**
  * Event schema versions using calendar versioning (YYYY-MM-DD).
  */
 export const LANGY_CONVERSATION_EVENT_VERSIONS = {
@@ -148,6 +201,7 @@ export const LANGY_CONVERSATION_EVENT_VERSIONS = {
   METADATA_UPDATED: "2026-07-10",
   CONVERSATION_HANDOFF_PENDING: "2026-07-11",
   CONVERSATION_HANDOFF_CONSUMED: "2026-07-11",
+  TITLE_GENERATED: "2026-07-11",
 } as const;
 
 /**
