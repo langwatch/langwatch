@@ -35,7 +35,7 @@ export const getTraceCommand = async (
       }
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch trace" });
+    failSpinner({ spinner, error, action: "fetch trace", format: options?.format });
     process.exit(1);
   }
 };

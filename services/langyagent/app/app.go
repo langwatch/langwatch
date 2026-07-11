@@ -72,6 +72,39 @@ type ChatRequest struct {
 	ResumeToken string
 }
 
+// Warm spawns the conversation's worker WITHOUT running a turn.
+//
+// Acquiring a worker is the expensive half of a cold turn: it forks opencode,
+// lays out the worker home, installs the skills and waits for the session to
+// come up. The control plane knows a turn is coming the moment the browser POSTs
+// — long before the event-sourced dispatch actually reaches us — so it calls this
+// immediately and the subprocess boots in parallel with the rest of the request
+// (persisting the message, reserving the PR permit, dispatching the command).
+// By the time /chat lands, Acquire is a map lookup.
+//
+// It is SAFE TO CALL ANY NUMBER OF TIMES, and that is the whole design: it does
+// not Claim the worker and it does not PostMessage, so it cannot start a turn,
+// cannot duplicate one, and cannot race the real /chat. Pool.Acquire is keyed by
+// conversation id and returns the existing worker when the credential signature
+// matches — so the later /chat reuses exactly the worker this warmed.
+//
+// The credentials MUST be the ones the turn will actually run with (same model,
+// same GitHub capability, same egress allow-list). SignatureOf covers all three,
+// so warming with a different set would spawn a worker that /chat then kills and
+// respawns — slower than not warming at all. The caller is responsible for
+// warming only once its credentials are final.
+//
+// At capacity is not an error worth surfacing: the turn itself will report it.
+func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Credentials) error {
+	if _, err := a.pool.Acquire(ctx, conversationID, creds); err != nil {
+		if errors.Is(err, domain.ErrMaxWorkers) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 // Chat runs one chat turn: acquire the worker, claim it, post the prompt, and
 // stream the reply into sink. It mirrors the flat handler's control flow
 // exactly — the only behavioural change is that operational telemetry is

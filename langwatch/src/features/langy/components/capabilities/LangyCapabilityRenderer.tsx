@@ -22,6 +22,7 @@ import { LangyEvalRunCard } from "./LangyEvalRunCard";
 import { LangyMetricsCard } from "./LangyMetricsCard";
 import { LangyResourceResultCard } from "./LangyResourceResultCard";
 import { LangyScenarioCard } from "./LangyScenarioCard";
+import { LangyTraceSampleCard } from "./LangyTraceSampleCard";
 import { LangyTracesCard } from "./LangyTracesCard";
 
 /** The slice of a tool call a capability card needs. */
@@ -43,7 +44,11 @@ export function hasCapabilityCard(call: CapabilityToolCall): boolean {
   return resolveCapability(call.name) !== null;
 }
 
-export function LangyCapabilityRenderer({ call }: { call: CapabilityToolCall }) {
+export function LangyCapabilityRenderer({
+  call,
+}: {
+  call: CapabilityToolCall;
+}) {
   const { project } = useOrganizationTeamProject();
   const descriptor = resolveCapability(call.name);
   if (!descriptor) return null;
@@ -70,6 +75,8 @@ function CapabilityCard({
 }) {
   const props = { descriptor, input, output, projectSlug };
   switch (descriptor.render) {
+    case "traceSample":
+      return <LangyTraceSampleCard {...props} />;
     case "traces":
     case "trace":
       return <LangyTracesCard {...props} />;

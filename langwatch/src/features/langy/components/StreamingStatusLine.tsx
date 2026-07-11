@@ -1,6 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { motion } from "motion/react";
-import { aiBrandPalette } from "~/features/traces-v2/components/ai/aiBrandPalette";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangyTurnMetric } from "../hooks/useLangyTurnSignals";
 import { NumberTicker } from "./NumberTicker";
@@ -8,10 +7,13 @@ import { StreamingStatCard } from "./StreamingStatCard";
 
 const MotionBox = motion.create(Box);
 
-// The progress bar fills with the two cooler AI-brand stops (pink → violet),
-// matching the "Full Experience" reference where the bar is the mesh, not the
-// flat brand orange. The orange lives on the status dot instead.
-const PROGRESS_FILL = `linear-gradient(90deg, ${aiBrandPalette[1]}, ${aiBrandPalette[2]})`;
+// DATA IS NOT THE IDENTITY GRADIENT. The homepage's Langy section runs its
+// scenario bars as a flat `brand-300/70` fill over a `white/10` track — one warm
+// colour, no gradient. The blue→purple→orange gradient belongs to the mark and
+// the thinking line, and smearing it across a progress bar was what made these
+// read as loud. `langy.barFill` / `langy.barTrack` carry the site's values.
+const PROGRESS_FILL = "langy.barFill";
+const PROGRESS_TRACK = "langy.barTrack";
 
 /**
  * Granular streaming state, driven by the event-sourcing turn vocabulary:
@@ -78,7 +80,7 @@ export function StreamingStatusLine({
           <Box
             height="6px"
             borderRadius="full"
-            background="bg.muted"
+            background={PROGRESS_TRACK}
             overflow="hidden"
           >
             <MotionBox
@@ -101,10 +103,7 @@ export function StreamingStatusLine({
             textStyle="2xs"
             color="fg.muted"
           >
-            <NumberTicker
-              value={Math.round(percent)}
-              format={(n) => `${n}%`}
-            />
+            <NumberTicker value={Math.round(percent)} format={(n) => `${n}%`} />
             {segment ? (
               <Text as="span">
                 · segment {segment.index} / {segment.total}

@@ -61,7 +61,7 @@ export const listWorkflowsCommand = async (options?: { format?: string }): Promi
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch workflows" });
+    failSpinner({ spinner, error, action: "fetch workflows", format: options?.format });
     process.exit(1);
   }
 };

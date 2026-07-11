@@ -30,6 +30,22 @@ export type LangyStreamEntry =
   | { type: "status"; status: string }
   | { type: "progress"; message?: string; progress?: number }
   | { type: "milestone"; kind: string; detail?: string }
+  // A tool call the agent ran, mirrored onto the live edge so the UI renders a
+  // card as the tool starts and updates it when it returns. `phase:"start"`
+  // carries the name + input; `phase:"end"` carries the result (`output`, a
+  // string) and `isError`. The durable `tool_call_started`/`tool_call_completed`
+  // events are dispatched separately (this is best-effort live UI, not the
+  // source of truth).
+  | {
+      type: "tool";
+      id: string;
+      name: string;
+      phase: "start" | "end";
+      title?: string;
+      input?: unknown;
+      output?: string;
+      isError?: boolean;
+    }
   | { type: "end" }
   | { type: "error"; error: string };
 
@@ -225,6 +241,46 @@ export class LangyTokenBuffer {
       type: "milestone",
       kind,
       ...(detail !== undefined ? { detail } : {}),
+    });
+  }
+
+  /**
+   * Mirror a tool-call transition onto the live stream. `phase:"start"` when the
+   * agent invokes a tool (name + input known), `phase:"end"` when it returns
+   * (`output` + `isError`). Flushes any buffered tokens first so the card lands
+   * after the prose that preceded it, in order.
+   */
+  async appendTool({
+    conversationId,
+    turnId,
+    id,
+    name,
+    phase,
+    title,
+    input,
+    output,
+    isError,
+  }: {
+    conversationId: string;
+    turnId: string;
+    id: string;
+    name: string;
+    phase: "start" | "end";
+    title?: string;
+    input?: unknown;
+    output?: string;
+    isError?: boolean;
+  }): Promise<void> {
+    await this.flush({ conversationId, turnId });
+    await this.append(conversationId, turnId, {
+      type: "tool",
+      id,
+      name,
+      phase,
+      ...(title !== undefined ? { title } : {}),
+      ...(input !== undefined ? { input } : {}),
+      ...(output !== undefined ? { output } : {}),
+      ...(isError !== undefined ? { isError } : {}),
     });
   }
 

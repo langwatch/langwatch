@@ -46,12 +46,18 @@ process.env.GITHUB_LANGY_CLIENT_SECRET = "test-client-secret";
 process.env.OPENCODE_AGENT_URL = "http://agent.test";
 process.env.LANGY_INTERNAL_SECRET = "internal-secret";
 
-import {
-  extractGithubPrLinks,
-  extractOpenedPrLinks,
-} from "../../services/langy/githubPrLinks";
-import { parseGithubProgressEvents } from "../../services/langy/githubProgressEvents";
-import { stripLangySentinels } from "../../services/langy/langySentinels";
+import { extractGithubPrLinks } from "../../services/langy/githubPrLinks";
+
+/**
+ * NOTE — the `[langy:progress:...]` scenarios that used to live in this file are
+ * gone, along with the protocol. Progress and PR accounting are no longer read
+ * out of the model's prose; they are read from the TOOL STREAM (the agent runs
+ * `git push`, so we know it pushed) and, for an opened PR, from the stdout of the
+ * `gh pr create` that created it. Their coverage moved to
+ * `services/langy/execution/__tests__/langy-github-progress.unit.test.ts`,
+ * which exercises the real path — including the invariant these protected: a PR
+ * merely MENTIONED in a reply must never burn the daily cap or forge an audit row.
+ */
 
 // ===========================================================================
 // SCENARIOS 1 & 2 — connecting GitHub (OAuth callback round-trip).
@@ -458,62 +464,6 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
   describe("given I have connected my GitHub account", () => {
     describe("when I ask Langy to fix a file and open a PR on acme/service-x", () => {
       /** @scenario "Connected user asks Langy to open a PR" */
-      it("forwards my github token, records the opened PR against the cap, and surfaces the PR link as a card", async () => {
-        // Worker reply: progress sentinels through to `opened`, ending with
-        // the real PR URL. extractOpenedPrLinks runs for real on this text.
-        const opened = "acme/service-x#42";
-        stubAgentReply(
-          `[langy:progress:cloning:acme/service-x]\n` +
-            `[langy:progress:branched:fix/typo]\n` +
-            `[langy:progress:committed:abc123]\n` +
-            `[langy:progress:pushed:fix/typo]\n` +
-            `[langy:progress:opened:${opened}]\n\n` +
-            `Done — opened https://github.com/acme/service-x/pull/42 for you.`,
-        );
-
-        const res = await postChat(
-          "Fix the typo in README and open a PR on acme/service-x",
-        );
-        expect(res.status).toBe(200);
-
-        // The credentials forwarded to the agent carry MY github token + login
-        // so the PR author on GitHub is my GitHub user.
-        const forwarded = forwardedAgentBody();
-        expect(forwarded.credentials.githubToken).toBe("gho_live_token");
-        expect(forwarded.credentials.githubLogin).toBe("octocat");
-
-        // The pre-turn permit was reserved exactly once (it was the cap-
-        // boundary check that decided whether to give the worker GH_TOKEN);
-        // because a PR WAS opened, the post-stream release branch does NOT
-        // run, leaving the permit committed against today's bucket.
-        const streamed = await drain(res);
-        expect(reserveLangyGithubPrPermit).toHaveBeenCalledTimes(1);
-        expect(reserveLangyGithubPrPermit).toHaveBeenCalledWith(
-          expect.objectContaining({ userId: "u-connected" }),
-        );
-        expect(releaseLangyGithubPrPermit).not.toHaveBeenCalled();
-
-        // The persisted reply renders the PR as a card: the PR URL survives
-        // (so the card extractor finds it) while progress sentinels are
-        // stripped from history.
-        const persisted = persistedAssistantText();
-        expect(persisted).toContain(
-          "https://github.com/acme/service-x/pull/42",
-        );
-        expect(persisted).not.toContain("[langy:progress:");
-        const cardLinks = extractGithubPrLinks(persisted);
-        expect(cardLinks).toEqual([
-          {
-            owner: "acme",
-            repo: "service-x",
-            number: 42,
-            url: "https://github.com/acme/service-x/pull/42",
-          },
-        ]);
-
-        // The live steps stream carried the progress markers to the client.
-        expect(streamed).toContain("[langy:progress:");
-      });
     });
 
     describe("when the agent is completely unreachable", () => {
@@ -575,7 +525,6 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
 
         // No PR was opened: no link, no `opened` progress event.
         const persisted = persistedAssistantText();
-        expect(extractOpenedPrLinks(persisted)).toEqual([]);
         expect(persisted).not.toMatch(/github\.com\/[^\s]+\/pull\/\d+/);
         // The reservation IS released — a read-only turn must not burn a
         // permit, otherwise users asking questions slowly run themselves out
@@ -590,43 +539,6 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
 
     describe("when I ask Langy to open a PR on acme/service-x", () => {
       /** @scenario "Live steps card reflects the worker's progress" */
-      it("streams ordered progress stages, marks opened with the PR url, and strips raw markers from history", async () => {
-        const reply =
-          `[langy:progress:cloning:acme/service-x]\n` +
-          `[langy:progress:branched:fix/x]\n` +
-          `[langy:progress:committed:deadbeef]\n` +
-          `[langy:progress:pushed:fix/x]\n` +
-          `[langy:progress:opened:acme/service-x#7]\n\n` +
-          `Opened https://github.com/acme/service-x/pull/7`;
-        stubAgentReply(reply);
-
-        const res = await postChat("Open a PR on acme/service-x");
-        const streamed = await drain(res);
-
-        // The live stream carries the markers so the steps card can render
-        // cloning → branched → committed → pushed → opened in order.
-        const { events } = parseGithubProgressEvents(streamed);
-        const stages = events.map((e) => e.stage);
-        expect(stages).toEqual([
-          "cloning",
-          "branched",
-          "committed",
-          "pushed",
-          "opened",
-        ]);
-        // The opened step carries the PR identity (so the card flips to
-        // "opened" when the PR URL arrives).
-        const openedEvent = events.find((e) => e.stage === "opened");
-        expect(openedEvent?.detail).toBe("acme/service-x#7");
-
-        // No raw `[langy:progress:` markers survive into my chat history.
-        const persisted = persistedAssistantText();
-        expect(persisted).not.toContain("[langy:progress:");
-        // Sanity: the strip helper this route uses leaves the prose + PR URL.
-        expect(stripLangySentinels(reply)).toContain(
-          "https://github.com/acme/service-x/pull/7",
-        );
-      });
     });
 
     describe("given I have already opened 20 PRs via Langy today", () => {

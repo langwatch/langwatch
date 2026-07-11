@@ -50,7 +50,7 @@ export const createApiKeyCommand = async (options: CreateApiKeyOptions): Promise
     console.log(chalk.gray("Created:    ") + new Date(result.apiKey.createdAt).toLocaleString());
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "create API key" });
+    failSpinner({ spinner, error, action: "create API key", format: options?.format });
     process.exit(1);
   }
 };

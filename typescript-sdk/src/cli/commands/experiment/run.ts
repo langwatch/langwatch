@@ -70,7 +70,7 @@ export const runExperimentCommand = async (
       console.log(JSON.stringify(runResult, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "run experiment" });
+    failSpinner({ spinner, error, action: "run experiment", format: options?.format });
     process.exit(1);
   }
 };

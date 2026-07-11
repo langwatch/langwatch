@@ -60,7 +60,7 @@ export const listProjectsCommand = async (options?: {
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch projects" });
+    failSpinner({ spinner, error, action: "fetch projects", format: options?.format });
     process.exit(1);
   }
 };

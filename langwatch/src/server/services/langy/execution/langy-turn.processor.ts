@@ -7,9 +7,9 @@
  * what the old `/chat` stream executor did, minus holding a browser socket.
  *
  *   1. POST {OPENCODE_AGENT_URL}/chat with the internal Bearer secret.
- *   2. Bridge the manager's NDJSON: token deltas -> the Redis token buffer;
- *      transient `[langy:progress:*]` ticks -> EPHEMERAL signals; the meaningful
- *      `opened` (PR opened) result -> a DURABLE `tool_call_completed` event.
+ *   2. Bridge the manager's NDJSON: token deltas -> the Redis token buffer; the
+ *      TOOL STREAM -> tool cards, PR-flow progress (ephemeral) and, when
+ *      `gh pr create` settles, a DURABLE `tool_call_completed` (PR opened).
  *   3. Refresh the heartbeat key on a timer for the turn's life (liveness).
  *   4. On completion: `finalizeTurn` (turn_finalized, the whole answer) + end
  *      marker. On error: `failTurn` (agent_turn_failed) + error marker.
@@ -26,12 +26,10 @@ import {
   recordExtraLangyGithubPrs,
   releaseLangyGithubPrPermit,
 } from "~/server/middleware/rate-limit-langy-github-prs";
-import { extractOpenedPrLinks } from "~/server/services/langy/githubPrLinks";
 import {
-  parseGithubProgressEvents,
-  type GithubProgressEvent,
-} from "~/server/services/langy/githubProgressEvents";
-import { stripLangySentinels } from "~/server/services/langy/langySentinels";
+  extractGithubPrLinks,
+  type GithubPrLink,
+} from "~/server/services/langy/githubPrLinks";
 import type { LangyConversationService } from "~/server/app-layer/langy/langy-conversation.service";
 import { LANGY_LIVENESS } from "../streaming/langy.streaming.constants";
 import { RedisLangyEphemeralPublisher } from "../streaming/langyEphemeralPublisher";
@@ -44,6 +42,30 @@ import {
   LANGY_FAST_TOKEN_TYPE,
 } from "../streaming/langyFastStream";
 import { createLangyTurnHandoffStore } from "../streaming/langyTurnHandoff";
+import {
+  LangyCliEnvelopeService,
+  type LangyToolFrame,
+} from "./langy-cli-envelope.service";
+import {
+  AGENT_CHAT_TIMEOUT_MS,
+  LangyAgentUnavailableError,
+  LangyGithubNotConnectedError,
+  LangyWorkerRestartingError,
+  classifyLangyTurnError,
+  langyAgentErrorFromFrame,
+  serializeLangyTurnError,
+} from "./langy-turn-errors";
+import { resolveServerRecovery } from "./langy-turn-recovery";
+import {
+  githubStepOf,
+  needsGithubAuth,
+  type GithubProgressEvent,
+} from "./githubCommand";
+import { fetchGithubPrDetails } from "./githubPrDetails";
+import {
+  LANGY_OPEN_PR_TOOL,
+  type GithubPrCardData,
+} from "~/shared/langy/githubPrCard";
 import type { LangyTurnJobData, LangyWorkerPool } from "./langy-worker-pool";
 import {
   reconcileLangyTurns,
@@ -52,19 +74,16 @@ import {
 
 const logger = createLogger("langwatch:langy:turn-processor");
 
-/** Progress stages that carry no persisted result — pure "how far through". */
-const EPHEMERAL_PROGRESS_STAGES = new Set<GithubProgressEvent["stage"]>([
-  "cloning",
-  "cloned",
-  "branched",
-  "edited",
-  "committed",
-  "pushed",
-  "opening_pr",
-]);
+/** The backoff wait between server-side turn retries. */
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** How the manager wire is spelled today (unchanged from the old route). */
-const AGENT_CHAT_TIMEOUT_MS = 120_000;
+/**
+ * Langy reaches LangWatch through the `langwatch` CLI, which opencode runs in
+ * its `bash` tool — so a trace search arrives as an opaque shell command. This
+ * decodes it back into the typed capability before anything is recorded.
+ */
+const cliEnvelope = LangyCliEnvelopeService.create();
 
 export interface RunTurnDeps {
   conversations: LangyConversationService;
@@ -79,6 +98,11 @@ export interface RunTurnDeps {
   agentUrl: string;
   internalSecret: string;
   fetchImpl?: typeof fetch;
+  /**
+   * The backoff wait between server-side turn retries. Injectable so a test can
+   * exercise the recovery loop without sitting through the real schedule.
+   */
+  sleepImpl?: (ms: number) => Promise<void>;
 }
 
 /**
@@ -92,9 +116,15 @@ export interface RunTurnDeps {
  * emits it ALONGSIDE the full `message.part.delta` event, so the durable path
  * (fed by `message.part.delta` below) is unchanged and never double-counts.
  */
-function parseAgentLine(
-  line: string,
-): { delta?: string; error?: string; handoff?: string; fastToken?: string } | null {
+function parseAgentLine(line: string):
+  | {
+      delta?: string;
+      error?: string;
+      handoff?: string;
+      fastToken?: string;
+      tool?: LangyToolFrame;
+    }
+  | null {
   if (!line.trim()) return null;
   try {
     const event = JSON.parse(line) as {
@@ -104,11 +134,40 @@ function parseAgentLine(
       text?: string;
       part?: { type?: string; text?: string };
       properties?: { field?: string; delta?: string; token?: string };
+      // langy.tool frame fields
+      id?: string;
+      name?: string;
+      phase?: string;
+      title?: string;
+      input?: unknown;
+      output?: string;
+      isError?: boolean;
     };
     if (event.type === LANGY_FAST_TOKEN_TYPE) {
       return typeof event.text === "string" && event.text
         ? { fastToken: event.text }
         : null;
+    }
+    // A tool-call lifecycle frame (ADR-044/tool events). Forwarded ALONGSIDE the
+    // text/token frames, so the durable answer path is unchanged.
+    if (
+      event.type === "langy.tool" &&
+      typeof event.id === "string" &&
+      typeof event.name === "string"
+    ) {
+      return {
+        tool: {
+          id: event.id,
+          name: event.name,
+          phase: event.phase === "end" ? "end" : "start",
+          ...(typeof event.title === "string" ? { title: event.title } : {}),
+          ...(event.input !== undefined ? { input: event.input } : {}),
+          ...(typeof event.output === "string" ? { output: event.output } : {}),
+          ...(typeof event.isError === "boolean"
+            ? { isError: event.isError }
+            : {}),
+        },
+      };
     }
     if (event.type === "error") {
       return { error: event.error || "agent error" };
@@ -159,7 +218,16 @@ export async function runTurn(
     resumeToken,
   } = job;
   const doFetch = deps.fetchImpl ?? fetch;
+  const doSleep = deps.sleepImpl ?? sleep;
   const turnLogger = logger.child({ projectId, conversationId, turnId });
+
+  // Whether this turn was handed a GitHub token at all. The route mints one only
+  // when the user has connected their account (and strips it when the daily PR
+  // cap is reached), so its absence is exactly "the agent cannot do GitHub on
+  // this turn" — known up front, without asking the model anything.
+  const hasGithubToken = !!(credentials as { githubToken?: string })?.githubToken;
+  const shellCommandOf = (frame: LangyToolFrame) =>
+    cliEnvelope.shellCommandOf(frame);
 
   const heartbeat = setInterval(() => {
     void deps.buffer
@@ -172,43 +240,268 @@ export async function runTurn(
   await deps.buffer.heartbeat({ conversationId, turnId }).catch(() => {});
 
   let fullText = "";
-  let emittedProgress = 0;
+  // The PRs this turn actually opened, read from `gh pr create`'s own stdout —
+  // never from the model's prose. The daily cap and the audit log reconcile
+  // against THIS.
+  const openedPrLinks: GithubPrLink[] = [];
+  /** A failing tool can fail with megabytes; an event is not a log sink. */
+  const MAX_EVENT_ERROR_TEXT = 2_000;
+  // Tool calls seen this turn, keyed by id — accumulated so the FINAL durable
+  // message can carry them as parts (event-driven recovery: a refresh replays
+  // the tool cards, not just the prose). The live edge already showed them via
+  // the buffer as they happened.
+  const toolCalls = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      input?: unknown;
+      output?: string;
+      isError?: boolean;
+      /** Wall-clock start, so the completed event can carry a duration. */
+      startedAt?: number;
+    }
+  >();
 
-  const drainProgress = async () => {
-    const { events } = parseGithubProgressEvents(fullText);
-    for (let i = emittedProgress; i < events.length; i++) {
-      const ev = events[i]!;
-      if (EPHEMERAL_PROGRESS_STAGES.has(ev.stage)) {
-        // Transient "how far through" — ephemeral (Redis), never the event log.
-        await deps.ephemeral.publish(projectId, {
-          type: "lw.langy_conversation.progress_reported",
-          conversationId,
-          turnId,
-          message: ev.detail ? `${ev.stage}: ${ev.detail}` : ev.stage,
-          occurredAt: Date.now(),
-        });
-      } else if (ev.stage === "opened") {
-        // A PR was opened — a meaningful, persisted result. DURABLE milestone.
-        const toolCallId = ev.detail || `${turnId}:pr:${i}`;
-        await deps.conversations.recordToolCallCompleted({
+  const handleTool = async (rawTool: LangyToolFrame) => {
+    // The agent is reaching for GitHub on a turn that has no GitHub token: the
+    // user has never connected their account. Stop the turn HERE, at the exact
+    // moment the missing capability is needed — not as a blanket pre-flight
+    // (most turns never touch GitHub and must not be stopped), and not by asking
+    // the model to notice and announce it in prose. We can see it run `gh`.
+    //
+    // The browser turns this into the in-chat Connect card, and connecting
+    // re-drives the turn; the reserved PR permit is returned by the failure path
+    // below, so a stalled turn never eats a daily slot.
+    if (
+      rawTool.phase === "start" &&
+      !hasGithubToken &&
+      needsGithubAuth(shellCommandOf(rawTool) ?? "")
+    ) {
+      throw new LangyGithubNotConnectedError();
+    }
+
+    // The PR-flow progress card, read off the command itself. `gh pr create`
+    // settling is the moment a PR exists, and its stdout carries the URL.
+    const step = githubStepOf(shellCommandOf(rawTool) ?? "");
+    if (step) {
+      if (rawTool.phase === "start") {
+        if (step.begin) {
+          await publishProgress({ stage: step.begin, detail: step.detail });
+        }
+      } else if (!rawTool.isError) {
+        // A FAILED command completed no step — a push that was rejected has not
+        // pushed. The prose protocol could not tell the difference; the tool
+        // stream can, because it carries `isError`.
+        if (step.end === "opened") {
+          await recordOpenedPrs(rawTool.output);
+        } else {
+          await publishProgress({ stage: step.end, detail: step.detail });
+        }
+      }
+    }
+
+    // Re-typed BEFORE anything is recorded, so the durable events, the live
+    // buffer, and the cards the browser draws from them all speak capabilities,
+    // never shells.
+    //
+    // An end frame is re-typed against the input we saw on its START. The
+    // command is what identifies a CLI call, and a frame that arrives without one
+    // cannot be re-typed at all — which is how a call could be recorded as
+    // `langwatch.trace.search` when it opened and plain `bash` when it closed,
+    // the two halves of one call disagreeing about what it was. Remembering the
+    // input keeps the pair consistent whatever any single frame happens to carry.
+    const started = toolCalls.get(rawTool.id);
+    const framed =
+      rawTool.phase === "end" && rawTool.input === undefined && started?.input !== undefined
+        ? { ...rawTool, input: started.input }
+        : rawTool;
+    const tool = cliEnvelope.normalizeToolFrame({ frame: framed });
+    // The command, lifted out of the input, is what makes a `bash` event mean
+    // something to whoever reads the log later.
+    const command = shellCommandOf(framed) ?? undefined;
+    if (tool.phase === "start") {
+      toolCalls.set(tool.id, {
+        id: tool.id,
+        name: tool.name,
+        input: tool.input,
+        startedAt: Date.now(),
+      });
+      // Durable milestone (event log) + live mirror (Redis) — separate transports.
+      await deps.conversations
+        .recordToolCallStarted({
           projectId,
           conversationId,
           turnId,
-          toolCallId,
-          toolName: "github.open_pr",
-        });
-        await deps.buffer.appendMilestone({
+          toolCallId: tool.id,
+          toolName: tool.name,
+          ...(command !== undefined ? { command } : {}),
+          ...(tool.input !== undefined ? { input: tool.input } : {}),
+        })
+        .catch((error) =>
+          turnLogger.debug({ error, tool: tool.name }, "recordToolCallStarted failed"),
+        );
+      await deps.buffer
+        .appendTool({
           conversationId,
           turnId,
-          kind: "pr_opened",
-          detail: ev.detail,
-        });
-      }
+          id: tool.id,
+          name: tool.name,
+          phase: "start",
+          ...(tool.title !== undefined ? { title: tool.title } : {}),
+          ...(tool.input !== undefined ? { input: tool.input } : {}),
+        })
+        .catch(() => {});
+      return;
     }
-    emittedProgress = events.length;
+    // phase === "end"
+    const existing = toolCalls.get(tool.id) ?? { id: tool.id, name: tool.name };
+    toolCalls.set(tool.id, {
+      ...existing,
+      output: tool.output,
+      isError: tool.isError,
+    });
+    // How long the call actually took. Without it the log tells you a call
+    // happened but never that it was the slow one.
+    const durationMs =
+      existing.startedAt !== undefined ? Date.now() - existing.startedAt : undefined;
+    // A failure's message is the useful half of the failure. Capped, because a
+    // tool can fail with megabytes and this is an event, not a log sink.
+    const errorText =
+      tool.isError && tool.output ? tool.output.slice(0, MAX_EVENT_ERROR_TEXT) : undefined;
+    await deps.conversations
+      .recordToolCallCompleted({
+        projectId,
+        conversationId,
+        turnId,
+        toolCallId: tool.id,
+        toolName: tool.name,
+        ...(tool.isError !== undefined ? { isError: tool.isError } : {}),
+        ...(command !== undefined ? { command } : {}),
+        ...(existing.input !== undefined ? { input: existing.input } : {}),
+        ...(durationMs !== undefined ? { durationMs } : {}),
+        ...(errorText !== undefined ? { errorText } : {}),
+      })
+      .catch((error) =>
+        turnLogger.debug({ error, tool: tool.name }, "recordToolCallCompleted failed"),
+      );
+    await deps.buffer
+      .appendTool({
+        conversationId,
+        turnId,
+        id: tool.id,
+        name: tool.name,
+        phase: "end",
+        // The input rides the end entry too, so a card rebuilt from the buffer
+        // alone (a reload mid-turn, a replay) can still say what the call was.
+        ...(existing.input !== undefined ? { input: existing.input } : {}),
+        ...(tool.output !== undefined ? { output: tool.output } : {}),
+        ...(tool.isError !== undefined ? { isError: tool.isError } : {}),
+      })
+      .catch(() => {});
   };
 
-  try {
+  /**
+   * The PR-flow progress card, driven by what the agent RUNS.
+   *
+   * Previously the skill asked the model to print `[langy:progress:<stage>]`
+   * markers into its reply and this parsed them back out of the prose. `git push`
+   * IS the push — there was never anything to announce, and asking an LLM to
+   * narrate its own state machine meant it could paraphrase a marker, forget one,
+   * or emit `opened` on a turn that opened nothing.
+   *
+   * A transient stage ("cloning…") is ephemeral (Redis, never the event log). A
+   * PR actually opening is a real, persisted result: a durable milestone.
+   */
+  const publishProgress = async (event: GithubProgressEvent) => {
+    await deps.ephemeral.publish(projectId, {
+      type: "lw.langy_conversation.progress_reported",
+      conversationId,
+      turnId,
+      message: event.detail ? `${event.stage}: ${event.detail}` : event.stage,
+      occurredAt: Date.now(),
+    });
+  };
+
+  /**
+   * `gh pr create` prints the URL of the PR it just opened. THAT is the PR that
+   * was opened — not whatever URL the model later retyped into its prose.
+   *
+   * This is a correctness fix, not a cosmetic one. The daily PR cap and the
+   * `langy.github.pr_opened` audit log both used to be reconciled against
+   * `extractOpenedPrLinks(fullText)`, so a model that mangled, truncated or
+   * simply forgot the URL corrupted permit accounting and the audit trail. The
+   * command's own stdout cannot be misremembered.
+   */
+  const recordOpenedPrs = async (output: string | undefined) => {
+    for (const link of extractGithubPrLinks(output ?? "")) {
+      if (openedPrLinks.some((seen) => seen.url === link.url)) continue;
+      openedPrLinks.push(link);
+
+      // Enrich from GitHub — by US, with the user's token, off the identity the
+      // command's own stdout just gave us. NOT by asking the model to run a
+      // second command and hoping it remembers (`gh pr create` has no `--json`,
+      // so that design would put the model back in the protocol). Best-effort:
+      // a token that expired or a repo that went private says nothing about
+      // whether the PR exists, so a failure degrades to the bare link rather
+      // than to an error where a pull request should be.
+      const details = hasGithubToken
+        ? await fetchGithubPrDetails({
+            token: (credentials as { githubToken: string }).githubToken,
+            owner: link.owner,
+            repo: link.repo,
+            number: link.number,
+            url: link.url,
+            fetchImpl: deps.fetchImpl,
+          })
+        : null;
+
+      // The card's source of truth is a DURABLE TOOL PART, not the assistant's
+      // prose. Carried in `toolCalls`, it is persisted by `finalizeTurn` and
+      // mirrored onto the live buffer — so the PR card streams in during the turn
+      // AND survives a refresh, and nothing has to scrape the model's text.
+      const toolCallId = `${link.owner}/${link.repo}#${link.number}`;
+      const card: GithubPrCardData = details ?? { ...link, state: "open" };
+      toolCalls.set(toolCallId, {
+        id: toolCallId,
+        name: LANGY_OPEN_PR_TOOL,
+        input: { repo: `${link.owner}/${link.repo}`, number: link.number },
+        output: JSON.stringify(card),
+      });
+
+      await deps.conversations.recordToolCallCompleted({
+        projectId,
+        conversationId,
+        turnId,
+        toolCallId,
+        toolName: LANGY_OPEN_PR_TOOL,
+      });
+      await deps.buffer
+        .appendTool({
+          conversationId,
+          turnId,
+          id: toolCallId,
+          name: LANGY_OPEN_PR_TOOL,
+          phase: "end",
+          output: JSON.stringify(card),
+        })
+        .catch(() => {});
+      await deps.buffer.appendMilestone({
+        conversationId,
+        turnId,
+        kind: "pr_opened",
+        detail: toolCallId,
+      });
+    }
+  };
+
+  /**
+   * ONE pass at the manager: POST, bridge the NDJSON, and either return the
+   * ADR-048 handoff token (or null for a clean finish) or THROW the classified
+   * failure. Idempotent to call again ONLY when it produced no output — which
+   * `resolveServerRecovery` enforces before it lets us round again.
+   */
+  const attemptManagerTurn = async (): Promise<string | null> => {
     const agentResponse = await doFetch(`${deps.agentUrl}/chat`, {
       method: "POST",
       headers: {
@@ -229,7 +522,13 @@ export async function runTurn(
 
     if (!agentResponse.ok || !agentResponse.body) {
       void agentResponse.body?.cancel();
-      throw new Error(`manager responded ${agentResponse.status}`);
+      // A non-2xx (or a 2xx with no body) means the manager can't serve this
+      // turn: down, mid-deploy, misconfigured, or refusing it. The status is the
+      // only detail that crosses to the browser; the message stays in the log.
+      throw new LangyAgentUnavailableError(
+        `manager responded ${agentResponse.status}`,
+        agentResponse.ok ? {} : { status: agentResponse.status },
+      );
     }
 
     const reader = agentResponse.body.getReader();
@@ -259,6 +558,10 @@ export async function runTurn(
         handoffToken = parsed.handoff;
         return;
       }
+      if (parsed.tool) {
+        await handleTool(parsed.tool);
+        return;
+      }
       if (parsed.delta) {
         fullText += parsed.delta;
         await deps.buffer.appendChunk({
@@ -266,7 +569,6 @@ export async function runTurn(
           turnId,
           text: parsed.delta,
         });
-        await drainProgress();
       }
     };
 
@@ -283,8 +585,75 @@ export async function runTurn(
     if (buffer.trim()) await handleLine(buffer);
 
     if (hardError) {
-      throw new Error(hardError);
+      // The manager's typed frames (`at-capacity`, `session-not-found`) become
+      // the matching domain error; any other frame stays an opaque Error whose
+      // text only ever reaches the log.
+      throw langyAgentErrorFromFrame(hardError);
     }
+    return handoffToken;
+  };
+
+  /**
+   * SERVER-SIDE RECOVERY. Some failures this process can simply fix by having
+   * another go, and doing it HERE is strictly better than bouncing them to the
+   * browser: the user's message is never re-posted (so it cannot be duplicated),
+   * no PR permit is re-reserved, the busy-guard is never re-crossed, and the
+   * already-open stream just keeps streaming. The user sees a calm status line,
+   * not an error card, and never has to re-ask.
+   *
+   * Only failures that emitted NOTHING are retried (see `resolveServerRecovery`)
+   * — a turn that already streamed prose or ran a tool is terminal here, because
+   * replaying it could duplicate an answer or a side effect. `langy_turn_timeout`
+   * and `langy_worker_restarting` are deliberately NOT recovered here either
+   * (the browser's attach budget is spent / this process is dying); the client
+   * policy owns those two.
+   */
+  const runWithServerRecovery = async (): Promise<string | null> => {
+    const startedAt = Date.now();
+    let attemptsUsed = 0;
+    for (;;) {
+      try {
+        return await attemptManagerTurn();
+      } catch (error) {
+        const { kind } = classifyLangyTurnError(error);
+        const decision = resolveServerRecovery({
+          kind,
+          attemptsUsed,
+          elapsedMs: Date.now() - startedAt,
+          producedOutput: fullText.length > 0 || toolCalls.size > 0,
+        });
+        if (!decision.retry) {
+          turnLogger.debug(
+            { kind, attemptsUsed, reason: decision.reason },
+            "langy turn not recovered in process — surfacing to the client",
+          );
+          throw error;
+        }
+        attemptsUsed++;
+        turnLogger.info(
+          { kind, attempt: attemptsUsed, delayMs: decision.delayMs },
+          "langy turn failed recoverably — retrying in process",
+        );
+        // Tell the user what is happening on the SAME stream they are already
+        // watching. Strictly best-effort, and guarded with a real try/catch
+        // rather than a trailing `.catch()`: the latter cannot catch a
+        // SYNCHRONOUS throw, which would abort a retry that was about to work.
+        try {
+          await deps.buffer.appendStatus({
+            conversationId,
+            turnId,
+            status: decision.status,
+          });
+        } catch (statusError) {
+          turnLogger.debug({ statusError }, "failed to publish recovery status");
+        }
+        await doSleep(decision.delayMs);
+      }
+    }
+  };
+
+  try {
+    const handoffToken = await runWithServerRecovery();
 
     if (handoffToken !== null) {
       // ADR-048: the worker handed off mid-turn on pod shutdown. Persist the
@@ -317,13 +686,29 @@ export async function runTurn(
     }
 
     // Terminal: the whole final answer is the durable source of truth; tokens
-    // were never events. Sentinels are stripped from the persisted body.
-    const answer = stripLangySentinels(fullText);
+    // were never events. Sentinels are stripped from the persisted body. Tool
+    // calls this turn ran are carried as parts BEFORE the text so a refreshed
+    // client replays the tool cards in order, then the prose (event-driven
+    // recovery). The part shape matches the AI-SDK tool part the live stream
+    // emits, so the SAME renderer draws them live and on reload.
+    const answer = fullText;
+    const toolParts = [...toolCalls.values()].map((call) => ({
+      type: `tool-${call.name}`,
+      toolCallId: call.id,
+      state: call.isError ? "output-error" : "output-available",
+      ...(call.input !== undefined ? { input: call.input } : {}),
+      ...(call.isError
+        ? { errorText: call.output ?? "Tool call failed" }
+        : { output: call.output ?? "" }),
+    }));
     await deps.conversations.finalizeTurn({
       projectId,
       conversationId,
       turnId,
-      parts: [{ type: "text", text: answer, role: "assistant" }],
+      parts: [
+        ...toolParts,
+        { type: "text", text: answer, role: "assistant" },
+      ],
       outcome: "completed",
     });
     await deps.buffer.markEnd({ conversationId, turnId });
@@ -339,7 +724,7 @@ export async function runTurn(
     // per-turn: bump the daily counter by any EXTRA PRs a runaway turn opened,
     // and release the slot when the turn opened none. Preserves the
     // release-only-if-`permitReserved` latch (the erosion-via-blip cap-bypass).
-    await reconcilePrPermit({ job, fullText, turnLogger });
+    await reconcilePrPermit({ job, openedPrLinks, turnLogger });
 
     turnLogger.info("langy turn completed");
   } catch (error) {
@@ -359,8 +744,16 @@ export async function runTurn(
         "failed to dispatch failTurn",
       );
     }
+    // The buffer error entry carries the CLASSIFIED domain error (not the raw
+    // message) so `attachTurnStream` emits a structured error PART the browser
+    // renders as an error card naming what actually happened — at-capacity,
+    // timeout, unreachable — while the raw detail stays in the log above.
     await deps.buffer
-      .markError({ conversationId, turnId, error: message })
+      .markError({
+        conversationId,
+        turnId,
+        error: serializeLangyTurnError(error),
+      })
       .catch(() => {});
     // End Stream B too so the fast SSE stops waiting and the browser settles on
     // the durable error state (Stream A).
@@ -387,15 +780,16 @@ export async function runTurn(
  */
 async function reconcilePrPermit({
   job,
-  fullText,
+  openedPrLinks,
   turnLogger,
 }: {
   job: LangyTurnJobData;
-  fullText: string;
+  /** PRs read from `gh pr create` stdout — the commands' own output. */
+  openedPrLinks: GithubPrLink[];
   turnLogger: ReturnType<typeof logger.child>;
 }): Promise<void> {
   try {
-    const links = extractOpenedPrLinks(fullText);
+    const links = openedPrLinks;
     if (links.length === 0) {
       // No PR opened — return the reserved slot.
       if (job.permitReserved) {
@@ -506,19 +900,40 @@ export async function startLangyTurnProcessor(
       const handoffStore = createLangyTurnHandoffStore({ redis: connection! });
       void handoffStore; // reserved: retry path would re-stash here in future
       await pool.drain(async (job) => {
+        // A known, nameable failure — not an "unexpected error". The browser
+        // gets `langy_worker_restarting`, and the recovery policy re-drives the
+        // turn on its own (features/langy/logic/langyRecoveryPolicy.ts) so a
+        // deploy never costs the user their question.
+        const restarting = new LangyWorkerRestartingError();
         await deps.conversations.failTurn({
           projectId: job.projectId,
           conversationId: job.conversationId,
           turnId: job.turnId,
-          error: "Worker restarting — turn terminated before completion",
+          error: restarting.message,
         });
         await deps.buffer
           .markError({
             conversationId: job.conversationId,
             turnId: job.turnId,
-            error: "worker restart",
+            error: serializeLangyTurnError(restarting),
           })
           .catch(() => {});
+        // Return the reserved PR permit, exactly as the failure and handoff
+        // paths in runTurn do. A drained turn opened no PR, and the turn the
+        // browser retries reserves its OWN permit — without this release, every
+        // deploy-interrupted turn silently ate one of the user's daily slots,
+        // and the auto-retry would eat a second on top. Same
+        // release-only-if-`permitReserved` latch (a Redis-down reserve returns
+        // reserved:false, and DECRing that walks the shared counter negative).
+        if (job.permitReserved) {
+          await releaseLangyGithubPrPermit({ userId: job.actorUserId }).catch(
+            (releaseError) =>
+              logger.warn(
+                { releaseError, turnId: job.turnId },
+                "failed to release PR permit on drain",
+              ),
+          );
+        }
       });
     },
   };

@@ -54,6 +54,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 		chatHandler(deps.App, deps.MaxRequestBodyBytes),
 	))
 
+	// Boot the worker ahead of the turn. The control plane fires this the moment
+	// it knows a turn is coming and does not wait for it; see warmHandler.
+	mux.Handle("POST /warm", requireInternalSecret(
+		deps.InternalSecret,
+		warmHandler(deps.App, deps.MaxRequestBodyBytes),
+	))
+
 	// Middleware chain — applied so RequestID is outermost (mirrors aigateway).
 	var h http.Handler = mux
 	if deps.Version != "" {

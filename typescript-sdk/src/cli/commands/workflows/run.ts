@@ -63,7 +63,7 @@ export const runWorkflowCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--input must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "run workflow" });
+      failSpinner({ spinner, error, action: "run workflow", format: options?.format });
     }
     process.exit(1);
   }

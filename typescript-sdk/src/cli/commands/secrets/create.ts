@@ -60,7 +60,7 @@ export const createSecretCommand = async (
     console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(secret.name)}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "create secret" });
+    failSpinner({ spinner, error, action: "create secret", format: options?.format });
     process.exit(1);
   }
 };

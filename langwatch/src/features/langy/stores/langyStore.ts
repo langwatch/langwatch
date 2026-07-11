@@ -37,13 +37,46 @@ export interface LangyContextChip {
     | "prompt"
     | "dataset"
     | "dashboard"
-    | "scenario";
+    | "scenario"
+    // An evaluation / evaluator / monitor the user has open (usually via a
+    // drawer). Distinct from `experiment` — this is a single evaluator or
+    // online-evaluation, not an offline experiment run.
+    | "evaluation"
+    // A multi-row selection the user made in the Trace Explorer table
+    // ("N traces selected"). `ref` carries the selected ids (comma-joined)
+    // so the agent can act on exactly what's checked.
+    | "selection"
+    // An active filter / query on the Trace Explorer ("filtered: <summary>"),
+    // so the agent scopes "these traces" to what the user has narrowed to.
+    | "filter";
   label: string;
   /**
    * The resource ref (id / slug) this chip stands for, forwarded to the agent
    * as turn context. Absent for the project chip (the project is implicit).
    */
   ref?: string;
+}
+
+/**
+ * A capability the user has explicitly asked Langy to use on the next turn.
+ *
+ * `targetChipId` is the ASSOCIATION: the id of a `LangyContextChip` this skill
+ * is aimed at, expressing "use the GitHub skill, on this trace" as one thought
+ * rather than two chips sitting next to each other hoping the agent guesses.
+ * Null means the skill has no specific target — a perfectly good state, and the
+ * default until the user says otherwise.
+ *
+ * It stores the chip's ID, not its label: labels change (a title reactor lands,
+ * a filter is edited) and a binding that silently pointed at a stale string
+ * would be worse than no binding. The label is resolved at send time, from the
+ * chip that is actually present — and if that chip has since been removed, the
+ * binding resolves to nothing rather than to a lie.
+ */
+export interface LangySkillChip {
+  /** Feature-map feature id, or agent skill name. See ~/shared/langy/langySkills.ts. */
+  id: string;
+  label: string;
+  targetChipId: string | null;
 }
 
 /** The "Open in <surface>" affordance a page-scoped proposal handler returns. */
@@ -53,12 +86,24 @@ export interface LangyAppliedOutcome {
   onOpen?: () => void;
 }
 
+/**
+ * How the panel is laid out (Notion-style). `floating` = a rounded card that
+ * overlays the page (and floats above a drawer); `sidebar` = a full-height right
+ * dock that pushes page content left (a drawer nests to its left). User-picked,
+ * persisted.
+ */
+export type LangyPanelMode = "floating" | "sidebar";
+
 interface LangyState {
   // Panel visibility
   isOpen: boolean;
   openPanel: () => void;
   closePanel: () => void;
   togglePanel: () => void;
+
+  // Layout mode (Floating / Sidebar) — user-picked, persisted
+  panelMode: LangyPanelMode;
+  setPanelMode: (mode: LangyPanelMode) => void;
 
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
@@ -97,6 +142,21 @@ interface LangyState {
   restoreChip: (id: string) => void;
   resetDismissedChips: () => void;
 
+  /**
+   * Skill chips the user has attached to the next turn.
+   *
+   * A resource chip says "look at this"; a skill chip says "DO this". They are
+   * separate state because they are separate grammar — nouns and verbs — and
+   * because a skill is chosen deliberately, where page context arrives on its
+   * own from the route.
+   */
+  skillChips: LangySkillChip[];
+  addSkillChip: (skill: { id: string; label: string }) => void;
+  removeSkillChip: (id: string) => void;
+  /** Bind a skill to one of the turn's resource chips, or clear the binding. */
+  setSkillTarget: (skillId: string, targetChipId: string | null) => void;
+  clearSkillChips: () => void;
+
   // Proposal lifecycle (keyed by proposal id)
   appliedOutcomes: Record<string, LangyAppliedOutcome>;
   discardedProposalIds: Set<string>;
@@ -105,6 +165,13 @@ interface LangyState {
   markProposalApplied: (id: string, outcome: LangyAppliedOutcome) => void;
   clearProposalApplying: (id: string) => void;
   discardProposal: (id: string) => void;
+
+  // Feedback cards the user waved away, keyed by the assistant message they sat
+  // under. Conversation-scoped (see emptyConversationState) — a dismissal means
+  // "not for this answer", not "never again"; the long cross-session snooze is
+  // localStorage's job (see logic/langyFeedbackDirective).
+  dismissedFeedbackMessageIds: Set<string>;
+  dismissFeedback: (messageId: string) => void;
 
   // Stream B (raw-token fast path, ADR-048)
   activeTurnId: string | null;
@@ -117,6 +184,16 @@ interface LangyState {
   devMode: boolean;
   setDevMode: (devMode: boolean) => void;
 
+  /**
+   * Developer-mode card gallery: renders every card Langy can produce, with
+   * fixture data, in place of the conversation. Deliberately NOT persisted — it
+   * is a debugging lens you open, look through, and close, not a mode you leave
+   * a browser in.
+   */
+  cardGalleryOpen: boolean;
+  toggleCardGallery: () => void;
+  closeCardGallery: () => void;
+
   // Resets
   /** Wipe per-conversation transient state (proposals + optimistic + turn). */
   resetActiveConversationState: () => void;
@@ -125,9 +202,13 @@ interface LangyState {
 }
 
 const emptyConversationState = () => ({
+  // Skills steer ONE turn. Carrying "use GitHub" silently into the next
+  // conversation would be the panel making decisions on the user's behalf.
+  skillChips: [] as LangySkillChip[],
   appliedOutcomes: {} as Record<string, LangyAppliedOutcome>,
   discardedProposalIds: new Set<string>(),
   applyingProposalIds: new Set<string>(),
+  dismissedFeedbackMessageIds: new Set<string>(),
   activeTurnId: null as string | null,
   optimisticText: "",
 });
@@ -139,6 +220,9 @@ export const useLangyStore = create<LangyState>()(
       openPanel: () => set({ isOpen: true }),
       closePanel: () => set({ isOpen: false }),
       togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
+
+      panelMode: "floating",
+      setPanelMode: (panelMode) => set({ panelMode }),
 
       activeConversationId: null,
       historyLoadConversationId: null,
@@ -153,6 +237,11 @@ export const useLangyStore = create<LangyState>()(
         set({
           activeConversationId: null,
           historyLoadConversationId: null,
+          // A new chat starts on a BLANK composer. Without this, the half-typed
+          // text abandoned in the last conversation is still sitting there,
+          // primed to be sent into the new one. (`resetForProject` already
+          // cleared the draft — it was simply missed here.)
+          draft: "",
           dismissedChipIds: new Set<string>(),
           ...emptyConversationState(),
         }),
@@ -178,6 +267,33 @@ export const useLangyStore = create<LangyState>()(
           return { dismissedChipIds: next };
         }),
       resetDismissedChips: () => set({ dismissedChipIds: new Set<string>() }),
+
+      skillChips: [],
+      addSkillChip: (skill) =>
+        set((state) => {
+          // Idempotent: summoning the same skill twice is a no-op, not a
+          // duplicate chip. `/gh` then `/github` is one intent.
+          if (state.skillChips.some((chip) => chip.id === skill.id)) {
+            return state;
+          }
+          return {
+            skillChips: [
+              ...state.skillChips,
+              { id: skill.id, label: skill.label, targetChipId: null },
+            ],
+          };
+        }),
+      removeSkillChip: (id) =>
+        set((state) => ({
+          skillChips: state.skillChips.filter((chip) => chip.id !== id),
+        })),
+      setSkillTarget: (skillId, targetChipId) =>
+        set((state) => ({
+          skillChips: state.skillChips.map((chip) =>
+            chip.id === skillId ? { ...chip, targetChipId } : chip,
+          ),
+        })),
+      clearSkillChips: () => set({ skillChips: [] }),
 
       appliedOutcomes: {},
       discardedProposalIds: new Set<string>(),
@@ -206,13 +322,29 @@ export const useLangyStore = create<LangyState>()(
           return { discardedProposalIds: next };
         }),
 
+      dismissedFeedbackMessageIds: new Set<string>(),
+      dismissFeedback: (messageId) =>
+        set((state) => {
+          const next = new Set(state.dismissedFeedbackMessageIds);
+          next.add(messageId);
+          return { dismissedFeedbackMessageIds: next };
+        }),
+
       activeTurnId: null,
       setActiveTurnId: (activeTurnId) => set({ activeTurnId }),
       optimisticText: "",
       setOptimisticText: (optimisticText) => set({ optimisticText }),
 
       devMode: false,
-      setDevMode: (devMode) => set({ devMode }),
+      // Leaving dev mode takes the gallery with it — otherwise a user who
+      // toggles dev mode off is left staring at a wall of fixtures.
+      setDevMode: (devMode) =>
+        set(devMode ? { devMode } : { devMode, cardGalleryOpen: false }),
+
+      cardGalleryOpen: false,
+      toggleCardGallery: () =>
+        set((state) => ({ cardGalleryOpen: !state.cardGalleryOpen })),
+      closeCardGallery: () => set({ cardGalleryOpen: false }),
 
       resetActiveConversationState: () => set(emptyConversationState()),
       resetForProject: () =>
@@ -226,9 +358,13 @@ export const useLangyStore = create<LangyState>()(
     }),
     {
       name: "langy:store",
-      // Only developer mode is durable; everything else is per-session client
-      // state that must start clean (the panel opens empty by default).
-      partialize: (state) => ({ devMode: state.devMode }),
+      // Durable across sessions: developer mode + the layout mode. Everything
+      // else is per-session client state that must start clean (the panel opens
+      // empty by default).
+      partialize: (state) => ({
+        devMode: state.devMode,
+        panelMode: state.panelMode,
+      }),
     },
   ),
 );

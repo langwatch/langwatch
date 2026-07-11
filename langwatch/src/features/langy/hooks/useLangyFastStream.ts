@@ -45,7 +45,10 @@ export function useLangyFastStream({
           `/api/langy/conversations/${conversationId}/fast?projectId=${encodeURIComponent(
             projectId,
           )}&turnId=${encodeURIComponent(turnId)}`,
-          { signal: controller.signal, headers: { Accept: "text/event-stream" } },
+          {
+            signal: controller.signal,
+            headers: { Accept: "text/event-stream" },
+          },
         );
         if (!res.ok || !res.body) {
           void res.body?.cancel();

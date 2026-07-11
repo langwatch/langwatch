@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
+import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import type {
   LangyErrorPresentation,
   LangySerializedReason,
@@ -22,7 +23,9 @@ export function LangyError({
   onAction,
 }: {
   presentation: LangyErrorPresentation;
-  onAction?: (kind: NonNullable<LangyErrorPresentation["action"]>["kind"]) => void;
+  onAction?: (
+    kind: NonNullable<LangyErrorPresentation["action"]>["kind"],
+  ) => void;
 }) {
   if (presentation.render === "suppress") return null;
 
@@ -104,8 +107,22 @@ export function LangyError({
 }
 
 /**
- * Renders the trace id, domain `meta`, and the `reasons` chain when present —
- * high-signal for debugging a handled error without leaking a stack trace.
+ * The debug drawer under an error: the domain `meta` and the `reasons` chain.
+ *
+ * ── DEVELOPER MODE ONLY ────────────────────────────────────────────────────
+ * This used to render for everyone, which is how a timeout card — whose copy is
+ * otherwise good ("That took too long… ask for a narrower slice") — ended up
+ * with `timeoutMs: 120000` printed underneath it. That is our plumbing, in the
+ * user's face, and `dev/docs/best_practices/copywriting.md` forbids exactly it:
+ * copy says what happened to the customer, never how we implemented it. Nobody
+ * outside this repo knows what a `timeoutMs` is, and nobody should have to.
+ *
+ * The information is genuinely useful — to US. So it lives where our tools live:
+ * behind developer mode, with the rest of the machinery.
+ *
+ * The TRACE ID is the exception and stays. It is not an internal detail; it is
+ * the one thing a user can hand to support, and the copy explicitly asks them to
+ * ("share the id below with support").
  */
 function ErrorDetails({
   meta,
@@ -116,8 +133,9 @@ function ErrorDetails({
   reasons?: LangySerializedReason[];
   traceId?: string;
 }) {
-  const hasMeta = meta && Object.keys(meta).length > 0;
-  const hasReasons = reasons && reasons.length > 0;
+  const [devMode] = useLangyDevMode();
+  const hasMeta = devMode && meta && Object.keys(meta).length > 0;
+  const hasReasons = devMode && reasons && reasons.length > 0;
   if (!traceId && !hasMeta && !hasReasons) return null;
 
   return (
@@ -177,10 +195,7 @@ function formatMetaValue(val: unknown): string {
 }
 
 /** Flatten the recursive reason chain into an indented kind list. */
-function flattenReasons(
-  reasons: LangySerializedReason[],
-  depth = 0,
-): string[] {
+function flattenReasons(reasons: LangySerializedReason[], depth = 0): string[] {
   const out: string[] = [];
   for (const reason of reasons) {
     out.push(`${"  ".repeat(depth)}${reason.kind}`);

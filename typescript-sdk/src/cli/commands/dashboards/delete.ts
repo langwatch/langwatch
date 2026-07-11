@@ -18,7 +18,7 @@ export const deleteDashboardCommand = async (id: string, options?: { format?: st
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete dashboard" });
+    failSpinner({ spinner, error, action: "delete dashboard", format: options?.format });
     process.exit(1);
   }
 };

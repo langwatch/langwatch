@@ -1,11 +1,15 @@
 /**
  * Steps card for the PR-opening flow.
  *
- * The card shows checkpoints (cloning → branched → committed → pushed →
- * opened) as Langy's worker runs them. Each event is emitted by the
- * `github.md` skill as a `[langy:progress:...]` sentinel that the manager
- * parses out via {@link parseGithubProgressEvents} — see
- * server/services/langy/githubProgressEvents.ts.
+ * The card shows checkpoints (cloning → branched → committed → pushed → opened)
+ * as Langy's worker runs them. Each event is derived from the turn's TOOL PARTS
+ * via {@link githubProgressFromToolParts} — `git push` IS the push, so the card
+ * reads what the agent actually ran rather than a `[langy:progress:...]` marker
+ * the model was asked to print into its reply. See
+ * server/services/langy/execution/githubCommand.ts.
+ *
+ * Because tool parts are persisted with the message (the sentinels were stripped
+ * before persistence), the card now survives a refresh. It did not used to.
  *
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
@@ -14,7 +18,7 @@ import { Check } from "lucide-react";
 import type {
   GithubProgressEvent,
   GithubProgressStage,
-} from "~/server/services/langy/githubProgressEvents";
+} from "~/server/services/langy/execution/githubCommand";
 
 type Step = {
   stage: GithubProgressStage;
@@ -23,8 +27,9 @@ type Step = {
 
 // Stages that visibly progress the user-facing card. `cloning` and
 // `opening_pr` are transient — the next step's arrival turns them green.
-// `edited` is omitted from the visible track because it fires once per file
-// and would explode the strip; it still lets us mark "branched" complete.
+// (There is no `edited` stage any more: the tool stream has no single moment
+// that is "the edit", and this track never rendered one. The tool cards already
+// show which files were written.)
 const TRACK: Step[] = [
   { stage: "cloned", label: "Clone" },
   { stage: "branched", label: "Branch" },

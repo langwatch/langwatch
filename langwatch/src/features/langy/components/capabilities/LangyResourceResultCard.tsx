@@ -30,7 +30,8 @@ function promptContent(input: unknown, output: unknown): string | null {
     if (!source || typeof source !== "object") continue;
     const obj = source as Record<string, unknown>;
     if (typeof obj.prompt === "string" && obj.prompt.trim()) return obj.prompt;
-    if (typeof obj.content === "string" && obj.content.trim()) return obj.content;
+    if (typeof obj.content === "string" && obj.content.trim())
+      return obj.content;
     if (Array.isArray(obj.messages)) {
       const joined = obj.messages
         .map((m) =>

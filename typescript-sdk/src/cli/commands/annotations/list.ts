@@ -74,7 +74,7 @@ export const listAnnotationsCommand = async (options: {
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch annotations" });
+    failSpinner({ spinner, error, action: "fetch annotations", format: options?.format });
     process.exit(1);
   }
 };

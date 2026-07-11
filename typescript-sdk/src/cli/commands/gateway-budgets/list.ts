@@ -60,7 +60,7 @@ export const listGatewayBudgetsCommand = async (options?: { format?: string }): 
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch gateway budgets" });
+    failSpinner({ spinner, error, action: "fetch gateway budgets", format: options?.format });
     process.exit(1);
   }
 };

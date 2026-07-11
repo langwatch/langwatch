@@ -38,7 +38,7 @@ export const createAnnotationCommand = async (
       console.log(JSON.stringify(annotation, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "create annotation" });
+    failSpinner({ spinner, error, action: "create annotation", format: options?.format });
     process.exit(1);
   }
 };

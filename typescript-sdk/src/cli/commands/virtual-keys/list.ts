@@ -58,7 +58,7 @@ export const listVirtualKeysCommand = async (options?: { format?: string }): Pro
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch virtual keys" });
+    failSpinner({ spinner, error, action: "fetch virtual keys", format: options?.format });
     process.exit(1);
   }
 };

@@ -49,7 +49,7 @@ export const getVirtualKeyCommand = async (id: string, options?: { format?: stri
     console.log(JSON.stringify(vk.config, null, 2));
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch virtual key" });
+    failSpinner({ spinner, error, action: "fetch virtual key", format: options?.format });
     process.exit(1);
   }
 };

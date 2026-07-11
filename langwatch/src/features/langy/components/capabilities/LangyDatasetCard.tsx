@@ -28,11 +28,17 @@ function parseDataset(output: unknown): {
     const trimmed = line.trim();
     const bullet = trimmed.match(/^[-*]\s+(.+)/);
     const cells = trimmed.startsWith("|")
-      ? trimmed.split("|").map((c) => c.trim()).filter(Boolean)
+      ? trimmed
+          .split("|")
+          .map((c) => c.trim())
+          .filter(Boolean)
       : null;
     if (bullet) names.push(bullet[1]!.replace(/\*\*/g, ""));
     else if (cells && cells.length > 0 && !/^-+$/.test(cells[0]!)) {
-      if (cells[0]!.toLowerCase() !== "name" && cells[0]!.toLowerCase() !== "date")
+      if (
+        cells[0]!.toLowerCase() !== "name" &&
+        cells[0]!.toLowerCase() !== "date"
+      )
         names.push(cells[0]!);
     }
     if (names.length >= 5) break;

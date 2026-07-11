@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"go.uber.org/zap"
 
@@ -73,11 +74,41 @@ type sseEvent struct {
 		// token fast-path reads the same single sseEvent decode as session routing.
 		Field string `json:"field"`
 		Delta string `json:"delta"`
+		// Part is where opencode puts the message part on `message.part.updated` —
+		// the carrier for the tool-call lifecycle (see ssePart).
+		Part ssePart `json:"part"`
 	} `json:"properties"`
-	// Part carries the legacy type=="text" token shape (part.text).
-	Part struct {
-		Text string `json:"text"`
-	} `json:"part"`
+	// Part carries the legacy type=="text" token shape (part.text), and the
+	// unwrapped part shape some opencode versions emit at the top level.
+	Part ssePart `json:"part"`
+}
+
+// ssePart is an opencode message part. Text parts carry `text`; TOOL parts
+// (`type":"tool"`) carry the call's identity (`tool` = name, `callID` = the
+// stable id that pairs a start with its end) plus a `state` that transitions
+// pending -> running -> completed | error. Decoded typed (not map[string]any) so
+// the tool branch rides the SAME single decode as session routing and the text
+// fast-path — no per-event boxed-any allocation on the streaming hot path.
+type ssePart struct {
+	ID     string       `json:"id"`
+	Type   string       `json:"type"`
+	Tool   string       `json:"tool"`
+	CallID string       `json:"callID"`
+	Text   string       `json:"text"`
+	State  sseToolState `json:"state"`
+}
+
+// sseToolState is a tool part's state. `input` / `output` / `error` are held as
+// raw JSON because opencode types them loosely: input is an arbitrary args
+// object, and a result may arrive as a JSON string OR as a structured value.
+// Keeping them raw defers the decision to toolTextFromRaw, which renders either
+// shape as the STRING the frame contract requires.
+type sseToolState struct {
+	Status string          `json:"status"`
+	Title  string          `json:"title"`
+	Input  json.RawMessage `json:"input"`
+	Output json.RawMessage `json:"output"`
+	Error  json.RawMessage `json:"error"`
 }
 
 // addBearer attaches the per-worker bearer token to an outgoing request. Every
@@ -433,6 +464,285 @@ func textDeltaFromEvent(ev *sseEvent) (string, bool) {
 	return "", false
 }
 
+// langyToolFrame is the compact tool-lifecycle frame. Like langyTokenFrame it
+// rides the SAME /chat ndjson stream as the full events, multiplexed by `type`,
+// so the control plane can event-source the call (tool_call_started /
+// tool_call_completed) and stream a mapped UI card without re-deriving the
+// lifecycle from raw opencode parts.
+//
+// Optionality is carried by pointers/omitempty so the wire shape is exact:
+// a `start` frame is {type,id,name,phase[,title][,input]} and an `end` frame is
+// {type,id,name,phase[,input],output,isError} — `isError` is ALWAYS present on an
+// end (false is meaningful there), and always absent on a start.
+//
+// BOTH phases carry the input, so either event identifies the call on its own.
+type langyToolFrame struct {
+	Type    string          `json:"type"`
+	ID      string          `json:"id"`
+	Name    string          `json:"name"`
+	Phase   string          `json:"phase"`
+	Title   string          `json:"title,omitempty"`
+	Input   json.RawMessage `json:"input,omitempty"`
+	Output  *string         `json:"output,omitempty"`
+	IsError *bool           `json:"isError,omitempty"`
+}
+
+// langyToolType is the discriminator the control plane matches on to route a
+// frame to the tool-card mapper. Single source of truth for the wire contract,
+// mirroring langyTokenType.
+const langyToolType = "langy.tool"
+
+const (
+	toolPhaseStart = "start"
+	toolPhaseEnd   = "end"
+)
+
+// opencode's `part.type` for a tool call, and the `state.status` values a tool
+// part transitions through. `completed` and `error` are the settle transitions.
+// `failed` is not a shape opencode is known to emit — it is tolerated as an
+// error alias purely so an unrecognised settle status can never strand a card
+// spinning forever with no `end`.
+const (
+	toolPartType        = "tool"
+	toolStatusRunning   = "running"
+	toolStatusCompleted = "completed"
+	toolStatusError     = "error"
+	toolStatusFailed    = "failed"
+)
+
+// maxToolOutputBytes caps a forwarded tool result. A tool can return megabytes
+// (a big file read, a wide query); the card only ever shows a preview, so the
+// stream must not carry the whole thing. Overflow is cut on a rune boundary and
+// marked with a trailing ellipsis.
+const maxToolOutputBytes = 8 * 1024
+
+// toolStateSettled classifies a tool state.status: reports whether the call has
+// finished, and whether it finished badly.
+func toolStateSettled(status string) (settled, isError bool) {
+	switch status {
+	case toolStatusCompleted:
+		return true, false
+	case toolStatusError, toolStatusFailed:
+		return true, true
+	}
+	return false, false
+}
+
+// toolPartFromEvent returns the tool part an opencode event carries, if any.
+// opencode wraps the part under `properties.part` on `message.part.updated`;
+// some versions emit it unwrapped at the top level. Both are accepted — the
+// event `type` is deliberately NOT gated on, so a tool part is picked up
+// whichever envelope delivers it.
+func toolPartFromEvent(ev *sseEvent) (*ssePart, bool) {
+	if ev.Properties.Part.Type == toolPartType {
+		return &ev.Properties.Part, true
+	}
+	if ev.Part.Type == toolPartType {
+		return &ev.Part, true
+	}
+	return nil, false
+}
+
+// toolCallID is the stable id that pairs a start frame with its end. opencode's
+// `callID` is the tool call's own identity; the part `id` is the fallback for a
+// shape that omits it. Whichever is used, the SAME part yields the same id on
+// every re-send, which is what makes the de-dupe and the pairing work.
+func toolCallID(part *ssePart) string {
+	if part.CallID != "" {
+		return part.CallID
+	}
+	return part.ID
+}
+
+// rawToolValue normalises an optional raw JSON field: an absent field and an
+// explicit `null` both become nil, so the frame omits them rather than carrying
+// a meaningless `"input":null`.
+func rawToolValue(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return nil
+	}
+	return raw
+}
+
+// hasToolInput reports whether a tool part actually tells us WHAT the call is
+// doing — i.e. whether its input carries any argument at all.
+//
+// `{}` is the case that matters and the one `rawToolValue` cannot see: it is a
+// present, valid, entirely uninformative object. opencode really does emit a
+// `running` transition whose input is still `{}` and then RE-SEND the same
+// `running` once the arguments have materialised (the re-send is a known shape —
+// see the tracker's dedupe). Treating that first empty `{}` as "we know the
+// input" is what stranded every card: the start frame went out with no command,
+// the tracker latched the call as started, and the re-send carrying the actual
+// command was dropped as a duplicate. The command then existed nowhere on the
+// wire — not on the start, not on the end — so the control plane could not
+// re-type `bash("langwatch trace search")` into the capability it was, and the
+// panel had nothing to label the card with but the tool's own name ("Bash…").
+//
+// So an empty object is NOT input. Waiting one more transition for the real
+// thing is the whole difference between a card that says what it is doing and a
+// card that says "Bash".
+func hasToolInput(raw json.RawMessage) bool {
+	raw = rawToolValue(raw)
+	if len(raw) == 0 {
+		return false
+	}
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &probe); err == nil {
+		return len(probe) > 0
+	}
+	// A non-object input (opencode types tool input loosely) is information.
+	return true
+}
+
+// toolTextFromRaw renders a raw tool result as the STRING the frame contract
+// requires. A JSON string is unquoted to its value; any other JSON value (an
+// object, an array, a number — opencode types tool output loosely) is carried
+// as its compact JSON text, which is exactly its marshalled form.
+func toolTextFromRaw(raw json.RawMessage) string {
+	raw = rawToolValue(raw)
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s
+	}
+	return string(raw)
+}
+
+// truncateToolOutput caps a result at maxToolOutputBytes so one huge tool return
+// cannot bloat the stream. The cut backs up to a rune boundary so the truncated
+// string stays valid UTF-8, and is marked so the UI can show it was clipped.
+func truncateToolOutput(s string) string {
+	if len(s) <= maxToolOutputBytes {
+		return s
+	}
+	cut := maxToolOutputBytes
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
+}
+
+// toolStateOpensCard reports whether a not-yet-settled tool state exposes enough
+// to open a card — and the bar is the INPUT, not the status.
+//
+// It used to open on `running` alone, on the belief that `running` is the
+// "args known, tool executing" transition and therefore always carries them.
+// Production disagrees: opencode emits `running` with an input of `{}` and fills
+// the arguments in on a later re-send of that same `running`. Opening on the
+// status meant opening before the args existed, and the tracker then treated the
+// re-send that carried them as a duplicate to drop.
+//
+// So the card opens the moment we can say what the call is DOING, whichever
+// transition brings that — a `pending` that already carries input opens it, a
+// `running` that does not yet carry input waits. Nothing is stranded by waiting:
+// a tool that never surfaces an input at all still gets its start emitted from
+// the settle transition (see framesFor), which is the last shape that could
+// possibly carry one.
+func toolStateOpensCard(part *ssePart) bool {
+	return hasToolInput(part.State.Input)
+}
+
+// toolStartFrame opens the card: the tool's identity plus, when opencode has
+// surfaced them, the human title and the args it was called with.
+func toolStartFrame(id string, part *ssePart) langyToolFrame {
+	return langyToolFrame{
+		Type:  langyToolType,
+		ID:    id,
+		Name:  part.Tool,
+		Phase: toolPhaseStart,
+		Title: part.State.Title,
+		Input: rawToolValue(part.State.Input),
+	}
+}
+
+// toolEndFrame closes the card with the settled result. On an error settle the
+// error message IS the output (that is what the card shows); it falls back to
+// the output field when opencode reported the failure there instead.
+//
+// The end frame carries the INPUT as well as the output. That is not redundant
+// with the start frame: it makes each event self-describing, so "what command
+// was this, and how did it end?" is answerable from the end event alone — by the
+// card, by the durable event log, and by anyone debugging a turn after the fact.
+// It also means a call whose start went out before its arguments materialised is
+// still correctly identified when it settles, rather than being permanently
+// anonymous because of the transition it happened to open on.
+func toolEndFrame(id string, part *ssePart, isError bool) langyToolFrame {
+	output := toolTextFromRaw(part.State.Output)
+	if isError {
+		if msg := toolTextFromRaw(part.State.Error); msg != "" {
+			output = msg
+		}
+	}
+	output = truncateToolOutput(output)
+	return langyToolFrame{
+		Type:    langyToolType,
+		ID:      id,
+		Name:    part.Tool,
+		Phase:   toolPhaseEnd,
+		Input:   rawToolValue(part.State.Input),
+		Output:  &output,
+		IsError: &isError,
+	}
+}
+
+// toolCallTracker de-dupes the tool lifecycle across the re-sent part updates
+// opencode emits: a tool part is re-published on every state transition (and can
+// repeat within one), so the same callID lands on the stream many times. The
+// tracker holds the per-turn set of ids it has already opened and closed, which
+// is what guarantees EXACTLY one `start` and one `end` per call. Scoped to a
+// single streamSessionEvents call — one turn, one tracker, no cross-turn leak.
+type toolCallTracker struct {
+	started map[string]struct{}
+	ended   map[string]struct{}
+}
+
+func newToolCallTracker() *toolCallTracker {
+	return &toolCallTracker{
+		started: map[string]struct{}{},
+		ended:   map[string]struct{}{},
+	}
+}
+
+// framesFor maps one decoded opencode event onto the langy.tool frames it should
+// produce: nothing for a non-tool event, a `start` the first time the call
+// exposes its name + input, and an `end` on the settle transition. A tool whose
+// only surfaced transition is the settle one (a fast tool that never showed a
+// `running`) still gets its `start` emitted first, so the consumer is never
+// asked to close a card it was never told to open. Pure apart from the tracker's
+// own bookkeeping — no I/O — so it is trivially unit-testable, mirroring
+// textDeltaFromEvent.
+func (t *toolCallTracker) framesFor(ev *sseEvent) []langyToolFrame {
+	part, ok := toolPartFromEvent(ev)
+	if !ok {
+		return nil
+	}
+	id := toolCallID(part)
+	if id == "" || part.Tool == "" {
+		return nil
+	}
+	settled, isError := toolStateSettled(part.State.Status)
+	if !settled && !toolStateOpensCard(part) {
+		return nil
+	}
+
+	var frames []langyToolFrame
+	if _, seen := t.started[id]; !seen {
+		t.started[id] = struct{}{}
+		frames = append(frames, toolStartFrame(id, part))
+	}
+	if !settled {
+		return frames
+	}
+	if _, seen := t.ended[id]; !seen {
+		t.ended[id] = struct{}{}
+		frames = append(frames, toolEndFrame(id, part, isError))
+	}
+	return frames
+}
+
 // streamSessionEvents tails /event from the worker and forwards every event
 // belonging to sessionID as one ndjson line to w. Returns when a terminal event
 // lands or the context is cancelled. The fetch carries the same ctx so a client
@@ -450,6 +760,12 @@ func textDeltaFromEvent(ev *sseEvent) (string, bool) {
 // of the heavy full-event line — so the raw-token fast-path is never queued
 // behind Stream A's payload. That is the only new work per delta (one typed
 // field read + one small write); terminal detection + session routing untouched.
+//
+// Tool lifecycle: when a forwarded event carries an opencode tool part, compact
+// {"type":"langy.tool",...} start/end frames are written the same way, so the
+// control plane can event-source the call and stream a mapped UI card instead of
+// re-deriving the lifecycle from raw parts. Best-effort and additive — the raw
+// event is still forwarded verbatim, and a tool frame never fails the turn.
 func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID string, w io.Writer, flush func()) error {
 	url := baseURL + "/event"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -475,6 +791,7 @@ func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID st
 	dataPrefix := []byte("data:")
 	var out []byte // reused across the whole stream: one alloc/turn, not one/event
 	var ev sseEvent
+	tools := newToolCallTracker() // per-turn de-dupe of the tool start/end frames
 	for scanner.Scan() {
 		line := bytes.TrimSpace(scanner.Bytes())
 		if !bytes.HasPrefix(line, dataPrefix) {
@@ -505,6 +822,22 @@ func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID st
 				if flush != nil {
 					flush()
 				}
+			}
+		}
+		// Tool lifecycle: emit the compact start/end frames ahead of the heavy
+		// full-event line so the card opens as promptly as the tokens flow.
+		// Best-effort — a marshal failure drops the frame and the turn keeps
+		// streaming; forwarding must never fail a turn.
+		for _, tf := range tools.framesFor(&ev) {
+			frame, mErr := json.Marshal(tf)
+			if mErr != nil {
+				continue
+			}
+			if _, wErr := w.Write(append(frame, '\n')); wErr != nil {
+				return nil // client disconnect.
+			}
+			if flush != nil {
+				flush()
 			}
 		}
 		// Forward the payload VERBATIM, newline-terminated. payload aliases the

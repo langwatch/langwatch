@@ -66,6 +66,14 @@ export interface LangyDomainError extends DomainErrorShape {
 export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_conversation_not_found",
   "langy_conversation_not_owned",
+  // Turn-execution failures (see server/services/langy/execution/langy-turn-errors.ts).
+  "langy_agent_unavailable",
+  "langy_agent_at_capacity",
+  "langy_agent_session_lost",
+  "langy_turn_timeout",
+  "langy_worker_restarting",
+  // NOT a failure — an unmet prerequisite. See the `suppress` case below.
+  "langy_github_not_connected",
 ] as const;
 
 function parseReasons(value: unknown): LangySerializedReason[] | undefined {
@@ -176,6 +184,84 @@ export function explainLangyError(
         description:
           "You can view shared conversations but only the owner can continue them.",
         render: "card",
+        ...debug,
+      };
+
+    case "langy_agent_unavailable":
+      return {
+        kind: domain.kind,
+        title: "Langy is unavailable",
+        description:
+          "Langy can't be reached right now. Your message is safe — send it again in a moment.",
+        render: "card",
+        action: { label: "Try again", kind: "retry" },
+        ...debug,
+      };
+
+    case "langy_agent_at_capacity":
+      return {
+        kind: domain.kind,
+        title: "Langy is busy right now",
+        description:
+          "Too many conversations are running at once. Give it a few seconds and try again.",
+        render: "card",
+        action: { label: "Try again", kind: "retry" },
+        ...debug,
+      };
+
+    case "langy_agent_session_lost":
+      return {
+        kind: domain.kind,
+        title: "Langy lost its place",
+        description:
+          "Langy dropped this conversation before the reply finished. Send your message again to pick it back up.",
+        render: "card",
+        action: { label: "Try again", kind: "retry" },
+        ...debug,
+      };
+
+    case "langy_turn_timeout":
+      return {
+        kind: domain.kind,
+        title: "That took too long",
+        description:
+          "Langy didn't finish in time. Try again, or ask for a narrower slice — a shorter time range or a single trace.",
+        render: "card",
+        action: { label: "Try again", kind: "retry" },
+        ...debug,
+      };
+
+    case "langy_worker_restarting":
+      return {
+        kind: domain.kind,
+        title: "Langy restarted",
+        description:
+          "An update interrupted this reply. Nothing was lost — send your message again.",
+        render: "card",
+        action: { label: "Try again", kind: "retry" },
+        ...debug,
+      };
+
+    case "langy_github_not_connected":
+      // The ONLY suppressed kind, and the reason the mode exists.
+      //
+      // Langy needing GitHub and not having it is a setup step, not a fault:
+      // nothing broke, the user did nothing wrong, and there is a perfectly good
+      // next action. Rendering it red would be the product blaming someone for
+      // not having finished onboarding. `suppress` means the caller draws the
+      // connect card in the message flow instead (see LangyPanel), so the answer
+      // to "I need GitHub" is a Connect button exactly where the turn stopped.
+      //
+      // The title/description are still populated: they are what the card falls
+      // back to if a future caller renders this generically, and they are what a
+      // test reads. Nothing in the UI shows them today.
+      return {
+        kind: domain.kind,
+        title: "Connect GitHub to continue",
+        description:
+          "Langy needs access to your GitHub account to open pull requests.",
+        render: "suppress",
+        action: { label: "Connect GitHub", kind: "connect-github" },
         ...debug,
       };
 

@@ -32,7 +32,7 @@ export const getProjectCommand = async (id: string, options?: { format?: string 
     console.log(`${chalk.bold("Updated:")}         ${new Date(project.updatedAt).toLocaleString()}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch project" });
+    failSpinner({ spinner, error, action: "fetch project", format: options?.format });
     process.exit(1);
   }
 };

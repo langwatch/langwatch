@@ -119,7 +119,7 @@ export const unsetModelDefaultCommand = async (
       );
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "unset default model" });
+    failSpinner({ spinner, error, action: "unset default model", format: options?.format });
     process.exit(1);
   }
 };
