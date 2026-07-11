@@ -1,14 +1,20 @@
 import {
   Box,
   Button,
+  Code,
   createListCollection,
   Field,
+  HStack,
   Input,
+  List,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
+import { ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
+import { Link } from "~/components/ui/link";
+import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Select } from "~/components/ui/select";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
@@ -34,10 +40,13 @@ import type {
   SavedTriggerRow,
   SummaryIdentity,
 } from "../../types";
-import type {
-  SlackActionParams,
-  SlackPreview,
-  SlackTemplateType,
+import {
+  SLACK_BOT_TOKEN_KEPT,
+  slackDeliveryMethodOf,
+  type SlackActionParams,
+  type SlackDeliveryMethod,
+  type SlackPreview,
+  type SlackTemplateType,
 } from "./shared";
 import { findTemplateOptionBySource } from "./templates/registry";
 import { SlackBlockKitTemplatePicker } from "./templates/TemplatePicker";
@@ -48,7 +57,22 @@ interface FieldDraft {
 }
 
 export interface SlackSlice {
+  /** How the message reaches Slack: a legacy incoming webhook, or a Slack app
+   *  bot token posting via the Web API. Drives which destination fields and
+   *  which templates are offered. */
+  deliveryMethod: SlackDeliveryMethod;
+  /** Webhook destination (used when `deliveryMethod` is "webhook"). */
   webhook: string;
+  /** A newly typed bot token. Empty means "unchanged": on an edit the server
+   *  keeps the stored token; on a fresh draft an empty token is incomplete.
+   *  The stored token is never read back into the form (see `botTokenAlreadySet`). */
+  botToken: string;
+  /** Bot destination channel (id like C0123, or #name). */
+  channelId: string;
+  /** True when the row already has a stored bot token (echoed by the server as
+   *  a flag, never the token itself), so the form can show "token set" and let
+   *  the author keep it without retyping. */
+  botTokenAlreadySet: boolean;
   templateType: SlackTemplateType;
   template: FieldDraft;
 }
@@ -61,22 +85,47 @@ function initialSlice(): SlackSlice {
   // better in Slack than the plain-text fallback. Existing rows whose
   // `slackTemplateType` is null are read as plain text upstream
   // (`fromTriggerRow`) so we don't accidentally retype historical configs.
-  return { webhook: "", templateType: "block_kit", template: EMPTY_FIELD };
+  return {
+    deliveryMethod: "webhook",
+    webhook: "",
+    botToken: "",
+    channelId: "",
+    botTokenAlreadySet: false,
+    templateType: "block_kit",
+    template: EMPTY_FIELD,
+  };
 }
 
 function isComplete(slice: SlackSlice): boolean {
+  if (slice.deliveryMethod === "bot") {
+    return (
+      slice.channelId.trim().length > 0 &&
+      (slice.botToken.trim().length > 0 || slice.botTokenAlreadySet)
+    );
+  }
   return slice.webhook.trim().length > 0;
 }
 
 function summary(slice: SlackSlice, identity: SummaryIdentity): string {
   const name = identity.name || "(unnamed)";
+  if (slice.deliveryMethod === "bot") {
+    const channel = slice.channelId.trim();
+    return `${name} → Slack app${channel ? ` ${channel}` : " (channel not set)"}`;
+  }
   return `${name} → Slack webhook${slice.webhook ? " set" : " (not set)"}`;
 }
 
 function fromTriggerRow(row: SavedTriggerRow): SlackSlice {
   const params = (row.actionParams ?? {}) as Partial<SlackActionParams>;
   return {
+    deliveryMethod: slackDeliveryMethodOf(params),
     webhook: typeof params.slackWebhook === "string" ? params.slackWebhook : "",
+    // The token is never sent to the browser — start blank and rely on
+    // `botTokenAlreadySet` to keep the stored one.
+    botToken: "",
+    channelId:
+      typeof params.slackChannelId === "string" ? params.slackChannelId : "",
+    botTokenAlreadySet: params.slackBotTokenSet === true,
     templateType:
       row.slackTemplateType === "block_kit" ? "block_kit" : "string",
     template: {
@@ -87,12 +136,37 @@ function fromTriggerRow(row: SavedTriggerRow): SlackSlice {
 }
 
 function toActionParams(slice: SlackSlice): SlackActionParams {
-  return { slackWebhook: slice.webhook };
+  if (slice.deliveryMethod === "bot") {
+    const typed = slice.botToken.trim();
+    // A typed token is sent as-is. A blank field on a row that already has a
+    // stored token sends the sentinel so the server keeps it; a blank field on
+    // a fresh draft sends blank (the server rejects it with a clear error).
+    const slackBotToken =
+      typed.length > 0
+        ? typed
+        : slice.botTokenAlreadySet
+          ? SLACK_BOT_TOKEN_KEPT
+          : "";
+    return {
+      slackDelivery: "bot",
+      slackChannelId: slice.channelId,
+      slackBotToken,
+    };
+  }
+  return { slackDelivery: "webhook", slackWebhook: slice.webhook };
 }
 
 function testFireTarget(slice: SlackSlice) {
+  // Test-fire only posts to a webhook server-side; a bot connection has no
+  // webhook, so return null and let the drawer's null-webhook guard skip it.
+  if (slice.deliveryMethod === "bot") return { webhook: null };
   return { webhook: slice.webhook || null };
 }
+
+const DELIVERY_ITEMS: { value: SlackDeliveryMethod; label: string }[] = [
+  { value: "webhook", label: "Incoming webhook" },
+  { value: "bot", label: "Slack app (bot)" },
+];
 
 function templatesFromSlice(slice: SlackSlice) {
   return {
@@ -167,6 +241,41 @@ function SlackConfigForm({
 
   return (
     <VStack align="stretch" gap={4}>
+      {/* Destination first: choose how the message reaches Slack, then fill in
+          the fields for that method. Switching only flips `deliveryMethod`, so
+          the other method's fields survive a round-trip. */}
+      <Field.Root>
+        <Field.Label>Connection</Field.Label>
+        <SegmentedControl
+          size="sm"
+          value={slice.deliveryMethod}
+          onValueChange={({ value }) => {
+            if (value)
+              onChange({
+                ...slice,
+                deliveryMethod: value as SlackDeliveryMethod,
+              });
+          }}
+          items={DELIVERY_ITEMS}
+        />
+      </Field.Root>
+      {slice.deliveryMethod === "bot" ? (
+        <SlackBotFields slice={slice} onChange={onChange} />
+      ) : (
+        <Field.Root>
+          <Field.Label>Slack webhook URL</Field.Label>
+          <Input
+            value={slice.webhook}
+            onChange={(e) => onChange({ ...slice, webhook: e.target.value })}
+            placeholder="https://hooks.slack.com/services/..."
+          />
+          <ReuseSlackWebhook
+            projectId={ctx.projectId}
+            currentWebhook={slice.webhook}
+            onPick={(webhook) => onChange({ ...slice, webhook })}
+          />
+        </Field.Root>
+      )}
       {/* Alerts always deliver immediately (cadence is pinned server-side),
           so the cadence switch only renders for trace automations. */}
       {!isGraphAlert ? (
@@ -175,19 +284,6 @@ function SlackConfigForm({
           onChange={ctx.setNotificationCadence}
         />
       ) : null}
-      <Field.Root>
-        <Field.Label>Slack webhook URL</Field.Label>
-        <Input
-          value={slice.webhook}
-          onChange={(e) => onChange({ ...slice, webhook: e.target.value })}
-          placeholder="https://hooks.slack.com/services/..."
-        />
-        <ReuseSlackWebhook
-          projectId={ctx.projectId}
-          currentWebhook={slice.webhook}
-          onPick={(webhook) => onChange({ ...slice, webhook })}
-        />
-      </Field.Root>
       <FieldHeader
         label="Message"
         usingDefault={slice.template.usingDefault}
@@ -202,6 +298,7 @@ function SlackConfigForm({
           <SlackBlockKitTemplatePicker
             cadence={ctx.cadenceMode}
             kind={ctx.sourceKind}
+            deliveryMethod={slice.deliveryMethod}
             hasEvaluationFilter={ctx.hasEvaluationFilter}
             currentSource={templateValue}
             onSelect={(option) =>
@@ -304,6 +401,130 @@ function SlackConfigForm({
           </Button>
         </VStack>
       )}
+    </VStack>
+  );
+}
+
+/**
+ * Bot-connection destination: the channel to post in plus the app's bot token.
+ * The token is write-only from the browser's side — once stored, the server
+ * echoes a "set" flag (`botTokenAlreadySet`) instead of the secret, so the
+ * field stays blank and the author keeps the stored token unless they type a
+ * new one. A short setup callout points at where to create the Slack app.
+ */
+function SlackBotFields({
+  slice,
+  onChange,
+}: {
+  slice: SlackSlice;
+  onChange: (next: SlackSlice) => void;
+}) {
+  const tokenRef = useRef<HTMLInputElement>(null);
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const tokenKept = slice.botTokenAlreadySet && slice.botToken.length === 0;
+
+  return (
+    <VStack align="stretch" gap={3}>
+      <Field.Root>
+        <Field.Label>Channel</Field.Label>
+        <Input
+          value={slice.channelId}
+          onChange={(e) => onChange({ ...slice, channelId: e.target.value })}
+          placeholder="#alerts or C0123…"
+        />
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>Bot User OAuth Token</Field.Label>
+        <Input
+          ref={tokenRef}
+          type="password"
+          autoComplete="off"
+          value={slice.botToken}
+          onChange={(e) => onChange({ ...slice, botToken: e.target.value })}
+          placeholder={
+            slice.botTokenAlreadySet
+              ? "•••••••• (unchanged, leave blank to keep)"
+              : "xoxb-…"
+          }
+        />
+        {tokenKept ? (
+          <HStack gap={1} pt={1}>
+            <Text textStyle="xs" color="fg.muted">
+              A token is already saved.
+            </Text>
+            <Button
+              variant="plain"
+              size="xs"
+              height="auto"
+              paddingX={0}
+              color="fg.muted"
+              _hover={{ color: "fg" }}
+              onClick={() => tokenRef.current?.focus()}
+            >
+              Replace token
+            </Button>
+          </HStack>
+        ) : null}
+      </Field.Root>
+      <Box
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        bg="bg.subtle"
+        padding={3}
+      >
+        <VStack align="stretch" gap={2}>
+          <Text textStyle="xs" color="fg.muted">
+            Post with your own Slack app for charts, tables, and alert banners.
+          </Text>
+          <Link
+            href="https://api.slack.com/apps"
+            isExternal
+            textStyle="xs"
+            fontWeight="medium"
+            display="inline-flex"
+            alignItems="center"
+            gap={1}
+            width="fit-content"
+          >
+            Create a Slack app <ExternalLink size={12} />
+          </Link>
+          <TemplateDisclosure
+            triggerLabel="Setup steps"
+            open={stepsOpen}
+            onToggle={() => setStepsOpen((prev) => !prev)}
+          >
+            <List.Root as="ol" gap={1} paddingLeft={4}>
+              <List.Item>
+                <Text textStyle="xs" color="fg.muted">
+                  Create an app in your workspace.
+                </Text>
+              </List.Item>
+              <List.Item>
+                <Text textStyle="xs" color="fg.muted">
+                  Add the <Code size="sm">chat:write</Code> bot scope.
+                </Text>
+              </List.Item>
+              <List.Item>
+                <Text textStyle="xs" color="fg.muted">
+                  Install the app to your workspace.
+                </Text>
+              </List.Item>
+              <List.Item>
+                <Text textStyle="xs" color="fg.muted">
+                  Copy the Bot User OAuth Token (starts with{" "}
+                  <Code size="sm">xoxb-</Code>).
+                </Text>
+              </List.Item>
+              <List.Item>
+                <Text textStyle="xs" color="fg.muted">
+                  Invite the bot to the channel you post to.
+                </Text>
+              </List.Item>
+            </List.Root>
+          </TemplateDisclosure>
+        </VStack>
+      </Box>
     </VStack>
   );
 }

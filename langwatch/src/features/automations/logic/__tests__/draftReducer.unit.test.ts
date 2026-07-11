@@ -62,7 +62,11 @@ describe("draftReducer", () => {
   describe("SET_SLICE", () => {
     it("updates exactly the provider's slice", () => {
       const slack = {
+        deliveryMethod: "webhook" as const,
         webhook: "https://hooks.slack.com/services/T/B/X",
+        botToken: "",
+        channelId: "",
+        botTokenAlreadySet: false,
         templateType: "string" as const,
         template: { value: "", usingDefault: true },
       };

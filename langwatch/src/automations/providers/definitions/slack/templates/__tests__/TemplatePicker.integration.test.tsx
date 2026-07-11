@@ -18,6 +18,7 @@ const renderPicker = (
     <SlackBlockKitTemplatePicker
       cadence="immediate"
       kind="trace"
+      deliveryMethod="webhook"
       hasEvaluationFilter={false}
       currentSource=""
       onSelect={vi.fn()}
@@ -75,6 +76,46 @@ describe("SlackBlockKitTemplatePicker", () => {
         id: firstOption!.id,
         source: firstOption!.source,
       });
+    });
+  });
+
+  describe("given a webhook connection", () => {
+    it("renders a template that needs a Slack app but blocks selecting it", () => {
+      const onSelect = vi.fn();
+      renderPicker({ deliveryMethod: "webhook", onSelect });
+
+      // "Eval failure banner" leads with a gated `alert` block.
+      const gatedCard = screen.getByRole("button", {
+        name: /use eval failure banner template/i,
+      });
+      expect(gatedCard).toBeDisabled();
+      expect(gatedCard.textContent).toContain("Needs a Slack app connection");
+
+      fireEvent.click(gatedCard);
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it("keeps a non-gated template selectable", () => {
+      renderPicker({ deliveryMethod: "webhook" });
+
+      expect(
+        screen.getByRole("button", { name: /use compact alert template/i }),
+      ).toBeEnabled();
+    });
+  });
+
+  describe("given a bot connection", () => {
+    it("lets the author select a template that needs a Slack app", () => {
+      const onSelect = vi.fn();
+      renderPicker({ deliveryMethod: "bot", onSelect });
+
+      const gatedCard = screen.getByRole("button", {
+        name: /use eval failure banner template/i,
+      });
+      expect(gatedCard).toBeEnabled();
+
+      fireEvent.click(gatedCard);
+      expect(onSelect).toHaveBeenCalledTimes(1);
     });
   });
 

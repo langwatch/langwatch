@@ -122,6 +122,15 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: null, isLoading: false }),
       },
     },
+    dashboards: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
+    // The trace-subject query editor previews matches via tracesV2.list.
+    tracesV2: {
+      list: {
+        useQuery: () => ({ data: undefined, isFetching: false, error: null }),
+      },
+    },
     useContext: () => ({
       automation: { getTriggers: { invalidate: mockInvalidate } },
     }),
@@ -274,21 +283,19 @@ describe("AutomationDrawer", () => {
   });
 
   describe("given the trace subject is edited inline", () => {
-    describe("when a filter is added", () => {
-      it("records it on the draft without opening a secondary", async () => {
+    describe("when a filter query is typed", () => {
+      it("records it on the draft filterQuery without opening a secondary", async () => {
         renderDrawer();
 
-        // The subject facet is inline now — the filter editor is on the main
-        // pane, no "When" row to open first.
-        await waitFor(() => {
-          expect(screen.getByTestId("add-filter")).toBeInTheDocument();
-        });
-        fireEvent.click(screen.getByTestId("add-filter"));
+        // The subject facet is inline now — a fresh trace automation authors a
+        // Traces-V2 query on the main pane (no "When" secondary to open).
+        const input = await screen.findByPlaceholderText(/status:error/i);
+        fireEvent.change(input, { target: { value: "status:error" } });
 
         await waitFor(() => {
-          expect(
-            useAutomationStore.getState().draft.filters["metadata.labels"],
-          ).toEqual(["production"]);
+          expect(useAutomationStore.getState().draft.filterQuery).toBe(
+            "status:error",
+          );
         });
       });
     });

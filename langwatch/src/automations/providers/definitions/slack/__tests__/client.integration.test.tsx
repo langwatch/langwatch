@@ -11,6 +11,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "~/automations/providers/types";
@@ -30,7 +31,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import slackClient, { type SlackSlice } from "../client";
-import type { SlackPreview } from "../shared";
+import { SLACK_BOT_TOKEN_KEPT, type SlackPreview } from "../shared";
 import { templateOptionsFor } from "../templates/registry";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -68,12 +69,16 @@ function makeCtx(
  *  test assert the exact slice written. */
 function Harness({
   ctx,
+  initial,
   onChangeSpy,
 }: {
   ctx: ConfigFormCtx<SlackPreview>;
+  initial?: SlackSlice;
   onChangeSpy?: (next: SlackSlice) => void;
 }) {
-  const [slice, setSlice] = useState<SlackSlice>(slackClient.initialSlice());
+  const [slice, setSlice] = useState<SlackSlice>(
+    initial ?? slackClient.initialSlice(),
+  );
   const Form = slackClient.ConfigForm;
   return (
     <Form
@@ -90,12 +95,27 @@ function Harness({
 const renderForm = (
   props: {
     ctx?: ConfigFormCtx<SlackPreview>;
+    initial?: SlackSlice;
     onChangeSpy?: (next: SlackSlice) => void;
   } = {},
 ) =>
-  render(<Harness ctx={props.ctx ?? makeCtx()} onChangeSpy={props.onChangeSpy} />, {
-    wrapper: Wrapper,
-  });
+  render(
+    <Harness
+      ctx={props.ctx ?? makeCtx()}
+      initial={props.initial}
+      onChangeSpy={props.onChangeSpy}
+    />,
+    {
+      wrapper: Wrapper,
+    },
+  );
+
+const botSlice = (overrides: Partial<SlackSlice> = {}): SlackSlice => ({
+  ...slackClient.initialSlice(),
+  deliveryMethod: "bot",
+  channelId: "C0123",
+  ...overrides,
+});
 
 describe("SlackConfigForm authoring tiers", () => {
   afterEach(() => cleanup());
@@ -175,6 +195,116 @@ describe("SlackConfigForm authoring tiers", () => {
       expect(
         screen.queryByRole("button", { name: /use compact alert template/i }),
       ).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("SlackConfigForm delivery method", () => {
+  afterEach(() => cleanup());
+
+  describe("given the webhook default", () => {
+    it("shows the webhook URL field", () => {
+      renderForm();
+
+      expect(
+        screen.getByPlaceholderText(/hooks\.slack\.com/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("when the author switches to a bot connection", () => {
+    it("swaps in the channel and bot token fields", async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByRole("radio", { name: /slack app/i }));
+
+      expect(
+        await screen.findByPlaceholderText(/#alerts or c0123/i),
+      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/xoxb-/i)).toBeInTheDocument();
+    });
+
+    it("keeps a typed webhook when toggling back", async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      const url = "https://hooks.slack.com/services/T000/B000/xyz";
+      fireEvent.change(screen.getByPlaceholderText(/hooks\.slack\.com/i), {
+        target: { value: url },
+      });
+      await user.click(screen.getByRole("radio", { name: /slack app/i }));
+      // Confirm we actually switched before toggling back.
+      await screen.findByPlaceholderText(/xoxb-/i);
+      await user.click(screen.getByRole("radio", { name: /incoming webhook/i }));
+
+      expect(
+        await screen.findByPlaceholderText(/hooks\.slack\.com/i),
+      ).toHaveValue(url);
+    });
+  });
+
+  describe("given a bot draft whose token is already stored", () => {
+    it("offers to keep the saved token without retyping", () => {
+      renderForm({ initial: botSlice({ botTokenAlreadySet: true }) });
+
+      expect(
+        screen.getByPlaceholderText(/unchanged, leave blank to keep/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /replace token/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("lets the author select a template that needs a Slack app", () => {
+      renderForm({ initial: botSlice({ botTokenAlreadySet: true }) });
+
+      expect(
+        screen.getByRole("button", {
+          name: /use eval failure banner template/i,
+        }),
+      ).toBeEnabled();
+    });
+  });
+});
+
+describe("Slack client slice contract", () => {
+  describe("given a bot slice", () => {
+    describe("when the channel is set and a token is stored", () => {
+      it("reports the config as complete without a typed token", () => {
+        expect(
+          slackClient.isComplete(botSlice({ botTokenAlreadySet: true })),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the channel is set but no token exists yet", () => {
+      it("reports the config as incomplete", () => {
+        expect(
+          slackClient.isComplete(botSlice({ botTokenAlreadySet: false })),
+        ).toBe(false);
+      });
+    });
+
+    describe("when a token is typed", () => {
+      it("sends the typed token verbatim", () => {
+        const params = slackClient.toActionParams(
+          botSlice({ botToken: "xoxb-fresh", botTokenAlreadySet: false }),
+        ) as { slackDelivery: string; slackBotToken?: string };
+
+        expect(params.slackDelivery).toBe("bot");
+        expect(params.slackBotToken).toBe("xoxb-fresh");
+      });
+    });
+
+    describe("when the stored token is left untouched on edit", () => {
+      it("sends the keep sentinel so the server keeps the stored token", () => {
+        const params = slackClient.toActionParams(
+          botSlice({ botToken: "", botTokenAlreadySet: true }),
+        ) as { slackBotToken?: string };
+
+        expect(params.slackBotToken).toBe(SLACK_BOT_TOKEN_KEPT);
+      });
     });
   });
 });
