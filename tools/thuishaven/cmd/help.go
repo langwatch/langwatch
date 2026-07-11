@@ -60,6 +60,9 @@ ENVIRONMENT
     LANGWATCH_HAVEN_CH_STOP_IDLE=1  Daemon stops the CH server when no stacks run.
     LANGWATCH_HAVEN_CH_MAX_MEMORY   CH server memory ceiling in bytes (default 4GiB).
     CLICKHOUSE_BIN=/path/clickhouse  Override the clickhouse binary location.
+    LANGWATCH_LOCAL_API_KEY      Stable local dev API key haven seeds + injects
+                                 (default sk-lw-local-development-key) — every
+                                 worktree and agent authenticates with the same key.
     LANGWATCH_OBSERVABILITY_PORT Grafana port to route (default 3000).
     PORTLESS=0                   Bypass portless entirely (legacy PORT scheme).
     HAVEN_AGENT=1                Plain, colourless, redraw-free output (also on

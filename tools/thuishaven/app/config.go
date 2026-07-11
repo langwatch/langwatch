@@ -18,6 +18,7 @@ type Config struct {
 	Agent              bool          // token-free plain output for AI drivers (no colour/TUI)
 	ManageClickHouse   bool          // haven provisions a shared native clickhouse-server + per-slug DBs
 	StopClickHouseIdle bool          // daemon stops the managed CH server when the last stack is reaped
+	LocalAPIKey        string        // stable local dev API key seeded + injected into every stack
 }
 
 // PlanOptions decide which services `up` runs and how.

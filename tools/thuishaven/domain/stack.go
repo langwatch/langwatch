@@ -23,11 +23,14 @@ type Stack struct {
 	// of its own: it is a backend of `app`, reached same-origin at
 	// app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort). One app URL, not
 	// two confusable ones — the frontend and its API share a single origin.
-	APIPort            int       `json:"apiPort"`
-	WorkerMetricsPort  int       `json:"workerMetricsPort"`
-	ClickHouseHTTPPort int       `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
-	ClickHouseDatabase string    `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
-	Services           []Service `json:"services"`
+	APIPort            int    `json:"apiPort"`
+	WorkerMetricsPort  int    `json:"workerMetricsPort"`
+	ClickHouseHTTPPort int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
+	ClickHouseDatabase string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
+	// LocalAPIKey is the stable, deterministic local dev API key haven seeds and
+	// injects, so every worktree (and every agent) authenticates with the same key.
+	LocalAPIKey string    `json:"localApiKey"`
+	Services    []Service `json:"services"`
 	// UpdatedAt is refreshed by the launcher's heartbeat; the daemon reaps a
 	// stack whose launcher has died or whose heartbeat has gone stale.
 	UpdatedAt time.Time `json:"updatedAt"`
