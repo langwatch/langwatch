@@ -385,11 +385,12 @@ function buildOtelEnvBlock(
       //     receiver-side previously had only `tool_input_size_bytes`
       //     and `tool_result_size_bytes` - proven across the
       //     andre-claude-tool-calls + sergey-third-eye dump set.
-      //   OTEL_LOG_TOOL_CONTENT  - TRACES-ONLY + requires beta
-      //     tracing. claude 2.x is LOGS-ONLY today so this is a
-      //     no-op for us. Set anyway as forward-compat for when
-      //     claude turns on traces. Tool I/O on the logs path
-      //     actually comes from TOOL_DETAILS + RAW_API_BODIES.
+      //   OTEL_LOG_TOOL_CONTENT  - lifts tool input/output content onto
+      //     the `tool.output` span event of claude_code.tool spans.
+      //     Active because we now set CLAUDE_CODE_ENHANCED_TELEMETRY_BETA
+      //     below, which unlocks the real span-tracing signal (see note).
+      //     Tool I/O on the logs path also still comes from
+      //     TOOL_DETAILS + RAW_API_BODIES.
       //   OTEL_LOG_RAW_API_BODIES - emits two NEW event types
       //     `api_request_body` + `api_response_body` carrying the
       //     FULL JSON of every message (system prompts + user content
@@ -416,8 +417,20 @@ function buildOtelEnvBlock(
       // the platform settings page. Note: extended-thinking content
       // is ALWAYS redacted by claude from raw bodies - we cannot
       // capture it regardless of flag state.
+      //
+      // CLAUDE_CODE_ENHANCED_TELEMETRY_BETA unlocks the real span-tracing
+      // signal (scope com.anthropic.claude_code.tracing): claude_code
+      // interaction / llm_request / tool / tool.execution / subagent.spawn
+      // spans, carrying agent_id + parent_agent_id. That is the ONLY
+      // telemetry that ties each model call / tool run to the sub-agent
+      // that issued it and reconstructs the sub-agent tree. Without it
+      // OTEL_TRACES_EXPORTER is a no-op for claude-code, every log arrives
+      // context-less, and the receiver collapses every sub-agent into one
+      // synthesized per-turn trace. Content (prompts/responses) still rides
+      // the log events and joins to the llm_request span by request_id.
       return {
         CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+        CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: "1",
         OTEL_TRACES_EXPORTER: "otlp",
         OTEL_LOGS_EXPORTER: "otlp",
         OTEL_METRICS_EXPORTER: "otlp",
