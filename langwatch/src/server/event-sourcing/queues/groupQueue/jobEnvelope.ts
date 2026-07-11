@@ -75,9 +75,10 @@ function envelopeWritesEnabled(): boolean {
  * job was squashed by dedup or lost in a crash must eventually expire.
  */
 export interface JobBlobStore {
-  put(params: { id: string; data: Buffer }): Promise<void>;
+  /** `ttlSeconds` overrides the GQ1 default backstop (see {@link RedisJobBlobStore}). */
+  put(params: { id: string; data: Buffer; ttlSeconds?: number }): Promise<void>;
   /** Read the blob AND refresh its backstop TTL. Worker hot path only. */
-  get(params: { id: string }): Promise<Buffer | null>;
+  get(params: { id: string; ttlSeconds?: number }): Promise<Buffer | null>;
   /** Read the blob WITHOUT refreshing its TTL. Non-worker / ops-dashboard inspection path. */
   peek(params: { id: string }): Promise<Buffer | null>;
   delete(params: { id: string }): Promise<void>;
