@@ -1,4 +1,5 @@
 import { on } from "node:events";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
@@ -8,7 +9,7 @@ import type {
 } from "~/server/app-layer/langy/langy-conversation.service";
 import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
 import { trackServerEvent } from "~/server/posthog";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, isDemoProjectId } from "../rbac";
 import {
   langyConversationDetailSchema,
   langyConversationListItemSchema,
@@ -38,6 +39,28 @@ import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/lan
 
 const LANGY_READ_PERMISSION = "evaluations:view" as const;
 
+/**
+ * Every Langy read/command procedure shares one gate: the caller can read the
+ * project (`evaluations:view`) AND the project is not the public demo. The demo
+ * grants `evaluations:view` to every authenticated user, so the permission check
+ * alone would expose the per-user Langy chat that belongs to whoever used Langy
+ * there — hence the explicit `isDemoProjectId` refusal, mirroring the Hono
+ * `/langy/*` surface. `projectId` lives on the base so procedures declare only
+ * their own inputs.
+ */
+const langyReadProcedure = protectedProcedure
+  .input(z.object({ projectId: z.string() }))
+  .use(checkProjectPermission(LANGY_READ_PERMISSION))
+  .use(async ({ input, next }) => {
+    if (isDemoProjectId(input.projectId)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Langy is not available on the demo project.",
+      });
+    }
+    return next();
+  });
+
 function toListItemDto(item: ConversationListItem): LangyConversationListItemDto {
   return {
     id: item.id,
@@ -65,14 +88,12 @@ export const langyRouter = createTRPCRouter({
    * `keepPreviousData` + `staleTime` so a freshness refetch never blanks the
    * list.
    */
-  list: protectedProcedure
+  list: langyReadProcedure
     .input(
       z.object({
-        projectId: z.string(),
         limit: z.number().int().min(1).max(100).default(50),
       }),
     )
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
     .query(
       async ({
         input,
@@ -91,9 +112,8 @@ export const langyRouter = createTRPCRouter({
    * Single-conversation spine (status + counts), for the open conversation.
    * Returns null when the conversation is not visible to the user.
    */
-  detail: protectedProcedure
-    .input(z.object({ projectId: z.string(), conversationId: z.string() }))
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+  detail: langyReadProcedure
+    .input(z.object({ conversationId: z.string() }))
     .query(
       async ({
         input,
@@ -118,9 +138,8 @@ export const langyRouter = createTRPCRouter({
    * `list` so opening a conversation never re-fetches the slim list, and the
    * list never carries content.
    */
-  messages: protectedProcedure
-    .input(z.object({ projectId: z.string(), conversationId: z.string() }))
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+  messages: langyReadProcedure
+    .input(z.object({ conversationId: z.string() }))
     .query(
       async ({
         input,
@@ -181,9 +200,8 @@ export const langyRouter = createTRPCRouter({
    * non-owner (shared) conversation is visible but not deletable and reports
    * `success: false`; the client invalidates the list either way.
    */
-  deleteConversation: protectedProcedure
-    .input(z.object({ projectId: z.string(), conversationId: z.string() }))
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+  deleteConversation: langyReadProcedure
+    .input(z.object({ conversationId: z.string() }))
     .mutation(async ({ input, ctx }): Promise<{ success: boolean }> => {
       const success = await getApp().langy.conversations.deleteById({
         id: input.conversationId,
@@ -199,9 +217,8 @@ export const langyRouter = createTRPCRouter({
    * backoff), mirroring `tracesV2.newCount`. The count derivation lives in the
    * service (`countSince`), not here — transport only shapes input/output.
    */
-  newCount: protectedProcedure
-    .input(z.object({ projectId: z.string(), since: z.number() }))
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+  newCount: langyReadProcedure
+    .input(z.object({ since: z.number() }))
     .query(async ({ input, ctx }): Promise<{ count: number }> => {
       const count = await getApp().langy.conversations.countSince({
         projectId: input.projectId,
@@ -229,10 +246,9 @@ export const langyRouter = createTRPCRouter({
    * granted permission to inspect the full conversation for debugging — the
    * consent flag only; acting on it is a separate, gated flow.
    */
-  recordFeedback: protectedProcedure
+  recordFeedback: langyReadProcedure
     .input(
       z.object({
-        projectId: z.string(),
         conversationId: z.string().optional(),
         messageId: z.string().optional(),
         /** Trace id of the conversation turn, for LangWatch feedback events. */
@@ -243,7 +259,6 @@ export const langyRouter = createTRPCRouter({
         shareConversationConsent: z.boolean().optional(),
       }),
     )
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
     .mutation(async ({ input, ctx }): Promise<void> => {
       trackServerEvent({
         userId: ctx.session.user.id,
@@ -269,9 +284,7 @@ export const langyRouter = createTRPCRouter({
    * `traces.onTraceUpdate` / `tracesV2.onDiscoverUpdate` so `useSSESubscription`
    * handles it unchanged.
    */
-  onConversationUpdate: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+  onConversationUpdate: langyReadProcedure
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
       const userId = opts.ctx.session.user.id;
