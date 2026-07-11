@@ -107,8 +107,14 @@ path stays only as the pre-flip / non-beta fallback.
 ### C4 — Trace-summary fold under the new mix *(headline IO + cost)*
 - `extractIOFromLogRecord` already lifts input (`user_prompt`) + output (`repl_main_thread` `api_response_body`), and `CONVERSATIONAL_QUERY_SOURCES={repl_main_thread}` already excludes sub-agent/utility output. **Verify** it works when content logs land under the **real** traceId alongside real spans (post-gate), and that **cost/tokens now derive from the real `llm_request` spans** (synthesized spans gone → no summary double-count either).
 - Watch: one real traceId can hold 600+ spans (native tracer groups a session); `MAX_PROCESSED_SPANS=512` may under-count huge claude traces — decide whether to raise/skip for this scope.
-- Files: `projections/services/trace-io-accumulation.service.ts` (adjust only if a gap is found), `traceSummary.foldProjection.ts`.
-- Tests: fold a real-span + content-log event stream (no synthesized spans) → summary has correct headline input/output + single-counted cost; sub-agent response doesn't win the headline.
+- Files: `projections/services/trace-io-accumulation.service.ts` (adjust only if a gap is found), `traceSummary.foldProjection.ts`, + `trace-io-accumulation.service.unit.test.ts` / a fold integration test.
+- **Trace-summary test suite** (the explicit ask), fed real-span + content-log event streams with **no synthesized spans**:
+  - headline **input** lifts from the `user_prompt` event; **output** lifts from the main-thread (`repl_main_thread`) `api_response_body`/`assistant_response`.
+  - a **sub-agent** (`agent:builtin:*`) `api_response_body` does **not** win the headline (`CONVERSATIONAL_QUERY_SOURCES` gate) even though it lands under the same real traceId.
+  - a **utility** call (`generate_session_title`/`prompt_suggestion`) output does not clobber the real reply.
+  - **cost/tokens** accumulate from the real `llm_request` spans and are **single-counted** (no synthesized-span double-count) once the C0 gate is on.
+  - a **>512-span** claude session trace: assert the `MAX_PROCESSED_SPANS` behavior is intentional (decide raise vs skip for this scope) and cost isn't silently truncated.
+  - **input fallback**: when the request body was truncated, input still resolves from the co-located `user_prompt`.
 
 ### C5 — Retire synthesis *(gated)*
 - Keep `claudeCodeSpanSync.reactor.ts` + `convertClaudeCodeTurnToSpans` as the **logs-only fallback** (runs only when the project flag is off). Delete once the beta snippet is default + adoption confirmed (removes the reactor, converter, and `getMarkedClaudeCodeLogsByTrace`).
@@ -119,24 +125,47 @@ re-dispatching `recordSpan` for the **real SpanId** with capped `gen_ai.*.messag
 (map-native RMT versioned re-write + completeness-nudge) — **not** a fold. Build on
 demand; there is no per-span content search today.
 
-## 4. Build order
+### C6 — Native trace linking *(sub-agent tree + cross-trace parent)*
+Populate `ParentTraceId` + `Links` from Claude's native linkage (§6): `agent_id`/`parent_agent_id` (within-session subtree) and `link.type=parent_of` (cross-trace spawner chain). Prereq landed (the `linkSchema` fix). UI surfaces "parent trace" / subtree.
+- Files: a read/projection step deriving `ParentTraceId` from the `parent_of` link; `features/traces-v2/**` (tree + "view parent trace").
+- Tests: a span with a `parent_of` link → `ParentTraceId` resolved; subtree grouped by `agent_id`.
 
-1. **C0** (gate + retention) — stops the live double-count. Ship first.
-2. **C4** (trace-summary verify/adjust) — headline correct under the new mix.
-3. **C1** (logs read API) — foundation for C2 + C3.
-4. **C2** (legacy backend enrichment) — exports/evals whole again.
-5. **C3** (dashboard frontend join).
-6. **C5** (retire synthesis) — once beta is default.
+## 4. Build order & mapping to the ask
+
+| Your ask | Components |
+|---|---|
+| **Deprecate synthetic spans** | C0 (per-project gate stops emitting them) → C5 (delete once beta default) |
+| **Enrichment on old APIs** | C2 (backend join on `TraceService` — REST/export/legacy/evals) |
+| **New UI + endpoints to show logs on UI** | C1 (logs read API + tRPC) + C3 (dashboard frontend join) |
+| **Tests for trace summary** | C4 (fold verify/adjust + the trace-summary test suite) |
+| **(native linking, from the `parent_of` find)** | C6 |
+
+Order:
+1. **C0** — gate + retention; stops the live double-count. Ship first.
+2. **C4** — trace-summary verify/adjust + tests; headline correct under the new mix.
+3. **C1** — logs read API; foundation for C2 + C3.
+4. **C2** — legacy backend enrichment; exports/evals whole again.
+5. **C3** — dashboard frontend join (+ raw-log inspector).
+6. **C6** — native trace linking (parent_of / agent_id).
+7. **C5** — retire synthesis, once beta is default + adopted.
+
+The `linkSchema` ingest fix (span links) is already **landed** in this PR — a
+prerequisite for C6 (and for real spans in general).
 
 ## 5. Why not the alternatives (kept for the record)
 
 - **Write-time fold:** a fold keys on one value + stores one state blob per key (`foldProjection.types.ts:162-176`), can't emit N keyed rows. The join key isn't single (output by `request_id`; input has neither `request_id` nor the `llm_request` SpanId — only the parent interaction SpanId; positional pairing is cross-span). The only fold that does both is a **per-trace fold emitting N rows** → re-stores every span (+heavy bodies) per event → **O(n²)** = the documented hot-trace fold-amplification incident (`traceSummary.foldProjection.ts:89`, "730 re-folds in 2h"). Rejected.
 - **Synthesize-at-ingest (before `recordLog`):** cross-batch split (input START in an earlier batch than the END anchor), stateless receiver ("only appends, no cross-batch state"), no `request_id` on input → orphan half-spans. Moot under the beta (the real span already exists). Rejected.
 
-## 6. Sub-agent tree
-Render subtrees by `agent_id`/`parent_agent_id` on the real spans; re-keying into
-linked child traces (`ParentTraceId` + `Links`, already carried) is a later,
-separable option. Independent of this plan.
+## 6. Sub-agent + cross-trace linking *(native — two mechanisms)*
+
+Claude Code emits the linkage **for us**; we populate `ParentTraceId` + `Links` from it
+(no heuristics):
+
+1. **Within a session — `agent_id` / `parent_agent_id`** on `llm_request`/`tool` spans → the sub-agent subtree. Render subtrees by these attrs.
+2. **Across traces — native `link.type = parent_of` links.** Verified live: an `llm_request` span in one trace carries a `parent_of` link to a span in a *different* trace (a spawned `claude -p` linked to its spawner). Claude explicitly chains related traces with typed links.
+
+Map both onto the columns we already carry end-to-end: `Links.TraceId`/`Links.SpanId`/`Links.Attributes` (`link.type`) and `ParentTraceId`. **Prerequisite (landed):** the `linkSchema` fix in this PR — before it, `/api/otel` rejected every span carrying a link (missing `droppedAttributesCount`), dropping the `claude_code.interaction` root and destroying exactly these `parent_of` links. Component: a projection/read step that surfaces the `parent_of` link as `ParentTraceId` so the UI can render "View parent trace" / the sub-agent tree.
 
 ## 7. Open questions / upstream asks
 - **Stamp `request_id` (or `llm_request` span_id) on `api_request_body`** → exact input join, no positional heuristic; closes the concurrent-same-type-sub-agent gap.
