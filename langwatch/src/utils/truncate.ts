@@ -51,28 +51,47 @@ const truncateWithSizeLimit = (
     }
   }
 
-  // If still too large, start dropping keys
+  // If still too large, start dropping keys.
+  //
+  // The serialised length of an object is the sum of its entries' lengths plus
+  // the separators, so we can track the running total by serialising each value
+  // exactly once. Re-serialising the whole accumulated object on every key (as
+  // this used to) is quadratic, and it runs on precisely the inputs already
+  // known to be oversized.
   if (typeof data === "object" && data !== null && !Array.isArray(data)) {
     const entries = Object.entries(data);
-    let result: Record<string, unknown> = {};
+    const result: Record<string, unknown> = {};
 
-    // biome-ignore lint/style/useForOf: this is a fair use case for a for loop, as we need to access the index of the entries array.
-    for (let i = 0; i < entries.length; i++) {
-      const tempResult = {
-        ...result,
-        // @ts-ignore
-        [entries[i][0]]: truncateRecursive(entries[i][1], {
-          maxStringLength: 2 * 1024,
-          maxTotalLength,
-        }),
-      };
+    // Matches what the old whole-object `JSON.stringify(tempResult).length`
+    // measured: the accumulated object *without* the truncation marker, which
+    // is why the budget below keeps the same `- 50` headroom for it.
+    let length = "{}".length;
+    let kept = 0;
 
-      if (JSON.stringify(tempResult).length <= maxTotalLength - 50) {
-        // Leave room for truncation marker
-        result = tempResult;
-      } else {
-        break;
-      }
+    for (const [key, value] of entries) {
+      const truncated = truncateRecursive(value, {
+        maxStringLength: 2 * 1024,
+        maxTotalLength,
+      });
+
+      // JSON.stringify returns undefined for undefined/function values; those
+      // keys vanish from the serialised form, so they cost nothing and must not
+      // be measured with `.length`.
+      const serializedValue = JSON.stringify(truncated);
+      const entryLength =
+        serializedValue === undefined
+          ? 0
+          : JSON.stringify(key).length +
+            ":".length +
+            serializedValue.length +
+            (kept > 0 ? ",".length : 0);
+
+      // Leave room for the truncation marker.
+      if (length + entryLength > maxTotalLength - 50) break;
+
+      result[key] = truncated;
+      length += entryLength;
+      if (entryLength > 0) kept++;
     }
 
     return {
