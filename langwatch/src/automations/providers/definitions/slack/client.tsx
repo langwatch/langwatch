@@ -266,6 +266,11 @@ function SlackConfigForm({
           }}
           items={DELIVERY_ITEMS}
         />
+        <Field.HelperText>
+          {slice.deliveryMethod === "webhook"
+            ? "Quick to set up, but limited formatting. Switch to a Slack app for charts, tables, and alert banners."
+            : "Recommended — renders charts, tables, and alert banners. A quick one-time setup, below."}
+        </Field.HelperText>
       </Field.Root>
       {slice.deliveryMethod === "bot" ? (
         <SlackBotFields slice={slice} onChange={onChange} />
@@ -482,8 +487,13 @@ function SlackBotFields({
         padding={3}
       >
         <VStack align="stretch" gap={2}>
+          <Text textStyle="xs" color="fg">
+            A Slack app unlocks the richer messages — charts, tables, and colored
+            alert banners — that a webhook can&rsquo;t show.
+          </Text>
           <Text textStyle="xs" color="fg.muted">
-            Post with your own Slack app for charts, tables, and alert banners.
+            It takes about two minutes: create an app, give it one permission,
+            and paste the token below. You only do it once.
           </Text>
           <Link
             href="https://api.slack.com/apps"
