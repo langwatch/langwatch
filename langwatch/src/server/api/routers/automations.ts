@@ -17,9 +17,17 @@ import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to
 import {
   InvalidEmailRecipientError,
   MissingAnnotatorError,
-  MissingSlackWebhookError,
   ProjectNotFoundError,
 } from "~/server/app-layer/triggers/errors";
+import {
+  persistSlackActionParams,
+  redactSlackActionParams,
+  slackBotTokenMissing,
+} from "~/automations/providers/definitions/slack/secret";
+import {
+  type SlackActionParams,
+  slackDeliveryMethodOf,
+} from "~/automations/providers/definitions/slack/shared";
 import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,
@@ -47,6 +55,21 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 import { buildRetryAfterMessage } from "./rateLimitMessage";
+
+/** Strip the encrypted Slack bot token from a trigger row before it leaves the
+ *  server — the client only needs to know a token is set (ADR-041). No-op for
+ *  every non-Slack action. */
+function redactTriggerForRead<
+  T extends { action: TriggerAction; actionParams: unknown },
+>(trigger: T): T {
+  if (trigger.action !== TriggerAction.SEND_SLACK_MESSAGE) return trigger;
+  return {
+    ...trigger,
+    actionParams: redactSlackActionParams(
+      (trigger.actionParams ?? {}) as SlackActionParams,
+    ),
+  };
+}
 
 const templateDraftSchema = z.object({
   slackTemplateType: z.string().nullable().optional(),
@@ -109,6 +132,14 @@ const actionParamsSchema = z.object({
   // (builder5015-002 / applyr-002).
   members: z.string().array().optional(),
   slackWebhook: z.string().optional(),
+  // ADR-041 Slack bot delivery. `slackBotToken` arrives as plaintext (or the
+  // "kept" sentinel / blank on edit) and is encrypted server-side before
+  // persist; it is never returned to the client. `slackBotTokenSet` is a
+  // read-only echo the client ignores on the way in.
+  slackDelivery: z.enum(["webhook", "bot"]).optional(),
+  slackBotToken: z.string().optional(),
+  slackChannelId: z.string().optional(),
+  slackBotTokenSet: z.boolean().optional(),
   datasetId: z.string().optional(),
   datasetMapping: z
     .object({ mapping: z.any(), expansions: z.array(z.string()).optional() })
@@ -394,7 +425,7 @@ export const automationRouter = createTRPCRouter({
           : null;
 
         return {
-          ...trigger,
+          ...redactTriggerForRead(trigger),
           checks,
           customGraph,
         };
@@ -456,9 +487,11 @@ export const automationRouter = createTRPCRouter({
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.trigger.findUnique({
+      const trigger = await ctx.prisma.trigger.findUnique({
         where: { id: input.triggerId, projectId: input.projectId },
       });
+      // Never return the encrypted bot token to the browser (ADR-041).
+      return trigger ? redactTriggerForRead(trigger) : trigger;
     }),
   updateTriggerFilters: protectedProcedure
     .input(
@@ -684,12 +717,9 @@ export const automationRouter = createTRPCRouter({
         ) {
           validateEmailRecipientFormats(input.actionParams.members);
         }
-        if (
-          input.action === TriggerAction.SEND_SLACK_MESSAGE &&
-          !input.actionParams.slackWebhook
-        ) {
-          throw new MissingSlackWebhookError();
-        }
+        // Slack webhook / bot-channel presence is enforced by the per-action
+        // schema's superRefine above. The bot-token presence check (which must
+        // allow "kept" on edit) runs after this block — it needs the saved row.
         if (
           input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
           (!input.actionParams.annotators ||
@@ -726,6 +756,31 @@ export const automationRouter = createTRPCRouter({
         }
       }
 
+      // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or
+      // keep the stored ciphertext when the field was left blank on edit), and
+      // reject a bot connection saved with no token at all. The token is never
+      // returned to the client, so honouring "kept" means reading the saved row.
+      let slackActionParams: SlackActionParams | null = null;
+      if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
+        const incoming = input.actionParams as SlackActionParams;
+        const existing =
+          input.triggerId && slackDeliveryMethodOf(incoming) === "bot"
+            ? ((
+                await ctx.prisma.trigger.findUnique({
+                  where: { id: input.triggerId, projectId: input.projectId },
+                  select: { actionParams: true },
+                })
+              )?.actionParams as SlackActionParams | undefined)
+            : undefined;
+        if (slackBotTokenMissing({ incoming, existing })) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "A Slack bot token is required for a bot connection.",
+          });
+        }
+        slackActionParams = persistSlackActionParams({ incoming, existing });
+      }
+
       // Annotation-queue dispatch attributes created queue items to a user
       // and skips the action when `createdByUserId` is absent. The drawer's
       // provider slice doesn't carry it, so stamp the caller here — same as
@@ -740,7 +795,9 @@ export const automationRouter = createTRPCRouter({
               ...input.actionParams,
               createdByUserId: ctx.session?.user.id,
             }
-          : { ...input.actionParams };
+          : slackActionParams
+            ? { ...slackActionParams }
+            : { ...input.actionParams };
 
       // Graph alerts: route the row shape through the SSOT builder so it's
       // byte-identical to what `graphs.updateById` writes on the dashboard

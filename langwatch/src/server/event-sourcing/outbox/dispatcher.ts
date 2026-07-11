@@ -22,10 +22,13 @@ import {
   sendTriggerEmail,
 } from "~/server/mailer/triggerEmail";
 import type { Trace } from "~/server/tracer/types";
+import { slackDeliveryMethodOf } from "~/automations/providers/definitions/slack/shared";
+import { decryptSlackBotToken } from "~/automations/providers/definitions/slack/secret";
 import {
   sendRenderedSlackMessage,
   sendSlackWebhook,
 } from "~/server/triggers/sendSlackWebhook";
+import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import { renderTriggerSlack } from "~/shared/templating/renderSlack";
 import {
@@ -58,6 +61,11 @@ const logger = createLogger("langwatch:outbox:dispatcher");
 interface ActionParams {
   members?: string[] | null;
   slackWebhook?: string | null;
+  /** ADR-041 Slack bot delivery. Absent `slackDelivery` = legacy webhook. */
+  slackDelivery?: "webhook" | "bot";
+  /** Encrypted bot token (ciphertext) — decrypted just before dispatch. */
+  slackBotToken?: string;
+  slackChannelId?: string;
 }
 
 export interface OutboxDispatcherDeps {
@@ -728,7 +736,43 @@ async function handleCadenceBatch(
         didSend = true;
         break;
       }
-      case TriggerAction.SEND_SLACK_MESSAGE:
+      case TriggerAction.SEND_SLACK_MESSAGE: {
+        // ADR-041: a bot connection posts via the Web API, which renders the
+        // gated chart/table/alert blocks — so bot mode always goes through the
+        // Block Kit render path (custom template or framework default) with the
+        // gate open, never the legacy plain-text webhook builder.
+        if (slackDeliveryMethodOf(params) === "bot") {
+          const token = decryptSlackBotToken(params);
+          const channel = params.slackChannelId?.trim();
+          if (!token || !channel) {
+            throw new DispatchError({
+              message: `Slack bot connection for trigger "${trigger.name}" is missing its token or channel`,
+              retryable: false,
+            });
+          }
+          const rendered = await renderTriggerSlack({
+            templateType:
+              t.slackTemplateType === "block_kit" ? "block_kit" : "string",
+            template: t.slackTemplate,
+            context: buildContext(),
+            allowGatedBlocks: true,
+          });
+          for (const v of rendered.missingVariables) missingVariables.add(v);
+          if (rendered.errors.length > 0) {
+            logger.warn(
+              { projectId, triggerId, errors: rendered.errors },
+              "Custom Slack template render errors — fell back to default",
+            );
+          }
+          await postSlackChatMessage({
+            token,
+            channel,
+            payload: rendered.payload,
+            triggerName: trigger.name,
+          });
+          didSend = true;
+          break;
+        }
         if (hasCustomSlack) {
           const rendered = await renderTriggerSlack({
             templateType:
@@ -761,6 +805,7 @@ async function handleCadenceBatch(
         });
         didSend = true;
         break;
+      }
       default:
         throw new DispatchError({
           message: `cadence stage cannot dispatch action ${trigger.action} — settle stage misrouted`,

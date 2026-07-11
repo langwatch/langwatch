@@ -97,6 +97,7 @@ export async function renderTriggerSlack({
   context,
   defaults,
   testFire = false,
+  allowGatedBlocks = false,
 }: {
   templateType: SlackTemplateType | null;
   template: string | null;
@@ -105,6 +106,10 @@ export async function renderTriggerSlack({
    *  the trace defaults apply — same behaviour as before. */
   defaults?: SlackRenderDefaults;
   testFire?: boolean;
+  /** Keep the gated Block Kit blocks (chart/table/alert) that only render on
+   *  the Web API surface. Set only for bot-token delivery; a webhook drops
+   *  them (they'd be rejected as `invalid_blocks`). */
+  allowGatedBlocks?: boolean;
 }): Promise<RenderedSlack> {
   const ctx = context as unknown as Record<string, unknown>;
   const slackString = defaults?.slackString ?? DEFAULT_SLACK_TEMPLATE;
@@ -147,7 +152,7 @@ export async function renderTriggerSlack({
     const blocksInput = Array.isArray(parsed)
       ? parsed
       : (parsed as { blocks?: unknown })?.blocks;
-    const blocks = filterBlockKit(blocksInput);
+    const blocks = filterBlockKit(blocksInput, { allowGatedBlocks });
     if (blocks.length === 0) {
       // Expected outcome (e.g. every block was filtered by the allowlist),
       // not a render failure — fall back to the plain-text default directly.
