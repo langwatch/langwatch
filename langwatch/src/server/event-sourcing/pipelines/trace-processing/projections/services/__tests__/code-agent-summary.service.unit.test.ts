@@ -1,19 +1,32 @@
 /**
- * Claude-specific facts about an interaction — the ones you cannot reconstruct
- * from a prompt-and-reply pair, and which Claude splits across signals (the
- * stop_reason rides a span; the slash command and the compaction ride logs).
+ * What a coding-agent interaction actually DID, folded onto the trace — the
+ * facts you cannot reconstruct from a prompt-and-reply pair, and which the agent
+ * splits across signals (the stop_reason rides a span; the slash command and the
+ * compaction ride logs).
+ *
+ * The attributes are agent-agnostic (`langwatch.code_agent.*`); Claude Code is
+ * simply the first adapter that populates them, which is why the fixtures below
+ * speak claude_code span names.
  */
 import { describe, expect, it } from "vitest";
 import type { LogRecordReceivedEventData } from "../../../schemas/events";
 import type { NormalizedSpan } from "../../../schemas/spans";
 import {
-  accumulateClaudeSummaryFromLog,
-  accumulateClaudeSummaryFromSpan,
-  CLAUDE_ATTRS,
-} from "../claude-code-summary.service";
+  accumulateCodeAgentSummaryFromLog,
+  accumulateCodeAgentSummaryFromSpan,
+  CODE_AGENT_ATTRS,
+} from "../code-agent-summary.service";
 
 function span(name: string, spanAttributes: Record<string, string> = {}) {
   return { name, spanAttributes } as unknown as NormalizedSpan;
+}
+
+function spanWithStatus(
+  name: string,
+  spanAttributes: Record<string, string>,
+  statusCode: string,
+) {
+  return { name, spanAttributes, statusCode } as unknown as NormalizedSpan;
 }
 
 function logData(attributes: Record<string, string>) {
@@ -32,19 +45,19 @@ function foldAll({
   for (const s of spans) {
     Object.assign(
       attributes,
-      accumulateClaudeSummaryFromSpan({ attributes, span: s }),
+      accumulateCodeAgentSummaryFromSpan({ attributes, span: s }),
     );
   }
   for (const data of logs) {
     Object.assign(
       attributes,
-      accumulateClaudeSummaryFromLog({ attributes, data }),
+      accumulateCodeAgentSummaryFromLog({ attributes, data }),
     );
   }
   return attributes;
 }
 
-describe("Claude Code trace facts", () => {
+describe("code-agent interaction summary", () => {
   describe("given an agentic loop that finished normally", () => {
     // The earlier calls all stop on `tool_use` by definition — that is what
     // drove the loop onward. Only the LAST one says how the interaction ended.
@@ -57,8 +70,8 @@ describe("Claude Code trace facts", () => {
         ],
       });
 
-      expect(attributes[CLAUDE_ATTRS.STOP_REASON]).toBe("end_turn");
-      expect(attributes[CLAUDE_ATTRS.TRUNCATED]).toBe("false");
+      expect(attributes[CODE_AGENT_ATTRS.STOP_REASON]).toBe("end_turn");
+      expect(attributes[CODE_AGENT_ATTRS.TRUNCATED]).toBe("false");
     });
   });
 
@@ -70,7 +83,7 @@ describe("Claude Code trace facts", () => {
         spans: [span("claude_code.llm_request", { stop_reason: "max_tokens" })],
       });
 
-      expect(attributes[CLAUDE_ATTRS.TRUNCATED]).toBe("true");
+      expect(attributes[CODE_AGENT_ATTRS.TRUNCATED]).toBe("true");
     });
 
     it("marks a refusal the same way", () => {
@@ -78,7 +91,7 @@ describe("Claude Code trace facts", () => {
         spans: [span("claude_code.llm_request", { stop_reason: "refusal" })],
       });
 
-      expect(attributes[CLAUDE_ATTRS.TRUNCATED]).toBe("true");
+      expect(attributes[CODE_AGENT_ATTRS.TRUNCATED]).toBe("true");
     });
   });
 
@@ -97,7 +110,7 @@ describe("Claude Code trace facts", () => {
     });
 
     it("records the slash command that was the real intent", () => {
-      expect(attributes[CLAUDE_ATTRS.SLASH_COMMAND]).toBe("review");
+      expect(attributes[CODE_AGENT_ATTRS.SLASH_COMMAND]).toBe("review");
     });
 
     it("collects skills from the Skill tool span as well as the log event", () => {
@@ -110,24 +123,24 @@ describe("Claude Code trace facts", () => {
         ],
       });
 
-      expect(JSON.parse(merged[CLAUDE_ATTRS.SKILLS] ?? "[]")).toEqual([
+      expect(JSON.parse(merged[CODE_AGENT_ATTRS.SKILLS] ?? "[]")).toEqual([
         "deep-research",
         "code-review",
       ]);
     });
 
     it("records WHICH agents and skills ran, without duplicates", () => {
-      expect(JSON.parse(attributes[CLAUDE_ATTRS.SUBAGENT_TYPES] ?? "[]")).toEqual([
+      expect(JSON.parse(attributes[CODE_AGENT_ATTRS.SUBAGENT_TYPES] ?? "[]")).toEqual([
         "Explore",
         "general-purpose",
       ]);
-      expect(JSON.parse(attributes[CLAUDE_ATTRS.SKILLS] ?? "[]")).toEqual([
+      expect(JSON.parse(attributes[CODE_AGENT_ATTRS.SKILLS] ?? "[]")).toEqual([
         "code-review",
       ]);
     });
 
     it("records which interaction of the session this was", () => {
-      expect(attributes[CLAUDE_ATTRS.SEQUENCE]).toBe("3");
+      expect(attributes[CODE_AGENT_ATTRS.SEQUENCE]).toBe("3");
     });
   });
 
@@ -145,20 +158,73 @@ describe("Claude Code trace facts", () => {
         ],
       });
 
-      expect(attributes[CLAUDE_ATTRS.COMPACTED]).toBe("true");
-      expect(attributes[CLAUDE_ATTRS.API_ERRORS]).toBe("2");
-      expect(attributes[CLAUDE_ATTRS.PERMISSION_MODE]).toBe("plan");
+      expect(attributes[CODE_AGENT_ATTRS.COMPACTED]).toBe("true");
+      expect(attributes[CODE_AGENT_ATTRS.API_ERRORS]).toBe("2");
+      expect(attributes[CODE_AGENT_ATTRS.PERMISSION_MODE]).toBe("plan");
     });
   });
 
   describe("given a non-Claude span", () => {
     it("derives nothing", () => {
       expect(
-        accumulateClaudeSummaryFromSpan({
+        accumulateCodeAgentSummaryFromSpan({
           attributes: {},
           span: span("openai.chat", { stop_reason: "stop" }),
         }),
       ).toEqual({});
+    });
+  });
+});
+
+describe("the work an interaction did", () => {
+  describe("given an interaction that read, edited and ran commands", () => {
+    const attributes = foldAll({
+      spans: [
+        span("claude_code.llm_request", { stop_reason: "tool_use" }),
+        span("claude_code.llm_request", { stop_reason: "end_turn" }),
+        span("claude_code.tool", { tool_name: "Read", file_path: "a.ts" }),
+        span("claude_code.tool", { tool_name: "Read", file_path: "b.ts" }),
+        span("claude_code.tool", { tool_name: "Bash" }),
+        span("claude_code.tool", { tool_name: "Edit", file_path: "a.ts" }),
+        span("claude_code.subagent.spawn"),
+      ],
+    });
+
+    it("counts the model calls in the loop", () => {
+      expect(attributes[CODE_AGENT_ATTRS.MODEL_CALLS]).toBe("2");
+    });
+
+    it("counts the tool runs and which tools they were", () => {
+      expect(attributes[CODE_AGENT_ATTRS.TOOL_CALLS]).toBe("4");
+      expect(JSON.parse(attributes[CODE_AGENT_ATTRS.TOOLS] ?? "{}")).toEqual({
+        Read: 2,
+        Bash: 1,
+        Edit: 1,
+      });
+    });
+
+    it("records the distinct files it touched, without duplicates", () => {
+      expect(
+        JSON.parse(attributes[CODE_AGENT_ATTRS.FILES_TOUCHED] ?? "[]"),
+      ).toEqual(["a.ts", "b.ts"]);
+    });
+
+    it("counts the sub-agents it spawned", () => {
+      expect(attributes[CODE_AGENT_ATTRS.SUB_AGENTS]).toBe("1");
+    });
+  });
+
+  describe("given a tool that failed", () => {
+    it("counts it, so a broken interaction is visible without opening it", () => {
+      const attributes = foldAll({
+        spans: [
+          spanWithStatus("claude_code.tool", { tool_name: "Bash" }, "error"),
+          span("claude_code.tool", { tool_name: "Bash" }),
+        ],
+      });
+
+      expect(attributes[CODE_AGENT_ATTRS.FAILED_TOOLS]).toBe("1");
+      expect(attributes[CODE_AGENT_ATTRS.TOOL_CALLS]).toBe("2");
     });
   });
 });
