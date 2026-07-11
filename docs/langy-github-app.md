@@ -13,7 +13,7 @@ once per environment.
 ## 0. Enabling Langy in the chart
 
 The Langy agent pod is **default OFF** in the umbrella chart
-(`langy-agent.chartManaged: false`). This is deliberate: the agent + app
+(`langyagent.chartManaged: false`). This is deliberate: the agent + app
 Deployments both reference a shared `LANGY_INTERNAL_SECRET` Secret that the
 chart does NOT materialise (it's created out-of-band — Terraform / external
 secrets / a manual `kubectl create secret`). Defaulting on would break the
@@ -25,14 +25,14 @@ To turn Langy on:
 ```bash
 # 1. Create the shared Bearer secret the app + agent use to authenticate to
 #    each other. 64 hex chars is plenty.
-kubectl -n langwatch create secret generic langwatch-langy-agent-auth \
+kubectl -n langwatch create secret generic langwatch-langyagent-auth \
   --from-literal=LANGY_INTERNAL_SECRET="$(openssl rand -hex 32)"
 
 # 2. Opt the agent in. The app deployment will then pick up
 #    OPENCODE_AGENT_URL + LANGY_INTERNAL_SECRET automatically.
 helm upgrade langwatch ./charts/langwatch -n langwatch \
   -f values.prod.yaml \
-  --set langy-agent.chartManaged=true
+  --set langyagent.chartManaged=true
 ```
 
 Even with the agent running, **the in-product UI stays staff-only** until
@@ -102,7 +102,7 @@ time as the OAuth consent.
 
 ## 4. NetworkPolicy / egress
 
-The Langy agent's stock chart (`charts/langy-agent`) ships with
+The Langy agent's stock chart (`charts/langyagent`) ships with
 `networkPolicy.allowExternalHttps: true`, which allows `0.0.0.0/0:443` —
 `github.com`, `api.github.com`, and `codeload.github.com` work without
 further changes.

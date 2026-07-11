@@ -2,7 +2,7 @@
  * spawnAgent reactor (ADR-044 part 1).
  *
  * Fires on `agent_turn_started` and submits the turn to the in-process
- * `LangyWorkerPool`, which calls the Go langy-agent manager. A direct analog of
+ * `LangyWorkerPool`, which calls the Go langyagent manager. A direct analog of
  * `createScenarioExecutionReactor`: fire-and-forget (does NOT await the turn, so
  * the GroupQueue keeps draining later events for the same aggregate), pool
  * late-bound via `setPool()` from worker startup.

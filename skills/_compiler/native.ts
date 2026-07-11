@@ -2,7 +2,7 @@
 /**
  * Native skill generator.
  *
- * Emits opencode-discoverable SKILL.md files for the langy-agent image from the
+ * Emits opencode-discoverable SKILL.md files for the langyagent image from the
  * canonical skills/<name>/SKILL.mdx sources — the SAME files skills/_publish/
  * sync.ts publishes to langwatch/skills.
  *
@@ -18,7 +18,7 @@
  * NOT rewrite bodies. In-product nuances (the worker already has credentials +
  * the CLI) live as a single global override in AGENTS.md.
  *
- * Output (committed, like skills/_compiled/*.txt) is consumed by the langy-agent
+ * Output (committed, like skills/_compiled/*.txt) is consumed by the langyagent
  * image at build time. Regenerate via skills/_compiled/generate.sh.
  *
  * Usage:  tsx skills/_compiler/native.ts [--out <dir>]

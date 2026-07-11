@@ -143,7 +143,7 @@ const chatRequestSchema = z.object({
 // the stored message from ever drifting.
 //
 // Token counts still live on the gateway-emitted OTel trace (see the per-worker
-// OPENCODE_OTLP_* env in services/langy-agent — the OpenCode OTel plugin exports
+// OPENCODE_OTLP_* env in services/langyagent — the OpenCode OTel plugin exports
 // gen_ai.usage.{prompt,completion}_tokens for every LLM call); consumers that
 // need usage figures fold the trace by langwatch.thread.id=conversationId, not
 // an in-process tokenizer here. Discussed on PR #4913.
@@ -454,7 +454,7 @@ langyRoute().post("/langy/chat", async (c) => {
     : "";
   // Revoke GitHub capability when the cap is reached: deleting these fields
   // means the agent omits GH_TOKEN + GITHUB_LOGIN from the worker subprocess
-  // env (services/langy-agent/worker.go::spawnOpenCode conditionally appends
+  // env (services/langyagent/worker.go::spawnOpenCode conditionally appends
   // them based on truthiness), so the worker cannot reach github.com with
   // an authenticated token even if it ignores the system note.
   if (!permit.allowed) {

@@ -23,7 +23,7 @@ export interface PublishedSkill {
 
 // The SINGLE definition of "our skills": the curated FEATURE_SKILLS plus every
 // recipe under skills/recipes/. Both the publisher (skills/_publish/sync.ts) and
-// the langy-agent generator (skills/_compiler/native.ts) read this, so Langy can
+// the langyagent generator (skills/_compiler/native.ts) read this, so Langy can
 // never carry a different SET than what we publish. A new recipe folder flows to
 // both automatically; a new feature skill is one edit to FEATURE_SKILLS that
 // both pick up.
