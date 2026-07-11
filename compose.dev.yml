@@ -429,12 +429,14 @@ services:
     container_name: langwatch-otel-lgtm
     profiles: [observability]
     ports:
-      - "${LW_OBS_OTLP_GRPC_PORT:-4317}:4317" # OTLP gRPC
-      - "${LW_OBS_OTLP_HTTP_PORT:-4318}:4318" # OTLP HTTP
-      - "${LW_OBS_GRAFANA_PORT:-3000}:3000"   # Grafana UI + API
+      # Loopback-bound: anonymous access below is Admin, so the stack must not be
+      # reachable from anywhere but this machine.
+      - "127.0.0.1:${LW_OBS_OTLP_GRPC_PORT:-4317}:4317" # OTLP gRPC
+      - "127.0.0.1:${LW_OBS_OTLP_HTTP_PORT:-4318}:4318" # OTLP HTTP
+      - "127.0.0.1:${LW_OBS_GRAFANA_PORT:-3000}:3000"   # Grafana UI + API
     environment:
       # Deterministic local-only creds so `make observability-connect` can mint
-      # the Grafana token non-interactively. Never exposed off-host.
+      # the Grafana token non-interactively. Only reachable on loopback (see ports).
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_AUTH_ANONYMOUS_ENABLED: "true"

@@ -23,7 +23,14 @@ import {
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { setupObservability } from "langwatch/observability/node";
 
-const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+const isEnvTrue = (value: string | undefined) => value === "true";
+
+// A trailing slash on the endpoint would produce `//v1/traces`, which some
+// collectors 404 on.
+const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.replace(
+  /\/+$/,
+  "",
+);
 const langwatchTracingEnabled = !!process.env.LANGWATCH_API_KEY;
 
 const spanProcessors = [] as Array<BatchSpanProcessor>;
@@ -41,7 +48,7 @@ if (explicitEndpoint) {
     ),
   );
 
-  if (process.env.PINO_OTEL_ENABLED) {
+  if (isEnvTrue(process.env.PINO_OTEL_ENABLED)) {
     logRecordProcessors.push(
       new BatchLogRecordProcessor(
         new OTLPLogExporter({
@@ -129,7 +136,7 @@ if (
 // only pushes to a collector that's actually configured. Emits Node/host
 // runtime metrics (CPU, memory, event loop, GC) — enough to correlate with the
 // traces + logs when debugging local dev in Grafana.
-if (explicitEndpoint && process.env.OTEL_METRICS_ENABLED) {
+if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
   const metricAttrs: Record<string, string> = {
     "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-backend",
   };

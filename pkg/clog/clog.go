@@ -92,7 +92,14 @@ func WithCollector(ctx context.Context, cfg Config, base *zap.Logger, lp *sdklog
 		otelzap.NewCore(otelScopeName, otelzap.WithLoggerProvider(lp)),
 		cfg.otelZapLevel(),
 	)
-	logger := zap.New(zapcore.NewTee(consoleCore, otelCore))
+	// zap.New starts from a bare logger, so the caller/stacktrace annotation the
+	// New path gets from zap.NewProductionConfig has to be re-applied here or the
+	// split stream would silently lose it.
+	logger := zap.New(
+		zapcore.NewTee(consoleCore, otelCore),
+		zap.AddCaller(),
+		zap.AddStacktrace(zapcore.ErrorLevel),
+	)
 	if fields := serviceFields(ctx); fields != nil {
 		logger = logger.With(fields...)
 	}
