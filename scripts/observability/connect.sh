@@ -6,8 +6,8 @@
 #   1. points langwatch/.env at the local collector (traces + logs + metrics),
 #      backing up the current .env first;
 #   2. mints a Grafana service-account token for read access;
-#   3. registers a `grafana-local` MCP server (mirrors `grafana-prod`) so an
-#      agent can query the local logs/traces/metrics.
+#   3. configures the `gcx` CLI (Grafana's official CLI) with that token so an
+#      agent can query the local logs/traces/metrics from the shell.
 #
 # Nothing here is secret — the stack is local-only (admin/admin, never exposed
 # off-host). Re-run any time; it converges.
@@ -17,9 +17,6 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${REPO_ROOT}/langwatch/.env"
 GRAFANA_PORT="${LW_OBS_GRAFANA_PORT:-3000}"
 GRAFANA_URL="http://localhost:${GRAFANA_PORT}"
-# The MCP runs grafana/mcp-grafana in Docker, so it reaches the host's Grafana
-# via host.docker.internal (Docker Desktop maps this to the host).
-GRAFANA_MCP_URL="http://host.docker.internal:${GRAFANA_PORT}"
 OTLP_ENDPOINT="http://localhost:${LW_OBS_OTLP_HTTP_PORT:-4318}"
 
 say() { printf '\033[1;36m▶ %s\033[0m\n' "$*"; }
@@ -86,7 +83,7 @@ if ! curl -sf -o /dev/null "${GRAFANA_URL}/api/health"; then
 fi
 
 AUTH="admin:admin"
-SA_NAME="langwatch-mcp"
+SA_NAME="langwatch-gcx"
 
 # Reuse the service account if it already exists, else create it.
 sa_id="$(curl -sf -u "$AUTH" "${GRAFANA_URL}/api/serviceaccounts/search?query=${SA_NAME}" \
@@ -101,45 +98,23 @@ else
 fi
 
 TOKEN="$(curl -sf -u "$AUTH" -H 'Content-Type: application/json' \
-  -d "{\"name\":\"mcp-$(date +%s)\"}" \
+  -d "{\"name\":\"gcx-$(date +%s)\"}" \
   "${GRAFANA_URL}/api/serviceaccounts/${sa_id}/tokens" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['key'])")"
 if [ -z "$TOKEN" ]; then warn "Failed to mint Grafana token."; exit 1; fi
 say "Minted a Grafana service-account token."
 
 # ---------------------------------------------------------------------------
-# 2b. Configure gcx (Grafana CLI) so an agent can query from the shell
+# 3. Configure gcx (Grafana CLI) so an agent can query from the shell
 # ---------------------------------------------------------------------------
 if command -v gcx >/dev/null 2>&1; then
   if gcx login local --server "$GRAFANA_URL" --token "$TOKEN" --yes >/dev/null 2>&1; then
     say "Configured gcx context 'local' → ${GRAFANA_URL}. Try: gcx datasources list"
   else
-    warn "gcx login failed (needs Grafana v12+). The MCP path below still works."
+    warn "gcx login failed (needs Grafana v12+). Query the raw Grafana HTTP API instead."
   fi
 else
   warn "gcx not installed — skip shell queries. Install: brew install grafana/grafana/gcx"
-fi
-
-# ---------------------------------------------------------------------------
-# 3. Register the grafana-local MCP server (token inlined, local scope — never
-#    committed, mirroring how grafana-prod lives in ~/.claude.json)
-# ---------------------------------------------------------------------------
-MCP_JSON="$(cat <<EOF
-{"type":"stdio","command":"docker","args":["run","-i","--rm","-e","GRAFANA_URL=${GRAFANA_MCP_URL}","-e","GRAFANA_SERVICE_ACCOUNT_TOKEN=${TOKEN}","grafana/mcp-grafana:latest","-t","stdio"],"env":{}}
-EOF
-)"
-
-if command -v claude >/dev/null 2>&1; then
-  claude mcp remove grafana-local -s local >/dev/null 2>&1 || true
-  if claude mcp add-json grafana-local "$MCP_JSON" -s local >/dev/null 2>&1; then
-    say "Registered MCP server 'grafana-local' (local scope). Restart Claude Code to load it."
-  else
-    warn "Could not auto-register via 'claude mcp add-json'. Add it manually:"
-    printf '  claude mcp add-json grafana-local %q -s local\n' "$MCP_JSON"
-  fi
-else
-  warn "'claude' CLI not on PATH. Register the MCP server manually:"
-  printf '  claude mcp add-json grafana-local %q -s local\n' "$MCP_JSON"
 fi
 
 echo

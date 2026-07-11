@@ -49,7 +49,7 @@ func (o *Orchestrator) observabilityUp(ctx context.Context) error {
 		fmt.Printf("\n%d stack(s) are already running and were wired before this existed.\n", n)
 		fmt.Printf("Restart them (`pnpm dev`) to export into it.\n")
 	}
-	fmt.Printf("\nNext: make observability-connect   # mint a Grafana token + register the Grafana MCP\n")
+	fmt.Printf("\nNext: make observability-connect   # mint a Grafana token + configure gcx\n")
 	return nil
 }
 

@@ -3,8 +3,7 @@
 A lightweight, ephemeral **OTLP Collector + Loki + Tempo + Prometheus + Grafana**
 stack you run on your laptop so that — while debugging local dev — you (and an
 agent) always have **structured logs, distributed traces, and runtime metrics**
-in one place. An agent reads them over the Grafana MCP, the `gcx` CLI, or the
-Grafana skills.
+in one place. An agent reads them over the `gcx` CLI or the Grafana skills.
 
 This is **local-dev only**. Production logging stays on AWS CloudWatch (see
 `dev/docs/adr/003-logging.md`); this stack never touches the prod path. See
@@ -32,7 +31,7 @@ local-dev orchestrator) owns its lifecycle. That buys three things a raw
   `.env.portless` overlay and tags its telemetry `langwatch.worktree=<slug>`. No
   `.env` surgery, and one shared collector serves every worktree — filter Grafana
   to `langwatch.worktree="<your-slug>"` to see only your own logs, traces and
-  metrics. `make observability-connect` remains for the Grafana MCP/token wiring
+  metrics. `make observability-connect` remains for the Grafana token wiring
   an agent needs.
 
 ## TL;DR
@@ -40,7 +39,7 @@ local-dev orchestrator) owns its lifecycle. That buys three things a raw
 ```bash
 make observability            # start the capped stack on colima (OTLP :4318, Grafana :3000)
                               #   (equivalently: haven observability up)
-make observability-connect    # mint a Grafana token + register the Grafana MCP
+make observability-connect    # mint a Grafana token + configure gcx
 # any pnpm dev stack you start while it is up exports to it automatically,
 # tagged by worktree — no .env changes needed. Already-running stacks need a
 # restart (pnpm dev) to pick it up.
@@ -131,13 +130,9 @@ LW_OBS_GRAFANA_PORT=3100 LW_OBS_OTLP_HTTP_PORT=4319 make observability
 
 ## Reading the data as an agent
 
-Three ways, all wired by `make observability-connect`:
+Two ways, both wired by `make observability-connect`:
 
-1. **Grafana MCP** — a `grafana-local` MCP server (the same `grafana/mcp-grafana`
-   image used for `grafana-prod`) pointed at the local Grafana with a minted
-   service-account token. Restart Claude Code to load it, then the
-   `query_loki_logs` / `query_prometheus` / Tempo tools work against local data.
-2. **gcx CLI** — Grafana's official CLI. `connect` runs `gcx login local
+1. **gcx CLI** — Grafana's official CLI. `connect` runs `gcx login local
    --server http://localhost:3000 --token <token>`. Then:
    ```bash
    gcx logs query '{service_name="langwatch-backend"}' --since 15m
@@ -145,7 +140,7 @@ Three ways, all wired by `make observability-connect`:
    gcx traces query '{ .service.name = "langwatch-ai-gateway" }' --since 15m
    gcx datasources list
    ```
-3. **Grafana skills** — the `grafana-lgtm` / `grafana-core` / `grafana-datasources`
+2. **Grafana skills** — the `grafana-lgtm` / `grafana-core` / `grafana-datasources`
    plugins (`claude plugin marketplace add grafana/skills`) give the agent
    task-level knowledge for LogQL/PromQL/TraceQL and dashboards.
 

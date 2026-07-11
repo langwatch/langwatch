@@ -47,7 +47,7 @@ type ObservabilityEndpoints struct {
 }
 
 // DefaultObservabilityEndpoints is the conventional port set. They are fixed
-// rather than ephemeral because agents, the Grafana MCP and gcx all need to find
+// rather than ephemeral because agents and gcx all need to find
 // the stack without asking haven first.
 func DefaultObservabilityEndpoints() ObservabilityEndpoints {
 	return ObservabilityEndpoints{GrafanaPort: 3000, OTLPHTTPPort: 4318, OTLPGRPCPort: 4317}

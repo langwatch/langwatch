@@ -58,15 +58,14 @@ it.
    `...envFromFile`, so the `.env` var reaches both Go binaries.
 
 4. **Reading it** — `make observability-connect` mints a Grafana service-account
-   token and wires three read paths for an agent: the **Grafana MCP**
-   (`grafana-local`, mirroring `grafana-prod`), the **`gcx` CLI** (`gcx logs/
-   metrics/traces query`), and the **Grafana skills** plugins
+   token and wires two read paths for an agent: the **`gcx` CLI** (`gcx logs/
+   metrics/traces query`) and the **Grafana skills** plugins
    (`grafana-lgtm`/`grafana-core`/`grafana-datasources`).
 
 ## Consequences
 
 - One command (`make observability` + `make observability-connect`) gives an
-  agent structured logs + traces + metrics for local debugging, queryable three
+  agent structured logs + traces + metrics for local debugging, queryable two
   ways.
 - The "some Go telemetry → LangWatch, all Go telemetry → collector" split is
   preserved: dogfooding continues, debugging gains a superset.
@@ -76,4 +75,4 @@ it.
 - Ephemeral by design: restarting the stack loses history. Acceptable for
   debugging; the compose file documents how to persist + cap retention if needed.
 - `grafana/otel-lgtm`'s Grafana must be v12+ for `gcx`; if the pinned image ships
-  an older Grafana, the MCP and raw API still work — only `gcx` needs the bump.
+  an older Grafana, the raw API still works — only `gcx` needs the bump.

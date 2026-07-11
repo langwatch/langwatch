@@ -31,7 +31,7 @@ help:
 	@echo ""
 	@echo "  Local observability (logs/traces/metrics → Grafana for agent debugging):"
 	@echo "    make observability                  start the LGTM stack on colima, capped (OTLP :4318, Grafana :3000)"
-	@echo "    make observability-connect          mint a Grafana token + register the Grafana MCP"
+	@echo "    make observability-connect          mint a Grafana token + configure gcx"
 	@echo "    make observability-logs             tail the stack logs"
 	@echo "    make observability-down             stop the stack (discards all telemetry)"
 	@echo "    (once it is up, every 'pnpm dev' stack exports to it, tagged by worktree)"
@@ -160,7 +160,7 @@ portless-down:
 # LOCAL OBSERVABILITY STACK (owned by haven — one capped container on colima)
 # =============================================================================
 # An ephemeral OTLP Collector + Loki + Tempo + Prometheus + Grafana for reading
-# local logs/traces/metrics — including from an agent over the Grafana MCP.
+# local logs/traces/metrics — including from an agent over the gcx CLI.
 #
 # haven owns the lifecycle (it is not a compose service): it runs the bundle on
 # colima rather than Docker Desktop, so the VM has an explicit ceiling, and it
@@ -174,7 +174,7 @@ portless-down:
 observability:
 	@$(HAVEN) observability up
 
-# Mint a Grafana service-account token + register the grafana-local MCP server so
+# Mint a Grafana service-account token and configure the gcx CLI with it so
 # an agent can query the stack. Idempotent.
 observability-connect:
 	@bash scripts/observability/connect.sh
