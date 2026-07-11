@@ -3,6 +3,7 @@ package clog
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	prettyconsole "github.com/thessem/zap-prettyconsole"
 	"go.uber.org/zap"
@@ -12,6 +13,14 @@ import (
 )
 
 type contextKey struct{}
+
+// fallbackLogger is the process-global logger returned by Get when a context
+// carries none. Built once under fallbackOnce so a bare ctx reaching Get on a
+// hot path doesn't construct a fresh production logger on every call.
+var (
+	fallbackOnce   sync.Once
+	fallbackLogger *zap.Logger
+)
 
 // Set stores a zap logger in the context.
 func Set(ctx context.Context, logger *zap.Logger) context.Context {
@@ -23,8 +32,10 @@ func Get(ctx context.Context) *zap.Logger {
 	if l, ok := ctx.Value(contextKey{}).(*zap.Logger); ok && l != nil {
 		return l
 	}
-	l, _ := zap.NewProduction()
-	return l
+	fallbackOnce.Do(func() {
+		fallbackLogger, _ = zap.NewProduction()
+	})
+	return fallbackLogger
 }
 
 // With returns a child logger with additional fields, stored back into context.
