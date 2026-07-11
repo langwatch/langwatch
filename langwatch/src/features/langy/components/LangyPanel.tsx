@@ -630,6 +630,10 @@ function LangyPanel({
       borderLeftWidth="1px"
       borderLeftStyle="solid"
       borderLeftColor="border.muted"
+      // Reference `--sh-panel`: the docked sidecar floats over the page with a
+      // soft left shadow (previously dropped — the panel read flat).
+      boxShadow="-12px 0 40px rgba(12,18,30,0.10)"
+      _dark={{ boxShadow: "-14px 0 48px rgba(0,0,0,0.55)" }}
       overflow="hidden"
       transition={`transform ${LANGY_TRANSITION}, opacity 220ms ease`}
       transform={isOpen ? "translateX(0)" : `translateX(${PANEL_WIDTH}px)`}

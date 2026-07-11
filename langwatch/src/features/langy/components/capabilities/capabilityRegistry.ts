@@ -1,5 +1,5 @@
 /**
- * Domain-capability registry (task #12).
+ * Domain-capability registry (task #12 / #27).
  *
  * Langy's worker streams every CLI/MCP tool call into the assistant turn as an
  * AI-SDK tool part (`tool-<name>` / `dynamic-tool`). This module is the pure,
@@ -19,7 +19,10 @@
  *     confirm-gated variant; an already-executed delete renders as a quiet
  *     "removed" card here.
  * Anything this registry does not map returns null and falls through to the
- * existing raw-JSON fallback in LangyToolActivity.
+ * existing raw-JSON fallback in LangyToolActivity. The read tools that stay on
+ * the fallback are ONLY the docs/schema helpers (`fetch_langwatch_docs`,
+ * `fetch_scenario_docs`, `discover_schema`), which render as clean activity
+ * lines (see LangyToolActivity), not raw JSON — every resource read has a card.
  */
 
 export type CapabilitySurface =
@@ -32,7 +35,13 @@ export type CapabilitySurface =
   | "dashboards"
   | "simulations"
   | "agents"
-  | "automations";
+  | "automations"
+  | "workflows"
+  | "annotations"
+  | "secrets"
+  | "projects"
+  | "apiKeys"
+  | "modelProviders";
 
 /** Visual tone of the shared capability-card shell. */
 export type CapabilityTone = "read" | "created" | "updated" | "removed";
@@ -82,6 +91,12 @@ export const SURFACE_LABEL: Record<CapabilitySurface, string> = {
   simulations: "Simulations",
   agents: "Agents",
   automations: "Automations",
+  workflows: "Workflows",
+  annotations: "Annotations",
+  secrets: "Secrets",
+  projects: "Projects",
+  apiKeys: "API keys",
+  modelProviders: "Model providers",
 };
 
 /** Project-relative base path for each surface's index page. */
@@ -96,6 +111,14 @@ const SURFACE_PATH: Record<CapabilitySurface, string> = {
   simulations: "simulations",
   agents: "agents",
   automations: "automations",
+  workflows: "workflows",
+  annotations: "annotations",
+  // Settings/org surfaces — never deep-linked (see SURFACE_NO_DEEPLINK); paths
+  // are placeholders only to satisfy the exhaustive Record.
+  secrets: "settings",
+  projects: "settings/projects",
+  apiKeys: "settings/authentication",
+  modelProviders: "settings/model-providers",
 };
 
 // Surfaces whose index route accepts a trailing resource id as a deep segment
@@ -108,10 +131,20 @@ const SURFACE_ACCEPTS_ID: Partial<Record<CapabilitySurface, boolean>> = {
   evaluations: true,
 };
 
+// Settings / org-level surfaces whose reads render a card but have no clean
+// project-scoped page to deep-link to. The card shows the result without an
+// "Open in <surface>" chip rather than linking somewhere wrong.
+const SURFACE_NO_DEEPLINK: Partial<Record<CapabilitySurface, boolean>> = {
+  secrets: true,
+  projects: true,
+  apiKeys: true,
+  modelProviders: true,
+};
+
 /**
  * Build a project-scoped deep link to a surface, optionally targeting one
- * resource. Returns null without a project slug so callers can hide the chip
- * rather than link to a broken path.
+ * resource. Returns null without a project slug (or for a no-deep-link surface)
+ * so callers hide the chip rather than link to a broken path.
  */
 export function buildSurfaceHref({
   surface,
@@ -123,6 +156,7 @@ export function buildSurfaceHref({
   resourceId?: string | null;
 }): string | null {
   if (!projectSlug) return null;
+  if (SURFACE_NO_DEEPLINK[surface]) return null;
   const base = `/${projectSlug}/${SURFACE_PATH[surface]}`;
   if (resourceId && SURFACE_ACCEPTS_ID[surface]) {
     return `${base}/${encodeURIComponent(resourceId)}`;
@@ -130,9 +164,8 @@ export function buildSurfaceHref({
   return base;
 }
 
-// Nouns this registry knows a surface for. A tool whose noun is absent here
-// (projects, api_keys, secrets, model_providers, workflows, annotations, the
-// docs/schema helpers) is intentionally unmapped and falls to the JSON view.
+// Nouns this registry knows a surface for. A tool whose noun is absent here is
+// unmapped and falls to the JSON view (only the docs/schema helpers do so now).
 const SURFACE_BY_NOUN: Record<string, CapabilitySurface> = {
   evaluator: "evaluations",
   evaluators: "evaluations",
@@ -150,6 +183,8 @@ const SURFACE_BY_NOUN: Record<string, CapabilitySurface> = {
   dataset_records: "datasets",
   prompt: "prompts",
   prompts: "prompts",
+  prompt_tag: "prompts",
+  prompt_tags: "prompts",
   scenario: "simulations",
   scenarios: "simulations",
   suite: "simulations",
@@ -158,6 +193,18 @@ const SURFACE_BY_NOUN: Record<string, CapabilitySurface> = {
   simulation_runs: "simulations",
   experiment: "experiments",
   experiments: "experiments",
+  workflow: "workflows",
+  workflows: "workflows",
+  annotation: "annotations",
+  annotations: "annotations",
+  secret: "secrets",
+  secrets: "secrets",
+  project: "projects",
+  projects: "projects",
+  api_key: "apiKeys",
+  api_keys: "apiKeys",
+  model_provider: "modelProviders",
+  model_providers: "modelProviders",
 };
 
 // The datasets / simulations surfaces have bespoke read cards; other reads use
@@ -214,6 +261,21 @@ const EXPLICIT: Record<string, CapabilityDescriptor> = {
     surface: "experiments",
     overline: "Experiment run",
   },
+  // `platform_experiment_list` / `_list_runs` parse as verb=`experiment`,
+  // noun=`list` under the generic rule (which has no `experiment` verb) and
+  // would fall through — pin them explicitly to the experiments surface.
+  platform_experiment_list: {
+    render: "resourceRead",
+    tone: "read",
+    surface: "experiments",
+    overline: "Experiments",
+  },
+  platform_experiment_list_runs: {
+    render: "evalRun",
+    tone: "read",
+    surface: "experiments",
+    overline: "Experiment runs",
+  },
   platform_update_prompt: {
     render: "promptDiff",
     tone: "updated",
@@ -242,6 +304,12 @@ function verbLabel(verb: string): string {
       return "New";
     case "update":
       return "Update";
+    case "rename":
+      return "Rename";
+    case "set":
+      return "Set";
+    case "assign":
+      return "Assign";
     case "delete":
     case "archive":
     case "revoke":
@@ -289,11 +357,14 @@ export function resolveCapability(
         overline: `New ${readable}`,
       };
     case "update":
+    case "rename":
+    case "set":
+    case "assign":
       return {
         render: "resourceUpdated",
         tone: "updated",
         surface,
-        overline: `Update ${readable}`,
+        overline: `${verbLabel(verb)} ${readable}`,
       };
     case "delete":
     case "archive":
