@@ -42,6 +42,7 @@ import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
+import { LangyDevModeToggle } from "./LangyDevModeToggle";
 import { LangyGitHubMenu } from "./github/LangyGitHubMenu";
 import {
   type LangyProposal,
@@ -780,6 +781,7 @@ function PanelHeader({
         {organizationId ? (
           <LangyGitHubMenu organizationId={organizationId} />
         ) : null}
+        <LangyDevModeToggle />
         <IconButton
           size="xs"
           variant="ghost"
