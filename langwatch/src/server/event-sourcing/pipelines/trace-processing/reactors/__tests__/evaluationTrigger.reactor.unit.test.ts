@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
-import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
+import { MAX_EVAL_DISPATCH_SPANS } from "../../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createEvaluationTriggerReactor,
@@ -284,7 +284,7 @@ describe("evaluationTrigger reactor", () => {
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
-        spanCount: MAX_PROCESSED_SPANS - 1,
+        spanCount: MAX_EVAL_DISPATCH_SPANS - 1,
         occurredAt: Date.now(),
       });
 
@@ -299,7 +299,7 @@ describe("evaluationTrigger reactor", () => {
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
-        spanCount: MAX_PROCESSED_SPANS,
+        spanCount: MAX_EVAL_DISPATCH_SPANS,
         occurredAt: Date.now(),
       });
 
@@ -594,7 +594,7 @@ describe("evaluationTrigger relevance check", () => {
       // The cap guard deliberately lives in handle, not shouldReact: shouldReact
       // runs once per event of a coalesced batch and would multiply the
       // once-per-crossing warn by the batch size.
-      const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
+      const atCap = withOrigin({ spanCount: MAX_EVAL_DISPATCH_SPANS });
       expect(shouldReact(createSpanEvent(), atCap)).toBe(true);
 
       const deps = createDeps();
@@ -604,13 +604,13 @@ describe("evaluationTrigger relevance check", () => {
 
       // A coalesced batch can jump the span count clean past the cap without
       // ever landing on it, so the guard is `>=`, not `===`.
-      const pastCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS + 1 });
+      const pastCap = withOrigin({ spanCount: MAX_EVAL_DISPATCH_SPANS + 1 });
       const depsPast = createDeps();
       const reactorPast = createEvaluationTriggerReactor(depsPast);
       await reactorPast.handle(createSpanEvent(), createContext(pastCap));
       expect(depsPast.evaluation).not.toHaveBeenCalled();
 
-      const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
+      const belowCap = withOrigin({ spanCount: MAX_EVAL_DISPATCH_SPANS - 1 });
       const depsBelow = createDeps();
       const reactorBelow = createEvaluationTriggerReactor(depsBelow);
       await reactorBelow.handle(createSpanEvent(), createContext(belowCap));

@@ -6,7 +6,6 @@ import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/fold
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
-  MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
 import { createInitState } from "./fixtures/trace-summary-test.fixtures";
@@ -34,7 +33,10 @@ function stateWithSpanCount(spanCount: number): TraceSummaryData {
   } as TraceSummaryData;
 }
 
-/** Past the cap the fold never reads `data`, so the span stays minimal. */
+/**
+ * Derivation is no longer capped, so every span IS normalized — the fixture has
+ * to carry real timestamps rather than relying on the old short-circuit.
+ */
 function spanEventAt(occurredAt: number, id: string): TraceProcessingEvent {
   return {
     id,
@@ -45,15 +47,32 @@ function spanEventAt(occurredAt: number, id: string): TraceProcessingEvent {
     occurredAt,
     createdAt: occurredAt,
     version: "2025-12-17",
-    data: { span: { name: "child", spanId: id, traceId: TRACE_ID } },
+    data: {
+      span: {
+        name: "child",
+        spanId: id,
+        traceId: TRACE_ID,
+        startTimeUnixNano: String(occurredAt * 1_000_000),
+        endTimeUnixNano: String((occurredAt + 10) * 1_000_000),
+        status: { code: 0 },
+        attributes: [],
+        events: [],
+        links: [],
+      },
+      resource: {},
+      instrumentationScope: { name: "test", version: null },
+    },
   } as unknown as TraceProcessingEvent;
 }
+
+/** A trace far bigger than any old processing cap — derivation no longer stops. */
+const LARGE_TRACE_SPAN_COUNT = 512;
 
 describe("TraceSummaryFoldProjection re-fold policy", () => {
   /** @scenario "The trace summary folds an earlier span without reading the event log" */
   it("folds a span that occurred before the checkpoint without reading the event log", async () => {
     const store: FoldProjectionStore<TraceSummaryData> = {
-      get: vi.fn().mockResolvedValue(stateWithSpanCount(MAX_PROCESSED_SPANS + 1)),
+      get: vi.fn().mockResolvedValue(stateWithSpanCount(LARGE_TRACE_SPAN_COUNT + 1)),
       store: vi.fn().mockResolvedValue(undefined),
     };
     const projection = new TraceSummaryFoldProjection({ store });
@@ -67,14 +86,14 @@ describe("TraceSummaryFoldProjection re-fold policy", () => {
     );
 
     expect(eventLoader).not.toHaveBeenCalled();
-    expect(result.spanCount).toBe(MAX_PROCESSED_SPANS + 2);
+    expect(result.spanCount).toBe(LARGE_TRACE_SPAN_COUNT + 2);
   });
 
   describe("given a trace summary with spans already folded", () => {
     describe("when a batch of three earlier spans is folded", () => {
       /** @scenario "Folding out-of-order spans without a re-fold still counts every span" */
       it("skips the event-log replay, counts every span, and never rewinds the checkpoint", async () => {
-        const stored = stateWithSpanCount(MAX_PROCESSED_SPANS + 10);
+        const stored = stateWithSpanCount(LARGE_TRACE_SPAN_COUNT + 10);
         let persisted: TraceSummaryData | undefined;
         const store: FoldProjectionStore<TraceSummaryData> = {
           get: vi.fn().mockResolvedValue(stored),
@@ -100,8 +119,8 @@ describe("TraceSummaryFoldProjection re-fold policy", () => {
         );
 
         expect(eventLoader).not.toHaveBeenCalled();
-        expect(result.spanCount).toBe(MAX_PROCESSED_SPANS + 13);
-        expect(persisted?.spanCount).toBe(MAX_PROCESSED_SPANS + 13);
+        expect(result.spanCount).toBe(LARGE_TRACE_SPAN_COUNT + 13);
+        expect(persisted?.spanCount).toBe(LARGE_TRACE_SPAN_COUNT + 13);
         // The checkpoint is a high-water mark: folding older spans never rewinds it.
         expect(result.LastEventOccurredAt).toBe(CHECKPOINT_MS);
       });

@@ -1,10 +1,11 @@
-import { Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
 import { buildTerminalStepsFromSpans } from "./buildStepsFromSpans";
 import { deriveSessionEvents } from "./sessionEvents";
 import { indexToolSpansByUseId } from "./toolSpans";
 import { TERMINAL_TOKENS } from "./palette";
+import { TerminalSkeleton } from "./TerminalSkeleton";
 import { TerminalView } from "./TerminalView";
 
 interface TerminalTabProps {
@@ -70,22 +71,9 @@ export function TerminalTab({
     [query.data, eventsQuery.data],
   );
 
+  // The loading state has to look like a terminal too — see TerminalSkeleton.
   if (query.isLoading) {
-    return (
-      <VStack
-        align="stretch"
-        gap={2}
-        padding={4}
-        height="full"
-        bg={TERMINAL_TOKENS.screenBg}
-        aria-busy="true"
-        aria-label="Loading terminal session"
-      >
-        {["70%", "45%", "88%", "62%"].map((width) => (
-          <Skeleton key={width} height="12px" width={width} borderRadius="sm" />
-        ))}
-      </VStack>
-    );
+    return <TerminalSkeleton />;
   }
 
   if (query.isError) {

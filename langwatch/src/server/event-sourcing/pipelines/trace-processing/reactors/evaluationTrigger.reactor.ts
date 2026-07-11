@@ -10,7 +10,7 @@ import type { ReactorDefinition } from "../../../reactors/reactor.types";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import {
-  MAX_PROCESSED_SPANS,
+  MAX_EVAL_DISPATCH_SPANS,
   type TraceSummaryData,
 } from "../projections/traceSummary.foldProjection";
 import {
@@ -77,7 +77,7 @@ export function createEvaluationTriggerReactor(
 
       // Oversized-trace guard (2026-05-28 incident follow-up). Past the same
       // processing cap the fold uses to stop deriving the summary
-      // (MAX_PROCESSED_SPANS), a trace is a runaway / reused trace_id and is too
+      // (MAX_EVAL_DISPATCH_SPANS), a trace is a runaway / reused trace_id and is too
       // large to keep evaluating: re-running every ON_MESSAGE monitor per span
       // on a 26k-span trace is pure amplification for no added signal. Skip the
       // eval dispatch (lighter processing). The span itself is still stored and
@@ -88,17 +88,17 @@ export function createEvaluationTriggerReactor(
       // a coalesced batch, and would multiply the log by the batch size. The
       // enqueue it no longer skips is already collapsed to one job per batch by
       // the router's dedup-id collapse, so there is nothing left to save.
-      if (foldState.spanCount >= MAX_PROCESSED_SPANS) {
+      if (foldState.spanCount >= MAX_EVAL_DISPATCH_SPANS) {
         // Log once, on the first crossing only. A runaway trace would otherwise
         // emit thousands of identical warns — the very per-span amplification we
         // are skipping the eval to avoid.
-        if (foldState.spanCount === MAX_PROCESSED_SPANS) {
+        if (foldState.spanCount === MAX_EVAL_DISPATCH_SPANS) {
           logger.warn(
             {
               tenantId,
               observedTraceId: traceId,
               spanCount: foldState.spanCount,
-              cap: MAX_PROCESSED_SPANS,
+              cap: MAX_EVAL_DISPATCH_SPANS,
             },
             "Skipping evaluation dispatch: trace reached the processing cap (spans still stored)",
           );
