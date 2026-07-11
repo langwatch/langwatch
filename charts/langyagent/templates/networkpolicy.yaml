@@ -78,28 +78,42 @@ spec:
         - protocol: TCP
           port: {{ .Values.networkPolicy.gatewayPort }}
     {{- if .Values.networkPolicy.allowExternalHttps }}
-    # External HTTPS (OpenCode update/telemetry, etc.). Loosen/tighten here.
+    # External HTTPS (OpenCode update/telemetry, git/gh/npm over :443). This is
+    # the pod's ONLY route to the public internet, and the most dangerous rule
+    # in the policy — it is off by default (allowExternalHttps=false).
     #
-    # ipBlock `except` denies the standard private ranges so a compromised
-    # OpenCode subprocess (RCE via prompt injection, supply-chain, etc.)
-    # cannot use this public-egress rule to reach internal services on :443
-    # — the kube apiserver, sidecar containers on the same node, neighbor
-    # pods, or the cloud metadata service (169.254.169.254, classic SSRF
-    # target for IAM credential theft). Legitimate cluster-internal traffic
-    # (the gateway, DNS) is allowed via explicit podSelector rules above.
+    # ADR-043: FQDN bounding ("only github/npm/…") is enforced at L7 by the
+    # per-worker egress adapter (worker tools egress via HTTPS_PROXY), NOT here —
+    # L3/L4 policy cannot express FQDN egress. This rule stays the coarse
+    # backstop; for bypass-proof datapath FQDN egress enable
+    # `egress.cilium.enabled`.
+    #
+    # The ipBlock `except` lists (networkPolicy.privateExcept / privateExceptV6)
+    # deny the private + link-local + CGNAT ranges so a compromised OpenCode
+    # subprocess (RCE via prompt injection, supply chain) cannot use this
+    # public-egress rule to reach internal services on :443 — the kube
+    # apiserver, sidecars on the same node, neighbour pods (INCLUDING the
+    # RFC 6598 100.64/10 CGNAT range EKS custom-networking uses for pods/nodes),
+    # or the cloud metadata service (169.254.169.254, classic SSRF -> IAM
+    # credential theft). Legitimate cluster-internal traffic (gateway, control
+    # plane, DNS) is allowed via the explicit podSelector rules above.
+    #
+    # NOTE :80 is intentionally NOT allowed anywhere in this policy, so IMDSv2
+    # over http://169.254.169.254 (port 80) is denied by default-deny regardless
+    # of the list below. Keep it that way.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
             except:
-              - 10.0.0.0/8
-              - 172.16.0.0/12
-              - 192.168.0.0/16
-              - 169.254.0.0/16
+              {{- range .Values.networkPolicy.privateExcept }}
+              - {{ . }}
+              {{- end }}
         - ipBlock:
             cidr: ::/0
             except:
-              - fd00::/8
-              - fe80::/10
+              {{- range .Values.networkPolicy.privateExceptV6 }}
+              - {{ . }}
+              {{- end }}
       ports:
         - protocol: TCP
           port: 443
