@@ -127,8 +127,8 @@ func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
 		t.Fatalf("generateBearerToken: %v", err)
 	}
 
-	envA := buildWorkerEnv("conv-a", "/workspace/sessions/conv-a", creds, pwA)
-	envB := buildWorkerEnv("conv-b", "/workspace/sessions/conv-b", creds, pwB)
+	envA := buildWorkerEnv("conv-a", "/workspace/sessions/conv-a", creds, pwA, 19001)
+	envB := buildWorkerEnv("conv-b", "/workspace/sessions/conv-b", creds, pwB, 19002)
 
 	if got := valueOfEnv(envA, "OPENCODE_SERVER_PASSWORD"); got != pwA {
 		t.Fatalf("worker A env OPENCODE_SERVER_PASSWORD = %q, want %q", got, pwA)
@@ -151,7 +151,7 @@ func TestBuildWorkerEnv_InjectsCredentialsAndConditionalGithub(t *testing.T) {
 		GatewayBaseURL:    "https://gateway.internal/v1",
 		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
-	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw")
+	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0)
 
 	wants := map[string]string{
 		"OPENAI_BASE_URL":        "https://gateway.internal/v1",
@@ -172,12 +172,49 @@ func TestBuildWorkerEnv_InjectsCredentialsAndConditionalGithub(t *testing.T) {
 
 	creds.GithubToken = "ghp_real"
 	creds.GithubLogin = "alice"
-	withGH := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw")
+	withGH := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0)
 	if got := valueOfEnv(withGH, "GH_TOKEN"); got != "ghp_real" {
 		t.Errorf("GH_TOKEN = %q, want ghp_real", got)
 	}
 	if got := valueOfEnv(withGH, "GITHUB_LOGIN"); got != "alice" {
 		t.Errorf("GITHUB_LOGIN = %q, want alice", got)
+	}
+}
+
+// buildWorkerEnv must point the worker's HTTPS_PROXY at the per-worker egress
+// adapter (ADR-043) when an egress port is set, and must NO_PROXY the loopback +
+// in-cluster control-plane / gateway hosts so their traffic goes direct rather
+// than through the throttled per-worker proxy. With no egress port, no proxy env
+// is injected (the worker egresses direct, as before).
+func TestBuildWorkerEnv_InjectsEgressProxy(t *testing.T) {
+	creds := domain.Credentials{
+		LangwatchAPIKey:   "lw-key",
+		LLMVirtualKey:     "vk",
+		GatewayBaseURL:    "https://gateway.internal/v1",
+		LangwatchEndpoint: "https://app.langwatch.ai",
+	}
+
+	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 19555)
+	wantProxy := "http://127.0.0.1:19555"
+	for _, key := range []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"} {
+		if got := valueOfEnv(env, key); got != wantProxy {
+			t.Errorf("env[%s] = %q, want %q", key, got, wantProxy)
+		}
+	}
+	noProxy := valueOfEnv(env, "NO_PROXY")
+	for _, host := range []string{"127.0.0.1", "localhost", "app.langwatch.ai", "gateway.internal"} {
+		if !strings.Contains(noProxy, host) {
+			t.Errorf("NO_PROXY %q missing in-cluster/loopback host %q", noProxy, host)
+		}
+	}
+	if valueOfEnv(env, "no_proxy") != noProxy {
+		t.Errorf("no_proxy must mirror NO_PROXY")
+	}
+
+	// No egress port ⇒ no proxy env at all.
+	direct := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0)
+	if got := valueOfEnv(direct, "HTTPS_PROXY"); got != "" {
+		t.Errorf("HTTPS_PROXY must be absent when no egress port is set, got %q", got)
 	}
 }
 

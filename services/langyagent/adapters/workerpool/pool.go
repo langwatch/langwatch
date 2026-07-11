@@ -471,10 +471,16 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		}
 	}()
 
-	// Egress seam (ADR-047): a real guard (PR4) may set up per-worker egress
-	// monitoring here and fail the spawn closed. The default pass-through does
-	// nothing.
-	if err := p.egress.PrepareWorker(ctx, egress.WorkerContext{ConversationID: conversationID, UID: uid}); err != nil {
+	// Egress seam (ADR-043 / ADR-047): the enforcing guard stands up THIS
+	// worker's outbound forward proxy here and returns its loopback port (which
+	// buildWorkerEnv points HTTPS_PROXY at); it can fail the spawn closed. The
+	// observe-only / pass-through guards run no proxy (ProxyPort 0).
+	we, err := p.egress.PrepareWorker(ctx, egress.WorkerContext{
+		ConversationID:  conversationID,
+		UID:             uid,
+		EgressAllowlist: creds.EgressAllowlist,
+	})
+	if err != nil {
 		// The guard's reason is an internal diagnostic — logged, not surfaced.
 		// The rejection is deliberately handled, so the caller gets a herr with
 		// an actionable message.
@@ -483,6 +489,10 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	}
 	defer func() {
 		if !success {
+			// we.Close tears down THIS worker's forward proxy; ReleaseWorker fires
+			// the guard's observe-only release hook. Both nil-safe / idempotent and
+			// only run on a failed spawn — on success the live Worker owns `we`.
+			we.Close()
 			p.egress.ReleaseWorker(ctx, conversationID)
 		}
 	}()
@@ -565,7 +575,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	// alive across turns and only dies on idle/shutdown. Binding to baseCtx
 	// (rather than context.Background, as the flat manager did) means a pool
 	// Shutdown / deadline propagates to the subprocess.
-	cmd, err := spawnOpenCode(p.baseCtx, p.openCodeBinaryPath, conversationID, workerHome, uid, internalPort, creds, openCodePassword, p.disableUIDIsolation)
+	cmd, err := spawnOpenCode(p.baseCtx, p.openCodeBinaryPath, conversationID, workerHome, uid, internalPort, creds, openCodePassword, we.ProxyPort, p.disableUIDIsolation)
 	if err != nil {
 		return nil, err
 	}
@@ -624,6 +634,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		bearerToken:       bearerToken,
 		baseURL:           "http://127.0.0.1:" + strconv.Itoa(externalPort),
 		authProxy:         proxy,
+		egress:            we,
 		openCodeSessionID: sessionID,
 		cmd:               cmd,
 		uid:               uid,
@@ -652,6 +663,7 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 	var proxyToShutdown *authProxy
 	shouldWipe := false
 	deletedOwnEntry := false
+	var egressToClose egress.WorkerEgress
 
 	// The decision runs under the lock (defer-unlocked so a panic can't leave it
 	// held); the slow RemoveAll + egress I/O run AFTER the unlock.
@@ -662,6 +674,7 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 		if w, ok := p.workers[conversationID]; ok {
 			if w.cmd == cmd {
 				proxyToShutdown = w.authProxy
+				egressToClose = w.egress
 				delete(p.workers, conversationID)
 				shouldWipe = true
 				deletedOwnEntry = true
@@ -711,6 +724,10 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 	// Egress teardown runs OUTSIDE the pool lock: a real PR4 guard may perform
 	// network/monitoring I/O here, which must never stall the pool. It is not
 	// part of the home-dir race, so ordering after the unlock is correct.
+	// Close is the per-worker forward-proxy teardown (identity-guarded above so a
+	// replacement's proxy is never closed); ReleaseWorker is the guard's own
+	// observe-only hook. Both are idempotent / nil-safe.
+	egressToClose.Close()
 	if shouldWipe {
 		p.egress.ReleaseWorker(p.baseCtx, conversationID)
 	}
@@ -761,6 +778,11 @@ func (p *Pool) kill(conversationID, reason string) {
 	if w.authProxy != nil {
 		clog.Go(p.baseCtx, "authproxy-shutdown", w.authProxy.shutdown)
 	}
+	// Same for the per-worker egress forward proxy's loopback port. Closed HERE
+	// (synchronously with the kill, before the exit watcher's onWorkerExit runs)
+	// so a kill-then-respawn on the same conversation frees the port promptly and
+	// never leaves the old worker's proxy bound. Idempotent + nil-safe.
+	go w.egress.Close()
 }
 
 // reapIdle scans the registry and kills workers idle longer than WorkerIdle.

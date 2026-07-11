@@ -72,8 +72,9 @@ type Config struct {
 
 	// Egress monitoring (ADR-044 part 5). Comma-separated hosts a worker may
 	// legitimately reach (control plane, gateway, git / gh / registry). Calls
-	// outside this set are FLAGGED (never blocked in PR3). Empty = flag every
-	// non-IP-literal host as unexpected; operators should set the real hosts.
+	// outside this set are FLAGGED (never blocked) by the observe-only
+	// MonitoringGuard/scorer. Empty = flag every non-IP-literal host as
+	// unexpected; operators should set the real hosts.
 	EgressAllowedHosts string `env:"LANGY_EGRESS_ALLOWED_HOSTS"`
 
 	// ShutdownHandoffDeadlineMS (ADR-048) is the wall-clock budget the manager
@@ -90,6 +91,28 @@ type Config struct {
 	// teardown, margin). Subtracted from the graceful window so the handoff
 	// deadline can never eat the drain budget out from under the kill.
 	ShutdownDrainBudgetMS int64 `env:"LANGY_SHUTDOWN_DRAIN_BUDGET_MS" validate:"gte=0"`
+
+	// Egress enforcement (ADR-043). These configure the per-worker egress
+	// forward proxy the manager spawns for each worker (see adapters/egress).
+	//
+	// EgressFqdnFloor is the operator-owned always-allowed set (github /
+	// gateway / control plane) — a floor, not a per-project policy. Additive to
+	// each project's customer allow-list (which rides the credentials envelope);
+	// never a ceiling by itself unless EgressEnforceFloor is on. Comma-separated
+	// (config.Hydrate has no []string support) and split in cmd.
+	EgressFqdnFloor string `env:"LANGY_EGRESS_FQDN_FLOOR"`
+	// EgressRequireTLS refuses cleartext forwards and non-:443 CONNECTs
+	// (rung 1a). Default ON — worker egress is HTTPS already, so this is the
+	// always-safe rung. (A malformed bool env fails the pod closed at startup.)
+	EgressRequireTLS bool `env:"LANGY_EGRESS_REQUIRE_TLS"`
+	// EgressEnforceFloor makes the floor a hard ceiling for projects that set
+	// no allow-list (rung 3 "always-on floor"). Default OFF so the stock
+	// posture stays monitor-only: an install that configures nothing upgrades
+	// into watching, not blocking.
+	EgressEnforceFloor bool `env:"LANGY_EGRESS_ENFORCE_FLOOR"`
+	// EgressSNICrossCheck peeks the TLS ClientHello SNI as an anti-fronting
+	// cross-check of the CONNECT authority. Default ON.
+	EgressSNICrossCheck bool `env:"LANGY_EGRESS_SNI_CROSSCHECK"`
 
 	// WorkspaceRoot is the shared-templates directory the pod entrypoint seeds
 	// with AGENTS.md and skills/ (see entrypoint.sh). setupWorkerHome reads
@@ -165,6 +188,13 @@ func defaultConfig() Config {
 		ShutdownHandoffDeadlineMS: defaultShutdownHandoffDeadlineMS,
 		ShutdownDrainBudgetMS:     defaultShutdownDrainBudgetMS,
 		reaperInterval:            defaultReaperInterval,
+		// ADR-043 rung 1a + SNI cross-check are the always-safe rungs; both
+		// default ON. Unset env leaves these defaults (Hydrate skips empty env),
+		// so an install that configures nothing still requires TLS and cross-
+		// checks SNI. EgressEnforceFloor defaults OFF (zero value) — the floor
+		// stays monitor-only until an operator flips it after reading monitoring.
+		EgressRequireTLS:    true,
+		EgressSNICrossCheck: true,
 		OTel: config.OTel{
 			SampleRatio: 1.0, // overridden to 0.1 for non-local in LoadConfig
 		},
