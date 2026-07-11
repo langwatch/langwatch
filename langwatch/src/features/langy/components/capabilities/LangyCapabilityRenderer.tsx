@@ -6,19 +6,30 @@
  * read once here from the org/team/project hook and threaded down, so the
  * individual cards stay pure of app context.
  *
+ * Beneath the card it also draws the follow-up suggestions the result justifies
+ * — the quiet "Graph these" / "Alert me on this" chips. WHICH offers to make is
+ * `cliFollowUps.ts`'s call, driven by the feature map; WHERE each lands is a
+ * `traceQueryIntent` builder that recompiles the search into a destination URL.
+ * An offer only becomes a chip when a builder can actually carry it out, so
+ * offers with no destination (dataset / annotation / lens — no link exists yet)
+ * are silently dropped rather than rendered as dead ends.
+ *
  * `hasCapabilityCard` is the shared predicate that decides whether a call
  * renders as a card at all — used both here and by LangyToolActivity to skip
  * such calls in the generic activity collapser (so a settled search never shows
  * both a "Analysing traces" line AND a traces card).
  */
+import { VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   isProposalOutput,
   resolveCapability,
   type CapabilityDescriptor,
 } from "./capabilityRegistry";
+import { deriveFollowUpChips } from "./followUpChips";
 import { LangyDatasetCard } from "./LangyDatasetCard";
 import { LangyEvalRunCard } from "./LangyEvalRunCard";
+import { LangyFollowUpChips } from "./LangyFollowUpChips";
 import { LangyMetricsCard } from "./LangyMetricsCard";
 import { LangyResourceResultCard } from "./LangyResourceResultCard";
 import { LangyScenarioCard } from "./LangyScenarioCard";
@@ -52,13 +63,25 @@ export function LangyCapabilityRenderer({
   const { project } = useOrganizationTeamProject();
   const descriptor = resolveCapability(call.name);
   if (!descriptor) return null;
-  return (
+
+  const projectSlug = project?.slug ?? null;
+  const card = (
     <CapabilityCard
       descriptor={descriptor}
       input={call.input}
       output={call.output}
-      projectSlug={project?.slug ?? null}
+      projectSlug={projectSlug}
     />
+  );
+
+  const chips = deriveFollowUpChips({ call, projectSlug });
+  if (chips.length === 0) return card;
+
+  return (
+    <VStack align="stretch" gap={2}>
+      {card}
+      <LangyFollowUpChips chips={chips} />
+    </VStack>
   );
 }
 
