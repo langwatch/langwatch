@@ -9,6 +9,7 @@ import type {
   SpanTreeNode,
 } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
+import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import { formatDuration } from "../../../utils/formatters";
@@ -73,6 +74,7 @@ export const WaterfallView = memo(function WaterfallView({
   const { signalsBySpanId, isFetched: signalsFetched } =
     useSpanLangwatchSignals();
   const hasAnySignals = signalsBySpanId.size > 0;
+  const { logsBySpanId } = useSpanLogs();
 
   const isDraggingDivider = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -551,6 +553,7 @@ export const WaterfallView = memo(function WaterfallView({
                     rootDuration={rootDuration}
                     isSelected={node.span.spanId === selectedSpanId}
                     isPrompt={promptSpanIds?.has(node.span.spanId) ?? false}
+                    logCount={logsBySpanId.get(node.span.spanId)?.length ?? 0}
                     isPinned={pinnedSet.has(node.span.spanId)}
                     isCollapsed={collapsedIds.has(node.span.spanId)}
                     hasChildren={node.children.length > 0}

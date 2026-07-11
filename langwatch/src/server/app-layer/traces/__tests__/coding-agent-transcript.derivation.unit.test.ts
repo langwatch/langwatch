@@ -72,10 +72,62 @@ describe("buildCodingAgentTranscript", () => {
 
       expect(transcript.entries.map((e) => e.kind)).toEqual([
         "user_prompt",
+        "model_call",
         "tool",
         "assistant_message",
       ]);
       expect(transcript.entries[0]).toMatchObject({ text: "fix the build" });
+    });
+  });
+
+  describe("given a model call span", () => {
+    it("carries its own tokens and cost, positioned where it happened", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [modelSpan({ atMs: 2_000, cost: 0.75 })],
+        logs: [],
+      });
+
+      expect(transcript.entries).toEqual([
+        {
+          kind: "model_call",
+          atMs: 2_000,
+          model: null,
+          tokens: 120,
+          costUsd: 0.75,
+          durationMs: 500,
+          spanId: "llm-2000",
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      ]);
+    });
+
+    it("carries the cache split, not just the total", () => {
+      const span = {
+        spanId: "llm-1",
+        name: "claude_code.llm_request",
+        startTimeMs: 1_000,
+        endTimeMs: 1_500,
+        status: "ok",
+        metrics: { promptTokens: 100, completionTokens: 20, cost: 0.1 },
+        params: {
+          input_tokens: "2000",
+          output_tokens: "150",
+          cache_read_tokens: "14000000",
+          cache_creation_tokens: "284000",
+        },
+      } as unknown as SpanDetail;
+
+      const transcript = buildCodingAgentTranscript({ spans: [span], logs: [] });
+
+      expect(transcript.entries[0]).toMatchObject({
+        cacheReadTokens: 14_000_000,
+        cacheCreationTokens: 284_000,
+        inputTokens: 2_000,
+        outputTokens: 150,
+      });
     });
   });
 
@@ -224,6 +276,30 @@ describe("buildCodingAgentTranscript", () => {
       });
       expect(transcript.entries[1]).toMatchObject({
         text: "The request failed (500).",
+      });
+    });
+  });
+
+  describe("given a mid-session compaction", () => {
+    it("reports the token count before and after, not just that it happened", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [],
+        logs: [
+          log(
+            {
+              "event.name": "compaction",
+              pre_tokens: "142000",
+              post_tokens: "18000",
+              trigger: "auto",
+            },
+            1_000,
+          ),
+        ],
+      });
+
+      expect(transcript.entries[0]).toMatchObject({
+        kind: "note",
+        text: "Context compacted (auto): 142k → 18k tokens",
       });
     });
   });

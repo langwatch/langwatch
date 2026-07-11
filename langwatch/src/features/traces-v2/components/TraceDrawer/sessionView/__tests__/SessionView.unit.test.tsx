@@ -14,6 +14,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/codingAgentSession.foldProjection";
+import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { SessionView } from "../SessionView";
 
 /** Straight from ClickHouse. Do not tidy. */
@@ -110,10 +111,13 @@ const REAL_SESSION: CodingAgentSessionRow = {
   truncated: false,
 };
 
-function renderSession(over: Partial<CodingAgentSessionRow> = {}) {
+function renderSession(
+  over: Partial<CodingAgentSessionRow> = {},
+  entries?: TranscriptEntry[],
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SessionView session={{ ...REAL_SESSION, ...over }} />
+      <SessionView session={{ ...REAL_SESSION, ...over }} entries={entries} />
     </ChakraProvider>,
   );
 }
@@ -182,6 +186,52 @@ describe("SessionView", () => {
       renderSession({ truncated: true });
 
       expect(screen.getByText("The reply was cut off")).toBeTruthy();
+    });
+  });
+
+  describe("given no transcript entries", () => {
+    it("omits the token timeline rather than showing an empty chart", () => {
+      renderSession();
+      expect(screen.queryByText("Where the tokens went")).toBeNull();
+    });
+  });
+
+  describe("given transcript entries with a cache rebuild", () => {
+    it("shows the timeline and names the prompt that triggered the rebuild", () => {
+      const entries: TranscriptEntry[] = [
+        { kind: "user_prompt", atMs: 500, text: "start over on this", chars: 19 },
+        {
+          kind: "model_call",
+          atMs: 1_000,
+          model: "claude-opus-4-8",
+          tokens: 100_000,
+          costUsd: 5,
+          durationMs: 2_000,
+          spanId: "llm-1",
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 100_000,
+          cacheCreationTokens: 0,
+        },
+        {
+          kind: "model_call",
+          atMs: 2_000,
+          model: "claude-opus-4-8",
+          tokens: 90_000,
+          costUsd: 6,
+          durationMs: 2_000,
+          spanId: "llm-2",
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 90_000,
+        },
+      ];
+
+      renderSession({}, entries);
+
+      expect(screen.getByText("Where the tokens went")).toBeTruthy();
+      expect(screen.getByText(/after "start over on this"/)).toBeTruthy();
     });
   });
 });

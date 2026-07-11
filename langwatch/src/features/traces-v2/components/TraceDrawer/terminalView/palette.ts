@@ -53,4 +53,23 @@ export const TERMINAL_TOKENS = {
   frameBg: "bg.panel",
   border: "border.muted",
   faint: "fg.muted",
+  /** Claude's own accent — the mark, the assistant bullet, the cost figure. */
+  accent: "orange.fg",
+  accentStrong: "orange.solid",
 } as const;
+
+/**
+ * The startup mark's shading, left to right — a warm terracotta gradient, not
+ * one flat colour. This is the same kind of narrow, deliberate exception as
+ * `ansiColorToken`'s truecolor passthrough above: Chakra's palette has no
+ * multi-stop gradient token, and the mark is a fixed piece of brand art, not
+ * themeable UI chrome, so it is pinned here rather than left to a token that
+ * doesn't exist.
+ */
+export const CLAUDE_MARK_GRADIENT = [
+  "#F2C4AA",
+  "#E8A587",
+  "#DA7756",
+  "#C15F3C",
+  "#9C4A2E",
+] as const;

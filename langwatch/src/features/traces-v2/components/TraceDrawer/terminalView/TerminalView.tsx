@@ -1,5 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
+import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { SimpleSlider } from "~/components/ui/slider";
 import {
   abbreviateModel,
@@ -7,31 +8,21 @@ import {
   formatDuration,
   formatTokens,
 } from "../../../utils/formatters";
-import {
-  type ContentBlock,
-  type ConversationTurn,
-  pairToolBlocks,
-  toolResultBodyToString,
-} from "../transcript";
-import { TERMINAL_TOKENS } from "./palette";
+import { toolResultBodyToString } from "../transcript";
+import { CLAUDE_MARK_GRADIENT, TERMINAL_TOKENS } from "./palette";
 import { TerminalDiff } from "./TerminalDiff";
 import { TerminalOutput } from "./TerminalOutput";
 import { TerminalPatch } from "./TerminalPatch";
+import type { SessionBanner } from "./sessionBanner";
 import {
-  buildTimeline,
+  buildEntryTimeline,
   extractDiffFromToolInput,
   isDiffTool,
-  type TerminalStep,
   toolPrimaryArg,
 } from "./terminalSession";
-import type {
-  SessionEvents,
-  SessionNote,
-  ToolRejection,
-} from "./sessionEvents";
 import { parsePatchHunks, type TerminalToolSpan } from "./toolSpans";
 
-/** What actually ran, keyed by the `tool_use_id` the model called it with. */
+/** What actually ran, keyed by the tool span's OWN id (matches `entry.spanId`). */
 export type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;
 const NO_TOOL_SPANS: ToolSpanIndex = new Map();
 
@@ -47,9 +38,9 @@ const GLYPH = {
   elbow: "⎿",
   /** The user's prompt caret. */
   caret: "❯",
-  /** Thinking / extended reasoning. */
-  thinking: "✻",
-  /** Session-level notes (system prompt, recap). */
+  /** A tool the human turned down. */
+  denied: "✕",
+  /** Session-level notes (compaction, an error, a rate limit). */
   note: "※",
 } as const;
 
@@ -60,64 +51,74 @@ const CELL = {
   lineHeight: "1.55",
 } as const;
 
+/**
+ * The block mark Claude Code prints above the prompt when a session starts,
+ * reproduced glyph-for-glyph. Three rows; the gradient is applied per
+ * character so it reads as shaded rather than flat.
+ */
+const MARK_ROWS = [" ▐▛███▜▌", "▝▜█████▛▘", "  ▘▘ ▝▝ "] as const;
+
 interface TerminalViewProps {
-  /** Session beats, in order. Build from the trace's spans at the wiring site. */
-  steps: TerminalStep[];
+  /** The whole session, in the order it happened — spans AND logs, agent-neutral. */
+  entries: TranscriptEntry[];
   /**
-   * What each tool call actually did, from Claude's real tool spans. The
-   * transcript only carries what the model was TOLD a tool returned; these
-   * carry what ran — real stdout, a real patch, how long it took, whether it
-   * failed. Optional: without it the view falls back to the transcript.
+   * What each tool call actually did, from Claude's real tool spans, keyed by
+   * span id. The transcript's own `tool` entries only carry what got recorded
+   * generically; these carry the real stdout, the real patch, whether it
+   * failed. Optional: without it the view falls back to the transcript entry.
    */
   toolSpans?: ToolSpanIndex;
-  /**
-   * The parts of the session that exist only as LOGS — a tool the user denied
-   * (which produces no span at all), API errors, refusals, a mid-session
-   * compaction. Spans and logs complement each other; without these the turn is
-   * missing its most interesting moments.
-   */
-  sessionEvents?: SessionEvents;
-  meta?: {
-    model?: string;
-    cwd?: string;
-  };
+  /** Claude Code's own version, model, and repo — shown above the first prompt. */
+  banner?: SessionBanner;
+  /** The trace's name, shown in the bottom bar where Claude Code shows its input. */
+  sessionName?: string | null;
 }
 
-const NO_SESSION_EVENTS: SessionEvents = {
-  rejectionsByToolUseId: new Map(),
-  notes: [],
-};
-
 /**
- * A recreation of how a Claude Code session looked in the terminal.
- *
- * Deliberately NOT a "terminal widget": no window frame, no traffic lights, no
- * title bar. Claude Code doesn't draw those — it prints into the terminal you
- * already have, and its entire hierarchy is carried by four glyphs (see
- * {@link GLYPH}) at one monospace size. Adding chrome around it makes it read
- * as a screenshot of a terminal rather than as the session itself.
+ * A recreation of how a Claude Code session looked in the terminal — the
+ * WHOLE session, not the last turn. Deliberately NOT a "terminal widget": no
+ * window frame, no traffic lights, no title bar. Claude Code doesn't draw
+ * those — it prints into the terminal you already have, and its entire
+ * hierarchy is carried by a handful of glyphs (see {@link GLYPH}) at one
+ * monospace size. Adding chrome around it makes it read as a screenshot of a
+ * terminal rather than as the session itself.
  *
  * A timeline scrubber replays the session beat by beat, ticking the running
  * token + cost totals up as you travel through it.
  */
 export const TerminalView = memo(function TerminalView({
-  steps,
+  entries,
   toolSpans = NO_TOOL_SPANS,
-  sessionEvents = NO_SESSION_EVENTS,
-  meta,
+  banner,
+  sessionName,
 }: TerminalViewProps) {
-  const timeline = useMemo(() => buildTimeline(steps), [steps]);
-  const lastIndex = Math.max(0, steps.length - 1);
-  const [revealIndex, setRevealIndex] = useState(lastIndex);
+  const timeline = useMemo(() => buildEntryTimeline(entries), [entries]);
 
-  // Keep the reveal index valid if the step list changes underneath us, and
-  // snap to the newest beat when new steps arrive.
+  // `model_call` entries carry economics for the HUD but render nothing —
+  // the scrubber steps through the VISIBLE beats only.
+  const visibleIndices = useMemo(
+    () =>
+      entries.reduce<number[]>((acc, entry, index) => {
+        if (entry.kind !== "model_call") acc.push(index);
+        return acc;
+      }, []),
+    [entries],
+  );
+  const lastReveal = Math.max(0, visibleIndices.length - 1);
+  const [revealIndex, setRevealIndex] = useState(lastReveal);
+
+  // Keep the reveal index valid if the entry list changes underneath us, and
+  // snap to the newest beat when new entries arrive.
   useEffect(() => {
-    setRevealIndex(lastIndex);
-  }, [lastIndex]);
+    setRevealIndex(lastReveal);
+  }, [lastReveal]);
 
-  const revealed = steps.slice(0, revealIndex + 1);
-  const point = timeline[revealIndex];
+  const revealedFullIndex = visibleIndices[revealIndex] ?? -1;
+  const point = timeline[revealedFullIndex];
+  const modelAtReveal = useMemo(
+    () => modelAt(entries, revealedFullIndex) ?? banner?.model ?? null,
+    [entries, revealedFullIndex, banner?.model],
+  );
 
   // Follow the newest revealed beat as the scrubber moves.
   const screenRef = useRef<HTMLDivElement>(null);
@@ -126,7 +127,7 @@ export const TerminalView = memo(function TerminalView({
     if (el) el.scrollTop = el.scrollHeight;
   }, [revealIndex]);
 
-  if (steps.length === 0) {
+  if (entries.length === 0) {
     return (
       <VStack
         align="center"
@@ -135,7 +136,7 @@ export const TerminalView = memo(function TerminalView({
         bg={TERMINAL_TOKENS.screenBg}
       >
         <Text {...CELL} color={TERMINAL_TOKENS.faint}>
-          No terminal session recorded for this turn
+          No terminal session recorded for this trace
         </Text>
       </VStack>
     );
@@ -154,63 +155,119 @@ export const TerminalView = memo(function TerminalView({
         paddingY={3}
       >
         <VStack align="stretch" gap={2.5}>
-          {sessionEvents.notes.map((note, index) => (
-            <SessionNoteLine key={`note-${index}`} note={note} />
-          ))}
-          {revealed.map((step, index) => (
-            <StepView
-              key={index}
-              step={step}
+          <TerminalBanner banner={banner} />
+          {visibleIndices.slice(0, revealIndex + 1).map((fullIndex) => (
+            <EntryLine
+              key={fullIndex}
+              entry={entries[fullIndex]!}
               toolSpans={toolSpans}
-              rejections={sessionEvents.rejectionsByToolUseId}
             />
           ))}
         </VStack>
       </Box>
 
       <StatusLine
-        stepCount={steps.length}
+        stepCount={visibleIndices.length}
         revealIndex={revealIndex}
         onScrub={setRevealIndex}
         tokens={point?.cumulativeTokens ?? 0}
         costUsd={point?.cumulativeCostUsd ?? 0}
         elapsedMs={point?.elapsedMs ?? 0}
-        model={steps[revealIndex]?.model ?? meta?.model}
-        cwd={meta?.cwd}
+        model={modelAtReveal}
+        sessionName={sessionName}
       />
     </VStack>
   );
 });
 
-function StepView({
-  step,
-  toolSpans,
-  rejections,
-}: {
-  step: TerminalStep;
-  toolSpans: ToolSpanIndex;
-  rejections: ReadonlyMap<string, ToolRejection>;
-}) {
-  const { turn } = step;
-  if (turn.kind === "user") return <PromptLine turn={turn} />;
-  if (turn.kind === "system") return <SystemNote turn={turn} />;
+/** The nearest model in effect at or before `fullIndex` — sessions mostly use one. */
+function modelAt(entries: TranscriptEntry[], fullIndex: number): string | null {
+  for (let i = fullIndex; i >= 0; i--) {
+    const entry = entries[i];
+    if (entry?.kind === "model_call" && entry.model) return entry.model;
+    if (entry?.kind === "assistant_message" && entry.model) return entry.model;
+  }
+  return null;
+}
+
+function TerminalBanner({ banner }: { banner?: SessionBanner }) {
+  if (!banner || (!banner.version && !banner.model && !banner.repo)) {
+    return null;
+  }
   return (
-    <AssistantBlocks
-      turn={turn}
-      toolSpans={toolSpans}
-      rejections={rejections}
-    />
+    <HStack align="center" gap={3} paddingBottom={2}>
+      <ClaudeMark />
+      <VStack align="stretch" gap={0} minWidth={0}>
+        <Text {...CELL} color={TERMINAL_TOKENS.screenFg} fontWeight="semibold">
+          {banner.version ? `Claude Code v${banner.version}` : "Claude Code"}
+        </Text>
+        {banner.model && (
+          <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate>
+            {abbreviateModel(banner.model)}
+          </Text>
+        )}
+        {banner.repo && (
+          <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate>
+            {banner.repo}
+          </Text>
+        )}
+      </VStack>
+    </HStack>
   );
 }
 
-/** The user's prompt: `❯ what they typed`. */
-function PromptLine({
-  turn,
+/** The startup mark, shaded left-to-right rather than drawn in one flat colour. */
+function ClaudeMark() {
+  return (
+    <VStack align="flex-start" gap={0} flexShrink={0} aria-hidden userSelect="none">
+      {MARK_ROWS.map((row, rowIndex) => (
+        <Text key={rowIndex} {...CELL} lineHeight="1.15" whiteSpace="pre">
+          {[...row].map((char, charIndex) => (
+            <Fragment key={charIndex}>
+              <Text as="span" color={gradientColorAt(charIndex, row.length)}>
+                {char}
+              </Text>
+            </Fragment>
+          ))}
+        </Text>
+      ))}
+    </VStack>
+  );
+}
+
+function gradientColorAt(index: number, length: number): string {
+  const stops = CLAUDE_MARK_GRADIENT;
+  const t = length <= 1 ? 0 : index / (length - 1);
+  const stopIndex = Math.round(t * (stops.length - 1));
+  return stops[stopIndex] ?? stops[stops.length - 1]!;
+}
+
+function EntryLine({
+  entry,
+  toolSpans,
 }: {
-  turn: Extract<ConversationTurn, { kind: "user" }>;
+  entry: TranscriptEntry;
+  toolSpans: ToolSpanIndex;
 }) {
-  const text = useMemo(() => textOf(turn.blocks), [turn.blocks]);
-  if (!text.trim()) return null;
+  switch (entry.kind) {
+    case "user_prompt":
+      return <PromptLine text={entry.text} />;
+    case "assistant_message":
+      return <AssistantLine text={entry.text} />;
+    case "tool":
+      return <ToolCall entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />;
+    case "tool_rejected":
+      return <RejectedLine name={entry.name} reason={entry.reason} />;
+    case "note":
+      return <NoteLine level={entry.level} text={entry.text} />;
+    default:
+      return null;
+  }
+}
+
+/** The user's prompt: `❯ what they typed`. */
+function PromptLine({ text }: { text: string | null }) {
+  if (!text?.trim()) return null;
   return (
     <HStack align="flex-start" gap={2} paddingTop={1}>
       <Glyph char={GLYPH.caret} color="blue.fg" bold />
@@ -229,181 +286,80 @@ function PromptLine({
   );
 }
 
-function SystemNote({
-  turn,
-}: {
-  turn: Extract<ConversationTurn, { kind: "system" }>;
-}) {
-  const text = useMemo(() => textOf(turn.blocks), [turn.blocks]);
+/**
+ * The assistant's own prose. A model call that only issued tool calls has no
+ * text at all — rendering nothing here (rather than an empty bullet) is
+ * exactly what fixes a session collapsing to "step 1/1": its tool calls are
+ * independent entries and still render as their own lines.
+ */
+function AssistantLine({ text }: { text: string | null }) {
+  if (!text?.trim()) return null;
   return (
     <HStack align="flex-start" gap={2}>
-      <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
-      <Text {...CELL} color={TERMINAL_TOKENS.faint}>
-        {`system prompt (${text.length.toLocaleString()} chars)`}
+      <Glyph char={GLYPH.bullet} color={TERMINAL_TOKENS.accent} />
+      <Text
+        {...CELL}
+        whiteSpace="pre-wrap"
+        wordBreak="break-word"
+        color={TERMINAL_TOKENS.screenFg}
+        flex={1}
+        minWidth={0}
+      >
+        {text}
       </Text>
     </HStack>
   );
 }
 
-/** One assistant beat: prose, thinking, and its tool calls with output. */
-function AssistantBlocks({
-  turn,
-  toolSpans,
-  rejections,
-}: {
-  turn: Extract<ConversationTurn, { kind: "assistant" }>;
-  toolSpans: ToolSpanIndex;
-  rejections: ReadonlyMap<string, ToolRejection>;
-}) {
-  const items = useMemo(() => pairToolBlocks(turn.blocks), [turn.blocks]);
-  return (
-    <VStack align="stretch" gap={2.5}>
-      {items.map((item, index) => {
-        if (item.kind === "tool_pair") {
-          return (
-            <ToolCall
-              key={index}
-              name={item.use.name}
-              input={item.use.input}
-              result={item.result}
-              ran={
-                item.use.id !== undefined
-                  ? toolSpans.get(item.use.id) ?? null
-                  : null
-              }
-              rejected={
-                item.use.id !== undefined
-                  ? rejections.get(item.use.id) ?? null
-                  : null
-              }
-            />
-          );
-        }
-        if (item.kind === "orphan_result") {
-          return (
-            <ResultLine key={index}>
-              <ToolResultBody
-                content={item.result.content}
-                isError={item.result.isError}
-              />
-            </ResultLine>
-          );
-        }
-        return <BlockLine key={index} block={item.block} />;
-      })}
-    </VStack>
-  );
-}
-
-function BlockLine({ block }: { block: ContentBlock }) {
-  if (block.kind === "text") {
-    // Assistant prose opens with the same bullet a tool call does — in the CLI
-    // they're peers in one stream, not separate kinds of thing.
-    return (
-      <HStack align="flex-start" gap={2}>
-        <Glyph char={GLYPH.bullet} color="green.fg" />
-        <Text
-          {...CELL}
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-          color={TERMINAL_TOKENS.screenFg}
-          flex={1}
-          minWidth={0}
-        >
-          {block.text}
-        </Text>
-      </HStack>
-    );
-  }
-  if (block.kind === "thinking") {
-    return (
-      <HStack align="flex-start" gap={2}>
-        <Glyph char={GLYPH.thinking} color={TERMINAL_TOKENS.faint} />
-        <Text
-          {...CELL}
-          fontStyle="italic"
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-          color={TERMINAL_TOKENS.faint}
-          flex={1}
-          minWidth={0}
-        >
-          {block.text}
-        </Text>
-      </HStack>
-    );
-  }
-  // Anything the transcript couldn't classify still gets printed rather than
-  // dropped — a terminal shows you what came back, even when it's odd.
-  if (block.kind === "raw") {
-    return (
-      <Text {...CELL} color={TERMINAL_TOKENS.faint}>
-        {safeStringify(block.data)}
-      </Text>
-    );
-  }
-  return null;
-}
-
 /**
- * `⏺ Tool(arg)` with its result hanging underneath on the `⎿` elbow. The bullet
- * is the only status signal — green ran, red failed — exactly as in the CLI.
+ * `⏺ Tool(arg)` with its result hanging underneath on the `⎿` elbow. The
+ * bullet is the only status signal — muted ran, red failed — matching how
+ * little chrome the real CLI draws around a tool call.
  */
 function ToolCall({
-  name,
-  input,
-  result,
+  entry,
   ran,
-  rejected,
 }: {
-  name: string;
-  input: unknown;
-  result: Extract<ContentBlock, { kind: "tool_result" }> | null;
+  entry: Extract<TranscriptEntry, { kind: "tool" }>;
   /** The tool's real span, when we have it. */
   ran: TerminalToolSpan | null;
-  /**
-   * Set when the user DENIED this tool. It never ran, so there is no span and no
-   * result — only a `tool_decision` log. Without this the call would render as a
-   * tool that mysteriously produced no output.
-   */
-  rejected: ToolRejection | null;
 }) {
-  // The span knows the command it really ran; the transcript only has what the
-  // model asked for. Prefer the former.
-  const arg = useMemo(
-    () => ran?.bashCommand ?? ran?.filePath ?? toolPrimaryArg(input),
-    [ran, input],
-  );
-  const isError = rejected !== null || (ran?.isError ?? result?.isError === true);
+  const arg = ran?.bashCommand ?? ran?.filePath ?? toolPrimaryArg(entry.input);
+  const isError = ran?.isError ?? entry.failed;
+  const name = ran?.toolName ?? entry.name;
 
   // Edit emits a real structured patch on its span. Only fall back to diffing
   // the tool's own `old_string` → `new_string` when that patch isn't there.
-  const patch = useMemo(() => parsePatchHunks(ran?.diff ?? null), [ran?.diff]);
-  const synthesizedDiff = useMemo(
-    () =>
-      patch === null && isDiffTool(name)
-        ? extractDiffFromToolInput(input)
-        : null,
-    [patch, name, input],
-  );
+  const patch = parsePatchHunks(ran?.diff ?? null);
+  const synthesizedDiff =
+    patch === null && isDiffTool(name) ? extractDiffFromToolInput(entry.input) : null;
 
   // Bash stdout / a file's content, as it actually came back — not the capped
-  // echo the model was handed.
+  // echo the model was handed. Falls back to the transcript's own output.
   const ranOutput = ran?.output ?? ran?.content ?? null;
+  const transcriptOutput =
+    ranOutput === null && entry.output !== null
+      ? toolResultBodyToString(entry.output)
+      : null;
 
   return (
     <VStack align="stretch" gap={0.5}>
       <HStack align="flex-start" gap={2}>
-        <Glyph char={GLYPH.bullet} color={isError ? "red.fg" : "green.fg"} />
+        <Glyph char={GLYPH.bullet} color={isError ? "red.fg" : TERMINAL_TOKENS.faint} />
         <Text {...CELL} color={TERMINAL_TOKENS.screenFg} flex={1} minWidth={0}>
           <Text as="span" fontWeight="bold">
-            {ran?.toolName ?? name}
+            {name}
           </Text>
           {arg ? (
             <Text as="span" color={TERMINAL_TOKENS.faint}>
               {`(${truncateArg(arg)})`}
             </Text>
           ) : null}
+          {entry.agentId !== null && (
+            <Text as="span" color={TERMINAL_TOKENS.faint}>
+              {" · sub-agent"}
+            </Text>
+          )}
         </Text>
         {ran !== null && ran.durationMs > 0 && (
           <Text {...CELL} color={TERMINAL_TOKENS.faint} flexShrink={0}>
@@ -413,14 +369,8 @@ function ToolCall({
       </HStack>
 
       <ResultLine>
-        {rejected ? (
-          <Text {...CELL} color="red.fg">
-            {rejected.source === "user_abort"
-              ? "Aborted by the user — this tool never ran"
-              : "Denied by the user — this tool never ran"}
-          </Text>
-        ) : patch ? (
-          <TerminalPatch hunks={patch} filePath={ran?.filePath} />
+        {patch ? (
+          <TerminalPatch hunks={patch} filePath={ran?.filePath ?? undefined} />
         ) : synthesizedDiff ? (
           <TerminalDiff
             oldText={synthesizedDiff.oldText}
@@ -429,8 +379,8 @@ function ToolCall({
           />
         ) : ranOutput !== null ? (
           <TerminalOutput text={ranOutput} isError={isError} maxHeight="360px" />
-        ) : result ? (
-          <ToolResultBody content={result.content} isError={result.isError} />
+        ) : transcriptOutput !== null && transcriptOutput.trim() !== "" ? (
+          <TerminalOutput text={transcriptOutput} isError={isError} maxHeight="360px" />
         ) : (
           <Text {...CELL} color={TERMINAL_TOKENS.faint}>
             (no output)
@@ -442,26 +392,46 @@ function ToolCall({
 }
 
 /**
+ * A tool the human turned down. It never ran, so there is no span and no
+ * output — only that it was asked for and refused.
+ */
+function RejectedLine({
+  name,
+  reason,
+}: {
+  name: string | null;
+  reason: string | null;
+}) {
+  const verb = reason === "user_abort" ? "aborted" : "denied";
+  return (
+    <HStack align="flex-start" gap={2}>
+      <Glyph char={GLYPH.denied} color="red.fg" />
+      <Text {...CELL} color="red.fg" flex={1} minWidth={0}>
+        {`${name ?? "A tool call"} — ${verb} by the user, never ran`}
+      </Text>
+    </HStack>
+  );
+}
+
+/**
  * A session-level fact with no span of its own — an API error, a refusal, a
  * mid-session context compaction. These live only in the logs, so without them
  * the session reads as if they never happened.
  */
-function SessionNoteLine({ note }: { note: SessionNote }) {
-  const isError = note.kind !== "compaction";
+function NoteLine({
+  level,
+  text,
+}: {
+  level: "info" | "warning" | "error";
+  text: string;
+}) {
+  const color =
+    level === "error" ? "red.fg" : level === "warning" ? "yellow.fg" : TERMINAL_TOKENS.faint;
   return (
     <HStack align="flex-start" gap={2}>
-      <Glyph
-        char={isError ? GLYPH.bullet : GLYPH.note}
-        color={isError ? "red.fg" : TERMINAL_TOKENS.faint}
-      />
-      <Text
-        {...CELL}
-        color={isError ? "red.fg" : TERMINAL_TOKENS.faint}
-        flex={1}
-        minWidth={0}
-        wordBreak="break-word"
-      >
-        {note.text}
+      <Glyph char={level === "error" ? GLYPH.bullet : GLYPH.note} color={color} />
+      <Text {...CELL} color={color} flex={1} minWidth={0} wordBreak="break-word">
+        {text}
       </Text>
     </HStack>
   );
@@ -477,24 +447,6 @@ function ResultLine({ children }: { children: React.ReactNode }) {
       </Box>
     </HStack>
   );
-}
-
-function ToolResultBody({
-  content,
-  isError,
-}: {
-  content: unknown;
-  isError?: boolean;
-}) {
-  const text = useMemo(() => toolResultBodyToString(content), [content]);
-  if (!text.trim()) {
-    return (
-      <Text {...CELL} color={TERMINAL_TOKENS.faint}>
-        (empty)
-      </Text>
-    );
-  }
-  return <TerminalOutput text={text} isError={isError} maxHeight="360px" />;
 }
 
 /**
@@ -526,8 +478,10 @@ function Glyph({
 
 /**
  * The bottom status line — the CLI's own idiom (`⏵⏵ auto mode on · …`), doing
- * real work here: it's the scrubber, and it reports what the session had cost
- * by the beat you're parked on.
+ * real work here: it's the scrubber, it names the session where Claude Code
+ * would show your input, and it reports what the session had cost by the beat
+ * you're parked on. Fixed to the bottom of the pane — it does not scroll away
+ * with the transcript above it.
  */
 function StatusLine({
   stepCount,
@@ -537,7 +491,7 @@ function StatusLine({
   costUsd,
   elapsedMs,
   model,
-  cwd,
+  sessionName,
 }: {
   stepCount: number;
   revealIndex: number;
@@ -545,8 +499,8 @@ function StatusLine({
   tokens: number;
   costUsd: number;
   elapsedMs: number;
-  model?: string;
-  cwd?: string;
+  model?: string | null;
+  sessionName?: string | null;
 }) {
   const scrubbable = stepCount > 1;
   return (
@@ -579,17 +533,21 @@ function StatusLine({
       )}
       <HStack gap={2} justify="space-between" flexWrap="wrap">
         <HStack gap={2} minWidth={0}>
-          <Text {...CELL} color="blue.fg" flexShrink={0} aria-hidden>
+          <Text {...CELL} color={TERMINAL_TOKENS.accent} flexShrink={0} aria-hidden>
             ⏵⏵
           </Text>
-          <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+          <Text
+            {...CELL}
+            color={TERMINAL_TOKENS.screenFg}
+            fontWeight="medium"
+            truncate
+            minWidth={0}
+          >
+            {sessionName ?? "Untitled session"}
+          </Text>
+          <Text {...CELL} color={TERMINAL_TOKENS.faint} flexShrink={0}>
             {`step ${Math.min(revealIndex + 1, stepCount)}/${stepCount}`}
           </Text>
-          {cwd && (
-            <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate minWidth={0}>
-              {`· ${cwd}`}
-            </Text>
-          )}
         </HStack>
         <HStack gap={3} flexWrap="wrap" justify="flex-end">
           {model && <Stat label={abbreviateModel(model)} />}
@@ -606,7 +564,7 @@ function Stat({ label, accent }: { label: string; accent?: boolean }) {
   return (
     <Text
       {...CELL}
-      color={accent ? "green.fg" : TERMINAL_TOKENS.faint}
+      color={accent ? TERMINAL_TOKENS.accent : TERMINAL_TOKENS.faint}
       fontWeight={accent ? "semibold" : undefined}
     >
       {label}
@@ -614,25 +572,7 @@ function Stat({ label, accent }: { label: string; accent?: boolean }) {
   );
 }
 
-/** Join a turn's text blocks into a single string. */
-function textOf(blocks: ContentBlock[]): string {
-  return blocks
-    .filter(
-      (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
-    )
-    .map((b) => b.text)
-    .join("\n");
-}
-
 function truncateArg(arg: string): string {
   const oneLine = arg.replace(/\s+/g, " ").trim();
   return oneLine.length > 120 ? `${oneLine.slice(0, 117)}…` : oneLine;
-}
-
-function safeStringify(value: unknown): string {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
 }

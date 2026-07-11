@@ -1,49 +1,38 @@
-import type { ConversationTurn } from "../transcript";
+import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 
 /**
- * One beat of a Claude Code session for the Terminal view: the already-shaped
- * conversation turn (reused verbatim from the transcript module) plus the
- * optional per-turn metrics that drive the time-travel scrubber. The metrics
- * come off the trace list item at the wiring site; the turn content comes from
- * `groupMessagesIntoTurns`, exactly as the conversation view builds it.
- */
-export interface TerminalStep {
-  turn: ConversationTurn;
-  /** Wall-clock start of this turn (ms epoch), for the timeline axis. */
-  timestamp?: number;
-  /** Tokens attributed to this turn. */
-  tokens?: number;
-  /** List-price cost of this turn, in USD. */
-  costUsd?: number;
-  /** Model that produced this turn, shown in the tool chrome. */
-  model?: string;
-}
-
-/**
- * Running totals at each step, so scrubbing the timeline to step _k_ can show
- * the cost/tokens/elapsed accumulated up to and including that step — the
+ * Running totals at each point in the transcript, so scrubbing to entry _k_
+ * can show the cost/tokens/elapsed accumulated up to and including it — the
  * "watch the cost tick up as you travel through time" HUD.
+ *
+ * Built over the FULL entry list, including `model_call` entries (which carry
+ * economics but render nothing) — so the totals advance at the exact point in
+ * the sequence the model call actually happened, not just at the visible
+ * beats around it.
  */
 export interface TimelinePoint {
   index: number;
   cumulativeTokens: number;
   cumulativeCostUsd: number;
-  /** Milliseconds since the first step with a timestamp. */
+  /** Milliseconds since the first entry. */
   elapsedMs: number;
 }
 
-export function buildTimeline(steps: TerminalStep[]): TimelinePoint[] {
-  const startTimestamp = steps.find((s) => s.timestamp != null)?.timestamp;
+export function buildEntryTimeline(entries: TranscriptEntry[]): TimelinePoint[] {
+  const startMs = entries[0]?.atMs;
   let cumulativeTokens = 0;
   let cumulativeCostUsd = 0;
-  return steps.map((step, index) => {
-    cumulativeTokens += step.tokens ?? 0;
-    cumulativeCostUsd += step.costUsd ?? 0;
-    const elapsedMs =
-      step.timestamp != null && startTimestamp != null
-        ? step.timestamp - startTimestamp
-        : 0;
-    return { index, cumulativeTokens, cumulativeCostUsd, elapsedMs };
+  return entries.map((entry, index) => {
+    if (entry.kind === "model_call") {
+      cumulativeTokens += entry.tokens;
+      cumulativeCostUsd += entry.costUsd;
+    }
+    return {
+      index,
+      cumulativeTokens,
+      cumulativeCostUsd,
+      elapsedMs: startMs != null ? entry.atMs - startMs : 0,
+    };
   });
 }
 

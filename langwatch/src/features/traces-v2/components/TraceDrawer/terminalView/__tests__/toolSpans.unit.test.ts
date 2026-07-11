@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
-import { indexToolSpansByUseId, parsePatchHunks } from "../toolSpans";
+import { indexToolSpansBySpanId, parsePatchHunks } from "../toolSpans";
 
 /**
  * Claude Code's real tool spans, and the `tool.output` span event they carry
@@ -34,15 +34,15 @@ function event(
   return { spanId, name, attributes };
 }
 
-describe("indexToolSpansByUseId", () => {
+describe("indexToolSpansBySpanId", () => {
   describe("given a Bash tool span with its tool.output event", () => {
-    it("keys it by tool_use_id and takes the real command and stdout", () => {
-      const index = indexToolSpansByUseId({
+    it("keys it by span id and takes the real command and stdout", () => {
+      const index = indexToolSpansBySpanId({
         spans: [
           span({
             spanId: "bash-1",
             durationMs: 2400,
-            params: { tool_name: "Bash", tool_use_id: "toolu_1" },
+            params: { tool_name: "Bash" },
           }),
         ],
         events: [
@@ -53,7 +53,7 @@ describe("indexToolSpansByUseId", () => {
         ],
       });
 
-      const ran = index.get("toolu_1");
+      const ran = index.get("bash-1");
       expect(ran?.toolName).toBe("Bash");
       expect(ran?.bashCommand).toBe("pnpm test");
       expect(ran?.output).toBe("1 failed, 40 passed");
@@ -62,31 +62,16 @@ describe("indexToolSpansByUseId", () => {
     });
   });
 
-  describe("given the id only under the OTel GenAI attribute", () => {
-    it("still keys the span, rather than dropping the tool call", () => {
-      const index = indexToolSpansByUseId({
-        spans: [
-          span({
-            params: { tool_name: "Read", "gen_ai.tool.call.id": "toolu_9" },
-          }),
-        ],
-        events: [],
-      });
-
-      expect(index.get("toolu_9")?.toolName).toBe("Read");
-    });
-  });
-
   describe("given the tool body failed on the execution child", () => {
     // The outer `tool` span covers permission + execution, so it can read "ok"
     // while the body that actually ran failed.
     it("marks the tool call as errored", () => {
-      const index = indexToolSpansByUseId({
+      const index = indexToolSpansBySpanId({
         spans: [
           span({
             spanId: "tool-1",
             status: "ok",
-            params: { tool_name: "Bash", tool_use_id: "toolu_2" },
+            params: { tool_name: "Bash" },
           }),
           span({
             spanId: "exec-1",
@@ -98,17 +83,17 @@ describe("indexToolSpansByUseId", () => {
         events: [],
       });
 
-      expect(index.get("toolu_2")?.isError).toBe(true);
+      expect(index.get("tool-1")?.isError).toBe(true);
     });
   });
 
   describe("given the tool.output event landed on the execution child", () => {
     it("still finds the output", () => {
-      const index = indexToolSpansByUseId({
+      const index = indexToolSpansBySpanId({
         spans: [
           span({
             spanId: "tool-1",
-            params: { tool_name: "Bash", tool_use_id: "toolu_3" },
+            params: { tool_name: "Bash" },
           }),
           span({
             spanId: "exec-1",
@@ -119,14 +104,14 @@ describe("indexToolSpansByUseId", () => {
         events: [event("exec-1", { output: "done" })],
       });
 
-      expect(index.get("toolu_3")?.output).toBe("done");
+      expect(index.get("tool-1")?.output).toBe("done");
     });
   });
 
-  describe("given a span with no tool_use_id", () => {
-    it("is skipped — there is nothing in the transcript to match it to", () => {
-      const index = indexToolSpansByUseId({
-        spans: [span({ params: { tool_name: "Bash" } })],
+  describe("given a span that isn't a tool call at all", () => {
+    it("is not included in the index", () => {
+      const index = indexToolSpansBySpanId({
+        spans: [span({ name: "claude_code.llm_request", params: {} })],
         events: [],
       });
 

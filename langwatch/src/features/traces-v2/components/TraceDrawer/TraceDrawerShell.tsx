@@ -311,6 +311,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                               projectId={project?.id ?? ""}
                               traceId={trace.traceId}
                               occurredAtMs={trace.timestamp}
+                              sessionName={
+                                trace.traceName?.trim() || trace.name?.trim() || null
+                              }
                             />
                           </Box>
                         </IsolatedErrorBoundary>

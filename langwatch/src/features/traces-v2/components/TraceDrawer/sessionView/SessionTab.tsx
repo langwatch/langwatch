@@ -26,6 +26,12 @@ export function SessionTab({
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
+  // Shares its cache key with the Terminal tab's own read, so switching tabs
+  // on a session already opened once costs nothing extra.
+  const transcriptQuery = api.tracesV2.codingAgentTranscript.useQuery(
+    { projectId, traceId, occurredAtMs },
+    { refetchOnWindowFocus: false, staleTime: 60_000, enabled: !!query.data },
+  );
 
   if (query.isLoading) return <SessionSkeleton />;
 
@@ -58,7 +64,7 @@ export function SessionTab({
     );
   }
 
-  return <SessionView session={query.data} />;
+  return <SessionView session={query.data} entries={transcriptQuery.data?.entries} />;
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

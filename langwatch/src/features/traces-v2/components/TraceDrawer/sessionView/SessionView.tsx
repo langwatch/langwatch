@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/codingAgentSession.foldProjection";
+import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { formatCost } from "../../../utils/formatters";
 import {
   deriveSessionSignals,
@@ -10,6 +11,8 @@ import {
   formatShortDuration,
   type SessionSignal,
 } from "./sessionSignals";
+import { TokenTimelineChart } from "./TokenTimelineChart";
+import { deriveTokenTimeline, findCacheRebuilds } from "./tokenTimeline";
 
 /**
  * The session overview for a coding agent.
@@ -26,10 +29,25 @@ import {
 
 interface SessionViewProps {
   session: CodingAgentSessionRow;
+  /**
+   * The session's transcript entries, for the per-call token timeline. The
+   * fold above is a bounded aggregate (ADR-040) — it has the SUM of cache
+   * reused/rebuilt but not the "where". Optional: without it the timeline
+   * section is simply omitted rather than the whole tab failing.
+   */
+  entries?: TranscriptEntry[];
 }
 
-export function SessionView({ session }: SessionViewProps) {
+export function SessionView({ session, entries }: SessionViewProps) {
   const signals = useMemo(() => deriveSessionSignals(session), [session]);
+  const tokenTimeline = useMemo(
+    () => (entries ? deriveTokenTimeline(entries) : []),
+    [entries],
+  );
+  const cacheRebuilds = useMemo(
+    () => (entries ? findCacheRebuilds(entries) : []),
+    [entries],
+  );
 
   return (
     <Box height="full" overflowY="auto">
@@ -42,6 +60,12 @@ export function SessionView({ session }: SessionViewProps) {
           it cost you money. Findings before figures.
         */}
         {signals.length > 0 && <Signals signals={signals} />}
+
+        {tokenTimeline.length > 0 && (
+          <Section title="Where the tokens went">
+            <TokenTimelineChart points={tokenTimeline} rebuilds={cacheRebuilds} />
+          </Section>
+        )}
 
         <Section title="What it did">
           <Steps steps={session.steps} />
