@@ -41,7 +41,7 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^3.0.44",
+    "@ai-sdk/anthropic": "^4.0.7",
     "@anthropic-ai/claude-code": "^2.1.195",
     "@eslint/js": "^10.0.1",
     "@langwatch/scenario": "^0.4.6",
@@ -50,7 +50,7 @@
     "@types/node": "^25.6.0",
     "@types/yargs": "^17.0.33",
     "@typescript/native-preview": "7.0.0-dev.20260628.1",
-    "ai": "^6.0.161",
+    "ai": "^7.0.14",
     "dotenv": "^17.2.2",
     "esbuild": "^0.28.1",
     "eslint": "^10.2.1",
