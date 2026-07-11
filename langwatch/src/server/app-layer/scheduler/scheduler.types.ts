@@ -26,8 +26,20 @@ export interface ScheduledJobRecord {
   timezone: string;
   /** Resolved UTC instant of the next fire (the forward marker). */
   nextRunAt: Date;
-  /** Last calendar instant fired; null until the first fire. */
+  /**
+   * Last calendar instant DELIVERED; null until the first delivered fire.
+   * Only advanced once a fire succeeds (see `settleClaim`), so a failed slot is
+   * retried, not silently skipped.
+   */
   lastSlot: Date | null;
+  /**
+   * Retry counter for the slot currently being worked. Bumped on each handler
+   * failure and reset to 0 once the slot is delivered (or abandoned to the next
+   * cron instant after the retry cap). The scheduler service owns the cap.
+   */
+  attempts: number;
+  /** Last handler error message, for operator observability. Null when clean. */
+  lastError: string | null;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -70,23 +82,56 @@ export interface ScheduledJobRepository {
   earliestActiveNextRunAt(): Promise<Date | null>;
 
   /**
-   * Atomically claim a due slot: a CONDITIONAL update
+   * Atomically LEASE a due slot: a CONDITIONAL update
    * `WHERE id = :id AND projectId = :projectId AND nextRunAt = :expectedNextRunAt`
-   * that advances `nextRunAt` and records `lastSlot`. Returns `true` iff this
-   * call won the claim — exactly one of N racing workers can, because Postgres
-   * serialises the update and the loser's WHERE no longer matches once the
-   * winner flips `nextRunAt`. This DB-level claim is the SOLE exactly-once
-   * mechanism (no Redis leader-lock), which is what lets multiple workers scan
-   * and fire concurrently to share load (ADR-042 §4 "No double-firing").
-   * `projectId` is included purely to satisfy the multitenancy guard; it is
-   * always the row's own project, so it does not weaken the claim.
+   * that pushes `nextRunAt` to `leaseUntil` (a near-future instant) and touches
+   * NOTHING else — `lastSlot`, `attempts`, `lastError` are left as-is because
+   * the slot is not yet delivered. Returns `true` iff this call won the lease —
+   * exactly one of N racing workers can, because Postgres serialises the update
+   * and the loser's WHERE no longer matches once the winner moves `nextRunAt`.
+   *
+   * Leasing (not advancing to the next cron slot) is what makes a failed fire
+   * retryable: `findDue` selects `nextRunAt <= now`, so the leased row is
+   * invisible to every worker — including this one — until the lease elapses.
+   * That both stops a second worker double-claiming AND is the natural backoff
+   * if this worker crashes before settling (the lease expires and the slot is
+   * re-fired). The service advances the calendar only via `settleClaim` after a
+   * delivered fire. This DB-level lease is the SOLE exactly-once mechanism (no
+   * Redis leader-lock), which is what lets multiple workers scan and fire
+   * concurrently to share load (ADR-042 §4 "No double-firing"). `projectId` is
+   * included purely to satisfy the multitenancy guard; it is always the row's
+   * own project, so it does not weaken the claim.
    */
   claim(params: {
     id: string;
     projectId: string;
     expectedNextRunAt: Date;
+    leaseUntil: Date;
+  }): Promise<boolean>;
+
+  /**
+   * Resolve a lease this worker holds: a CONDITIONAL update
+   * `WHERE id = :id AND projectId = :projectId AND nextRunAt = :expectedLease`
+   * that writes the next schedule + retry bookkeeping in one atomic step. The
+   * guard is the lease value `claim` set, so only the lease-holder can settle
+   * (a lease that expired and got re-claimed by another worker → 0 rows, this
+   * call returns `false`). The SERVICE decides the values — this is a dumb
+   * conditional writer that carries no retry policy:
+   *   - delivered: `nextRunAt` = next cron instant, `lastSlot` = the slot,
+   *     `attempts` = 0, `lastError` = null.
+   *   - retry: `nextRunAt` = now + backoff, `lastSlot` unchanged (pass the
+   *     row's existing value), `attempts` bumped, `lastError` = message.
+   *   - abandoned / released: `nextRunAt` = next cron instant, `lastSlot`
+   *     unchanged, `attempts` = 0.
+   */
+  settleClaim(params: {
+    id: string;
+    projectId: string;
+    expectedLease: Date;
     nextRunAt: Date;
-    lastSlot: Date;
+    lastSlot: Date | null;
+    attempts: number;
+    lastError: string | null;
   }): Promise<boolean>;
 
   /**

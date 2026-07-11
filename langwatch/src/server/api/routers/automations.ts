@@ -1125,6 +1125,16 @@ export const automationRouter = createTRPCRouter({
           cron: input.report.schedule.cron,
           timezone: input.report.schedule.timezone,
         });
+      } else {
+        // Editing a report into a trace automation or graph alert must retire
+        // its calendar entry — otherwise the ScheduledJob keeps waking forever
+        // and the report handler repeatedly loads a now-non-report trigger,
+        // fails to parse its actionParams, and skips every cadence. Idempotent,
+        // so a trigger that was never a report costs one no-op deactivate.
+        await getApp().triggers.removeReportSchedule({
+          projectId: input.projectId,
+          triggerId: trigger.id,
+        });
       }
 
       await getApp().triggers.invalidate(input.projectId);

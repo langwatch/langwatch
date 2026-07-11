@@ -52,6 +52,7 @@ import {
   type GraphAlertDispatchResult,
 } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
 import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
+import { createLogger } from "~/utils/logger/server";
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,
@@ -61,6 +62,8 @@ import type {
   OpenGraphTriggerSent,
 } from "./repositories/trigger.repository";
 import { parseSeriesIndex } from "./seriesName";
+
+const logger = createLogger("langwatch:graph-trigger-evaluation");
 
 /**
  * What woke the evaluator up. Carried into logs + telemetry so operators can
@@ -324,8 +327,10 @@ export async function evaluateGraphTrigger({
 
   if (breached) {
     if (openTriggerSent) {
-      // Already firing — only update lastRunAt, do not notify again.
-      // Mirrors cron's `already_firing` branch.
+      // Already firing — cheap pre-check only. Update lastRunAt, do not notify
+      // again. Mirrors cron's `already_firing` branch. This avoids a doomed
+      // INSERT on the common already-firing path; the claim's unique violation
+      // below is the real guarantee.
       await deps.updateLastRunAt({ triggerId, projectId });
       return {
         triggerId,
@@ -406,12 +411,42 @@ export async function evaluateGraphTrigger({
     // generation — it keys the per-recipient idempotency ledger so an outbox
     // retry of THIS fire doesn't re-notify anyone the previous attempt reached.
     // There is no open incident on this branch, so this reads the last resolved
-    // one (null on the alert's very first fire).
+    // one (null on the alert's very first fire). Read BEFORE the claim so it
+    // reflects the PREVIOUS incident, not the row we are about to open.
     const previousFire = await deps.triggerSent.findLatestForGraphAlert({
       triggerId,
       projectId,
       customGraphId,
     });
+
+    // ADR-034 P1: atomically claim the open incident BEFORE any provider side
+    // effect. `findOpenForGraphAlert` above is only a pre-check — two evaluators
+    // can both pass it before either writes a row (traceId is NULL for graph
+    // alerts, so `@@unique([triggerId, traceId])` can't guard them). The
+    // single-column unique on `openIncidentKey` arbitrates the INSERT: the loser
+    // gets null here and backs off WITHOUT dispatching, so a breach fans out at
+    // most one notification. Bot-destination resolution above may throw, but it
+    // is pure-local (no provider call) and runs before the claim, so an
+    // unresolvable connection dead-letters without orphaning an open row.
+    const claim = await deps.triggerSent.claimOpenForGraphAlert({
+      triggerId,
+      projectId,
+      customGraphId,
+    });
+    if (!claim) {
+      logger.debug(
+        { triggerId, projectId, customGraphId },
+        "Another evaluator already claimed this graph-alert fire — backing off without dispatching",
+      );
+      await deps.updateLastRunAt({ triggerId, projectId });
+      return {
+        triggerId,
+        projectId,
+        reason,
+        status: "already_firing",
+        value: currentValue,
+      };
+    }
 
     const dispatchResult = await deps.notifier.dispatch({
       trigger,
@@ -427,13 +462,15 @@ export async function evaluateGraphTrigger({
       }),
     });
 
-    // An alert that told nobody is not "currently firing". Opening the incident
-    // here would light the alert up in the UI, stamp a last-fired time, and —
+    // An alert that told nobody is not "currently firing". Leaving the claim
+    // open would light the alert up in the UI, stamp a last-fired time, and —
     // worst of all — suppress every future notification until the metric
     // recovers, because `findOpenForGraphAlert` would keep returning this row.
-    // The scheduled-report path gates `recordFire` on delivery for exactly this
+    // Roll the claim back so the next evaluation can re-claim and re-dispatch.
+    // The scheduled-report path gates `recordFire` on delivery for the same
     // reason (see `report-dispatch.ts`).
     if (!dispatchResult.didSend) {
+      await deps.triggerSent.deleteOpenClaim({ id: claim.id, projectId });
       await deps.updateLastRunAt({ triggerId, projectId });
       return {
         triggerId,
@@ -448,13 +485,9 @@ export async function evaluateGraphTrigger({
       };
     }
 
-    // Record the fire BEFORE updateLastRunAt — same order as the cron
-    // (`addTriggersSent` then `updateAlert`).
-    await deps.triggerSent.createOpenForGraphAlert({
-      triggerId,
-      projectId,
-      customGraphId,
-    });
+    // Delivered — the claim row IS the open incident (written before the send),
+    // so there is nothing more to record. Just stamp lastRunAt, same order as
+    // the cron (`addTriggersSent` then `updateAlert`).
     await deps.updateLastRunAt({ triggerId, projectId });
 
     return {

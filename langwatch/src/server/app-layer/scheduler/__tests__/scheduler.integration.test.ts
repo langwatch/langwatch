@@ -83,7 +83,12 @@ describe("SchedulerService (real Postgres, no Redis)", () => {
             projectId,
             targetType: "test-once",
             targetId,
-            cron: "* * * * *", // every minute — advance is strictly > now
+            // Hourly, not every-minute: the delivered-fire advance is
+            // `computeNextRunAt(after: slot)`, so a coarse cron keeps the next
+            // instant unambiguously in the future (the next top-of-hour after a
+            // ~1s-old slot) and the row can't immediately re-fire a catch-up
+            // slot — which would race the strict exactly-once assertion below.
+            cron: "0 * * * *",
             timezone: "UTC",
             nextRunAt: slot,
           },
@@ -246,15 +251,13 @@ describe("SchedulerService (real Postgres, no Redis)", () => {
             id: created.id,
             projectId,
             expectedNextRunAt: slot,
-            nextRunAt: new Date(Date.now() + 60_000),
-            lastSlot: slot,
+            leaseUntil: new Date(Date.now() + 60_000),
           }),
           repo.claim({
             id: created.id,
             projectId,
             expectedNextRunAt: slot,
-            nextRunAt: new Date(Date.now() + 120_000),
-            lastSlot: slot,
+            leaseUntil: new Date(Date.now() + 120_000),
           }),
         ]);
 

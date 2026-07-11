@@ -70,9 +70,10 @@ import {
   type EvaluateGraphTriggerResult,
   type GraphTriggerEvaluationDeps,
 } from "../graph-trigger-evaluation.service";
-import type {
-  GraphTriggerSentRepository,
-  OpenGraphTriggerSent,
+import {
+  graphAlertIncidentKey,
+  type GraphTriggerSentRepository,
+  type OpenGraphTriggerSent,
 } from "../repositories/trigger.repository";
 
 // ─────────────────────────────────────────────────────────────────────
@@ -376,11 +377,18 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     return latest ? { id: latest.id } : null;
   }
 
-  async createOpenForGraphAlert(params: {
+  async claimOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
-  }): Promise<OpenGraphTriggerSent> {
+  }): Promise<OpenGraphTriggerSent | null> {
+    // Faithful to the DB: the openIncidentKey unique blocks a second OPEN
+    // incident for the same identity — the loser gets null.
+    const key = graphAlertIncidentKey({ triggerId: params.triggerId });
+    const held = this.openRows.some(
+      (r) => graphAlertIncidentKey({ triggerId: r.triggerId }) === key,
+    );
+    if (held) return null;
     const row: OpenGraphTriggerSent = {
       id: `sent-${this.allRows.length + 1}`,
       ...params,
@@ -388,6 +396,11 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     this.openRows.push(row);
     this.allRows.push(row);
     return row;
+  }
+
+  async deleteOpenClaim(params: { id: string }): Promise<void> {
+    this.openRows = this.openRows.filter((r) => r.id !== params.id);
+    this.allRows = this.allRows.filter((r) => r.id !== params.id);
   }
 
   async markResolvedById(params: { id: string }): Promise<void> {

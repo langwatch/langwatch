@@ -85,6 +85,12 @@ pnpm dev                            # from langwatch/
     "customGraphId" IS NOT NULL`).
   - `20260711100000_add_trigger_filter_query` — nullable
     `Trigger.filterQuery` column.
+  - `20260711110000_add_trigger_sent_open_incident_key` — nullable
+    `TriggerSent.openIncidentKey` column with a single-column unique
+    index (the atomic open-incident claim for graph alerts).
+  - `20260711120000_add_scheduled_job_retry` — `ScheduledJob.attempts`
+    (NOT NULL default 0) and nullable `ScheduledJob.lastError` (the
+    report scheduler's retry bookkeeping).
 - Test tenant prep: one project with `release_es_graph_triggers_firing`
   ON, one dashboard with at least one custom-graph chart. Have an
   email address you can inbox and a Slack webhook you can watch.

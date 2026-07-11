@@ -85,6 +85,33 @@ export interface OpenGraphTriggerSent {
 }
 
 /**
+ * The identity of an open graph-alert incident. Written to
+ * `TriggerSent.openIncidentKey` while the alert is firing and cleared to NULL
+ * on resolve. The single-column unique index on that column turns the INSERT
+ * into the atomic claim: at most ONE open incident can exist per identity,
+ * because Postgres treats NULLs as distinct (so any number of resolved rows,
+ * all carrying NULL, coexist).
+ *
+ * `@@unique([triggerId, traceId])` cannot guard graph alerts — `traceId` is
+ * NULL for them — which is exactly the race this key closes: two evaluators
+ * that both pass the `findOpenForGraphAlert` pre-check cannot both open an
+ * incident once the INSERT arbitrates on this column.
+ *
+ * Namespaced with a `graph-alert:` prefix so the column can host other incident
+ * kinds later without their keyspaces colliding. `triggerId` is globally
+ * unique, so one trigger maps to exactly one live incident identity. This is
+ * the single source of truth for the string — the claim writes it and the
+ * resolve clears it, so nothing else may hand-roll the format.
+ */
+export function graphAlertIncidentKey({
+  triggerId,
+}: {
+  triggerId: string;
+}): string {
+  return `graph-alert:${triggerId}`;
+}
+
+/**
  * Repository surface for the event-sourced graph-trigger path
  * (ADR-034 Phase 5). Models the EXACT TriggerSent dedup the cron uses:
  * the (triggerId, projectId, customGraphId, resolvedAt IS NULL)
@@ -121,20 +148,40 @@ export interface GraphTriggerSentRepository {
   }): Promise<{ id: string } | null>;
 
   /**
-   * Mirror of cron's `addTriggersSent` graph branch
-   * (src/pages/api/cron/triggers/utils.ts:39-48): one create per fire,
-   * traceId null, customGraphId set, resolvedAt null.
+   * Atomically claim the alert's single OPEN incident BEFORE any provider
+   * side effect (ADR-034 P1). Inserts a TriggerSent row (traceId null,
+   * customGraphId set, resolvedAt null) with `openIncidentKey` set to
+   * {@link graphAlertIncidentKey}. The single-column unique on that column is
+   * the real race guard: exactly one concurrent evaluator inserts, the rest hit
+   * a Prisma P2002 unique violation.
+   *
+   * Returns the created row for the winner, or `null` for a caller that lost
+   * the race — the loser MUST NOT dispatch. Replaces the former
+   * check-then-`createOpenForGraphAlert`, whose window let two evaluators both
+   * pass the pre-check and both dispatch before either wrote its row.
    */
-  createOpenForGraphAlert(params: {
+  claimOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
-  }): Promise<OpenGraphTriggerSent>;
+  }): Promise<OpenGraphTriggerSent | null>;
+
+  /**
+   * Roll back a claim whose dispatch delivered nothing (didSend false): delete
+   * the just-claimed row so its `openIncidentKey` frees up and the next
+   * evaluation can re-claim and re-dispatch. Without this an alert that reached
+   * nobody would sit "firing" forever, suppressing every future notification —
+   * the guarantee the didSend gate added.
+   */
+  deleteOpenClaim(params: { id: string; projectId: string }): Promise<void>;
 
   /**
    * Mirror of cron's resolve sequence
    * (src/pages/api/cron/triggers/customGraphTrigger.ts:264-271): update
-   * by id+projectId, set resolvedAt = now.
+   * by id+projectId, set resolvedAt = now — AND clear `openIncidentKey` back to
+   * NULL, so the identity frees for the next fire. Setting resolvedAt without
+   * clearing the key would wedge the alert: the next claim's INSERT would hit
+   * the still-held unique key and never fire again.
    */
   markResolvedById(params: {
     id: string;

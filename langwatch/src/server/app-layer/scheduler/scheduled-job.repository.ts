@@ -46,7 +46,8 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     // the boundary by the session offset — firing future jobs hours early).
     const rows = await this.prisma.$queryRaw<ScheduledJobRecord[]>`
       SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
-             "nextRunAt", "lastSlot", "active", "createdAt", "updatedAt"
+             "nextRunAt", "lastSlot", "attempts", "lastError", "active",
+             "createdAt", "updatedAt"
       FROM "ScheduledJob"
       WHERE "active" = true AND "nextRunAt" <= ${toPgTimestampUtc(now)}::timestamp
       ORDER BY "nextRunAt" ASC
@@ -73,21 +74,27 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     id,
     projectId,
     expectedNextRunAt,
-    nextRunAt,
-    lastSlot,
+    leaseUntil,
   }: {
     id: string;
     projectId: string;
     expectedNextRunAt: Date;
-    nextRunAt: Date;
-    lastSlot: Date;
+    leaseUntil: Date;
   }): Promise<boolean> {
     // The correctness core (ADR-042 §4): a CONDITIONAL update guarded on the
     // exact `nextRunAt` we read during the due-scan. N workers racing the same
     // due row all issue this UPDATE; Postgres row-locks serialise them, the
-    // first flips `nextRunAt` so every other WHERE no longer matches (0 rows
+    // first moves `nextRunAt` so every other WHERE no longer matches (0 rows
     // affected). Exactly one worker wins the slot — the whole exactly-once
     // guarantee, no Redis required.
+    //
+    // This is a LEASE, not an advance: `nextRunAt` jumps to a near-future
+    // `leaseUntil` and NOTHING else changes (`lastSlot`/`attempts`/`lastError`
+    // stay put — the slot is not delivered yet). Because `findDue` selects
+    // `nextRunAt <= now`, the leased row is invisible until the lease elapses,
+    // so the calendar is only advanced later by `settleClaim` after a delivered
+    // fire, and a crash before settle just re-fires the slot when the lease
+    // expires. The service owns lease duration + retry policy.
     //
     // MUST be a single raw UPDATE, NOT prisma.updateMany, for TWO reasons:
     //   1. When the where contains the `@id`, Prisma collapses the compound
@@ -106,12 +113,50 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     // guard's raw-query tenancy check; it always equals the row's own project.
     const affected = await this.prisma.$executeRaw`
       UPDATE "ScheduledJob"
-      SET "nextRunAt" = ${toPgTimestampUtc(nextRunAt)}::timestamp,
-          "lastSlot" = ${toPgTimestampUtc(lastSlot)}::timestamp,
+      SET "nextRunAt" = ${toPgTimestampUtc(leaseUntil)}::timestamp,
           "updatedAt" = now()
       WHERE "id" = ${id}
         AND "projectId" = ${projectId}
         AND "nextRunAt" = ${toPgTimestampUtc(expectedNextRunAt)}::timestamp
+    `;
+    return affected === 1;
+  }
+
+  async settleClaim({
+    id,
+    projectId,
+    expectedLease,
+    nextRunAt,
+    lastSlot,
+    attempts,
+    lastError,
+  }: {
+    id: string;
+    projectId: string;
+    expectedLease: Date;
+    nextRunAt: Date;
+    lastSlot: Date | null;
+    attempts: number;
+    lastError: string | null;
+  }): Promise<boolean> {
+    // Settle a lease this worker owns: a CONDITIONAL update guarded on the exact
+    // `leaseUntil` value `claim` set. Only the lease-holder matches; a lease
+    // that expired and was re-claimed by another worker → 0 rows → `false`.
+    // Single raw UPDATE for the same two reasons as `claim` (atomic guard +
+    // naive-UTC `::timestamp` comparison). `lastSlot` is nullable: binding a JS
+    // `null` yields `NULL::timestamp` (SQL NULL), so "leave unchanged" is
+    // expressed by passing the row's existing value back. `lastError` is a text
+    // column — binds directly, `null` → SQL NULL. `attempts` binds as int.
+    const affected = await this.prisma.$executeRaw`
+      UPDATE "ScheduledJob"
+      SET "nextRunAt" = ${toPgTimestampUtc(nextRunAt)}::timestamp,
+          "lastSlot" = ${lastSlot === null ? null : toPgTimestampUtc(lastSlot)}::timestamp,
+          "attempts" = ${attempts},
+          "lastError" = ${lastError},
+          "updatedAt" = now()
+      WHERE "id" = ${id}
+        AND "projectId" = ${projectId}
+        AND "nextRunAt" = ${toPgTimestampUtc(expectedLease)}::timestamp
     `;
     return affected === 1;
   }
@@ -193,7 +238,8 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     // opt-out for a system-owned cross-tenant view (read-only, never fires).
     return this.prisma.$queryRaw<ScheduledJobRecord[]>`
       SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
-             "nextRunAt", "lastSlot", "active", "createdAt", "updatedAt"
+             "nextRunAt", "lastSlot", "attempts", "lastError", "active",
+             "createdAt", "updatedAt"
       FROM "ScheduledJob"
       ORDER BY "active" DESC, "nextRunAt" ASC
       LIMIT ${limit}
@@ -216,6 +262,9 @@ export class NullScheduledJobRepository implements ScheduledJobRepository {
     return null;
   }
   async claim(): Promise<boolean> {
+    return false;
+  }
+  async settleClaim(): Promise<boolean> {
     return false;
   }
   async upsertForTarget(): Promise<void> {}

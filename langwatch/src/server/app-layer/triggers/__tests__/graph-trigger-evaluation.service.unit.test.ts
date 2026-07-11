@@ -7,9 +7,10 @@ import {
   evaluateGraphTrigger,
   type GraphTriggerEvaluationDeps,
 } from "../graph-trigger-evaluation.service";
-import type {
-  GraphTriggerSentRepository,
-  OpenGraphTriggerSent,
+import {
+  graphAlertIncidentKey,
+  type GraphTriggerSentRepository,
+  type OpenGraphTriggerSent,
 } from "../repositories/trigger.repository";
 
 const PROJECT_ID = "proj-1";
@@ -102,7 +103,8 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
   /** Every incident ever created, open or resolved — the fire generation the
    *  per-recipient idempotency digest is keyed on. */
   allRows: OpenGraphTriggerSent[] = [];
-  createCalls = 0;
+  claimCalls = 0;
+  deleteCalls: Array<{ id: string; projectId: string }> = [];
   resolveCalls: Array<{ id: string; projectId: string; now: Date }> = [];
 
   async findOpenForGraphAlert(params: {
@@ -135,12 +137,22 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     return latest ? { id: latest.id } : null;
   }
 
-  async createOpenForGraphAlert(params: {
+  // Faithful to the DB: the atomic claim arbitrates on `openIncidentKey`
+  // (= graphAlertIncidentKey(triggerId)). If an OPEN row already holds that
+  // identity, the INSERT would hit the single-column unique — modelled here as
+  // returning null. The check-and-push has no `await` between them, so it is
+  // atomic under Promise.all exactly as a Postgres INSERT is.
+  async claimOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
-  }): Promise<OpenGraphTriggerSent> {
-    this.createCalls++;
+  }): Promise<OpenGraphTriggerSent | null> {
+    this.claimCalls++;
+    const key = graphAlertIncidentKey({ triggerId: params.triggerId });
+    const held = this.openRows.some(
+      (r) => graphAlertIncidentKey({ triggerId: r.triggerId }) === key,
+    );
+    if (held) return null;
     const row: OpenGraphTriggerSent = {
       id: `sent-${this.allRows.length + 1}`,
       ...params,
@@ -150,12 +162,23 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     return row;
   }
 
+  async deleteOpenClaim(params: { id: string; projectId: string }): Promise<void> {
+    this.deleteCalls.push(params);
+    // A real delete removes the row entirely — from the open set AND the fire
+    // generation, so a rolled-back claim never advances `findLatestForGraphAlert`.
+    this.openRows = this.openRows.filter((r) => r.id !== params.id);
+    this.allRows = this.allRows.filter((r) => r.id !== params.id);
+  }
+
   async markResolvedById(params: {
     id: string;
     projectId: string;
     now: Date;
   }): Promise<void> {
     this.resolveCalls.push(params);
+    // Resolve frees the identity (clears openIncidentKey): the row leaves the
+    // OPEN set so the next claim on the same triggerId succeeds. It stays in
+    // allRows — resolved incidents persist as the fire generation.
     this.openRows = this.openRows.filter((r) => r.id !== params.id);
   }
 }
@@ -292,7 +315,7 @@ describe("evaluateGraphTrigger", () => {
       expect(result.status).toBe("fired");
       expect(result.value).toBe(15);
       expect(harness.dispatch).toHaveBeenCalledTimes(1);
-      expect(harness.triggerSent.createCalls).toBe(1);
+      expect(harness.triggerSent.claimCalls).toBe(1);
       expect(harness.triggerSent.openRows).toHaveLength(1);
       expect(harness.triggerSent.openRows[0]?.customGraphId).toBe(GRAPH_ID);
       expect(harness.updateLastRunAt).toHaveBeenCalledWith({
@@ -530,7 +553,8 @@ describe("evaluateGraphTrigger", () => {
 
       expect(result.status).toBe("already_firing");
       expect(harness.dispatch).not.toHaveBeenCalled();
-      expect(harness.triggerSent.createCalls).toBe(0);
+      // The cheap pre-check short-circuits before the claim INSERT is attempted.
+      expect(harness.triggerSent.claimCalls).toBe(0);
       expect(harness.updateLastRunAt).toHaveBeenCalledTimes(1);
     });
 
@@ -553,7 +577,7 @@ describe("evaluateGraphTrigger", () => {
 
       expect(second.status).toBe("already_firing");
       expect(harness.dispatch).toHaveBeenCalledTimes(1);
-      expect(harness.triggerSent.createCalls).toBe(1);
+      expect(harness.triggerSent.claimCalls).toBe(1);
     });
   });
 
@@ -597,7 +621,7 @@ describe("evaluateGraphTrigger", () => {
       });
     });
 
-    it("does not open an incident, so future notifications are not suppressed", async () => {
+    it("rolls the claim back, so no open incident is left to suppress future notifications", async () => {
       const result = await evaluateGraphTrigger({
         deps: harness.deps,
         triggerId: TRIGGER_ID,
@@ -608,8 +632,19 @@ describe("evaluateGraphTrigger", () => {
       expect(result.status).toBe("not_delivered");
       expect(result.didSend).toBe(false);
       expect(harness.dispatch).toHaveBeenCalledTimes(1);
-      expect(harness.triggerSent.createCalls).toBe(0);
+      // The claim is taken pre-send (claim-before-send), then rolled back
+      // because nothing was delivered — so no open incident lingers.
+      expect(harness.triggerSent.claimCalls).toBe(1);
+      expect(harness.triggerSent.deleteCalls).toHaveLength(1);
       expect(harness.triggerSent.openRows).toHaveLength(0);
+      // The pre-check is null again — the next evaluation can re-claim.
+      expect(
+        await harness.triggerSent.findOpenForGraphAlert({
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          customGraphId: GRAPH_ID,
+        }),
+      ).toBeNull();
     });
 
     it("re-dispatches on the next evaluation instead of reporting already_firing", async () => {
@@ -619,9 +654,9 @@ describe("evaluateGraphTrigger", () => {
         projectId: PROJECT_ID,
         reason: "real-time",
       });
-      // A real second breach: had the first (undelivered) evaluation opened an
-      // incident, this would short-circuit to `already_firing` and the customer
-      // would never hear about the breach at all.
+      // A real second breach: had the first (undelivered) evaluation left an
+      // open claim, this would short-circuit to `already_firing` and the
+      // customer would never hear about the breach at all.
       harness.dispatch.mockResolvedValue({
         channel: "slack",
         didSend: true,
@@ -637,7 +672,10 @@ describe("evaluateGraphTrigger", () => {
 
       expect(second.status).toBe("fired");
       expect(harness.dispatch).toHaveBeenCalledTimes(2);
-      expect(harness.triggerSent.createCalls).toBe(1);
+      // Both evaluations claimed; the first claim was rolled back, the second
+      // kept — exactly one open incident survives.
+      expect(harness.triggerSent.claimCalls).toBe(2);
+      expect(harness.triggerSent.openRows).toHaveLength(1);
     });
   });
 
@@ -695,15 +733,24 @@ describe("evaluateGraphTrigger", () => {
       ).rejects.toThrow(/missing its token or channel/);
 
       expect(harness.dispatch).not.toHaveBeenCalled();
-      expect(harness.triggerSent.createCalls).toBe(0);
+      // The throw happens during bot-destination resolution, which runs BEFORE
+      // the claim — so no incident is claimed and none is orphaned.
+      expect(harness.triggerSent.claimCalls).toBe(0);
     });
   });
 
-  describe("given a fire that is retried after its incident write failed", () => {
-    it("carries the same fire digest, so the ledger can suppress the re-send", async () => {
-      harness.triggerSent.createOpenForGraphAlert = async () => {
-        throw new Error("postgres is down");
-      };
+  // ADR-034 P1: the claim is taken BEFORE the send, so once it commits an
+  // outbox retry that re-runs the whole evaluation short-circuits at the
+  // pre-check instead of dispatching a second time.
+  describe("given a delivered fire whose bookkeeping then fails", () => {
+    it("does not re-dispatch on the retry — the committed claim short-circuits the pre-check", async () => {
+      let updateCalls = 0;
+      harness.updateLastRunAt.mockImplementation(async () => {
+        updateCalls++;
+        // First attempt: the send succeeded and the claim committed, but the
+        // trailing bookkeeping throws, so the outbox retries the evaluation.
+        if (updateCalls === 1) throw new Error("postgres is down");
+      });
 
       await expect(
         evaluateGraphTrigger({
@@ -714,27 +761,109 @@ describe("evaluateGraphTrigger", () => {
         }),
       ).rejects.toThrow(/postgres is down/);
 
-      // The outbox retries the whole evaluation. No incident row was written,
-      // so the fire generation has not moved and the digest is unchanged —
-      // which is what lets the dispatcher's per-recipient gate recognise the
-      // recipients the first attempt already reached.
-      await expect(
+      const retry = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(retry.status).toBe("already_firing");
+      // Exactly one delivery across the original attempt and its retry.
+      expect(harness.dispatch).toHaveBeenCalledTimes(1);
+      // The retry sees the open claim and never attempts a second INSERT.
+      expect(harness.triggerSent.claimCalls).toBe(1);
+    });
+  });
+
+  // ADR-034 P1 (the core fix): two evaluators that BOTH pass the
+  // findOpenForGraphAlert pre-check race on the claim. Only the INSERT winner
+  // may dispatch — the loser hits the openIncidentKey unique and backs off.
+  describe("given two concurrent evaluators that both pass the open pre-check", () => {
+    it("lets exactly one claim win and dispatch, the loser backs off", async () => {
+      // Force BOTH evaluators past the cheap pre-check (as if each read the
+      // empty open set before either wrote its row). The claim's atomic
+      // check-and-insert in the fake is the only arbiter left — exactly the DB
+      // unique constraint's job.
+      harness.getTimeseries.mockResolvedValue(timeseries(15));
+      const findOpen = vi
+        .spyOn(harness.triggerSent, "findOpenForGraphAlert")
+        .mockResolvedValue(null);
+
+      const [a, b] = await Promise.all([
         evaluateGraphTrigger({
           deps: harness.deps,
           triggerId: TRIGGER_ID,
           projectId: PROJECT_ID,
           reason: "real-time",
         }),
-      ).rejects.toThrow(/postgres is down/);
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ]);
 
-      const first = harness.dispatch.mock.calls[0]?.[0] as {
-        fireDigest: string;
-      };
-      const retry = harness.dispatch.mock.calls[1]?.[0] as {
-        fireDigest: string;
-      };
-      expect(first.fireDigest).toBeTruthy();
-      expect(retry.fireDigest).toBe(first.fireDigest);
+      const statuses = [a.status, b.status].sort();
+      expect(statuses).toEqual(["already_firing", "fired"]);
+      // Only the winner dispatched — a single breach fans out one notification.
+      expect(harness.dispatch).toHaveBeenCalledTimes(1);
+      // Both attempted the claim; only one row survives open.
+      expect(harness.triggerSent.claimCalls).toBe(2);
+      expect(harness.triggerSent.openRows).toHaveLength(1);
+
+      findOpen.mockRestore();
+    });
+  });
+
+  describe("given an incident that resolves after firing", () => {
+    it("frees the identity so the next breach can re-claim and dispatch again", async () => {
+      // First breach fires and opens an incident.
+      const first = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+      expect(first.status).toBe("fired");
+      expect(harness.triggerSent.openRows).toHaveLength(1);
+
+      // Metric recovers → the open incident resolves and clears the key.
+      harness.getTimeseries.mockResolvedValue(timeseries(2));
+      const resolved = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "heartbeat-resolve",
+      });
+      expect(resolved.status).toBe("resolved");
+      expect(harness.triggerSent.resolveCalls).toHaveLength(1);
+      expect(harness.triggerSent.openRows).toHaveLength(0);
+
+      // Metric breaches again → because the identity was freed, the same
+      // trigger can re-claim and dispatch. (If resolve had NOT cleared the key,
+      // this claim would collide and the alert could never fire twice.)
+      harness.getTimeseries.mockResolvedValue(timeseries(20));
+      const second = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(second.status).toBe("fired");
+      expect(harness.dispatch).toHaveBeenCalledTimes(2);
+      // The two fires carry DISTINCT digests — the resolved first incident is
+      // the second fire's generation, so retries never conflate them.
+      const firstDigest = (
+        harness.dispatch.mock.calls[0]?.[0] as { fireDigest: string }
+      ).fireDigest;
+      const secondDigest = (
+        harness.dispatch.mock.calls[1]?.[0] as { fireDigest: string }
+      ).fireDigest;
+      expect(firstDigest).toBeTruthy();
+      expect(secondDigest).not.toBe(firstDigest);
     });
   });
 
@@ -780,7 +909,7 @@ describe("evaluateGraphTrigger", () => {
       expect(result.status).toBe("fired");
       expect(result.detail).toBe("no-data predicate");
       expect(harness.dispatch).toHaveBeenCalledTimes(1);
-      expect(harness.triggerSent.createCalls).toBe(1);
+      expect(harness.triggerSent.claimCalls).toBe(1);
     });
   });
 
