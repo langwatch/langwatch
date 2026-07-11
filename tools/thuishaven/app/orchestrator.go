@@ -63,9 +63,12 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams) (domain.Stack,
 		return domain.Stack{}, nil, err
 	}
 	scheme, pport := o.proxy.Endpoint()
+	// FreePorts(5): [0..2] the three routed services (app/gateway/nlp), [3] the
+	// API backend that lives behind app's /api, [4] the worker metrics endpoint.
 	st := domain.Stack{
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
-		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug), WorkerMetricsPort: ports[4],
+		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
+		APIPort: ports[3], WorkerMetricsPort: ports[4],
 	}
 	for i, r := range domain.PerWorktreeServices {
 		st.Services = append(st.Services, domain.Service{
@@ -192,8 +195,13 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams) error {
 func (o *Orchestrator) printStack(st domain.Stack) {
 	fmt.Printf("\n  thuishaven: stack %q  (redis db %d)\n", st.Slug, st.RedisDB)
 	for _, s := range st.Services {
-		fmt.Printf("    %-8s %s  ->  127.0.0.1:%d\n", s.Name, s.URL, s.Port)
+		fmt.Printf("    %-10s %s  ->  127.0.0.1:%d\n", s.Name, s.URL, s.Port)
+		// The API shares app's origin — surface it right under app so the single
+		// URL is obvious (no separate api.<slug> hostname to reach for).
+		if s.Name == "app" && st.APIPort != 0 {
+			fmt.Printf("    %-10s %s/api  ->  127.0.0.1:%d\n", "└ api", s.URL, st.APIPort)
+		}
 	}
 	scheme, port := o.proxy.Endpoint()
-	fmt.Printf("    %-8s %s\n\n", "dashboard", o.cfg.Naming.URL(o.cfg.Naming.Project, "", scheme, port))
+	fmt.Printf("    %-10s %s\n\n", "dashboard", o.cfg.Naming.URL(o.cfg.Naming.Project, "", scheme, port))
 }

@@ -23,26 +23,39 @@ func (s Stack) svc(name string) Service {
 // Stack (which already holds every URL/port) keeps this the single source of
 // truth with no file round-trip.
 func (s Stack) OverlayEnv() []string {
-	app, api, gw, nlp := s.svc("app"), s.svc("api"), s.svc("gateway"), s.svc("nlp")
-	return []string{
+	app, gw, nlp := s.svc("app"), s.svc("gateway"), s.svc("nlp")
+	// The API is same-origin with the app: the browser (and any agent) uses one
+	// URL, app.<slug>.../api, which Vite proxies to the API backend on loopback.
+	// Server-to-server callers (Vite's /api proxy, the Go gateway's control-plane
+	// client, langy) dial that loopback port directly — robust, no TLS/CA, no
+	// second public hostname to confuse anyone.
+	apiInternal := fmt.Sprintf("http://127.0.0.1:%d", s.APIPort)
+	env := []string{
 		"LANGWATCH_PORTLESS=1",
 		"LANGWATCH_SLUG=" + s.Slug,
 		fmt.Sprintf("LANGWATCH_APP_PORT=%d", app.Port),
-		fmt.Sprintf("LANGWATCH_API_PORT=%d", api.Port),
+		fmt.Sprintf("LANGWATCH_API_PORT=%d", s.APIPort),
 		fmt.Sprintf("LANGWATCH_GATEWAY_PORT=%d", gw.Port),
 		fmt.Sprintf("LANGWATCH_NLP_PORT=%d", nlp.Port),
 		fmt.Sprintf("WORKER_METRICS_PORT=%d", s.WorkerMetricsPort),
 		"BASE_HOST=" + app.URL,
 		"NEXTAUTH_URL=" + app.URL,
 		"LANGWATCH_ENDPOINT=" + app.URL,
-		"LANGWATCH_API_URL=" + api.URL,
+		"LANGWATCH_API_URL=" + apiInternal,
 		"LANGWATCH_NLP_SERVICE=" + nlp.URL,
-		"GATEWAY_CONTROL_PLANE_URL=" + api.URL,
-		"LW_GATEWAY_BASE_URL=" + api.URL,
+		"GATEWAY_CONTROL_PLANE_URL=" + apiInternal,
+		"LW_GATEWAY_BASE_URL=" + apiInternal,
 		"LW_GATEWAY_PUBLIC_URL=" + gw.URL,
 		"LW_GATEWAY_INTERNAL_URL=" + gw.URL,
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
 	}
+	// haven manages one shared clickhouse-server; this stack gets its own database
+	// on it. The app connects straight to loopback (native CH HTTP, no proxy) at
+	// the per-slug database, so migration counts are always this worktree's own.
+	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" {
+		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://127.0.0.1:%d/%s", s.ClickHouseHTTPPort, s.ClickHouseDatabase))
+	}
+	return env
 }
 
 // OverlayFile renders the .env.portless file body (header + OverlayEnv).

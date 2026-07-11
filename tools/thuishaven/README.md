@@ -15,10 +15,16 @@ worktree path and cached in `.langwatch-slug`). Its services are reached at:
 
 | Hostname | Service |
 | --- | --- |
-| `app.<slug>.langwatch.localhost` | Vite frontend |
-| `api.<slug>.langwatch.localhost` | Hono API |
+| `app.<slug>.langwatch.localhost` | App — the UI, **and its API at `/api`** |
 | `gateway.<slug>.langwatch.localhost` | AI Gateway (Go) |
 | `nlp.<slug>.langwatch.localhost` | NLP engine (Go) |
+| `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database |
+
+The **app and its API are one origin**: open `app.<slug>.langwatch.localhost` for
+the UI and hit `app.<slug>.langwatch.localhost/api` for the API. There is no
+separate `api.<slug>` hostname — the frontend and backend never split into two
+confusable URLs. Vite serves the SPA and proxies `/api` (plus `/mcp`, `/sse`,
+`/oauth`, `/.well-known/*`) to the API backend on loopback.
 
 Shared, machine-wide (one daemon serves all worktrees):
 

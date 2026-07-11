@@ -14,23 +14,31 @@ type Service struct {
 // Stack is one worktree's running set of services — the unit the dashboard lists,
 // the daemon monitors, and the reaper tears down.
 type Stack struct {
-	Slug              string    `json:"slug"`
-	WorktreeDir       string    `json:"worktreeDir"`
-	Branch            string    `json:"branch"`
-	LauncherPID       int       `json:"launcherPid"`
-	RedisDB           int       `json:"redisDb"`
-	WorkerMetricsPort int       `json:"workerMetricsPort"`
-	Services          []Service `json:"services"`
+	Slug        string `json:"slug"`
+	WorktreeDir string `json:"worktreeDir"`
+	Branch      string `json:"branch"`
+	LauncherPID int    `json:"launcherPid"`
+	RedisDB     int    `json:"redisDb"`
+	// APIPort is the Hono API's loopback port. The API is NOT a routed hostname
+	// of its own: it is a backend of `app`, reached same-origin at
+	// app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort). One app URL, not
+	// two confusable ones — the frontend and its API share a single origin.
+	APIPort            int       `json:"apiPort"`
+	WorkerMetricsPort  int       `json:"workerMetricsPort"`
+	ClickHouseHTTPPort int       `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
+	ClickHouseDatabase string    `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
+	Services           []Service `json:"services"`
 	// UpdatedAt is refreshed by the launcher's heartbeat; the daemon reaps a
 	// stack whose launcher has died or whose heartbeat has gone stale.
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// PerWorktreeServices are the services a stack always plans for. Order is the
-// launch + print order.
+// PerWorktreeServices are the routed hostnames a stack always plans for — each
+// gets its own <name>.<slug>.langwatch.localhost. The Hono API is deliberately
+// absent: it shares `app`'s origin at /api (see Stack.APIPort), so the app and
+// its API are one URL. Order is the launch + print order.
 var PerWorktreeServices = []struct{ Name, Role string }{
-	{"app", "Vite frontend"},
-	{"api", "Hono API"},
+	{"app", "App — UI + API at /api"},
 	{"gateway", "AI Gateway (Go)"},
 	{"nlp", "NLP engine (Go)"},
 }
