@@ -14,6 +14,7 @@ import { actionParamsSchemaFor } from "~/automations/providers/server";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { listSlackChannels } from "~/server/triggers/slackWebApi";
 import {
   InvalidEmailRecipientError,
   MissingAnnotatorError,
@@ -493,6 +494,36 @@ export const automationRouter = createTRPCRouter({
       });
       // Never return the encrypted bot token to the browser (ADR-041).
       return trigger ? redactTriggerForRead(trigger) : trigger;
+    }),
+  /**
+   * List the Slack channels a bot token can see, to populate the channel
+   * picker (ADR-041). Uses the freshly-typed token, or the saved automation's
+   * stored token (decrypted server-side, never returned). A missing
+   * `channels:read` scope comes back as `{ error: "missing_scope" }` so the UI
+   * degrades to manual entry instead of failing.
+   */
+  listSlackChannels: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        botToken: z.string().nullable().default(null),
+        automationId: z.string().optional(),
+      }),
+    )
+    .use(checkProjectPermission("triggers:view"))
+    .mutation(async ({ ctx, input }) => {
+      let token = input.botToken?.trim() || null;
+      if (!token && input.automationId) {
+        const saved = await ctx.prisma.trigger.findUnique({
+          where: { id: input.automationId, projectId: input.projectId },
+          select: { actionParams: true },
+        });
+        token = decryptSlackBotToken(
+          (saved?.actionParams ?? {}) as SlackActionParams,
+        );
+      }
+      if (!token) return { channels: [], error: "no_token" as string };
+      return listSlackChannels(token);
     }),
   updateTriggerFilters: protectedProcedure
     .input(

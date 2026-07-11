@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import { sendHttpDestination } from "../httpDestination";
-import { postSlackChatMessage } from "../slackWebApi";
+import { listSlackChannels, postSlackChatMessage } from "../slackWebApi";
 
 vi.mock("../httpDestination", () => ({ sendHttpDestination: vi.fn() }));
 
@@ -96,6 +96,49 @@ describe("postSlackChatMessage", () => {
       const err = await call().catch((e) => e);
       expect(err).toBeInstanceOf(DispatchError);
       expect((err as DispatchError).retryable).toBe(true);
+    });
+  });
+});
+
+describe("listSlackChannels", () => {
+  describe("when the app has the channels:read scope", () => {
+    it("returns the channels sorted by name", async () => {
+      respond(200, {
+        ok: true,
+        channels: [
+          { id: "C2", name: "random", is_private: false },
+          { id: "C1", name: "alerts", is_private: false },
+          { id: "C3", name: "ops-private", is_private: true },
+        ],
+      });
+      const result = await listSlackChannels("xoxb-test");
+      expect(result.error).toBeNull();
+      expect(result.channels.map((c) => c.name)).toEqual([
+        "alerts",
+        "ops-private",
+        "random",
+      ]);
+      expect(result.channels[1]).toMatchObject({ id: "C3", isPrivate: true });
+    });
+  });
+
+  describe("when the scope is missing", () => {
+    it("surfaces the error instead of throwing (UI degrades to manual)", async () => {
+      respond(200, { ok: false, error: "missing_scope" });
+      const result = await listSlackChannels("xoxb-test");
+      expect(result).toEqual({ channels: [], error: "missing_scope" });
+    });
+  });
+
+  describe("when the request fails at the transport", () => {
+    it("returns a request_failed error", async () => {
+      mockedSend.mockRejectedValue(
+        new DispatchError({ message: "timeout", retryable: true }),
+      );
+      expect(await listSlackChannels("xoxb-test")).toEqual({
+        channels: [],
+        error: "request_failed",
+      });
     });
   });
 });

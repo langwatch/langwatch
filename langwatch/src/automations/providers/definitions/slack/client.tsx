@@ -7,6 +7,7 @@ import {
   HStack,
   Input,
   List,
+  NativeSelect,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -217,6 +218,84 @@ function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
   );
 }
 
+/**
+ * Channel input with an optional "load from Slack" picker. Manual entry always
+ * works; if the app has the `channels:read` scope, the author can load the
+ * channel list off the typed token and pick from it. A missing scope degrades
+ * to a hint, never an error.
+ */
+function SlackChannelField({
+  projectId,
+  slice,
+  onChange,
+}: {
+  projectId: string;
+  slice: SlackSlice;
+  onChange: (next: SlackSlice) => void;
+}) {
+  const list = api.automation.listSlackChannels.useMutation();
+  const canLoad = slice.botToken.trim().length > 0;
+  const channels = list.data?.channels ?? [];
+  const scopeHint =
+    list.data && list.data.error && list.data.error !== "no_token"
+      ? list.data.error === "missing_scope"
+        ? "Add the channels:read scope to your app to pick from a list — you can still type the channel above."
+        : "Couldn't load channels from Slack. Type the channel above."
+      : null;
+
+  return (
+    <Field.Root>
+      <Field.Label>Channel</Field.Label>
+      <Input
+        value={slice.channelId}
+        onChange={(e) => onChange({ ...slice, channelId: e.target.value })}
+        placeholder="#alerts or C0123…"
+      />
+      <HStack gap={2} pt={1}>
+        {channels.length > 0 ? (
+          <NativeSelect.Root size="sm" width="auto">
+            <NativeSelect.Field
+              value=""
+              onChange={(e) => {
+                if (e.target.value)
+                  onChange({ ...slice, channelId: e.target.value });
+              }}
+            >
+              <option value="">Pick a channel…</option>
+              {channels.map((c) => (
+                <option key={c.id} value={c.id}>
+                  #{c.name}
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        ) : (
+          <Button
+            variant="plain"
+            size="xs"
+            height="auto"
+            paddingX={0}
+            color="fg.muted"
+            _hover={{ color: "fg" }}
+            disabled={!canLoad || list.isPending}
+            onClick={() =>
+              list.mutate({ projectId, botToken: slice.botToken.trim() })
+            }
+          >
+            {list.isPending ? "Loading…" : "Load channels from Slack"}
+          </Button>
+        )}
+      </HStack>
+      {scopeHint ? (
+        <Text textStyle="xs" color="fg.muted" pt={1}>
+          {scopeHint}
+        </Text>
+      ) : null}
+    </Field.Root>
+  );
+}
+
 function templatesFromSlice(slice: SlackSlice) {
   return {
     emailSubjectTemplate: null,
@@ -316,7 +395,11 @@ function SlackConfigForm({
         </Field.Root>
       ) : null}
       {slice.deliveryMethod === "bot" ? (
-        <SlackBotFields slice={slice} onChange={onChange} />
+        <SlackBotFields
+          slice={slice}
+          onChange={onChange}
+          projectId={ctx.projectId}
+        />
       ) : (
         <VStack align="stretch" gap={3}>
           <UpgradeToBotBanner
@@ -476,9 +559,11 @@ function SlackConfigForm({
 function SlackBotFields({
   slice,
   onChange,
+  projectId,
 }: {
   slice: SlackSlice;
   onChange: (next: SlackSlice) => void;
+  projectId: string;
 }) {
   const tokenRef = useRef<HTMLInputElement>(null);
   const [stepsOpen, setStepsOpen] = useState(false);
@@ -486,14 +571,11 @@ function SlackBotFields({
 
   return (
     <VStack align="stretch" gap={3}>
-      <Field.Root>
-        <Field.Label>Channel</Field.Label>
-        <Input
-          value={slice.channelId}
-          onChange={(e) => onChange({ ...slice, channelId: e.target.value })}
-          placeholder="#alerts or C0123…"
-        />
-      </Field.Root>
+      <SlackChannelField
+        projectId={projectId}
+        slice={slice}
+        onChange={onChange}
+      />
       <Field.Root>
         <Field.Label>Bot User OAuth Token</Field.Label>
         <Input

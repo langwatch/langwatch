@@ -93,3 +93,55 @@ export async function postSlackChatMessage({
     retryable: RETRYABLE_SLACK_ERRORS.has(code),
   });
 }
+
+export interface SlackChannel {
+  id: string;
+  name: string;
+  isPrivate: boolean;
+}
+
+interface SlackConversationsResponse {
+  ok: boolean;
+  error?: string;
+  channels?: { id: string; name: string; is_private?: boolean }[];
+}
+
+/**
+ * List the channels a bot token can see (`conversations.list`) so the config
+ * form can offer a channel picker. Requires the `channels:read` (and
+ * `groups:read` for private) scope on the app — WITHOUT it Slack returns
+ * `missing_scope`, which is surfaced (not thrown) so the UI degrades to manual
+ * channel entry rather than erroring.
+ */
+export async function listSlackChannels(
+  token: string,
+): Promise<{ channels: SlackChannel[]; error: string | null }> {
+  let response: { status: number; body: string };
+  try {
+    response = await sendHttpDestination({
+      url: "https://slack.com/api/conversations.list",
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "types=public_channel,private_channel&exclude_archived=true&limit=1000",
+      contextLabel: "Slack conversations.list",
+    });
+  } catch {
+    return { channels: [], error: "request_failed" };
+  }
+
+  let body: SlackConversationsResponse;
+  try {
+    body = JSON.parse(response.body) as SlackConversationsResponse;
+  } catch {
+    return { channels: [], error: "bad_response" };
+  }
+  if (!body.ok) return { channels: [], error: body.error ?? "unknown_error" };
+
+  const channels = (body.channels ?? [])
+    .map((c) => ({ id: c.id, name: c.name, isPrivate: !!c.is_private }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { channels, error: null };
+}

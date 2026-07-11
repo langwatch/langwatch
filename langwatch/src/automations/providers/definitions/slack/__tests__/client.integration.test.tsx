@@ -26,6 +26,13 @@ vi.mock("~/utils/api", () => ({
       getTriggers: {
         useQuery: () => ({ data: [], isLoading: false }),
       },
+      listSlackChannels: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          data: undefined,
+          isPending: false,
+        }),
+      },
     },
   },
 }));
