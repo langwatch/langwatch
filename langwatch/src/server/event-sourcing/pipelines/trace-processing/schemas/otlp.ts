@@ -167,7 +167,7 @@ export const statusSchema = z.object({
 export const eventSchema = z.object({
   timeUnixNano: fixed64Schema,
   name: z.string(),
-  attributes: z.array(keyValueSchema),
+  attributes: z.array(keyValueSchema).optional().default([]),
   droppedAttributesCount: z.number().optional().nullable(),
 });
 
@@ -196,7 +196,11 @@ export const spanSchema = z.object({
   kind: eSpanKindSchema,
   startTimeUnixNano: fixed64Schema,
   endTimeUnixNano: fixed64Schema,
-  attributes: z.array(keyValueSchema),
+  // OTLP/JSON omits empty repeated fields (proto3), so a span carrying no
+  // attributes arrives with no `attributes` key. Requiring it rejected the
+  // whole span at `/api/otel` ingest — same failure mode already fixed for
+  // `links` above, which was silently dropping real Claude Code spans.
+  attributes: z.array(keyValueSchema).optional().default([]),
   events: z.array(eventSchema).optional().default([]),
   links: z.array(linkSchema).optional().default([]),
   status: statusSchema
