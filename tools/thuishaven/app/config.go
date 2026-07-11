@@ -1,0 +1,39 @@
+package app
+
+import (
+	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
+)
+
+// Config carries the knobs the orchestrator + daemon need. Everything here is
+// resolved once by the composition root (cmd) and injected.
+type Config struct {
+	Naming                   domain.Naming
+	Home                     string        // thuishaven home dir (~/.langwatch/portless)
+	IdleTTL                  time.Duration // reap stacks whose heartbeat is older than this (0 = only reap dead launchers)
+	HeartbeatEvery           time.Duration // launcher heartbeat cadence
+	DaemonArgv               []string      // how to (re)launch `haven daemon`
+	IsAgent                  bool          // token-free plain output for AI drivers (no colour/TUI)
+	ShouldManageClickHouse   bool          // haven provisions a shared ClickHouse container (colima) + per-slug DBs
+	ShouldStopClickHouseIdle bool          // daemon stops the managed CH container when the last stack is reaped
+	ShouldManagePostgres     bool          // haven ensures a shared brew-services Postgres + per-slug DBs
+	ShouldManageRedis        bool          // haven ensures a shared brew-services Redis is running
+	// ShouldStartObservability makes `up` boot the LGTM stack itself. On by
+	// default: it shares ClickHouse's colima VM, so the VM is already paying for
+	// itself — opt out with LANGWATCH_HAVEN_OBS=0.
+	ShouldStartObservability bool
+	LocalAPIKey              string // stable local dev API key seeded + injected into every stack
+	RepoRoot                 string // repo root the daemon prunes orphaned git worktrees from
+}
+
+// PlanOptions decide which services `up` runs and how.
+type PlanOptions struct {
+	ShouldGoWatch      bool // air hot-reload for the Go services instead of `go run`
+	ShouldStartWorkers bool
+	ShouldSkipNLP      bool
+	ShouldSkipGateway  bool
+	ShouldSeed         bool
+	IsStub             bool // verification: echo servers instead of the real apps
+	RepoRoot           string
+}

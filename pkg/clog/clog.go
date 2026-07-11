@@ -83,6 +83,11 @@ func serviceFields(ctx context.Context) []zap.Field {
 //
 // The two cores carry independent LevelEnablers, so a Debug entry is still
 // created and delivered to the otel core even though the console core rejects it.
+//
+// base is only consulted for the lp == nil case above — when lp != nil, a
+// fresh logger is built and only serviceFields(ctx) is reapplied, so any
+// fields a caller attached to base after New() are silently lost. Call this
+// immediately after New, before attaching any extra fields.
 func WithCollector(ctx context.Context, cfg Config, base *zap.Logger, lp *sdklog.LoggerProvider) *zap.Logger {
 	if lp == nil {
 		return base
@@ -192,6 +197,19 @@ func (c Config) Validate() error {
 		var lvl zap.AtomicLevel
 		if err := lvl.UnmarshalText([]byte(c.Level)); err != nil {
 			return fmt.Errorf("clog: unknown LOG_LEVEL %q: %w", c.Level, err)
+		}
+	}
+
+	if c.ConsoleLevel != "" {
+		var lvl zapcore.Level
+		if err := lvl.UnmarshalText([]byte(c.ConsoleLevel)); err != nil {
+			return fmt.Errorf("clog: unknown LOG_CONSOLE_LEVEL %q: %w", c.ConsoleLevel, err)
+		}
+	}
+	if c.OTelLevel != "" {
+		var lvl zapcore.Level
+		if err := lvl.UnmarshalText([]byte(c.OTelLevel)); err != nil {
+			return fmt.Errorf("clog: unknown LOG_OTEL_LEVEL %q: %w", c.OTelLevel, err)
 		}
 	}
 

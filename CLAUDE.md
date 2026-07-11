@@ -19,6 +19,34 @@ If no feature file exists for your task, create one before writing code.
 
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
 
+### Local dev by hostname — thuishaven / portless (recommended)
+
+Stop juggling ports. `pnpm dev` routes through **`haven`** (the Go orchestrator in
+`tools/thuishaven`, binary `cmd/haven`), which gives every worktree's services a
+stable hostname via the [portless](https://github.com/vercel-labs/portless) proxy —
+`app|gateway|nlp.<slug>.langwatch.localhost`, where `<slug>` is the worktree's own
+directory name, sanitised (a checkout at `.../worktrees/portless` is the `portless`
+stack). The app and its API share one origin — open `app.<slug>...` for the UI,
+hit `app.<slug>.../api` for the API. `.localhost` resolves to loopback natively,
+so there is no `/etc/hosts`, DNS, or sudo for name resolution, and two worktrees
+can never collide.
+
+```bash
+make portless-setup     # one-time: install the portless proxy (443, trusted CA) + build haven
+pnpm dev                # == haven up (registers hostnames, supervises the stack)
+make portless-list      # which worktree runs what (all stacks)     — or: haven list
+make portless-doctor    # proxy / daemon / observability health     — or: haven doctor
+```
+
+Open `https://langwatch.localhost` for the cross-worktree dashboard;
+`observability.langwatch.localhost` proxies the local Grafana LGTM stack;
+`telemetry.langwatch.localhost` fans OTLP out to every running stack. haven's
+resolved config lands in `langwatch/.env.portless` (loaded last with
+`override: true` so it beats `.env`). Agent-driving haven? Add `--agent` (or
+`HAVEN_AGENT=1`) for plain, token-free output; `haven list --json` is
+machine-readable. Escape hatch: `pnpm dev:legacy` (or `PORTLESS=0`) uses the old
+`PORT`+offset scheme. See `tools/thuishaven/README.md`.
+
 ```bash
 make quickstart                        # Interactive preset picker
 make quickstart all-local              # Local CH + PG + Redis + app + workers, no NLP (fast iteration default)
