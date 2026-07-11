@@ -85,6 +85,11 @@ function StepLabel({ step }: { step: CodeAgentStep }) {
       flexShrink={0}
     >
       {step.name}
+      {step.count > 1 && (
+        <Text as="span" color="fg.subtle">
+          {` ×${step.count}`}
+        </Text>
+      )}
     </Text>
   );
 }
@@ -122,7 +127,10 @@ function ActivityDetail({ activity }: { activity: CodeAgentActivity }) {
       {activity.steps.length > 0 && (
         <Text textStyle="2xs" marginTop={1} whiteSpace="normal">
           {activity.steps
-            .map((s) => (s.failed ? `${s.name} (failed)` : s.name))
+            .map((s) => {
+              const label = s.count > 1 ? `${s.name} ×${s.count}` : s.name;
+              return s.failed ? `${label} (failed)` : label;
+            })
             .join(" › ")}
         </Text>
       )}
@@ -133,9 +141,11 @@ function ActivityDetail({ activity }: { activity: CodeAgentActivity }) {
         </Text>
       )}
 
-      {activity.subAgentTypes.length > 0 && (
-        <Text textStyle="2xs">
-          {`Agents: ${activity.subAgentTypes.join(", ")}`}
+      {activity.subAgents > 0 && (
+        <Text textStyle="2xs" marginTop={1} whiteSpace="normal">
+          {activity.subAgentTypes.length > 0
+            ? `Ran ${plural(activity.subAgents, "sub-agent")} (${activity.subAgentTypes.join(", ")}). Their own steps are nested under the step that started them, not shown inline above.`
+            : `Ran ${plural(activity.subAgents, "sub-agent")}. Their own steps are nested under the step that started them.`}
         </Text>
       )}
 

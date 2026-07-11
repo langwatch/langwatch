@@ -292,6 +292,31 @@ describe("the ORDER things happened", () => {
     });
   });
 
+  describe("given a sub-agent that ran its own tools", () => {
+    // A sub-agent runs its own conversation and can do twenty reads of its own.
+    // Splicing those inline would read as though the MAIN thread did them,
+    // destroying the hierarchy. The sub-agent is already represented by the step
+    // that spawned it; its detail lives one level down.
+    it("keeps the sub-agent's steps out of the main sequence", () => {
+      const subAgentRead = {
+        name: "claude_code.tool",
+        spanAttributes: { tool_name: "Read", agent_id: "agent_abc" },
+        startTimeUnixMs: 2500,
+        statusCode: null,
+      } as unknown as NormalizedSpan;
+
+      const attributes = foldAll({
+        spans: [
+          toolSpan("Task", 2000),
+          subAgentRead,
+          toolSpan("Edit", 3000),
+        ],
+      });
+
+      expect(stepNames(attributes)).toEqual(["Task", "Edit"]);
+    });
+  });
+
   describe("given a step that failed", () => {
     it("marks it in place, so the failure reads where it happened", () => {
       const attributes = foldAll({

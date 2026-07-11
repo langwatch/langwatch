@@ -45,11 +45,13 @@ describe("InteractionActivity", () => {
     it("shows the steps in the order they happened", () => {
       renderActivity(READ_TEST_FIX_RERUN);
 
-      // A tally would say "Bash 2, Read 2, Edit 1" and lose the story.
+      // A tally would say "Bash 2, Read 2, Edit 1" and lose the story. The two
+      // opening reads batch; the trailing Bash stays its own beat because it
+      // came after the Edit.
       const labels = screen
-        .getAllByText(/^(Read|Bash|Edit)$/)
+        .getAllByText(/^(Read|Bash|Edit)/)
         .map((el) => el.textContent);
-      expect(labels).toEqual(["Read", "Read", "Bash", "Edit", "Bash"]);
+      expect(labels).toEqual(["Read ×2", "Bash", "Edit", "Bash"]);
     });
 
     it("summarises the work in plain language for screen readers", () => {
@@ -76,7 +78,7 @@ describe("InteractionActivity", () => {
       // A command that failed BEFORE an edit means something different from one
       // that failed after, so the sequence must be preserved.
       const labels = screen
-        .getAllByText(/^(Read|Bash|Edit)$/)
+        .getAllByText(/^(Read|Bash|Edit)/)
         .map((el) => el.textContent);
       expect(labels).toEqual(["Read", "Bash", "Edit"]);
     });
@@ -84,18 +86,19 @@ describe("InteractionActivity", () => {
 
   describe("given more steps than fit on one line", () => {
     it("collapses the tail into a +N rather than wrapping the row", () => {
-      const many: [number, string][] = Array.from({ length: 10 }, (_, i) => [
-        i,
-        "Read",
-      ]);
+      // Distinct tools, so nothing batches away and the strip really does
+      // overflow. (A run of the SAME tool would collapse into one "×N" step
+      // instead, which is the point of batching.)
+      const tools = ["Read", "Bash", "Edit", "Grep", "Write", "Task", "Glob"];
+      const many: [number, string][] = tools.map((name, i) => [i, name]);
       renderActivity({
         ...steps(many),
-        "langwatch.code_agent.tool_calls": "10",
+        "langwatch.code_agent.tool_calls": String(tools.length),
       });
 
       // The trace list is virtualized on a fixed row height, so the cell must
-      // never grow taller.
-      expect(screen.getByText("+4")).toBeInTheDocument();
+      // never grow taller. 7 distinct steps, 6 inline.
+      expect(screen.getByText("+1")).toBeInTheDocument();
     });
   });
 
@@ -117,5 +120,42 @@ describe("InteractionActivity", () => {
 
       expect(container).toBeEmptyDOMElement();
     });
+  });
+});
+
+describe("batching runs of the same tool", () => {
+  it("collapses a back-to-back run into one step with a count", () => {
+    renderActivity({
+      ...steps([
+        [1, "Read"],
+        [2, "Read"],
+        [3, "Read"],
+        [4, "Bash"],
+      ]),
+      "langwatch.code_agent.tool_calls": "4",
+    });
+
+    // Eight reads in a row is one thing done eight times; spelling it out buries
+    // the shape of the interaction under repetition.
+    expect(screen.getByText(/×3/)).toBeInTheDocument();
+  });
+
+  it("only batches ADJACENT runs, so a return to a tool stays its own beat", () => {
+    renderActivity({
+      ...steps([
+        [1, "Read"],
+        [2, "Read"],
+        [3, "Bash"],
+        [4, "Read"],
+      ]),
+      "langwatch.code_agent.tool_calls": "4",
+    });
+
+    // It checked, ran, and checked again — merging the trailing Read back into
+    // the first would erase that story.
+    const labels = screen
+      .getAllByText(/^(Read|Bash)/)
+      .map((el) => el.textContent);
+    expect(labels).toEqual(["Read ×2", "Bash", "Read"]);
   });
 });
