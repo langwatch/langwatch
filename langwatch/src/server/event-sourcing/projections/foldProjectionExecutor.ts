@@ -385,10 +385,12 @@ export class FoldProjectionExecutor {
    * unbounded read materialises every EventPayload blob simultaneously.
    *
    * Parity with the array `refoldUpToDelivered`:
-   * - Dedup: `deduplicateEvents` runs per page in the store; the cross-page
-   *   `seen` set (idempotencyKey ?? id) reproduces its effect across page
-   *   boundaries, which the strict `>` cursor alone cannot (a retry can share
-   *   an idempotencyKey under a different EventId).
+   * - Dedup: the store returns each page raw (undeduplicated), so the last
+   *   row always matches what was actually read and the cursor never stalls.
+   *   This `seen` set (idempotencyKey ?? id) does the deduplication instead,
+   *   reproducing `deduplicateEvents`'s effect across page boundaries — which
+   *   the strict `>` cursor alone cannot (a retry can share an idempotencyKey
+   *   under a different EventId).
    * - Order: immaterial — this path is gated on `refoldOnOutOfOrder: false`.
    * - Missing delivered: any delivered event the history read did not return
    *   (event-log read lag) is applied on top, as the array path does.
@@ -400,12 +402,24 @@ export class FoldProjectionExecutor {
     upToEvent: E,
   ): Promise<State | null> {
     const PAGE_SIZE = this.refoldPageSize;
+    // Safety net only: the paged loader's cursor is expected to strictly
+    // advance every call. If that contract is ever violated (e.g. a
+    // non-advancing cursor from a repository bug), this bounds the loop
+    // instead of hanging the fold worker for the aggregate indefinitely.
+    // 100k pages * 1000/page default covers a 100M-event aggregate.
+    const MAX_PAGES = 100_000;
     const seen = new Set<string>();
     let state = projection.init();
     let after: { timestamp: number; eventId: string } | undefined;
     let refoldEventCount = 0;
+    let pageCount = 0;
 
     for (;;) {
+      if (++pageCount > MAX_PAGES) {
+        throw new Error(
+          `streamRefoldUpToDelivered exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
+        );
+      }
       // biome-ignore lint/style/noNonNullAssertion: caller guards eventLoaderUpToPaged is set.
       const page = await projection.eventLoaderUpToPaged!({
         tenantId: context.tenantId,

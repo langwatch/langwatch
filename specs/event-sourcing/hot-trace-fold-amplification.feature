@@ -23,6 +23,37 @@ Feature: Hot-trace fold amplification is bounded
     Given a trace fold with a persisted checkpoint at a known occurred-at
     And the fold's event loader is available for re-folds
 
+  # The mechanism the rest of this file relies on: the executor's decision to
+  # re-fold (or not) on an out-of-order event, independent of any specific
+  # fold. traceSummary and traceAnalytics below just instantiate the opt-out.
+
+  @unit
+  Scenario: An out-of-order batch re-folds from the event log by default
+    Given a fold that has not opted out of re-folding on out-of-order events
+    When a batch starting before the persisted checkpoint is folded
+    Then the aggregate's full history is loaded and replayed from init state
+
+  @unit
+  Scenario: An order-insensitive fold never re-folds
+    Given a fold that has opted out of re-folding on out-of-order events
+    When a batch starting before the persisted checkpoint is folded
+    Then the event log is never read
+    And the batch is applied on top of the existing state in occurredAt order
+
+  @unit
+  Scenario: A single out-of-order event honours the same opt-out
+    Given a fold that has opted out of re-folding on out-of-order events
+    When a single event that occurred before the checkpoint is folded
+    Then the event log is never read
+    And the event is applied on top of the existing state
+
+  @unit
+  Scenario: An out-of-order batch with no event loader applies on top instead
+    Given a fold with no event loader wired
+    When a batch starting before the persisted checkpoint is folded
+    Then the batch is applied on top of the existing state
+    And the re-fold is recorded as unavailable
+
   @unit
   Scenario: The trace summary folds an earlier span without reading the event log
     Given a trace summary state with spans already folded past the processing cap

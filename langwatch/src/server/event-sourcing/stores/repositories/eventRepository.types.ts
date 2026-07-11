@@ -69,15 +69,15 @@ export interface EventRepository {
    * and OOM the ClickHouse instance. Optional: implementations without it fall
    * back to the unbounded `getEventRecordsUpTo`.
    */
-  getEventRecordsUpToPaged?(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    upToTimestamp: number,
-    upToEventId: string,
-    after: { timestamp: number; eventId: string } | undefined,
-    limit: number,
-  ): Promise<EventRecord[]>;
+  getEventRecordsUpToPaged?(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }): Promise<EventRecord[]>;
 
   /**
    * Counts event records that come before a given event.

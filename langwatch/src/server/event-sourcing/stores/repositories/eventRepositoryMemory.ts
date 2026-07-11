@@ -75,15 +75,24 @@ export class EventRepositoryMemory implements EventRepository {
     return sortedRecords.map((record) => ({ ...record }));
   }
 
-  async getEventRecordsUpToPaged(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    upToTimestamp: number,
-    upToEventId: string,
-    after: { timestamp: number; eventId: string } | undefined,
-    limit: number,
-  ): Promise<EventRecord[]> {
+  async getEventRecordsUpToPaged(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }): Promise<EventRecord[]> {
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      after,
+      limit,
+    } = request;
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
 

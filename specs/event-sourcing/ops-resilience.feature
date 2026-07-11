@@ -46,7 +46,7 @@ Feature: Tenant-scoped bulk drain (post-2026-05-11 incident)
   @integration @v1 @bulk-drain
   Scenario: drainTenant supports an optional groupIdContains substring filter
     Given tenant A has groups across multiple projections
-    When the operator calls drainTenant with groupIdContains="/fold/traceSummary/"
+    When the operator drains only tenant A's trace-summary groups
     Then only groups whose groupId contains that substring are drained
     And groups in tenant A's other projections are preserved
     And the filter is a plain substring match (no pretense of pipeline-name resolution)

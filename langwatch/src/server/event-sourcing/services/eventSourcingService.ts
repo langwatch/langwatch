@@ -183,14 +183,14 @@ export class EventSourcingService<
             after: { timestamp: number; eventId: string } | undefined;
             limit: number;
           }) => {
-            const events = await capturedEventStore.getEventsUpToPaged!(
-              ctx.aggregateId,
-              { tenantId: createTenantId(ctx.tenantId) },
-              capturedAggregateType,
-              ctx.upToEvent as EventType,
-              ctx.after,
-              ctx.limit,
-            );
+            const events = await capturedEventStore.getEventsUpToPaged!({
+              aggregateId: ctx.aggregateId,
+              context: { tenantId: createTenantId(ctx.tenantId) },
+              aggregateType: capturedAggregateType,
+              upToEvent: ctx.upToEvent as EventType,
+              after: ctx.after,
+              limit: ctx.limit,
+            });
             return [...events];
           };
         }

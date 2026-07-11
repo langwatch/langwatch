@@ -117,14 +117,14 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
    *
    * **Security:** Implementations MUST call validateTenantId(context, ...).
    */
-  getEventsUpToPaged?(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    upToEvent: EventType,
-    after: { timestamp: number; eventId: string } | undefined,
-    limit: number,
-  ): Promise<readonly EventType[]>;
+  getEventsUpToPaged?(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    upToEvent: EventType;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }): Promise<readonly EventType[]>;
 
   /**
    * Counts events that come before a given event in chronological order.

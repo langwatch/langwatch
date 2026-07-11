@@ -8,7 +8,7 @@ import { EventRepositoryMemory } from "../eventRepositoryMemory";
  * whole. The ClickHouse repository mirrors this exact cursor + upper-bound +
  * (EventTimestamp, EventId) order, so locking the behaviour here guards both.
  */
-function record(eventId: string, ts: number): EventRecord {
+function record({ eventId, ts }: { eventId: string; ts: number }): EventRecord {
   return {
     TenantId: "tenant",
     AggregateType: "trace",
@@ -29,12 +29,12 @@ describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
   async function seeded() {
     const repo = new EventRepositoryMemory();
     await repo.insertEventRecords([
-      record("e4", 4000),
-      record("e2", 2000),
-      record("e3b", 3000),
-      record("e1", 1000),
-      record("e3a", 3000),
-      record("e5", 5000),
+      record({ eventId: "e4", ts: 4000 }),
+      record({ eventId: "e2", ts: 2000 }),
+      record({ eventId: "e3b", ts: 3000 }),
+      record({ eventId: "e1", ts: 1000 }),
+      record({ eventId: "e3a", ts: 3000 }),
+      record({ eventId: "e5", ts: 5000 }),
     ]);
     return repo;
   }
@@ -46,40 +46,40 @@ describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
     it("pages in (timestamp, eventId) order, honouring the after cursor and limit", async () => {
       const repo = await seeded();
 
-      const page1 = await repo.getEventRecordsUpToPaged(
-        "tenant",
-        "trace",
-        "agg",
-        upTo.ts,
-        upTo.id,
-        undefined,
-        2,
-      );
+      const page1 = await repo.getEventRecordsUpToPaged({
+        tenantId: "tenant",
+        aggregateType: "trace",
+        aggregateId: "agg",
+        upToTimestamp: upTo.ts,
+        upToEventId: upTo.id,
+        after: undefined,
+        limit: 2,
+      });
       expect(page1.map((r) => r.EventId)).toEqual(["e1", "e2"]);
 
       const c1 = page1[page1.length - 1]!;
-      const page2 = await repo.getEventRecordsUpToPaged(
-        "tenant",
-        "trace",
-        "agg",
-        upTo.ts,
-        upTo.id,
-        { timestamp: c1.EventTimestamp, eventId: c1.EventId },
-        2,
-      );
+      const page2 = await repo.getEventRecordsUpToPaged({
+        tenantId: "tenant",
+        aggregateType: "trace",
+        aggregateId: "agg",
+        upToTimestamp: upTo.ts,
+        upToEventId: upTo.id,
+        after: { timestamp: c1.EventTimestamp, eventId: c1.EventId },
+        limit: 2,
+      });
       // Same-timestamp events tie-break by EventId.
       expect(page2.map((r) => r.EventId)).toEqual(["e3a", "e3b"]);
 
       const c2 = page2[page2.length - 1]!;
-      const page3 = await repo.getEventRecordsUpToPaged(
-        "tenant",
-        "trace",
-        "agg",
-        upTo.ts,
-        upTo.id,
-        { timestamp: c2.EventTimestamp, eventId: c2.EventId },
-        2,
-      );
+      const page3 = await repo.getEventRecordsUpToPaged({
+        tenantId: "tenant",
+        aggregateType: "trace",
+        aggregateId: "agg",
+        upToTimestamp: upTo.ts,
+        upToEventId: upTo.id,
+        after: { timestamp: c2.EventTimestamp, eventId: c2.EventId },
+        limit: 2,
+      });
       // e4 is the last within the bound; e5 is excluded.
       expect(page3.map((r) => r.EventId)).toEqual(["e4"]);
     });
@@ -90,15 +90,15 @@ describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
       let after: { timestamp: number; eventId: string } | undefined;
 
       for (;;) {
-        const page = await repo.getEventRecordsUpToPaged(
-          "tenant",
-          "trace",
-          "agg",
-          upTo.ts,
-          upTo.id,
+        const page = await repo.getEventRecordsUpToPaged({
+          tenantId: "tenant",
+          aggregateType: "trace",
+          aggregateId: "agg",
+          upToTimestamp: upTo.ts,
+          upToEventId: upTo.id,
           after,
-          2,
-        );
+          limit: 2,
+        });
         if (page.length === 0) break;
         all.push(...page.map((r) => r.EventId));
         const last = page[page.length - 1]!;
