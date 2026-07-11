@@ -9,9 +9,6 @@
 {%- capture _card_body -%}
 {{ _snippet_src | truncate: 190 | mrkdwn_escape }}
 {%- endcapture -%}
-{%- capture _lead -%}
-*{{ trigger.name | mrkdwn_escape }}*{% if match.evaluation %} · {{ match.evaluation.evaluatorName | default: "Evaluation" | mrkdwn_escape }} `{{ match.evaluation.score | default: "—" }}`{% endif %}
-{%- endcapture -%}
 {%- capture _footer -%}
 `{{ match.trace.id | truncate: 12 }}`{% if match.trace.metadata.model %} · {{ match.trace.metadata.model | mrkdwn_escape }}{% endif %}{% if match.trace.metadata.duration_ms %} · {{ match.trace.metadata.duration_ms }}ms{% endif %}{% if match.trace.metadata.cost %} · ${{ match.trace.metadata.cost }}{% endif %} · <{{ match.trace.url }}|View trace ↗>
 {%- endcapture -%}
@@ -35,8 +32,7 @@
     {%- if _card_body != "" -%}
     ,"body": { "type": "mrkdwn", "text": {{ _card_body | json }} }
     {%- endif -%}
-  },
-  { "type": "section", "text": { "type": "mrkdwn", "text": {{ _lead | json }} } }
+  }
   {%- if _rt_body != "" -%}
   ,{ "type": "rich_text", "elements": [ {{ _rt_body }} ] }
   {%- endif -%}

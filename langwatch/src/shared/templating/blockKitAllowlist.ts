@@ -46,20 +46,27 @@ export const ALLOWED_BLOCK_TYPES = [
   "header",
   "markdown",
   "rich_text",
+  // `card` is delivery-verified: a 2026-07 live probe against a real Slack
+  // incoming webhook returned `200 ok` for a card block (while alert / chart /
+  // table all returned `400 invalid_blocks`). It renders on the message
+  // surface, so it passes through — still run through `sanitizeCard` below to
+  // strip fetch-on-render icons and callback actions (ADR-036).
+  "card",
 ] as const;
 
 export type AllowedBlockType = (typeof ALLOWED_BLOCK_TYPES)[number];
 
 /**
- * Blocks with sanitisers below but UNVERIFIED incoming-webhook delivery. Dropped
- * by `filterBlockKit` unless `allowGatedBlocks` is set (a delivery probe has
- * confirmed the channel renders them). Every template that uses one carries an
- * allowlisted fallback so stripping the gated block never yields an empty
- * message.
+ * Blocks with sanitisers below but that a real incoming webhook REJECTS with
+ * `400 invalid_blocks` (probed 2026-07): `alert` is documented modal-only;
+ * `data_visualization` and `data_table` have no message-surface support yet.
+ * `filterBlockKit` DROPS them unless `allowGatedBlocks` is set (a future
+ * delivery path — e.g. the Web API — confirms rendering). Every template that
+ * uses one carries an allowlisted fallback so stripping it never yields an
+ * empty message.
  */
 export const GATED_BLOCK_TYPES = [
   "alert",
-  "card",
   "data_visualization",
   "data_table",
 ] as const;
@@ -220,7 +227,11 @@ function sanitizeRichText(
 
 function sanitizeVerifiedBlock(
   block: Record<string, unknown>,
-): Record<string, unknown> {
+): Record<string, unknown> | null {
+  // `card` is allowlisted for delivery but still needs its own sanitiser to
+  // drop fetch-on-render icons and callback actions (returns null if the card
+  // has neither a title nor a body).
+  if (block.type === "card") return sanitizeCard(block);
   return sanitizeRichText(
     sanitizeContextElements(stripInteractiveAccessory(block)),
   );
@@ -447,8 +458,6 @@ function sanitizeGatedBlock(
   switch (block.type) {
     case "alert":
       return sanitizeAlert(block);
-    case "card":
-      return sanitizeCard(block);
     case "data_visualization":
       return sanitizeDataVisualization(block);
     case "data_table":
@@ -462,11 +471,11 @@ function sanitizeGatedBlock(
  * Filters arbitrary parsed Block Kit JSON down to the safe, presentational
  * allowlist. Non-array input or non-object entries yield an empty list.
  *
- * Gated blocks (`alert`, `card`, `data_visualization`, `data_table`) are DROPPED
- * unless `allowGatedBlocks` is set — the caller has confirmed via a delivery
- * probe that the incoming-webhook surface renders them. When allowed, each is
- * run through its defensive sanitiser (fetch-on-render icons stripped, callback
- * actions stripped, nested cells recursively sanitised, sizes capped).
+ * Gated blocks (`alert`, `data_visualization`, `data_table`) are DROPPED unless
+ * `allowGatedBlocks` is set — a delivery path that renders them is confirmed.
+ * When allowed, each is run through its defensive sanitiser (callback actions
+ * stripped, nested cells recursively sanitised, sizes capped). `card` is
+ * delivery-verified and lives in the allowed tier, sanitised in-line.
  */
 export function filterBlockKit(
   blocks: unknown,
@@ -477,7 +486,8 @@ export function filterBlockKit(
   for (const block of blocks) {
     if (!isBlock(block)) continue;
     if (isAllowedType(block.type)) {
-      out.push(sanitizeVerifiedBlock(block));
+      const sanitized = sanitizeVerifiedBlock(block);
+      if (sanitized) out.push(sanitized);
     } else if (allowGatedBlocks && isGatedType(block.type)) {
       const sanitized = sanitizeGatedBlock(block);
       if (sanitized) out.push(sanitized);

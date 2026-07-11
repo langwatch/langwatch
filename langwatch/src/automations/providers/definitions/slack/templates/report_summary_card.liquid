@@ -18,8 +18,7 @@
     {%- if _body != "" -%}
     ,"body": { "type": "mrkdwn", "text": {{ _body | json }} }
     {%- endif -%}
-  },
-  { "type": "section", "text": { "type": "mrkdwn", "text": {{ trigger.name | mrkdwn_escape | prepend: "*" | append: "*" | json }} } }
+  }
   {%- if rows != empty -%}
   ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _rows_md | json }} } }
   {%- endif -%}

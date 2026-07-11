@@ -236,12 +236,13 @@ describe("filterBlockKit", () => {
     });
   });
 
-  // ADR-041 Phase 3 — the modern blocks (`alert`, `card`, `data_visualization`,
-  // `data_table`). Their incoming-webhook delivery is UNVERIFIED, so they are
-  // dropped by default (graceful degradation) and only sanitised-and-kept when
-  // the caller has confirmed the surface renders them (`allowGatedBlocks`).
-  describe("when gated modern blocks are present with default options", () => {
-    it("drops alert / card / data_visualization / data_table, keeps allowlisted siblings", () => {
+  // ADR-041 Phase 3 — the modern blocks. A live 2026-07 webhook probe showed
+  // `card` renders (200 ok) while `alert` / `data_visualization` / `data_table`
+  // are rejected (400 invalid_blocks). So `card` is allowlisted (kept, sanitised)
+  // and the other three stay gated — dropped by default, sanitised-and-kept only
+  // when the caller confirms the surface renders them (`allowGatedBlocks`).
+  describe("when modern blocks are present with default options", () => {
+    it("keeps card (delivery-verified) but drops the still-gated alert / data_visualization / data_table", () => {
       const blocks = filterBlockKit([
         { type: "alert", level: "error", text: { type: "mrkdwn", text: "x" } },
         { type: "card", title: { type: "mrkdwn", text: "t" } },
@@ -260,14 +261,18 @@ describe("filterBlockKit", () => {
         },
         { type: "section", text: { type: "mrkdwn", text: "keep me" } },
       ]);
-      expect(blocks.map((b) => b.type)).toEqual(["section"]);
+      expect(blocks.map((b) => b.type)).toEqual(["card", "section"]);
     });
   });
 
   describe("when a template's gated hero is filtered but a fallback follows", () => {
     it("degrades to the allowlisted fallback so the message is never empty", () => {
       const blocks = filterBlockKit([
-        { type: "card", title: { type: "mrkdwn", text: "Summary" } },
+        {
+          type: "alert",
+          level: "success",
+          text: { type: "mrkdwn", text: "Summary" },
+        },
         { type: "section", text: { type: "mrkdwn", text: "*Name* · detail" } },
         { type: "context", elements: [{ type: "mrkdwn", text: "footer" }] },
       ]);

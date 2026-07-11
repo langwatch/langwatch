@@ -80,17 +80,17 @@ export interface SlackBlockKitTemplateOption {
   cadenceFit: SlackBlockKitTemplateCadenceFit;
   kind: SlackBlockKitTemplateKind;
   recommendedForEvaluationFilter?: true;
-  /** When set, this template LEADS with a modern block (`alert`, `card`,
-   *  `data_visualization`, `data_table`) whose incoming-webhook delivery is not
-   *  yet verified — Slack documents `alert` as modal-only and does not state
-   *  message-surface support for `card` / `data_visualization` / `data_table`.
-   *  The block is off the default Block Kit allowlist, so `filterBlockKit`
-   *  strips it and the template DEGRADES to its allowlisted fallback blocks
-   *  (header / section / rich_text / context) — the message still delivers.
-   *  Every such template is authored with that fallback, so a stripped hero
-   *  never yields an empty message. Templates are NOT hidden from the picker;
-   *  the wireframe shows the intended layout and delivery degrades safely until
-   *  a probe flips the block on (`filterBlockKit(..., { allowGatedBlocks })`). */
+  /** When set, this template LEADS with a modern block (`alert`,
+   *  `data_visualization`, `data_table`) that a real Slack incoming webhook
+   *  REJECTS (probed 2026-07: `400 invalid_blocks`; `alert` is documented
+   *  modal-only). The block is off the default Block Kit allowlist, so
+   *  `filterBlockKit` strips it and the template DEGRADES to its allowlisted
+   *  fallback blocks (header / section / rich_text / context) — the message
+   *  still delivers. Every such template is authored with that fallback, so a
+   *  stripped hero never yields an empty message. Templates are NOT hidden from
+   *  the picker; the wireframe shows the intended layout and delivery degrades
+   *  safely until a probe flips the block on (`allowGatedBlocks`). `card` is
+   *  delivery-verified (webhook `200 ok`) so it is allowlisted, not gated. */
   gatedBlock?: GatedBlockType;
   source: string;
   Wireframe: ComponentType;
@@ -142,7 +142,6 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     deliveryNote: "1 message per trace",
     cadenceFit: "immediate",
     kind: "trace",
-    gatedBlock: "card",
     source: traceCardRichSource,
     Wireframe: TraceCardRichWireframe,
   },
@@ -305,7 +304,6 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     deliveryNote: "1 message per report",
     cadenceFit: "both",
     kind: "report",
-    gatedBlock: "card",
     source: reportSummaryCardSource,
     Wireframe: ReportSummaryCardWireframe,
   },
