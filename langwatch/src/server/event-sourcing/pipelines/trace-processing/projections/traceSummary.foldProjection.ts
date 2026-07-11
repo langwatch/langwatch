@@ -36,6 +36,7 @@ import {
   traceNameChangedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
+import { accumulateInteractionSummary } from "./services/interaction-summary.service";
 import {
   SpanTimingService,
   SpanStatusService,
@@ -211,6 +212,16 @@ export function applySpanToSummary({
     attributes,
     RESERVED_REASONING_TOKENS,
     cacheTokens.reasoningTokens,
+  );
+
+  // Summarise the WORK a coding-agent interaction did, not just what it said.
+  // `ComputedOutput` is one string — the closing remark — so on its own it loses
+  // the reads, the edits, the commands, the sub-agents. Counted here as the
+  // spans fold, so reads pay nothing. A non-coding-agent span costs one name
+  // comparison.
+  Object.assign(
+    attributes,
+    accumulateInteractionSummary({ attributes, span }),
   );
 
   const newModels = spanCostService.extractModelsFromSpan(span);
