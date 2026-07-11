@@ -201,6 +201,59 @@ func TestOpenCodeSkillsDir_UnderOpenCodeConfig(t *testing.T) {
 	}
 }
 
+// workerSysProcAttr must drop the child into the per-conversation UID by default
+// (setuid Credential + empty supplementary groups) and omit that Credential only
+// when isolation is disabled — in both modes it keeps Setpgid so the manager can
+// signal the worker's whole process group on shutdown.
+func TestWorkerSysProcAttr(t *testing.T) {
+	const uid = uint32(2345)
+
+	t.Run("when isolation is disabled", func(t *testing.T) {
+		attr := workerSysProcAttr(uid, true)
+		if attr.Credential != nil {
+			t.Errorf("Credential = %+v, want nil (opencode runs as the manager's own user)", attr.Credential)
+		}
+		if !attr.Setpgid {
+			t.Errorf("Setpgid = false, want true even with isolation disabled")
+		}
+	})
+
+	t.Run("when isolation is enabled", func(t *testing.T) {
+		attr := workerSysProcAttr(uid, false)
+		if attr.Credential == nil {
+			t.Fatalf("Credential = nil, want a setuid credential")
+		}
+		if attr.Credential.Uid != uid || attr.Credential.Gid != uid {
+			t.Errorf("Credential Uid/Gid = %d/%d, want %d/%d", attr.Credential.Uid, attr.Credential.Gid, uid, uid)
+		}
+		if attr.Credential.Groups == nil || len(attr.Credential.Groups) != 0 {
+			t.Errorf("Credential.Groups = %v, want empty non-nil slice to force setgroups([])", attr.Credential.Groups)
+		}
+		if !attr.Setpgid {
+			t.Errorf("Setpgid = false, want true")
+		}
+	})
+}
+
+// maybeChown / maybeLchown must skip the syscall entirely when isolation is
+// disabled: pointed at a path that does not exist, a real os.Chown returns
+// ENOENT, so a nil return proves the filesystem was never touched. With
+// isolation enabled the syscall runs and surfaces that ENOENT.
+func TestMaybeChown_NoOpWhenIsolationDisabled(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "definitely-absent")
+
+	if err := maybeChown(missing, 2345, true); err != nil {
+		t.Errorf("maybeChown(disableIsolation=true) = %v, want nil (must not touch the filesystem)", err)
+	}
+	if err := maybeLchown(missing, 2345, true); err != nil {
+		t.Errorf("maybeLchown(disableIsolation=true) = %v, want nil (must not touch the filesystem)", err)
+	}
+
+	if err := maybeChown(missing, 2345, false); err == nil {
+		t.Errorf("maybeChown(disableIsolation=false) on a missing path = nil, want an error (syscall must run)")
+	}
+}
+
 func TestSkillsSymlink_PointsAtSharedTemplateDir(t *testing.T) {
 	home := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(home, ".config", "opencode"), 0o755); err != nil {
