@@ -1,60 +1,59 @@
-import type { LogRecordReceivedEventData } from "../../schemas/events";
+import type {
+  LogRecordReceivedEventData,
+  MetricRecordReceivedEventData,
+} from "../../schemas/events";
 import type { NormalizedSpan } from "../../schemas/spans";
+import type {
+  CodingAgentSessionData,
+  SessionStep,
+} from "./coding-agent-session.types";
 
 /**
- * A coding-agent SESSION, derived from the spans and the logs as they arrive.
+ * Derive a coding-agent SESSION from its spans, its logs AND its metrics
+ * (ADR-040, specs/trace-processing/coding-agent-session.feature).
  *
- * See ADR-040. Three facts drive the whole design:
+ * All three signals are needed, because the agent splits the story across them:
  *
- * 1. **A trace IS the session.** Claude Code's native tracer groups a whole
- *    session under one traceId — one real session measured 796 spans, 34 model
- *    calls, 192 tool runs — and the per-prompt `interaction` span it might have
- *    been split on is emitted so rarely (3 times across every trace in 30 days)
- *    that it is not a seam we can rely on.
+ *   spans   — the structure, the timings, the tokens, the finish reason
+ *   logs    — the cost, the denials, the errors, the compactions, the hooks
+ *   metrics — what actually came OUT of it: lines changed, commits, PRs, and
+ *             the time a human spent
  *
- * 2. **The facts are split across signals.** Structure is in the spans; content
- *    and half the story are in the logs. A tool the user DENIED produces no span
- *    at all — read only the spans and the agent merely appears to change its
- *    mind.
+ * Read only the spans and you cannot see a tool the user DENIED (it never ran,
+ * so it has no span). Read only the logs and you cannot see how long anything
+ * took. Read neither and you cannot see that the session produced two commits.
  *
- * 3. **The facts are not agent-specific.** Every coding agent has a finish
- *    reason, tools, sub-agents, an approval mode, retries, context compaction.
- *    Only WHERE we read them from differs — so that lives in the {@link CLAUDE}
- *    adapter below, and everything else is agent-generic. A Codex adapter plugs
- *    in beside it and every consumer reads the same fields.
+ * AGENT-GENERIC. Every coding agent has a finish reason, tools, sub-agents, an
+ * approval mode, retries, compaction. What differs is only WHERE each fact is
+ * read from, and that lives in the {@link CLAUDE} adapter below. A Codex adapter
+ * plugs in beside it and every consumer reads the same fields.
  *
- * Derived once, at write time, so the app, the CLI and the MCP server all serve
- * the same numbers instead of each re-joining 60 KB payloads per request.
- *
- * PURE. No IO. The fold owns the state; this only folds one event into it.
- *
- * BOUNDED: nothing here may grow with the length of the session. The step list
- * and the file list are capped; everything else is a counter or a small set.
- * That invariant is what makes it safe to summarise an unbounded session at all
- * (it is the same one that let us delete MAX_PROCESSED_SPANS).
+ * PURE, LIGHT and BOUNDED — see `coding-agent-session.types.ts`.
  */
 
 /** Ordered steps we keep. Enough for the shape of any session to survive. */
 const MAX_STEPS = 100;
-/** Distinct files we keep. A big refactor touches hundreds. */
-const MAX_FILES = 50;
-/** Distinct values kept in any of the small sets (tools, skills, MCP servers). */
+/** Distinct values kept in any bounded set (files, tools, skills, servers). */
 const MAX_SET = 50;
 
 /**
- * The Claude Code adapter: the ONLY agent-specific part. Span names, event
- * names, and the attribute keys each fact rides on.
+ * The Claude Code adapter: the ONLY agent-specific part of this file. Span
+ * names, event names, metric names, and the keys each fact rides on.
  */
 const CLAUDE = {
+  NAME: "claude_code",
   SPAN: {
     LLM_REQUEST: "claude_code.llm_request",
     TOOL: "claude_code.tool",
     TOOL_EXECUTION: "claude_code.tool.execution",
+    BLOCKED_ON_USER: "claude_code.tool.blocked_on_user",
     SUBAGENT_SPAWN: "claude_code.subagent.spawn",
-    INTERACTION: "claude_code.interaction",
   },
   EVENT: {
     USER_PROMPT: "user_prompt",
+    ASSISTANT_RESPONSE: "assistant_response",
+    API_REQUEST: "api_request",
+    TOOL_RESULT: "tool_result",
     TOOL_DECISION: "tool_decision",
     API_ERROR: "api_error",
     RETRIES_EXHAUSTED: "api_retries_exhausted",
@@ -63,106 +62,107 @@ const CLAUDE = {
     PERMISSION_MODE: "permission_mode_changed",
     SKILL_ACTIVATED: "skill_activated",
     MCP_CONNECTION: "mcp_server_connection",
+    HOOK_COMPLETE: "hook_execution_complete",
+    AT_MENTION: "at_mention",
+    INTERNAL_ERROR: "internal_error",
+  },
+  METRIC: {
+    LINES_OF_CODE: "claude_code.lines_of_code.count",
+    COMMIT: "claude_code.commit.count",
+    PULL_REQUEST: "claude_code.pull_request.count",
+    EDIT_DECISION: "claude_code.code_edit_tool.decision",
+    ACTIVE_TIME: "claude_code.active_time.total",
   },
 } as const;
 
-/** HTTP 429. The one error worth telling apart from every other error. */
+/** HTTP 429 — the one failure worth telling apart from every other failure. */
 const RATE_LIMIT_STATUS = "429";
-
-/** A decision that means the human stopped the agent, not that the tool broke. */
-const DENIED_SOURCES = new Set(["user_reject", "user_permanent"]);
-const ABORTED_SOURCES = new Set(["user_abort"]);
-
-/** One thing the agent did, in the order it did it. */
-export interface SessionStep {
-  /** The tool's name. */
-  name: string;
-  /** How many times it ran back-to-back — a run of eight reads is one step. */
-  count: number;
-  /** True when any run in the batch failed. */
-  failed: boolean;
-  /** When the first run of the batch started; used to keep the order true. */
-  startedAtMs: number;
-}
-
-export interface CodingAgentSessionData {
-  /** Which agent produced this. Generic; the adapter sets it. */
-  agent: string | null;
-
-  // ── Shape ────────────────────────────────────────────────────────────
-  modelCalls: number;
-  toolCalls: number;
-  subAgents: number;
-  /** In the order they happened, batched, failures marked in place. */
-  steps: SessionStep[];
-
-  // ── Work ─────────────────────────────────────────────────────────────
-  /** Tool name → how many times it ran. */
-  toolCounts: Record<string, number>;
-  /** Tool name → total milliseconds spent in it. */
-  toolDurationMs: Record<string, number>;
-  filesTouched: string[];
-  skills: string[];
-  subAgentTypes: string[];
-  slashCommands: string[];
-  mcpServers: string[];
-
-  // ── What went wrong ──────────────────────────────────────────────────
-  failedTools: number;
-  apiErrors: number;
-  /** Rate limits (429) — worth telling apart from every other failure. */
-  rateLimited: number;
-  retriesExhausted: number;
-  refusals: number;
-
-  // ── What the human did ───────────────────────────────────────────────
-  /** Tools the user DENIED. They never ran, so they have no span. */
-  toolsDenied: number;
-  /** Tools the user aborted mid-run. Not the same as a tool that broke. */
-  toolsAborted: number;
-  /** The approval mode the session ended in (plan, bypassPermissions, …). */
-  permissionMode: string | null;
-
-  // ── What the agent did to itself ─────────────────────────────────────
-  compactions: number;
-  compactionTokensBefore: number;
-  compactionTokensAfter: number;
-
-  // ── How it ended ─────────────────────────────────────────────────────
-  /** The FINAL model call's stop reason — the earlier ones all say tool_use. */
-  stopReason: string | null;
-  /** The reply was CUT OFF rather than finished. Not an answer. */
-  truncated: boolean;
-}
 
 /** A reply that stopped for one of these did NOT finish answering. */
 const TRUNCATING_STOP_REASONS = new Set(["max_tokens", "refusal"]);
 
+/**
+ * A rejection the human made deliberately, versus one they made by walking away.
+ * Neither is a tool that BROKE — counting them together would report the human's
+ * judgement as the agent's failure.
+ */
+const ABORTED_SOURCES = new Set(["user_abort"]);
+
 export function createInitCodingAgentSession(): CodingAgentSessionData {
   return {
     agent: null,
+    sessionId: null,
+    agentVersion: null,
+    terminalType: null,
+    entrypoint: null,
+    finalRequestId: null,
+
     modelCalls: 0,
     toolCalls: 0,
     subAgents: 0,
     steps: [],
+    prompts: 0,
+    promptChars: 0,
+    responseChars: 0,
+
     toolCounts: {},
     toolDurationMs: {},
     filesTouched: [],
     skills: [],
     subAgentTypes: [],
     slashCommands: [],
+    models: [],
     mcpServers: [],
-    failedTools: 0,
-    apiErrors: 0,
-    rateLimited: 0,
-    retriesExhausted: 0,
-    refusals: 0,
-    toolsDenied: 0,
-    toolsAborted: 0,
-    permissionMode: null,
+    mcpTools: [],
+
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    costUsd: 0,
+
+    modelCallMs: 0,
+    toolMs: 0,
+    ttftMsTotal: 0,
+    ttftSamples: 0,
+    blockedOnUserMs: 0,
+    activeTimeUserSec: 0,
+    activeTimeCliSec: 0,
+
+    toolResultBytes: 0,
+    toolInputBytes: 0,
     compactions: 0,
     compactionTokensBefore: 0,
     compactionTokensAfter: 0,
+
+    failedTools: 0,
+    errorTypes: {},
+    apiErrors: 0,
+    rateLimited: 0,
+    retriesExhausted: 0,
+    retryMs: 0,
+    attempts: 0,
+    refusals: 0,
+    refusalCategories: [],
+    internalErrors: 0,
+
+    toolsDenied: 0,
+    toolsAborted: 0,
+    permissionMode: null,
+    permissionChanges: 0,
+    hooksBlocked: 0,
+    hooksCancelled: 0,
+    hookMs: 0,
+
+    linesAdded: 0,
+    linesRemoved: 0,
+    commits: 0,
+    pullRequests: 0,
+    editsAccepted: 0,
+    editsRejected: 0,
+    languagesEdited: [],
+    atMentions: 0,
+
     stopReason: null,
     truncated: false,
   };
@@ -173,11 +173,33 @@ export function isCodingAgentSession(state: CodingAgentSessionData): boolean {
   return state.modelCalls > 0 || state.toolCalls > 0;
 }
 
+/**
+ * The mean time-to-first-token. Kept as a sum + count on the state rather than a
+ * running average, because a running average cannot be folded incrementally
+ * without drifting.
+ */
+export function meanTtftMs(state: CodingAgentSessionData): number | null {
+  return state.ttftSamples > 0
+    ? Math.round(state.ttftMsTotal / state.ttftSamples)
+    : null;
+}
+
+/**
+ * The share of input tokens served from cache. The single most useful number for
+ * a coding agent's economics: a low hit rate on a long session means the context
+ * prefix keeps changing and every turn is re-paying for it.
+ */
+export function cacheHitRate(state: CodingAgentSessionData): number | null {
+  const total =
+    state.cacheReadTokens + state.cacheCreationTokens + state.inputTokens;
+  return total > 0 ? state.cacheReadTokens / total : null;
+}
+
 function str(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-function int(value: unknown): number {
+function num(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
@@ -188,18 +210,29 @@ function addTo(set: string[], value: string): string[] {
   return [...set, value];
 }
 
+/** Increment a bounded, low-cardinality counter map. */
+function bump(
+  map: Record<string, number>,
+  key: string,
+  by = 1,
+): Record<string, number> {
+  if (map[key] === undefined && Object.keys(map).length >= MAX_SET) return map;
+  return { ...map, [key]: (map[key] ?? 0) + by };
+}
+
 /**
  * Append a step, keeping the list in the order the steps actually HAPPENED, and
- * batching a back-to-back run of the same tool into one step.
+ * batching a back-to-back run of the same tool into one.
  *
  * Load-bearing: spans arrive in EXPORT order, not start order — they are batched
  * on the wire, so a slow tool's span can land after a later one's. Appending
  * blindly would produce a plausible-looking but WRONG sequence, which is worse
- * than showing none. So each step carries its start time and is placed by it.
+ * than showing none. Each step therefore carries its start time and is placed by
+ * it.
  *
- * Batching only ever collapses ADJACENT runs. `Read Read Bash Read` stays
+ * Batching only collapses ADJACENT runs. `Read Read Bash Read` stays
  * `Read x2, Bash, Read` — the return to Read after the Bash is a different beat
- * of the story (it checked, ran, checked again) and merging it would erase that.
+ * of the story (it checked, ran, checked again), and merging it would erase that.
  */
 function appendStep(
   steps: SessionStep[],
@@ -224,9 +257,33 @@ function appendStep(
   if (steps.length >= MAX_STEPS) return steps;
   return [
     ...steps.slice(0, index),
-    { name: step.name, count: 1, failed: step.failed, startedAtMs: step.startedAtMs },
+    {
+      name: step.name,
+      count: 1,
+      failed: step.failed,
+      startedAtMs: step.startedAtMs,
+    },
     ...steps.slice(index),
   ];
+}
+
+/** Identity that rides on every signal, so any of them can establish it. */
+function withIdentity(
+  state: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+  resourceAttrs: Record<string, unknown> = {},
+): CodingAgentSessionData {
+  return {
+    ...state,
+    agent: state.agent ?? CLAUDE.NAME,
+    sessionId: state.sessionId ?? str(attrs["session.id"]),
+    agentVersion:
+      state.agentVersion ??
+      str(attrs["app.version"]) ??
+      str(resourceAttrs["service.version"]),
+    terminalType: state.terminalType ?? str(attrs["terminal.type"]),
+    entrypoint: state.entrypoint ?? str(attrs["app.entrypoint"]),
+  };
 }
 
 /** Fold one SPAN into the session. */
@@ -238,16 +295,34 @@ export function applySpanToCodingAgentSession({
   span: NormalizedSpan;
 }): CodingAgentSessionData {
   const attrs = span.spanAttributes;
+  const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
 
   if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
+    const next = withIdentity(state, attrs);
     const stopReason = str(attrs.stop_reason);
+    const ttft = num(attrs.ttft_ms);
+    const model = str(attrs.model) ?? str(attrs["gen_ai.request.model"]);
+    const requestId = str(attrs.request_id);
+
     return {
-      ...state,
-      agent: state.agent ?? "claude_code",
-      modelCalls: state.modelCalls + 1,
+      ...next,
+      modelCalls: next.modelCalls + 1,
+      modelCallMs: next.modelCallMs + (num(attrs.duration_ms) || durationMs),
+      ttftMsTotal: next.ttftMsTotal + ttft,
+      ttftSamples: next.ttftSamples + (ttft > 0 ? 1 : 0),
+      // Attempts includes the first try, so attempts > modelCalls means the
+      // session paid for retries somewhere.
+      attempts: next.attempts + Math.max(1, num(attrs.attempt)),
+      inputTokens: next.inputTokens + num(attrs.input_tokens),
+      outputTokens: next.outputTokens + num(attrs.output_tokens),
+      cacheReadTokens: next.cacheReadTokens + num(attrs.cache_read_tokens),
+      cacheCreationTokens:
+        next.cacheCreationTokens + num(attrs.cache_creation_tokens),
+      models: model !== null ? addTo(next.models, model) : next.models,
+      // The pointer back to the body that ended the session. Last call wins.
+      finalRequestId: requestId ?? next.finalRequestId,
       // Only the LAST call's stop reason is the session's: the earlier ones all
       // stop on `tool_use` by definition, since that is what drove the loop on.
-      // Last-write-wins across the fold gives us the final call's.
       ...(stopReason !== null
         ? {
             stopReason,
@@ -258,42 +333,47 @@ export function applySpanToCodingAgentSession({
   }
 
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
+    const next = withIdentity(state, attrs);
     const agentType = str(attrs.agent_type) ?? str(attrs.subagent_type);
     return {
-      ...state,
-      agent: state.agent ?? "claude_code",
-      subAgents: state.subAgents + 1,
+      ...next,
+      subAgents: next.subAgents + 1,
       subAgentTypes:
         agentType !== null
-          ? addTo(state.subAgentTypes, agentType)
-          : state.subAgentTypes,
+          ? addTo(next.subAgentTypes, agentType)
+          : next.subAgentTypes,
+    };
+  }
+
+  // The time a HUMAN sat waiting to approve a tool. Pure friction: the agent was
+  // idle and so was the person. Nothing else in the telemetry surfaces it.
+  if (span.name === CLAUDE.SPAN.BLOCKED_ON_USER) {
+    return {
+      ...state,
+      blockedOnUserMs:
+        state.blockedOnUserMs + (num(attrs.duration_ms) || durationMs),
     };
   }
 
   if (span.name !== CLAUDE.SPAN.TOOL) return state;
 
+  const next = withIdentity(state, attrs);
   const toolName = str(attrs.tool_name);
   const failed = span.statusCode === "error";
-  const next: CodingAgentSessionData = {
-    ...state,
-    agent: state.agent ?? "claude_code",
-    toolCalls: state.toolCalls + 1,
-    failedTools: state.failedTools + (failed ? 1 : 0),
+  const toolMs = num(attrs.duration_ms) || durationMs;
+
+  const withTool: CodingAgentSessionData = {
+    ...next,
+    toolCalls: next.toolCalls + 1,
+    failedTools: next.failedTools + (failed ? 1 : 0),
+    toolMs: next.toolMs + toolMs,
   };
 
-  if (toolName === null) return next;
+  if (toolName === null) return withTool;
 
-  next.toolCounts = {
-    ...state.toolCounts,
-    [toolName]: (state.toolCounts[toolName] ?? 0) + 1,
-  };
-
-  const durationMs = span.endTimeUnixMs - span.startTimeUnixMs;
-  if (durationMs > 0) {
-    next.toolDurationMs = {
-      ...state.toolDurationMs,
-      [toolName]: (state.toolDurationMs[toolName] ?? 0) + durationMs,
-    };
+  withTool.toolCounts = bump(next.toolCounts, toolName);
+  if (toolMs > 0) {
+    withTool.toolDurationMs = bump(next.toolDurationMs, toolName, toolMs);
   }
 
   // A sub-agent runs its OWN conversation and can do twenty reads of its own.
@@ -301,10 +381,9 @@ export function applySpanToCodingAgentSession({
   // did them, flattening away the hierarchy. The sub-agent is already
   // represented by the step that SPAWNED it. `agent_id` is absent on the main
   // thread and present on every sub-agent span, so it is exactly the
-  // discriminator. Its tool still counts toward the totals — the work happened.
-  const isSubAgentStep = str(attrs.agent_id) !== null;
-  if (!isSubAgentStep) {
-    next.steps = appendStep(state.steps, {
+  // discriminator. The work still counts toward the totals — it happened.
+  if (str(attrs.agent_id) === null) {
+    withTool.steps = appendStep(next.steps, {
       name: toolName,
       startedAtMs: span.startTimeUnixMs,
       failed,
@@ -312,23 +391,24 @@ export function applySpanToCodingAgentSession({
   }
 
   const filePath = str(attrs.file_path);
-  if (filePath !== null && !state.filesTouched.includes(filePath)) {
-    next.filesTouched =
-      state.filesTouched.length < MAX_FILES
-        ? [...state.filesTouched, filePath]
-        : state.filesTouched;
+  if (filePath !== null) {
+    withTool.filesTouched = addTo(next.filesTouched, filePath);
   }
 
-  // A skill reaches the session two ways: the `skill_activated` event, and the
+  // A skill reaches the session two ways: the `skill_activated` event and the
   // Skill TOOL span. A skill the agent invoked proactively arrives on one path,
   // a `/slash` skill on the other — reading only one loses half of them.
   const skillName = str(attrs.skill_name);
-  if (skillName !== null) next.skills = addTo(state.skills, skillName);
+  if (skillName !== null) withTool.skills = addTo(next.skills, skillName);
 
   const mcpServer = str(attrs["mcp_server.name"]);
-  if (mcpServer !== null) next.mcpServers = addTo(state.mcpServers, mcpServer);
+  if (mcpServer !== null) {
+    withTool.mcpServers = addTo(next.mcpServers, mcpServer);
+  }
+  const mcpTool = str(attrs["mcp_tool.name"]);
+  if (mcpTool !== null) withTool.mcpTools = addTo(next.mcpTools, mcpTool);
 
-  return next;
+  return withTool;
 }
 
 /**
@@ -336,7 +416,7 @@ export function applySpanToCodingAgentSession({
  *
  * These are the facts with NO span: the tool the user denied (it never ran), the
  * model call that failed and was retried (a failed call has no successful span),
- * the mid-session compaction, the slash command that opened it.
+ * the authoritative cost, the compaction, the hook that blocked an action.
  */
 export function applyLogToCodingAgentSession({
   state,
@@ -349,74 +429,212 @@ export function applyLogToCodingAgentSession({
   const event = str(attrs["event.name"]);
   if (event === null) return state;
 
+  const base = withIdentity(state, attrs, data.resourceAttributes ?? {});
+
   switch (event) {
     case CLAUDE.EVENT.USER_PROMPT: {
       const command = str(attrs.command_name);
-      return command !== null
-        ? { ...state, slashCommands: addTo(state.slashCommands, command) }
-        : state;
-    }
-
-    case CLAUDE.EVENT.TOOL_DECISION: {
-      if (str(attrs.decision) !== "reject") return state;
-      const source = str(attrs.source) ?? "";
-      // A tool the user ABORTED mid-run is a different act from one they refused
-      // outright, and neither is a tool that BROKE — counting them together
-      // would report the human's judgement as the agent's failure.
-      if (ABORTED_SOURCES.has(source)) {
-        return { ...state, toolsAborted: state.toolsAborted + 1 };
-      }
-      if (DENIED_SOURCES.has(source) || source === "") {
-        return { ...state, toolsDenied: state.toolsDenied + 1 };
-      }
-      return state;
-    }
-
-    case CLAUDE.EVENT.API_ERROR: {
-      const isRateLimit = str(attrs.status_code) === RATE_LIMIT_STATUS;
       return {
-        ...state,
-        apiErrors: state.apiErrors + 1,
-        rateLimited: state.rateLimited + (isRateLimit ? 1 : 0),
+        ...base,
+        prompts: base.prompts + 1,
+        // The length, never the text.
+        promptChars: base.promptChars + num(attrs.prompt_length),
+        slashCommands:
+          command !== null
+            ? addTo(base.slashCommands, command)
+            : base.slashCommands,
       };
     }
 
-    case CLAUDE.EVENT.RETRIES_EXHAUSTED:
-      return { ...state, retriesExhausted: state.retriesExhausted + 1 };
+    case CLAUDE.EVENT.ASSISTANT_RESPONSE:
+      return {
+        ...base,
+        responseChars: base.responseChars + num(attrs.response_length),
+      };
 
-    case CLAUDE.EVENT.REFUSAL:
-      return { ...state, refusals: state.refusals + 1 };
+    case CLAUDE.EVENT.API_REQUEST:
+      // The authoritative cost: the agent reports what it was actually billed,
+      // which no span carries.
+      return { ...base, costUsd: base.costUsd + num(attrs.cost_usd) };
+
+    case CLAUDE.EVENT.TOOL_RESULT: {
+      const errorType = str(attrs.error_type);
+      return {
+        ...base,
+        // Bytes of tool OUTPUT fed back into the context — the usual cause of a
+        // session bloating its way into a compaction.
+        toolResultBytes:
+          base.toolResultBytes + num(attrs.tool_result_size_bytes),
+        toolInputBytes: base.toolInputBytes + num(attrs.tool_input_size_bytes),
+        errorTypes:
+          errorType !== null && str(attrs.success) === "false"
+            ? bump(base.errorTypes, errorType)
+            : base.errorTypes,
+      };
+    }
+
+    case CLAUDE.EVENT.TOOL_DECISION: {
+      if (str(attrs.decision) !== "reject") return base;
+      const source = str(attrs.source) ?? "";
+      // An ABORT (the human walked away from the prompt) is a different act from
+      // a refusal, and NEITHER is a tool that broke. Counting them as failures
+      // would report the human's judgement as the agent's fault.
+      return ABORTED_SOURCES.has(source)
+        ? { ...base, toolsAborted: base.toolsAborted + 1 }
+        : { ...base, toolsDenied: base.toolsDenied + 1 };
+    }
+
+    case CLAUDE.EVENT.API_ERROR:
+      return {
+        ...base,
+        apiErrors: base.apiErrors + 1,
+        rateLimited:
+          base.rateLimited +
+          (str(attrs.status_code) === RATE_LIMIT_STATUS ? 1 : 0),
+      };
+
+    case CLAUDE.EVENT.RETRIES_EXHAUSTED:
+      return {
+        ...base,
+        retriesExhausted: base.retriesExhausted + 1,
+        // Wall-clock burned on attempts that produced nothing.
+        retryMs: base.retryMs + num(attrs.total_retry_duration_ms),
+      };
+
+    case CLAUDE.EVENT.REFUSAL: {
+      // A server-side fallback hop already retried on another model, so the user
+      // never saw that refusal. Counting it would overstate how often the agent
+      // actually refused the human.
+      if (str(attrs.server_fallback_hop) === "true") return base;
+      const category = str(attrs.category);
+      return {
+        ...base,
+        refusals: base.refusals + 1,
+        refusalCategories:
+          category !== null
+            ? addTo(base.refusalCategories, category)
+            : base.refusalCategories,
+      };
+    }
 
     case CLAUDE.EVENT.COMPACTION:
       return {
-        ...state,
-        compactions: state.compactions + 1,
+        ...base,
+        compactions: base.compactions + 1,
         compactionTokensBefore:
-          state.compactionTokensBefore + int(attrs.pre_tokens),
+          base.compactionTokensBefore + num(attrs.pre_tokens),
         compactionTokensAfter:
-          state.compactionTokensAfter + int(attrs.post_tokens),
+          base.compactionTokensAfter + num(attrs.post_tokens),
       };
 
     case CLAUDE.EVENT.PERMISSION_MODE: {
       const mode = str(attrs.to_mode);
-      return mode !== null ? { ...state, permissionMode: mode } : state;
+      return {
+        ...base,
+        permissionMode: mode ?? base.permissionMode,
+        // Every widening of what the agent is allowed to do is worth auditing.
+        permissionChanges: base.permissionChanges + 1,
+      };
     }
 
     case CLAUDE.EVENT.SKILL_ACTIVATED: {
       const skill = str(attrs["skill.name"]);
       return skill !== null
-        ? { ...state, skills: addTo(state.skills, skill) }
-        : state;
+        ? { ...base, skills: addTo(base.skills, skill) }
+        : base;
     }
 
     case CLAUDE.EVENT.MCP_CONNECTION: {
       const server = str(attrs.server_name) ?? str(attrs["plugin.name"]);
       return server !== null
-        ? { ...state, mcpServers: addTo(state.mcpServers, server) }
-        : state;
+        ? { ...base, mcpServers: addTo(base.mcpServers, server) }
+        : base;
+    }
+
+    case CLAUDE.EVENT.HOOK_COMPLETE:
+      // The safeguards that actually FIRED: a hook that returned a blocking
+      // decision stopped the agent doing something.
+      return {
+        ...base,
+        hooksBlocked: base.hooksBlocked + num(attrs.num_blocking),
+        hooksCancelled: base.hooksCancelled + num(attrs.num_cancelled),
+        hookMs: base.hookMs + num(attrs.total_duration_ms),
+      };
+
+    case CLAUDE.EVENT.AT_MENTION:
+      return { ...base, atMentions: base.atMentions + 1 };
+
+    case CLAUDE.EVENT.INTERNAL_ERROR:
+      return { ...base, internalErrors: base.internalErrors + 1 };
+
+    default:
+      return base;
+  }
+}
+
+/**
+ * Fold one METRIC into the session.
+ *
+ * The metrics are the only signal that says what the session PRODUCED — lines
+ * changed, commits, pull requests — and the only one that measures the human's
+ * own time. A summary built from spans and logs alone can tell you the agent ran
+ * 192 tools and can't tell you whether anything came of it.
+ */
+export function applyMetricToCodingAgentSession({
+  state,
+  data,
+}: {
+  state: CodingAgentSessionData;
+  data: MetricRecordReceivedEventData;
+}): CodingAgentSessionData {
+  const attrs = data.attributes;
+  const value = num(data.value);
+  const base = withIdentity(state, attrs, data.resourceAttributes ?? {});
+
+  switch (data.metricName) {
+    case CLAUDE.METRIC.LINES_OF_CODE: {
+      const type = str(attrs.type);
+      if (type === "added") return { ...base, linesAdded: base.linesAdded + value };
+      if (type === "removed") {
+        return { ...base, linesRemoved: base.linesRemoved + value };
+      }
+      return base;
+    }
+
+    case CLAUDE.METRIC.COMMIT:
+      return { ...base, commits: base.commits + value };
+
+    case CLAUDE.METRIC.PULL_REQUEST:
+      return { ...base, pullRequests: base.pullRequests + value };
+
+    case CLAUDE.METRIC.EDIT_DECISION: {
+      const accepted = str(attrs.decision) === "accept";
+      const language = str(attrs.language);
+      return {
+        ...base,
+        editsAccepted: base.editsAccepted + (accepted ? value : 0),
+        editsRejected: base.editsRejected + (accepted ? 0 : value),
+        languagesEdited:
+          language !== null && language !== "unknown"
+            ? addTo(base.languagesEdited, language)
+            : base.languagesEdited,
+      };
+    }
+
+    case CLAUDE.METRIC.ACTIVE_TIME: {
+      const type = str(attrs.type);
+      if (type === "user") {
+        return { ...base, activeTimeUserSec: base.activeTimeUserSec + value };
+      }
+      if (type === "cli") {
+        return { ...base, activeTimeCliSec: base.activeTimeCliSec + value };
+      }
+      return base;
     }
 
     default:
-      return state;
+      return base;
   }
 }
+
+export type { CodingAgentSessionData, SessionStep };
