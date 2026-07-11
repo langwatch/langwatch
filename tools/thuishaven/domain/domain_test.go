@@ -20,10 +20,10 @@ func TestDeriveSlugIsTheWorktreeName(t *testing.T) {
 
 func TestDeriveSlugSanitisesMessyNames(t *testing.T) {
 	cases := map[string]string{
-		"/x/adr-domain-errors":  "adr-domain-errors",
-		"/x/My_Feature Branch":  "my-feature-branch",
-		"/x/feat/nested":        "nested",
-		"/x/__weird__.name__":   "weird-name",
+		"/x/adr-domain-errors": "adr-domain-errors",
+		"/x/My_Feature Branch": "my-feature-branch",
+		"/x/feat/nested":       "nested",
+		"/x/__weird__.name__":  "weird-name",
 	}
 	for path, want := range cases {
 		if got := DeriveSlug(path, nil); got != want {
@@ -210,4 +210,15 @@ func validCHIdentifier(s string) bool {
 		}
 	}
 	return true
+}
+
+func TestOverlayEmitsStableAPIKey(t *testing.T) {
+	st := Stack{Slug: "portless", APIPort: 1, Services: []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}}}
+	if valueOf(st.OverlayEnv(), "LANGWATCH_API_KEY") != "" {
+		t.Fatalf("no key set → LANGWATCH_API_KEY must be absent")
+	}
+	st.LocalAPIKey = DefaultLocalAPIKey
+	if got := valueOf(st.OverlayEnv(), "LANGWATCH_API_KEY"); got != DefaultLocalAPIKey {
+		t.Errorf("LANGWATCH_API_KEY = %q, want the stable default %q", got, DefaultLocalAPIKey)
+	}
 }

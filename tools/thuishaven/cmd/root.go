@@ -69,6 +69,7 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		Agent:              agent,
 		ManageClickHouse:   os.Getenv("LANGWATCH_HAVEN_CH") != "0",
 		StopClickHouseIdle: os.Getenv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
+		LocalAPIKey:        envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
 	}
 	orch := app.New(cfg, proxy, store, sup, sys, ch, logger)
 
@@ -196,6 +197,13 @@ func hasFlag(args []string, flag string) bool {
 		}
 	}
 	return false
+}
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }
 
 func envInt(key string, def int) int {

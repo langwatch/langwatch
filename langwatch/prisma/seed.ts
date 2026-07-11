@@ -13,6 +13,16 @@ async function main() {
 
   console.log(`🌱 Seeding database with API key: ${apiKey}`);
 
+  // Idempotent: haven runs this on every `up` so a freshly-provisioned database is
+  // always migrated AND seeded with the same stable credential. If a project with
+  // this API key already exists, there is nothing to do — re-running must not
+  // duplicate the org/team/project (nor error on a shared Postgres).
+  const existing = await prisma.project.findFirst({ where: { apiKey } });
+  if (existing) {
+    console.log(`✅ Project already seeded (${existing.id}); API key unchanged. Skipping.`);
+    return;
+  }
+
   // Create organization with enterprise license to avoid free plan limits in E2E tests
   const organization = await prisma.organization.create({
     data: {

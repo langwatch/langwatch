@@ -73,7 +73,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, manageCH bool)
 	st := domain.Stack{
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
 		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
-		APIPort: ports[3], WorkerMetricsPort: ports[4],
+		APIPort: ports[3], WorkerMetricsPort: ports[4], LocalAPIKey: o.cfg.LocalAPIKey,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		st.Services = append(st.Services, domain.Service{
@@ -151,10 +151,12 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm run start:prepare:db", env); err != nil {
 		o.log.Warn("db prepare failed (continuing)", zap.Error(err))
 	}
-	if opts.Seed {
-		if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
-			o.log.Warn("seed failed (continuing)", zap.Error(err))
-		}
+	// Always seed. The seed is idempotent (a no-op once the stable local project +
+	// API key exist), so every `up` guarantees the same migrations AND the same
+	// seeded credential are in place — a freshly-provisioned DB is immediately
+	// usable with the well-known LANGWATCH_API_KEY, no manual sign-up.
+	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
+		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
 	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir))
 	return nil

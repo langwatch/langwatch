@@ -5,6 +5,13 @@ import (
 	"strings"
 )
 
+// DefaultLocalAPIKey is the stable local dev project API key haven seeds and
+// injects when none is pinned. It is intentionally fixed and well-known so any
+// worktree, script, or AI agent authenticates with the same key locally — the
+// "the API key is always the same locally" contract. It is a legacy sk-lw-* full
+// project key, matched by exact lookup on Project.apiKey.
+const DefaultLocalAPIKey = "sk-lw-local-development-key"
+
 // svc looks a service up by name; a zero value is fine for the string formatting
 // below when a stack is partial.
 func (s Stack) svc(name string) Service {
@@ -48,6 +55,11 @@ func (s Stack) OverlayEnv() []string {
 		"LW_GATEWAY_PUBLIC_URL=" + gw.URL,
 		"LW_GATEWAY_INTERNAL_URL=" + gw.URL,
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
+	}
+	// A stable local API key so the seed always mints the same credential and any
+	// agent can authenticate without rediscovering it per worktree.
+	if s.LocalAPIKey != "" {
+		env = append(env, "LANGWATCH_API_KEY="+s.LocalAPIKey)
 	}
 	// haven manages one shared clickhouse-server; this stack gets its own database
 	// on it. The app connects straight to loopback (native CH HTTP, no proxy) at
