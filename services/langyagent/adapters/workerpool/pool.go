@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -71,6 +72,11 @@ type Pool struct {
 	openCodeBinaryPath  string
 	otelPluginVersion   string
 	disableUIDIsolation bool
+	// agentsTemplate is the shared /workspace/AGENTS.md read ONCE at New; each
+	// spawn only does the per-worker ${LANGWATCH_ENDPOINT} ReplaceAll and never a
+	// disk read. Empty if the file was unreadable at startup — a spawn then fails
+	// with a clear error rather than crash-looping the whole service at boot.
+	agentsTemplate string
 
 	telemetry *telemetry.Telemetry
 	egress    egress.Guard
@@ -111,6 +117,20 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 	if err := os.MkdirAll(opts.SessionsRoot, 0o755); err != nil {
 		return nil, fmt.Errorf("mkdir sessions root: %w", err)
 	}
+	// Read the shared AGENTS.md ONCE here so no per-worker spawn touches disk for
+	// it — only the per-worker ${LANGWATCH_ENDPOINT} ReplaceAll runs at spawn. A
+	// read failure is logged, not fatal: /workspace may not be mounted in every
+	// dev preset, and a spawn then fails with a clear error instead of crash-
+	// looping the manager at boot.
+	var agentsTemplate string
+	if raw, err := os.ReadFile(filepath.Join(opts.WorkspaceRoot, "AGENTS.md")); err != nil {
+		clog.Get(ctx).Warn("read shared AGENTS.md at startup failed; worker spawns will fail until it is present",
+			zap.String("workspace_root", opts.WorkspaceRoot),
+			zap.Error(err),
+		)
+	} else {
+		agentsTemplate = string(raw)
+	}
 	tel := opts.Telemetry
 	if tel == nil {
 		tel = telemetry.New()
@@ -130,6 +150,7 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 		openCodeBinaryPath:  opts.OpenCodeBinaryPath,
 		otelPluginVersion:   opts.OTelPluginVersion,
 		disableUIDIsolation: opts.DisableUIDIsolation,
+		agentsTemplate:      agentsTemplate,
 		telemetry:           tel,
 		egress:              guard,
 		baseCtx:             baseCtx,
@@ -153,7 +174,12 @@ func (p *Pool) StartReaper() {
 			case <-p.stopCh:
 				return
 			case <-t.C:
-				p.reapIdle()
+				// Per-iteration recovery: a panic in ONE sweep must not end idle
+				// reaping forever (a whole-goroutine recover would). Log + continue.
+				func() {
+					defer clog.HandlePanic(p.baseCtx, false)
+					p.reapIdle()
+				}()
 			}
 		}
 	}()
@@ -331,6 +357,14 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		return nil, herr.New(ctx, domain.ErrInvalidConversationID, herr.M{"message": "invalid conversationId"})
 	}
 
+	// Stacked rollback: each acquired resource registers a deferred undo guarded
+	// by `success`. On ANY early return OR panic before success is set, the undos
+	// unwind in reverse acquisition order — no leaked UID (→ eventual capacity
+	// exhaustion), home dir with plaintext creds, listener, egress reservation, or
+	// opencode process. On success the guard flips and every undo becomes a no-op:
+	// the live worker owns these resources for its lifetime.
+	success := false
+
 	// Allocate a UID under the registry lock so two concurrent spawns can't both
 	// observe the same slot as free.
 	p.mu.Lock()
@@ -339,12 +373,13 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	if err != nil {
 		return nil, err
 	}
-
-	cleanupUID := func() {
-		p.mu.Lock()
-		p.releaseUIDLocked(uid, conversationID)
-		p.mu.Unlock()
-	}
+	defer func() {
+		if !success {
+			p.mu.Lock()
+			p.releaseUIDLocked(uid, conversationID)
+			p.mu.Unlock()
+		}
+	}()
 
 	// Egress seam (ADR-047): a real guard (PR4) may set up per-worker egress
 	// monitoring here and fail the spawn closed. The default pass-through does
@@ -354,19 +389,26 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		// The rejection is deliberately handled, so the caller gets a herr with
 		// an actionable message.
 		log.Warn("egress guard rejected worker", zap.String("conversation", conversationID), zap.Error(err))
-		cleanupUID()
 		return nil, herr.New(ctx, domain.ErrWorkerSpawn, herr.M{"message": "the assistant worker could not be started, please try again"})
 	}
+	defer func() {
+		if !success {
+			p.egress.ReleaseWorker(ctx, conversationID)
+		}
+	}()
 
 	if err := os.MkdirAll(workerHome, 0o700); err != nil {
-		p.egress.ReleaseWorker(ctx, conversationID)
-		cleanupUID()
 		return nil, fmt.Errorf("mkdir worker home: %w", err)
 	}
-	if err := setupWorkerHome(workerHome, p.workspaceRoot, creds, uid, p.otelPluginVersion, p.disableUIDIsolation); err != nil {
-		_ = os.RemoveAll(workerHome)
-		p.egress.ReleaseWorker(ctx, conversationID)
-		cleanupUID()
+	// Register the home undo right after MkdirAll so a failure inside
+	// setupWorkerHome (which writes config.json with the project API key) still
+	// wipes the partial home.
+	defer func() {
+		if !success {
+			_ = os.RemoveAll(workerHome)
+		}
+	}()
+	if err := setupWorkerHome(workerHome, p.workspaceRoot, creds, uid, p.otelPluginVersion, p.agentsTemplate, p.disableUIDIsolation); err != nil {
 		return nil, err
 	}
 
@@ -377,9 +419,6 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	//     Never exposed to callers; the proxy is the only consumer.
 	externalPort, err := getFreePort()
 	if err != nil {
-		_ = os.RemoveAll(workerHome)
-		p.egress.ReleaseWorker(ctx, conversationID)
-		cleanupUID()
 		return nil, err
 	}
 	// Any free port works: sibling isolation is enforced by opencode's own
@@ -393,9 +432,6 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	for attempt := 0; attempt < 8; attempt++ {
 		internalPort, err = getFreePort()
 		if err != nil {
-			_ = os.RemoveAll(workerHome)
-			p.egress.ReleaseWorker(ctx, conversationID)
-			cleanupUID()
 			return nil, err
 		}
 		if internalPort != externalPort {
@@ -403,17 +439,11 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		}
 	}
 	if internalPort == externalPort {
-		_ = os.RemoveAll(workerHome)
-		p.egress.ReleaseWorker(ctx, conversationID)
-		cleanupUID()
 		return nil, fmt.Errorf("could not allocate a distinct internal port (kept colliding with external port %d)", externalPort)
 	}
 
 	bearerToken, err := generateBearerToken()
 	if err != nil {
-		_ = os.RemoveAll(workerHome)
-		p.egress.ReleaseWorker(ctx, conversationID)
-		cleanupUID()
 		return nil, err
 	}
 
@@ -425,9 +455,6 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	// internal credential.
 	openCodePassword, err := generateBearerToken()
 	if err != nil {
-		_ = os.RemoveAll(workerHome)
-		p.egress.ReleaseWorker(ctx, conversationID)
-		cleanupUID()
 		return nil, err
 	}
 
@@ -435,11 +462,13 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	// lifetime follow the pool, not a single request.
 	proxy, err := startAuthProxy(p.baseCtx, externalPort, internalPort, bearerToken, openCodePassword)
 	if err != nil {
-		_ = os.RemoveAll(workerHome)
-		p.egress.ReleaseWorker(ctx, conversationID)
-		cleanupUID()
 		return nil, fmt.Errorf("start authproxy: %w", err)
 	}
+	defer func() {
+		if !success {
+			proxy.shutdown()
+		}
+	}()
 
 	// The worker subprocess is bound to the POOL-lifetime context — the
 	// per-request context controls a single chat turn, but the worker stays
@@ -448,54 +477,47 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	// Shutdown / deadline propagates to the subprocess.
 	cmd, err := spawnOpenCode(p.baseCtx, p.openCodeBinaryPath, conversationID, workerHome, uid, internalPort, creds, openCodePassword, p.disableUIDIsolation)
 	if err != nil {
-		proxy.shutdown()
-		_ = os.RemoveAll(workerHome)
-		p.egress.ReleaseWorker(ctx, conversationID)
-		cleanupUID()
 		return nil, err
 	}
-
-	// failSpawn is the cleanup path for readiness/session failures. The watcher
-	// goroutine has NOT started yet at these call sites, so this function owns
-	// cmd.Wait() without a race. It kills the process, drains its exit, shuts
-	// down the auth proxy, removes the worker home (which may already hold
-	// config.json with the project API key), releases the UID reservation, and
-	// notifies the egress guard — leaving no sensitive material on the emptyDir.
-	failSpawn := func(cause error) error {
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait() // drain; goroutine not started yet, no race
-		proxy.shutdown()
-		_ = os.RemoveAll(workerHome)
-		p.egress.ReleaseWorker(ctx, conversationID)
-		cleanupUID()
-		return cause
-	}
+	// The exit watcher goroutine is NOT started until success below, so this undo
+	// owns cmd.Wait() without a race: on a readiness/session failure it kills the
+	// process and drains its exit, and the rollbacks above shut the proxy, wipe
+	// the home (config.json with the project API key), release the UID, and notify
+	// the egress guard — leaving no sensitive material on the emptyDir.
+	defer func() {
+		if !success {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+		}
+	}()
 
 	readyStart := time.Now()
 	readinessCtx, cancel := context.WithTimeout(ctx, p.readinessTimeout)
 	defer cancel()
 	if err := waitForReadiness(readinessCtx, externalPort, internalPort, bearerToken, p.readinessTimeout); err != nil {
 		p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), false)
-		return nil, failSpawn(err)
+		return nil, err
 	}
 	p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), true)
 
 	sessionID, err := createOpenCodeSession(ctx, externalPort, bearerToken)
 	if err != nil {
-		return nil, failSpawn(err)
+		return nil, err
 	}
 
-	// Process is healthy — transfer watch ownership to the goroutine. Started
-	// AFTER readiness + session so the failSpawn path above owns cmd.Wait()
-	// cleanly.
-	go func() {
+	// Healthy. Commit: flip the guard so the deferred rollbacks become no-ops,
+	// THEN transfer watch ownership to the exit goroutine (started AFTER success
+	// so the cmd rollback above never double-Wait()s the process). clog.Go guards
+	// the watcher so a panic in teardown can't crash the manager.
+	success = true
+	clog.Go(p.baseCtx, "worker-exit-watcher", func() {
 		err := cmd.Wait()
 		clog.Get(p.baseCtx).Info("worker exited",
 			zap.String("conversation", conversationID),
 			zap.Error(err),
 		)
 		p.onWorkerExit(conversationID, cmd, uid)
-	}()
+	})
 
 	log.Info("worker ready",
 		zap.String("conversation", conversationID),
@@ -510,6 +532,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		port:              externalPort,
 		internalPort:      internalPort,
 		bearerToken:       bearerToken,
+		baseURL:           "http://127.0.0.1:" + strconv.Itoa(externalPort),
 		authProxy:         proxy,
 		openCodeSessionID: sessionID,
 		cmd:               cmd,
@@ -535,41 +558,66 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 //     still the entry there.
 //  3. UID release is convId-guarded inside releaseUIDLocked.
 func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
-	p.mu.Lock()
-	shouldWipe := false
+	var tombstone string
 	var proxyToShutdown *authProxy
-	if w, ok := p.workers[conversationID]; ok {
-		if w.cmd == cmd {
-			proxyToShutdown = w.authProxy
-			delete(p.workers, conversationID)
+	shouldWipe := false
+	deletedOwnEntry := false
+
+	// The decision runs under the lock (defer-unlocked so a panic can't leave it
+	// held); the slow RemoveAll + egress I/O run AFTER the unlock.
+	func() {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+
+		if w, ok := p.workers[conversationID]; ok {
+			if w.cmd == cmd {
+				proxyToShutdown = w.authProxy
+				delete(p.workers, conversationID)
+				shouldWipe = true
+				deletedOwnEntry = true
+			}
+			// else: replacement is in the slot; leave its home alone.
+		} else if _, spawning := p.spawnLocks[conversationID]; !spawning {
+			// Slot empty AND no spawn in flight — the home is ours to reclaim. (If
+			// a spawn IS in flight, its setupWorkerHome is writing into the home dir
+			// right now; reclaiming would corrupt the new worker.) This is a worker
+			// kill() already removed from the registry, so the gauge was decremented
+			// there — do NOT decrement again below.
 			shouldWipe = true
 		}
-		// else: replacement is in the slot; leave its home alone.
-	} else if _, spawning := p.spawnLocks[conversationID]; !spawning {
-		// Slot empty AND no spawn in flight — home is ours to wipe. (If a spawn
-		// IS in flight, its setupWorkerHome is writing into the home dir right
-		// now; wiping would corrupt the new worker.)
-		shouldWipe = true
-	}
-	p.releaseUIDLocked(uid, conversationID)
-	// The wipe MUST run while p.mu is held: releasing the lock first would let a
-	// fresh Acquire for the same conversation take spawnLocks[X] and start
-	// setupWorkerHome writing into the home dir between our decision and our
-	// rm -rf, which would then delete the replacement's freshly written
-	// credentials. Holding the lock blocks that Acquire until the wipe
-	// completes. os.RemoveAll under the lock is the accepted cost until
-	// generation-suffixed home paths make it lock-free.
-	if shouldWipe {
-		removeWorkerHome(p.baseCtx, p.sessionsRoot, conversationID)
-	}
-	// Launch the per-worker authproxy shutdown as a goroutine so we don't block
-	// on its in-flight drain while holding p.mu; the goroutine takes no pool
-	// lock so this is safe under the lock.
-	if proxyToShutdown != nil {
-		go proxyToShutdown.shutdown()
-	}
-	p.mu.Unlock()
+		p.releaseUIDLocked(uid, conversationID)
+		if shouldWipe {
+			// Rename the canonical home to a unique tombstone WHILE the lock is
+			// held — a microsecond metadata op that frees the canonical path so a
+			// fresh Acquire for the same conversation can't collide with our
+			// teardown — then RemoveAll the tombstone AFTER unlock, off the pool-
+			// wide hot path (every Acquire/kill/reap/Status blocks on this lock, so
+			// the old in-lock tree-walk unlink stalled them all).
+			tombstone = tombstoneWorkerHome(p.baseCtx, p.sessionsRoot, conversationID)
+		}
+		// Only the identity-owned delete decrements the active gauge: that worker
+		// exited on its own (crash / self-exit) and never went through kill(),
+		// which is the only other place the gauge is decremented. Without this the
+		// gauge drifts upward on every self-exit.
+		if deletedOwnEntry {
+			p.telemetry.WorkerExited(p.baseCtx)
+		}
+	}()
 
+	// Everything below runs WITHOUT the pool lock.
+	if proxyToShutdown != nil {
+		// The authproxy shutdown drains in-flight turns; run it off the lock as a
+		// panic-guarded goroutine so the pool never blocks on it.
+		clog.Go(p.baseCtx, "authproxy-shutdown", proxyToShutdown.shutdown)
+	}
+	if tombstone != "" {
+		if err := os.RemoveAll(tombstone); err != nil {
+			clog.Get(p.baseCtx).Warn("remove worker home tombstone failed",
+				zap.String("conversation", conversationID),
+				zap.Error(err),
+			)
+		}
+	}
 	// Egress teardown runs OUTSIDE the pool lock: a real PR4 guard may perform
 	// network/monitoring I/O here, which must never stall the pool. It is not
 	// part of the home-dir race, so ordering after the unlock is correct.
@@ -612,16 +660,16 @@ func (p *Pool) kill(conversationID, reason string) {
 		// Best-effort hard kill if SIGINT didn't take. Negative pid sends to the
 		// whole group; opencode's `defer` cleanup gets SIGINT first for a chance
 		// to flush, then SIGKILL nukes the tree.
-		go func(pid int) {
+		clog.Go(p.baseCtx, "worker-hard-kill", func() {
 			time.Sleep(2 * time.Second)
 			_ = syscall.Kill(-pid, syscall.SIGKILL)
-		}(pid)
+		})
 	}
 	// Shut down the authproxy so its externally-advertised port frees up
 	// immediately; otherwise a respawn picking the same port would fail with
 	// EADDRINUSE on the listener bind.
 	if w.authProxy != nil {
-		go w.authProxy.shutdown()
+		clog.Go(p.baseCtx, "authproxy-shutdown", w.authProxy.shutdown)
 	}
 }
 

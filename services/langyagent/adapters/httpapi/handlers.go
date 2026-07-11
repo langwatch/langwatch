@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,20 +9,67 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-playground/validator/v10"
+	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
+// validate is the shared struct validator for the /chat body. It is safe for
+// concurrent use and caches struct reflection, so it is built once.
+var validate = validator.New()
+
 // chatRequest is the body shape /chat accepts. The control plane (Hono langy.ts
 // route) is the only legitimate caller and is responsible for authn/authz of
 // the end user; we only verify the shared internal bearer secret.
 type chatRequest struct {
-	ConversationID string             `json:"conversationId"`
-	Prompt         string             `json:"prompt"`
-	System         string             `json:"system,omitempty"`
-	Credentials    domain.Credentials `json:"credentials"`
-	ModelOverride  string             `json:"modelOverride,omitempty"`
+	ConversationID string `json:"conversationId" validate:"required"`
+	Prompt         string `json:"prompt" validate:"required"`
+	System         string `json:"system,omitempty"`
+	// Credentials has no tag of its own — the validator descends into it and
+	// checks its own `validate:"required"` fields (see domain.Credentials).
+	Credentials   domain.Credentials `json:"credentials"`
+	ModelOverride string             `json:"modelOverride,omitempty"`
+}
+
+// validateChatRequest checks the decoded body against its `validate` tags. On
+// failure it returns a herr(ErrBadRequest) that NAMES the offending fields for
+// internal diagnostics (logged + carried in Meta) while the user-facing message
+// stays generic — the raw validator error is never surfaced to the caller.
+func validateChatRequest(ctx context.Context, req chatRequest) error {
+	err := validate.Struct(req)
+	if err == nil {
+		return nil
+	}
+	ve, ok := err.(validator.ValidationErrors)
+	if !ok {
+		// Non-field validator failure (misconfigured tag). Keep the detail in a
+		// logged reason; the client still gets a generic message.
+		return herr.New(ctx, domain.ErrBadRequest, herr.M{"message": "the request body was invalid"}, err)
+	}
+	fields := make([]string, 0, len(ve))
+	for _, fe := range ve {
+		fields = append(fields, validationFieldPath(fe))
+	}
+	clog.Get(ctx).Warn("chat request validation failed", zap.Strings("fields", fields))
+	return herr.New(ctx, domain.ErrBadRequest, herr.M{
+		"message": "the request was missing or contained invalid required fields",
+		"fields":  fields,
+	})
+}
+
+// validationFieldPath renders a validator field error as its struct path with
+// the root type stripped (e.g. "Credentials.LangwatchAPIKey"), naming exactly
+// which part of the /chat schema failed.
+func validationFieldPath(fe validator.FieldError) string {
+	ns := fe.StructNamespace()
+	if i := strings.IndexByte(ns, '.'); i >= 0 {
+		return ns[i+1:]
+	}
+	return ns
 }
 
 // chatHandler is the per-request worker dispatcher. Transport-only: it reads the
@@ -51,20 +99,17 @@ func chatHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 			herr.WriteHTTP(w, herr.New(ctx, domain.ErrBadRequest, herr.M{"message": "invalid JSON body"}))
 			return
 		}
-		if req.ConversationID == "" || req.Prompt == "" {
-			herr.WriteHTTP(w, herr.New(ctx, domain.ErrBadRequest, herr.M{
-				"message": "missing required: conversationId, prompt, credentials",
-			}))
+		// Structural validation (required conversationId, prompt, and the four
+		// mandatory credential fields) in one pass — the herr names the offending
+		// field for diagnostics with a generic user message.
+		if err := validateChatRequest(ctx, req); err != nil {
+			herr.WriteHTTP(w, err)
 			return
 		}
+		// Path-safety of conversationId is a separate, stricter check than
+		// `required`: a non-empty value can still escape SESSIONS_ROOT.
 		if !domain.IsValidConversationID(req.ConversationID) {
 			herr.WriteHTTP(w, herr.New(ctx, domain.ErrInvalidConversationID, herr.M{"message": "invalid conversationId"}))
-			return
-		}
-		if !req.Credentials.Complete() {
-			herr.WriteHTTP(w, herr.New(ctx, domain.ErrBadRequest, herr.M{
-				"message": "credentials must include langwatchApiKey, llmVirtualKey, gatewayBaseUrl, langwatchEndpoint",
-			}))
 			return
 		}
 

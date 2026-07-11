@@ -8,10 +8,15 @@ import "regexp"
 // pure value object: the workerpool adapter injects it into the subprocess
 // env, and the httpapi adapter decodes it off the wire.
 type Credentials struct {
-	LangwatchAPIKey   string `json:"langwatchApiKey"`
-	LLMVirtualKey     string `json:"llmVirtualKey"`
-	GatewayBaseURL    string `json:"gatewayBaseUrl"`
-	LangwatchEndpoint string `json:"langwatchEndpoint"`
+	// The four mandatory fields carry `validate:"required"` so the httpapi
+	// adapter can reject an incomplete bundle with a herr that names the offending
+	// field (see Complete for the equivalent boolean predicate). The validator
+	// descends into this struct automatically when the parent chatRequest is
+	// validated.
+	LangwatchAPIKey   string `json:"langwatchApiKey" validate:"required"`
+	LLMVirtualKey     string `json:"llmVirtualKey" validate:"required"`
+	GatewayBaseURL    string `json:"gatewayBaseUrl" validate:"required"`
+	LangwatchEndpoint string `json:"langwatchEndpoint" validate:"required"`
 	Model             string `json:"model,omitempty"`
 	GithubToken       string `json:"githubToken,omitempty"`
 	GithubLogin       string `json:"githubLogin,omitempty"`

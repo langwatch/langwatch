@@ -10,7 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -47,6 +47,24 @@ var httpClient = &http.Client{Transport: &http.Transport{
 	IdleConnTimeout:     30 * time.Second,
 }}
 
+// sseEvent is the minimal typed view of an opencode /event line — just enough
+// to route the event to its session and detect the terminal type. Decoding into
+// this struct (instead of map[string]any) skips unknown fields with no boxed-any
+// allocation, so the streaming hot path is strictly faster and lighter on GC.
+// The raw payload is still forwarded VERBATIM to the client; this struct is used
+// ONLY for routing + terminal detection. The duplicated session fields cover the
+// key OpenCode has emitted across versions.
+type sseEvent struct {
+	Type              string `json:"type"`
+	SessionID         string `json:"sessionID"`
+	SessionId         string `json:"sessionId"`
+	SessionUnderscore string `json:"session_id"`
+	Properties        struct {
+		SessionID string `json:"sessionID"`
+		SessionId string `json:"sessionId"`
+	} `json:"properties"`
+}
+
 // addBearer attaches the per-worker bearer token to an outgoing request. Every
 // helper in this file routes through the authProxy on port and so must carry
 // the token; an empty token here would surface as a 401 from the authproxy,
@@ -70,63 +88,82 @@ func getFreePort() (int, error) {
 	return port, nil
 }
 
-// waitForReadiness polls the worker's HTTP root until any response comes back.
-// opencode answers 404 on /, which is fine — any HTTP status means the server
-// is listening. Connection refused is the "not yet" state we keep polling
-// through.
+// waitForReadiness polls the worker until its opencode is both listening AND
+// enforcing auth. It runs two probes CONCURRENTLY each cycle — both must pass:
 //
-// Probed via the authProxy port so a successful poll also proves the proxy
-// chain is wired correctly. 401 from the proxy counts as ready (the proxy is
-// up); we treat it as a non-error status code along with 2xx/3xx/4xx — anything
-// other than transport failure means a listener answered.
+//   - The external probe (probeExternalReady) hits the authProxy root. opencode
+//     answers 404 on /, which is fine — any HTTP status means the server is
+//     listening. Connection refused / transport error is the "not yet" state we
+//     poll through. One exception: 502 from the proxy is authproxy.go's own
+//     rev.ErrorHandler reporting that opencode's listener isn't up yet.
+//     startAuthProxy binds and serves synchronously, but opencode is a separate
+//     process that takes real time to start listening — the proxy answers 502 to
+//     every poll in that window. Treating that as "ready" would race the auth
+//     probe against a backend that isn't there yet (it always loses in
+//     production, since the proxy is always first). So we keep polling THROUGH
+//     502 the same way we poll through a transport error.
 //
-// One exception: 502 from the proxy is not readiness, it's authproxy.go's own
-// rev.ErrorHandler reporting that opencode's listener isn't up yet.
-// startAuthProxy binds and starts serving synchronously, but opencode is a
-// separate process that takes real time to start listening — the proxy answers
-// 502 to every poll in that window. Treating that as "ready" would immediately
-// race requireOpenCodeAuthEnforced below against a backend that isn't there yet
-// (it always loses in production, since the proxy is always first). So we keep
-// polling through 502 the same way we poll through a transport error.
+//   - The internal probe (requireOpenCodeAuthEnforced) requires opencode's
+//     control port to actually enforce OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′
+//     fail-closed guard). The sibling-isolation guarantee this whole design
+//     rests on lives in that enforcement; if it's ever not there, the worker
+//     must not start. A definite non-401 fails the spawn closed; a transport
+//     failure is retryable.
 //
-// Once the proxy chain answers with something other than 502, this additionally
-// requires opencode's internal port to actually enforce OPENCODE_SERVER_PASSWORD
-// (ADR-033 Fix A′ fail-closed guard) — see requireOpenCodeAuthEnforced. The
-// sibling-isolation guarantee this whole design rests on lives in that
-// enforcement; if it's ever not there, the worker must not start.
+// The cadence is an adaptive backoff — start tight (opencode is usually ready in
+// tens of ms), grow to a 100ms cap — driven by a single reused timer.
 func waitForReadiness(ctx context.Context, externalPort, internalPort int, bearerToken string, deadline time.Duration) error {
 	dl := time.Now().Add(deadline)
-	url := fmt.Sprintf("http://127.0.0.1:%d/", externalPort)
+	backoff := 10 * time.Millisecond
+	const maxBackoff = 100 * time.Millisecond
+	timer := time.NewTimer(backoff)
+	defer timer.Stop()
+
 	for time.Now().Before(dl) {
-		reqCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-		req, _ := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
-		addBearer(req, bearerToken)
-		resp, err := httpClient.Do(req)
-		if err == nil {
-			status := resp.StatusCode
-			_ = resp.Body.Close()
-			cancel()
-			if status != http.StatusBadGateway {
-				// Proxy chain answers → verify opencode actually enforces the
-				// password on its control API. A transport error on the internal
-				// probe (opencode's listener still coming up, a reset) is
-				// retryable — keep polling. Only a definite non-401 *response*
-				// from the control endpoint fails the spawn closed.
-				authErr := requireOpenCodeAuthEnforced(ctx, internalPort)
-				if authErr == nil {
-					return nil
-				}
-				if !errors.Is(authErr, errAuthProbeUnreachable) {
-					return authErr
-				}
-			}
-		} else {
-			cancel()
+		var extReady bool
+		var authErr error
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			defer clog.HandlePanic(ctx, false)
+			extReady = probeExternalReady(ctx, externalPort, bearerToken)
+		}()
+		go func() {
+			defer wg.Done()
+			defer clog.HandlePanic(ctx, false)
+			authErr = requireOpenCodeAuthEnforced(ctx, internalPort)
+		}()
+		wg.Wait()
+
+		// A definite non-401 from the control endpoint is a security verdict —
+		// fail closed immediately regardless of the external probe. A transport
+		// failure (errAuthProbeUnreachable) is retryable.
+		if authErr != nil && !errors.Is(authErr, errAuthProbeUnreachable) {
+			return authErr
 		}
+		if extReady && authErr == nil {
+			return nil
+		}
+
+		// Not ready — sleep the current backoff on the reused timer, then grow it.
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+		timer.Reset(backoff)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(100 * time.Millisecond):
+		case <-timer.C:
+		}
+		if backoff < maxBackoff {
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
 		}
 	}
 	// The port + timeout are internal diagnostics — logged, never surfaced in
@@ -138,6 +175,27 @@ func waitForReadiness(ctx context.Context, externalPort, internalPort int, beare
 	return herr.New(ctx, domain.ErrWorkerNotReady, herr.M{
 		"message": "the assistant took too long to start, please try again",
 	})
+}
+
+// probeExternalReady reports whether the authProxy answers with any non-502
+// status. 502 is authproxy.go's ErrorHandler reporting opencode's listener isn't
+// up yet (the poll-through-502 gate); a transport error is "not up yet" too.
+func probeExternalReady(ctx context.Context, externalPort int, bearerToken string) bool {
+	reqCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	url := fmt.Sprintf("http://127.0.0.1:%d/", externalPort)
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+	if err != nil {
+		return false
+	}
+	addBearer(req, bearerToken)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return false
+	}
+	status := resp.StatusCode
+	_ = resp.Body.Close()
+	return status != http.StatusBadGateway
 }
 
 // requireOpenCodeAuthEnforced is the Fix A′ fail-closed guard: an
@@ -226,8 +284,9 @@ func createOpenCodeSession(ctx context.Context, port int, bearerToken string) (s
 
 // postMessage queues a turn for the worker. 204/2xx → success. 404 means the
 // session vanished (rare; surfaces as domain.ErrSessionNotFound so the
-// orchestrator can recycle the worker).
-func postMessage(ctx context.Context, port int, bearerToken, sessionID, system, userText string) error {
+// orchestrator can recycle the worker). baseURL is the worker's precomputed
+// "http://127.0.0.1:<port>" so no per-turn Sprintf is needed.
+func postMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, userText string) error {
 	type part struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
@@ -240,7 +299,7 @@ func postMessage(ctx context.Context, port int, bearerToken, sessionID, system, 
 		System: system,
 	}
 	body, _ := json.Marshal(payload)
-	url := fmt.Sprintf("http://127.0.0.1:%d/session/%s/prompt_async", port, sessionID)
+	url := baseURL + "/session/" + sessionID + "/prompt_async"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -253,7 +312,8 @@ func postMessage(ctx context.Context, port int, bearerToken, sessionID, system, 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return herr.New(ctx, domain.ErrSessionNotFound, nil)
+		// Expected, handled recycle signal on the hot path — no stack capture.
+		return herr.NewLight(ctx, domain.ErrSessionNotFound, nil)
 	}
 	if resp.StatusCode >= 400 && resp.StatusCode != http.StatusNoContent {
 		b, _ := io.ReadAll(resp.Body)
@@ -266,9 +326,15 @@ func postMessage(ctx context.Context, port int, bearerToken, sessionID, system, 
 // belonging to sessionID as one ndjson line to w. Returns when a terminal event
 // lands or the context is cancelled. The fetch carries the same ctx so a client
 // disconnect aborts the upstream socket immediately — opencode would otherwise
-// hold it open until it had something to send.
-func streamSessionEvents(ctx context.Context, port int, bearerToken, sessionID string, w io.Writer, flush func()) error {
-	url := fmt.Sprintf("http://127.0.0.1:%d/event", port)
+// hold it open until it had something to send. baseURL is the worker's
+// precomputed "http://127.0.0.1:<port>".
+//
+// Performance: it reads with scanner.Bytes() (no per-line string alloc), routes
+// via the typed sseEvent, and writes each forwarded event through ONE reused
+// scratch buffer — so a whole turn allocates a single write buffer instead of
+// one per event.
+func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID string, w io.Writer, flush func()) error {
+	url := baseURL + "/event"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
@@ -289,32 +355,40 @@ func streamSessionEvents(ctx context.Context, port int, bearerToken, sessionID s
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	dataPrefix := []byte("data:")
+	var out []byte // reused across the whole stream: one alloc/turn, not one/event
+	var ev sseEvent
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if !strings.HasPrefix(line, "data:") {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if !bytes.HasPrefix(line, dataPrefix) {
 			continue
 		}
-		payload := strings.TrimSpace(line[len("data:"):])
-		if payload == "" {
+		payload := bytes.TrimSpace(line[len(dataPrefix):])
+		if len(payload) == 0 {
 			continue
 		}
-		var event map[string]any
-		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+		// Reset before decode: json.Unmarshal leaves fields absent from THIS event
+		// at their previous values, which would misroute a following event.
+		ev = sseEvent{}
+		if err := json.Unmarshal(payload, &ev); err != nil {
 			continue
 		}
-		if !eventBelongsToSession(event, sessionID) {
+		if !eventBelongsToSession(&ev, sessionID) {
 			continue
 		}
-		if _, err := w.Write(append([]byte(payload), '\n')); err != nil {
+		// Forward the payload VERBATIM, newline-terminated. payload aliases the
+		// scanner buffer (valid only until the next Scan); appending into out
+		// copies it out before Write.
+		out = append(out[:0], payload...)
+		out = append(out, '\n')
+		if _, err := w.Write(out); err != nil {
 			return nil // client disconnect — opencode keeps producing, but we're done.
 		}
 		if flush != nil {
 			flush()
 		}
-		if typ, _ := event["type"].(string); typ != "" {
-			if _, ok := terminalEventTypes[typ]; ok {
-				return nil
-			}
+		if _, terminal := terminalEventTypes[ev.Type]; terminal {
+			return nil
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -328,26 +402,17 @@ func streamSessionEvents(ctx context.Context, port int, bearerToken, sessionID s
 
 // eventBelongsToSession extracts the session id from any of the shapes OpenCode
 // has emitted across versions. If none match the routed session, the event
-// belongs to a different worker's session and we skip it.
-func eventBelongsToSession(event map[string]any, sessionID string) bool {
+// belongs to a different worker's session and we skip it. The first non-empty
+// session id decides routing — the same precedence the map-based version used.
+func eventBelongsToSession(ev *sseEvent, sessionID string) bool {
 	if sessionID == "" {
 		return false
 	}
-	if v, _ := event["sessionID"].(string); v != "" {
-		return v == sessionID
-	}
-	if v, _ := event["sessionId"].(string); v != "" {
-		return v == sessionID
-	}
-	if v, _ := event["session_id"].(string); v != "" {
-		return v == sessionID
-	}
-	props, _ := event["properties"].(map[string]any)
-	if props != nil {
-		if v, _ := props["sessionID"].(string); v != "" {
-			return v == sessionID
-		}
-		if v, _ := props["sessionId"].(string); v != "" {
+	for _, v := range []string{
+		ev.SessionID, ev.SessionId, ev.SessionUnderscore,
+		ev.Properties.SessionID, ev.Properties.SessionId,
+	} {
+		if v != "" {
 			return v == sessionID
 		}
 	}
