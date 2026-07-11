@@ -1,4 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
+import { z } from "zod";
 
 import type { Session } from "~/server/auth";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
@@ -14,6 +15,27 @@ import { provisionLangyVirtualKey } from "./langyVirtualKey";
 
 const logger = createLogger("langwatch:langy:credentials");
 const githubLogger = createLogger("langwatch:langy:credentials:github");
+
+/**
+ * The per-project Langy egress allow-list (ADR-043). Each entry is either an
+ * exact host (`registry.npmjs.org`) or a single-leading-label wildcard
+ * (`*.internal.acme.com`). Validated at read time so a drifted column value
+ * fails closed (throws) rather than silently disabling enforcement — the same
+ * posture `getModelsAllowed` takes on a malformed VK config. Kept in sync with
+ * the Go matcher (`hostMatchesAny` in
+ * services/langyagent/adapters/egress/policy.go).
+ */
+const egressHostPatternSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(253)
+  .regex(
+    /^(\*\.)?([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+\.?$/,
+    "egress allow-list entries must be a host or a *.suffix wildcard",
+  );
+
+export const langyEgressAllowlistSchema = z.array(egressHostPatternSchema);
 
 /**
  * The Langy worker hands `gatewayBaseUrl` straight to OpenCode as
@@ -78,6 +100,14 @@ export type LangyCredentials = {
    * "Acting as @login" sidebar chip.
    */
   githubLogin?: string;
+  /**
+   * The project's Langy egress allow-list (ADR-043). Threaded into the agent's
+   * per-request credentials envelope; the worker's egress adapter is
+   * constructed with it at spawn. Absent/empty ⇒ monitor-only (the adapter
+   * watches but blocks nothing); non-empty ⇒ the adapter restricts outbound to
+   * floor ∪ this list. The *presence* of the list is the enforcement mode.
+   */
+  egressAllowlist?: string[];
 };
 
 /**
@@ -275,5 +305,64 @@ export class LangyCredentialService {
     const parsed = parseVirtualKeyConfig(langyVk.config);
     const allowed = parsed.modelsAllowed;
     return allowed && allowed.length > 0 ? allowed : null;
+  }
+
+  /**
+   * Returns the project's Langy egress allow-list (ADR-043 rung 2), or `null`
+   * when unset/empty. `null` ⇒ monitor-only (the agent's egress adapter
+   * watches but blocks nothing); a non-empty array ⇒ the enforced set (the
+   * adapter restricts outbound to floor ∪ this list). Same `null-means-watch`
+   * convention as `getModelsAllowed`.
+   *
+   * Unlike the model allow-list — which lives on the VirtualKey because the
+   * *gateway* enforces it — the egress list is a project network policy
+   * enforced by the *agent pod's egress adapter*, so it lives on the Project
+   * (ADR-043 §"Where the allow-list config lives"). The value is parsed through
+   * Zod so a drifted/corrupt column fails closed (throws) rather than silently
+   * disabling enforcement — a stray non-array or a bad host pattern must not
+   * quietly open egress.
+   */
+  async getEgressAllowlist({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<string[] | null> {
+    // The Project row IS the tenant root here; its id is the projectId filter
+    // (multitenancy). No cross-project value can be returned.
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { langyEgressAllowlist: true },
+    });
+    if (!project || project.langyEgressAllowlist == null) return null;
+    const parsed = langyEgressAllowlistSchema.parse(project.langyEgressAllowlist);
+    return parsed.length > 0 ? parsed : null;
+  }
+
+  /**
+   * Writes the project's Langy egress allow-list (ADR-043). Validates + trims
+   * every entry through the same Zod schema the resolver reads by, so a client
+   * cannot persist a malformed host pattern. An empty array clears the column
+   * to `null` (monitor-only) — the canonical "unset" state — rather than
+   * storing `[]`, keeping the resolver's null/empty branches equivalent.
+   * Setting or clearing the list takes effect on the conversation's next turn
+   * (the worker recycles when its egress signature changes).
+   */
+  async setEgressAllowlist({
+    projectId,
+    allowlist,
+  }: {
+    projectId: string;
+    allowlist: string[];
+  }): Promise<string[] | null> {
+    const parsed = langyEgressAllowlistSchema.parse(allowlist);
+    const normalized = parsed.map((h) =>
+      h.trim().replace(/\.$/, "").toLowerCase(),
+    );
+    const value = normalized.length > 0 ? normalized : null;
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: { langyEgressAllowlist: value ?? Prisma.DbNull },
+    });
+    return value;
   }
 }

@@ -427,6 +427,17 @@ model Project {
   /// lens, used when a trace has no principal user). Accounting-only.
   departmentId String?
 
+  /// Per-project Langy egress allow-list (ADR-043). A nullable JSON array of
+  /// host patterns (`["registry.npmjs.org", "*.internal.acme.com"]`) that the
+  /// project's Langy workers may reach outbound. The *presence* of the list is
+  /// the enforcement mode: null/absent ⇒ monitor-only (watch, never block);
+  /// non-empty ⇒ the worker's egress adapter restricts outbound to
+  /// floor ∪ this list. Enforced in the agent pod's egress adapter — NOT the
+  /// gateway — so it lives on the project, not the VirtualKey. Resolved by
+  /// LangyCredentialService.getEgressAllowlist and threaded through the
+  /// per-request credentials envelope. See specs/langy/langy-egress-enforcement.feature.
+  langyEgressAllowlist Json?
+
   @@index([teamId])
   @@index([isPersonal])
   @@index([ownerUserId])
