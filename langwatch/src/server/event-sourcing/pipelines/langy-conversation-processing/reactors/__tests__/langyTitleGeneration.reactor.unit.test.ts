@@ -70,6 +70,8 @@ function state(
     LastActivityAt: 1,
     CurrentTurnId: null,
     LastError: null,
+    PendingHandoffToken: null,
+    PendingHandoffTurnId: null,
     ArchivedAt: null,
     CreatedAt: 1,
     UpdatedAt: 1,
