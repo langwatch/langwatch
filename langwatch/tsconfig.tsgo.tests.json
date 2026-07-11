@@ -1,0 +1,26 @@
+{
+	"extends": "./tsconfig.tsgo.json",
+	"include": [
+		"./src/**/*.test.ts",
+		"./src/**/*.test.tsx",
+		"./src/**/__tests__/**/*",
+		"./src/**/__mocks__/**/*",
+		"./src/**/*.d.ts",
+		"./ee/**/*.test.ts",
+		"./ee/**/*.test.tsx",
+		"./ee/**/__tests__/**/*",
+		"./ee/**/__mocks__/**/*",
+		"./ee/**/*.d.ts",
+		"./scripts/**/*.test.ts",
+		"./scripts/__tests__/**/*",
+		"./e2e/**/*",
+		"next-env.d.ts"
+	],
+	"exclude": [
+		"node_modules",
+		"../mcp-server",
+		".next",
+		".next-saas",
+		"**/*.snippet.*"
+	]
+}

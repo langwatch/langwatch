@@ -34,6 +34,8 @@
     "start:workers": "tsx --tsconfig tsconfig.workers.json src/workers.ts",
     "typecheck:legacy": "./node_modules/.bin/tsc --noEmit --project ./tsconfig.json",
     "typecheck": "./node_modules/.bin/tsgo --noEmit --project ./tsconfig.tsgo.json",
+    "typecheck:tests": "./node_modules/.bin/tsgo --noEmit --project ./tsconfig.tsgo.tests.json",
+    "typecheck:all": "pnpm run typecheck && pnpm run typecheck:tests",
     "test:unit": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest",
     "test:browser": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.browser.config.ts",
     "test:ci": "pnpm run test:unit",
