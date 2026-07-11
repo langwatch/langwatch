@@ -5,7 +5,6 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import type { CommandEnvelope } from "~/server/event-sourcing/commands/commandEnvelope";
 import type {
-  LangyAgentRespondedEventData,
   LangyAgentTurnFailedEventData,
   LangyConversationArchivedEventData,
   LangyConversationHandoffConsumedEventData,
@@ -275,7 +274,6 @@ export interface LangyConversationCommands {
   startAgentTurn: Dispatch<LangyAgentTurnStartedEventData>;
   recordToolCallStarted: Dispatch<LangyToolCallStartedEventData>;
   recordToolCallCompleted: Dispatch<LangyToolCallCompletedEventData>;
-  recordAgentResponded: Dispatch<LangyAgentRespondedEventData>;
   failAgentTurn: Dispatch<LangyAgentTurnFailedEventData>;
   reconcileAgentTurn: Dispatch<LangyTurnFinalizedEventData>;
   archiveConversation: Dispatch<LangyConversationArchivedEventData>;
@@ -589,24 +587,6 @@ export class LangyConversationService {
       ...(input !== undefined ? { input } : {}),
       ...(durationMs !== undefined ? { durationMs } : {}),
       ...(errorText !== undefined ? { errorText } : {}),
-    });
-  }
-
-  /** Record a durable intermediate assistant response within a turn. */
-  async recordAgentResponded({
-    projectId,
-    conversationId,
-    turnId,
-  }: {
-    projectId: string;
-    conversationId: string;
-    turnId: string;
-  }): Promise<void> {
-    await this.commands.recordAgentResponded({
-      tenantId: projectId,
-      occurredAt: Date.now(),
-      conversationId,
-      turnId,
     });
   }
 

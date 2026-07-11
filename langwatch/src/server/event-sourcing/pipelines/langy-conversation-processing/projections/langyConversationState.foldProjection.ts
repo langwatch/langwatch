@@ -11,8 +11,6 @@ import {
   type LangyTitleSource,
 } from "../schemas/constants";
 import type {
-  LangyAgentRespondedEvent,
-  LangyAgentTurnCompletedEvent,
   LangyAgentTurnFailedEvent,
   LangyAgentTurnStartedEvent,
   LangyConversationArchivedEvent,
@@ -26,8 +24,6 @@ import type {
   LangyTurnFinalizedEvent,
 } from "../schemas/events";
 import {
-  LangyAgentRespondedEventSchema,
-  LangyAgentTurnCompletedEventSchema,
   LangyAgentTurnFailedEventSchema,
   LangyAgentTurnStartedEventSchema,
   LangyConversationArchivedEventSchema,
@@ -103,8 +99,6 @@ const langyConversationEvents = [
   LangyAgentTurnStartedEventSchema,
   LangyToolCallStartedEventSchema,
   LangyToolCallCompletedEventSchema,
-  LangyAgentRespondedEventSchema,
-  LangyAgentTurnCompletedEventSchema,
   LangyAgentTurnFailedEventSchema,
   LangyTurnFinalizedEventSchema,
   LangyConversationArchivedEventSchema,
@@ -242,30 +236,6 @@ export class LangyConversationStateFoldProjection
     return {
       ...state,
       ConversationId: state.ConversationId || event.data.conversationId,
-      LastActivityAt: event.occurredAt,
-    };
-  }
-
-  handleLangyConversationAgentResponded(
-    event: LangyAgentRespondedEvent,
-    state: LangyConversationStateData,
-  ): LangyConversationStateData {
-    return {
-      ...state,
-      ConversationId: state.ConversationId || event.data.conversationId,
-      LastActivityAt: event.occurredAt,
-    };
-  }
-
-  handleLangyConversationAgentTurnCompleted(
-    event: LangyAgentTurnCompletedEvent,
-    state: LangyConversationStateData,
-  ): LangyConversationStateData {
-    return {
-      ...state,
-      ConversationId: state.ConversationId || event.data.conversationId,
-      Status: this.nextStatus(state, LANGY_CONVERSATION_STATUS.IDLE),
-      CurrentTurnId: null,
       LastActivityAt: event.occurredAt,
     };
   }

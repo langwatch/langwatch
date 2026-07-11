@@ -127,49 +127,6 @@ export type LangyToolCallCompletedEvent = z.infer<
 >;
 
 /**
- * AgentResponded — PR3 seam. An intermediate assistant response within a turn.
- * The final answer is carried by `turn_finalized`, so this does not append a
- * message row in PR2 — it only bumps activity.
- */
-export const langyAgentRespondedEventDataSchema = z.object({
-  conversationId: z.string(),
-  turnId: z.string(),
-});
-export type LangyAgentRespondedEventData = z.infer<
-  typeof langyAgentRespondedEventDataSchema
->;
-
-export const LangyAgentRespondedEventSchema = EventSchema.extend({
-  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED),
-  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED),
-  data: langyAgentRespondedEventDataSchema,
-});
-export type LangyAgentRespondedEvent = z.infer<
-  typeof LangyAgentRespondedEventSchema
->;
-
-/**
- * AgentTurnCompleted — PR3 seam. The turn's lifecycle completed cleanly.
- * `turn_finalized` carries the answer; this is the fold's terminal marker.
- */
-export const langyAgentTurnCompletedEventDataSchema = z.object({
-  conversationId: z.string(),
-  turnId: z.string(),
-});
-export type LangyAgentTurnCompletedEventData = z.infer<
-  typeof langyAgentTurnCompletedEventDataSchema
->;
-
-export const LangyAgentTurnCompletedEventSchema = EventSchema.extend({
-  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_COMPLETED),
-  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_COMPLETED),
-  data: langyAgentTurnCompletedEventDataSchema,
-});
-export type LangyAgentTurnCompletedEvent = z.infer<
-  typeof LangyAgentTurnCompletedEventSchema
->;
-
-/**
  * AgentTurnFailed — PR3 seam. The turn's lifecycle failed.
  */
 export const langyAgentTurnFailedEventDataSchema = z.object({
@@ -357,8 +314,6 @@ export type LangyConversationProcessingEvent =
   | LangyAgentTurnStartedEvent
   | LangyToolCallStartedEvent
   | LangyToolCallCompletedEvent
-  | LangyAgentRespondedEvent
-  | LangyAgentTurnCompletedEvent
   | LangyAgentTurnFailedEvent
   | LangyTurnFinalizedEvent
   | LangyConversationArchivedEvent
@@ -372,8 +327,6 @@ export {
   isLangyAgentTurnStartedEvent,
   isLangyToolCallStartedEvent,
   isLangyToolCallCompletedEvent,
-  isLangyAgentRespondedEvent,
-  isLangyAgentTurnCompletedEvent,
   isLangyAgentTurnFailedEvent,
   isLangyTurnFinalizedEvent,
   isLangyConversationArchivedEvent,

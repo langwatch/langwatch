@@ -2,9 +2,9 @@
  * reconcileAgentTurn reactor (ADR-044 part 2).
  *
  * A delayed, per-turn liveness timer. It arms on `agent_turn_started` and
- * re-arms on every durable milestone (`tool_call_started/completed`,
- * `agent_responded`) — those milestones double as the reconcile timer's re-arm,
- * so a healthy turn that keeps producing milestones keeps pushing the timer out.
+ * re-arms on every durable milestone (`tool_call_started/completed`) — those
+ * milestones double as the reconcile timer's re-arm, so a healthy turn that
+ * keeps producing milestones keeps pushing the timer out.
  * When it finally fires (grace window past the last milestone) it checks whether
  * the turn is still in flight on the fold AND its heartbeat has lapsed; if so it
  * drives the turn to a terminal state.
@@ -31,7 +31,6 @@ import {
   serializeLangyTurnError,
 } from "~/server/services/langy/execution/langy-turn-errors";
 import {
-  isLangyAgentRespondedEvent,
   isLangyAgentTurnStartedEvent,
   isLangyToolCallCompletedEvent,
   isLangyToolCallStartedEvent,
@@ -44,8 +43,7 @@ function isArmingEvent(event: LangyConversationProcessingEvent): boolean {
   return (
     isLangyAgentTurnStartedEvent(event) ||
     isLangyToolCallStartedEvent(event) ||
-    isLangyToolCallCompletedEvent(event) ||
-    isLangyAgentRespondedEvent(event)
+    isLangyToolCallCompletedEvent(event)
   );
 }
 

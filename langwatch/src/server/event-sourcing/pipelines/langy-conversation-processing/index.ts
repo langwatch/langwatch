@@ -6,7 +6,6 @@ export {
   ConsumeTurnHandoffCommand,
   FailAgentTurnCommand,
   GenerateConversationTitleCommand,
-  RecordAgentRespondedCommand,
   RecordToolCallCompletedCommand,
   RecordToolCallStartedCommand,
   RecordTurnHandoffCommand,

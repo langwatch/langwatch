@@ -7,7 +7,6 @@ import {
   ConsumeTurnHandoffCommand,
   FailAgentTurnCommand,
   GenerateConversationTitleCommand,
-  RecordAgentRespondedCommand,
   RecordToolCallCompletedCommand,
   RecordToolCallStartedCommand,
   RecordTurnHandoffCommand,
@@ -87,9 +86,8 @@ export interface LangyConversationProcessingPipelineDeps {
  * - archiveConversation: soft-delete -> conversation_archived
  * - updateConversationMetadata: rename/share -> conversation_metadata_updated
  *
- * The turn-lifecycle events (tool_call_*, agent_responded,
- * agent_turn_completed/failed) are defined with fold handlers but their
- * dispatching worker/reactor is PR3.
+ * The turn-lifecycle events (tool_call_*, agent_turn_failed) are defined with
+ * fold handlers dispatched by the streaming worker during a turn.
  *
  * Status/progress are EPHEMERAL signals (ADR-046): NOT commands and NOT durable
  * events — they are published to a Redis buffer via LangyEphemeralPublisher
@@ -151,7 +149,6 @@ export function createLangyConversationProcessingPipeline(
     .withCommand("startAgentTurn", StartAgentTurnCommand)
     .withCommand("recordToolCallStarted", RecordToolCallStartedCommand)
     .withCommand("recordToolCallCompleted", RecordToolCallCompletedCommand)
-    .withCommand("recordAgentResponded", RecordAgentRespondedCommand)
     .withCommand("failAgentTurn", FailAgentTurnCommand)
     .withCommand("reconcileAgentTurn", ReconcileAgentTurnCommand)
     .withCommand("archiveConversation", ArchiveConversationCommand)
