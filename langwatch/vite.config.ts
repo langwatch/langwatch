@@ -27,9 +27,15 @@ const API_PORT = FRONTEND_PORT + 1000;
 // asks to trust the cert once for the whole local stack.
 const USE_HTTP2 = process.env.LANGWATCH_DEV_HTTP2 === "1";
 const API_PROTOCOL = USE_HTTP2 ? "https" : "http";
-// In portless (haven) mode the SPA's /api/* is proxied to the API's hostname
-// (api.<slug>.langwatch.localhost) via the portless proxy; otherwise loopback.
-const API_TARGET = process.env.LANGWATCH_API_URL ?? `${API_PROTOCOL}://localhost:${API_PORT}`;
+// In portless (haven) mode the app and its API are ONE origin
+// (app.<slug>.langwatch.localhost): the SPA is served here and /api/* is proxied
+// straight to the API backend on loopback. Proxying to loopback (not the app's
+// own public hostname) avoids a self-proxy loop and needs no TLS/CA. Outside
+// portless we keep the legacy PORT+1000 target (or an explicit LANGWATCH_API_URL).
+const API_TARGET =
+  process.env.LANGWATCH_PORTLESS === "1"
+    ? `http://127.0.0.1:${process.env.LANGWATCH_API_PORT ?? API_PORT}`
+    : (process.env.LANGWATCH_API_URL ?? `${API_PROTOCOL}://localhost:${API_PORT}`);
 
 /**
  * Load (and lazily generate) the dev TLS credentials. Mirrors

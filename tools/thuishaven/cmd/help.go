@@ -8,10 +8,13 @@ const helpText = `thuishaven (haven) — LangWatch local-dev orchestrator, your 
 Every worktree gets a random slug (e.g. happy-tiger). Its services are reachable
 by hostname through the portless proxy — no ports to juggle, no collisions:
 
-    app.happy-tiger.langwatch.localhost      Vite frontend
-    api.happy-tiger.langwatch.localhost      Hono API
-    gateway.happy-tiger.langwatch.localhost  AI Gateway (Go)
-    nlp.happy-tiger.langwatch.localhost      NLP engine (Go)
+    app.happy-tiger.langwatch.localhost         App — the UI, and its API at /api
+    gateway.happy-tiger.langwatch.localhost     AI Gateway (Go)
+    nlp.happy-tiger.langwatch.localhost         NLP engine (Go)
+    clickhouse.happy-tiger.langwatch.localhost  ClickHouse (this stack's own DB)
+
+The app and its API share ONE origin: open app.<slug>.langwatch.localhost for the
+UI and hit app.<slug>.langwatch.localhost/api for the API — one URL, not two.
 
 Shared, machine-wide (one daemon, all worktrees):
 

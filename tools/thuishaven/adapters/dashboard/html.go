@@ -24,6 +24,13 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string) string {
 			rows.WriteString(fmt.Sprintf(
 				`<tr><td class="svc">%s</td><td><a href="%s">%s</a></td><td class="dim">127.0.0.1:%d</td></tr>`,
 				svc.Name, svc.URL, svc.Hostname, svc.Port))
+			// The API shares app's origin — show it as a sub-row so the single URL
+			// is unmistakable (no separate api.<slug> hostname).
+			if svc.Name == "app" && s.APIPort != 0 {
+				rows.WriteString(fmt.Sprintf(
+					`<tr><td class="svc dim">└ api</td><td><a href="%s/api">%s/api</a></td><td class="dim">127.0.0.1:%d</td></tr>`,
+					svc.URL, svc.Hostname, s.APIPort))
+			}
 		}
 		cards.WriteString(fmt.Sprintf(`
       <section class="card">
