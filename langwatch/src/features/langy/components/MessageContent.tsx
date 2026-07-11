@@ -15,7 +15,10 @@ import { CONNECT_GITHUB_SENTINEL } from "~/server/services/langy/langySentinels"
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
-import { parseLangyFeedbackDirective } from "../logic/langyFeedbackDirective";
+import {
+  isSubstantiveLangyAnswer,
+  parseLangyFeedbackDirective,
+} from "../logic/langyFeedbackDirective";
 import { LangyFeedback } from "./LangyFeedback";
 import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
 import { StreamingText } from "./StreamingText";
@@ -218,9 +221,24 @@ export function MessageContent({
             onDiscard={() => onDiscard(id)}
           />
         ))}
-        {(showFeedback || feedbackDirective.requested) &&
+        {/* WHEN to ask is a model's call, not a heuristic. The canonical
+            trigger is Langy's agent-side cheap model emitting a
+            [langy:feedback] directive at a genuinely high-signal moment
+            (feedbackDirective.requested) — that's the "logical time". The
+            default path is only a conservative backstop until that timing
+            lands: a substance floor so we never rate a bare one-word ack,
+            deliberately NOT keyed on message count.
+            `showFeedback` carries the snooze (a long throttle) AND the position
+            gate (settled, last assistant), so BOTH paths respect it — even a
+            model directive won't nag if we asked recently. Renders only under
+            the FINAL, settled answer, never mid-stream.
+            TODO(agent + composer): let the fast model surface this near the end
+            of a conversation / while the next turn runs, and let `/feedback`
+            open it on demand from the composer. */}
+        {showFeedback &&
         !isStreaming &&
-        text ? (
+        text &&
+        (feedbackDirective.requested || isSubstantiveLangyAnswer(text)) ? (
           <LangyFeedback
             conversationId={conversationId ?? undefined}
             messageId={message.id}

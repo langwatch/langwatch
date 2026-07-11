@@ -1,6 +1,8 @@
-import { Button, chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { motion } from "motion/react";
 import type React from "react";
 import { useState } from "react";
+import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useLangyFeedback } from "../data/useLangyFeedback";
 import {
   type LangyFeedbackSentiment,
@@ -38,14 +40,18 @@ function promptFor(sentiment?: LangyFeedbackSentiment): string {
   }
 }
 
+const MotionDiv = motion.create("div");
+
 /**
  * Low-chrome, four-point feedback under a completed assistant answer.
  *
- * A subtle card (hairline border, no bright fill) with four ghost segments —
- * bad / okay / good / great. Picking one reveals an optional one-line note,
- * then everything collapses to a quiet "Thanks — noted". The ordinal is
- * derived to the backend's up/down rating (see SCALE) so the data path keeps
- * working ahead of a real `score` field.
+ * A quiet card — hairline border, no bright fill — with four evenly-spaced
+ * ghost segments (bad / okay / good / great) that go muted → foreground on
+ * hover and flash the soft brand accent as you pick. One tap is the whole
+ * interaction: it submits and the card collapses to a small "Thanks — noted",
+ * so it never lingers or nags. The ordinal is derived to the backend's up/down
+ * rating (see SCALE) ahead of a real `score` field. Enters with a whisper of a
+ * fade; static under `prefers-reduced-motion`.
  */
 export function LangyFeedback({
   conversationId,
@@ -60,8 +66,7 @@ export function LangyFeedback({
   sentiment?: LangyFeedbackSentiment;
 }) {
   const { submit } = useLangyFeedback();
-  const [selected, setSelected] = useState<number | null>(null);
-  const [comment, setComment] = useState("");
+  const reduce = useReducedMotion();
   const [done, setDone] = useState(false);
 
   const send = (score: number) => {
@@ -72,7 +77,6 @@ export function LangyFeedback({
       traceId,
       rating: point.rating,
       sentiment: point.sentiment,
-      comment: comment.trim() || undefined,
     });
     markFeedbackAsked();
     setDone(true);
@@ -80,80 +84,54 @@ export function LangyFeedback({
 
   if (done) {
     return (
-      <Text textStyle="2xs" color="fg.subtle" alignSelf="flex-start">
+      <Text textStyle="2xs" color="fg.subtle" alignSelf="flex-start" paddingY={1}>
         Thanks — noted.
       </Text>
     );
   }
 
   return (
-    <VStack
-      align="stretch"
-      gap={2.5}
-      alignSelf="flex-start"
-      maxWidth="100%"
-      padding={2.5}
-      borderRadius="lg"
-      borderWidth="1px"
-      borderStyle="solid"
-      borderColor="border.muted"
-      background="transparent"
+    <MotionDiv
+      style={{ width: "100%" }}
+      initial={reduce ? false : { opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={
+        reduce ? { duration: 0 } : { duration: 0.28, ease: [0.32, 0.72, 0, 1] }
+      }
     >
-      <Text textStyle="2xs" color="fg.muted">
-        {promptFor(sentiment)}
-      </Text>
-      <HStack gap={1}>
-        {SCALE.map((point, score) => (
-          <Segment
-            key={point.label}
-            isSelected={selected === score}
-            onClick={() => setSelected(score)}
-          >
-            {point.label}
-          </Segment>
-        ))}
-      </HStack>
-
-      {selected !== null ? (
-        <HStack gap={1.5}>
-          <Input
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                send(selected);
-              }
-            }}
-            placeholder="Add a note (optional)"
-            size="xs"
-            borderColor="border.muted"
-            textStyle="2xs"
-            flex={1}
-          />
-          <Button
-            size="2xs"
-            variant="outline"
-            borderColor="orange.emphasized"
-            color="orange.fg"
-            _hover={{ background: "orange.subtle" }}
-            onClick={() => send(selected)}
-          >
-            Send
-          </Button>
+      <VStack
+        align="stretch"
+        gap={2.5}
+        width="full"
+        maxWidth="100%"
+        paddingX={3}
+        paddingY={2.5}
+        borderRadius="xl"
+        borderWidth="1px"
+        borderStyle="solid"
+        borderColor="border.muted"
+        background="transparent"
+      >
+        <Text textStyle="2xs" color="fg.muted" letterSpacing="-0.005em">
+          {promptFor(sentiment)}
+        </Text>
+        <HStack gap={1.5} width="full">
+          {SCALE.map((point, score) => (
+            <Segment key={point.label} onClick={() => send(score)}>
+              {point.label}
+            </Segment>
+          ))}
         </HStack>
-      ) : null}
-    </VStack>
+      </VStack>
+    </MotionDiv>
   );
 }
 
 function Segment({
   children,
-  isSelected,
   onClick,
 }: {
   children: React.ReactNode;
-  isSelected: boolean;
   onClick: () => void;
 }) {
   return (
@@ -161,7 +139,7 @@ function Segment({
       type="button"
       onClick={onClick}
       flex={1}
-      paddingY={1}
+      paddingY={1.5}
       borderRadius="md"
       borderWidth="1px"
       borderStyle="solid"
@@ -169,14 +147,19 @@ function Segment({
       fontWeight="500"
       cursor="pointer"
       transition="color 120ms ease, background 120ms ease, border-color 120ms ease"
-      background={isSelected ? "orange.subtle" : "transparent"}
-      color={isSelected ? "orange.fg" : "fg.muted"}
-      borderColor={isSelected ? "orange.emphasized" : "border.muted"}
-      _hover={
-        isSelected
-          ? undefined
-          : { color: "fg", borderColor: "border.emphasized" }
-      }
+      background="transparent"
+      color="fg.muted"
+      borderColor="border.muted"
+      _hover={{
+        color: "fg",
+        background: "bg.muted",
+        borderColor: "border.emphasized",
+      }}
+      _active={{
+        color: "orange.fg",
+        background: "orange.subtle",
+        borderColor: "orange.emphasized",
+      }}
     >
       {children}
     </chakra.button>

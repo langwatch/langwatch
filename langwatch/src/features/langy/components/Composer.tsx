@@ -17,7 +17,6 @@ import type React from "react";
 import { useState } from "react";
 import { ModelSelector } from "~/components/ModelSelector";
 import { Menu } from "~/components/ui/menu";
-import { useTypewriterPlaceholder } from "~/features/traces-v2/components/ai/useTypewriterPlaceholder";
 import type { LangyContextChip } from "../stores/langyComposerStore";
 
 // Icon per context kind, so a chip reads as its resource at a glance.
@@ -31,13 +30,10 @@ const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
   scenario: MessagesSquare,
 };
 
-const COMPOSER_PLACEHOLDER_EXAMPLES = [
-  "Ask Langy or describe what you want…",
-  "Try: which evaluators are failing most?",
-  "Maybe: summarize today's runs",
-  "How about: suggest an evaluator for hallucinations",
-  "Like: compare last two experiment runs",
-];
+// A single, static placeholder. A cycling typewriter here read as gimmicky and
+// kept the composer visually busy; one calm prompt matches the reference and
+// stays out of the way of what the person is trying to type.
+const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
 
 export function Composer({
   input,
@@ -75,11 +71,6 @@ export function Composer({
   onAddChip?: (id: string) => void;
 }) {
   const [focused, setFocused] = useState(false);
-  const filled = input.trim().length > 0;
-  const typewriterPlaceholder = useTypewriterPlaceholder(
-    !filled && !isBusy && !disabled,
-    COMPOSER_PLACEHOLDER_EXAMPLES,
-  );
 
   return (
     <>
@@ -134,21 +125,25 @@ export function Composer({
                 if (!isBusy && canSend) onSend();
               }
             }}
-            placeholder={isBusy ? "Langy is working…" : typewriterPlaceholder}
+            placeholder={isBusy ? "Langy is working…" : COMPOSER_PLACEHOLDER}
             disabled={disabled || isBusy}
             rows={1}
             autoresize
             maxHeight="120px"
-            minHeight="24px"
+            minHeight="22px"
             paddingX={3.5}
-            paddingTop={3}
-            paddingBottom={1}
+            paddingTop={2.5}
+            paddingBottom={0.5}
             border="none"
             background="transparent"
             textStyle="sm"
             lineHeight="1.5"
             color="fg"
             resize="none"
+            // Block (not the default inline-block) so the textarea has no
+            // baseline descender gap under it — that phantom ~5px was the
+            // "dead band" between the placeholder and the model/send rail.
+            display="block"
             _focus={{ outline: "none", boxShadow: "none" }}
             _focusVisible={{ outline: "none", boxShadow: "none" }}
           />
@@ -156,11 +151,28 @@ export function Composer({
           {/* Bottom rail: the per-send model picker (left) and the send /
               stop control (right). Reuses the shared ModelSelector so the
               picker is identical to the prompts playground and evaluations. */}
-          <HStack gap={2} paddingLeft={3} paddingRight={2} paddingY={2}>
+          <HStack gap={2} paddingLeft={3} paddingRight={2} paddingBottom={2} paddingTop={1.5}>
             <Box
               data-testid="langy-model-picker"
               data-model={model}
-              minWidth={0}
+              flexShrink={0}
+              maxWidth="220px"
+              // The shared ModelSelector clamps its value text (the trigger's
+              // value-text part has overflow:hidden + max-width:80%, plus an
+              // inner line-clamp), which in the narrow rail cut the pill to
+              // "gpt-5-…". Release those so the pill sizes to its label and the
+              // full model name ("gpt-5-mini") renders.
+              css={{
+                "& [data-part='trigger'], & [data-part='trigger'] *": {
+                  minWidth: "auto",
+                  maxWidth: "none",
+                  overflow: "visible",
+                  whiteSpace: "nowrap",
+                  wordBreak: "normal",
+                  textOverflow: "clip",
+                  WebkitLineClamp: "unset",
+                },
+              }}
               _dark={{ "& svg path": { fill: "white" } }}
             >
               <ModelSelector

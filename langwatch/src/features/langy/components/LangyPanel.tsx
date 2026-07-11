@@ -32,16 +32,14 @@ import {
   SparkleTile,
   thinkingShimmerStyles,
 } from "~/features/traces-v2/components/ai/aiBrandVisuals";
-import {
-  DEFAULT_THINKING_VERBS,
-  useCyclingVerb,
-} from "~/features/traces-v2/components/ai/useCyclingVerb";
+import { useCyclingVerb } from "~/features/traces-v2/components/ai/useCyclingVerb";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
+import { LANGY_THINKING_VERBS } from "./langyThinkingVerbs";
 import { LangyDevModeToggle } from "./LangyDevModeToggle";
 import { LangyGitHubMenu } from "./github/LangyGitHubMenu";
 import {
@@ -150,16 +148,25 @@ function LangyHandle({
       borderTopLeftRadius="999px"
       borderBottomLeftRadius="999px"
       // Two personalities. Closed: the loud branded opener (mesh gradient,
-      // LANGY wordmark). Open: a quiet collapse tab hugging the panel edge —
-      // still the biggest close target on screen, but it stops competing
-      // with the panel content for attention.
-      background={isOpen ? "bg.panel" : "transparent"}
+      // LANGY wordmark). Open: a quiet collapse tab that reads as a notch of
+      // the panel itself — same surface, same hairline, only a whisper of a
+      // shadow — so it stops looking like a button floating over the page.
+      background={isOpen ? "bg.surface" : "transparent"}
       borderWidth="1px"
       borderStyle="solid"
       borderColor={isOpen ? "border.muted" : "rgba(255,255,255,0.18)"}
       borderRightWidth={0}
       color={isOpen ? "fg.muted" : "white"}
-      boxShadow={isOpen ? "sm" : hover ? AI_SHADOW : AI_SHADOW_SOFT}
+      boxShadow={
+        isOpen
+          ? hover
+            ? "-3px 0 8px rgba(12,18,30,0.08)"
+            : "-2px 0 5px rgba(12,18,30,0.05)"
+          : hover
+            ? AI_SHADOW
+            : AI_SHADOW_SOFT
+      }
+      _hover={isOpen ? { background: "bg.muted", color: "fg" } : undefined}
       transform={hover ? "translate(-2px, -50%)" : "translateY(-50%)"}
       transition={`right ${LANGY_TRANSITION}, background 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease`}
       overflow="hidden"
@@ -872,7 +879,7 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
   // While a tool is active, surface what it is — that's higher-signal
   // than a generic verb. Otherwise cycle through the AI thinking verbs
   // so the panel doesn't feel frozen during long generations.
-  const cyclingVerb = useCyclingVerb(!toolLabel, DEFAULT_THINKING_VERBS);
+  const cyclingVerb = useCyclingVerb(!toolLabel, LANGY_THINKING_VERBS);
   const text = toolLabel ? `Langy is ${toolLabel}…` : `${cyclingVerb}…`;
 
   // Reduced-motion: drop the keyframes animation but keep the static
