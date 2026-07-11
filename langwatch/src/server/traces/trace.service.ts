@@ -1,15 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { LogRecordStorageService } from "~/server/app-layer/traces/log-record-storage.service";
-import { LogRecordStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/log-record-storage.clickhouse.repository";
-import { NullLogRecordStorageRepository } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
-import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
-  type ClickHouseClientResolver,
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+  LogRecordStorageService,
+  createDefaultLogRecordStorageService,
+} from "~/server/app-layer/traces/log-record-storage.service";
+import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { prisma as defaultPrisma } from "~/server/db";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
@@ -191,10 +187,10 @@ export class TraceService {
     );
     this.evaluationService = EvaluationService.create();
     // Injected store for the read-time Claude Code content enrichment; the
-    // default is built LAZILY on first use (see logRecordStorageService) so
-    // construction never touches ClickHouse config. Non-enriching callers and
-    // unit tests that never hit the coding-agent path pay nothing — and don't
-    // need to mock `isClickHouseEnabled`/`getClickHouseClientForProject`.
+    // default comes from the app-layer factory built LAZILY on first use (see
+    // logRecordStorageService), so construction here stays free of ClickHouse
+    // wiring. Non-enriching callers and unit tests that never hit the
+    // coding-agent path pay nothing.
     this.injectedLogRecordStorage = logRecordStorage;
   }
 
@@ -207,24 +203,7 @@ export class TraceService {
   private logRecordStorageService(): LogRecordStorageService {
     if (this.injectedLogRecordStorage) return this.injectedLogRecordStorage;
     return (this.cachedLogRecordStorage ??=
-      TraceService.buildDefaultLogRecordStorage());
-  }
-
-  private static buildDefaultLogRecordStorage(): LogRecordStorageService {
-    const resolveClickHouseClient: ClickHouseClientResolver = async (
-      tenantId,
-    ) => {
-      const client = await getClickHouseClientForProject(tenantId);
-      if (!client) {
-        throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-      }
-      return client;
-    };
-    return new LogRecordStorageService(
-      isClickHouseEnabled()
-        ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
-        : new NullLogRecordStorageRepository(),
-    );
+      createDefaultLogRecordStorageService());
   }
 
   /**
