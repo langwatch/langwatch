@@ -28,6 +28,10 @@ const EXEC_CAPS = {
   max_execution_time: 10,
   max_result_bytes: "10000000",
   max_memory_usage: "1073741824",
+  // A quantile over an all-NULL group returns NaN; with denormals unquoted
+  // ClickHouse writes a bare `nan` token that is invalid JSON and throws in
+  // result.json(). Quote denormals so such a row parses to a string instead.
+  output_format_json_quote_denormals: 1,
 } as const;
 
 export interface ExecuteArgs {

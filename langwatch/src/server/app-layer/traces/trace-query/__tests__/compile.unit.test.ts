@@ -247,4 +247,75 @@ describe("compileTraceQuery — security core", () => {
       });
     });
   });
+
+  describe("given two aggregations that share an op+column", () => {
+    describe("when neither supplies an explicit alias", () => {
+      it("emits distinct aliases so the SQL has no duplicate AS clause", () => {
+        const { sql } = compileTraceQuery({
+          request: countTrace({
+            aggregations: [{ op: "count" }, { op: "count" }],
+          }),
+          tenantId: ACME,
+        });
+        const aliases = [...sql.matchAll(/AS\s+([a-zA-Z][a-zA-Z0-9_]*)/g)].map(
+          (m) => m[1],
+        );
+        expect(aliases.length).toBe(2);
+        expect(new Set(aliases).size).toBe(2); // distinct — no duplicate alias
+      });
+    });
+
+    describe("when an explicit alias collides with a group-by dimension", () => {
+      it("fails closed rather than emitting an ambiguous duplicate alias", () => {
+        expect(() =>
+          compileTraceQuery({
+            request: countTrace({
+              groupBy: ["model"],
+              aggregations: [{ op: "count", alias: "model" }],
+            }),
+            tenantId: ACME,
+          }),
+        ).toThrow();
+      });
+    });
+  });
+
+  describe("given SR-6 correctness: ReplacingMergeTree dedup + deterministic paging", () => {
+    describe("when compiling any aggregation", () => {
+      it("keeps only the latest version per trace (IN-tuple dedup)", () => {
+        const { sql } = compileTraceQuery({
+          request: countTrace(),
+          tenantId: ACME,
+        });
+        expect(sql).toMatch(/\(TenantId,\s*TraceId,\s*UpdatedAt\)\s*IN\s*\(/);
+        expect(sql).toMatch(/max\(UpdatedAt\)/);
+      });
+    });
+
+    describe("when the query groups by a dimension", () => {
+      it("emits a deterministic ORDER BY so LIMIT never drops arbitrary groups", () => {
+        const { sql } = compileTraceQuery({
+          request: countTrace({ groupBy: ["model"] }),
+          tenantId: ACME,
+        });
+        expect(sql).toMatch(/ORDER BY[\s\S]*LIMIT/i);
+      });
+    });
+  });
+
+  describe("given SR-6: an inverted time range", () => {
+    describe("when from is greater than to", () => {
+      it("is rejected rather than silently matching nothing", () => {
+        expect(() =>
+          compileTraceQuery({
+            request: {
+              aggregations: [{ op: "count" }],
+              timeRange: { from: now, to: now - NINETY_DAYS },
+            },
+            tenantId: ACME,
+          }),
+        ).toThrow();
+      });
+    });
+  });
 });

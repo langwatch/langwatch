@@ -115,7 +115,13 @@ export const traceQueryRequestSchema = z.object({
     .max(3)
     .optional(),
   filter: z.string().max(2000).optional(),
-  timeRange: z.object({ from: z.number().int(), to: z.number().int() }),
+  timeRange: z
+    .object({ from: z.number().int(), to: z.number().int() })
+    .refine((t) => t.from <= t.to, {
+      // An inverted range would emit `OccurredAt >= big AND <= small` and
+      // silently match nothing — reject it rather than return an empty result.
+      message: "timeRange.from must be <= timeRange.to",
+    }),
   limit: z.number().int().positive().optional(),
 });
 

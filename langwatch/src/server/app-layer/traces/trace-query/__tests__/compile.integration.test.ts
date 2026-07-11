@@ -154,13 +154,58 @@ describe("trace-query compiler — cross-tenant isolation (SR-1)", () => {
   });
 
   describe("given SR-2: an independent read-only execution layer", () => {
-    it("refuses a write issued under readonly=1 (grammar-independent guard)", async () => {
+    it("refuses a write issued under readonly=2 — the setting the executor uses", async () => {
       await expect(
         ch.command({
           query: `INSERT INTO trace_summaries (TenantId, TraceId) VALUES ('${ACME}', 'x')`,
-          clickhouse_settings: { readonly: "1" },
+          clickhouse_settings: { readonly: "2" },
         }),
       ).rejects.toThrow();
+    });
+  });
+
+  describe("given SR-6 correctness: a trace with multiple un-merged versions", () => {
+    const DEDUP = "dedup-5670";
+
+    beforeAll(async () => {
+      // Two seed passes with the same tenant+traceCount write the SAME TraceId
+      // twice with different UpdatedAt — two un-merged ReplacingMergeTree
+      // versions of one trace (a background merge has not collapsed them yet).
+      await seedSpans(ch, {
+        tenantId: DEDUP,
+        count: 1,
+        attributeKeys: 1,
+        traceCount: 1,
+      });
+      await seedSpans(ch, {
+        tenantId: DEDUP,
+        count: 1,
+        attributeKeys: 1,
+        traceCount: 1,
+      });
+    }, 120_000);
+
+    afterAll(async () => {
+      await cleanupTestData(DEDUP);
+    });
+
+    it("counts the trace once, not once per un-merged version", async () => {
+      // Control: a bare scan sees BOTH versions — proves the duplication exists.
+      const bare = await ch.query({
+        query: `SELECT count() AS c FROM trace_summaries WHERE TenantId = {t:String}`,
+        query_params: { t: DEDUP },
+        format: "JSONEachRow",
+      });
+      const [bareRow] = await bare.json<{ c: string }>();
+      expect(Number(bareRow?.c)).toBe(2);
+
+      // The compiler's IN-tuple dedup collapses them to the single latest trace.
+      const rows = await run(
+        { aggregations: [{ op: "count", alias: "c" }], timeRange },
+        DEDUP,
+      );
+      const total = rows.reduce((s, r) => s + Number(r.c), 0);
+      expect(total).toBe(1);
     });
   });
 

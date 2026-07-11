@@ -62,17 +62,26 @@ export function compileTraceQuery({
   const limit = Math.min(q.limit ?? DEFAULT_ROW_LIMIT, maxRows);
 
   // ---- SELECT list: curated dimensions, then allowlisted aggregations -------
+  // Every output alias must be distinct: a dimension aliased the same as an
+  // aggregation (e.g. groupBy:["model"] + an aggregation aliased "model") emits
+  // two `AS model` clauses over different expressions — ClickHouse error 179,
+  // and an ambiguous GROUP BY. claimAlias() fails closed on any collision.
   const selectParts: string[] = [];
   const groupByAliases: string[] = [];
+  const usedAliases = new Set<string>();
   for (const dim of q.groupBy ?? []) {
     // `dim` is an enum key; DIMENSION_COLUMNS[dim] is a developer-authored expr.
+    claimAlias(usedAliases, dim);
     selectParts.push(`${DIMENSION_COLUMNS[dim]} AS ${dim}`);
     groupByAliases.push(dim);
   }
   q.aggregations.forEach((agg, i) => {
     const spec = AGGREGATION_OPS[agg.op];
     const columnExpr = agg.column ? METRIC_COLUMNS[agg.column] : "";
-    const alias = agg.alias ?? defaultAlias(agg.op, agg.column, i);
+    const alias = claimAlias(
+      usedAliases,
+      agg.alias ?? defaultAlias(agg.op, agg.column, i),
+    );
     selectParts.push(`${spec.fn(columnExpr)} AS ${alias}`);
   });
 
@@ -83,6 +92,19 @@ export function compileTraceQuery({
     "TenantId = {tenantId:String}",
     "OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})",
     "OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})",
+    // trace_summaries is a ReplacingMergeTree(UpdatedAt): a trace keeps
+    // un-merged row versions until a background merge collapses them, so a bare
+    // scan double-counts on count/sum/avg. Keep only the latest version per
+    // trace via the IN-tuple dedup pattern (same as
+    // trace-list.clickhouse.repository.ts and the analytics dedupedTraceSummaries).
+    // The subquery is itself tenant- and time-scoped, preserving the
+    // "every table reference carries TenantId" invariant.
+    "(TenantId, TraceId, UpdatedAt) IN (" +
+      "SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries " +
+      "WHERE TenantId = {tenantId:String} " +
+      "AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64}) " +
+      "AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64}) " +
+      "GROUP BY TenantId, TraceId)",
   ];
 
   const params: Record<string, unknown> = {};
@@ -111,12 +133,27 @@ export function compileTraceQuery({
     "FROM trace_summaries",
     `WHERE ${whereParts.join(" AND ")}`,
     groupByAliases.length ? `GROUP BY ${groupByAliases.join(", ")}` : "",
+    // Deterministic ordering: without it, LIMIT drops an arbitrary, run-to-run
+    // non-deterministic subset of groups. Order by the group keys so a capped
+    // result is stable and reproducible.
+    groupByAliases.length ? `ORDER BY ${groupByAliases.join(", ")}` : "",
     `LIMIT ${limit}`,
   ]
     .filter(Boolean)
     .join("\n");
 
   return { sql, params };
+}
+
+/** Register an output alias, failing closed if it collides with an earlier one. */
+function claimAlias(used: Set<string>, alias: string): string {
+  if (used.has(alias)) {
+    throw new Error(
+      `Duplicate output alias "${alias}" — every dimension and aggregation must map to a distinct column name`,
+    );
+  }
+  used.add(alias);
+  return alias;
 }
 
 function defaultAlias(
@@ -128,5 +165,9 @@ function defaultAlias(
   // `op`/`column` are enum keys (already `[a-zA-Z0-9_]`), but guard anyway so a
   // future non-identifier key can never reach the SQL.
   const safe = base.replace(/[^a-zA-Z0-9_]/g, "_");
-  return /^[a-zA-Z]/.test(safe) ? safe : `agg_${index}`;
+  const prefixed = /^[a-zA-Z]/.test(safe) ? safe : `agg_${safe}`;
+  // Always suffix with the positional index so two aggregations sharing the
+  // same op+column (e.g. two `count()`) get distinct aliases — otherwise the
+  // emitted SQL carries a duplicate `AS count` and ClickHouse rejects it.
+  return `${prefixed}_${index}`;
 }

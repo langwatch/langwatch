@@ -210,17 +210,43 @@ New module `app-layer/traces/trace-query/`:
   dropdowns; shows results **and** the compiled tenant-scoped SQL).
 
 **Tests** (`app-layer/traces/trace-query/__tests__/`):
-- `compile.unit.test.ts` — 15 SQL-structure assertions (SR-1…SR-6).
-- `compile.integration.test.ts` — 8 executed proofs on a real two-tenant
+- `compile.unit.test.ts` — 20 SQL-structure assertions (SR-1…SR-6 + correctness).
+- `compile.integration.test.ts` — 9 executed proofs on a real two-tenant
   ClickHouse: the adversarial corpus (subquery/UNION-shaped/filter-injection/
   span-subquery) returns **zero foreign rows**; a control confirms the foreign
-  data really is present; a write under `readonly=1` is refused; the full
-  compile→execute path redacts its audit shape.
+  data really is present; a write under `readonly=2` is refused; a two-version
+  trace is de-duplicated to a count of 1; the full compile→execute path redacts
+  its audit shape.
 
 **Falsifiability (run both ways):** deleting the outer `TenantId` predicate turns
-4 unit tests **and** 3 integration tests red (the executed query really leaks the
-other tenant's rows). Restoring it returns to green. The tests are load-bearing,
-not vacuous.
+4 unit + 3 integration tests red (the executed query really leaks the other
+tenant's rows); deleting the dedup predicate turns the de-dup test red
+(double-counts un-merged versions). Restoring each returns to green. The tests
+are load-bearing, not vacuous.
+
+### Correctness hardening (independent code review)
+
+An adversarial review of the emitted SQL (post-implementation, on the actual
+code) found no cross-tenant hole but surfaced aggregation-correctness bugs, now
+fixed and tested:
+- **ReplacingMergeTree dedup** — the compiler applies the IN-tuple dedup (latest
+  version per trace) so `count`/`sum`/`avg` don't over-count un-merged row
+  versions (the pattern the trace-list + analytics paths already mandate).
+- **Alias collisions** — fail closed when a dimension and an aggregation (or two
+  aggregations) would emit the same output alias (ClickHouse error 179).
+- **Deterministic paging** — grouped queries carry `ORDER BY` before `LIMIT`, so
+  a capped result is reproducible, not an arbitrary subset of groups.
+- **Inverted time range** — rejected at validation instead of silently matching
+  nothing.
+- **NaN-safe JSON** — `output_format_json_quote_denormals` so a quantile over an
+  all-NULL group can't emit invalid JSON.
+
+Documented spike limitations (deliberately not fixed): grouping by `model` fans
+out the `Models` array — a multi-model trace is counted once per model and a
+trace with an empty `Models` array is omitted (`count` by model is a model-tally,
+not a trace count); `sum` coalesces missing to 0 while `avg`/quantiles exclude
+NULLs (a deliberate, documented asymmetry); a `column` on a column-less op is
+ignored rather than rejected.
 
 ---
 
