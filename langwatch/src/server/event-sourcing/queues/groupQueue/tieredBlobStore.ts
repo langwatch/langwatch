@@ -271,9 +271,10 @@ export class TieredBlobStore {
   }
 
   /**
-   * Returns null when a redis-tier blob is gone; lets an s3 read error
-   * propagate. Either way the envelope decode treats the absence as a missing
-   * blob and reaches the fail-safe (complete the slot, recover via replay).
+   * Returns null when a blob is genuinely gone (key absent, or a durable-store
+   * "not found"). A client-side failure on either tier (connection drop,
+   * timeout, OOM rejection, network 5xx) throws {@link TransientBlobStoreError}
+   * instead, so the caller retries rather than treating a blip as "missing".
    */
   async get(ref: BlobRef): Promise<Buffer | null> {
     return this.fetch(ref, /* refresh */ true);
@@ -293,9 +294,25 @@ export class TieredBlobStore {
   private async fetch(ref: BlobRef, refresh: boolean): Promise<Buffer | null> {
     if (ref.tier === "redis") {
       const id = redisBlobId({ projectId: ref.projectId, hash: ref.hash });
-      return refresh
-        ? this.redisBlobs.get({ id, ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS })
-        : this.redisBlobs.peek({ id });
+      // A redis-tier miss is represented by a null return (GETEX/GET on an
+      // absent key), never an exception — so any exception here is the
+      // client itself (connection drop, command timeout, OOM-from-noeviction
+      // rejection), not "the blob is gone". Treat it as transient (retry),
+      // mirroring the s3 branch below, instead of letting it fall through to
+      // the decode fail-safe and permanently drop a job over a blip
+      // (2026-07-11 incident: uncaught ioredis errors here were indistinguishable
+      // from a genuinely missing blob).
+      try {
+        return await (refresh
+          ? this.redisBlobs.get({ id, ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS })
+          : this.redisBlobs.peek({ id }));
+      } catch (err) {
+        throw new TransientBlobStoreError({
+          projectId: ref.projectId,
+          hash: ref.hash,
+          cause: err,
+        });
+      }
     }
     // Re-mint OUTSIDE the missing-classification: a destination-resolve / mint
     // failure is transient (retry), never "missing" (ADR-030 §2).
