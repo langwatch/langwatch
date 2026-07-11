@@ -319,6 +319,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
 
   describe("given stagings sharing one content-addressed blob", () => {
     describe("when a value is encoded", () => {
+      /** @scenario "A staging's hold on its shared blob exists before the blob is written" */
       it("registers the occupancy's hold before encode returns", async () => {
         const value = await lifecycle.encode({
           jobData: REDIS_TIER_PAYLOAD,
@@ -337,6 +338,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
     });
 
     describe("when one staging retires before a concurrent one dispatches", () => {
+      /** @scenario "A fan-out sibling completing early never reclaims a blob a concurrent staging references" */
       it("keeps the shared s3 blob alive for the remaining staging", async () => {
         const shared = { bulk: incompressible(768 * 1024) }; // > 256 KiB gzipped → s3
         const first = await lifecycle.encode({
@@ -348,16 +350,9 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
           groupId: TENANT_GROUP,
         });
         expect(readEnvelopeHold(second)!.ref.tier).toBe("s3");
-        // Ensure the FIRST staging's hold has landed (post-stage refresh), so
-        // its release below actually removes a member — the interleave where a
-        // hold-after-staging design empties the set and reclaims the blob out
-        // from under the second staging.
-        lifecycle.acquire(first);
-        await vi.waitFor(async () =>
-          expect(await redis.scard(holderKey(hashOf(first)))).toBeGreaterThan(
-            0,
-          ),
-        );
+        // Both stagings' holds land at encode-time (hold-before-write), so the
+        // set already has 2 members before either is released.
+        expect(await redis.scard(holderKey(hashOf(first)))).toBe(2);
 
         // The first staging completes and releases its hold while the second
         // is still awaiting dispatch.
@@ -380,12 +375,9 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
           jobData: REDIS_TIER_PAYLOAD,
           groupId: TENANT_GROUP,
         });
-        lifecycle.acquire(first);
-        await vi.waitFor(async () =>
-          expect(await redis.scard(holderKey(hashOf(first)))).toBeGreaterThan(
-            0,
-          ),
-        );
+        // Both stagings' holds land at encode-time (hold-before-write), so the
+        // set already has 2 members before either is released.
+        expect(await redis.scard(holderKey(hashOf(first)))).toBe(2);
 
         lifecycle.release({ values: [first], groupId: TENANT_GROUP });
         await new Promise((resolve) => setTimeout(resolve, 150));
@@ -412,6 +404,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
       });
 
     describe("when the same content is re-held before the delete executes", () => {
+      /** @scenario "An s3 reclaim is skipped when the content is re-held before the delete executes" */
       it("skips the delete so the new occupancy never references a deleted object", async () => {
         const graced = gracedLifecycle(200);
         const shared = { bulk: incompressible(768 * 1024) };

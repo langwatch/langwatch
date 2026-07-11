@@ -338,6 +338,11 @@ export async function encodeJobEnvelope({
       // holder-set TTL backstop clears it (ADR-030 §3).
       if (acquireHold) {
         await acquireHold({ projectId, hash, token });
+      } else if (logger) {
+        logger.warn(
+          { projectId, queueName },
+          "GQ2 encode staged a tiered blob without acquireHold wired — hold-before-write race protection is disabled",
+        );
       }
       const ref = await tieredBlobs.put({
         projectId,
