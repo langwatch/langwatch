@@ -24,3 +24,11 @@ data:
   LANGY_MAX_WORKERS: {{ .Values.manager.maxWorkers | quote }}
   LANGY_WORKER_IDLE_MS: {{ .Values.manager.workerIdleMs | quote }}
   LANGY_READINESS_TIMEOUT_MS: {{ .Values.manager.readinessTimeoutMs | quote }}
+  # Egress enforcement (ADR-043). The FQDN floor is the operator-owned
+  # always-allowed set; the toggles gate the enforcement rungs. Per-project
+  # customer allow-lists do NOT live here — they ride the per-request
+  # credentials envelope (Project.langyEgressAllowlist).
+  LANGY_EGRESS_FQDN_FLOOR: {{ join "," .Values.egress.fqdnFloor | quote }}
+  LANGY_EGRESS_REQUIRE_TLS: {{ .Values.egress.requireTls | quote }}
+  LANGY_EGRESS_ENFORCE_FLOOR: {{ .Values.egress.enforceFloor | quote }}
+  LANGY_EGRESS_SNI_CROSSCHECK: {{ .Values.egress.sniCrossCheck | quote }}
