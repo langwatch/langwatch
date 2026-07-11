@@ -84,26 +84,30 @@ export interface SettleStagePayload
     Record<string, unknown> {
   stage: "settle";
   traceId: string;
-  /**
-   * Fold snapshot at enqueue time. The settle process callback
-   * **re-reads** the fold from the projection store at fire time so a
-   * 30-second-old snapshot doesn't drive the filter check — the
-   * snapshot here is only a debugging breadcrumb.
-   */
-  foldSnapshotAtEnqueue: {
-    computedInput: string;
-    computedOutput: string;
-  };
+  // A settle payload carries an IDENTITY, never trace content. It used to also
+  // carry a `foldSnapshotAtEnqueue` copy of the trace's computed input/output
+  // — but the settle callback re-reads the fold at fire time (a stale snapshot
+  // must not drive the filter check), so the copy was never read. It was
+  // customer prompt/response text sitting in Redis and, via the audit
+  // projection, at rest in Postgres, for nothing.
 }
 
 export interface CadenceStagePayload
   extends CommonStagePayload,
     Record<string, unknown> {
   stage: "cadence";
+  /**
+   * The matched trace — an IDENTITY, not its content. The trace's input and
+   * output used to ride along here so the dispatcher could render without a
+   * second read; but the dispatcher already re-fetches the trace at dispatch,
+   * and it reads the fold (the same projection settle took the copy from), so
+   * the copy bought nothing and cost a duplicate of customer prompt/response
+   * text in Redis and — via the audit projection — at rest in Postgres,
+   * outliving the trace and surviving its deletion. Keeping the payload to an
+   * identity also keeps it small enough to never need a queue blob.
+   */
   match: {
     traceId: string;
-    input: string;
-    output: string;
   };
   /**
    * Set by the dispatcher when a cadence dispatch resolves to a no-op

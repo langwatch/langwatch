@@ -142,12 +142,11 @@ describe("evaluationAlertTriggerNotifyOutbox reactor", () => {
         "tenant-1/triggerNotify:trigger-eval-notify",
       );
       expect(request!.enqueueOptions).toEqual({ ttlMs: 25_000 });
-      const payload = request!.payload as unknown as {
-        stage: string;
-        foldSnapshotAtEnqueue: { computedInput: string };
-      };
+      const payload = request!.payload as unknown as { stage: string };
       expect(payload.stage).toBe("settle");
-      expect(payload.foldSnapshotAtEnqueue.computedInput).toBe("the input");
+      // Identity only — the trace's content is re-read at fire time, never
+      // carried on the payload (and so never projected into Postgres).
+      expect(JSON.stringify(payload)).not.toContain("the input");
     });
   });
 

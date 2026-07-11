@@ -81,7 +81,7 @@ function makeCadencePayload(
     triggerId: TRIGGER_ID,
     reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
     auditDedupKey: `${PROJECT_ID}/${TRIGGER_ID}:trace:${TRACE_ID}`,
-    match: { traceId: TRACE_ID, input: "in", output: "out" },
+    match: { traceId: TRACE_ID },
     ...overrides,
   };
 }
@@ -110,8 +110,12 @@ function makeDeps(trigger: TriggerSummary = makeTrigger()) {
         .fn()
         .mockResolvedValue({ id: PROJECT_ID, slug: "p", name: "Proj" }),
     } as any,
+    // The cadence stage reads the trace's content from the FOLD at dispatch —
+    // it is no longer carried on the payload — so the store must answer for a
+    // dispatched trace. Settle tests that exercise the missing-fold path
+    // override this with null.
     traceSummaryStore: {
-      get: vi.fn().mockResolvedValue(null),
+      get: vi.fn().mockResolvedValue(makePersistFold()),
       store: vi.fn(),
     },
     evaluationRuns: { findByTraceId: vi.fn().mockResolvedValue([]) } as any,
@@ -508,7 +512,7 @@ describe("createOutboxDispatcher cadence stage", () => {
 
         await dispatcher.process(
           makeCadencePayload({
-            match: { traceId: "trace-2", input: "in", output: "out" },
+            match: { traceId: "trace-2" },
             auditDedupKey: `${PROJECT_ID}/${TRIGGER_ID}:trace:trace-2`,
           }),
         );
@@ -781,7 +785,6 @@ function makePersistSettlePayload(
     actionClass: "persist",
     auditDedupKey: `${PROJECT_ID}/${TRIGGER_ID}:trace:${TRACE_ID}`,
     traceId: TRACE_ID,
-    foldSnapshotAtEnqueue: { computedInput: "in", computedOutput: "out" },
     ...overrides,
   };
 }

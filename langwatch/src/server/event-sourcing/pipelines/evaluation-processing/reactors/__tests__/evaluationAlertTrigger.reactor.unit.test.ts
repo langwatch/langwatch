@@ -299,18 +299,16 @@ describe("evaluationAlertTrigger reactor (persist outbox)", () => {
           stage: string;
           actionClass: string;
           traceId: string;
-          foldSnapshotAtEnqueue: {
-            computedInput: string;
-            computedOutput: string;
-          };
         };
         expect(payload.stage).toBe("settle");
         expect(payload.actionClass).toBe("persist");
         expect(payload.traceId).toBe("trace-1");
-        expect(payload.foldSnapshotAtEnqueue).toEqual({
-          computedInput: "test input",
-          computedOutput: "test output",
-        });
+        // A settle payload carries an IDENTITY, never trace content: settle
+        // re-reads the fold at fire time, so a copy here would be unread
+        // customer text living in Redis and (via the audit projection) at rest
+        // in Postgres. The trace's input/output must not appear anywhere in it.
+        expect(JSON.stringify(payload)).not.toContain("test input");
+        expect(JSON.stringify(payload)).not.toContain("test output");
       });
     });
 

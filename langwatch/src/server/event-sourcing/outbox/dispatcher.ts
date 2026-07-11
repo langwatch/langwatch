@@ -396,11 +396,8 @@ async function handleSettle(
     reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
     actionClass,
     auditDedupKey: payload.auditDedupKey,
-    match: {
-      traceId,
-      input: foldState.computedInput ?? "",
-      output: foldState.computedOutput ?? "",
-    },
+    // Identity only — the cadence handler re-reads this fold at dispatch.
+    match: { traceId },
   };
 
   const now = new Date();
@@ -512,17 +509,35 @@ async function handleCadenceBatch(
     return;
   }
 
+  // Content is read HERE, not carried on the payload. The payload is an
+  // identity (ADR-042's tiny-trigger discipline): a copy of the trace's input
+  // and output on it would be customer text sitting in Redis and — via the
+  // audit projection — at rest in Postgres, duplicated from ClickHouse and
+  // outliving the trace it came from. The dispatcher already re-fetches the
+  // trace on the next line, and the fold is the very projection the settle
+  // stage read to build this payload, so reading it here costs one store hit
+  // and yields the SAME bytes — fresher, if anything.
+  const brandedTenantId = createTenantId(projectId);
   const triggerData = await Promise.all(
     candidatePayloads.map(async (p) => {
-      const fullTrace =
-        (await deps.traceById(projectId, p.match.traceId)) ??
-        ({ trace_id: p.match.traceId } as Trace);
+      const traceId = p.match.traceId;
+      const [trace, fold] = await Promise.all([
+        deps.traceById(projectId, traceId),
+        deps.traceSummaryStore.get(traceId, {
+          tenantId: brandedTenantId,
+          aggregateId: traceId,
+        }),
+      ]);
       return {
-        traceId: p.match.traceId,
-        input: p.match.input,
-        output: p.match.output,
+        traceId,
+        // The fold, not the protections-filtered trace: this is the same
+        // source the payload copy was taken from, so swapping to it changes no
+        // bytes. (`traceById` applies capture protections, which would quietly
+        // change what a notification contains.)
+        input: fold?.computedInput ?? "",
+        output: fold?.computedOutput ?? "",
         projectId,
-        fullTrace,
+        fullTrace: trace ?? ({ trace_id: traceId } as Trace),
       };
     }),
   );

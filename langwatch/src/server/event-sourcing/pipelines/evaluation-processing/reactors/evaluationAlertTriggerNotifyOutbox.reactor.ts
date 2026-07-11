@@ -96,9 +96,9 @@ export function createEvaluationAlertTriggerNotifyOutboxReactor(
       );
       if (candidates.length === 0) return [];
 
-      // Cross-pipeline read: settle re-reads the fold itself, but we
-      // need foldSnapshotAtEnqueue for the debugging breadcrumb. A
-      // missing fold short-circuits — no payload to enqueue.
+      // Existence guard only: settle re-reads the fold at fire time, so nothing
+      // from the summary is carried on the payload. A trace with no fold has
+      // nothing to match, so there is no payload to enqueue.
       const brandedTenantId = createTenantId(tenantId);
       const traceSummary = await deps.traceSummaryStore.get(traceId, {
         tenantId: brandedTenantId,
@@ -129,10 +129,6 @@ export function createEvaluationAlertTriggerNotifyOutboxReactor(
             triggerId: trigger.id,
             traceId,
           }),
-          foldSnapshotAtEnqueue: {
-            computedInput: traceSummary.computedInput ?? "",
-            computedOutput: traceSummary.computedOutput ?? "",
-          },
         };
         requests.push({
           dedupKey: payload.auditDedupKey,

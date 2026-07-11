@@ -8,6 +8,39 @@ const logger = createLogger("langwatch:outbox:pg-audit-adapter");
 const SETTLE_NO_MATCH_REASON = "settle: no match";
 
 /**
+ * The audit row is an OPERATOR record, not a copy of the customer's data.
+ *
+ * `ReactorOutbox` is durable, backed up, and — unlike the queue — not pruned by
+ * a TTL, so anything written here is customer content at rest in Postgres:
+ * duplicated from ClickHouse, outliving the trace it came from, and surviving
+ * that trace's deletion.
+ *
+ * Payloads are identities now, so in the normal case there is nothing to strip.
+ * This stays as the LAST line of defence: the payload type is open
+ * (`Record<string, unknown>`), so a future field could carry content onto this
+ * table without anyone noticing. Whatever the queue chooses to carry, the audit
+ * row keeps only what an operator uses to answer "did this get out, and if not,
+ * why" — identity, routing, and outcome.
+ *
+ * `renderDiagnostics` is deliberately kept: it names the template variables
+ * that failed to resolve, never their values.
+ */
+const CONTENT_KEYS = new Set(["input", "output"]);
+
+export function redactOutboxPayloadForAudit(payload: OutboxJob): object {
+  const { match, ...rest } = payload as OutboxJob & {
+    match?: Record<string, unknown>;
+  };
+  if (!match) return { ...rest };
+  // The trace id is the dispatch's identity (already the row's `dedupKey`), not
+  // content — an operator needs it. Everything else on `match` is dropped.
+  const safeMatch = Object.fromEntries(
+    Object.entries(match).filter(([key]) => !CONTENT_KEYS.has(key)),
+  );
+  return { ...rest, match: safeMatch };
+}
+
+/**
  * Projects every outbox queue lifecycle event into a `ReactorOutbox`
  * row (ADR-030 revision).
  *
@@ -68,7 +101,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
               reactorName: p.reactorName,
               dedupKey: p.auditDedupKey,
               groupKey: event.groupKey,
-              payload: p as object,
+              payload: redactOutboxPayloadForAudit(p),
               status: "queued",
               attempts: 0,
               maxAttempts: event.maxAttempts ?? 8,
@@ -98,7 +131,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
             attempts: 0,
             nextAttemptAt: event.scheduledAt,
             groupKey: event.groupKey,
-            payload: p as object,
+            payload: redactOutboxPayloadForAudit(p),
           },
         }),
       );
@@ -114,7 +147,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
                 reactorName: p.reactorName,
                 dedupKey: p.auditDedupKey,
                 groupKey: event.groupKey,
-                payload: p as object,
+                payload: redactOutboxPayloadForAudit(p),
                 status: "queued",
                 attempts: 0,
                 maxAttempts: event.maxAttempts ?? 8,
