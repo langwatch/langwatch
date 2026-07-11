@@ -532,8 +532,11 @@ function LangyPanel({
     isError: hasListError,
   } = useLangyConversationList();
   const { remove: removeConversation } = useLangyConversationCommands();
-  const { messages: historyMessages, isFetching: isFetchingHistory } =
-    useLangyMessages(activeConversationId);
+  const {
+    messages: historyMessages,
+    lastError: historyLastError,
+    isFetching: isFetchingHistory,
+  } = useLangyMessages(activeConversationId);
 
   // Push a settled server history into the chat engine. Gated on a USER
   // selection (`historyLoadConversationId`) so a background refetch — or the
@@ -814,14 +817,24 @@ function LangyPanel({
     turnSignals.progress !== null ||
     (turnSignals.metrics?.length ?? 0) > 0;
   const turnError = useMemo(() => {
-    if (!error) return null;
-    const domain = readLangyStreamError(error.message) ?? {
-      kind: "unknown",
-      meta: {},
-      httpStatus: 500,
-    };
-    return explainLangyError(domain);
-  }, [error]);
+    // The LIVE failure, off the stream.
+    if (error) {
+      const domain = readLangyStreamError(error.message) ?? {
+        kind: "unknown",
+        meta: {},
+        httpStatus: 500,
+      };
+      return explainLangyError(domain);
+    }
+    // The DURABLE failure, off the conversation fold. A turn error lived only in
+    // `useChat` state, so a refresh after a failed turn left the user's question
+    // sitting there with no answer and no explanation — even though the failure
+    // was on record the whole time. Suppressed while a turn is in flight: the
+    // previous turn's error is not this one's.
+    if (isBusy || !historyLastError) return null;
+    const domain = readLangyStreamError(historyLastError);
+    return domain ? explainLangyError(domain) : null;
+  }, [error, isBusy, historyLastError]);
 
   // RE-DRIVE the turn; never RE-POST the message. The user's message was
   // persisted server-side before the turn ran, so the old `send(lastUserText)`

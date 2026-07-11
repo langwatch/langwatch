@@ -127,6 +127,25 @@ export class LangyWorkerSpawnFailedError extends DomainError {
   }
 }
 
+/**
+ * The turn stopped reporting and no worker is alive for it — found by the
+ * liveness reconcile sweep, not by the turn itself (which is, by definition, no
+ * longer running to report anything). The pod died mid-turn, or the worker was
+ * OOM-killed.
+ *
+ * The user's message is safely on record, so this is a retry, not a loss.
+ */
+export class LangyTurnStalledError extends DomainError {
+  declare readonly kind: "langy_turn_stalled";
+
+  constructor() {
+    super("langy_turn_stalled", "turn stalled with no live worker", {
+      httpStatus: 503,
+    });
+    this.name = "LangyTurnStalledError";
+  }
+}
+
 /** The turn blew the `AGENT_CHAT_TIMEOUT_MS` budget (AbortSignal.timeout). */
 export class LangyTurnTimeoutError extends DomainError {
   declare readonly kind: "langy_turn_timeout";

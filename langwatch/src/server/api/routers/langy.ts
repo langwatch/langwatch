@@ -19,6 +19,7 @@ import {
   type LangyConversationListItemDto,
   type LangyMessageDto,
 } from "./langy.schemas";
+import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 
 /**
  * Read-side tRPC router for Langy conversations (ADR-046 frontend).
@@ -98,7 +99,12 @@ export const langyRouter = createTRPCRouter({
         input,
         ctx,
       }): Promise<LangyConversationDetailDto | null> => {
-        const detail = await getApp().langy.conversations.getById({
+        // A freshness poll of the OPEN conversation — which may be the one the
+        // user JUST started, whose fold has not been projected yet. So this is a
+        // caller for which absence is a real answer: `findByIdVisible`, not
+        // `getById`. Using the throwing form here would 500 the poll on every
+        // first turn.
+        const detail = await getApp().langy.conversations.findByIdVisible({
           id: input.conversationId,
           projectId: input.projectId,
           userId: ctx.session.user.id,
@@ -115,20 +121,53 @@ export const langyRouter = createTRPCRouter({
   messages: protectedProcedure
     .input(z.object({ projectId: z.string(), conversationId: z.string() }))
     .use(checkProjectPermission(LANGY_READ_PERMISSION))
-    .query(async ({ input }): Promise<{ messages: LangyMessageDto[] }> => {
-      const rows = await getApp().langy.messages.getAllByConversation({
-        conversationId: input.conversationId,
-        projectId: input.projectId,
-      });
-      const messages = rows.map<LangyMessageDto>((row) => ({
-        id: row.id,
-        role: langyMessageRoleSchema.catch("assistant").parse(row.role),
-        parts: Array.isArray(row.parts)
-          ? (row.parts as LangyMessageDto["parts"])
-          : [],
-        createdAtMs: row.createdAt.getTime(),
-      }));
-      return { messages };
+    .query(
+      async ({
+        input,
+        ctx,
+      }): Promise<{
+        messages: LangyMessageDto[];
+        /**
+         * The last turn's failure, serialized (a domain-error kind + safe meta —
+         * never raw text). Null unless the conversation ended in one.
+         *
+         * Turn errors used to live ONLY in the browser's `useChat` state, so a
+         * refresh after a failed turn left the user's question sitting there with
+         * no answer and no explanation — the failure was real, durable, and on
+         * the fold the whole time; nobody read it back.
+         */
+        lastError: string | null;
+      }> => {
+        // OWNERSHIP GATE. This query used to check only the PROJECT permission and
+        // then read any conversation by id — so any project member could read
+        // anyone else's Langy history. Langy conversations are scoped to org +
+        // project + USER; `getById` is what enforces that (owner, or explicitly
+        // shared) and it THROWS rather than returning an ambiguous null, so the
+        // gate cannot be forgotten by a caller who ignores a falsy return.
+        const conversation = await getApp().langy.conversations.getById({
+          id: input.conversationId,
+          projectId: input.projectId,
+          userId: ctx.session.user.id,
+        });
+        const rows = await getApp().langy.messages.getAllByConversation({
+          conversationId: input.conversationId,
+          projectId: input.projectId,
+        });
+        const messages = rows.map<LangyMessageDto>((row) => ({
+          id: row.id,
+          role: langyMessageRoleSchema.catch("assistant").parse(row.role),
+          parts: Array.isArray(row.parts)
+            ? (row.parts as LangyMessageDto["parts"])
+            : [],
+          createdAtMs: row.createdAt.getTime(),
+        }));
+        return {
+          messages,
+          lastError:
+            conversation.status === LANGY_CONVERSATION_STATUS.FAILED
+              ? conversation.lastError
+              : null,
+        };
     }),
 
   /**

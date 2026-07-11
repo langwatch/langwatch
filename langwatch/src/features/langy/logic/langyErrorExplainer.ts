@@ -73,6 +73,7 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_turn_timeout",
   "langy_worker_restarting",
   "langy_worker_spawn_failed",
+  "langy_turn_stalled",
   // NOT a failure — an unmet prerequisite. See the `suppress` case below.
   "langy_github_not_connected",
 ] as const;
@@ -227,6 +228,19 @@ export function explainLangyError(
         title: "That took too long",
         description:
           "Langy didn't finish in time. Try again, or ask for a narrower slice — a shorter time range or a single trace.",
+        render: "card",
+        action: { label: "Try again", kind: "retry" },
+        ...debug,
+      };
+
+    case "langy_turn_stalled":
+      // Found by the liveness sweep, not by the turn — the pod died mid-reply.
+      // The user's message is safely on record, so this is a retry, not a loss.
+      return {
+        kind: domain.kind,
+        title: "Langy stopped mid-reply",
+        description:
+          "Langy stopped before it finished. Nothing was lost — try again.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         ...debug,

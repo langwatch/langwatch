@@ -50,6 +50,7 @@ import { context, propagation } from "@opentelemetry/api";
 import { connection } from "~/server/redis";
 import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import { createLangyTurnHandoffStore } from "~/server/services/langy/streaming/langyTurnHandoff";
+import { createLangyTurnAccessStore } from "~/server/services/langy/streaming/langyTurnAccess";
 import {
   createLangyTokenBuffer,
   type LangyStreamEntry,
@@ -592,7 +593,11 @@ langyRoute().post("/langy/chat", async (c) => {
   // do not need each other. The busy-guard status and any pending resume handoff
   // wait together.
   const [currentResult, handoffResult] = await Promise.allSettled([
-    conversationService.getById({
+    // `findByIdVisible`, not `getById`: this is the ONE caller for which absence
+    // is a real answer. A conversation whose fold has not been projected yet
+    // cannot have a turn running in it, so "not there" means "not busy".
+    // Everywhere else, a missing conversation is an error and must say so.
+    conversationService.findByIdVisible({
       id: conversation.id,
       projectId,
       userId: session.user.id,
@@ -809,6 +814,12 @@ langyRoute().post("/langy/chat", async (c) => {
   // Read in the parallel batch above; a failed read must not block a turn.
   const current =
     currentResult.status === "fulfilled" ? currentResult.value : null;
+  if (currentResult.status === "rejected") {
+    logger.warn(
+      { error: currentResult.reason, conversationId: conversation.id },
+      "busy-guard read failed — allowing the turn",
+    );
+  }
   if (current?.status === LANGY_CONVERSATION_STATUS.RUNNING) {
     await releaseReservedPermit();
     return c.json(
@@ -860,6 +871,20 @@ langyRoute().post("/langy/chat", async (c) => {
   }
   const pendingHandoff: { token: string; turnId: string } | null =
     handoffResult.status === "fulfilled" ? handoffResult.value : null;
+
+  // Who is allowed to watch this turn's live streams — written NOW, synchronously,
+  // because the browser subscribes to Stream B the instant it reads the turn-id
+  // header and the conversation's ClickHouse fold will not exist for seconds yet.
+  // Gating on that fold is what made the fast path 404 on every first turn, for
+  // the life of the feature. Separate from the spawn handoff below, which the
+  // spawn reactor DELETES on take() and so can vanish before the browser asks.
+  const accessStore = createLangyTurnAccessStore({ redis: connection });
+  await accessStore.grant({
+    projectId,
+    conversationId: conversation.id,
+    turnId,
+    userId: session.user.id,
+  });
 
   const handoffStore = createLangyTurnHandoffStore({ redis: connection });
   await handoffStore.stash({
@@ -1087,6 +1112,56 @@ function attachTurnStream({
  * turns are served from durable state (the assistant message), so no worker is
  * spawned to reproduce an answer.
  */
+/**
+ * May this caller watch this turn's live stream?
+ *
+ * TWO gates, in the order that makes the fast path actually work.
+ *
+ *   1. The TURN-ACCESS record (Redis, written synchronously in the POST before
+ *      the turn dispatched). Answers "did this user start this turn?" instantly.
+ *   2. The conversation FOLD, for everything else — a shared conversation, a
+ *      resumed turn, a refresh long after the window.
+ *
+ * Gate 2 alone is what broke Stream B. The fold is a ClickHouse projection off
+ * the event log and lands SECONDS after the turn starts, but the browser
+ * subscribes the moment it reads `x-langy-turn-id`. So on the first turn of any
+ * conversation the fold did not exist, `getById` returned null, and this route
+ * answered 404 — every time, for the life of the feature, in a product that is
+ * overwhelmingly first turns. The fast path never once ran.
+ *
+ * Gate 1 does not widen access: it only ever confirms the turn's own actor, in
+ * the same project. Anyone else still has to satisfy the fold's visibility rule.
+ */
+async function canWatchTurn({
+  projectId,
+  conversationId,
+  turnId,
+  userId,
+}: {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  userId: string;
+}): Promise<boolean> {
+  if (connection) {
+    const access = createLangyTurnAccessStore({ redis: connection });
+    if (
+      await access.isTurnActor({ projectId, conversationId, turnId, userId })
+    ) {
+      return true;
+    }
+  }
+  // No fast answer — fall back to the durable visibility rule. `getById` THROWS
+  // when the conversation is not there (or not theirs); absence is an answer
+  // here, not an error, so tolerate it explicitly.
+  const conv = await getApp().langy.conversations.findByIdVisible({
+    id: conversationId,
+    projectId,
+    userId,
+  });
+  return !!conv;
+}
+
 langyRoute().get("/langy/conversations/:id/stream", async (c) => {
   const projectId = c.req.query("projectId");
   const guard = await requireSessionAndPermission(c, projectId);
@@ -1096,13 +1171,14 @@ langyRoute().get("/langy/conversations/:id/stream", async (c) => {
   if (!turnId) {
     return c.json({ error: "Missing turnId" }, { status: 400 });
   }
-  const convService = getApp().langy.conversations;
-  const conv = await convService.getById({
-    id,
-    projectId: projectId!,
-    userId: guard.session!.user.id,
-  });
-  if (!conv) {
+  if (
+    !(await canWatchTurn({
+      projectId: projectId!,
+      conversationId: id,
+      turnId,
+      userId: guard.session!.user.id,
+    }))
+  ) {
     return c.json(handledErrorBody(new LangyConversationNotFoundError(id)), {
       status: 404,
     });
@@ -1212,15 +1288,17 @@ langyRoute().get("/langy/conversations/:id/fast", async (c) => {
     return c.json({ error: "Missing turnId" }, { status: 400 });
   }
 
-  // Ownership gate: same visibility rule as the resume route — a caller must be
-  // able to see the conversation to attach to its live tokens. `getById` returns
-  // null for a conversation that is neither owned nor shared.
-  const conv = await getApp().langy.conversations.getById({
-    id,
-    projectId: projectId!,
-    userId: guard.session!.user.id,
-  });
-  if (!conv) {
+  // Ownership gate. THIS is the 404 that killed the fast path: it used to read
+  // the conversation FOLD, which had not been projected yet on a first turn, so
+  // Stream B 404'd on every new conversation and silently never ran.
+  if (
+    !(await canWatchTurn({
+      projectId: projectId!,
+      conversationId: id,
+      turnId,
+      userId: guard.session!.user.id,
+    }))
+  ) {
     return c.json(handledErrorBody(new LangyConversationNotFoundError(id)), {
       status: 404,
     });
@@ -1313,15 +1391,19 @@ langyRoute().get("/langy/conversations/:id", async (c) => {
   if (guard.error) return guard.error;
   const id = c.req.param("id");
   const convService = getApp().langy.conversations;
-  const conv = await convService.getById({
-    id,
-    projectId: projectId!,
-    userId: guard.session!.user.id,
-  });
-  if (!conv)
-    return c.json(handledErrorBody(new LangyConversationNotFoundError(id)), {
-      status: 404,
+  let conv;
+  try {
+    conv = await convService.getById({
+      id,
+      projectId: projectId!,
+      userId: guard.session!.user.id,
     });
+  } catch (error) {
+    if (LangyConversationNotFoundError.is(error)) {
+      return c.json(handledErrorBody(error), { status: 404 });
+    }
+    throw error;
+  }
   const msgService = getApp().langy.messages;
   const messages = await msgService.getRecordsByConversation({
     conversationId: conv.id,

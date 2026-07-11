@@ -37,6 +37,7 @@ const ensureConversation = vi.fn();
 const recordUserMessage = vi.fn();
 const startTurn = vi.fn();
 const getById = vi.fn();
+const findByIdVisible = vi.fn();
 const getPendingHandoff = vi.fn();
 const stash = vi.fn(async (_handoff: { system?: string }) => undefined);
 // The route mints the session key DIRECTLY (it probes the manager first and only
@@ -103,6 +104,7 @@ vi.mock("~/server/app-layer/app", () => ({
         recordUserMessage: (...args: unknown[]) => recordUserMessage(...args),
         startTurn: (...args: unknown[]) => startTurn(...args),
         getById: (...args: unknown[]) => getById(...args),
+        findByIdVisible: (...args: unknown[]) => findByIdVisible(...args),
         getPendingHandoff: (...args: unknown[]) => getPendingHandoff(...args),
       },
       messages: {},
@@ -118,6 +120,9 @@ vi.mock("~/server/redis", () => ({
     expire: async () => 1,
     xrange: async () => [],
   },
+}));
+vi.mock("~/server/services/langy/streaming/langyTurnAccess", () => ({
+  createLangyTurnAccessStore: () => ({ grant: async () => undefined }),
 }));
 vi.mock("~/server/services/langy/streaming/langyTurnHandoff", () => ({
   createLangyTurnHandoffStore: () => ({
@@ -197,7 +202,9 @@ beforeEach(() => {
   startTurn.mockResolvedValue({ turnId: "turn-1" });
   // The previous turn terminalized (agent_turn_failed → status "failed"), so the
   // busy-guard lets the retry through.
-  getById.mockResolvedValue({ id: "conv-1", status: "failed" });
+  getById.mockResolvedValue({ id: "conv-1", status: "failed", lastError: null });
+  // The busy-guard now reads through findByIdVisible (absence == not busy).
+  findByIdVisible.mockResolvedValue({ id: "conv-1", status: "failed", lastError: null });
   getPendingHandoff.mockResolvedValue(null);
   stash.mockResolvedValue(undefined);
   mintLangySessionApiKey.mockResolvedValue({

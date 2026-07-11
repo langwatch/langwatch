@@ -5,6 +5,7 @@ import {
   LangyConversationService,
 } from "../langy-conversation.service";
 import { LangyConversationNotOwnedError } from "../errors";
+import { LangyConversationNotFoundError } from "../errors";
 
 /** Latest-version fold row the read repository returns. */
 type Row = {
@@ -63,17 +64,40 @@ const row = (o: Partial<Row> = {}): Row => ({
 describe("LangyConversationService", () => {
   describe("given a conversation owned by another user in the same project", () => {
     describe("when getById is called by a non-owner without share", () => {
-      it("returns null to prevent cross-user leakage", async () => {
+      it("throws not-found — reported as not-found so it can't probe existence", async () => {
+        // Cross-user leakage prevention: a conversation you may not see must be
+        // indistinguishable from one that does not exist, or the error becomes an
+        // existence oracle across users.
         const repo = makeRepo({
           findById: vi.fn().mockResolvedValue(row({ userId: "bob" })),
         });
         const svc = new LangyConversationService(repo, makeCommands());
-        const result = await svc.getById({
-          id: "c1",
-          projectId: "p1",
-          userId: "alice",
+        await expect(
+          svc.getById({ id: "c1", projectId: "p1", userId: "alice" }),
+        ).rejects.toThrow(LangyConversationNotFoundError);
+      });
+
+      it("findByIdVisible returns null for the same case", async () => {
+        const repo = makeRepo({
+          findById: vi.fn().mockResolvedValue(row({ userId: "bob" })),
         });
-        expect(result).toBeNull();
+        const svc = new LangyConversationService(repo, makeCommands());
+        expect(
+          await svc.findByIdVisible({ id: "c1", projectId: "p1", userId: "alice" }),
+        ).toBeNull();
+      });
+    });
+
+    describe("when the conversation does not exist (or its fold is not projected yet)", () => {
+      it("getById throws rather than returning an ambiguous null", async () => {
+        // The bug this shape exists to kill: `null` used to mean BOTH "no such
+        // conversation" and "exists but not projected yet", and the stream routes
+        // 404'd on the second because it looked like the first.
+        const repo = makeRepo({ findById: vi.fn().mockResolvedValue(null) });
+        const svc = new LangyConversationService(repo, makeCommands());
+        await expect(
+          svc.getById({ id: "c1", projectId: "p1", userId: "alice" }),
+        ).rejects.toThrow(LangyConversationNotFoundError);
       });
     });
 
