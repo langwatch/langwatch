@@ -363,6 +363,14 @@ model Project {
   kind                     String                              @default("application")
   firstMessage             Boolean                             @default(false)
   integrated               Boolean                             @default(false)
+  /// Set true (once, by the claudeCodeEnhancedTelemetryGate reactor) the
+  /// first time this project sends real Claude Code tracing spans (scope
+  /// `com.anthropic.claude_code.tracing`). While true, log ingest stops
+  /// stamping `langwatch.claude_code.kind` on content logs: the synthesis
+  /// fold finds nothing to fold (no double-counted synthetic spans) and the
+  /// content logs fall through to normal project retention instead of the
+  /// 1-day claude-code retention. Write-once, never reset.
+  claudeCodeEnhancedTelemetry Boolean                          @default(false)
   createdAt                DateTime                            @default(now())
   updatedAt                DateTime                            @default(now()) @updatedAt
   userLinkTemplate         String?

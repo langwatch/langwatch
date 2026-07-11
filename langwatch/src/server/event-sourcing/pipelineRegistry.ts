@@ -106,6 +106,7 @@ import type { TraceAnalyticsData } from "./pipelines/trace-processing/projection
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
+import { createClaudeCodeEnhancedTelemetryGateReactor } from "./pipelines/trace-processing/reactors/claudeCodeEnhancedTelemetryGate.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
@@ -432,6 +433,11 @@ export class PipelineRegistry {
       projects: this.deps.projects,
     });
 
+    const claudeCodeEnhancedTelemetryGateReactor =
+      createClaudeCodeEnhancedTelemetryGateReactor({
+        projects: this.deps.projects,
+      });
+
     const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
       computeRunMetrics: simComputeRunMetrics.fn,
     });
@@ -511,6 +517,7 @@ export class PipelineRegistry {
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
+        claudeCodeEnhancedTelemetryGateReactor,
         simulationMetricsSyncReactor,
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,

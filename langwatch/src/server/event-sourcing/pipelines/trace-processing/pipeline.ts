@@ -104,6 +104,7 @@ export interface TraceProcessingPipelineDeps {
     TraceSummaryData
   >;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
+  claudeCodeEnhancedTelemetryGateReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
@@ -231,6 +232,11 @@ export function createTraceProcessingPipeline(
       "spanStorage",
       "spanStorageBroadcast",
       deps.spanStorageBroadcastReactor,
+    )
+    .withReactor(
+      "spanStorage",
+      "claudeCodeEnhancedTelemetryGate",
+      deps.claudeCodeEnhancedTelemetryGateReactor,
     );
 
   if (deps.customerIoTraceSyncReactor) {

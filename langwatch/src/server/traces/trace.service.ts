@@ -1,7 +1,15 @@
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { LogRecordStorageService } from "~/server/app-layer/traces/log-record-storage.service";
+import { LogRecordStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/log-record-storage.clickhouse.repository";
+import { NullLogRecordStorageRepository } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import {
+  type ClickHouseClientResolver,
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
@@ -9,6 +17,10 @@ import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-pro
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
+import {
+  CODING_AGENT_ORIGIN,
+  enrichSpansWithClaudeLogContent,
+} from "./claude-code-log-enrichment";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 
@@ -154,9 +166,12 @@ export class TraceService {
   private readonly logger = createLogger("langwatch:traces:service");
   private readonly clickHouseService: ClickHouseTraceService;
   private readonly evaluationService: EvaluationService;
+  private readonly injectedLogRecordStorage?: LogRecordStorageService;
+  private cachedLogRecordStorage?: LogRecordStorageService;
   constructor(
     readonly prisma: PrismaClient,
     blobResolutionDeps?: BlobResolutionDeps,
+    logRecordStorage?: LogRecordStorageService,
   ) {
     // Build the per-trace resolver callback when deps are present.
     // The callback is passed to ClickHouseTraceService so resolution happens
@@ -175,6 +190,41 @@ export class TraceService {
       resolveTraceSpansFn,
     );
     this.evaluationService = EvaluationService.create();
+    // Injected store for the read-time Claude Code content enrichment; the
+    // default is built LAZILY on first use (see logRecordStorageService) so
+    // construction never touches ClickHouse config. Non-enriching callers and
+    // unit tests that never hit the coding-agent path pay nothing — and don't
+    // need to mock `isClickHouseEnabled`/`getClickHouseClientForProject`.
+    this.injectedLogRecordStorage = logRecordStorage;
+  }
+
+  /**
+   * The log-record store for read-time Claude Code content enrichment, built
+   * lazily so a TraceService that never enriches (or a unit test that never
+   * exercises the coding-agent-origin path) never constructs the
+   * ClickHouse-backed default.
+   */
+  private logRecordStorageService(): LogRecordStorageService {
+    if (this.injectedLogRecordStorage) return this.injectedLogRecordStorage;
+    return (this.cachedLogRecordStorage ??=
+      TraceService.buildDefaultLogRecordStorage());
+  }
+
+  private static buildDefaultLogRecordStorage(): LogRecordStorageService {
+    const resolveClickHouseClient: ClickHouseClientResolver = async (
+      tenantId,
+    ) => {
+      const client = await getClickHouseClientForProject(tenantId);
+      if (!client) {
+        throw new Error(`ClickHouse not available for tenant ${tenantId}`);
+      }
+      return client;
+    };
+    return new LogRecordStorageService(
+      isClickHouseEnabled()
+        ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
+        : new NullLogRecordStorageRepository(),
+    );
   }
 
   /**
@@ -182,13 +232,16 @@ export class TraceService {
    *
    * @param prisma - PrismaClient instance
    * @param blobResolutionDeps - Optional blob-offload resolution deps (#4888)
+   * @param logRecordStorage - Optional log-record store for read-time Claude
+   *   Code content enrichment; default-built when omitted.
    * @returns TraceService instance
    */
   static create(
     prisma: PrismaClient = defaultPrisma,
     blobResolutionDeps?: BlobResolutionDeps,
+    logRecordStorage?: LogRecordStorageService,
   ): TraceService {
-    return new TraceService(prisma, blobResolutionDeps);
+    return new TraceService(prisma, blobResolutionDeps, logRecordStorage);
   }
 
   /**
@@ -221,7 +274,7 @@ export class TraceService {
           { resolveBlobs: opts?.full },
         );
         if (traces[0]) {
-          return traces[0];
+          return this.enrichCodingAgentTrace(projectId, traces[0]);
         }
 
         // No exact match. If the input looks like a truncated hex prefix
@@ -262,12 +315,57 @@ export class TraceService {
             undefined,
             { resolveBlobs: opts?.full },
           );
-          return resolved[0];
+          return resolved[0]
+            ? this.enrichCodingAgentTrace(projectId, resolved[0])
+            : undefined;
         }
 
         return undefined;
       },
     );
+  }
+
+  /**
+   * Read-time Claude Code content enrichment for coding-agent-origin traces.
+   * The real `llm_request` spans carry tokens / `request_id` but no message
+   * content and no cost — both live in the trace's OTLP log records. When the
+   * trace is coding-agent origin we do one lazy, time-capped log read and join
+   * capped `input` / `output` + the authoritative `cost` onto the spans so the
+   * legacy trace/span API (REST, export, legacy tRPC, evals) returns whole
+   * spans. Origin-gated so a non-Claude trace pays nothing; idempotent and a
+   * no-op when the trace has no Claude content logs; best-effort (a log-read
+   * failure returns the un-enriched trace rather than failing the read).
+   */
+  private async enrichCodingAgentTrace(
+    projectId: string,
+    trace: Trace,
+  ): Promise<Trace> {
+    if (trace.metadata?.["langwatch.origin"] !== CODING_AGENT_ORIGIN) {
+      return trace;
+    }
+    try {
+      const logRows = await this.logRecordStorageService().getLogsByTraceId(
+        projectId,
+        trace.trace_id,
+        trace.timestamps.started_at,
+      );
+      if (logRows.length === 0) return trace;
+      const spans = enrichSpansWithClaudeLogContent({
+        spans: trace.spans,
+        logRows,
+      });
+      return spans === trace.spans ? trace : { ...trace, spans };
+    } catch (error) {
+      this.logger.warn(
+        {
+          projectId,
+          traceId: trace.trace_id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Claude Code log enrichment skipped: failed to read trace logs",
+      );
+      return trace;
+    }
   }
 
   /**

@@ -12,6 +12,16 @@
 export const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
 
 /**
+ * The OTLP instrumentation scope Claude Code's enhanced-telemetry beta stamps
+ * on its REAL tracing spans (`llm_request`, `tool`, `interaction`). A project
+ * emitting spans under this scope has real traces — the signal the
+ * claudeCodeEnhancedTelemetryGate reactor watches for to flip the project off
+ * log-synthesis (distinct from {@link CLAUDE_CODE_EVENT_SCOPE}, which is the
+ * LOG scope carrying the content records).
+ */
+export const CLAUDE_CODE_TRACING_SCOPE = "com.anthropic.claude_code.tracing";
+
+/**
  * The three claude_code log events that describe one model call: `api_request`
  * (the anchor: model, tokens, cost, duration, request_id), `api_request_body`
  * (the request payload) and `api_response_body` (the response payload).
