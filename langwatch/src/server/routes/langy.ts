@@ -46,6 +46,7 @@ import {
   createLangyTokenBuffer,
   type LangyStreamEntry,
 } from "~/server/services/langy/streaming/langyTokenBuffer";
+import { subscribeFastTokens } from "~/server/services/langy/streaming/langyFastStream";
 import type { DomainError } from "~/server/app-layer/domain-error";
 import {
   LangyConversationNotFoundError,
@@ -680,6 +681,136 @@ langyRoute().get("/langy/conversations/:id/stream", async (c) => {
     status: streamResponse.status,
     headers,
   });
+});
+
+// ============================================================================
+// Stream B — raw token fast-path (ADR-048)
+// ============================================================================
+
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache, no-transform",
+  Connection: "keep-alive",
+  // Disable proxy buffering so tokens are not held back (nginx/ingress).
+  "X-Accel-Buffering": "no",
+} as const;
+
+/**
+ * Bridge a turn's ephemeral fast-token pub/sub channel to a Server-Sent Events
+ * stream (ADR-048, Stream B). Each raw token is forwarded verbatim as one SSE
+ * `data:` frame carrying the `{"d":...}` / `{"e":1}` wire shape the browser
+ * validates with `fastFrameSchema`. Pub/sub, so nothing replays: this is the
+ * speed channel, not the truth. The stream ends on the terminal frame, the
+ * turn-timeout bound, or client disconnect — whichever comes first.
+ */
+function createFastTokenStream({
+  redis,
+  conversationId,
+  turnId,
+  signal,
+}: {
+  redis: unknown;
+  conversationId: string;
+  turnId: string;
+  signal: AbortSignal | undefined;
+}): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      let closed = false;
+      let subscription: { close: () => void } | null = null;
+      let timeout: ReturnType<typeof setTimeout> | null = null;
+
+      const frame = (payload: string) =>
+        encoder.encode(`data: ${payload}\n\n`);
+
+      const shutdown = () => {
+        if (closed) return;
+        closed = true;
+        if (timeout) clearTimeout(timeout);
+        subscription?.close();
+        signal?.removeEventListener("abort", shutdown);
+        try {
+          controller.close();
+        } catch {
+          // already closed
+        }
+      };
+
+      if (signal?.aborted) {
+        shutdown();
+        return;
+      }
+      signal?.addEventListener("abort", shutdown);
+
+      subscription = subscribeFastTokens({
+        // ioredis satisfies the module's minimal subscriber surface; cast at the
+        // transport boundary rather than leaking ioredis into the service type.
+        redis: redis as Parameters<typeof subscribeFastTokens>[0]["redis"],
+        conversationId,
+        turnId,
+        onToken: (text) => {
+          if (closed) return;
+          controller.enqueue(frame(JSON.stringify({ d: text })));
+        },
+        onEnd: () => {
+          if (closed) return;
+          controller.enqueue(frame(JSON.stringify({ e: 1 })));
+          shutdown();
+        },
+      });
+
+      // Bound the fast stream to the turn budget so a wedged worker can't hold
+      // the SSE open forever; the durable stream + reconcile sweep own recovery.
+      timeout = setTimeout(shutdown, AGENT_CHAT_TIMEOUT_MS);
+    },
+  });
+}
+
+langyRoute().get("/langy/conversations/:id/fast", async (c) => {
+  const projectId = c.req.query("projectId");
+  const guard = await requireSessionAndPermission(c, projectId);
+  if (guard.error) return guard.error;
+  const id = c.req.param("id");
+  const turnId = c.req.query("turnId");
+  if (!turnId) {
+    return c.json({ error: "Missing turnId" }, { status: 400 });
+  }
+
+  // Ownership gate: same visibility rule as the resume route — a caller must be
+  // able to see the conversation to attach to its live tokens. `getById` returns
+  // null for a conversation that is neither owned nor shared.
+  const conv = await getApp().langy.conversations.getById({
+    id,
+    projectId: projectId!,
+    userId: guard.session!.user.id,
+  });
+  if (!conv) {
+    return c.json(handledErrorBody(new LangyConversationNotFoundError(id)), {
+      status: 404,
+    });
+  }
+
+  if (!connection) {
+    // No pub/sub transport — return an immediately-ended SSE so the browser
+    // falls back to Stream A without hanging.
+    const encoder = new TextEncoder();
+    const empty = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ e: 1 })}\n\n`));
+        controller.close();
+      },
+    });
+    return new Response(empty, { headers: SSE_HEADERS });
+  }
+
+  const stream = createFastTokenStream({
+    redis: connection,
+    conversationId: id,
+    turnId,
+    signal: c.req.raw.signal,
+  });
+  return new Response(stream, { headers: SSE_HEADERS });
 });
 
 // ============================================================================

@@ -39,6 +39,10 @@ import {
   createLangyTokenBuffer,
   LangyTokenBuffer,
 } from "../streaming/langyTokenBuffer";
+import {
+  LangyFastTokenPublisher,
+  LANGY_FAST_TOKEN_TYPE,
+} from "../streaming/langyFastStream";
 import { createLangyTurnHandoffStore } from "../streaming/langyTurnHandoff";
 import type { LangyTurnJobData, LangyWorkerPool } from "./langy-worker-pool";
 import {
@@ -66,6 +70,12 @@ export interface RunTurnDeps {
   conversations: LangyConversationService;
   ephemeral: RedisLangyEphemeralPublisher;
   buffer: LangyTokenBuffer;
+  /**
+   * Stream B (ADR-048): raw opencode tokens are fanned onto an ephemeral
+   * per-turn Redis pub/sub channel for the fast-path SSE. Fire-and-forget —
+   * a failed publish degrades Stream B to durable-only and never fails the turn.
+   */
+  fastPublisher: LangyFastTokenPublisher;
   agentUrl: string;
   internalSecret: string;
   fetchImpl?: typeof fetch;
@@ -76,19 +86,30 @@ export interface RunTurnDeps {
  * byte-identical to the old route's `handleLine` (message.part.delta with
  * field=text, plus the legacy `text` shape); adds `error` event detection so an
  * at-capacity / opencode error terminalizes the turn instead of hanging.
+ *
+ * Also recognises the manager's Stream B `langy.token` fast frame (ADR-048) —
+ * routed to the ephemeral fast channel, NOT the durable buffer. The manager
+ * emits it ALONGSIDE the full `message.part.delta` event, so the durable path
+ * (fed by `message.part.delta` below) is unchanged and never double-counts.
  */
 function parseAgentLine(
   line: string,
-): { delta?: string; error?: string; handoff?: string } | null {
+): { delta?: string; error?: string; handoff?: string; fastToken?: string } | null {
   if (!line.trim()) return null;
   try {
     const event = JSON.parse(line) as {
       type?: string;
       error?: string;
       token?: string;
+      text?: string;
       part?: { type?: string; text?: string };
       properties?: { field?: string; delta?: string; token?: string };
     };
+    if (event.type === LANGY_FAST_TOKEN_TYPE) {
+      return typeof event.text === "string" && event.text
+        ? { fastToken: event.text }
+        : null;
+    }
     if (event.type === "error") {
       return { error: event.error || "agent error" };
     }
@@ -220,6 +241,14 @@ export async function runTurn(
     const handleLine = async (line: string) => {
       const parsed = parseAgentLine(line);
       if (!parsed) return;
+      if (parsed.fastToken) {
+        // Stream B: raw token straight onto the ephemeral fast channel. Never
+        // awaited into the durable critical path and never allowed to throw.
+        void deps.fastPublisher
+          .publishToken({ conversationId, turnId, text: parsed.fastToken })
+          .catch(() => undefined);
+        return;
+      }
       if (parsed.error) {
         hardError = parsed.error;
         return;
@@ -298,6 +327,11 @@ export async function runTurn(
       outcome: "completed",
     });
     await deps.buffer.markEnd({ conversationId, turnId });
+    // Close Stream B's fast channel so any attached SSE ends promptly and hands
+    // off to the reconciled final answer (Stream A). Best-effort — ephemeral.
+    await deps.fastPublisher
+      .publishEnd({ conversationId, turnId })
+      .catch(() => undefined);
 
     // GitHub-PR permit reconcile + audit — moved here from the old synchronous
     // route's stream executor `finally` (ADR-044). The reserve happened on the
@@ -328,6 +362,11 @@ export async function runTurn(
     await deps.buffer
       .markError({ conversationId, turnId, error: message })
       .catch(() => {});
+    // End Stream B too so the fast SSE stops waiting and the browser settles on
+    // the durable error state (Stream A).
+    await deps.fastPublisher
+      .publishEnd({ conversationId, turnId })
+      .catch(() => undefined);
     // A failed turn opened no PR — return the reserved permit so a read-only /
     // failed chat doesn't burn the user's daily slot.
     if (job.permitReserved) {
@@ -407,10 +446,14 @@ function createRunTurnDeps(): RunTurnDeps | null {
   // connection directly.
   const buffer = createLangyTokenBuffer({ redis: connection });
   const ephemeral = new RedisLangyEphemeralPublisher(buffer);
+  // Stream B publisher rides the shared connection — publish is a plain
+  // fire-and-forget command (no blocking reads), so no dedicated connection.
+  const fastPublisher = new LangyFastTokenPublisher(connection);
   return {
     conversations: getApp().langy.conversations,
     ephemeral,
     buffer,
+    fastPublisher,
     agentUrl,
     internalSecret,
   };

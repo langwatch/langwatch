@@ -253,6 +253,42 @@ func TestStreamSessionEvents_ForwardsOwnSessionAndFiltersSibling(t *testing.T) {
 	}
 }
 
+func TestTextDeltaFromEvent_MessagePartDelta(t *testing.T) {
+	// The current opencode shape: message.part.delta with a text field carries a
+	// token in properties.delta. This is the Stream B fast-path source (ADR-048).
+	ev := decodeSSE(t, `{"type":"message.part.delta","properties":{"sessionID":"s1","field":"text","delta":"Hel"}}`)
+	got, ok := textDeltaFromEvent(ev)
+	if !ok || got != "Hel" {
+		t.Errorf("expected delta %q ok=true, got %q ok=%v", "Hel", got, ok)
+	}
+}
+
+func TestTextDeltaFromEvent_LegacyTextShape(t *testing.T) {
+	ev := decodeSSE(t, `{"type":"text","part":{"text":"world"}}`)
+	got, ok := textDeltaFromEvent(ev)
+	if !ok || got != "world" {
+		t.Errorf("expected delta %q ok=true, got %q ok=%v", "world", got, ok)
+	}
+}
+
+func TestTextDeltaFromEvent_NonTextEventsYieldNothing(t *testing.T) {
+	// Tool-call / lifecycle / non-text-field deltas must NOT produce a fast
+	// frame — Stream B is raw answer tokens only.
+	cases := []string{
+		`{"type":"message.completed"}`,
+		`{"type":"tool.call","properties":{"name":"search_traces"}}`,
+		`{"type":"message.part.delta","properties":{"field":"reasoning","delta":"x"}}`,
+		`{"type":"message.part.delta","properties":{"field":"text","delta":""}}`,
+		`{"type":"text","part":{"text":""}}`,
+	}
+	for _, raw := range cases {
+		ev := decodeSSE(t, raw)
+		if got, ok := textDeltaFromEvent(ev); ok {
+			t.Errorf("expected no delta for %s, got %q", raw, got)
+		}
+	}
+}
+
 func TestTerminalEventTypes_Present(t *testing.T) {
 	for _, name := range []string{
 		"message.completed",
