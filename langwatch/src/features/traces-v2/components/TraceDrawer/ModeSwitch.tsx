@@ -27,6 +27,11 @@ interface ModeSwitchProps {
   /** Trace id used to scope the per-mode peer presence dots. */
   traceId?: string;
   /**
+   * True for coding-agent traces (Claude Code and friends), which carry a
+   * terminal session worth replaying. Gates the Terminal tab's existence.
+   */
+  showTerminal?: boolean;
+  /**
    * Right-aligned trailing content for this row — typically the trace ID
    * + relative timestamp. Sits in the same horizontal band as the tabs so
    * the meta tucks neatly into the corner.
@@ -145,6 +150,7 @@ export function ModeSwitch({
   hasConversation = true,
   isConversationLoading = false,
   traceId,
+  showTerminal = false,
   endSlot,
 }: ModeSwitchProps) {
   // Tristate gate: no conversationId → permanently disabled; has id
@@ -194,6 +200,22 @@ export function ModeSwitch({
         onClick={() => onViewModeChange("conversation")}
         presence={presenceFor("conversation")}
       />
+      {/*
+        Terminal only exists for coding-agent traces (Claude Code and friends):
+        it replays the turn the way the CLI drew it. A normal LLM trace has no
+        terminal session to show, so the tab isn't rendered at all rather than
+        being shown disabled — an always-greyed tab on every other trace would
+        be noise.
+      */}
+      {showTerminal && (
+        <ModeTab
+          label="Terminal"
+          shortcut="M"
+          active={viewMode === "terminal"}
+          onClick={() => onViewModeChange("terminal")}
+          presence={presenceFor("terminal")}
+        />
+      )}
       {turnLabel && viewMode === "trace" && (
         <Text textStyle="xs" color="fg.muted" marginLeft="auto">
           {turnLabel}

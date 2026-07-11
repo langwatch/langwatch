@@ -74,11 +74,7 @@ function renderView() {
     <ChakraProvider value={defaultSystem}>
       <TerminalView
         steps={steps}
-        meta={{
-          terminalType: "xterm-256color",
-          cwd: "/repo",
-          osType: "darwin",
-        }}
+        meta={{ cwd: "/repo" }}
       />
     </ChakraProvider>,
   );

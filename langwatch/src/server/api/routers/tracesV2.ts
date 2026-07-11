@@ -9,6 +9,7 @@ import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
+import { enrichCodingAgentSpansFromLogs } from "~/server/app-layer/traces/claude-code-log-enrichment";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
@@ -1325,13 +1326,25 @@ export const tracesV2Router = createTRPCRouter({
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
-      const spans = await app.traces.spans.getSpansByTraceId({
+      const storedSpans = await app.traces.spans.getSpansByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
         ),
         ...occurredAtFromInput(input),
+      });
+      // Claude Code's real `llm_request` spans carry tokens + `request_id` but
+      // NO message content and NO cost — both live in the trace's OTLP log
+      // records. Join them on before protections run, so the joined content
+      // goes through the same redaction pass as any other span content rather
+      // than bypassing it.
+      const spans = await enrichCodingAgentSpansFromLogs({
+        logRecords: app.traces.logRecords,
+        tenantId: input.projectId,
+        traceId: input.traceId,
+        spans: storedSpans,
+        occurredAtMs: input.occurredAtMs,
       });
       // Span-level protections first (category visibility, restricted custom
       // attributes, hidden content scrubbed out of params), then the DTO pass.

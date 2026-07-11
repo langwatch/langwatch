@@ -1,130 +1,102 @@
-# Claude Code "Terminal" view (prototype)
+# Claude Code "Terminal" view
 
-A Traces V2 drawer view that renders a coding-agent trace the way it looked
-inside the Claude Code CLI: ANSI-coloured tool output, red/green code diffs,
-prompt chrome, and a scrubber to travel through the session while the token and
-cost totals tick up.
+A Traces V2 drawer tab that replays a coding-agent turn the way it looked inside
+the Claude Code CLI: ANSI-coloured tool output, red/green code diffs, and a
+scrubber to travel through the session while token and cost totals tick up.
 
-This doc covers what was built and how to wire it into the drawer. The
-components are self-contained; nothing is wired in yet.
+## The data model (verified)
 
-## Why
+Source of truth: <https://code.claude.com/docs/en/monitoring-usage>. Claude Code
+emits three signals; we consume all three.
 
-Claude Code traces carry `service.name=claude-code`, a `terminal.type`
-(`xterm-256color`), `os.type`, and tool output (Bash `git`, test runners, build
-tools) full of raw ANSI escape codes (`\x1b[32m…`). Today that renders as noise.
-`terminal.type=xterm-256color` tells us it's true 256-colour ANSI, so we can
-parse it into real colours (a readability win) and, for the recreation, show the
-session as a terminal.
+### Spans (`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1` + `OTEL_TRACES_EXPORTER=otlp`)
 
-## Files
+```
+claude_code.interaction        (root — carries user_prompt, interaction.sequence)
+├── claude_code.llm_request    (one per model call)
+└── claude_code.tool           (one per tool call)
+    ├── claude_code.tool.blocked_on_user   (decision, source)
+    └── claude_code.tool.execution         (success, error)
+```
 
-ANSI engine (pure, no new npm dependency — see "ANSI library" below):
+`llm_request` carries `request_id`, `model`, `input_tokens`, `output_tokens`,
+`cache_read_tokens`, `ttft_ms`, `stop_reason`, `response.has_tool_call`, and
+`agent_id` / `parent_agent_id` for the sub-agent tree. **It carries no message
+content and no cost.** `claude_code.tool` carries `tool_name`, `tool_use_id`,
+`file_path`, `full_command`, `result_tokens`, and — when `OTEL_LOG_TOOL_CONTENT=1`
+— a `tool.output` span EVENT holding the tool's real input and output bodies.
 
-- `langwatch/src/features/traces-v2/utils/ansi/ansi.ts` — SGR parser:
-  `parseAnsi(str) → AnsiLine[]`, plus `stripAnsi`, `hasAnsi`, `xterm256ToHex`.
-  Handles 16-colour, xterm-256, truecolor, bold/dim/italic/underline/inverse/
-  strikethrough + resets; strips cursor/erase/OSC sequences and stray control
-  bytes; collapses carriage-return overwrites. Never throws.
-- `langwatch/src/features/traces-v2/utils/terminalOrigin.ts` —
-  `isTerminalOrigin({ serviceName, origin, terminalType })` gating helper.
+### Log events — each with its OWN content key
 
-Presentational components (`langwatch/src/features/traces-v2/components/TraceDrawer/terminalView/`):
+There is **no shared `body` convention**. This bit us: enrichment read `body` for
+everything, so on the light path spans came back with no input and no output,
+silently (fixed; regression-pinned in `trace-service-claude-enrichment.unit.test.ts`).
 
-- `palette.ts` — maps ANSI colours onto **Chakra semantic/colour tokens**
-  (`red.fg`, `green.solid`, …) so everything is theme-aware; only 256/truecolor
-  codes fall back to their literal hex (no token equivalent exists).
-- `AnsiText.tsx` — renders a raw string as selectable, theme-aware coloured
-  monospace. Escape codes never reach the DOM, so selection copies clean text.
-- `TerminalOutput.tsx` — one block of tool output on a terminal "screen", with a
-  hover copy button and click-to-copy (copies the de-ANSI'd text). Mount only
-  when the trace is terminal origin; it doesn't gate itself.
-- `diff.ts` + `TerminalDiff.tsx` — line diff (`computeLineDiff`) rendered
-  Claude-Code-style: removed lines red, added lines green, context dimmed, with
-  line numbers and a `+N -M` stat.
-- `terminalSession.ts` — `TerminalStep` type, `buildTimeline` (cumulative
-  tokens/cost/elapsed per step), `toolPrimaryArg`, `isDiffTool`,
-  `extractDiffFromToolInput`.
-- `TerminalView.tsx` — the full recreation: window frame, `>` user prompts,
-  assistant prose, `⏺ Tool(arg)` calls with `⎿` results, diffs for Edit/Write,
-  and the timeline scrubber + token/cost HUD.
-- `index.ts` — barrel.
+| event | content key | gate |
+|---|---|---|
+| `user_prompt` | `prompt` | `OTEL_LOG_USER_PROMPTS` |
+| `assistant_response` | `response` | `OTEL_LOG_ASSISTANT_RESPONSES` (falls back to the above) |
+| `api_request_body` / `api_response_body` | `body` | `OTEL_LOG_RAW_API_BODIES` |
+| `api_request` | — (`cost_usd`, `request_id`) | always |
+| `tool_result` / `tool_decision` | `tool_input`, `tool_parameters` | `OTEL_LOG_TOOL_DETAILS` |
 
-Tests (all run under `pnpm test:unit`):
-`ansi.unit.test.ts` (33), `terminalOrigin.unit.test.ts`, `diff.unit.test.ts`,
-`terminalSession.unit.test.ts`, `TerminalOutput.unit.test.tsx`,
-`TerminalView.unit.test.tsx`. The `.tsx` render tests are pure jsdom with plain
-props (no boundary mocking), matching the existing traces-v2 `*.unit.test.tsx`
-precedent (e.g. `TraceTable/__tests__/IOPreview.unit.test.tsx`).
+Every event also carries **`prompt.id`** (a UUID linking all events from one user
+prompt) and **`event.sequence`** (monotonic per session).
 
-## ANSI library
+## How the pieces fit
 
-There is **no ANSI library in the repo** (`anser`, `ansi-to-html`, `fansi`, …
-are all absent). Rather than add a dependency, the SGR parser is hand-rolled
-(~230 lines, thoroughly tested). Recommendation: keep it hand-rolled — the
-scope we need (SGR + strip-the-rest) is small and the parser has no runtime
-deps. If we later need full terminal emulation (cursor addressing, scroll
-regions, alt-screen) revisit `xterm.js`, but that's out of scope for read-only
-trace rendering.
+Claude's spans have the structure but no content; the logs have the content but
+no span ids. `enrichCodingAgentSpansFromLogs`
+(`src/server/app-layer/traces/claude-code-log-enrichment.ts`) joins them at read
+time and is called by BOTH read paths — `tracesV2.spansFull` (the drawer) and the
+legacy `TraceService` (REST, exports, evals). Joins:
 
-## How it integrates
+- **output**, **cost** — exact, by `request_id`.
+- **input** — positional today (Nth span ↔ Nth `api_request_body` within a
+  `query_source`), because the request body carries no `request_id`. See
+  follow-ups: `prompt.id` + `event.sequence` can make this exact.
 
-The conversation view already builds turns from the trace's I/O payloads. Add a
-"Terminal" mode to the coding-agent drawer alongside the existing
-thread/bubbles/markdown modes, gated so it only appears for terminal-origin
-traces.
+The join runs **before** protections, so joined content goes through the same
+PII/redaction pass as any other span content.
 
-1. **Gate the tab.** Show the Terminal mode only when
-   `isTerminalOrigin({ serviceName, origin, terminalType })` is true —
-   `serviceName`/`origin` are on `TraceListItem`; `terminalType` comes from the
-   `terminal.type` span attribute (surface it in the drawer's trace context).
+## The view
 
-2. **Build `TerminalStep[]`.** Reuse the existing shapes — do not reinvent:
-   - Turn content: for each turn's message payload, run
-     `coerceToChatMessages(...)` then `groupMessagesIntoTurns(...)` (both from
-     `../transcript`) to get `ConversationTurn[]` — the same path
-     `ConversationTurnsList` uses. Each `ConversationTurn` is one step's `turn`.
-   - Per-step metrics for the timeline come straight off the conversation's
-     `TraceListItem`s (`timestamp`, `totalTokens`/`inputTokens`,
-     `totalCost`, `models[0]`). Map one trace/turn → one `TerminalStep`.
+`TerminalTab` (its own drawer tab, next to Conversation — gated on
+`isTerminalOrigin`) reads `tracesV2.spansFull` and rebuilds the session with
+`buildTerminalStepsFromSpans`.
 
-   ```tsx
-   const steps: TerminalStep[] = turns.map((t) => ({
-     turn: /* ConversationTurn from groupMessagesIntoTurns(t) */,
-     timestamp: t.timestamp,
-     tokens: t.totalTokens,
-     costUsd: t.totalCost,
-     model: t.models[0],
-   }));
-   <TerminalView steps={steps} meta={{ terminalType, osType, cwd, model }} />
-   ```
+Why spans and not the trace summary: a Claude Code turn is an agentic **loop** —
+model → tool → model → tool → answer. The trace summary only ever holds the
+opening prompt and the closing reply, so rendering from it loses every tool call.
+Each model call carries the *rolling* history, so the final `llm_request` span's
+input already contains the whole turn (prompt, every `tool_use`, every
+`tool_result`); appending its own reply completes the transcript. Metrics are
+summed across all the calls — the turn cost is the whole loop.
 
-3. **Or render output inline.** `TerminalOutput` can also drop into the existing
-   transcript tool cards to colour Bash/test output in place — mount it in place
-   of the raw `<pre>` result body when `hasAnsi(resultText)` and the trace is
-   terminal origin.
+`TerminalView` deliberately has **no window chrome** — no frame, no traffic
+lights, no title bar. Claude Code doesn't draw those; it prints into the terminal
+you already have, and its whole hierarchy rides on four glyphs at one monospace
+size: `❯` prompt, `⏺` call/message, `⎿` result, `✻` thinking. Chrome around it
+makes it read as a screenshot of a terminal rather than as the session.
 
-## Data it needs
-
-- Trace/turn payloads (already loaded by the conversation view).
-- `service.name`, `langwatch.origin`, and the `terminal.type` span attribute for
-  gating + the window title.
-- Per-turn `timestamp`, tokens, cost, model for the timeline HUD (all on
-  `TraceListItem`).
-
-For diffs, `TerminalView` synthesises the before/after from the Edit tool's
-`old_string`/`new_string` (or Write's `content`) in the tool-call input — no
-extra data needed.
+Components (`langwatch/src/features/traces-v2/components/TraceDrawer/terminalView/`):
+`TerminalTab` (data boundary) · `TerminalView` (the screen + status line) ·
+`buildStepsFromSpans` (spans → steps) · `TerminalOutput` (ANSI tool output,
+click-to-copy) · `TerminalDiff` + `diff.ts` · `terminalSession.ts` (timeline,
+tool-arg + diff extraction) · `palette.ts` (ANSI → Chakra semantic tokens) ·
+`AnsiText`. ANSI parsing is hand-rolled in `utils/ansi/` (no dependency added).
 
 ## Follow-ups
 
-- **Prefer span-level tool output** if/when the drawer exposes `tool.output`
-  events per span — richer and avoids re-deriving output from message payloads.
-- **Real diffs for Read+Edit**: today the diff is `old_string`→`new_string`
-  only; pairing with the file's Read span would give full-file context lines.
-- **Virtualize** the screen for very long sessions (mirror the conversation
-  view's `useVirtualizer` threshold).
-- **Timeline polish**: continuous time axis (currently step-indexed), per-step
-  tick marks with relative-time labels, play/pause auto-advance.
-- Consider promoting `utils/ansi/` to a shared location if non-traces surfaces
-  (e.g. worker logs) want ANSI rendering too.
+- **Exact input join.** Use `prompt.id` + `event.sequence` instead of positional
+  pairing; removes the documented "two concurrent sub-agents sharing a
+  `query_source` can cross their inputs" caveat.
+- **Tool spans + `tool.output` events.** We set `OTEL_LOG_TOOL_CONTENT=1` and read
+  neither. They carry the tool's real I/O and are richer than re-deriving it from
+  the message history. `tool_result` log events (`duration_ms`, `success`) are
+  ingested and read by nothing either.
+- **Sub-agent tree.** `agent_id` / `parent_agent_id` are on the spans and lifted
+  into no DTO, so sub-agents can't be told apart in the UI.
+- **Per-turn spans in the conversation view** — same model as the Terminal tab,
+  so a turn row can expand into the loop it actually ran.
+- **Virtualize** the screen for very long sessions.
