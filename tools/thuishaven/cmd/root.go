@@ -16,6 +16,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhouseserver"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/portlessproxy"
@@ -51,6 +52,7 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	store := fileregistry.New(havenHome())
 	sup := procsupervisor.New(agent)
 	sys := system.New()
+	ch := clickhouseserver.New(havenHome(), os.Getenv("CLICKHOUSE_BIN"), envBytes("LANGWATCH_HAVEN_CH_MAX_MEMORY", 0))
 	sharedURL := func(svc string) string {
 		scheme, port := proxy.Endpoint()
 		return naming.URL(svc, "", scheme, port)
@@ -58,15 +60,17 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	dash := dashboard.New(store.Stacks, sharedURL)
 
 	cfg := app.Config{
-		Naming:            naming,
-		Home:              havenHome(),
-		ObservabilityPort: envInt("LANGWATCH_OBSERVABILITY_PORT", 3000),
-		IdleTTL:           envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
-		HeartbeatEvery:    30 * time.Second,
-		DaemonArgv:        selfArgv(worktree, "daemon"),
-		Agent:             agent,
+		Naming:             naming,
+		Home:               havenHome(),
+		ObservabilityPort:  envInt("LANGWATCH_OBSERVABILITY_PORT", 3000),
+		IdleTTL:            envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
+		HeartbeatEvery:     30 * time.Second,
+		DaemonArgv:         selfArgv(worktree, "daemon"),
+		Agent:              agent,
+		ManageClickHouse:   os.Getenv("LANGWATCH_HAVEN_CH") != "0",
+		StopClickHouseIdle: os.Getenv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
 	}
-	orch := app.New(cfg, proxy, store, sup, sys, logger)
+	orch := app.New(cfg, proxy, store, sup, sys, ch, logger)
 
 	// SIGINT/SIGTERM cancel the context so up/daemon/watch clean up.
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
@@ -95,7 +99,9 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	case "daemon":
 		return orch.RunDaemon(ctx, dash)
 	case "down":
-		return orch.Down(params)
+		return orch.Down(ctx, params, hasFlag(rest, "--keep-db"))
+	case "clickhouse", "ch":
+		return orch.RunClickHouse(ctx, params, rest)
 	case "seed":
 		return orch.Seed(ctx, params)
 	case "list", "ls", "status":
@@ -195,6 +201,17 @@ func hasFlag(args []string, flag string) bool {
 func envInt(key string, def int) int {
 	if v := os.Getenv(key); v != "" {
 		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil {
+			return n
+		}
+	}
+	return def
+}
+
+// envBytes parses a byte count (plain integer) from an env var; def when unset.
+func envBytes(key string, def int64) int64 {
+	if v := os.Getenv(key); v != "" {
+		var n int64
 		if _, err := fmt.Sscanf(v, "%d", &n); err == nil {
 			return n
 		}

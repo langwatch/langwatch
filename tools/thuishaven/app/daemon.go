@@ -101,7 +101,21 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
 			}
 			o.refreshObservability()
+			o.reapClickHouse()
 		}
+	}
+}
+
+// reapClickHouse stops the shared managed clickhouse-server once no stacks remain,
+// reclaiming its memory (opt-in via StopClickHouseIdle). Data + endpoint stay on
+// disk, so the next `haven up` restarts it with every per-slug database intact.
+func (o *Orchestrator) reapClickHouse() {
+	if o.ch == nil || !o.cfg.StopClickHouseIdle {
+		return
+	}
+	if len(o.store.Stacks()) == 0 && o.ch.Running() {
+		o.ch.Stop()
+		o.log.Info("stopped idle managed clickhouse-server (no stacks running)")
 	}
 }
 
