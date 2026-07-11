@@ -2,6 +2,7 @@
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
 .PHONY: observability observability-down observability-connect observability-logs observability-status
+.PHONY: portless-setup haven haven-install portless-list portless-doctor portless-down
 .PHONY: _dev-up-deprecation-warning
 
 # Surface every target — boxd-* are pulled in via include below.
@@ -20,6 +21,12 @@ help:
 	@echo "    make quickstart full-local          kitchen-sink local (dedicated workers container + bullboard + ai-server)"
 	@echo "    make quickstart-help                non-interactive preset reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
+	@echo ""
+	@echo "  Local dev by hostname (thuishaven / portless — ADR-048):"
+	@echo "    make portless-setup                 one-time: install portless proxy + build haven"
+	@echo "    make portless-list                  which worktree runs what (all stacks)"
+	@echo "    make portless-doctor                check portless / haven / observability health"
+	@echo "    (then just 'pnpm dev' in any worktree; dashboard at https://langwatch.localhost)"
 	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
 	@echo ""
 	@echo "  Local observability (logs/traces/metrics → Grafana for agent debugging):"
@@ -158,6 +165,42 @@ observability-status:
 # ephemeral, so this discards all collected telemetry.
 observability-down:
 	$(OBS_COMPOSE) rm -sf otel-lgtm
+
+# =============================================================================
+# THUISHAVEN — hostname-based local dev via portless (ADR-048)
+# =============================================================================
+# `haven` (built from cmd/haven) gives every worktree's services stable
+# hostnames — app|api|gateway|nlp.<slug>.langwatch.localhost — so multiple
+# worktrees never fight over ports. `pnpm dev` routes through it automatically
+# once the portless proxy is installed. Dashboard: https://langwatch.localhost
+
+HAVEN_PKG = ./cmd/haven
+HAVEN = $$(command -v haven || echo "go run $(HAVEN_PKG)")
+
+# One-time machine setup: install the portless proxy (persistent), trust its CA,
+# and build the haven binary. `.localhost` resolves to loopback natively, so
+# there is no /etc/hosts or DNS step.
+portless-setup:
+	@command -v portless >/dev/null 2>&1 || npm install -g portless
+	@portless service install 2>/dev/null || portless proxy start || true
+	@portless trust || true
+	@$(MAKE) haven
+	@echo ""
+	@echo "thuishaven ready. Run 'pnpm dev' in any worktree; open https://langwatch.localhost"
+
+# Build / install the haven orchestrator.
+haven:
+	@go build -o bin/haven $(HAVEN_PKG) && echo "built bin/haven"
+haven-install:
+	@go install $(HAVEN_PKG) && echo "installed haven -> $$(go env GOPATH)/bin/haven"
+
+# Convenience wrappers (use an installed `haven`, else `go run ./cmd/haven`).
+portless-list:
+	@$(HAVEN) list
+portless-doctor:
+	@$(HAVEN) doctor
+portless-down:
+	@$(HAVEN) down
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`
 # (interactive) or `./scripts/dev.sh <preset>` directly. Preset list:

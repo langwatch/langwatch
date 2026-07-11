@@ -98,3 +98,6 @@ screenshot-*.png
 
 # Langy scenario-test transcripts (regenerated per run; never commit)
 /src/tests/langy/scenario-logs/
+
+# thuishaven (portless local dev)
+.env.portless

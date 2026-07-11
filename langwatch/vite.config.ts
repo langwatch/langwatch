@@ -13,8 +13,11 @@ import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawe
 // the same way; doing it here keeps both processes reading from one
 // source of truth.
 dotenv.config({ path: path.resolve(__dirname, ".env") });
+// Portless (haven) overlay wins: loaded after .env with override so the
+// resolved app port + api hostname take effect. Absent in non-portless runs.
+dotenv.config({ path: path.resolve(__dirname, ".env.portless"), override: true });
 
-const FRONTEND_PORT = parseInt(process.env.PORT ?? "5560");
+const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
 
 // When `LANGWATCH_DEV_HTTP2=1` is set, Vite serves the SPA over
@@ -24,6 +27,9 @@ const API_PORT = FRONTEND_PORT + 1000;
 // asks to trust the cert once for the whole local stack.
 const USE_HTTP2 = process.env.LANGWATCH_DEV_HTTP2 === "1";
 const API_PROTOCOL = USE_HTTP2 ? "https" : "http";
+// In portless (haven) mode the SPA's /api/* is proxied to the API's hostname
+// (api.<slug>.langwatch.localhost) via the portless proxy; otherwise loopback.
+const API_TARGET = process.env.LANGWATCH_API_URL ?? `${API_PROTOCOL}://localhost:${API_PORT}`;
 
 /**
  * Load (and lazily generate) the dev TLS credentials. Mirrors
@@ -236,7 +242,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
     // splitting is dev-only.
     proxy: {
       "/api": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         ws: true,
         // Self-signed dev cert — don't fail the proxy on cert verification.
@@ -244,32 +250,32 @@ export default defineConfig(async (): Promise<UserConfig> => {
         secure: false,
       },
       "/mcp": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/sse": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/messages": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/oauth": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/.well-known/oauth-protected-resource": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/.well-known/oauth-authorization-server": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
