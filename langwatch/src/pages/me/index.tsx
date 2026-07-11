@@ -12,6 +12,7 @@ import { useState } from "react";
 import Head from "~/utils/compat/next-head";
 
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { ShikiCommandBox } from "~/components/code/ShikiCommandBox";
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
@@ -21,6 +22,7 @@ import { PersonalRecentTracesTable } from "~/components/me/PersonalRecentTracesT
 import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
+  PersonalGetStartedOffers,
 } from "~/components/me/PersonalTracesEmptyState";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
@@ -47,6 +49,15 @@ function MyUsagePage() {
   } = ctx;
 
   const isOverBudget = budget.status === "exceeded";
+
+  // Nothing has been sent yet: no requests, no daily spend, no per-tool spend.
+  // Instead of four separate "no data" panels the section collapses to one
+  // intentional get-started state — muted stat cards, a preview of the
+  // dashboard to come, and the tools that light it up.
+  const isSectionEmpty =
+    summary.requestsThisMonth === 0 &&
+    spendByDay.length === 0 &&
+    spendByTool.length === 0;
 
   // "Spent this month" leads with the actually-billed amount; the theoretical
   // bundled portion (e.g. Claude Max usage that isn't billed per token) is most
@@ -148,198 +159,226 @@ function MyUsagePage() {
           <SummaryCard
             title="Spent this month"
             value={fmtUsd(summary.billedThisMonthUsd)}
-            subline={spentSubline}
+            subline={isSectionEmpty ? "No usage yet" : spentSubline}
             tone={isOverBudget ? "red" : "default"}
+            muted={isSectionEmpty}
           />
           <SummaryCard
             title="Requests this month"
             value={numeral(summary.requestsThisMonth).format("0,0")}
-            subline={fmtPctDelta(summary.requestsDeltaPctVsLastMonth) ?? "—"}
+            subline={
+              isSectionEmpty
+                ? "No usage yet"
+                : (fmtPctDelta(summary.requestsDeltaPctVsLastMonth) ?? "—")
+            }
+            muted={isSectionEmpty}
           />
           <SummaryCard
             title="Most-used model"
             value={summary.mostUsedModel?.name ?? "—"}
             subline={
-              summary.mostUsedModel
-                ? `${summary.mostUsedModel.usagePct}% of usage`
-                : "Run a request to see this"
+              isSectionEmpty
+                ? "No usage yet"
+                : summary.mostUsedModel
+                  ? `${summary.mostUsedModel.usagePct}% of usage`
+                  : "Run a request to see this"
             }
+            muted={isSectionEmpty}
           />
         </SimpleGrid>
 
-        <SectionCard title="Spending over time">
-          {spendByDay.length === 0 ? (
-            <EmptyState
-              message="No usage yet"
-              hint="Run `langwatch claude` to get started"
-            />
-          ) : (
-            <VStack align="stretch" gap={2}>
-              <CostSeriesLegend
-                showTheoretical={showTheoretical}
-                showBilled={showBilled}
-                onToggleTheoretical={() => setShowTheoretical((v) => !v)}
-                onToggleBilled={() => setShowBilled((v) => !v)}
-              />
-              <HStack gap={1} alignItems="end" height="120px" paddingTop={2}>
-                {spendByDay.map((d) => {
-                  const theoreticalPct = (d.usd / maxDay) * 100;
-                  const billedPct = (d.billedUsd / maxDay) * 100;
-                  return (
-                    <Tooltip
-                      key={d.day}
-                      openDelay={100}
-                      positioning={{ placement: "top" }}
-                      content={
-                        <VStack gap={0.5} align="start">
-                          <Text fontWeight="semibold">{d.day}</Text>
-                          <Text>Theoretical: {fmtUsd(d.usd)}</Text>
-                          <Text>Billed: {fmtUsd(d.billedUsd)}</Text>
-                        </VStack>
-                      }
-                    >
-                      <Box
-                        flex={1}
-                        position="relative"
-                        height="full"
-                        cursor="default"
-                      >
-                        {/* Always-present baseline so empty days still read as a
+        {isSectionEmpty ? (
+          <>
+            <UsagePreviewPanel />
+            <SectionCard title="Get started">
+              <PersonalGetStartedOffers projectSlug={personalProjectSlug} />
+            </SectionCard>
+          </>
+        ) : (
+          <>
+            <SectionCard title="Spending over time">
+              {spendByDay.length === 0 ? (
+                <EmptyState
+                  message="No usage yet"
+                  hint="Run `langwatch claude` to get started"
+                />
+              ) : (
+                <VStack align="stretch" gap={2}>
+                  <CostSeriesLegend
+                    showTheoretical={showTheoretical}
+                    showBilled={showBilled}
+                    onToggleTheoretical={() => setShowTheoretical((v) => !v)}
+                    onToggleBilled={() => setShowBilled((v) => !v)}
+                  />
+                  <HStack
+                    gap={1}
+                    alignItems="end"
+                    height="120px"
+                    paddingTop={2}
+                  >
+                    {spendByDay.map((d) => {
+                      const theoreticalPct = (d.usd / maxDay) * 100;
+                      const billedPct = (d.billedUsd / maxDay) * 100;
+                      return (
+                        <Tooltip
+                          key={d.day}
+                          openDelay={100}
+                          positioning={{ placement: "top" }}
+                          content={
+                            <VStack gap={0.5} align="start">
+                              <Text fontWeight="semibold">{d.day}</Text>
+                              <Text>Theoretical: {fmtUsd(d.usd)}</Text>
+                              <Text>Billed: {fmtUsd(d.billedUsd)}</Text>
+                            </VStack>
+                          }
+                        >
+                          <Box
+                            flex={1}
+                            position="relative"
+                            height="full"
+                            cursor="default"
+                          >
+                            {/* Always-present baseline so empty days still read as a
                             point on the timeline instead of a blank gap. */}
-                        <Box
-                          position="absolute"
-                          bottom={0}
-                          width="full"
-                          height="2px"
-                          borderRadius="full"
-                          backgroundColor="blue.200"
-                        />
-                        {showTheoretical && d.usd > 0 && (
-                          <Box
-                            position="absolute"
-                            bottom={0}
-                            width="full"
-                            backgroundColor="blue.200"
-                            borderRadius="sm"
-                            height={`${Math.max(2, theoreticalPct)}%`}
-                          />
-                        )}
-                        {showBilled && d.billedUsd > 0 && (
-                          <Box
-                            position="absolute"
-                            bottom={0}
-                            width="full"
-                            backgroundColor="blue.400"
-                            borderRadius="sm"
-                            height={`${Math.max(2, billedPct)}%`}
-                          />
-                        )}
-                      </Box>
-                    </Tooltip>
-                  );
-                })}
-              </HStack>
-              <HStack justifyContent="space-between" fontSize="xs" color="fg.muted">
-                <Text>{spendByDay[0]?.day}</Text>
-                <Text>{spendByDay[spendByDay.length - 1]?.day}</Text>
-              </HStack>
-            </VStack>
-          )}
-        </SectionCard>
-
-        <SectionCard title="By tool">
-          {spendByTool.length === 0 ? (
-            <EmptyState message="No tool data yet" />
-          ) : (
-            <VStack align="stretch" gap={3}>
-              <CostSeriesLegend
-                showTheoretical={showTheoretical}
-                showBilled={showBilled}
-                onToggleTheoretical={() => setShowTheoretical((v) => !v)}
-                onToggleBilled={() => setShowBilled((v) => !v)}
-              />
-              {spendByTool.map((tool) => {
-                const theoreticalPct = (tool.usd / maxTool) * 100;
-                const billedPct = (tool.billedUsd / maxTool) * 100;
-                return (
-                  <HStack key={tool.tool} gap={3}>
-                    <Text fontSize="sm" minWidth="120px">
-                      {tool.tool}
-                    </Text>
-                    <Tooltip
-                      openDelay={100}
-                      positioning={{ placement: "top" }}
-                      content={
-                        <VStack gap={0.5} align="start">
-                          <Text fontWeight="semibold">{tool.tool}</Text>
-                          <Text>Theoretical: {fmtUsd(tool.usd)}</Text>
-                          <Text>Billed: {fmtUsd(tool.billedUsd)}</Text>
-                        </VStack>
-                      }
-                    >
-                      <Box
-                        flex={1}
-                        height="14px"
-                        backgroundColor="bg.muted"
-                        borderRadius="sm"
-                        overflow="hidden"
-                        position="relative"
-                        cursor="default"
-                      >
-                        {showTheoretical && (
-                          <Box
-                            position="absolute"
-                            left={0}
-                            top={0}
-                            height="full"
-                            width={`${Math.max(tool.usd > 0 ? 2 : 0, theoreticalPct)}%`}
-                            backgroundColor="blue.200"
-                          />
-                        )}
-                        {showBilled && (
-                          <Box
-                            position="absolute"
-                            left={0}
-                            top={0}
-                            height="full"
-                            width={`${Math.max(tool.billedUsd > 0 ? 2 : 0, billedPct)}%`}
-                            backgroundColor="blue.400"
-                          />
-                        )}
-                      </Box>
-                    </Tooltip>
-                    <VStack
-                      gap={0}
-                      align="end"
-                      minWidth="90px"
-                      fontSize="sm"
-                    >
-                      {showBilled && (
-                        <Text>{fmtUsd(tool.billedUsd)}</Text>
-                      )}
-                      {showTheoretical && tool.usd - tool.billedUsd > 1e-6 && (
-                        <Text color="fg.subtle" fontSize="xs">
-                          {fmtUsd(tool.usd - tool.billedUsd)} bundled
-                        </Text>
-                      )}
-                    </VStack>
+                            <Box
+                              position="absolute"
+                              bottom={0}
+                              width="full"
+                              height="2px"
+                              borderRadius="full"
+                              backgroundColor="blue.200"
+                            />
+                            {showTheoretical && d.usd > 0 && (
+                              <Box
+                                position="absolute"
+                                bottom={0}
+                                width="full"
+                                backgroundColor="blue.200"
+                                borderRadius="sm"
+                                height={`${Math.max(2, theoreticalPct)}%`}
+                              />
+                            )}
+                            {showBilled && d.billedUsd > 0 && (
+                              <Box
+                                position="absolute"
+                                bottom={0}
+                                width="full"
+                                backgroundColor="blue.400"
+                                borderRadius="sm"
+                                height={`${Math.max(2, billedPct)}%`}
+                              />
+                            )}
+                          </Box>
+                        </Tooltip>
+                      );
+                    })}
                   </HStack>
-                );
-              })}
-            </VStack>
-          )}
-        </SectionCard>
+                  <HStack
+                    justifyContent="space-between"
+                    fontSize="xs"
+                    color="fg.muted"
+                  >
+                    <Text>{spendByDay[0]?.day}</Text>
+                    <Text>{spendByDay[spendByDay.length - 1]?.day}</Text>
+                  </HStack>
+                </VStack>
+              )}
+            </SectionCard>
 
-        <SectionCard title="Recent activity" flushContent>
-          {personalProjectId && personalProjectSlug ? (
-            <PersonalRecentTracesTable
-              projectId={personalProjectId}
-              projectSlug={personalProjectSlug}
-            />
-          ) : (
-            <EmptyState message="No requests yet" />
-          )}
-        </SectionCard>
+            <SectionCard title="By tool">
+              {spendByTool.length === 0 ? (
+                <EmptyState message="No tool data yet" />
+              ) : (
+                <VStack align="stretch" gap={3}>
+                  <CostSeriesLegend
+                    showTheoretical={showTheoretical}
+                    showBilled={showBilled}
+                    onToggleTheoretical={() => setShowTheoretical((v) => !v)}
+                    onToggleBilled={() => setShowBilled((v) => !v)}
+                  />
+                  {spendByTool.map((tool) => {
+                    const theoreticalPct = (tool.usd / maxTool) * 100;
+                    const billedPct = (tool.billedUsd / maxTool) * 100;
+                    return (
+                      <HStack key={tool.tool} gap={3}>
+                        <Text fontSize="sm" minWidth="120px">
+                          {tool.tool}
+                        </Text>
+                        <Tooltip
+                          openDelay={100}
+                          positioning={{ placement: "top" }}
+                          content={
+                            <VStack gap={0.5} align="start">
+                              <Text fontWeight="semibold">{tool.tool}</Text>
+                              <Text>Theoretical: {fmtUsd(tool.usd)}</Text>
+                              <Text>Billed: {fmtUsd(tool.billedUsd)}</Text>
+                            </VStack>
+                          }
+                        >
+                          <Box
+                            flex={1}
+                            height="14px"
+                            backgroundColor="bg.muted"
+                            borderRadius="sm"
+                            overflow="hidden"
+                            position="relative"
+                            cursor="default"
+                          >
+                            {showTheoretical && (
+                              <Box
+                                position="absolute"
+                                left={0}
+                                top={0}
+                                height="full"
+                                width={`${Math.max(tool.usd > 0 ? 2 : 0, theoreticalPct)}%`}
+                                backgroundColor="blue.200"
+                              />
+                            )}
+                            {showBilled && (
+                              <Box
+                                position="absolute"
+                                left={0}
+                                top={0}
+                                height="full"
+                                width={`${Math.max(tool.billedUsd > 0 ? 2 : 0, billedPct)}%`}
+                                backgroundColor="blue.400"
+                              />
+                            )}
+                          </Box>
+                        </Tooltip>
+                        <VStack
+                          gap={0}
+                          align="end"
+                          minWidth="90px"
+                          fontSize="sm"
+                        >
+                          {showBilled && <Text>{fmtUsd(tool.billedUsd)}</Text>}
+                          {showTheoretical &&
+                            tool.usd - tool.billedUsd > 1e-6 && (
+                              <Text color="fg.subtle" fontSize="xs">
+                                {fmtUsd(tool.usd - tool.billedUsd)} bundled
+                              </Text>
+                            )}
+                        </VStack>
+                      </HStack>
+                    );
+                  })}
+                </VStack>
+              )}
+            </SectionCard>
+
+            <SectionCard title="Recent activity" flushContent>
+              {personalProjectId && personalProjectSlug ? (
+                <PersonalRecentTracesTable
+                  projectId={personalProjectId}
+                  projectSlug={personalProjectSlug}
+                />
+              ) : (
+                <EmptyState message="No requests yet" />
+              )}
+            </SectionCard>
+          </>
+        )}
       </VStack>
     </MyLayout>
   );
@@ -350,12 +389,17 @@ function SummaryCard({
   value,
   subline,
   tone = "default",
+  muted = false,
 }: {
   title: string;
   value: string;
   subline: string;
   tone?: "default" | "red";
+  // Softens the headline value when the card has nothing to report yet, so a
+  // placeholder "$0.00 / 0 / —" reads as "waiting" rather than broken.
+  muted?: boolean;
 }) {
+  const valueColor = tone === "red" ? "red.500" : muted ? "fg.muted" : "fg";
   return (
     <Box
       borderWidth="1px"
@@ -364,21 +408,101 @@ function SummaryCard({
       padding={4}
       backgroundColor="bg.subtle"
     >
-      <Text fontSize="xs" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
+      <Text
+        fontSize="xs"
+        color="fg.muted"
+        textTransform="uppercase"
+        letterSpacing="wider"
+      >
         {title}
       </Text>
       <Text
         fontSize="2xl"
         fontWeight="semibold"
         marginTop={1}
-        color={tone === "red" ? "red.500" : "fg"}
+        color={valueColor}
       >
         {value}
       </Text>
-      <Text fontSize="sm" color={tone === "red" ? "red.500" : "fg.muted"} marginTop={1}>
+      <Text
+        fontSize="sm"
+        marginTop={1}
+        color={tone === "red" ? "red.500" : muted ? "fg.subtle" : "fg.muted"}
+      >
         {subline}
       </Text>
     </Box>
+  );
+}
+
+// Deterministic bar heights (percent) for the ghost spend preview — a gently
+// rising, jagged shape that reads as "spend over time" without implying real
+// numbers. Fixed so it never flickers or re-rolls between renders.
+const GHOST_BAR_HEIGHTS = [
+  18, 30, 22, 42, 28, 50, 34, 24, 46, 60, 38, 54, 30, 66, 44, 58, 36, 72, 50,
+  64, 40, 78, 56, 68, 46, 84, 60, 74,
+];
+
+// A faint, non-interactive placeholder chart shown before any usage lands.
+// Bars fade out toward their tips so the block reads as a preview, not data.
+function GhostSpendPreview() {
+  return (
+    <Box
+      aria-hidden="true"
+      pointerEvents="none"
+      opacity={0.6}
+      css={{
+        maskImage: "linear-gradient(to bottom, transparent 0%, black 55%)",
+        WebkitMaskImage:
+          "linear-gradient(to bottom, transparent 0%, black 55%)",
+      }}
+    >
+      <HStack gap={1} alignItems="end" height="96px">
+        {GHOST_BAR_HEIGHTS.map((height, index) => (
+          <Box
+            key={index}
+            flex={1}
+            height={`${height}%`}
+            borderRadius="sm"
+            backgroundColor="bg.emphasized"
+          />
+        ))}
+      </HStack>
+      <Box
+        height="2px"
+        marginTop={1}
+        borderRadius="full"
+        backgroundColor="border.muted"
+      />
+    </Box>
+  );
+}
+
+// The empty-state stand-in for the "Spending over time" + "By tool" panels:
+// a preview of the dashboard to come plus the one command that starts filling
+// it. Replaces two separate "no data" boxes with a single intentional panel.
+function UsagePreviewPanel() {
+  return (
+    <SectionCard title="Your dashboard, once your tools send requests">
+      <VStack align="stretch" gap={4}>
+        <GhostSpendPreview />
+        <Text fontSize="sm" color="fg.muted">
+          Your spending over time and top tools by cost appear here as soon as
+          your coding assistants and agents start sending requests.
+        </Text>
+        <VStack align="stretch" gap={2}>
+          <Text fontSize="xs" fontWeight="medium" color="fg.muted">
+            Start a session from your terminal
+          </Text>
+          <ShikiCommandBox
+            command="langwatch claude"
+            lang="bash"
+            showPrompt
+            copyLabel="Command"
+          />
+        </VStack>
+      </VStack>
+    </SectionCard>
   );
 }
 
@@ -445,7 +569,12 @@ function BudgetBanner({
   const colors =
     tone === "red"
       ? { bg: "red.50", border: "red.200", title: "red.700", text: "red.700" }
-      : { bg: "yellow.50", border: "yellow.200", title: "yellow.800", text: "yellow.800" };
+      : {
+          bg: "yellow.50",
+          border: "yellow.200",
+          title: "yellow.800",
+          text: "yellow.800",
+        };
 
   return (
     <Box
@@ -532,7 +661,12 @@ function LegendChip({
       _hover={{ opacity: active ? 0.8 : 0.65 }}
       title={active ? `Hide ${label}` : `Show ${label}`}
     >
-      <Box width="10px" height="10px" borderRadius="sm" backgroundColor={color} />
+      <Box
+        width="10px"
+        height="10px"
+        borderRadius="sm"
+        backgroundColor={color}
+      />
       <Text
         color="fg.muted"
         textDecoration={active ? undefined : "line-through"}

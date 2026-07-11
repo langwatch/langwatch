@@ -75,7 +75,13 @@ function OfferBody({
   );
 }
 
-const OfferCard: React.FC<Offer> = ({ icon, title, description, onClick, href }) => {
+const OfferCard: React.FC<Offer> = ({
+  icon,
+  title,
+  description,
+  onClick,
+  href,
+}) => {
   if (href) {
     return (
       <Link href={href} display="block" _hover={{ textDecoration: "none" }}>
@@ -92,7 +98,14 @@ const OfferCard: React.FC<Offer> = ({ icon, title, description, onClick, href })
   );
 };
 
-export function PersonalTracesEmptyState({
+/**
+ * The three getting-started offers on their own — a coding assistant, an
+ * ingestion key, an API key. Rendered inside the recent-activity hero
+ * (`PersonalTracesEmptyState`) and, standalone, as the "Get started" panel
+ * of the /me usage section's empty state. Shared so the two surfaces can't
+ * drift apart.
+ */
+export function PersonalGetStartedOffers({
   projectSlug,
 }: {
   projectSlug?: string | null;
@@ -123,6 +136,20 @@ export function PersonalTracesEmptyState({
   ];
 
   return (
+    <SimpleGrid columns={{ base: 1, md: 3 }} gap={3}>
+      {offers.map((offer) => (
+        <OfferCard key={offer.title} {...offer} />
+      ))}
+    </SimpleGrid>
+  );
+}
+
+export function PersonalTracesEmptyState({
+  projectSlug,
+}: {
+  projectSlug?: string | null;
+}) {
+  return (
     <IntegratePaneShell isCompact ariaLabel="Start sending your AI usage">
       <VStack align="stretch" gap={6}>
         <VStack align="start" gap={1.5}>
@@ -136,14 +163,10 @@ export function PersonalTracesEmptyState({
           </Text>
           <Text textStyle="sm" color="fg.muted" lineHeight="tall">
             Send your AI usage to LangWatch with the tools you already have set
-            up above — no SDK wiring required.
+            up above, no SDK wiring required.
           </Text>
         </VStack>
-        <SimpleGrid columns={{ base: 1, md: 3 }} gap={3}>
-          {offers.map((offer) => (
-            <OfferCard key={offer.title} {...offer} />
-          ))}
-        </SimpleGrid>
+        <PersonalGetStartedOffers projectSlug={projectSlug} />
       </VStack>
     </IntegratePaneShell>
   );
