@@ -424,4 +424,148 @@ describe("LangyCredentialService", () => {
       });
     });
   });
+
+  // Per-project Langy egress allow-list (ADR-043). Read by /langy/chat and
+  // threaded into the credentials envelope; the agent's egress adapter is
+  // constructed with it at spawn. null/empty = monitor-only (watch, never
+  // block); a set list = the enforced set (floor ∪ list). Parsed through Zod so
+  // a drifted column fails closed rather than silently disabling enforcement.
+  describe("getEgressAllowlist", () => {
+    function makePrismaWithProject(langyEgressAllowlist: unknown) {
+      const findUnique = vi.fn().mockResolvedValue({ langyEgressAllowlist });
+      return {
+        project: { findUnique },
+      } as any;
+    }
+
+    describe("when the project has no allow-list column value", () => {
+      it("returns null — monitor-only (watch, never block)", async () => {
+        const prisma = makePrismaWithProject(null);
+        const svc = new LangyCredentialService(prisma);
+
+        expect(
+          await svc.getEgressAllowlist({ projectId: "p1" }),
+        ).toBeNull();
+        // Reads the Project by its own id (the tenancy filter) and selects only
+        // the column — no cross-project value can be returned.
+        expect(prisma.project.findUnique).toHaveBeenCalledWith({
+          where: { id: "p1" },
+          select: { langyEgressAllowlist: true },
+        });
+      });
+    });
+
+    describe("when the allow-list is an empty array", () => {
+      it("returns null — empty is equivalent to unset (monitor-only)", async () => {
+        const prisma = makePrismaWithProject([]);
+        const svc = new LangyCredentialService(prisma);
+
+        expect(await svc.getEgressAllowlist({ projectId: "p1" })).toBeNull();
+      });
+    });
+
+    describe("when the allow-list has host patterns", () => {
+      it("returns the array — the enforced set", async () => {
+        const prisma = makePrismaWithProject([
+          "registry.npmjs.org",
+          "*.internal.acme.com",
+        ]);
+        const svc = new LangyCredentialService(prisma);
+
+        expect(await svc.getEgressAllowlist({ projectId: "p1" })).toEqual([
+          "registry.npmjs.org",
+          "*.internal.acme.com",
+        ]);
+      });
+    });
+
+    describe("when the project does not exist", () => {
+      it("returns null", async () => {
+        const prisma = { project: { findUnique: vi.fn().mockResolvedValue(null) } } as any;
+        const svc = new LangyCredentialService(prisma);
+
+        expect(await svc.getEgressAllowlist({ projectId: "missing" })).toBeNull();
+      });
+    });
+
+    describe("when the column value is malformed (a drifted non-array)", () => {
+      it("throws (via Zod) — a silent-disable would open egress", async () => {
+        const prisma = makePrismaWithProject("attacker.example.com");
+        const svc = new LangyCredentialService(prisma);
+
+        await expect(
+          svc.getEgressAllowlist({ projectId: "p1" }),
+        ).rejects.toThrow();
+      });
+    });
+
+    describe("when an entry is not a valid host pattern", () => {
+      it("throws — a bad pattern must not persist to the enforced set", async () => {
+        const prisma = makePrismaWithProject(["not a host!!"]);
+        const svc = new LangyCredentialService(prisma);
+
+        await expect(
+          svc.getEgressAllowlist({ projectId: "p1" }),
+        ).rejects.toThrow();
+      });
+    });
+  });
+
+  describe("setEgressAllowlist", () => {
+    function makePrismaForWrite() {
+      const update = vi.fn().mockResolvedValue({});
+      return { prisma: { project: { update } } as any, update };
+    }
+
+    describe("when given host patterns", () => {
+      it("normalises (trim / lowercase / drop trailing dot) and writes them", async () => {
+        const { prisma, update } = makePrismaForWrite();
+        const svc = new LangyCredentialService(prisma);
+
+        const saved = await svc.setEgressAllowlist({
+          projectId: "p1",
+          allowlist: ["Registry.NPMjs.org.", "  *.Internal.Acme.com "],
+        });
+
+        expect(saved).toEqual(["registry.npmjs.org", "*.internal.acme.com"]);
+        expect(update).toHaveBeenCalledWith({
+          where: { id: "p1" },
+          data: { langyEgressAllowlist: ["registry.npmjs.org", "*.internal.acme.com"] },
+        });
+      });
+    });
+
+    describe("when given an empty list", () => {
+      it("clears the column to database NULL (back to monitor-only)", async () => {
+        const { prisma, update } = makePrismaForWrite();
+        const svc = new LangyCredentialService(prisma);
+
+        const saved = await svc.setEgressAllowlist({
+          projectId: "p1",
+          allowlist: [],
+        });
+
+        expect(saved).toBeNull();
+        // DbNull writes SQL NULL for a nullable Json column; [] would read back
+        // as "empty" which the resolver already treats as null, but null is the
+        // canonical unset state.
+        expect(update).toHaveBeenCalledWith({
+          where: { id: "p1" },
+          data: { langyEgressAllowlist: Prisma.DbNull },
+        });
+      });
+    });
+
+    describe("when given an invalid host pattern", () => {
+      it("throws before writing anything", async () => {
+        const { prisma, update } = makePrismaForWrite();
+        const svc = new LangyCredentialService(prisma);
+
+        await expect(
+          svc.setEgressAllowlist({ projectId: "p1", allowlist: ["bad host"] }),
+        ).rejects.toThrow();
+        expect(update).not.toHaveBeenCalled();
+      });
+    });
+  });
 });

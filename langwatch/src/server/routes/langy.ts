@@ -378,6 +378,29 @@ langyRoute().post("/langy/chat", async (c) => {
     throw error;
   }
 
+  // Resolve the project's Langy egress allow-list (ADR-043) and attach it to
+  // the credentials envelope. The presence of the list is the mode: null ⇒ the
+  // worker's egress adapter watches but blocks nothing; a set list ⇒ the
+  // adapter restricts outbound to floor ∪ this list. It rides the same /chat
+  // body every other capability does — no second channel — and is bound at
+  // worker spawn (a change recycles the worker on its next turn). A drifted
+  // column throws in getEgressAllowlist and fails closed here; surface a 409
+  // rather than silently running with enforcement disabled.
+  try {
+    const egressAllowlist = await credentialService.getEgressAllowlist({
+      projectId,
+    });
+    if (egressAllowlist) {
+      credentials.egressAllowlist = egressAllowlist;
+    }
+  } catch (error) {
+    logger.error({ error, projectId }, "failed to resolve Langy egress allow-list");
+    return c.json(
+      { error: "Langy egress policy is misconfigured for this project." },
+      { status: 409 },
+    );
+  }
+
   // Defense in depth: when a `modelOverride` rides in, enforce the project's
   // Langy VK allowlist HERE — don't trust the picker UI to gate it. If the VK
   // has no allowlist (modelsAllowed=null), the gateway is still the final
