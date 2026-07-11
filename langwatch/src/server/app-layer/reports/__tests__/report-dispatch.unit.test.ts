@@ -42,20 +42,25 @@ function makeDeps(
   deps: ReportDispatchDeps;
   sendEmail: ReturnType<typeof vi.fn>;
   sendSlack: ReturnType<typeof vi.fn>;
+  sendSlackBot: ReturnType<typeof vi.fn>;
   listTraceRows: ReturnType<typeof vi.fn>;
 } {
   const sendEmail = vi.fn(async () => undefined);
   const sendSlack = vi.fn(async () => undefined);
+  const sendSlackBot = vi.fn(async () => undefined);
   const listTraceRows = vi.fn(async () => opts.rows ?? []);
   return {
     sendEmail,
     sendSlack,
+    sendSlackBot,
     listTraceRows,
     deps: {
       loadTrigger: vi.fn(async () => trigger),
       loadProject: vi.fn(async () => PROJECT),
       sendEmail: sendEmail as unknown as ReportDispatchDeps["sendEmail"],
       sendSlack: sendSlack as unknown as ReportDispatchDeps["sendSlack"],
+      sendSlackBot:
+        sendSlackBot as unknown as ReportDispatchDeps["sendSlackBot"],
       filterSuppressedRecipients: vi.fn(async ({ emails }) => emails),
       listTraceRows:
         listTraceRows as unknown as ReportDispatchDeps["listTraceRows"],

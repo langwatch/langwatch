@@ -2,6 +2,7 @@ import type { Project, Trigger } from "@prisma/client";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import type { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import type { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { ALERT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import {
@@ -33,6 +34,10 @@ export interface GraphAlertDispatchInput {
    *  `trigger.actionParams`. */
   recipients: string[];
   slackWebhook: string | null;
+  /** ADR-041 Slack bot connection: resolved token + channel, pre-extracted
+   *  (and decrypted) from `trigger.actionParams` by the evaluator. When set,
+   *  the alert posts via the Web API with gated blocks instead of the webhook. */
+  botDestination?: { token: string; channel: string } | null;
 }
 
 export interface GraphAlertDispatchDeps {
@@ -45,6 +50,9 @@ export interface GraphAlertDispatchDeps {
   /** Slack sender — same `sendRenderedSlackMessage` the trace cadence
    *  dispatcher uses. */
   sendSlack: typeof sendRenderedSlackMessage;
+  /** Slack Web API sender for bot connections — same `postSlackChatMessage`
+   *  the trace cadence dispatcher uses. */
+  sendSlackBot: typeof postSlackChatMessage;
   /**
    * ADR-031 email suppression gate. The event-sourced graph-alert path
    * renders the SAME one-click-unsubscribe footer + `List-Unsubscribe`
@@ -179,6 +187,42 @@ export async function dispatchGraphAlertAction({
   }
 
   if (trigger.action === "SEND_SLACK_MESSAGE") {
+    const templateType: SlackTemplateType | null =
+      trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
+
+    // Bot connection (ADR-041): post via the Web API with the gate open so the
+    // alert's chart/table/alert blocks render.
+    if (input.botDestination) {
+      const rendered = await renderTriggerSlack({
+        templateType,
+        template: trigger.slackTemplate,
+        context,
+        defaults: {
+          slackString: defaults.slackString,
+          slackBlockKit: defaults.slackBlockKit,
+        },
+        allowGatedBlocks: true,
+      });
+      if (rendered.errors.length > 0) {
+        logger.warn(
+          { triggerId: trigger.id, projectId: project.id, errors: rendered.errors },
+          "Graph-alert Slack render errors — fell back to default",
+        );
+      }
+      await deps.sendSlackBot({
+        token: input.botDestination.token,
+        channel: input.botDestination.channel,
+        payload: rendered.payload,
+        triggerName: trigger.name,
+      });
+      return {
+        channel: "slack",
+        didSend: true,
+        missingVariables: rendered.missingVariables,
+        renderErrors: rendered.errors,
+      };
+    }
+
     if (!slackWebhook) {
       logger.info(
         { triggerId: trigger.id, projectId: project.id },
@@ -191,8 +235,6 @@ export async function dispatchGraphAlertAction({
         renderErrors: [],
       };
     }
-    const templateType: SlackTemplateType | null =
-      trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
     const rendered = await renderTriggerSlack({
       templateType,
       template: trigger.slackTemplate,

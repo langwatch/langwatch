@@ -57,6 +57,7 @@ import { formatTraceReportRow } from "./reports/trace-report-row";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./triggers/report.builder";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { EventSourcing } from "../event-sourcing";
 import { dispatchOutboxEnqueues } from "../event-sourcing/outbox/dispatchOutboxEnqueues";
 import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
@@ -728,6 +729,7 @@ export function initializeDefaultApp(options?: {
               prisma.project.findUnique({ where: { id: projectId } }),
             sendEmail: sendRenderedTriggerEmail,
             sendSlack: sendRenderedSlackMessage,
+            sendSlackBot: postSlackChatMessage,
             filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
               emailSuppressions.filterSuppressed({
                 projectId,

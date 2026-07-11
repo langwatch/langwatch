@@ -2,8 +2,14 @@ import type { Project, Trigger } from "@prisma/client";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import { extractReportFromTriggerRow } from "~/server/app-layer/triggers/report.builder";
 import type { ReportSource } from "~/server/app-layer/triggers/report.builder";
+import { decryptSlackBotToken } from "~/automations/providers/definitions/slack/secret";
+import {
+  type SlackActionParams,
+  slackDeliveryMethodOf,
+} from "~/automations/providers/definitions/slack/shared";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import type { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import type { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { REPORT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import {
@@ -23,6 +29,7 @@ export interface ReportDispatchDeps {
   loadProject(projectId: string): Promise<Project | null>;
   sendEmail: typeof sendRenderedTriggerEmail;
   sendSlack: typeof sendRenderedSlackMessage;
+  sendSlackBot: typeof postSlackChatMessage;
   filterSuppressedRecipients: (params: {
     projectId: string;
     triggerId: string;
@@ -204,18 +211,42 @@ export async function dispatchScheduledReport({
   }
 
   if (trigger.action === "SEND_SLACK_MESSAGE") {
-    const webhook = params.slackWebhook ?? null;
-    if (!webhook) return;
     const templateType: SlackTemplateType | null =
       trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
+    const slackDefaults = {
+      slackString: REPORT_TRIGGER_DEFAULTS.slackString,
+      slackBlockKit: REPORT_TRIGGER_DEFAULTS.slackBlockKit,
+    };
+
+    // ADR-041: a bot connection posts via the Web API with the gate open.
+    const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
+    if (slackDeliveryMethodOf(slackParams) === "bot") {
+      const token = decryptSlackBotToken(slackParams);
+      const channel = slackParams.slackChannelId?.trim();
+      if (!token || !channel) return;
+      const rendered = await renderTriggerSlack({
+        templateType,
+        template: trigger.slackTemplate,
+        context,
+        defaults: slackDefaults,
+        allowGatedBlocks: true,
+      });
+      await deps.sendSlackBot({
+        token,
+        channel,
+        payload: rendered.payload,
+        triggerName: trigger.name,
+      });
+      return;
+    }
+
+    const webhook = params.slackWebhook ?? null;
+    if (!webhook) return;
     const rendered = await renderTriggerSlack({
       templateType,
       template: trigger.slackTemplate,
       context,
-      defaults: {
-        slackString: REPORT_TRIGGER_DEFAULTS.slackString,
-        slackBlockKit: REPORT_TRIGGER_DEFAULTS.slackBlockKit,
-      },
+      defaults: slackDefaults,
     });
     await deps.sendSlack({
       triggerWebhook: webhook,

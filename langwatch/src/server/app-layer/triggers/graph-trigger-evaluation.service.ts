@@ -31,6 +31,11 @@ import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { sumMetricAcrossGroups } from "~/pages/api/cron/triggers/customGraphTrigger";
 import type { ActionParams } from "~/pages/api/cron/triggers/types";
+import { decryptSlackBotToken } from "~/automations/providers/definitions/slack/secret";
+import {
+  type SlackActionParams,
+  slackDeliveryMethodOf,
+} from "~/automations/providers/definitions/slack/shared";
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
 import type {
   SeriesInputType,
@@ -360,12 +365,23 @@ export async function evaluateGraphTrigger({
       baseHost: deps.baseHost,
     });
 
+    // ADR-041: a bot connection posts via the Web API (gated blocks render);
+    // extract + decrypt the token here so the dispatch helper stays crypto-free.
+    const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
+    let botDestination: { token: string; channel: string } | null = null;
+    if (slackDeliveryMethodOf(slackParams) === "bot") {
+      const token = decryptSlackBotToken(slackParams);
+      const channel = slackParams.slackChannelId?.trim();
+      if (token && channel) botDestination = { token, channel };
+    }
+
     await deps.notifier.dispatch({
       trigger,
       project,
       context,
       recipients: params.members ?? [],
       slackWebhook: params.slackWebhook ?? null,
+      botDestination,
     });
 
     // Record the fire BEFORE updateLastRunAt — same order as the cron
