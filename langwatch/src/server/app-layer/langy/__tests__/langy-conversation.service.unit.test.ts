@@ -37,7 +37,6 @@ function makeCommands(
     startAgentTurn: vi.fn(async () => {}),
     recordToolCallStarted: vi.fn(async () => {}),
     recordToolCallCompleted: vi.fn(async () => {}),
-    recordAgentResponded: vi.fn(async () => {}),
     failAgentTurn: vi.fn(async () => {}),
     reconcileAgentTurn: vi.fn(async () => {}),
     archiveConversation: vi.fn(async () => {}),

@@ -1,7 +1,5 @@
 import { LANGY_CONVERSATION_EVENT_TYPES } from "./constants";
 import type {
-  LangyAgentRespondedEvent,
-  LangyAgentTurnCompletedEvent,
   LangyAgentTurnFailedEvent,
   LangyAgentTurnStartedEvent,
   LangyConversationArchivedEvent,
@@ -38,18 +36,6 @@ export function isLangyToolCallCompletedEvent(
   event: LangyConversationProcessingEvent,
 ): event is LangyToolCallCompletedEvent {
   return event.type === LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_COMPLETED;
-}
-
-export function isLangyAgentRespondedEvent(
-  event: LangyConversationProcessingEvent,
-): event is LangyAgentRespondedEvent {
-  return event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED;
-}
-
-export function isLangyAgentTurnCompletedEvent(
-  event: LangyConversationProcessingEvent,
-): event is LangyAgentTurnCompletedEvent {
-  return event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_COMPLETED;
 }
 
 export function isLangyAgentTurnFailedEvent(

@@ -5,7 +5,6 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "./schemas/constants";
 import {
-  langyAgentRespondedEventDataSchema,
   langyAgentTurnFailedEventDataSchema,
   langyConversationArchivedEventDataSchema,
   langyConversationHandoffConsumedEventDataSchema,
@@ -104,24 +103,6 @@ export const RecordToolCallCompletedCommand = defineCommand({
   }),
   makeJobId: (d) =>
     `${d.tenantId}:${d.conversationId}:tool-done:${d.toolCallId}`,
-});
-
-/** RecordAgentResponded → agent_responded (an intermediate assistant response). */
-export const RecordAgentRespondedCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECORD_AGENT_RESPONDED,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
-  aggregateType: "langy_conversation",
-  schema: langyAgentRespondedEventDataSchema,
-  aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:responded:${d.turnId}:${d.occurredAt}`,
-  spanAttributes: (d) => ({
-    "payload.conversation.id": d.conversationId,
-    "payload.turn.id": d.turnId,
-  }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.conversationId}:responded:${d.turnId}:${d.occurredAt}`,
 });
 
 /**
