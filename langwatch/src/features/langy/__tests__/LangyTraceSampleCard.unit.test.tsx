@@ -12,7 +12,7 @@ import { LangyTraceSampleCard } from "../components/capabilities/LangyTraceSampl
 import type { CapabilityDescriptor } from "../components/capabilities/capabilityRegistry";
 
 const descriptor: CapabilityDescriptor = {
-  render: "traceSample",
+  render: "traces",
   tone: "read",
   surface: "traces",
   overline: "Traces",

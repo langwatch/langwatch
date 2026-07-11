@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { resolveCapability } from "../components/capabilities/capabilityRegistry";
-import { CARD_BY_FEATURE } from "../components/capabilities/cliCardMap";
+import {
+  resolveCapability,
+  SURFACE_BY_FEATURE,
+} from "../components/capabilities/capabilityRegistry";
 import { FEATURES } from "~/shared/langy/featureMap";
 
 describe("resolveCapability, given a LangWatch CLI tool call", () => {
   describe("when the CLI searched traces", () => {
     it("renders the trace-sample card, which shows the matched traces themselves", () => {
       expect(resolveCapability("langwatch.trace.search")).toEqual({
-        render: "traceSample",
+        render: "traces",
         tone: "read",
         surface: "traces",
         overline: "Traces",
@@ -114,7 +116,7 @@ describe("the card binding, given feature-map.json is the source of structure", 
   describe("when a card is bound to a feature", () => {
     it("binds only to features the map actually declares", () => {
       const featureIds = new Set(FEATURES.map((feature) => feature.id));
-      const unknown = Object.keys(CARD_BY_FEATURE).filter(
+      const unknown = Object.keys(SURFACE_BY_FEATURE).filter(
         (id) => !featureIds.has(id),
       );
 
@@ -125,7 +127,7 @@ describe("the card binding, given feature-map.json is the source of structure", 
       const unresolved: string[] = [];
 
       for (const feature of FEATURES) {
-        if (!CARD_BY_FEATURE[feature.id]) continue;
+        if (!SURFACE_BY_FEATURE[feature.id]) continue;
         for (const command of feature.cli) {
           const [resource, verb] = command.split(/\s+/);
           if (!resolveCapability(`langwatch.${resource}.${verb}`)) {

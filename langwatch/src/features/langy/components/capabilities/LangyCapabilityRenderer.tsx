@@ -98,9 +98,10 @@ function CapabilityCard({
 }) {
   const props = { descriptor, input, output, projectSlug };
   switch (descriptor.render) {
-    case "traceSample":
-      return <LangyTraceSampleCard {...props} />;
+    // `traces` is a trace SEARCH — the sample card, matched traces plus a way
+    // through to the Trace Explorer. `trace` is a single `get`.
     case "traces":
+      return <LangyTraceSampleCard {...props} />;
     case "trace":
       return <LangyTracesCard {...props} />;
     case "metrics":

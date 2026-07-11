@@ -18,9 +18,9 @@
  * How a result LOOKS is not in the map and must not be: the Langy panel is one
  * view of these features among several (sidebar, docs, CLI itself), and each
  * binds its own rendering on top of the same facts. Langy's binding lives in
- * `cliCardMap.ts` (which card) and `cliFollowUps.ts` (which offer, in which
- * words), both keyed by feature id — so they can drift in presentation without
- * ever drifting in structure.
+ * `capabilityRegistry.ts` (which surface, keyed by feature id — the card itself
+ * comes from the shared `@langwatch/cli-cards` contract) and `cliFollowUps.ts`
+ * (which offer, in which words) — so presentation can drift without structure.
  *
  * @see specs/langy/langy-cli-tool-envelope.feature
  */
