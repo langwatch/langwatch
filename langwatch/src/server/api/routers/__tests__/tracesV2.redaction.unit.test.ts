@@ -3,6 +3,7 @@ import type { ContentCategory } from "~/server/data-privacy/dataPrivacy.types";
 import type { CategoryVisibility } from "~/server/traces/protections";
 import {
   buildContentPrivacy,
+  gateTraceLogVisibility,
   redactTraceLogContent,
   redactV2Content,
   type TraceLogRecordDto,
@@ -454,6 +455,105 @@ describe("redactTraceLogContent", () => {
       expect(
         redactTraceLogContent(assistantResponse, inputOnly).attributes.body,
       ).toBeUndefined();
+    });
+  });
+});
+
+/**
+ * R2 teaser window: the sibling span reads teaser-redact spans older than the
+ * free-plan visibility cutoff, but the `traceLogs` read applied only the
+ * captured-content permission gate — so a free-plan viewer WITH captured-content
+ * permission could read raw prompts / responses older than their window through
+ * the logs endpoint, a bypass of the teaser the span reads enforce.
+ * `gateTraceLogVisibility` closes that.
+ */
+describe("gateTraceLogVisibility", () => {
+  function logRow(
+    attributes: Record<string, string>,
+    timeUnixMs: number,
+    body = attributes.body ?? attributes["event.name"] ?? "",
+  ): TraceLogRecordDto {
+    return {
+      spanId: "77bb432be48046f6",
+      timeUnixMs,
+      body,
+      attributes,
+      resourceAttributes: { "langwatch.origin": "coding_agent" },
+      scopeName: "com.anthropic.claude_code.events",
+      scopeVersion: null,
+    };
+  }
+
+  const full = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
+  const CUTOFF = 1_000;
+
+  describe("given a free-plan cutoff and a record older than the window", () => {
+    const stale = logRow(
+      { "event.name": "assistant_response", body: "old private answer" },
+      CUTOFF - 1,
+    );
+
+    it("withholds the content even for a viewer allowed to see it", () => {
+      const out = gateTraceLogVisibility(stale, full, CUTOFF);
+
+      expect(out.attributes.body).toBeUndefined();
+      expect(out.bodyRedacted).toBe(true);
+      expect(JSON.stringify(out)).not.toContain("old private answer");
+    });
+
+    it("offers no audience label — a plan gate is not an audience gate", () => {
+      const out = gateTraceLogVisibility(
+        stale,
+        { ...full, capturedOutputVisibleTo: "Admins" },
+        CUTOFF,
+      );
+
+      expect(out.bodyVisibleTo).toBeNull();
+    });
+
+    it("keeps a stale cost anchor's metadata (no content body to withhold)", () => {
+      const anchor = logRow(
+        { "event.name": "api_request", request_id: "req_1", cost_usd: "0.19" },
+        CUTOFF - 1,
+      );
+
+      const out = gateTraceLogVisibility(anchor, full, CUTOFF);
+
+      expect(out.attributes.cost_usd).toBe("0.19");
+      expect(out.bodyRedacted).toBeUndefined();
+    });
+  });
+
+  describe("given a free-plan cutoff and a record inside the window", () => {
+    const fresh = logRow(
+      { "event.name": "assistant_response", body: "recent answer" },
+      CUTOFF + 1,
+    );
+
+    it("falls through to the viewer's captured-content permission", () => {
+      expect(gateTraceLogVisibility(fresh, full, CUTOFF).attributes.body).toBe(
+        "recent answer",
+      );
+      expect(
+        gateTraceLogVisibility(
+          fresh,
+          { canSeeCapturedInput: false, canSeeCapturedOutput: false },
+          CUTOFF,
+        ).attributes.body,
+      ).toBeUndefined();
+    });
+  });
+
+  describe("given a paid plan with no window (cutoff null)", () => {
+    it("leaves the permission gate in sole control, even for an old record", () => {
+      const old = logRow(
+        { "event.name": "assistant_response", body: "answer" },
+        1,
+      );
+
+      expect(gateTraceLogVisibility(old, full, null).attributes.body).toBe(
+        "answer",
+      );
     });
   });
 });
