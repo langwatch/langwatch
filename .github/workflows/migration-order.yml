@@ -29,9 +29,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # The PR head itself, not the merge commit actions/checkout defaults to.
+      # A merge commit already carries the base branch's migrations, which is the
+      # very thing this check is comparing the branch against.
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
 

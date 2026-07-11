@@ -1,6 +1,7 @@
 package migrationorder
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strconv"
@@ -11,6 +12,9 @@ import (
 // the branch head, and the merge base the branch forked at.
 type Input struct {
 	Set Set
+	// BaseRef is the ref being compared against, e.g. "origin/main". It names the
+	// branch in the findings and in the commands that fix them.
+	BaseRef string
 	// Base are the entries on the tip of the base branch.
 	Base []string
 	// Head are the entries on the branch head.
@@ -45,13 +49,15 @@ func Check(in Input) []Finding {
 		existing[entry] = true
 	}
 
+	base := strings.TrimPrefix(in.BaseRef, "origin/")
+
 	for _, entry := range slices.Sorted(slices.Values(in.Touched)) {
 		if existing[entry] {
 			findings = append(findings, Finding{
 				Set:     in.Set.Name,
 				Entry:   entry,
 				Problem: "already merged, and migrations that have run somewhere cannot change",
-				Fix:     fmt.Sprintf("git checkout origin/main -- %s/%s", in.Set.Directory, entry),
+				Fix:     fmt.Sprintf("git checkout %s -- %s/%s", in.BaseRef, in.Set.Directory, entry),
 			})
 		}
 	}
@@ -74,7 +80,7 @@ func Check(in Input) []Finding {
 		}
 		added = append(added, migration{entry: entry, key: key})
 	}
-	slices.SortFunc(added, func(a, b migration) int { return int(a.key - b.key) })
+	slices.SortFunc(added, func(a, b migration) int { return cmp.Compare(a.key, b.key) })
 
 	// Suggested keys are handed out above everything in play — the newest on the
 	// base branch and anything this branch already numbered — so a suggestion
@@ -101,14 +107,14 @@ func Check(in Input) []Finding {
 			findings = append(findings, Finding{
 				Set:     in.Set.Name,
 				Entry:   m.entry,
-				Problem: fmt.Sprintf("takes key %d, which %s already took on main", m.key, taken[m.key]),
+				Problem: fmt.Sprintf("takes key %d, which %s already took on %s", m.key, taken[m.key], base),
 				Fix:     suggest(m.entry),
 			})
 		case m.key < highest:
 			findings = append(findings, Finding{
 				Set:     in.Set.Name,
 				Entry:   m.entry,
-				Problem: fmt.Sprintf("is numbered below %d, the newest migration on main, so it runs out of order or not at all", highest),
+				Problem: fmt.Sprintf("is numbered below %d, the newest migration on %s, so it runs out of order or not at all", highest, base),
 				Fix:     suggest(m.entry),
 			})
 		case twin:

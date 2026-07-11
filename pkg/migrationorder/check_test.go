@@ -31,6 +31,7 @@ func TestCheck(t *testing.T) {
 			name: "a migration numbered above everything on main is in order",
 			in: migrationorder.Input{
 				Set:       clickhouse,
+				BaseRef:   "origin/main",
 				Base:      []string{"00040_a.sql", "00041_b.sql"},
 				MergeBase: []string{"00040_a.sql", "00041_b.sql"},
 				Head:      []string{"00040_a.sql", "00041_b.sql", "00042_c.sql"},
@@ -40,6 +41,7 @@ func TestCheck(t *testing.T) {
 			name: "a branch that adds no migrations is in order",
 			in: migrationorder.Input{
 				Set:       clickhouse,
+				BaseRef:   "origin/main",
 				Base:      []string{"00040_a.sql"},
 				MergeBase: []string{"00040_a.sql"},
 				Head:      []string{"00040_a.sql"},
@@ -49,6 +51,7 @@ func TestCheck(t *testing.T) {
 			name: "migrations already on main are not judged, keyless or duplicated",
 			in: migrationorder.Input{
 				Set:       prisma,
+				BaseRef:   "origin/main",
 				Base:      []string{"0_init", "20260227120000_one", "20260227120000_two"},
 				MergeBase: []string{"0_init", "20260227120000_one", "20260227120000_two"},
 				Head:      []string{"0_init", "20260227120000_one", "20260227120000_two", "20260301000000_mine"},
@@ -58,6 +61,7 @@ func TestCheck(t *testing.T) {
 			name: "a key another branch merged first is reported with a rename",
 			in: migrationorder.Input{
 				Set:       clickhouse,
+				BaseRef:   "origin/main",
 				Base:      []string{"00040_a.sql", "00041_theirs.sql"},
 				MergeBase: []string{"00040_a.sql"},
 				Head:      []string{"00040_a.sql", "00041_theirs.sql", "00041_mine.sql"},
@@ -74,6 +78,7 @@ func TestCheck(t *testing.T) {
 			name: "a migration numbered below the newest on main is reported with a rename",
 			in: migrationorder.Input{
 				Set:       clickhouse,
+				BaseRef:   "origin/main",
 				Base:      []string{"00040_a.sql", "00041_b.sql", "00042_c.sql"},
 				MergeBase: []string{"00040_a.sql"},
 				Head:      []string{"00040_a.sql", "00041_b.sql", "00042_c.sql", "00039_mine.sql"},
@@ -90,6 +95,7 @@ func TestCheck(t *testing.T) {
 			name: "a Prisma migration timestamped before one already merged is renamed to now",
 			in: migrationorder.Input{
 				Set:       prisma,
+				BaseRef:   "origin/main",
 				Base:      []string{"20260101000000_old", "20260708150000_theirs"},
 				MergeBase: []string{"20260101000000_old"},
 				Head:      []string{"20260101000000_old", "20260708150000_theirs", "20260702090000_mine"},
@@ -107,6 +113,7 @@ func TestCheck(t *testing.T) {
 			name: "a merged migration that the branch edits is reported with a restore",
 			in: migrationorder.Input{
 				Set:       clickhouse,
+				BaseRef:   "origin/main",
 				Base:      []string{"00040_a.sql"},
 				MergeBase: []string{"00040_a.sql"},
 				Head:      []string{"00040_a.sql"},
@@ -123,6 +130,7 @@ func TestCheck(t *testing.T) {
 			name: "editing a migration the branch added itself is in order",
 			in: migrationorder.Input{
 				Set:       clickhouse,
+				BaseRef:   "origin/main",
 				Base:      []string{"00040_a.sql"},
 				MergeBase: []string{"00040_a.sql"},
 				Head:      []string{"00040_a.sql", "00041_mine.sql"},
@@ -133,6 +141,7 @@ func TestCheck(t *testing.T) {
 			name: "two migrations in one branch sharing a key are both reported",
 			in: migrationorder.Input{
 				Set:       clickhouse,
+				BaseRef:   "origin/main",
 				Base:      []string{"00040_a.sql"},
 				MergeBase: []string{"00040_a.sql"},
 				Head:      []string{"00040_a.sql", "00041_one.sql", "00041_two.sql"},
@@ -157,8 +166,9 @@ func TestCheck(t *testing.T) {
 		{
 			name: "a migration with no ordering key is reported with the naming format",
 			in: migrationorder.Input{
-				Set:  clickhouse,
-				Head: []string{"add-thing.sql"},
+				Set:     clickhouse,
+				BaseRef: "origin/main",
+				Head:    []string{"add-thing.sql"},
 			},
 			want: []migrationorder.Finding{{
 				Set:     "ClickHouse",

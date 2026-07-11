@@ -1,6 +1,7 @@
 package migrationorder
 
 import (
+	"bytes"
 	"fmt"
 	"os/exec"
 	"slices"
@@ -44,6 +45,7 @@ func (r Repo) Inputs(baseRef string) ([]Input, error) {
 		}
 		inputs = append(inputs, Input{
 			Set:       set,
+			BaseRef:   baseRef,
 			Base:      base,
 			Head:      head,
 			MergeBase: forked,
@@ -71,9 +73,11 @@ func (r Repo) touchedSince(baseRef, directory string) ([]string, error) {
 
 func (r Repo) git(args ...string) (string, error) {
 	cmd := exec.Command("git", append([]string{"-C", r.Root}, args...)...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
+		return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
 	}
 	return string(out), nil
 }
