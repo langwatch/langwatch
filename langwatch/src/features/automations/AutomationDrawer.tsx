@@ -143,6 +143,7 @@ export function AutomationDrawer({
   initialName,
   initialAction,
   initialFilters,
+  initialFilterQuery,
 }: {
   automationId?: string;
   /** Marker query param set by the email "Edit automation" footer link so the
@@ -164,6 +165,10 @@ export function AutomationDrawer({
   initialName?: string;
   initialAction?: string;
   initialFilters?: string;
+  /** ADR-043 Subject facet: a Traces-V2 liqe query to seed a fresh trace
+   *  automation with — set by the traces view's "Automate" button so the
+   *  current filter becomes the automation's subject. */
+  initialFilterQuery?: string;
 }) {
   const { project, organization, team } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
@@ -250,7 +255,13 @@ export function AutomationDrawer({
   useEffect(() => {
     if (automationId) return;
     if (prefilledFromParams.current) return;
-    if (!initialSource && !initialName && !initialAction && !initialFilters) {
+    if (
+      !initialSource &&
+      !initialName &&
+      !initialAction &&
+      !initialFilters &&
+      !initialFilterQuery
+    ) {
       return;
     }
     if (initialSource === "customGraph") {
@@ -287,6 +298,15 @@ export function AutomationDrawer({
       } catch {
         // Ignore malformed prefill — the user sets conditions themselves.
       }
+    }
+    // ADR-043: seed the trace-subject query from the traces view's Automate
+    // button. Only for a trace automation — customGraph/report don't carry one.
+    if (
+      initialFilterQuery &&
+      initialSource !== "customGraph" &&
+      initialSource !== "report"
+    ) {
+      dispatch({ type: "SET_FILTER_QUERY", value: initialFilterQuery });
     }
     prefilledFromParams.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -344,6 +364,9 @@ export function AutomationDrawer({
       alertType: row.alertType,
       source: row.customGraphId ? "customGraph" : "trace",
       customGraphId: row.customGraphId,
+      // ADR-043: a trace automation edited from a saved row keeps its liqe
+      // query so the Subject editor rehydrates it (null for legacy rows).
+      filterQuery: row.filterQuery ?? null,
       // Pull the threshold rule out of actionParams when this row is a
       // graph alert so the threshold form pre-populates on edit.
       graphAlert: row.customGraphId
@@ -652,6 +675,11 @@ export function AutomationDrawer({
         action: draft.action,
         alertType: draft.alertType ?? undefined,
         filters: draft.source === "customGraph" ? {} : draft.filters,
+        // ADR-043 Subject facet: send the liqe query for a trace automation;
+        // when set the router persists `filters` as `{}` and matches this
+        // in-memory. Null for alert/report (and legacy filter-only edits).
+        filterQuery:
+          draft.source === "trace" ? draft.filterQuery || null : null,
         customGraphId:
           draft.source === "customGraph" ? draft.customGraphId : null,
         // The graph-alert threshold rule travels alongside the destination

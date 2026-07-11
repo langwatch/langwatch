@@ -1,50 +1,35 @@
 import {
   Box,
+  Code,
   Field,
   HStack,
   Input,
   NativeSelect,
+  Spinner,
   Text,
+  Textarea,
   VStack,
 } from "@chakra-ui/react";
-import type { Monaco } from "@monaco-editor/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
-import { Switch } from "~/components/ui/switch";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import {
   type FilterField,
   sanitizeTriggerFilters,
   type TriggerFilterValue,
-  triggerFiltersPermissiveSchema,
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
-import dynamic from "~/utils/compat/next-dynamic";
 import {
-  monacoBackgroundFor,
-  trapEscapeInsideEditor,
-} from "../editors/monacoEditorChrome";
-import {
-  CONDITIONS_JSON_SCHEMA,
-  CONDITIONS_MODEL_URI,
-  registerJsonSchema,
-} from "../editors/monacoSchemas";
-import { useMonacoTheme } from "../editors/useMonacoTheme";
-import type { ReportSourceKind } from "../logic/draftReducer";
+  filterQueryIsSet,
+  filtersAreSet,
+  type ReportSourceKind,
+} from "../logic/draftReducer";
+import { estimateFiringRate } from "../logic/firingRate";
 import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { FacetSection } from "./FacetSection";
-
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
-  ssr: false,
-  loading: () => (
-    <Box padding={4} color="fg.muted">
-      Loading editor...
-    </Box>
-  ),
-});
 
 const SUBJECT_HELP = {
   trace:
@@ -289,129 +274,207 @@ function ReportSubject() {
   );
 }
 
-/** Automation subject: the trace filters, visual or JSON code mode. */
+/**
+ * Automation subject: the trace-filter query. A saved legacy automation
+ * (structured `filters`, no query) keeps the field-based editor so its
+ * conditions aren't silently dropped; everything else authors a Traces-V2
+ * search query with a live matched-traces preview.
+ */
 function TraceSubject() {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
-  const theme = useMonacoTheme();
-  const [codeMode, setCodeMode] = useState(false);
-  const [code, setCode] = useState(() =>
-    JSON.stringify(draft.filters, null, 2),
-  );
-  const [codeError, setCodeError] = useState<string | null>(null);
+  const isLegacy =
+    !filterQueryIsSet(draft.filterQuery) && filtersAreSet(draft.filters);
 
-  const commitCode = (raw: string): boolean => {
-    try {
-      const parsed = JSON.parse(raw);
-      const result = triggerFiltersPermissiveSchema.safeParse(parsed);
-      if (!result.success) {
-        setCodeError(result.error.errors[0]?.message ?? "Invalid filters");
-        return false;
-      }
-      const { sanitized } = sanitizeTriggerFilters(result.data);
-      dispatch({
-        type: "SET_FILTERS",
-        value: sanitized as Partial<Record<FilterField, FilterParam>>,
-      });
-      setCodeError(null);
-      return true;
-    } catch {
-      setCodeError("Invalid JSON syntax");
-      return false;
-    }
-  };
-
-  const onToggleCode = (toCode: boolean) => {
-    if (toCode) {
-      setCode(JSON.stringify(draft.filters, null, 2));
-      setCodeError(null);
-    } else if (!commitCode(code)) {
-      // Stay in code mode until the JSON is valid, so the switch never
-      // silently drops an in-progress edit.
-      return;
-    }
-    setCodeMode(toCode);
-  };
+  if (isLegacy) {
+    return (
+      <VStack align="stretch" gap={2}>
+        <Text textStyle="xs" color="fg.muted">
+          This automation uses the older structured filters. It keeps working as
+          is — clear these conditions to switch it to a search query.
+        </Text>
+        <FieldsFilters
+          filters={draft.filters as Record<FilterField, FilterParam>}
+          setFilters={(next) =>
+            dispatch({
+              type: "SET_FILTERS",
+              value: sanitizeTriggerFilters(
+                next as Record<string, TriggerFilterValue>,
+              ).sanitized as Partial<Record<FilterField, FilterParam>>,
+            })
+          }
+        />
+      </VStack>
+    );
+  }
 
   return (
-    <VStack align="stretch" gap={2}>
-      <HStack justify="flex-end" gap={2}>
-        <Text textStyle="sm" color="fg.muted">
-          Code
+    <TraceQuerySubject
+      query={draft.filterQuery ?? ""}
+      onChange={(value) => dispatch({ type: "SET_FILTER_QUERY", value })}
+    />
+  );
+}
+
+const PREVIEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const PREVIEW_SORT = { columnId: "time", direction: "desc" as const };
+const QUERY_DEBOUNCE_MS = 400;
+
+/**
+ * The trace-filter query editor: a Traces-V2 search query bound to the draft,
+ * with a live count of matching traces over the last 7 days. The preview runs
+ * the exact same compiler the dispatcher validates against, so an invalid query
+ * surfaces its parse error here instead of failing silently at save.
+ */
+function TraceQuerySubject({
+  query,
+  onChange,
+}: {
+  query: string;
+  onChange: (value: string) => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
+
+  // Debounce before hitting the preview endpoint so fluent typing stays local;
+  // the window re-anchors to "now" each time the debounced query settles.
+  const [debounced, setDebounced] = useState(query);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query), QUERY_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const trimmed = debounced.trim();
+  const timeRange = useMemo(() => {
+    const to = Date.now();
+    return { from: to - PREVIEW_WINDOW_MS, to };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debounced]);
+
+  const preview = api.tracesV2.list.useQuery(
+    {
+      projectId,
+      timeRange,
+      sort: PREVIEW_SORT,
+      page: 1,
+      pageSize: 5,
+      query: trimmed,
+    },
+    { enabled: !!projectId && trimmed.length > 0, retry: false },
+  );
+
+  return (
+    <VStack align="stretch" gap={3}>
+      <Text textStyle="xs" color="fg.muted">
+        The automation fires on every incoming trace that matches this search
+        query — the same one you use in the traces view.
+      </Text>
+      <Textarea
+        value={query}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder='e.g. status:error AND model:gpt-4o'
+        fontFamily="mono"
+        fontSize="sm"
+        rows={2}
+        autoresize
+      />
+      <HStack gap={1} flexWrap="wrap">
+        <Text textStyle="xs" color="fg.muted">
+          Try
         </Text>
-        <Switch
-          checked={codeMode}
-          onCheckedChange={({ checked }) => onToggleCode(checked)}
-        />
-      </HStack>
-      {codeMode ? (
-        <>
-          <Box
-            border="1px solid"
-            borderColor={codeError ? "red.500" : "border"}
-            borderRadius="md"
-            overflow="hidden"
-            height="360px"
-            background={monacoBackgroundFor(theme)}
+        {["status:error", "model:gpt*", "cost:>0.1", "has:eval"].map((ex) => (
+          <Code
+            key={ex}
+            size="sm"
+            cursor="pointer"
+            onClick={() => onChange(query.trim() ? `${query.trim()} ${ex}` : ex)}
           >
-            <MonacoEditor
-              height="100%"
-              language="json"
-              path={CONDITIONS_MODEL_URI}
-              value={code}
-              theme={theme}
-              beforeMount={(monaco: Monaco) => {
-                registerJsonSchema(
-                  monaco,
-                  CONDITIONS_MODEL_URI,
-                  CONDITIONS_JSON_SCHEMA,
-                );
-              }}
-              onMount={trapEscapeInsideEditor}
-              onChange={(v: string | undefined) => {
-                const next = v ?? "{}";
-                setCode(next);
-                // Live-commit so the save gate tracks the edit; invalid JSON
-                // just parks the error until it parses.
-                commitCode(next);
-              }}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 13,
-                wordWrap: "on",
-                automaticLayout: true,
-                scrollBeyondLastLine: false,
-                lineNumbers: "on",
-                tabSize: 2,
-                padding: { top: 12 },
-              }}
-            />
-          </Box>
-          {codeError ? (
-            <Text color="red.500" textStyle="sm">
-              {codeError}
-            </Text>
-          ) : null}
-        </>
-      ) : (
-        <>
-          <Text textStyle="xs" color="fg.muted">
-            The automation fires when an incoming trace matches every condition
-            you set below.
-          </Text>
-          <FieldsFilters
-            filters={draft.filters as Record<FilterField, FilterParam>}
-            setFilters={(next) =>
-              dispatch({
-                type: "SET_FILTERS",
-                value: sanitizeTriggerFilters(
-                  next as Record<string, TriggerFilterValue>,
-                ).sanitized as Partial<Record<FilterField, FilterParam>>,
-              })
-            }
-          />
-        </>
-      )}
+            {ex}
+          </Code>
+        ))}
+      </HStack>
+      <TracePreview
+        trimmed={trimmed}
+        loading={preview.isFetching}
+        error={preview.error?.message ?? null}
+        totalHits={preview.data?.totalHits ?? null}
+        sample={preview.data?.items ?? []}
+      />
     </VStack>
+  );
+}
+
+/** The live matched-traces preview under the query editor. */
+function TracePreview({
+  trimmed,
+  loading,
+  error,
+  totalHits,
+  sample,
+}: {
+  trimmed: string;
+  loading: boolean;
+  error: string | null;
+  totalHits: number | null;
+  sample: Array<{ traceId: string; name?: string | null }>;
+}) {
+  if (trimmed.length === 0) {
+    return (
+      <Text textStyle="xs" color="fg.muted">
+        Add a query above to preview which traces would match.
+      </Text>
+    );
+  }
+  if (loading) {
+    return (
+      <HStack gap={2} color="fg.muted">
+        <Spinner size="xs" />
+        <Text textStyle="xs">Checking matching traces…</Text>
+      </HStack>
+    );
+  }
+  if (error) {
+    return (
+      <Text textStyle="xs" color="fg.error">
+        {error}
+      </Text>
+    );
+  }
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      padding={3}
+      bg="bg.subtle"
+    >
+      <Text textStyle="sm" fontWeight="medium">
+        {totalHits === 0
+          ? "No traces matched in the last 7 days"
+          : `${totalHits?.toLocaleString()} ${
+              totalHits === 1 ? "trace" : "traces"
+            } matched in the last 7 days`}
+      </Text>
+      {totalHits !== null && totalHits > 0 ? (
+        <Text textStyle="xs" color="fg.muted" paddingTop={0.5}>
+          {estimateFiringRate(totalHits)}
+        </Text>
+      ) : null}
+      {sample.length > 0 ? (
+        <VStack align="stretch" gap={0.5} paddingTop={2}>
+          {sample.map((t) => (
+            <Text
+              key={t.traceId}
+              textStyle="xs"
+              color="fg.muted"
+              truncate
+              fontFamily="mono"
+            >
+              {t.name || t.traceId}
+            </Text>
+          ))}
+        </VStack>
+      ) : null}
+    </Box>
   );
 }

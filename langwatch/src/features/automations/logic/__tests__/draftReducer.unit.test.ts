@@ -315,6 +315,41 @@ describe("subjectIsSet + cadenceIsSet split", () => {
       expect(subjectIsSet({ ...SAMPLE, filters: {} })).toBe(false);
       expect(cadenceIsSet({ ...SAMPLE, filters: {} })).toBe(true);
     });
+
+    it("subjectIsSet accepts a filterQuery even without structured filters", () => {
+      const query: AutomationDraft = {
+        ...SAMPLE,
+        filters: {},
+        filterQuery: "status:error",
+      };
+      expect(subjectIsSet(query)).toBe(true);
+      // Whitespace-only query is not a subject.
+      expect(subjectIsSet({ ...query, filterQuery: "   " })).toBe(false);
+    });
+  });
+});
+
+describe("SET_FILTER_QUERY", () => {
+  it("sets the trace-subject query", () => {
+    const next = reducer(INITIAL_DRAFT, {
+      type: "SET_FILTER_QUERY",
+      value: "model:gpt-4o",
+    });
+    expect(next.filterQuery).toBe("model:gpt-4o");
+  });
+
+  it("is cleared when switching away from the trace source", () => {
+    const withQuery = reducer(INITIAL_DRAFT, {
+      type: "SET_FILTER_QUERY",
+      value: "status:error",
+    });
+    expect(
+      reducer(withQuery, { type: "SET_SOURCE", value: "customGraph" })
+        .filterQuery,
+    ).toBeNull();
+    expect(
+      reducer(withQuery, { type: "SET_SOURCE", value: "report" }).filterQuery,
+    ).toBeNull();
   });
 });
 

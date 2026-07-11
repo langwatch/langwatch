@@ -83,6 +83,12 @@ export interface AutomationDraft {
   /** Where conditions come from — trace filters or a custom graph alert. */
   source: ConditionSource;
   filters: Partial<Record<FilterField, FilterParam>>;
+  /** ADR-043 Subject facet: the Traces-V2 liqe query a trace-subject
+   *  automation is about. When non-empty it supersedes `filters` — the router
+   *  persists `filters` as `{}` and the dispatcher matches this in-memory.
+   *  `null`/empty keeps the legacy structured-`filters` path (edit of an older
+   *  automation). Only meaningful when `source === "trace"`. */
+  filterQuery: string | null;
   customGraphId: string | null;
   /** Threshold rule for graph alerts. Only meaningful when
    *  `source === "customGraph"`; carried around the draft so type-switching
@@ -117,6 +123,7 @@ export type DraftAction =
   | { type: "SET_SOURCE"; value: ConditionSource }
   | { type: "SET_CUSTOM_GRAPH_ID"; value: string | null }
   | { type: "SET_FILTERS"; value: Partial<Record<FilterField, FilterParam>> }
+  | { type: "SET_FILTER_QUERY"; value: string }
   | { type: "SET_GRAPH_ALERT"; value: GraphAlertDraft }
   | { type: "SET_REPORT"; value: ReportDraft }
   | { type: "SET_CADENCE"; value: NotificationCadence }
@@ -146,6 +153,7 @@ export const INITIAL_DRAFT: AutomationDraft = {
   alertType: null,
   source: "trace",
   filters: {},
+  filterQuery: null,
   customGraphId: null,
   graphAlert: INITIAL_GRAPH_ALERT_DRAFT,
   report: INITIAL_REPORT_DRAFT,
@@ -186,6 +194,7 @@ export function reducer(
           ...state,
           source: "customGraph",
           filters: {},
+          filterQuery: null,
           action:
             state.action === "SEND_EMAIL" ||
             state.action === "SEND_SLACK_MESSAGE"
@@ -199,6 +208,7 @@ export function reducer(
           ...state,
           source: "report",
           filters: {},
+          filterQuery: null,
           customGraphId: null,
           action:
             state.action === "SEND_EMAIL" ||
@@ -212,6 +222,8 @@ export function reducer(
       return { ...state, customGraphId: action.value };
     case "SET_FILTERS":
       return { ...state, filters: action.value };
+    case "SET_FILTER_QUERY":
+      return { ...state, filterQuery: action.value };
     case "SET_GRAPH_ALERT":
       return { ...state, graphAlert: action.value };
     case "SET_REPORT":
@@ -376,7 +388,8 @@ export function filtersAreSet(filters: AutomationDraft["filters"]): boolean {
 
 /**
  * The "what" facet (ADR-043 Subject): is the thing it's about chosen?
- * - Automation: at least one trace filter.
+ * - Automation: a trace filter query, or (legacy edit) at least one structured
+ *   trace filter.
  * - Alert: a custom graph plus a series to watch.
  * - Report: a valid content source — a trace table, a picked graph, or a
  *   picked dashboard.
@@ -395,7 +408,12 @@ export function subjectIsSet(draft: AutomationDraft): boolean {
       (r.sourceKind === "dashboard" && r.dashboardId !== null)
     );
   }
-  return filtersAreSet(draft.filters);
+  return filterQueryIsSet(draft.filterQuery) || filtersAreSet(draft.filters);
+}
+
+/** A trace-subject query is set when it has non-whitespace content. */
+export function filterQueryIsSet(filterQuery: string | null): boolean {
+  return (filterQuery ?? "").trim().length > 0;
 }
 
 /**
