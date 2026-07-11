@@ -22,7 +22,10 @@ import {
   tenantIdFromGroupId,
 } from "../../../observability/tenantRateTracker";
 import { connection } from "../../../redis";
-import type { ProjectStorageDestination } from "../../../stored-objects/project-storage-destination";
+import {
+  redactStorageUrisInText,
+  type ProjectStorageDestination,
+} from "../../../stored-objects/project-storage-destination";
 import { isDispatchError } from "../../outbox/dispatchError";
 import type {
   DeduplicationConfig,
@@ -431,10 +434,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     //     backstop.
     if (orphanedValue) {
       if (reclaimS3) {
-        this.blobLifecycle.reclaimOrphanedS3({ value: orphanedValue, groupId });
+        await this.blobLifecycle.reclaimOrphanedS3({
+          value: orphanedValue,
+          groupId,
+        });
       }
     } else {
-      this.blobLifecycle.acquire(jobDataJson);
+      await this.blobLifecycle.acquire(jobDataJson);
     }
 
     if (isNew) {
@@ -561,19 +567,21 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // only delete s3 objects the eval reported newly unreferenced, and acquire
     // holds for genuinely new stages. A squash that discarded the NEW value
     // (orphan === the job's own value) staged nothing and gets no hold.
-    jobsToStage.forEach((job, i) => {
-      const orphan = orphanedValues[i];
-      if (orphan && orphan.length > 0) {
-        if (reclaimS3Flags[i]) {
-          this.blobLifecycle.reclaimOrphanedS3({
-            value: orphan,
-            groupId: job.groupId,
-          });
+    await Promise.all(
+      jobsToStage.map(async (job, i) => {
+        const orphan = orphanedValues[i];
+        if (orphan && orphan.length > 0) {
+          if (reclaimS3Flags[i]) {
+            await this.blobLifecycle.reclaimOrphanedS3({
+              value: orphan,
+              groupId: job.groupId,
+            });
+          }
+        } else {
+          await this.blobLifecycle.acquire(job.jobDataJson);
         }
-      } else {
-        this.blobLifecycle.acquire(job.jobDataJson);
-      }
-    });
+      }),
+    );
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -721,13 +729,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           projectId: tenantIdFromGroupId(groupId),
           stagedJobId,
           groupId,
+          err: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
         },
         "Failed to parse staged job data",
       );
       // Missing blob or unparseable value: complete the slot so it's not stuck;
       // recover via event replay.
       await this.scripts.complete({ groupId, stagedJobId });
-      this.blobLifecycle.release({ values: [jobDataJson], groupId });
+      await this.blobLifecycle.release({ values: [jobDataJson], groupId });
       return;
     }
 
@@ -914,7 +925,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // removed from staging during the drain, so completing the
               // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
-              this.blobLifecycle.release({
+              await this.blobLifecycle.release({
                 values: [
                   jobDataJson,
                   ...drainedSiblings.map((sibling) => sibling.jobDataJson),
@@ -998,7 +1009,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     },
                     "Retry re-encode failed; releasing old hold and falling through to fail-safe",
                   );
-                  this.blobLifecycle.release({
+                  await this.blobLifecycle.release({
                     values: [jobDataJson],
                     groupId,
                   });
@@ -1028,7 +1039,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // hash, so it's SADD+SREM on one holder set (the blob stays
                 // referenced); for a mixed/GQ1 value it falls back to ordered
                 // acquire+release. Drained siblings keep their ORIGINAL values.
-                this.blobLifecycle.transfer({
+                await this.blobLifecycle.transfer({
                   newValue: retryJobData,
                   oldValue: jobDataJson,
                   groupId,
@@ -1103,7 +1114,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                       }),
                   ),
                 );
-                this.blobLifecycle.release({ values: [jobDataJson], groupId });
+                await this.blobLifecycle.release({
+                  values: [jobDataJson],
+                  groupId,
+                });
               }
             }
           },
@@ -1189,6 +1203,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           queueName: this.queueName,
           groupId,
           stagedJobId: sibling.stagedJobId,
+          err: err instanceof Error ? err.message : String(err),
         },
         "Failed to parse drained sibling job data — dropping (recoverable via replay)",
       );
@@ -1218,7 +1233,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         });
         // Re-acquire the sibling's hold (idempotent: it kept its hold through
         // the drain, and its value — hence token — is unchanged).
-        this.blobLifecycle.acquire(sibling.jobDataJson);
+        await this.blobLifecycle.acquire(sibling.jobDataJson);
       } catch (err) {
         this.logger.error(
           {
@@ -1315,7 +1330,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     // Acquire the re-staged value's hold; the caller releases the dispatched
     // one after this returns (acquire-before-release keeps a GQ2 blob alive).
-    this.blobLifecycle.acquire(jobDataJson);
+    await this.blobLifecycle.acquire(jobDataJson);
 
     gqGroupsBlockedTotal.inc(routingLabels);
     gqJobsExhaustedTotal.inc(routingLabels);
@@ -1366,7 +1381,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Blob store unreachable after retries; completing slot to recover via replay",
       );
       await this.scripts.complete({ groupId, stagedJobId });
-      this.blobLifecycle.release({ values: [jobDataJson], groupId });
+      await this.blobLifecycle.release({ values: [jobDataJson], groupId });
       return;
     }
     const backoffMs = getBackoffMs(attempt);
