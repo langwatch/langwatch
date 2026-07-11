@@ -62,14 +62,31 @@ export function parseLangyFeedbackDirective(
   return { requested, sentiment, cleanedText };
 }
 
+/**
+ * Substance floor for the DEFAULT (non-directive) feedback ask.
+ *
+ * The real "when to ask" decision belongs to Langy's agent-side cheap model,
+ * which emits `[langy:feedback]` at a high-signal moment. This is not that — it
+ * is only a floor for the throttled backstop path, so we never rate a bare
+ * one-word ack ("done", "dev server works") when no directive arrived. It is a
+ * content check, deliberately NOT a message-count or turn-index rule. ~55 chars
+ * is roughly a full sentence — below that it reads as an ack, not an answer.
+ */
+const SUBSTANTIVE_ANSWER_MIN_CHARS = 55;
+
+export function isSubstantiveLangyAnswer(text: string): boolean {
+  return text.trim().length >= SUBSTANTIVE_ANSWER_MIN_CHARS;
+}
+
 const THROTTLE_KEY = "langwatch:langy:feedback:last-asked:v1";
 /** Minimum gap between unprompted feedback asks (client backstop). 6 hours. */
 const MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 /**
- * Client-side backstop so the DEFAULT (non-directive) feedback affordance
- * doesn't nag: only allow it once per interval. A directive from Langy bypasses
- * this — if the cheap model decided it's a high-signal moment, honour it.
+ * The snooze. Feedback should never nag, so we only allow an ask once per
+ * interval — and this now gates BOTH paths (default and the fast-model
+ * directive): a high-signal moment is still not worth asking about if we just
+ * asked. The directive lowers the substance bar, not the snooze.
  */
 export function shouldAskFeedback(now: number = Date.now()): boolean {
   if (typeof window === "undefined") return false;
