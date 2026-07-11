@@ -24,6 +24,16 @@ resources:
     cpu: "2"
     memory: 4Gi
 
+# Deployment environment reported to the manager as ENVIRONMENT (surfaced via the
+# ConfigMap). Empty (the default) inherits the umbrella's global.env, which itself
+# defaults to "production"; a standalone install with no global falls back to
+# "production" too. This value is SECURITY-LOAD-BEARING: the manager refuses to
+# honour LANGY_UNSAFE_DEV_DISABLE_ISOLATION (the local-dev per-worker UID-isolation
+# bypass) unless ENVIRONMENT is a local-like value, so a prod pod MUST report a
+# production environment for that refusal to fire. Only set this to a local-like
+# value ("local"/"dev"/"development"/"test") for a throwaway dev cluster.
+environment: ""
+
 # Manager tunables (read by services/langy-agent/config.go). Surfaced via the ConfigMap.
 manager:
   port: 8080

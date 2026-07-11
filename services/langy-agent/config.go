@@ -31,6 +31,7 @@ package langyagent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/clog"
@@ -75,6 +76,30 @@ type Config struct {
 	// non-IP-literal host as unexpected; operators should set the real hosts.
 	EgressAllowedHosts string `env:"LANGY_EGRESS_ALLOWED_HOSTS"`
 
+	// WorkspaceRoot is the shared-templates directory the pod entrypoint seeds
+	// with AGENTS.md and skills/ (see entrypoint.sh). setupWorkerHome reads
+	// ${WorkspaceRoot}/AGENTS.md and symlinks ${WorkspaceRoot}/skills into each
+	// worker home. In the container this is /workspace (an emptyDir populated at
+	// boot). Overridable so the manager can run OUTSIDE the container in local
+	// dev, where `/workspace` cannot be created at the filesystem root — point it
+	// at a writable dir seeded with the same two entries. Independent of
+	// SESSIONS_ROOT (the per-conversation home dirs), which stays separate.
+	WorkspaceRoot string `env:"LANGY_WORKSPACE_ROOT" validate:"required"`
+
+	// UnsafeDevDisableIsolation disables the ADR-033 per-worker UID sandbox: no
+	// os.Chown of worker homes/config to a per-conversation UID, and no setuid
+	// Credential on the opencode subprocess (it runs as the manager's own user).
+	// This exists ONLY so the manager can spawn opencode on a LOCAL DEV box where
+	// it runs as an unprivileged user — there, the chown and the setuid Credential
+	// both fail with EPERM (they require root + CAP_SETUID/CAP_SETGID/CAP_CHOWN)
+	// and no worker can start at all. Enabling it DESTROYS sibling-worker
+	// isolation: every worker runs under one UID, so worker A can read worker B's
+	// plaintext credentials on the shared volume. It MUST only ever be used
+	// locally — LoadConfig hard-refuses it whenever ENVIRONMENT is not a
+	// local-like value (see environmentPermitsUnsafeDev), so it can never be
+	// switched on in production.
+	UnsafeDevDisableIsolation bool `env:"LANGY_UNSAFE_DEV_DISABLE_ISOLATION"`
+
 	// OpenCodeBinaryPath is the opencode executable (resolved via PATH). Not
 	// env-configurable in the original; kept as a fixed default so behaviour is
 	// unchanged, but overridable in tests.
@@ -92,6 +117,7 @@ const (
 	defaultReadinessTimeoutMS = 15_000  // 15s (the chart raises this to 60s for gVisor cold boot)
 	defaultReaperInterval     = 30 * time.Second
 	defaultSessionsRoot       = "/workspace/sessions"
+	defaultWorkspaceRoot      = "/workspace"
 	defaultGracefulSeconds    = 10
 	// defaultMaxBodyBytes caps the /chat body at 1MB so a hostile
 	// manager-internal caller can't OOM the pod. Deliberately far below the
@@ -113,6 +139,7 @@ func defaultConfig() Config {
 		WorkerIdleMS:       defaultWorkerIdleMS,
 		ReadinessTimeoutMS: defaultReadinessTimeoutMS,
 		SessionsRoot:       defaultSessionsRoot,
+		WorkspaceRoot:      defaultWorkspaceRoot,
 		OTelPluginVersion:  defaultOTelPluginVersion,
 		OpenCodeBinaryPath: "opencode",
 		reaperInterval:     defaultReaperInterval,
@@ -140,7 +167,33 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err
 	}
+	// Fail closed: the unsafe UID-isolation bypass may only be armed in a
+	// local-like environment. Checked AFTER hydrate+validate so cfg.Environment
+	// reflects the real ENVIRONMENT value. environmentPermitsUnsafeDev is an
+	// allowlist, so any non-local environment (production, staging, an unknown
+	// "prod-eu", or an empty value that isn't the local default) refuses the flag.
+	if cfg.UnsafeDevDisableIsolation && !environmentPermitsUnsafeDev(cfg.Environment) {
+		return Config{}, fmt.Errorf(
+			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION cannot be enabled when ENVIRONMENT=%q — per-worker isolation may only be disabled in local development",
+			cfg.Environment,
+		)
+	}
 	return cfg, nil
+}
+
+// environmentPermitsUnsafeDev reports whether env is a local-like environment in
+// which the ADR-033 per-worker UID sandbox may be disabled. It is an ALLOWLIST,
+// not a production denylist: only the explicitly-listed local-like values return
+// true, so a novel or misconfigured environment name (e.g. "prod-eu", "staging",
+// or an empty string) fails closed and NEVER permits the bypass. Matching is
+// case-insensitive and trims surrounding whitespace.
+func environmentPermitsUnsafeDev(env string) bool {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "local", "dev", "development", "test":
+		return true
+	default:
+		return false
+	}
 }
 
 // WorkerIdle is the idle duration after which a worker is reaped.

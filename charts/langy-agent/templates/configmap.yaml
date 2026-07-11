@@ -1,3 +1,15 @@
+{{- /* ENVIRONMENT tells the manager which deployment environment it runs in. It
+       gates the LANGY_UNSAFE_DEV_DISABLE_ISOLATION safety refusal: the manager
+       REFUSES to disable per-worker UID isolation unless ENVIRONMENT is a
+       local-like value (services/langy-agent/config.go). A prod pod MUST report a
+       production environment, otherwise the manager would default to "local" and
+       the refusal could be bypassed. Resolution (most specific wins):
+       per-chart .Values.environment override -> umbrella .Values.global.env ->
+       "production". `global` may be absent for a standalone install, so both
+       lookups are nil-safe. */ -}}
+{{- $env := "production" -}}
+{{- with .Values.global }}{{- with .env }}{{- $env = . }}{{- end }}{{- end }}
+{{- with .Values.environment }}{{- $env = . }}{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,6 +19,7 @@ data:
   # Non-secret tunables read by the manager (services/langy-agent). The service-to-
   # service auth secret (LANGY_INTERNAL_SECRET) is NOT here — it comes from
   # the existing Secret, injected directly in the Deployment env.
+  ENVIRONMENT: {{ $env | quote }}
   PORT: {{ .Values.manager.port | quote }}
   LANGY_MAX_WORKERS: {{ .Values.manager.maxWorkers | quote }}
   LANGY_WORKER_IDLE_MS: {{ .Values.manager.workerIdleMs | quote }}

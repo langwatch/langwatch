@@ -14,6 +14,7 @@ func clearLangyEnv(t *testing.T) {
 	for _, k := range []string{
 		"ENVIRONMENT", "PORT", "LANGY_INTERNAL_SECRET", "LANGY_MAX_WORKERS",
 		"LANGY_WORKER_IDLE_MS", "LANGY_READINESS_TIMEOUT_MS", "SESSIONS_ROOT",
+		"LANGY_WORKSPACE_ROOT", "LANGY_UNSAFE_DEV_DISABLE_ISOLATION",
 		"OPENCODE_OTEL_PLUGIN_VERSION", "LOG_LEVEL", "LOG_FORMAT",
 		"OTEL_OTLP_ENDPOINT", "OTEL_SAMPLE_RATIO",
 	} {
@@ -53,6 +54,12 @@ func TestLoadConfig_DefaultsWhenOnlySecretSet(t *testing.T) {
 	if cfg.OpenCodeBinaryPath != "opencode" {
 		t.Errorf("OpenCodeBinaryPath default = %q, want opencode", cfg.OpenCodeBinaryPath)
 	}
+	if cfg.WorkspaceRoot != "/workspace" {
+		t.Errorf("WorkspaceRoot default = %q, want /workspace", cfg.WorkspaceRoot)
+	}
+	if cfg.UnsafeDevDisableIsolation {
+		t.Errorf("UnsafeDevDisableIsolation default = true, want false")
+	}
 }
 
 func TestLoadConfig_EnvOverrides(t *testing.T) {
@@ -63,6 +70,7 @@ func TestLoadConfig_EnvOverrides(t *testing.T) {
 	t.Setenv("LANGY_WORKER_IDLE_MS", "1000")
 	t.Setenv("LANGY_READINESS_TIMEOUT_MS", "2000")
 	t.Setenv("SESSIONS_ROOT", "/tmp/langy-sessions")
+	t.Setenv("LANGY_WORKSPACE_ROOT", "/tmp/langy-workspace")
 	t.Setenv("OPENCODE_OTEL_PLUGIN_VERSION", "2.3.4")
 
 	cfg, err := LoadConfig(context.Background())
@@ -83,6 +91,9 @@ func TestLoadConfig_EnvOverrides(t *testing.T) {
 	}
 	if cfg.SessionsRoot != "/tmp/langy-sessions" {
 		t.Errorf("SessionsRoot override = %q", cfg.SessionsRoot)
+	}
+	if cfg.WorkspaceRoot != "/tmp/langy-workspace" {
+		t.Errorf("WorkspaceRoot override = %q, want /tmp/langy-workspace", cfg.WorkspaceRoot)
 	}
 	if cfg.OTelPluginVersion != "2.3.4" {
 		t.Errorf("OTelPluginVersion override = %q, want 2.3.4", cfg.OTelPluginVersion)
@@ -117,5 +128,41 @@ func TestLoadConfig_NonLocalLowersSampleRatio(t *testing.T) {
 	}
 	if cfg.OTel.SampleRatio != 0.1 {
 		t.Errorf("non-local SampleRatio = %v, want 0.1", cfg.OTel.SampleRatio)
+	}
+}
+
+func TestLoadConfig_UnsafeDevDisableIsolationAllowedInLocalEnvs(t *testing.T) {
+	for _, env := range []string{"local", "dev", "development", "test", "LOCAL", "  dev  "} {
+		t.Run(env, func(t *testing.T) {
+			clearLangyEnv(t)
+			t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+			t.Setenv("ENVIRONMENT", env)
+			t.Setenv("LANGY_UNSAFE_DEV_DISABLE_ISOLATION", "true")
+
+			cfg, err := LoadConfig(context.Background())
+			if err != nil {
+				t.Fatalf("LoadConfig(ENVIRONMENT=%q) = %v, want nil", env, err)
+			}
+			if !cfg.UnsafeDevDisableIsolation {
+				t.Errorf("UnsafeDevDisableIsolation = false, want true for env %q", env)
+			}
+		})
+	}
+}
+
+func TestLoadConfig_UnsafeDevDisableIsolationRefusedInNonLocalEnvs(t *testing.T) {
+	// Allowlist fail-closed: production, staging, and any unknown/prod-like value
+	// must reject the bypass, so it can never be armed off a dev box.
+	for _, env := range []string{"production", "staging", "prod-eu", "preview"} {
+		t.Run(env, func(t *testing.T) {
+			clearLangyEnv(t)
+			t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+			t.Setenv("ENVIRONMENT", env)
+			t.Setenv("LANGY_UNSAFE_DEV_DISABLE_ISOLATION", "true")
+
+			if _, err := LoadConfig(context.Background()); err == nil {
+				t.Fatalf("expected LoadConfig to refuse LANGY_UNSAFE_DEV_DISABLE_ISOLATION when ENVIRONMENT=%q", env)
+			}
+		})
 	}
 }
