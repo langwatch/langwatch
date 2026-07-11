@@ -38,7 +38,10 @@ const { mintLangySessionApiKey, LangySessionKeyScopeError } = vi.hoisted(() => {
   return {
     mintLangySessionApiKey: vi
       .fn()
-      .mockResolvedValue("sk-lw-test-langy-token"),
+      .mockResolvedValue({
+        token: "sk-lw-test-langy-token",
+        apiKeyId: "key-1",
+      }),
     LangySessionKeyScopeError,
   };
 });
@@ -81,7 +84,10 @@ beforeEach(() => {
     virtualKey: { id: "vk-1" },
   });
   mintLangySessionApiKey.mockReset();
-  mintLangySessionApiKey.mockResolvedValue("sk-lw-test-langy-token");
+  mintLangySessionApiKey.mockResolvedValue({
+    token: "sk-lw-test-langy-token",
+    apiKeyId: "key-1",
+  });
   process.env.LANGWATCH_API_URL = "https://api.langwatch.test";
   process.env.LW_GATEWAY_BASE_URL = "http://gateway.test:5563/v1";
   // Clear LW_GATEWAY_PUBLIC_URL so it doesn't leak in from the developer's
@@ -254,7 +260,9 @@ describe("LangyCredentialService", () => {
         ).rejects.toThrowError(
           expect.objectContaining({
             name: "LangyCredentialResolutionError",
-            message: expect.stringMatching(/Failed to mint a Langy session key/),
+            message: expect.stringMatching(
+              /Failed to mint a Langy session key/,
+            ),
           }),
         );
       });
@@ -443,9 +451,7 @@ describe("LangyCredentialService", () => {
         const prisma = makePrismaWithProject(null);
         const svc = new LangyCredentialService(prisma);
 
-        expect(
-          await svc.getEgressAllowlist({ projectId: "p1" }),
-        ).toBeNull();
+        expect(await svc.getEgressAllowlist({ projectId: "p1" })).toBeNull();
         // Reads the Project by its own id (the tenancy filter) and selects only
         // the column — no cross-project value can be returned.
         expect(prisma.project.findUnique).toHaveBeenCalledWith({
@@ -481,10 +487,14 @@ describe("LangyCredentialService", () => {
 
     describe("when the project does not exist", () => {
       it("returns null", async () => {
-        const prisma = { project: { findUnique: vi.fn().mockResolvedValue(null) } } as any;
+        const prisma = {
+          project: { findUnique: vi.fn().mockResolvedValue(null) },
+        } as any;
         const svc = new LangyCredentialService(prisma);
 
-        expect(await svc.getEgressAllowlist({ projectId: "missing" })).toBeNull();
+        expect(
+          await svc.getEgressAllowlist({ projectId: "missing" }),
+        ).toBeNull();
       });
     });
 
@@ -530,7 +540,9 @@ describe("LangyCredentialService", () => {
         expect(saved).toEqual(["registry.npmjs.org", "*.internal.acme.com"]);
         expect(update).toHaveBeenCalledWith({
           where: { id: "p1" },
-          data: { langyEgressAllowlist: ["registry.npmjs.org", "*.internal.acme.com"] },
+          data: {
+            langyEgressAllowlist: ["registry.npmjs.org", "*.internal.acme.com"],
+          },
         });
       });
     });

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  describeToolCall,
-  effectiveToolName,
-} from "../logic/langyToolLabel";
+import { describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
 
 /**
  * The frames in this file are the ones that were ON SCREEN in the screenshot
@@ -26,6 +23,28 @@ describe("given a tool frame from the live stream", () => {
       expect(label.detail).toContain("pull request");
       // The regression: it must never be the tool's own name.
       expect(label.title).not.toBe("Skill");
+    });
+
+    // The worker ships 14 skills, not 1. The catalogue used to know about `github`
+    // alone, so a `tracing` call fell through to the unnamed fallback.
+    it("names the native skills too, in their own words", () => {
+      const label = describeToolCall({
+        name: "skill",
+        input: { name: "tracing" },
+      });
+
+      expect(label.title).toBe("Using the Tracing skill");
+      expect(label.detail).toContain("LangWatch tracing");
+    });
+
+    it("calls a recipe a recipe", () => {
+      const label = describeToolCall({
+        name: "skill",
+        input: { name: "generate-rag-dataset" },
+      });
+
+      expect(label.title).toBe("Using the Generate RAG dataset recipe");
+      expect(label.title).not.toContain("skill");
     });
   });
 

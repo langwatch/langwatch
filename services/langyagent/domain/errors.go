@@ -43,6 +43,20 @@ const (
 	// never reaches WriteHTTP, but is still registered (503) for completeness.
 	ErrMaxWorkers = herr.Code("max_workers_reached")
 
+	// ErrCredentialsRequired signals the control plane asked us to serve a turn
+	// with NO LangWatch session key, but we have no live worker to serve it with —
+	// so we must spawn, and a spawn needs a key.
+	//
+	// This is the designed resolution of a race, not a failure: the control plane
+	// probes for a live worker and omits the key when it finds one (a reused
+	// worker keeps the key in its env, so minting another would be waste). The
+	// worker can die in the gap between that probe and the turn. Rather than have
+	// the control plane defensively mint a key on every turn — which is exactly
+	// the credential sprawl we removed — it mints once, on demand, when we say
+	// this. Maps to 428 Precondition Required: the caller must supply something
+	// before we can proceed, and retrying with it will work.
+	ErrCredentialsRequired = herr.Code("credentials_required")
+
 	// ErrNoFreeUID signals every UID slot in the per-worker range is in use.
 	// With 60_000 slots and a default MAX_WORKERS of 20 this cannot happen in
 	// practice; surfaced rather than silently colliding when an operator raises
@@ -80,6 +94,7 @@ func RegisterStatuses() {
 	herr.RegisterStatus(ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(ErrInvalidConversationID, http.StatusBadRequest)
 	herr.RegisterStatus(ErrConversationBusy, http.StatusConflict)
+	herr.RegisterStatus(ErrCredentialsRequired, http.StatusPreconditionRequired)
 	herr.RegisterStatus(ErrMaxWorkers, http.StatusServiceUnavailable)
 	herr.RegisterStatus(ErrNoFreeUID, http.StatusServiceUnavailable)
 	herr.RegisterStatus(ErrSessionNotFound, http.StatusNotFound)

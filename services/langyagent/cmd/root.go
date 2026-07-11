@@ -8,6 +8,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 	langyagent "github.com/langwatch/langwatch/services/langyagent"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/controlplane"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/workerpool"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 )
@@ -52,6 +53,11 @@ func Root(ctx context.Context, _ []string) error {
 		DisableUIDIsolation: cfg.UnsafeDevDisableIsolation,
 		Telemetry:           deps.Telemetry,
 		Egress:              mgr.EgressGuard(),
+		// Revoke-only. The manager can destroy a session key it was handed; it can
+		// never ask for one to be minted. It reuses the SAME shared secret the
+		// control plane authenticates to us with, so this direction adds no new
+		// credential and no new configuration to drift.
+		Revoker: controlplane.NewRevoker(cfg.InternalSecret, 0),
 	})
 	if err != nil {
 		return err

@@ -20,6 +20,8 @@
 
 import { createLogger } from "~/utils/logger/server";
 import { getApp } from "~/server/app-layer/app";
+import { prisma } from "~/server/db";
+import { mintLangySessionApiKeyForUser } from "~/server/services/langy/langyApiKey";
 import { auditLog } from "~/server/auditLog";
 import { connection } from "~/server/redis";
 import {
@@ -74,6 +76,16 @@ import {
 
 const logger = createLogger("langwatch:langy:turn-processor");
 
+/**
+ * 428 Precondition Required. The manager says: "I must spawn a worker for this
+ * turn, and a spawn needs a session key — you sent none."
+ *
+ * The route deliberately omits the key when its pre-flight probe says a live
+ * worker already holds one. This status is what closes the window where that
+ * worker dies in between. See `Credentials.Spawnable` / ErrCredentialsRequired.
+ */
+const HTTP_CREDENTIALS_REQUIRED = 428;
+
 /** The backoff wait between server-side turn retries. */
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -116,15 +128,13 @@ export interface RunTurnDeps {
  * emits it ALONGSIDE the full `message.part.delta` event, so the durable path
  * (fed by `message.part.delta` below) is unchanged and never double-counts.
  */
-function parseAgentLine(line: string):
-  | {
-      delta?: string;
-      error?: string;
-      handoff?: string;
-      fastToken?: string;
-      tool?: LangyToolFrame;
-    }
-  | null {
+function parseAgentLine(line: string): {
+  delta?: string;
+  error?: string;
+  handoff?: string;
+  fastToken?: string;
+  tool?: LangyToolFrame;
+} | null {
   if (!line.trim()) return null;
   try {
     const event = JSON.parse(line) as {
@@ -217,6 +227,9 @@ export async function runTurn(
     credentials,
     resumeToken,
   } = job;
+  // Once-only guard for the credentials_required re-mint below. A manager that
+  // keeps asking must not be able to make us mint keys in a loop.
+  let hasRemintedKey = false;
   const doFetch = deps.fetchImpl ?? fetch;
   const doSleep = deps.sleepImpl ?? sleep;
   const turnLogger = logger.child({ projectId, conversationId, turnId });
@@ -225,7 +238,8 @@ export async function runTurn(
   // when the user has connected their account (and strips it when the daily PR
   // cap is reached), so its absence is exactly "the agent cannot do GitHub on
   // this turn" — known up front, without asking the model anything.
-  const hasGithubToken = !!(credentials as { githubToken?: string })?.githubToken;
+  const hasGithubToken = !!(credentials as { githubToken?: string })
+    ?.githubToken;
   const shellCommandOf = (frame: LangyToolFrame) =>
     cliEnvelope.shellCommandOf(frame);
 
@@ -313,7 +327,9 @@ export async function runTurn(
     // input keeps the pair consistent whatever any single frame happens to carry.
     const started = toolCalls.get(rawTool.id);
     const framed =
-      rawTool.phase === "end" && rawTool.input === undefined && started?.input !== undefined
+      rawTool.phase === "end" &&
+      rawTool.input === undefined &&
+      started?.input !== undefined
         ? { ...rawTool, input: started.input }
         : rawTool;
     const tool = cliEnvelope.normalizeToolFrame({ frame: framed });
@@ -339,7 +355,10 @@ export async function runTurn(
           ...(tool.input !== undefined ? { input: tool.input } : {}),
         })
         .catch((error) =>
-          turnLogger.debug({ error, tool: tool.name }, "recordToolCallStarted failed"),
+          turnLogger.debug(
+            { error, tool: tool.name },
+            "recordToolCallStarted failed",
+          ),
         );
       await deps.buffer
         .appendTool({
@@ -364,11 +383,15 @@ export async function runTurn(
     // How long the call actually took. Without it the log tells you a call
     // happened but never that it was the slow one.
     const durationMs =
-      existing.startedAt !== undefined ? Date.now() - existing.startedAt : undefined;
+      existing.startedAt !== undefined
+        ? Date.now() - existing.startedAt
+        : undefined;
     // A failure's message is the useful half of the failure. Capped, because a
     // tool can fail with megabytes and this is an event, not a log sink.
     const errorText =
-      tool.isError && tool.output ? tool.output.slice(0, MAX_EVENT_ERROR_TEXT) : undefined;
+      tool.isError && tool.output
+        ? tool.output.slice(0, MAX_EVENT_ERROR_TEXT)
+        : undefined;
     await deps.conversations
       .recordToolCallCompleted({
         projectId,
@@ -383,7 +406,10 @@ export async function runTurn(
         ...(errorText !== undefined ? { errorText } : {}),
       })
       .catch((error) =>
-        turnLogger.debug({ error, tool: tool.name }, "recordToolCallCompleted failed"),
+        turnLogger.debug(
+          { error, tool: tool.name },
+          "recordToolCallCompleted failed",
+        ),
       );
     await deps.buffer
       .appendTool({
@@ -501,8 +527,8 @@ export async function runTurn(
    * failure. Idempotent to call again ONLY when it produced no output — which
    * `resolveServerRecovery` enforces before it lets us round again.
    */
-  const attemptManagerTurn = async (): Promise<string | null> => {
-    const agentResponse = await doFetch(`${deps.agentUrl}/chat`, {
+  const postTurnToManager = async () =>
+    doFetch(`${deps.agentUrl}/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -519,6 +545,44 @@ export async function runTurn(
       }),
       signal: AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
     });
+
+  const attemptManagerTurn = async (): Promise<string | null> => {
+    let agentResponse = await postTurnToManager();
+
+    // 428 CREDENTIALS REQUIRED — the designed resolution of a race, not a fault.
+    //
+    // The route asks the manager whether a live worker already exists before it
+    // mints a session key, because a reused worker keeps the key it booted with
+    // and a second one would be minted, never read, and left valid for hours. The
+    // worker can die in the gap between that probe and this turn: the manager then
+    // has to SPAWN, a spawn needs a key, and this turn arrived without one.
+    //
+    // So we mint here, once, and retry. Bounded deliberately — `hasRemintedKey`
+    // means a manager that keeps demanding credentials cannot make us mint in a
+    // loop, which would be a credential-generating DoS wearing a retry's clothes.
+    // No key came with this turn, so nothing has been consumed and the retry is a
+    // clean first attempt, not a duplicate.
+    if (
+      agentResponse.status === HTTP_CREDENTIALS_REQUIRED &&
+      !hasRemintedKey &&
+      !credentials.langwatchApiKey
+    ) {
+      void agentResponse.body?.cancel();
+      hasRemintedKey = true;
+      turnLogger.info(
+        { conversationId },
+        "manager needs a session key (worker died after the probe) — minting once and retrying",
+      );
+      const minted = await mintLangySessionApiKeyForUser({
+        prisma,
+        userId: job.actorUserId,
+        projectId,
+        organizationId: credentials.organizationId,
+      });
+      credentials.langwatchApiKey = minted.token;
+      credentials.langwatchApiKeyId = minted.apiKeyId;
+      agentResponse = await postTurnToManager();
+    }
 
     if (!agentResponse.ok || !agentResponse.body) {
       void agentResponse.body?.cancel();
@@ -645,7 +709,10 @@ export async function runTurn(
             status: decision.status,
           });
         } catch (statusError) {
-          turnLogger.debug({ statusError }, "failed to publish recovery status");
+          turnLogger.debug(
+            { statusError },
+            "failed to publish recovery status",
+          );
         }
         await doSleep(decision.delayMs);
       }
@@ -681,7 +748,9 @@ export async function runTurn(
             ),
         );
       }
-      turnLogger.info("langy turn handed off — checkpoint persisted for resume");
+      turnLogger.info(
+        "langy turn handed off — checkpoint persisted for resume",
+      );
       return;
     }
 
@@ -705,10 +774,7 @@ export async function runTurn(
       projectId,
       conversationId,
       turnId,
-      parts: [
-        ...toolParts,
-        { type: "text", text: answer, role: "assistant" },
-      ],
+      parts: [...toolParts, { type: "text", text: answer, role: "assistant" }],
       outcome: "completed",
     });
     await deps.buffer.markEnd({ conversationId, turnId });
@@ -739,10 +805,7 @@ export async function runTurn(
         error: message,
       });
     } catch (dispatchError) {
-      turnLogger.error(
-        { error: dispatchError },
-        "failed to dispatch failTurn",
-      );
+      turnLogger.error({ error: dispatchError }, "failed to dispatch failTurn");
     }
     // The buffer error entry carries the CLASSIFIED domain error (not the raw
     // message) so `attachTurnStream` emits a structured error PART the browser
@@ -830,7 +893,11 @@ function createRunTurnDeps(): RunTurnDeps | null {
   const internalSecret = process.env.LANGY_INTERNAL_SECRET;
   if (!agentUrl || !internalSecret || !connection) {
     logger.info(
-      { hasAgentUrl: !!agentUrl, hasSecret: !!internalSecret, hasRedis: !!connection },
+      {
+        hasAgentUrl: !!agentUrl,
+        hasSecret: !!internalSecret,
+        hasRedis: !!connection,
+      },
       "Langy turn processor missing config — spawn function will no-op",
     );
     return null;
@@ -875,11 +942,10 @@ export async function startLangyTurnProcessor(
 
   pool.setSpawnFunction((job) => runTurn(job, deps));
 
-  const reconcilerDeps: LangyTurnReconcilerDeps =
-    overrides?.reconcilerDeps ?? {
-      buffer: deps.buffer,
-      conversations: deps.conversations,
-    };
+  const reconcilerDeps: LangyTurnReconcilerDeps = overrides?.reconcilerDeps ?? {
+    buffer: deps.buffer,
+    conversations: deps.conversations,
+  };
 
   // Boot sweep + periodic sweep. Fire-and-forget so a slow ClickHouse scan
   // never wedges worker startup.
@@ -888,7 +954,10 @@ export async function startLangyTurnProcessor(
       logger.warn({ err }, "langy reconcile sweep failed"),
     );
   void runSweep();
-  const sweepInterval = setInterval(() => void runSweep(), LANGY_LIVENESS.SWEEP_INTERVAL_MS);
+  const sweepInterval = setInterval(
+    () => void runSweep(),
+    LANGY_LIVENESS.SWEEP_INTERVAL_MS,
+  );
 
   logger.info("Langy turn processor started (event-driven)");
 

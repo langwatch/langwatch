@@ -150,10 +150,14 @@ export function describeToolCall({
     const skillId = readString(input, SKILL_KEYS);
     const skill = skillId ? findSkill(skillId) : undefined;
     if (skill) {
+      // A recipe is a walkthrough, not a standing capability, and saying "the
+      // Generate RAG dataset skill" reads like we don't know our own product.
+      const kind = skill.source === "recipe" ? "recipe" : "skill";
       return {
-        title: `Using the ${skill.label} skill`,
-        // The summary comes from the derived catalogue — for `github` that is
-        // the SKILL.md's own description, so the card cannot over-promise.
+        title: `Using the ${skill.label} ${kind}`,
+        // The summary comes from the derived catalogue — the skill's OWN
+        // SKILL.md description, which is the copy on the public skill directory.
+        // The card therefore cannot over-promise: it can only quote the skill.
         detail: skill.summary,
         key: `skill:${skill.id}`,
       };

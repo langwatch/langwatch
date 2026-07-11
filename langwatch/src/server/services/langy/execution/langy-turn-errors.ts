@@ -103,6 +103,30 @@ export class LangyGithubNotConnectedError extends DomainError {
   }
 }
 
+/**
+ * The manager could not START a worker for this turn (`worker_spawn_failed`).
+ *
+ * Distinct from `at-capacity` (there was no free slot) and from `unavailable`
+ * (the manager did not answer at all): the manager answered, tried, and the
+ * opencode subprocess never came up — a readiness timeout, a failed skill
+ * install, a home-directory or egress-guard failure.
+ *
+ * This is what was landing in `unknown`. The manager emits it as a typed error
+ * frame, but `langyAgentErrorFromFrame` only knew two frames, so the third fell
+ * through to a bare `Error` and the user got "Something went wrong" plus a trace
+ * id — for a failure we can name exactly.
+ */
+export class LangyWorkerSpawnFailedError extends DomainError {
+  declare readonly kind: "langy_worker_spawn_failed";
+
+  constructor() {
+    super("langy_worker_spawn_failed", "agent reported worker-spawn failure", {
+      httpStatus: 503,
+    });
+    this.name = "LangyWorkerSpawnFailedError";
+  }
+}
+
 /** The turn blew the `AGENT_CHAT_TIMEOUT_MS` budget (AbortSignal.timeout). */
 export class LangyTurnTimeoutError extends DomainError {
   declare readonly kind: "langy_turn_timeout";
@@ -142,14 +166,22 @@ export class LangyWorkerRestartingError extends DomainError {
  * raw text still reaches the log via `error.message`.
  */
 export function langyAgentErrorFromFrame(frame: string): Error {
-  switch (frame.trim().toLowerCase()) {
+  const normalized = frame.trim().toLowerCase();
+  switch (normalized) {
     case "at-capacity":
       return new LangyAgentAtCapacityError();
     case "session-not-found":
       return new LangyAgentSessionLostError();
-    default:
-      return new Error(frame);
   }
+  // The manager also surfaces its typed `herr` CODES on this frame, e.g.
+  // `worker_spawn_failed (map[message:...])`. Match on the code prefix, not the
+  // whole string: the parenthesised detail is the manager's internal envelope and
+  // is neither stable nor safe to show. Anything still unmatched stays a bare
+  // Error — it becomes `unknown`, and its raw text reaches the log only.
+  if (normalized.startsWith("worker_spawn_failed")) {
+    return new LangyWorkerSpawnFailedError();
+  }
+  return new Error(frame);
 }
 
 /** Node/undici connect-level failures: the manager isn't answering the socket. */
@@ -191,13 +223,22 @@ function isUnreachable(error: unknown): boolean {
   });
 }
 
-/** The unhandled shape: no meta, nothing but a trace id to correlate on. */
+/**
+ * The unhandled shape: nothing but an id to correlate on.
+ *
+ * The id must IDENTIFY THE INCIDENT. It used to be the ACTIVE TRACE id, which in
+ * the worker is the long-lived process/turn-processor span — so every failure,
+ * in every conversation, showed the user the SAME id. An id that does not
+ * identify the thing it is attached to is worse than no id: it sends whoever
+ * receives it looking for the wrong incident. The SPAN id is per-failure, so we
+ * lead with it and keep the trace id only as a correlation hint.
+ */
 function unhandledShape(): SerializedDomainError {
   const spanContext = trace.getActiveSpan()?.spanContext();
   return {
     kind: "unknown",
     meta: {},
-    telemetry: { traceId: spanContext?.traceId, spanId: spanContext?.spanId },
+    telemetry: { traceId: spanContext?.spanId ?? spanContext?.traceId, spanId: spanContext?.spanId },
     httpStatus: 500,
     reasons: [],
   };

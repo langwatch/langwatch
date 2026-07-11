@@ -72,6 +72,7 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_agent_session_lost",
   "langy_turn_timeout",
   "langy_worker_restarting",
+  "langy_worker_spawn_failed",
   // NOT a failure — an unmet prerequisite. See the `suppress` case below.
   "langy_github_not_connected",
 ] as const;
@@ -226,6 +227,20 @@ export function explainLangyError(
         title: "That took too long",
         description:
           "Langy didn't finish in time. Try again, or ask for a narrower slice — a shorter time range or a single trace.",
+        render: "card",
+        action: { label: "Try again", kind: "retry" },
+        ...debug,
+      };
+
+    case "langy_worker_spawn_failed":
+      // The manager tried to start a worker for this turn and it never came up.
+      // Nothing the user did is wrong and nothing is lost — their message is on
+      // record — so this reads as a hiccup with a retry, not a fault.
+      return {
+        kind: domain.kind,
+        title: "Langy couldn't start up",
+        description:
+          "Langy failed to get going for this reply. Nothing was lost — try again in a moment.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         ...debug,

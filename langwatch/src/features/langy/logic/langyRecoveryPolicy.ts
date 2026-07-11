@@ -133,6 +133,9 @@ const WORKER_RESTART_WAITS = [1_500, 4_000] as const;
 /** A timeout is expensive to repeat — one more go, then hand it to the user. */
 const TIMEOUT_WAITS = [2_000] as const;
 
+/** A failed spawn is usually transient; give it a moment and one more go. */
+const SPAWN_RETRY_WAITS = [2_000, 6_000] as const;
+
 const POLICIES: Record<string, LangyRecoveryPolicy> = {
   // A deploy drained the worker mid-turn. Nothing was lost — the user's message
   // is already on record and the answer had not been finalized. This is the one
@@ -156,6 +159,18 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
     attempts: TIMEOUT_WAITS.length,
     delayMs: schedule(TIMEOUT_WAITS),
     recoveringMessage: "Taking another run at that…",
+  },
+
+  // A spawn that failed is usually transient (a slow skill install, a readiness
+  // timeout under load) and the next one succeeds. Retry it here, bounded — the
+  // SERVER cannot, because the spawn it would retry is the one that just died.
+  langy_worker_spawn_failed: {
+    kind: "langy_worker_spawn_failed",
+    disposition: "auto",
+    retry: true,
+    attempts: SPAWN_RETRY_WAITS.length,
+    delayMs: schedule(SPAWN_RETRY_WAITS),
+    recoveringMessage: "Langy is starting up…",
   },
 
   // ALREADY RETRIED BY THE SERVER — three times, with growing waits, showing a

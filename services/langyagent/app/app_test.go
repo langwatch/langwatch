@@ -19,7 +19,10 @@ type fakePool struct {
 	acquireErr error
 	worker     Worker
 	killed     []string
+	liveWorker bool
 }
+
+func (f *fakePool) HasLiveWorker(string, domain.CredentialSignature) bool { return f.liveWorker }
 
 func (f *fakePool) Acquire(_ context.Context, _ string, _ domain.Credentials) (Worker, error) {
 	if f.acquireErr != nil {

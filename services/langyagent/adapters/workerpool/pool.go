@@ -24,6 +24,12 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/telemetry"
 )
 
+// revokeTimeout bounds the revoke call to the control plane. Short on purpose:
+// the worker is already dead, nothing is waiting on the answer, and a control
+// plane that is slow or down must not leave revocation goroutines piling up. A
+// revoke we abandon is one the reaper collects.
+const revokeTimeout = 5 * time.Second
+
 // Options configure a Pool. Constructed from the service Config in deps.go.
 type Options struct {
 	MaxWorkers         int
@@ -44,6 +50,20 @@ type Options struct {
 	// (no-op instruments / pass-through guard) so tests and partial wiring boot.
 	Telemetry *telemetry.Telemetry
 	Egress    egress.Guard
+	// Revoker asks the control plane to revoke a dead worker's session key. nil
+	// disables revocation — the key then simply lives out its TTL and the control
+	// plane's reaper collects it, which is the same backstop that covers a manager
+	// killed outright. Optional, so tests and partial wiring boot unchanged.
+	Revoker CredentialRevoker
+}
+
+// CredentialRevoker revokes the session key a dead worker was carrying.
+//
+// Consumer-side interface, deliberately one method wide: the pool must be able to
+// destroy a credential and must NOT be able to create one. Anything broader here
+// would let a future change quietly hand the manager minting power.
+type CredentialRevoker interface {
+	Revoke(ctx context.Context, endpoint, apiKeyID string) error
 }
 
 // Pool owns the per-conversation worker registry (the former Manager). It
@@ -80,6 +100,7 @@ type Pool struct {
 
 	telemetry *telemetry.Telemetry
 	egress    egress.Guard
+	revoker   CredentialRevoker
 
 	// baseCtx is the pool-lifetime context (carries the logger; cancelled on
 	// Shutdown). Worker subprocesses bind to it via spawnOpenCode so a pool
@@ -153,6 +174,7 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 		agentsTemplate:      agentsTemplate,
 		telemetry:           tel,
 		egress:              guard,
+		revoker:             opts.Revoker,
 		baseCtx:             baseCtx,
 		baseCancel:          baseCancel,
 		workers:             make(map[string]*Worker),
@@ -308,6 +330,62 @@ func (p *Pool) countInFlight(workers []*Worker) int {
 // If an existing worker's CredentialSignature differs from the caller's (model
 // changed, GitHub token added/removed) the existing worker is killed and a
 // fresh one is spawned with the new capability set.
+// HasLiveWorker reports whether a worker is already running for this
+// conversation whose capabilities match `sig`.
+//
+// This is the pre-flight the control plane uses to decide whether it needs to
+// mint a session key at all. It answers exactly the question Acquire would ask
+// and nothing more — in particular the signature is computable WITHOUT a key
+// (SignatureOf reads only model / GitHub-presence / egress allow-list), which is
+// what makes "probe, then mint only if spawning" possible in the first place.
+//
+// Deliberately advisory: the worker can die immediately after we answer true.
+// The control plane does not have to get this right, because Acquire refuses a
+// keyless spawn with ErrCredentialsRequired and the caller mints and retries. A
+// stale `true` costs one round trip; it can never boot a broken worker.
+func (p *Pool) HasLiveWorker(conversationID string, sig domain.CredentialSignature) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	w, ok := p.workers[conversationID]
+	return ok && w.credSig == sig
+}
+
+// revokeKeyOf asks the control plane to revoke a dead worker's session key.
+//
+// Fire-and-forget on the pool's base context, NOT the caller's: the caller is
+// usually kill(), which may be running under a request that is about to return,
+// and a revocation must not be cancelled just because the turn finished. It must
+// also never block a kill — a dead worker's cleanup cannot wait on an HTTP call
+// to a control plane that might be down.
+//
+// Best-effort by design. If it fails, the key still expires and the control
+// plane's reaper collects it; this call only shortens the window. It has to be
+// this way: a manager that is SIGKILLed (OOM, eviction, force-delete) runs no
+// cleanup at all, so revocation can never be the guarantee — only the fast path.
+func (p *Pool) revokeKeyOf(w *Worker, reason string) {
+	if p.revoker == nil || w == nil || w.apiKeyID == "" {
+		return
+	}
+	apiKeyID, endpoint, conversationID := w.apiKeyID, w.langwatchEndpoint, w.conversationID
+	go func() {
+		defer clog.HandlePanic(p.baseCtx, false)
+		ctx, cancel := context.WithTimeout(p.baseCtx, revokeTimeout)
+		defer cancel()
+		if err := p.revoker.Revoke(ctx, endpoint, apiKeyID); err != nil {
+			clog.Get(p.baseCtx).Warn("revoking worker session key failed — it will expire and be reaped instead",
+				zap.String("conversation", conversationID),
+				zap.String("reason", reason),
+				zap.Error(err),
+			)
+			return
+		}
+		clog.Get(p.baseCtx).Debug("revoked worker session key",
+			zap.String("conversation", conversationID),
+			zap.String("reason", reason),
+		)
+	}()
+}
+
 func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
 	wantedSig := domain.SignatureOf(creds)
 
@@ -340,6 +418,28 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 			})
 		}
 		return w, nil
+	}
+
+	// A SPAWN is now committed: no live worker matched, and no other spawn is in
+	// flight to piggyback on. A spawn needs a session key — and the control plane
+	// deliberately sends none when its pre-flight probe told it we already had a
+	// live worker (a reused worker keeps the key in its env, so a second key would
+	// be minted, discarded unread, and left valid for hours).
+	//
+	// The worker can die in the gap between that probe and this call. THIS is that
+	// race, and refusing here is how it is resolved: we answer
+	// ErrCredentialsRequired, the control plane mints once and retries, and the
+	// user sees a normal response. The alternative — booting a worker with no
+	// LangWatch key — produces a worker that silently cannot call LangWatch at
+	// all, which is far worse than one extra round trip on a rare race.
+	//
+	// Checked BEFORE the capacity reservation so a keyless request can never
+	// consume a worker slot it was never going to fill.
+	if !creds.Spawnable() {
+		p.mu.Unlock()
+		return nil, herr.New(ctx, domain.ErrCredentialsRequired, herr.M{
+			"message": "a worker must be spawned for this conversation, but no session key was supplied",
+		})
 	}
 
 	// Atomic capacity reservation. Increment BEFORE releasing the registry lock
@@ -639,6 +739,8 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		cmd:               cmd,
 		uid:               uid,
 		credSig:           sig,
+		apiKeyID:          creds.LangwatchAPIKeyID,
+		langwatchEndpoint: creds.LangwatchEndpoint,
 		lastSeen:          time.Now(),
 	}, nil
 }
@@ -664,6 +766,11 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 	shouldWipe := false
 	deletedOwnEntry := false
 	var egressToClose egress.WorkerEgress
+	// The worker that exited, captured under the lock so its session key can be
+	// revoked after we release it. Only set when we still owned the slot — a
+	// worker that kill() already removed had its key revoked there, and revoking
+	// twice would race the reaper for no gain.
+	var exitedWorker *Worker
 
 	// The decision runs under the lock (defer-unlocked so a panic can't leave it
 	// held); the slow RemoveAll + egress I/O run AFTER the unlock.
@@ -675,6 +782,7 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 			if w.cmd == cmd {
 				proxyToShutdown = w.authProxy
 				egressToClose = w.egress
+				exitedWorker = w
 				delete(p.workers, conversationID)
 				shouldWipe = true
 				deletedOwnEntry = true
@@ -708,6 +816,16 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 	}()
 
 	// Everything below runs WITHOUT the pool lock.
+
+	// The worker exited on its own (crash or self-exit) and never went through
+	// kill(), so this is the one place its session key gets revoked. Its lifetime
+	// was this worker's — it lived in the subprocess env — and the process is gone,
+	// so the key is now pure liability: nothing can use it, and it would otherwise
+	// stay valid for hours.
+	if deletedOwnEntry {
+		p.revokeKeyOf(exitedWorker, "worker exited")
+	}
+
 	if proxyToShutdown != nil {
 		// The authproxy shutdown drains in-flight turns; run it off the lock as a
 		// panic-guarded goroutine so the pool never blocks on it.
@@ -749,6 +867,11 @@ func (p *Pool) kill(conversationID, reason string) {
 		return
 	}
 	p.telemetry.WorkerKilled(p.baseCtx, reason)
+	// The key's lifetime is the worker's. kill() is the funnel for EVERY
+	// deliberate death — capability change, idle reap, shutdown — so revoking here
+	// covers all three at once. Self-exit and crash are the other path, handled in
+	// the exit goroutine below.
+	p.revokeKeyOf(w, reason)
 	clog.Get(p.baseCtx).Info("killing worker",
 		zap.String("conversation", conversationID),
 		zap.String("reason", reason),

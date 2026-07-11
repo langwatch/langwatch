@@ -40,7 +40,6 @@ import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
-import { useCyclingVerb } from "~/features/traces-v2/components/ai/useCyclingVerb";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
@@ -50,7 +49,6 @@ import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 import { Composer } from "./Composer";
 import { LangyCardGallery } from "./LangyCardGallery";
 import { EmptyState } from "./EmptyState";
-import { LANGY_THINKING_VERBS } from "./langyThinkingVerbs";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import { LangyFoundryMenu } from "./LangyFoundryMenu";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
@@ -85,6 +83,7 @@ import type {
 } from "~/server/services/langy/langyTurnContext.schema";
 import { LangyError } from "./LangyError";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
+import { LangyThinkingLine } from "./LangyThinkingLine";
 import { StreamingStatusLine } from "./StreamingStatusLine";
 import {
   explainLangyError,
@@ -178,9 +177,6 @@ const OPEN_TRANSITION = {
   mass: 0.9,
 } as const;
 const CLOSE_TRANSITION = { duration: 0.16, ease: [0.4, 0, 1, 1] } as const;
-
-// Double the shared 1800ms default — see ThinkingIndicator.
-const THINKING_VERB_DWELL_MS = 3600;
 
 /**
  * The viewport's width, kept current across resizes.
@@ -1161,7 +1157,10 @@ function LangyPanel({
                         segment={turnSignals.segment}
                       />
                     ) : (
-                      <ThinkingIndicator messages={messages} />
+                      <LangyThinkingLine
+                        messages={messages}
+                        optimisticText={optimisticStreamText}
+                      />
                     )
                   ) : null}
                   {/* Recovering beats failing. While the policy has a retry
@@ -1573,86 +1572,3 @@ function LangyOverflowMenu() {
   );
 }
 
-function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
-  const reduceMotion = useReducedMotion();
-  const last = messages.at(-1);
-  const activeTool =
-    last?.role === "assistant"
-      ? last.parts.findLast((part) => part.type?.startsWith("tool-"))
-      : undefined;
-  // Map raw tool ids to human-readable verbs so the indicator doesn't read
-  // like dev console output. Unknown tools fall through to a stripped/spaced
-  // shape so we always say SOMETHING rather than blanking out.
-  const TOOL_VERBS: Record<string, string> = {
-    search_traces: "reading your traces",
-    get_trace: "loading a trace",
-    search: "searching",
-    read: "reading files",
-    write: "drafting changes",
-    edit: "editing files",
-    bash: "running a command",
-    list: "listing files",
-    todowrite: "planning",
-  };
-  const rawId = activeTool?.type?.replace(/^tool-/, "") ?? null;
-  const toolLabel = rawId
-    ? (TOOL_VERBS[rawId] ?? `using ${rawId.replace(/_/g, " ")}`)
-    : null;
-
-  // While a tool is active, surface what it is — that's higher-signal than a
-  // generic verb. Otherwise cycle through the AI thinking verbs so the panel
-  // doesn't feel frozen during long generations.
-  //
-  // The dwell is DOUBLE the shared default (1.8s): each swap is a ~0.28s
-  // blur-crossfade in and out, so at 1.8s the line spent most of its life
-  // mid-animation and never settled long enough to actually read. 3.6s lets it
-  // arrive, hold, and then leave.
-  const cyclingVerb = useCyclingVerb(
-    !toolLabel,
-    LANGY_THINKING_VERBS,
-    THINKING_VERB_DWELL_MS,
-  );
-  const text = toolLabel ? `Langy is ${toolLabel}…` : `${cyclingVerb}…`;
-
-  // Reduced-motion: drop the keyframes animation but keep the static gradient.
-  const shimmerCss = reduceMotion
-    ? { ...langyThinkingShimmerStyles, animation: "none" }
-    : langyThinkingShimmerStyles;
-
-  return (
-    // No avatar — the shimmering line IS the indicator. It keeps a small left
-    // inset so it sits on the same optical margin as the answer text above it
-    // rather than floating loose against the panel edge.
-    <HStack gap={2.5} alignSelf="flex-start" paddingY={0.5} paddingLeft={0.5}>
-      <Box
-        position="relative"
-        minHeight="1.5em"
-        display="flex"
-        alignItems="center"
-      >
-        <AnimatePresence mode="wait" initial={false}>
-          <MotionText
-            key={text}
-            fontSize="13px"
-            fontWeight="500"
-            letterSpacing="-0.005em"
-            lineHeight="1.5"
-            css={shimmerCss}
-            initial={
-              reduceMotion ? false : { opacity: 0, filter: "blur(5px)", y: 5 }
-            }
-            animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-            exit={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, filter: "blur(5px)", y: -5 }
-            }
-            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-          >
-            {text}
-          </MotionText>
-        </AnimatePresence>
-      </Box>
-    </HStack>
-  );
-}
