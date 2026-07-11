@@ -61,6 +61,8 @@ type System interface {
 	SpawnDetached(argv []string, dir, logPath string) error
 	Now() time.Time
 	Getpid() int
+	// TotalMemory is the machine's physical RAM in bytes (0 if undetectable).
+	TotalMemory() uint64
 }
 
 // ClickHouse manages one shared, single-node, memory-capped clickhouse-server on
@@ -94,6 +96,14 @@ type ClickHouse interface {
 // fan-out). It reads live state through the callbacks it is constructed with.
 type Dashboard interface {
 	Serve(ctx context.Context, port int) error
+}
+
+// Semaphore is a machine-wide counting semaphore so parallel, memory-hungry work
+// across worktrees (tsgo typechecks) can be bounded to a slot count.
+type Semaphore interface {
+	// Acquire blocks until one of `slots` slots for `name` is free; returns a
+	// release func and the 1-based slot taken. ctx cancellation aborts the wait.
+	Acquire(ctx context.Context, name string, slots int) (release func(), slot int, err error)
 }
 
 // Hygiene is the disk-reclamation surface: enumerating a repo's worktrees,
