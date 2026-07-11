@@ -20,7 +20,6 @@ import {
   type CodingAgentSessionData,
   createInitCodingAgentSession,
   isCodingAgentMetric,
-  parseMcpToolName,
   isCodingAgentSession,
   meanTtftMs,
 } from "../coding-agent-session.derivation";
@@ -690,26 +689,3 @@ describe("MCP servers, read off the tool name", () => {
   });
 });
 
-describe("parseMcpToolName", () => {
-  it("splits server from tool", () => {
-    expect(parseMcpToolName("mcp__notion__search")).toEqual({
-      server: "notion",
-      tool: "search",
-    });
-  });
-
-  it("keeps the rest of the name when the tool itself contains the separator", () => {
-    expect(parseMcpToolName("mcp__srv__a__b")).toEqual({
-      server: "srv",
-      tool: "a__b",
-    });
-  });
-
-  it("refuses names it cannot trust rather than inventing an empty server", () => {
-    expect(parseMcpToolName("Bash")).toBeNull();
-    expect(parseMcpToolName("mcp__onlyserver")).toBeNull();
-    expect(parseMcpToolName("mcp____tool")).toBeNull();
-    expect(parseMcpToolName("mcp__srv__")).toBeNull();
-    expect(parseMcpToolName(null)).toBeNull();
-  });
-});
