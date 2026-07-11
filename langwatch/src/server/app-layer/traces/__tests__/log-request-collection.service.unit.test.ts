@@ -4,7 +4,7 @@ import type { RecordLogCommandData } from "../../../event-sourcing/pipelines/tra
 import {
   CLAUDE_CODE_KIND_ATTR,
   CLAUDE_CODE_PII_ATTR,
-} from "../claude-code-log-to-span";
+} from "../claude-code-log-events";
 import { LogRequestCollectionService } from "../log-request-collection.service";
 
 function makeService() {
@@ -106,6 +106,11 @@ describe("LogRequestCollectionService", () => {
         spanId: "1122334455667788",
         body: "in-span log",
       });
+      // Real wire context is never marked synthetic.
+      expect(call?.[0]?.attributes["langwatch.trace.synthetic"]).toBeUndefined();
+      expect(
+        call?.[0]?.attributes["langwatch.trace.derived_from"],
+      ).toBeUndefined();
     });
   });
 
@@ -192,6 +197,10 @@ describe("LogRequestCollectionService", () => {
       // different spans.
       expect(r2.traceId).toBe(r1.traceId);
       expect(r2.spanId).not.toBe(r1.spanId);
+      // A synthesized record is marked so downstream consumers can tell a
+      // LangWatch-minted id apart from a real OTLP one.
+      expect(r1.attributes["langwatch.trace.synthetic"]).toBe("true");
+      expect(r1.attributes["langwatch.trace.derived_from"]).toBe("session.id");
     });
 
     it("returns a DIFFERENT traceId per turn (prompt.id) within one session", async () => {
@@ -251,7 +260,12 @@ describe("LogRequestCollectionService", () => {
       expect(c1![0]!.spanId).toBe(c2![0]!.spanId);
     });
 
-    it("does NOT synthesize ids for non-claude scopes even with empty wire ids", async () => {
+    it("synthesizes ids via the generic fallback for an unrecognized scope carrying session.id", async () => {
+      // A scope that is neither claude_code nor a `codex.*` event WITH a
+      // conversation.id still gets grouped through the generic fallback on
+      // the first present correlation key (session.id here), and the
+      // synthesized ids are marked so downstream can tell them apart from
+      // real wire context.
       const { service, recordLog } = makeService();
       await service.handleOtlpLogRequest({
         tenantId: "project_test",
@@ -287,8 +301,10 @@ describe("LogRequestCollectionService", () => {
         piiRedactionLevel: "ESSENTIAL",
       });
       const r = recordLog.mock.calls[0]![0]!;
-      expect(r.traceId).toBe("");
-      expect(r.spanId).toBe("");
+      expect(r.traceId).toMatch(/^[0-9a-f]{32}$/);
+      expect(r.spanId).toMatch(/^[0-9a-f]{16}$/);
+      expect(r.attributes["langwatch.trace.synthetic"]).toBe("true");
+      expect(r.attributes["langwatch.trace.derived_from"]).toBe("session.id");
     });
 
     it("preserves the wire ids when the LogRecord already carries trace context", async () => {
@@ -312,6 +328,37 @@ describe("LogRequestCollectionService", () => {
       const r = recordLog.mock.calls[0]![0]!;
       expect(r.traceId).toBe("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6");
       expect(r.spanId).toBe("1122334455667788");
+    });
+
+    it("keeps a real trace_id and marks only the span synthetic when span_id is missing", async () => {
+      // A real trace can legitimately hold a context-less record: the
+      // trace grouping stays real (no trace.synthetic, no derived_from),
+      // and only the invented span_id is badged span.synthetic.
+      const { service, recordLog } = makeService();
+      await service.handleOtlpLogRequest({
+        tenantId: "project_test",
+        logRequest: claudeBatch([
+          {
+            timeUnixNano: "1700000000000000000",
+            traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+            // no spanId on the wire
+            body: { stringValue: "claude_code.user_prompt" },
+            attributes: [
+              { key: "event.name", value: { stringValue: "user_prompt" } },
+              { key: "session.id", value: { stringValue: "s" } },
+              { key: "prompt.id", value: { stringValue: "p_1" } },
+              { key: "event.sequence", value: { stringValue: "1" } },
+            ],
+          },
+        ]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+      const r = recordLog.mock.calls[0]![0]!;
+      expect(r.traceId).toBe("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6");
+      expect(r.spanId).toMatch(/^[0-9a-f]{16}$/);
+      expect(r.attributes["langwatch.trace.synthetic"]).toBeUndefined();
+      expect(r.attributes["langwatch.trace.derived_from"]).toBeUndefined();
+      expect(r.attributes["langwatch.span.synthetic"]).toBe("true");
     });
 
     it("leaves ids empty when session.id is missing (no useful key to hash)", async () => {

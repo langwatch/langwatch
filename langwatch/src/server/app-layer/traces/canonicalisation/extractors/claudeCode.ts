@@ -9,7 +9,7 @@
  * The cost-bearing model-call events (`api_request`, `api_request_body`,
  * `api_response_body`) are NOT handled here: they are trapped at ingest
  * and CONVERTED into a single standard gen_ai.* span by
- * `claude-code-log-to-span.ts`, then dropped from the log path. The
+ * `claude-code-log-events.ts`, then dropped from the log path. The
  * existing span pipeline + canonicalisation + fold lift model / tokens /
  * cost / input / output from that span. This extractor therefore only
  * sees the lifecycle/prompt events that stay on the log path.
@@ -100,7 +100,7 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
 
     // The model-call events (api_request / api_request_body /
     // api_response_body) are trapped at ingest and converted to a gen_ai
-    // span by claude-code-log-to-span.ts — they never reach the log path,
+    // span by claude-code-log-events.ts — they never reach the log path,
     // so the only claude_code event this extractor lifts is user_prompt.
     if (eventName === "user_prompt") {
       this.liftUserPrompt(ctx);

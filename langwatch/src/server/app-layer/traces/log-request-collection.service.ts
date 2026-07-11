@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
@@ -18,29 +16,21 @@ import {
   CLAUDE_CODE_KIND_ATTR,
   CLAUDE_CODE_PII_ATTR,
   claudeCodeLogKind,
-} from "./claude-code-log-to-span";
+} from "./claude-code-log-events";
+import { synthesizeTraceContext } from "./synthesize-trace-context";
 
 /**
- * Claude Code 2.1.x emits its OTLP logs with NO trace context — the
- * standard exporter does not carry a current span when these fire
- * since the cost-bearing api_request events are not wrapped in one.
- * Without a trace_id+span_id the receiver writes empty-id rows and
- * the fold projection skips them, so /me/traces shows nothing.
- *
- * Synthesizing stable ids from the event's own correlation keys
- * (session.id groups every turn into one trace; prompt.id +
- * event.name + event.sequence make each event a distinct row) lets
- * the existing fold + I/O extractors do their job unchanged.
+ * Attribute keys stamped on a recorded log whose trace context was
+ * synthesized by LangWatch (see `synthesizeTraceContext`), so
+ * downstream consumers can tell an id we minted apart from a real
+ * OTLP id that arrived on the wire. `langwatch.trace.synthetic` marks
+ * a trace_id we minted (the whole grouping is ours);
+ * `langwatch.span.synthetic` marks the narrower case where the
+ * trace_id is real but only the span_id was invented.
  */
-const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
-
-/**
- * Codex's instrumentation scope varies across builds (codex 0.131
- * uses `codex_exec`, 0.13x sometimes just `codex`), so the
- * synthesizer below gates on the event.name prefix (`codex.*`)
- * which is stable across versions.
- */
-const CODEX_EVENT_NAME_PREFIX = "codex.";
+const SYNTHETIC_TRACE_ATTR = "langwatch.trace.synthetic";
+const SYNTHETIC_TRACE_DERIVED_FROM_ATTR = "langwatch.trace.derived_from";
+const SYNTHETIC_SPAN_ATTR = "langwatch.span.synthetic";
 
 export interface LogRequestCollectionDeps {
   recordLog: (data: RecordLogCommandData) => Promise<void>;
@@ -132,16 +122,18 @@ export class LogRequestCollectionService {
                 const logAttrs = normalizeOtlpAttributeMap(
                   logRecord.attributes,
                 );
-                const claudeIds = synthesizeClaudeCodeIdsIfMissing({
+                const {
+                  traceId,
+                  spanId,
+                  syntheticTraceId,
+                  syntheticSpanId,
+                  derivedFrom,
+                } = synthesizeTraceContext({
                   scopeName,
                   wireTraceId,
                   wireSpanId,
                   attrs: logAttrs,
-                });
-                const { traceId, spanId } = synthesizeCodexIdsIfMissing({
-                  wireTraceId: claudeIds.traceId,
-                  wireSpanId: claudeIds.spanId,
-                  attrs: logAttrs,
+                  resourceAttrs,
                 });
 
                 const timeUnixMs = logRecord.timeUnixNano
@@ -167,14 +159,26 @@ export class LogRequestCollectionService {
                   scopeName,
                   logAttrs["event.name"],
                 );
-                const attributes = claudeKind
-                  ? {
-                      ...logAttrs,
-                      [CLAUDE_CODE_KIND_ATTR]: claudeKind,
-                      [CLAUDE_CODE_PII_ATTR]: redaction,
-                    }
-                  : logAttrs;
-                if (claudeKind) claudeMarkedCount++;
+                // Both markings can apply: a synthesized claude_code
+                // model-call carries the kind marker AND the synthetic
+                // trace marker.
+                const attributes: Record<string, string> = { ...logAttrs };
+                if (claudeKind) {
+                  attributes[CLAUDE_CODE_KIND_ATTR] = claudeKind;
+                  attributes[CLAUDE_CODE_PII_ATTR] = redaction;
+                  claudeMarkedCount++;
+                }
+                // A minted trace_id badges the whole trace synthetic (and
+                // records which correlation key grouped it). A real trace_id
+                // with only an invented span_id badges just the span — never
+                // the trace, since a real trace can hold a context-less record.
+                if (syntheticTraceId) {
+                  attributes[SYNTHETIC_TRACE_ATTR] = "true";
+                  attributes[SYNTHETIC_TRACE_DERIVED_FROM_ATTR] =
+                    derivedFrom ?? "";
+                } else if (syntheticSpanId) {
+                  attributes[SYNTHETIC_SPAN_ATTR] = "true";
+                }
 
                 await this.deps.recordLog({
                   tenantId,
@@ -217,113 +221,6 @@ export class LogRequestCollectionService {
       },
     );
   }
-}
-
-/**
- * Synthesize trace_id + span_id for claude_code log records that
- * arrive without trace context (the normal case — Claude Code 2.1.x
- * emits its api_request / user_prompt events outside any active
- * span). Returns the wire ids unchanged for any other scope, or when
- * the wire ids ARE present.
- *
- * Stability contract:
- *   - trace_id = sha256(session.id || ':' || prompt.id) truncated to 32 hex.
- *     One trace PER TURN: every event of a single user turn (the user_prompt,
- *     the api_request / api_response model calls it drives, and the tool
- *     events) carries the same prompt.id, so they share a trace; a new user
- *     turn (new prompt.id) starts a new trace instead of growing one forever.
- *     gen_ai.conversation.id = session.id still groups every turn of the
- *     session into one conversation thread. Session-setup events that precede
- *     the first prompt (no prompt.id) fall back to sha256(session.id).
- *   - span_id = sha256(session.id || ':' || prompt.id || ':' ||
- *     event.name || ':' || event.sequence) truncated to 16 hex.
- *     Each event (user_prompt + api_request + tool_decision + …)
- *     becomes its own log row under that trace, idempotent under
- *     re-ingest through the stored_log_records ReplacingMergeTree.
- *
- * When session.id is missing we leave the ids empty rather than
- * inventing them — the record still lands in stored_log_records
- * with empty trace context (the c56eced2d behavior), and a future
- * caller with session.id will get correlated correctly.
- */
-function synthesizeClaudeCodeIdsIfMissing(args: {
-  scopeName: string;
-  wireTraceId: string;
-  wireSpanId: string;
-  attrs: Record<string, string>;
-}): { traceId: string; spanId: string } {
-  const { scopeName, wireTraceId, wireSpanId, attrs } = args;
-  if (scopeName !== CLAUDE_CODE_EVENT_SCOPE) {
-    return { traceId: wireTraceId, spanId: wireSpanId };
-  }
-  if (wireTraceId && wireSpanId) {
-    return { traceId: wireTraceId, spanId: wireSpanId };
-  }
-  const sessionId = attrs["session.id"];
-  if (!sessionId) {
-    return { traceId: wireTraceId, spanId: wireSpanId };
-  }
-  const promptId = attrs["prompt.id"] ?? "";
-  const eventName = attrs["event.name"] ?? "";
-  const eventSequence = attrs["event.sequence"] ?? "";
-  // Key the trace on the turn, not the session: every event of one user turn
-  // shares a prompt.id, so (session.id, prompt.id) yields one trace per turn
-  // while gen_ai.conversation.id = session.id keeps the turns grouped as one
-  // thread. Pre-prompt session-setup events (no prompt.id) fall back to the
-  // session-level id so they still correlate.
-  const turnKey = promptId ? `${sessionId}:${promptId}` : sessionId;
-  const traceId = wireTraceId
-    ? wireTraceId
-    : createHash("sha256").update(turnKey).digest("hex").slice(0, 32);
-  const spanId = wireSpanId
-    ? wireSpanId
-    : createHash("sha256")
-        .update(`${sessionId}:${promptId}:${eventName}:${eventSequence}`)
-        .digest("hex")
-        .slice(0, 16);
-  return { traceId, spanId };
-}
-
-/**
- * Codex equivalent of synthesizeClaudeCodeIdsIfMissing. Codex emits
- * its events (codex.user_prompt / codex.sse_event /
- * codex.conversation_starts) under a `conversation.id` that groups
- * a multi-turn chat into one trace. Each event gets its own span id
- * derived from (conversation.id, event.name, event.sequence) so the
- * fold sees them as distinct rows under the same trace.
- *
- * Scope-agnostic by design: codex's instrumentation scope varies
- * (`codex_exec` in 0.131, `codex` in 0.13x). We gate on the
- * event.name prefix instead, which is stable.
- */
-function synthesizeCodexIdsIfMissing(args: {
-  wireTraceId: string;
-  wireSpanId: string;
-  attrs: Record<string, string>;
-}): { traceId: string; spanId: string } {
-  const { wireTraceId, wireSpanId, attrs } = args;
-  if (wireTraceId && wireSpanId) {
-    return { traceId: wireTraceId, spanId: wireSpanId };
-  }
-  const eventName = attrs["event.name"] ?? "";
-  if (!eventName.startsWith(CODEX_EVENT_NAME_PREFIX)) {
-    return { traceId: wireTraceId, spanId: wireSpanId };
-  }
-  const conversationId = attrs["conversation.id"];
-  if (!conversationId) {
-    return { traceId: wireTraceId, spanId: wireSpanId };
-  }
-  const eventSequence = attrs["event.sequence"] ?? "";
-  const traceId = wireTraceId
-    ? wireTraceId
-    : createHash("sha256").update(conversationId).digest("hex").slice(0, 32);
-  const spanId = wireSpanId
-    ? wireSpanId
-    : createHash("sha256")
-        .update(`${conversationId}:${eventName}:${eventSequence}`)
-        .digest("hex")
-        .slice(0, 16);
-  return { traceId, spanId };
 }
 
 /**

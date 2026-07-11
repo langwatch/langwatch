@@ -44,8 +44,8 @@ import { TraceRequestUtils } from "../utils/traceRequest.utils";
  * Same `(tenantId, traceId, spanId)` dispatched within the TTL window is
  * squashed into the existing staged job (`extend + replace`) instead of
  * accumulating new HSET fields in the group `:data` hash. Without this,
- * a re-firing reactor (e.g. `claudeCodeSpanSync`) or a customer retry storm
- * grows the hash unboundedly until Redis runs out of memory.
+ * a re-firing reactor or a customer retry storm grows the hash unboundedly
+ * until Redis runs out of memory.
  *
  * Exported so the dedup-coverage integration test can import the exact same
  * shape rather than reproducing it inline — keeps production and the test
