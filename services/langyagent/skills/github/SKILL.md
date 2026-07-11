@@ -9,21 +9,19 @@ description: Open a real pull request on the user's behalf — clone a repo, bra
 
 **When to use**: User asks to "open a PR", "fix X in repo Y and submit it", "send a patch", "raise a pull request", or otherwise wants a code change landed on GitHub. Also when they ask you to apply a fix and you've already produced the diff — proactively offer the PR.
 
-## Preflight: is GitHub connected?
+## GitHub connection
 
-The user's GitHub token rides into your env as `GH_TOKEN` (and their login as `GITHUB_LOGIN`). If `GH_TOKEN` is empty or unset:
+The user's GitHub token rides into your env as `GH_TOKEN` (and their login as
+`GITHUB_LOGIN`). You do not need to check it, and you must not report on it.
 
-> Reply with EXACTLY this (the sentinel `[langy:connect-github]` is rendered as the in-chat Connect card by the sidebar; the rest is plain text):
->
-> ```
-> GitHub isn't connected for your account yet — connect it, then ask me again in a new conversation and I'll take it from there.
->
-> [langy:connect-github]
-> ```
->
-> Then stop. Do NOT try to clone, do NOT prompt for a PAT, do NOT call `gh auth login`.
+If the account is not connected, the platform stops the turn the moment you
+reach for `gh` or a `git` command that talks to the remote, and shows the user a
+Connect button in the chat. Once they connect, your turn is re-run
+automatically, with the token in place. That detection watches what you actually
+run — it does not read your reply — so there is nothing for you to announce.
 
-If `GH_TOKEN` is present, continue.
+Just follow the workflow below. Never prompt for a PAT, and never call
+`gh auth login`.
 
 ## One-time per session: configure git
 
@@ -42,43 +40,38 @@ Do this once. Do not re-run on subsequent PRs in the same session.
 
 ## Workflow: open a PR
 
-Emit a `[langy:progress:<stage>:<short detail>]` line at the start of each step. The Langy sidebar parses these out and renders a live steps card; they are stripped from the persisted reply so they don't pollute history. Keep `detail` short (under 60 chars). Stages: `cloning`, `cloned`, `branched`, `edited`, `committed`, `pushed`, `opening_pr`, `opened`.
+You do not need to narrate your progress. The platform watches the commands you
+actually run — `gh repo clone`, `git checkout -b`, `git commit`, `git push`,
+`gh pr create` — and renders the live steps card from those, reading the PR's URL
+straight out of `gh pr create`'s output. Just run the steps.
 
 1. **Pick a working directory inside `$HOME`** — never `/tmp`, never under `/workspace/skills`. Use `$HOME/work/<repo>` so the idle reaper cleans it with the session.
    ```bash
    mkdir -p "$HOME/work" && cd "$HOME/work"
    ```
 2. **Shallow clone** the target repo (App installation must include it; otherwise this fails with 404 and you should tell the user the LangWatch App isn't installed on that repo).
-   - Print `[langy:progress:cloning:<owner>/<repo>]` BEFORE the clone.
    ```bash
    gh repo clone owner/name -- --depth 1
    cd name
    ```
-   - Then print `[langy:progress:cloned:<owner>/<repo>]`.
 3. **Branch** with a descriptive slug:
    ```bash
    git checkout -b langy/<short-slug>
    ```
-   - Then print `[langy:progress:branched:langy/<short-slug>]`.
 4. **Make the edits** — read existing files, write changes, follow the repo's conventions.
-   - Print `[langy:progress:edited:<short summary, e.g. "src/foo.ts">]` after the last edit.
 5. **Commit**:
    ```bash
    git add -A
    git commit -m "<concise message describing the change>"
    ```
-   - Print `[langy:progress:committed:<concise message>]`.
 6. **Push and open the PR**:
    ```bash
    git push -u origin HEAD
    ```
-   - Print `[langy:progress:pushed:<branch>]`.
-   - Print `[langy:progress:opening_pr:<owner>/<repo>]`.
    ```bash
    gh pr create --title "<title>" --body "<body>" --base main
    ```
    Use `--base` matching the repo's default branch (check via `gh repo view --json defaultBranchRef`).
-   - Print `[langy:progress:opened:<owner>/<repo>#<number>]` with the PR's number.
 7. **Report the PR URL** in your reply — the sidebar renders it as a PR card.
 
 ## Hard rules

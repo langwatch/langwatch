@@ -79,7 +79,7 @@ export const listGraphsCommand = async (options: {
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch graphs" });
+    failSpinner({ spinner, error, action: "fetch graphs", format: options?.format });
     process.exit(1);
   }
 };

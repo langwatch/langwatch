@@ -19,7 +19,9 @@ function parseRun(output: unknown): {
   passRate: string | null;
 } {
   const text = extractToolText(output);
-  const status = text.match(/\b(completed|running|failed|queued|passed|finished)\b/i);
+  const status = text.match(
+    /\b(completed|running|failed|queued|passed|finished)\b/i,
+  );
   const passRate = text.match(/([\d.]+\s*%)\s*(?:pass|passed|pass rate)?/i);
   return {
     status: status ? status[1]! : null,

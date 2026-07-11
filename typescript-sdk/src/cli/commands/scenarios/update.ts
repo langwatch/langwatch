@@ -33,7 +33,7 @@ export const updateScenarioCommand = async (
       console.log(JSON.stringify(scenario, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "update scenario" });
+    failSpinner({ spinner, error, action: "update scenario", format: options?.format });
     process.exit(1);
   }
 };

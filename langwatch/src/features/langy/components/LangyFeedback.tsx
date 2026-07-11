@@ -1,9 +1,11 @@
 import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { X } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
 import { useState } from "react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useLangyFeedback } from "../data/useLangyFeedback";
+import { useLangyStore } from "../stores/langyStore";
 import {
   type LangyFeedbackSentiment,
   markFeedbackAsked,
@@ -68,6 +70,9 @@ export function LangyFeedback({
   const { submit } = useLangyFeedback();
   const reduce = useReducedMotion();
   const [done, setDone] = useState(false);
+  const dismissedIds = useLangyStore((s) => s.dismissedFeedbackMessageIds);
+  const dismissFeedback = useLangyStore((s) => s.dismissFeedback);
+  const [locallyDismissed, setLocallyDismissed] = useState(false);
 
   const send = (score: number) => {
     const point = SCALE[score]!;
@@ -82,9 +87,33 @@ export function LangyFeedback({
     setDone(true);
   };
 
+  /**
+   * "Not now." The card had no exit before — you either rated the answer or
+   * lived with it sitting there. Dismissing records the ask against the long
+   * snooze (so the next turn doesn't just ask again) AND remembers this
+   * message, so the card can't reappear when the conversation re-renders or is
+   * reloaded from history.
+   */
+  const dismiss = () => {
+    markFeedbackAsked();
+    if (messageId) dismissFeedback(messageId);
+    setLocallyDismissed(true);
+  };
+
+  // `messageId` is optional in the contract, so keep a local flag too — the
+  // card must be dismissible even when it has nothing to key the memory on.
+  if (locallyDismissed || (messageId && dismissedIds.has(messageId))) {
+    return null;
+  }
+
   if (done) {
     return (
-      <Text textStyle="2xs" color="fg.subtle" alignSelf="flex-start" paddingY={1}>
+      <Text
+        textStyle="2xs"
+        color="fg.subtle"
+        alignSelf="flex-start"
+        paddingY={1}
+      >
         Thanks — noted.
       </Text>
     );
@@ -106,15 +135,42 @@ export function LangyFeedback({
         maxWidth="100%"
         paddingX={3}
         paddingY={2.5}
-        borderRadius="xl"
+        borderRadius="langyCard"
         borderWidth="1px"
         borderStyle="solid"
         borderColor="border.muted"
         background="transparent"
       >
-        <Text textStyle="2xs" color="fg.muted" letterSpacing="-0.005em">
-          {promptFor(sentiment)}
-        </Text>
+        {/* The prompt shares its row with the way out. A ✕ (rather than a "Not
+            now" button) keeps the four-segment rail below it unbroken and reads
+            as the same dismiss gesture used everywhere else in the panel. */}
+        <HStack gap={2} width="full" align="center">
+          <Text
+            textStyle="2xs"
+            color="fg.muted"
+            letterSpacing="-0.005em"
+            flex={1}
+          >
+            {promptFor(sentiment)}
+          </Text>
+          <chakra.button
+            type="button"
+            aria-label="Dismiss feedback request"
+            onClick={dismiss}
+            display="grid"
+            placeItems="center"
+            borderRadius="full"
+            width="18px"
+            height="18px"
+            flexShrink={0}
+            color="fg.subtle"
+            cursor="pointer"
+            transition="color 120ms ease, background 120ms ease"
+            _hover={{ color: "fg", background: "bg.muted" }}
+          >
+            <X size={12} />
+          </chakra.button>
+        </HStack>
         <HStack gap={1.5} width="full">
           {SCALE.map((point, score) => (
             <Segment key={point.label} onClick={() => send(score)}>

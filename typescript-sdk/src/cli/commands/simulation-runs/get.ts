@@ -165,7 +165,7 @@ export const getSimulationRunCommand = async (
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch simulation run" });
+    failSpinner({ spinner, error, action: "fetch simulation run", format: options?.format });
     process.exit(1);
   }
 };

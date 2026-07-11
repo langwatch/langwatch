@@ -98,7 +98,9 @@ export function useLangyConversationUpdateListener({
         if (!data.event) return;
         try {
           const raw =
-            typeof data.event === "string" ? JSON.parse(data.event) : data.event;
+            typeof data.event === "string"
+              ? JSON.parse(data.event)
+              : data.event;
           const parsed = langyConversationUpdateSignalSchema.safeParse(raw);
           if (!parsed.success) return;
           setLastEventAt(Date.now());

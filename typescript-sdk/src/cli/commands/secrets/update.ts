@@ -51,7 +51,7 @@ export const updateSecretCommand = async (
     console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(secret.name)}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update secret" });
+    failSpinner({ spinner, error, action: "update secret", format: options?.format });
     process.exit(1);
   }
 };

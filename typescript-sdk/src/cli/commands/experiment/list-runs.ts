@@ -138,7 +138,7 @@ export const experimentListRunsCommand = async (
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "list experiment runs" });
+    failSpinner({ spinner, error, action: "list experiment runs", format: options?.format });
     process.exit(1);
   }
 };

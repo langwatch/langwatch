@@ -76,7 +76,7 @@ export const updateGraphCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--graph and --filters must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "update graph" });
+      failSpinner({ spinner, error, action: "update graph", format: options?.format });
     }
     process.exit(1);
   }

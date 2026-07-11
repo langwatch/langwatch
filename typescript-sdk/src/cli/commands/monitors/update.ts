@@ -78,7 +78,7 @@ export const updateMonitorCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--parameters must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "update monitor" });
+      failSpinner({ spinner, error, action: "update monitor", format: options?.format });
     }
     process.exit(1);
   }

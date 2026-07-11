@@ -75,7 +75,7 @@ export const getMonitorCommand = async (
     }
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch monitor" });
+    failSpinner({ spinner, error, action: "fetch monitor", format: options?.format });
     process.exit(1);
   }
 };

@@ -5,10 +5,12 @@ import { hasProjectPermission, type Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { decrypt, encrypt } from "~/utils/encryption";
+import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
 import { resolveAttributionUserId } from "./langyAttribution";
 
 const logger = createLogger("langwatch:langy:api-key");
+const tracer = getLangWatchTracer("langwatch.langy.api-key");
 
 export const LANGY_API_KEY_NAME = "Langy";
 
@@ -239,14 +241,54 @@ export async function mintLangySessionApiKey({
   // permissions this user actually holds at the project scope. `:manage` implies
   // `:view/:create/:update` via the rbac hierarchy, but `:update` does NOT imply
   // `:view/:create`, so we must probe each candidate individually rather than
-  // assume a role grants the whole family. Sequential (not Promise.all) —
-  // chat is not hot-path traffic and this keeps DB load predictable.
-  const heldPermissions: Permission[] = [];
-  for (const permission of LANGY_CANDIDATE_PERMISSIONS) {
-    if (await hasProjectPermission({ prisma, session }, projectId, permission)) {
-      heldPermissions.push(permission);
-    }
-  }
+  // assume a role grants the whole family.
+  //
+  // FANNED OUT, not sequential. This runs on EVERY chat turn (the session key is
+  // minted per turn), so it is squarely hot-path — an earlier comment here
+  // claimed otherwise and used that to justify awaiting inside the loop. With
+  // ~3 queries per probe over a 27-item candidate list that was ~81 SERIALIZED
+  // round-trips, measured at 500-600ms per turn against a local Postgres, and
+  // worse the further the DB is. Promise.all makes it one round-trip deep.
+  //
+  // `.map` preserves candidate order, so `heldPermissions` is deterministic.
+  //
+  // FOLLOW-UP (bigger win, deliberately not done here): this still issues ~81
+  // queries, just concurrently. Every lookup those probes make — organizationUser,
+  // groupMembership, roleBinding, customRole — is permission-INDEPENDENT, so the
+  // whole set can be fetched once and all 27 candidates resolved in memory,
+  // taking this to ~4 queries. `rbac.ts` already does exactly this for the other
+  // axis (`batchScopePermissions`: one permission across many scopes; we need
+  // many permissions across one scope) and its docstring already calls out this
+  // fan-out as the anti-pattern. Left alone because it means refactoring shared
+  // auth code, which deserves its own change and its own review.
+  const heldPermissions: Permission[] = await tracer.withActiveSpan(
+    "langy.mint.permission_probes",
+    {
+      attributes: {
+        "tenant.id": projectId,
+        // The two numbers that explain this span's duration. `candidates` is the
+        // fan-out width; each probe is ~3 queries, so queries ≈ candidates * 3.
+        "langy.permission.candidates": LANGY_CANDIDATE_PERMISSIONS.length,
+      },
+    },
+    async (span) => {
+      const probes = await Promise.all(
+        LANGY_CANDIDATE_PERMISSIONS.map(async (permission) => ({
+          permission,
+          held: await hasProjectPermission(
+            { prisma, session },
+            projectId,
+            permission,
+          ),
+        })),
+      );
+      const held = probes
+        .filter((probe) => probe.held)
+        .map((probe) => probe.permission);
+      span.setAttribute("langy.permission.held", held.length);
+      return held;
+    },
+  );
 
   if (heldPermissions.length === 0) {
     throw new LangySessionKeyScopeError(
@@ -256,23 +298,39 @@ export async function mintLangySessionApiKey({
   }
 
   const service = ApiKeyService.create(prisma);
-  const { token } = await service.create({
-    // Reserved name — hidden from the API-keys UI so per-session keys don't
-    // clutter the list (see HIDDEN_SYSTEM_KEY_NAMES).
-    name: LANGY_SESSION_API_KEY_NAME,
-    description:
-      "Ephemeral per-session key for the Langy assistant. Mirrors your own " +
-      "permissions in this project and auto-expires — revoked automatically " +
-      "when it lapses.",
-    // OWNED by the requesting user → their permissions are the ceiling.
-    userId: session.user.id,
-    createdByUserId: session.user.id,
-    organizationId,
-    permissionMode: "restricted",
-    permissions: heldPermissions,
-    bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: projectId }],
-    expiresAt: new Date(Date.now() + LANGY_SESSION_KEY_TTL_MS),
-  });
+  // Its own span: this is the INSERT (plus the ceiling check). Separating it from
+  // the probes above is the point — a fat `mint` span tells you nothing, but
+  // "probes 40ms / insert 8ms" tells you exactly which half to attack. It also
+  // makes the per-turn row churn visible in the trace: one of these per turn.
+  const { token } = await tracer.withActiveSpan(
+    "langy.mint.create_api_key",
+    {
+      attributes: {
+        "tenant.id": projectId,
+        "langy.permission.granted": heldPermissions.length,
+      },
+    },
+    async () =>
+      service.create({
+        // Reserved name — hidden from the API-keys UI so per-session keys don't
+        // clutter the list (see HIDDEN_SYSTEM_KEY_NAMES).
+        name: LANGY_SESSION_API_KEY_NAME,
+        description:
+          "Ephemeral per-session key for the Langy assistant. Mirrors your own " +
+          "permissions in this project and auto-expires — revoked automatically " +
+          "when it lapses.",
+        // OWNED by the requesting user → their permissions are the ceiling.
+        userId: session.user.id,
+        createdByUserId: session.user.id,
+        organizationId,
+        permissionMode: "restricted",
+        permissions: heldPermissions,
+        bindings: [
+          { role: "CUSTOM", scopeType: "PROJECT", scopeId: projectId },
+        ],
+        expiresAt: new Date(Date.now() + LANGY_SESSION_KEY_TTL_MS),
+      }),
+  );
 
   return token;
 }

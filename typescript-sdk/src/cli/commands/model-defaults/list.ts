@@ -74,7 +74,7 @@ export const listModelDefaultsCommand = async (options?: {
     }
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch default models" });
+    failSpinner({ spinner, error, action: "fetch default models", format: options?.format });
     process.exit(1);
   }
 };

@@ -63,7 +63,7 @@ export const listSuitesCommand = async (options?: { format?: string }): Promise<
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch suites" });
+    failSpinner({ spinner, error, action: "fetch suites", format: options?.format });
     process.exit(1);
   }
 };

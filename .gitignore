@@ -136,3 +136,4 @@ langwatch/e2e/langy/scenario-logs/
 
 # Dev server logs
 server.log
+langwatch/dev.log

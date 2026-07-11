@@ -297,21 +297,21 @@ func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials,
 
 	plugin := fmt.Sprintf("@devtheops/opencode-plugin-otel@%s", otelPluginVersion)
 
+	// No "mcp" block. The worker reaches LangWatch through the `langwatch` CLI
+	// and nothing else — that is the transport every skill is written against
+	// (each skill's frontmatter says so outright: "the `langwatch` CLI is the
+	// only interface"). Attaching the MCP server as a second transport injected
+	// its whole tool-schema set into EVERY turn's context for capability the CLI
+	// already has. The worker's credentials reach the CLI through the process env
+	// (see buildWorkerEnv), not through a server config block.
+	//
+	// This is about what the AGENT consumes. The MCP server package itself is
+	// untouched — it remains the customer-facing surface for Claude Desktop /
+	// Cursor.
 	config := map[string]any{
 		"$schema": "https://opencode.ai/config.json",
 		"model":   model,
 		"plugin":  []string{plugin},
-		"mcp": map[string]any{
-			"langwatch": map[string]any{
-				"type":    "local",
-				"command": []string{"langwatch-mcp-server"},
-				"enabled": true,
-				"environment": map[string]string{
-					"LANGWATCH_API_KEY":  creds.LangwatchAPIKey,
-					"LANGWATCH_ENDPOINT": creds.LangwatchEndpoint,
-				},
-			},
-		},
 	}
 
 	configPath := filepath.Join(configDir, "config.json")
@@ -373,7 +373,7 @@ func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials,
 // HTTP_PROXY so the worker's tools (`gh`, `git`, `npm`, `curl`, `pip`) egress
 // THROUGH the adapter, which enforces the require-TLS / throttle / allow-list /
 // FQDN-floor rungs. The in-cluster control-plane + gateway hosts and loopback
-// are put in NO_PROXY so the MCP server's LangWatch-API calls and opencode's
+// are put in NO_PROXY so the `langwatch` CLI's LangWatch-API calls and opencode's
 // LLM traffic go direct (they have their own explicit NetworkPolicy egress
 // rules; routing them through the per-worker proxy would add a hop and expose
 // LLM streaming to the throttle).

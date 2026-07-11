@@ -82,7 +82,7 @@ export const listCommand = async (options?: { format?: string }): Promise<void> 
         ),
       );
     } catch (error) {
-      failSpinner({ spinner, error, action: "fetch prompts" });
+      failSpinner({ spinner, error, action: "fetch prompts", format: options?.format });
       process.exit(1);
     }
   } catch (error) {

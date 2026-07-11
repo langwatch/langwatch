@@ -23,7 +23,21 @@
  * the fallback are ONLY the docs/schema helpers (`fetch_langwatch_docs`,
  * `fetch_scenario_docs`, `discover_schema`), which render as clean activity
  * lines (see LangyToolActivity), not raw JSON — every resource read has a card.
+ *
+ * TRANSPORT: Langy calls the `langwatch` CLI, so a live tool call arrives as
+ * `langwatch.<resource>.<verb>` — rewritten server-side by the CLI envelope out
+ * of the `bash` call opencode actually made. Those resolve through `cliCardMap`,
+ * which derives the structure from `feature-map.json`; this module words them.
+ * The `platform_*` / `search_traces` names below are the older MCP transport,
+ * kept resolving so a conversation recorded under it still replays — new work
+ * goes on the CLI path, and this block retires with the transport.
  */
+
+import {
+  CLI_COLLECTION_VERBS,
+  resolveCliCapability,
+  type CliCapability,
+} from "./cliCardMap";
 
 export type CapabilitySurface =
   | "traces"
@@ -49,6 +63,13 @@ export type CapabilityTone = "read" | "created" | "updated" | "removed";
 /** Which bespoke renderer draws the card. */
 export type CapabilityRenderKind =
   | "traces"
+  /**
+   * A trace SEARCH: a sample of the matched traces, each clickable through to
+   * its drawer, plus a "View in Trace Explorer" link carrying the agent's actual
+   * query. Distinct from `traces` (the older id-and-snippet list), which the
+   * legacy MCP transport still resolves to.
+   */
+  | "traceSample"
   | "trace"
   | "metrics"
   | "evalRun"
@@ -297,11 +318,20 @@ export function normalizeToolName(name: string): string {
   return n;
 }
 
-/** `create` → "New", `delete`/`archive`/`revoke` → "Delete", etc. */
+/**
+ * `create` → "New", `delete`/`archive`/`revoke` → "Delete", etc. Covers both
+ * transports' verbs — the MCP tool names and the CLI's — so a capability is
+ * worded in exactly one place.
+ */
 function verbLabel(verb: string): string {
   switch (verb) {
     case "create":
+    case "init":
       return "New";
+    case "add":
+      return "Add to";
+    case "upload":
+      return "Upload to";
     case "update":
       return "Update";
     case "rename":
@@ -310,7 +340,18 @@ function verbLabel(verb: string): string {
       return "Set";
     case "assign":
       return "Assign";
+    case "restore":
+      return "Restore";
+    case "sync":
+      return "Sync";
+    case "push":
+      return "Push";
+    case "pull":
+      return "Pull";
+    case "duplicate":
+      return "Duplicate";
     case "delete":
+    case "remove":
     case "archive":
     case "revoke":
       return "Delete";
@@ -321,9 +362,112 @@ function verbLabel(verb: string): string {
   }
 }
 
+/** `dataset_records` / `simulation-run` → "dataset records" / "simulation run". */
 function nounLabel(noun: string): string {
   const singular = noun.replace(/_records?$/, " records").replace(/s$/, "");
-  return singular.replace(/_/g, " ");
+  return singular.replace(/[_-]/g, " ");
+}
+
+/**
+ * Word a CLI capability. The CLI's verb grammar is resolved in `cliCardMap`;
+ * how it READS is decided here, alongside the MCP wording, so both transports
+ * speak with one voice: a collection read is titled by its surface ("Traces"),
+ * a single read by its resource ("trace"), a write by what it did.
+ */
+function cliOverline({ command, tone, surface }: CliCapability): string {
+  const noun = nounLabel(command.resource);
+  if (tone !== "read") {
+    return `${verbLabel(command.verb) || command.verb} ${noun}`;
+  }
+  if (command.verb === "run") return `Run ${noun}`;
+  if (CLI_COLLECTION_VERBS.has(command.verb)) return SURFACE_LABEL[surface];
+  return noun;
+}
+
+/**
+ * `search` → "Searching", `create` → "Creating". The present-tense twin of
+ * {@link verbLabel}: the same verb grammar, worded for a call that is still
+ * RUNNING. Kept beside it so the two never drift out of sync.
+ */
+function progressVerb(verb: string): string {
+  switch (verb) {
+    case "search":
+    case "query":
+      return "Searching";
+    case "list":
+    case "versions":
+    case "list-runs":
+    case "records":
+      return "Listing";
+    case "get":
+    case "show":
+    case "view":
+      return "Loading";
+    case "create":
+    case "init":
+      return "Creating";
+    case "add":
+      return "Adding to";
+    case "upload":
+      return "Uploading to";
+    case "update":
+    case "set":
+    case "rename":
+    case "assign":
+      return "Updating";
+    case "delete":
+    case "remove":
+    case "archive":
+    case "revoke":
+      return "Deleting";
+    case "restore":
+      return "Restoring";
+    case "run":
+      return "Running";
+    case "sync":
+      return "Syncing";
+    case "push":
+      return "Pushing";
+    case "pull":
+      return "Pulling";
+    case "duplicate":
+      return "Duplicating";
+    default:
+      return "Working on";
+  }
+}
+
+/** A capability call that is still in flight, worded for its in-progress card. */
+export interface CapabilityProgress {
+  surface: CapabilitySurface;
+  /** Mono overline — the surface being worked in, e.g. "Analytics". */
+  overline: string;
+  /** Present-tense headline, e.g. "Searching traces", "Creating evaluator". */
+  headline: string;
+}
+
+/**
+ * Word a RUNNING capability call, or null when the name maps to no card.
+ *
+ * The settled card says what came back; this says what is happening, named
+ * after the thing it is happening to — "Analytics · searching traces", not
+ * "Coding". Tone is deliberately NOT carried: a create that hasn't finished is
+ * not yet a "created" (green, ticked) card, so the in-progress shell always
+ * renders in the neutral read tone.
+ */
+export function resolveCapabilityProgress(
+  rawName: string,
+): CapabilityProgress | null {
+  const cli = resolveCliCapability(rawName);
+  if (!cli) return null;
+  const noun = CLI_COLLECTION_VERBS.has(cli.command.verb)
+    ? SURFACE_LABEL[cli.surface].toLowerCase()
+    : nounLabel(cli.command.resource);
+  return {
+    surface: cli.surface,
+    overline: SURFACE_LABEL[cli.surface],
+    headline: `${progressVerb(cli.command.verb)} ${noun}`,
+  };
 }
 
 /**
@@ -333,6 +477,20 @@ function nounLabel(noun: string): string {
 export function resolveCapability(
   rawName: string,
 ): CapabilityDescriptor | null {
+  // Langy's transport is the CLI, so this is the live path: a call arrives as
+  // `langwatch.<resource>.<verb>` and resolves off the feature map. It runs
+  // before `normalizeToolName`, which would strip the `langwatch.` prefix that
+  // identifies it.
+  const cli = resolveCliCapability(rawName);
+  if (cli) {
+    return {
+      render: cli.render,
+      tone: cli.tone,
+      surface: cli.surface,
+      overline: cliOverline(cli),
+    };
+  }
+
   const name = normalizeToolName(rawName);
   if (EXPLICIT[name]) return EXPLICIT[name];
 
@@ -411,7 +569,9 @@ export function extractToolText(output: unknown): string {
     if (Array.isArray(content)) {
       const parts = content
         .map((c) =>
-          c && typeof c === "object" && typeof (c as { text?: unknown }).text === "string"
+          c &&
+          typeof c === "object" &&
+          typeof (c as { text?: unknown }).text === "string"
             ? (c as { text: string }).text
             : "",
         )

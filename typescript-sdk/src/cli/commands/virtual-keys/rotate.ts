@@ -36,7 +36,7 @@ export const rotateVirtualKeyCommand = async (
     }
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "rotate virtual key" });
+    failSpinner({ spinner, error, action: "rotate virtual key", format: options?.format });
     process.exit(1);
   }
 };

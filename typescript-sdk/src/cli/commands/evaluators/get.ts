@@ -78,7 +78,7 @@ export const getEvaluatorCommand = async (idOrSlug: string, options?: { format?:
     }
     formatEvaluatorDetails(evaluator);
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch evaluator" });
+    failSpinner({ spinner, error, action: "fetch evaluator", format: options?.format });
     process.exit(1);
   }
 };

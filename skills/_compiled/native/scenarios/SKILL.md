@@ -201,7 +201,7 @@ import { setupScenarioTracing } from "@langwatch/scenario";
 setupScenarioTracing();
 ```
 
-For Python, scenario tracing is configured via `scenario.configure(...)` combined with langwatch setup — defer the exact call signature to the `tracing` skill.
+For Python, scenario tracing is configured via `scenario.configure(...)` combined with `langwatch.setup()` — defer the exact call signature to the `tracing` skill.
 
 **2. Agent-under-test tracing** — instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
 

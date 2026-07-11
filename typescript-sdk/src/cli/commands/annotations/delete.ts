@@ -18,7 +18,7 @@ export const deleteAnnotationCommand = async (id: string, options?: { format?: s
       console.log(JSON.stringify({ id, deleted: true }, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete annotation" });
+    failSpinner({ spinner, error, action: "delete annotation", format: options?.format });
     process.exit(1);
   }
 };

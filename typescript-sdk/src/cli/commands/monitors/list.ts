@@ -81,7 +81,7 @@ export const listMonitorsCommand = async (options?: {
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch monitors" });
+    failSpinner({ spinner, error, action: "fetch monitors", format: options?.format });
     process.exit(1);
   }
 };

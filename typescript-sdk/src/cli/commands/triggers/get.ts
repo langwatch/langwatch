@@ -70,7 +70,7 @@ export const getTriggerCommand = async (
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch trigger" });
+    failSpinner({ spinner, error, action: "fetch trigger", format: options?.format });
     process.exit(1);
   }
 };

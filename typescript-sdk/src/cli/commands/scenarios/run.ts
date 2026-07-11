@@ -156,7 +156,7 @@ export const runScenarioCommand = async (
     // Clean up ephemeral suite
     await suitesService.delete(suite.id).catch(() => undefined);
   } catch (error) {
-    failSpinner({ spinner, error, action: "run scenario" });
+    failSpinner({ spinner, error, action: "run scenario", format: options?.format });
     process.exit(1);
   }
 };

@@ -67,7 +67,7 @@ export const listEvaluatorsCommand = async (options?: { format?: string }): Prom
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch evaluators" });
+    failSpinner({ spinner, error, action: "fetch evaluators", format: options?.format });
     process.exit(1);
   }
 };

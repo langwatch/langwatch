@@ -58,7 +58,7 @@ export const getSuiteCommand = async (
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch suite" });
+    failSpinner({ spinner, error, action: "fetch suite", format: options?.format });
     process.exit(1);
   }
 };

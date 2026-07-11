@@ -1,5 +1,5 @@
-# Langy agent pod image — the OpenCode "manager" plus the LangWatch CLI +
-# MCP server the per-session workers shell out to.
+# Langy agent pod image — the OpenCode "manager" plus the LangWatch CLI the
+# per-session workers shell out to.
 #
 # Built by the `langyagent` matrix entry in
 # .github/workflows/publish-docker-app.yml on `langwatch@*` releases, and
@@ -12,7 +12,7 @@
 # Two-stage build: stage one compiles the Go manager binary from the
 # repo's mono-binary (services/langyagent/ is the package, dispatched via
 # cmd/service). Stage two is the runtime image with all the tooling the
-# workers shell out to (opencode, gh, langwatch CLI/MCP, OTel plugin).
+# workers shell out to (opencode, gh, langwatch CLI, OTel plugin).
 
 # -----------------------------------------------------------------------------
 # Stage 1: build the Go manager binary.
@@ -63,14 +63,71 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -o /out/langyagent ./cmd/service
 
 # -----------------------------------------------------------------------------
+# Stage 1b: compile the `langwatch` CLI into a single native binary with Bun.
+# -----------------------------------------------------------------------------
+# WHY THIS EXISTS: the agent's ONLY interface to LangWatch is shelling out to
+# the `langwatch` CLI, so every tool call the model makes is a fresh process
+# spawn. Installed from npm it runs under Node, which costs ~220ms per
+# invocation (measured: mean 222ms, min 125ms) just to boot the interpreter and
+# evaluate the module graph — before a single line of our code runs. A
+# Bun-compiled binary embeds a bytecode snapshot of the whole bundle and starts
+# in ~87ms (mean; min 59ms) — 2.6x faster, ~135ms saved on EVERY CLI call, and
+# an agent turn makes several.
+#
+# This replaces `npm install -g langwatch@X` below. The trade is image size:
+# the binary is ~99MB (it embeds the Bun runtime) against a much smaller npm
+# package — but it removes a network install from the build and a Node boot
+# from every tool call.
+#
+# The npm/tsup build is untouched and remains how the public `langwatch`
+# package is produced; this stage only compiles an extra artifact for this
+# image. See typescript-sdk/scripts/build-cli-binary.ts.
+FROM oven/bun:1.3.13-debian AS cli-builder
+
+WORKDIR /src
+
+# pnpm resolves the CLI's lockfile + the `../packages/cli-cards` workspace link;
+# the bun image ships no Node, and pnpm needs one.
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g pnpm@10.24.0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# typescript-sdk/pnpm-workspace.yaml declares `.` + `../packages/cli-cards`, so
+# both trees must be present for `workspace:*` to resolve. cli-cards is
+# source-only (its `main` points at src/index.ts) and is bundled into the binary.
+COPY packages/cli-cards ./packages/cli-cards
+COPY typescript-sdk ./typescript-sdk
+
+WORKDIR /src/typescript-sdk
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# BuildKit fills TARGETARCH from the target platform. Map it to Bun's target
+# triple so `--platform linux/arm64` (Graviton/gVisor) produces an arm64 binary
+# rather than silently emitting the builder's native arch — the same trap the Go
+# stage above documents.
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) bun_target=bun-linux-x64 ;; \
+      arm64) bun_target=bun-linux-arm64 ;; \
+      *) echo "unsupported TARGETARCH for the CLI binary: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /out; \
+    bun run scripts/build-cli-binary.ts --target="${bun_target}" --outfile=/out/langwatch; \
+    chmod 0755 /out/langwatch
+
+# -----------------------------------------------------------------------------
 # Stage 2: runtime image.
 # -----------------------------------------------------------------------------
 FROM ubuntu:26.04
 
-# Pin the CLI + MCP versions the agent was validated against. Bump these
-# in lockstep with a tested release rather than tracking `latest`.
+# Pin the CLI version the agent was validated against. Bump it in lockstep with
+# a tested release rather than tracking `latest`. The CLI is the agent's ONLY
+# LangWatch interface — the skills and AGENTS.md are written against this exact
+# grammar, so a bump means re-checking the command table in AGENTS.md.template.
 ARG LANGWATCH_CLI_VERSION=0.31.0
-ARG LANGWATCH_MCP_VERSION=0.10.1
 # opencode has no native OpenTelemetry export, so the per-session worker loads
 # this opencode plugin to emit session/llm/tool spans over OTLP into the user's
 # LangWatch project. Pinned; opencode auto-loads it by name from the per-worker
@@ -105,9 +162,9 @@ RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/
     && rm -rf /var/lib/apt/lists/* \
     && gh --version
 
-# Node is still required at runtime: opencode is a Node application and
-# the langwatch CLI / MCP server ship as npm packages. The manager itself
-# is now a Go binary (see stage 1) — there is no `server.js` anymore.
+# Node is still required at runtime: opencode is a Node application and the
+# langwatch CLI ships as an npm package. The manager itself is now a Go binary
+# (see stage 1) — there is no `server.js` anymore.
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -144,14 +201,37 @@ RUN set -eux; \
     rm -f /tmp/opencode /tmp/opencode.tar.gz; \
     opencode --version
 
-# CLI (`langwatch`) + MCP server (`langwatch-mcp-server`) from npm. Replaces
-# the old locally-`pnpm pack`'d tarballs so the image builds reproducibly in
-# CI with no host-side build step. The opencode OTel plugin is installed here
-# too so the pinned version is present in the image (and the build fails fast
-# if the version is bad) rather than relying solely on opencode's runtime fetch.
-RUN npm install -g "langwatch@${LANGWATCH_CLI_VERSION}" \
-    "@langwatch/mcp-server@${LANGWATCH_MCP_VERSION}" \
-    "@devtheops/opencode-plugin-otel@${OPENCODE_OTEL_PLUGIN_VERSION}"
+# CLI (`langwatch`) from npm. Replaces the old locally-`pnpm pack`'d tarballs so
+# the image builds reproducibly in CI with no host-side build step. The opencode
+# OTel plugin is installed here too so the pinned version is present in the image
+# (and the build fails fast if the version is bad) rather than relying solely on
+# opencode's runtime fetch.
+#
+# The LangWatch MCP server is deliberately NOT installed: the agent talks to
+# LangWatch through the CLI alone (see AGENTS.md.template and setupWorkerHome —
+# the per-worker opencode config has no "mcp" block). Shipping the binary anyway
+# would leave a second, unused transport a worker could still shell out to. The
+# MCP server package itself is unaffected — it remains the customer-facing
+# surface for Claude Desktop / Cursor, just not something this image carries.
+RUN npm install -g "@devtheops/opencode-plugin-otel@${OPENCODE_OTEL_PLUGIN_VERSION}"
+
+# The `langwatch` CLI as a single self-contained native binary, compiled from
+# THIS repo's typescript-sdk/ by the cli-builder stage — no longer
+# `npm install -g langwatch@<pinned>`. Two consequences worth knowing:
+#
+#   1. SPEED. Every tool call the model makes spawns this process; a Node boot
+#      cost ~222ms, the binary ~87ms. See the cli-builder stage for the numbers.
+#   2. VERSION. The CLI is now built from source in lockstep with the rest of
+#      the repo, so it can no longer drift behind (or ahead of) the manager and
+#      the skills. LANGWATCH_CLI_VERSION is retained only as the version string
+#      the binary reports; the code is whatever this commit contains. The
+#      AGENTS.md command grammar is now validated against the same tree.
+COPY --from=cli-builder /out/langwatch /usr/local/bin/langwatch
+
+# Fail the build here rather than at 2am in a worker: a binary that compiles but
+# dies on first invocation (a missing compile-time define, an unbundled dynamic
+# require) is worse than the npm install it replaced.
+RUN langwatch --version
 
 # Surface the pinned plugin version to the manager so each per-worker
 # opencode config requests the exact same version opencode loads.

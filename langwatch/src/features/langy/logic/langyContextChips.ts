@@ -1,0 +1,48 @@
+import type { LangyContextChip } from "../stores/langyStore";
+
+/**
+ * Compose the candidate context-chip list from every source, in priority order.
+ *
+ * Callers pass their sources already flattened, MOST-SPECIFIC FIRST. The first
+ * chip to claim an id wins; later duplicates are dropped. That ordering is what
+ * makes a clicked target and an auto-derived one collapse into a single chip:
+ * open the trace drawer for `abc123` (Langy derives `trace:abc123` from the
+ * URL) and then click the same trace's row, and the composer still shows one
+ * chip — the auto-derived one, whose label came from the richer source.
+ *
+ * Pure, so the merge rule can be unit-tested without a router or a store.
+ */
+export function mergeContextChips(
+  sources: (LangyContextChip | null | undefined)[],
+): LangyContextChip[] {
+  const merged: LangyContextChip[] = [];
+  const seen = new Set<string>();
+
+  for (const chip of sources) {
+    if (!chip || seen.has(chip.id)) continue;
+    seen.add(chip.id);
+    merged.push(chip);
+  }
+
+  return merged;
+}
+
+/**
+ * Shorten a long id for a chip label: `3f9a01…c2`. Shared so a chip minted by a
+ * clicked trace row reads identically to the one the route derives — same id,
+ * same label, so they dedupe instead of stacking.
+ */
+export function shortenChipId(id: string): string {
+  if (id.length <= 10) return id;
+  return `${id.slice(0, 6)}…${id.slice(-2)}`;
+}
+
+/** The stable chip a trace becomes, wherever it was picked up from. */
+export function traceContextChip(traceId: string): LangyContextChip {
+  return {
+    id: `trace:${traceId}`,
+    kind: "trace",
+    label: `trace ${shortenChipId(traceId)}`,
+    ref: traceId,
+  };
+}

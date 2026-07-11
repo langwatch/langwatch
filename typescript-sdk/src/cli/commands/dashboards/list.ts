@@ -57,7 +57,7 @@ export const listDashboardsCommand = async (options?: { format?: string }): Prom
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch dashboards" });
+    failSpinner({ spinner, error, action: "fetch dashboards", format: options?.format });
     process.exit(1);
   }
 };

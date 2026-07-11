@@ -1,6 +1,7 @@
 package workerpool
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -288,6 +289,66 @@ func TestMaybeChown_NoOpWhenIsolationDisabled(t *testing.T) {
 
 	if err := maybeChown(missing, 2345, false); err == nil {
 		t.Errorf("maybeChown(disableIsolation=false) on a missing path = nil, want an error (syscall must run)")
+	}
+}
+
+// The worker's opencode config.json decides which LangWatch transport the agent
+// gets. It is the `langwatch` CLI and nothing else: no MCP server, ever. This
+// pins that — a config.json carrying an "mcp" key would re-inject the whole
+// tool-schema set into every turn's context for capability the CLI already has,
+// and would put a second, divergent transport in front of skills that are written
+// against the CLI alone.
+//
+// The skills symlink is asserted alongside it: with MCP gone, skills + CLI ARE
+// the capability surface, so a silently-missing symlink is a total loss of it.
+func TestSetupWorkerHome_WritesCLIOnlyConfig(t *testing.T) {
+	home := t.TempDir()
+	workspace := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
+		t.Fatalf("mkdir shared skills: %v", err)
+	}
+
+	creds := domain.Credentials{
+		LangwatchAPIKey:   "sk-lw-test-key",
+		LLMVirtualKey:     "vk-test",
+		GatewayBaseURL:    "https://gateway.test",
+		LangwatchEndpoint: "https://app.test",
+	}
+
+	// disableIsolation=true: the test process is unprivileged, so the chowns would
+	// EPERM. The config.json content under test is unaffected by it.
+	if err := setupWorkerHome(home, workspace, creds, 0, "1.0.0", "# AGENTS\n${LANGWATCH_ENDPOINT}\n", true); err != nil {
+		t.Fatalf("setupWorkerHome: %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(home, ".config", "opencode", "config.json"))
+	if err != nil {
+		t.Fatalf("read config.json: %v", err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("unmarshal config.json: %v", err)
+	}
+
+	if _, present := cfg["mcp"]; present {
+		t.Errorf("config.json contains an %q key; Langy is CLI + skills only, no MCP server (got %v)", "mcp", cfg["mcp"])
+	}
+	if cfg["model"] == nil || cfg["plugin"] == nil {
+		t.Errorf("config.json lost unrelated keys: model=%v plugin=%v", cfg["model"], cfg["plugin"])
+	}
+
+	// Not a plaintext leak either: with no mcp block, the API key must not appear
+	// anywhere in the config file. The CLI reads it from the process env instead.
+	if strings.Contains(string(raw), creds.LangwatchAPIKey) {
+		t.Errorf("config.json contains the LangWatch API key; it belongs in the worker process env, not the opencode config")
+	}
+
+	target, err := os.Readlink(openCodeSkillsDir(home))
+	if err != nil {
+		t.Fatalf("skills symlink missing — with MCP gone, skills + CLI are the entire capability surface: %v", err)
+	}
+	if want := filepath.Join(workspace, "skills"); target != want {
+		t.Errorf("skills link target = %q, want %q", target, want)
 	}
 }
 

@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useCallback, useMemo } from "react";
+import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
 import {
   getColumnSizingKey,
@@ -236,6 +237,16 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                 isLoading={isLoading}
                 isFirstOfErrorRun={
                   !isLoading && isFirstOfErrorRun[virtualItem.index]
+                }
+                // A row in the trace lens IS a trace, so it offers itself to
+                // Langy as one: while the panel is open the row picks up a
+                // subtle gradient ring and clicking it drops the trace into
+                // the composer's context. Skeleton rows have no trace to
+                // offer. Same chip factory the route/drawer use, so pointing
+                // at a trace you already have open dedupes instead of
+                // stacking a second chip.
+                langyTarget={
+                  isLoading ? null : traceContextChip(row.original.traceId)
                 }
               />
             );
