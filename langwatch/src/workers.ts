@@ -49,7 +49,7 @@ async function gracefulShutdown(): Promise<void> {
 process.on("SIGINT", () => void gracefulShutdown());
 process.on("SIGTERM", () => void gracefulShutdown());
 
-void startWorkers({ startMetricsServer: true })
+void startWorkers({ shouldStartMetricsServer: true })
   .then((handle) => {
     workerHandle = handle;
   })

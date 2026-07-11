@@ -122,7 +122,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // `!== "production"`) so this matches scripts/start.sh's lane-skip predicate.
   // If they disagreed, an exotic NODE_ENV (e.g. "staging") would spawn BOTH the
   // standalone workers lane AND the in-process stack — duplicate consumers.
-  const inProcessWorkers =
+  const isInProcessWorkerModeEnabled =
     process.env.NODE_ENV === "development" &&
     (process.env.WORKERS_IN_PROCESS === "1" ||
       process.env.WORKERS_IN_PROCESS === "true");
@@ -131,7 +131,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // This was previously done by Next.js instrumentation hook. In-process mode
   // boots with the "all" role so the outbox consumer / drainer / heartbeat
   // scheduler wire up exactly as on a dedicated worker.
-  if (inProcessWorkers) {
+  if (isInProcessWorkerModeEnabled) {
     initializeInProcessApp();
   } else {
     initializeWebApp();
@@ -255,7 +255,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
           res.end("Unauthorized");
           return;
         }
-        if (pathname === "/metrics" || inProcessWorkers) {
+        if (pathname === "/metrics" || isInProcessWorkerModeEnabled) {
           // /metrics, or /workers/metrics in single-process mode: the workers
           // share this process's prom-client registry (no separate listener),
           // so both paths serve the same registry.
@@ -428,12 +428,13 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // the process exit cleanly; it just won't drain workers that are still
   // mid-boot. A boot failure is logged and the web server keeps running (only
   // the background jobs won't run).
-  if (inProcessWorkers) {
+  if (isInProcessWorkerModeEnabled) {
     logger.info("WORKERS_IN_PROCESS=1 — hosting the worker stack in-process");
     try {
-      // startMetricsServer: false — in one process the worker prom registry is
-      // this process's registry, already served at /metrics; no second listener.
-      workerHandle = await startWorkers({ startMetricsServer: false });
+      // shouldStartMetricsServer: false — in one process the worker prom
+      // registry is this process's registry, already served at /metrics; no
+      // second listener.
+      workerHandle = await startWorkers({ shouldStartMetricsServer: false });
       logger.info("in-process workers ready");
     } catch (error) {
       logger.error(

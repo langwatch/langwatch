@@ -208,7 +208,7 @@ The imperative worker boot (topic clustering, scenario pool, anomaly / spend-spi
 / usage-stats workers, ingestion pullers, storage stats) is extracted from the
 `src/workers.ts` entrypoint into a reusable `startWorkers()`
 (`src/server/workers/startWorkers.ts`). The standalone worker calls it with its
-own metrics HTTP server; `src/start.ts` calls it with `startMetricsServer: false`
+own metrics HTTP server; `src/start.ts` calls it with `shouldStartMetricsServer: false`
 (the web server already serves the shared prom registry at `/metrics`) after the
 server is listening, and drains it before closing the shared App on shutdown.
 

@@ -43,15 +43,23 @@ describe("roleRunsWorkers", () => {
 describe("roleSatisfiesRunIn", () => {
   describe("given a reactor with no runIn filter", () => {
     it("runs under any role (undefined filter means run everywhere)", () => {
-      expect(roleSatisfiesRunIn(undefined, "web")).toBe(true);
-      expect(roleSatisfiesRunIn(undefined, "worker")).toBe(true);
-      expect(roleSatisfiesRunIn(undefined, "all")).toBe(true);
+      expect(roleSatisfiesRunIn({ runIn: undefined, processRole: "web" })).toBe(
+        true,
+      );
+      expect(
+        roleSatisfiesRunIn({ runIn: undefined, processRole: "worker" }),
+      ).toBe(true);
+      expect(roleSatisfiesRunIn({ runIn: undefined, processRole: "all" })).toBe(
+        true,
+      );
     });
   });
 
   describe("given the process role is undefined", () => {
     it("does not exclude the reactor (backwards-compatible run-everywhere)", () => {
-      expect(roleSatisfiesRunIn(["worker"], undefined)).toBe(true);
+      expect(
+        roleSatisfiesRunIn({ runIn: ["worker"], processRole: undefined }),
+      ).toBe(true);
     });
   });
 
@@ -60,39 +68,55 @@ describe("roleSatisfiesRunIn", () => {
     // "all", otherwise `pnpm dev:single` boots the worker stack but every
     // runIn-gated reactor is silently skipped.
     it("satisfies a worker-only runIn filter", () => {
-      expect(roleSatisfiesRunIn(["worker"], "all")).toBe(true);
+      expect(
+        roleSatisfiesRunIn({ runIn: ["worker"], processRole: "all" }),
+      ).toBe(true);
     });
 
     it("satisfies a web+worker runIn filter", () => {
-      expect(roleSatisfiesRunIn(["web", "worker"], "all")).toBe(true);
+      expect(
+        roleSatisfiesRunIn({ runIn: ["web", "worker"], processRole: "all" }),
+      ).toBe(true);
     });
 
     it("satisfies even a web-only runIn filter (all plays every role)", () => {
-      expect(roleSatisfiesRunIn(["web"], "all")).toBe(true);
+      expect(roleSatisfiesRunIn({ runIn: ["web"], processRole: "all" })).toBe(
+        true,
+      );
     });
   });
 
   describe("given a dedicated role and a matching filter", () => {
     it("runs a worker reactor under the worker role", () => {
-      expect(roleSatisfiesRunIn(["worker"], "worker")).toBe(true);
+      expect(
+        roleSatisfiesRunIn({ runIn: ["worker"], processRole: "worker" }),
+      ).toBe(true);
     });
 
     it("runs a web+worker reactor under the web role", () => {
-      expect(roleSatisfiesRunIn(["web", "worker"], "web")).toBe(true);
+      expect(
+        roleSatisfiesRunIn({ runIn: ["web", "worker"], processRole: "web" }),
+      ).toBe(true);
     });
   });
 
   describe("given a dedicated role and a non-matching filter", () => {
     it("excludes a worker-only reactor under the web role", () => {
-      expect(roleSatisfiesRunIn(["worker"], "web")).toBe(false);
+      expect(
+        roleSatisfiesRunIn({ runIn: ["worker"], processRole: "web" }),
+      ).toBe(false);
     });
 
     it("excludes a web-only reactor under the worker role", () => {
-      expect(roleSatisfiesRunIn(["web"], "worker")).toBe(false);
+      expect(
+        roleSatisfiesRunIn({ runIn: ["web"], processRole: "worker" }),
+      ).toBe(false);
     });
 
     it("excludes a worker-only reactor under the migration role", () => {
-      expect(roleSatisfiesRunIn(["worker"], "migration")).toBe(false);
+      expect(
+        roleSatisfiesRunIn({ runIn: ["worker"], processRole: "migration" }),
+      ).toBe(false);
     });
   });
 });

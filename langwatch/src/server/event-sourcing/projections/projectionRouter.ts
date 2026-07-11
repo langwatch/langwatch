@@ -1347,7 +1347,10 @@ export class ProjectionRouter<
 
   /** Returns true if the reactor's runIn filter excludes the current processRole. */
   private isReactorExcluded(reactor: ReactorDefinition<EventType>): boolean {
-    return !roleSatisfiesRunIn(reactor.options?.runIn, this.processRole);
+    return !roleSatisfiesRunIn({
+      runIn: reactor.options?.runIn,
+      processRole: this.processRole,
+    });
   }
 
   private async resolveRetention(

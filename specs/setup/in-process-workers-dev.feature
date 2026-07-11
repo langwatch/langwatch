@@ -17,7 +17,7 @@ Feature: In-process workers for local development
   #   - scripts/check-ports.sh  — doesn't reserve the worker-metrics port
   #                               (no separate metrics listener in this mode)
   #   - src/start.ts            — boots the App with the "all" role and calls
-  #                               startWorkers({ startMetricsServer: false })
+  #                               startWorkers({ shouldStartMetricsServer: false })
   #                               after the server is listening
   #
   # The "all" role runs the same worker-side wiring as "worker" via

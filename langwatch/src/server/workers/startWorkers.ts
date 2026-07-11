@@ -1,6 +1,6 @@
 import http from "http";
 import { register } from "prom-client";
-import { verifyRedisReady } from "~/server/redis";
+import { assertRedisReady } from "~/server/redis";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:workers");
@@ -23,7 +23,7 @@ export interface StartWorkersOptions {
    * `GET /workers/metrics`); off for the in-process dev mode, where the web
    * server already serves the shared registry at `/metrics`.
    */
-  startMetricsServer?: boolean;
+  shouldStartMetricsServer?: boolean;
 }
 
 type ShutdownHandles = Array<() => Promise<void> | void>;
@@ -195,8 +195,13 @@ async function bootMetricsServer(
         res.writeHead(500).end();
       });
   });
-  metricsServer.listen(metricsPort, () => {
-    logger.info(`worker metrics server listening on port ${metricsPort}`);
+  await new Promise<void>((resolve, reject) => {
+    metricsServer.once("error", reject);
+    metricsServer.listen(metricsPort, () => {
+      metricsServer.removeListener("error", reject);
+      logger.info(`worker metrics server listening on port ${metricsPort}`);
+      resolve();
+    });
   });
   shutdownHandles.push(
     () => new Promise<void>((resolve) => metricsServer.close(() => resolve())),
@@ -228,31 +233,48 @@ async function bootMetricsServer(
 export async function startWorkers(
   options?: StartWorkersOptions,
 ): Promise<WorkerHandle> {
-  const startMetricsServer = options?.startMetricsServer ?? true;
+  const shouldStartMetricsServer = options?.shouldStartMetricsServer ?? true;
 
   // Resources that hold OS-level handles — child processes, sockets, timers,
   // Redis subscribers — and must be released on shutdown. Populated as each
   // worker boots below.
   const shutdownHandles: ShutdownHandles = [];
+  const closeRegisteredWorkers = async (): Promise<void> => {
+    // Reverse order: later stages may depend on earlier ones (e.g. the
+    // scenario processor depends on the pool it registered into), so tear
+    // down newest-first.
+    await Promise.allSettled(
+      [...shutdownHandles].reverse().map((close) => close()),
+    );
+  };
 
-  await verifyRedisReady();
+  await assertRedisReady();
   await verifyDatabaseReady();
 
-  await bootIngestionPuller(shutdownHandles);
-  await bootTopicClustering(shutdownHandles);
-  await bootStorageStatsCollection(shutdownHandles);
-  await bootScenarioProcessor(shutdownHandles);
-  await bootAnomalyWorker(shutdownHandles);
-  await bootSpendSpikeAnomalyWorker(shutdownHandles);
-  await bootUsageStatsWorker(shutdownHandles);
-  if (startMetricsServer) {
-    await bootMetricsServer(shutdownHandles);
+  try {
+    await bootIngestionPuller(shutdownHandles);
+    await bootTopicClustering(shutdownHandles);
+    await bootStorageStatsCollection(shutdownHandles);
+    await bootScenarioProcessor(shutdownHandles);
+    await bootAnomalyWorker(shutdownHandles);
+    await bootSpendSpikeAnomalyWorker(shutdownHandles);
+    await bootUsageStatsWorker(shutdownHandles);
+    if (shouldStartMetricsServer) {
+      await bootMetricsServer(shutdownHandles);
+    }
+  } catch (error) {
+    // A later stage failed after earlier stages already registered live
+    // resources (child processes, timers, sockets) — close them before
+    // rethrowing, or a partial boot failure leaks them silently.
+    logger.error({ error }, "worker boot failed partway — rolling back");
+    await closeRegisteredWorkers();
+    throw error;
   }
 
   return {
     shutdown: async () => {
       logger.info({ count: shutdownHandles.length }, "shutting down workers");
-      await Promise.allSettled(shutdownHandles.map((close) => close()));
+      await closeRegisteredWorkers();
     },
   };
 }

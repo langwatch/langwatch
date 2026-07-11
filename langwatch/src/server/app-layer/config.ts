@@ -25,13 +25,16 @@ export function roleRunsWorkers(role: ProcessRole | undefined): boolean {
  * without this, reactors declared `runIn: ["worker"]` would be excluded in
  * in-process mode and the worker stack would boot but do no reactor work.
  */
-export function roleSatisfiesRunIn(
-  runIn: ProcessRole[] | undefined,
-  role: ProcessRole | undefined,
-): boolean {
-  if (!runIn || !role) return true;
-  if (role === "all") return true;
-  return runIn.includes(role);
+export function roleSatisfiesRunIn({
+  runIn,
+  processRole,
+}: {
+  runIn: ProcessRole[] | undefined;
+  processRole: ProcessRole | undefined;
+}): boolean {
+  if (!runIn || !processRole) return true;
+  if (processRole === "all") return true;
+  return runIn.includes(processRole);
 }
 
 export interface AppConfig {
