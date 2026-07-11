@@ -47,35 +47,36 @@ export function LangyGitHubConnectCard({
   return (
     <Box
       borderWidth="1px"
-      borderColor="border"
+      borderColor="border.muted"
       borderRadius="md"
-      p={4}
+      padding={3}
       maxWidth="420px"
-      bg="bg.panel"
+      background="bg.subtle"
     >
-      <VStack align="stretch" gap={3}>
+      <VStack align="stretch" gap={2}>
         <HStack gap={2}>
-          <GitHub size={18} />
-          <Text fontWeight="600" color="fg">
+          <GitHub size={16} />
+          <Text textStyle="sm" fontWeight="640" color="fg">
             {headline}
           </Text>
         </HStack>
-        <Text fontSize="sm" color="fg.muted">
-          LangWatch will open pull requests authored by your GitHub user. The
-          connection uses short-lived tokens; we never store your password and
-          you can disconnect any time.
+        <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
+          Langy opens PRs authored by your GitHub user, using short-lived
+          tokens.
         </Text>
         <Button
-          colorPalette="gray"
-          variant="solid"
+          size="sm"
           onClick={onClick}
           loading={busy}
           alignSelf="flex-start"
+          background="fg"
+          color="bg"
+          _hover={{ background: "fg.muted" }}
         >
           Connect GitHub
         </Button>
         {error ? (
-          <Text fontSize="xs" color="red.fg">
+          <Text textStyle="xs" color="red.fg">
             {error}
           </Text>
         ) : null}

@@ -17,6 +17,7 @@ import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
 import { parseLangyFeedbackDirective } from "../logic/langyFeedbackDirective";
 import { LangyFeedback } from "./LangyFeedback";
+import { LangyToolActivity, toActivityGroups } from "./LangyToolActivity";
 import { StreamingText } from "./StreamingText";
 
 export interface LangyProposal {
@@ -99,12 +100,17 @@ export function MessageContent({
 
   const proposals = extractProposals(message);
   const prLinks = isUser ? [] : extractGithubPrLinks(text);
+  // Generic CLI/tool-call activity ("Coding", "Analysing traces") for the
+  // assistant turn — counts toward "has something to render" so a turn that is
+  // still running tools (no prose yet) still surfaces its activity.
+  const toolGroups = isUser ? [] : toActivityGroups(message);
   if (
     !text &&
     proposals.length === 0 &&
     !showConnectCard &&
     prLinks.length === 0 &&
-    progress.events.length === 0
+    progress.events.length === 0 &&
+    toolGroups.length === 0
   )
     return null;
 
@@ -163,6 +169,11 @@ export function MessageContent({
               <Markdown>{text}</Markdown>
             </Box>
           ))}
+        {/* Generic CLI/tool-call activity: "Coding", "Analysing traces", and
+            a raw-JSON fallback for tools with no card yet (developer mode
+            exposes the raw view for every tool). Single insertion point;
+            all mapping lives in LangyToolActivity. */}
+        <LangyToolActivity message={message} />
         {showConnectCard && organizationId ? (
           <LangyGitHubConnectCard
             organizationId={organizationId}
