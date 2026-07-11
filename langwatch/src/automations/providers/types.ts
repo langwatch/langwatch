@@ -121,10 +121,14 @@ export interface ConfigFormCtx<TPreview = unknown> {
   /** True when the draft has any evaluations.* filter set — used by the
    *  Slack picker to surface the eval-failure template. */
   hasEvaluationFilter: boolean;
-  /** What the draft triggers on — trace data or a custom-graph alert.
-   *  Notify providers seed their template defaults from this so the editor
-   *  shows the same template dispatch will render. */
-  sourceKind: "trace" | "graphAlert";
+  /** What the draft is about — trace data, a custom-graph alert, or a scheduled
+   *  report. Notify providers seed their template defaults from this AND filter
+   *  the template gallery by it, so a report never offers the per-trace
+   *  (immediate) layouts. */
+  sourceKind: "trace" | "graphAlert" | "report";
+  /** For a report, the content it sends — a table of matching traces, one
+   *  custom graph, or a whole dashboard. Narrows which report layouts apply. */
+  reportSourceKind?: "traceQuery" | "customGraph" | "dashboard";
   /** Send a test notification with the current draft, so the author can try it
    *  from inside the config section. No-op / absent when the draft isn't
    *  test-fireable yet. `testFireLoading` reflects the in-flight send. */

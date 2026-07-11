@@ -29,6 +29,8 @@ import {
 import {
   DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE,
   DEFAULT_ALERT_SLACK_TEMPLATE,
+  DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE,
+  DEFAULT_REPORT_SLACK_TEMPLATE,
   DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
   DEFAULT_SLACK_TEMPLATE,
 } from "~/shared/templating/defaults";
@@ -336,13 +338,20 @@ function SlackConfigForm({
   // must seed the same template — otherwise the shown template and the
   // rendered message disagree.
   const isGraphAlert = ctx.sourceKind === "graphAlert";
+  const isReport = ctx.sourceKind === "report";
+  // The editor must seed the same default dispatch renders for this kind —
+  // otherwise the shown template and the sent message disagree.
   const templateDefault = isBlockKit
     ? isGraphAlert
       ? DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE
-      : DEFAULT_SLACK_BLOCK_KIT_TEMPLATE
+      : isReport
+        ? DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE
+        : DEFAULT_SLACK_BLOCK_KIT_TEMPLATE
     : isGraphAlert
       ? DEFAULT_ALERT_SLACK_TEMPLATE
-      : DEFAULT_SLACK_TEMPLATE;
+      : isReport
+        ? DEFAULT_REPORT_SLACK_TEMPLATE
+        : DEFAULT_SLACK_TEMPLATE;
   const templateValue = slice.template.usingDefault
     ? templateDefault
     : slice.template.value;
@@ -449,9 +458,10 @@ function SlackConfigForm({
               : "Add a webhook URL first"
         }
       />
-      {/* Alerts always deliver immediately (cadence is pinned server-side),
-          so the cadence switch only renders for trace automations. */}
-      {!isGraphAlert ? (
+      {/* Alerts always deliver immediately (cadence is pinned server-side) and
+          reports run on their own cron schedule — so the digest-cadence switch
+          only makes sense for trace automations. */}
+      {!isGraphAlert && !isReport ? (
         <InlineCadenceSelect
           value={ctx.notificationCadence}
           onChange={ctx.setNotificationCadence}

@@ -760,9 +760,17 @@ export function AutomationDrawer({
       setNotificationCadence: (value) =>
         dispatch({ type: "SET_CADENCE", value: value as NotificationCadence }),
       hasEvaluationFilter,
-      // Providers seed editor defaults from this so the template shown in
-      // the editor matches the one dispatch renders for the draft's kind.
-      sourceKind: isGraphAlert ? "graphAlert" : "trace",
+      // Providers seed editor defaults from this AND filter the template
+      // gallery by it, so a report never offers the per-trace layouts.
+      sourceKind:
+        draft.source === "customGraph"
+          ? "graphAlert"
+          : draft.source === "report"
+            ? "report"
+            : "trace",
+      // Narrows a report's layouts to the content it actually sends.
+      reportSourceKind:
+        draft.source === "report" ? draft.report.sourceKind : undefined,
       // Lets a notify provider offer a "Send test" button inside its config.
       onTestFire,
       testFireLoading: testFire.isLoading,
@@ -777,7 +785,8 @@ export function AutomationDrawer({
       draft.notificationCadence,
       dispatch,
       hasEvaluationFilter,
-      isGraphAlert,
+      draft.source,
+      draft.report.sourceKind,
       onTestFire,
       testFire.isLoading,
     ],
