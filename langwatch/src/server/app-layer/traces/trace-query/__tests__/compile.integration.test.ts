@@ -88,6 +88,7 @@ describe("trace-query compiler — cross-tenant isolation (SR-1)", () => {
   });
 
   describe("when tenant acme runs count() grouped by model", () => {
+    /** @scenario "An adversarial cross-tenant corpus returns zero foreign rows" */
     it("returns only its own model bucket, never the foreign model", async () => {
       const rows = await run(
         { aggregations: [{ op: "count", alias: "c" }], groupBy: ["model"], timeRange },
@@ -98,6 +99,7 @@ describe("trace-query compiler — cross-tenant isolation (SR-1)", () => {
       expect(models).not.toContain(GLOBEX_MODEL);
     });
 
+    /** @scenario "Aggregations never leak foreign rows into a bucket" */
     it("counts only its own traces (a leak would inflate the total)", async () => {
       const rows = await run(
         { aggregations: [{ op: "count", alias: "c" }], timeRange },
@@ -109,6 +111,7 @@ describe("trace-query compiler — cross-tenant isolation (SR-1)", () => {
   });
 
   describe("when tenant acme runs p95 latency by model", () => {
+    /** @scenario "A user runs p95 latency by model over the last 7 days" */
     it("produces a bucket for its own model only", async () => {
       const rows = await run(
         {
@@ -154,6 +157,7 @@ describe("trace-query compiler — cross-tenant isolation (SR-1)", () => {
   });
 
   describe("given SR-2: an independent read-only execution layer", () => {
+    /** @scenario "Execution runs under a read-only ClickHouse profile" */
     it("refuses a write issued under readonly=2 — the setting the executor uses", async () => {
       await expect(
         ch.command({
@@ -210,6 +214,7 @@ describe("trace-query compiler — cross-tenant isolation (SR-1)", () => {
   });
 
   describe("when running the full compile → execute path", () => {
+    /** @scenario "The audit log records a redacted shape and hash, never raw literals" */
     it("returns only the caller's rows and audits a redacted query shape", async () => {
       const compiled = compileTraceQuery({
         request: {

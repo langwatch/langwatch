@@ -133,7 +133,7 @@ Feature: Read-only tenant-isolated trace query surface
       Then the identifier is not in the allowlist and compilation fails
       And the emitted SQL (when compilation is forced) contains no table-function call
 
-    @integration
+    @integration @unimplemented
     Scenario: The executing DB user has no SOURCES grant
       Given the query executor uses the langwatch_ops-style read-only user
       When a table function is somehow reached
@@ -156,7 +156,7 @@ Feature: Read-only tenant-isolated trace query surface
       When the user compiles any query
       Then the emitted SQL includes a LIMIT no greater than the configured row cap
 
-    @integration
+    @integration @unimplemented
     Scenario: A deliberately heavy query is stopped by the guardrails
       Given a running ClickHouse test container with schema applied
       When a query designed to exceed the wall-clock or memory cap is executed
@@ -169,7 +169,7 @@ Feature: Read-only tenant-isolated trace query surface
 
   Rule: Payload columns are governed and every query is audited by redacted shape
 
-    @unit
+    @unit @unimplemented
     Scenario: Raw payload columns are filter/aggregate-only by default
       When the user requests a raw input/output/attributes column in the projection
       Then the default column policy rejects returning the raw payload

@@ -47,6 +47,7 @@ function tenantPredicateCount(sql: string): number {
 describe("compileTraceQuery — security core", () => {
   describe("given SR-1: multi-tenant isolation (compiler-injected)", () => {
     describe("when compiling any query", () => {
+      /** @scenario "The outer query carries a compiler-injected tenant predicate" */
       it("constrains the outer table with a compiler-injected tenant predicate", () => {
         const { sql, params } = compileTraceQuery({
           request: countTrace(),
@@ -67,6 +68,7 @@ describe("compileTraceQuery — security core", () => {
     });
 
     describe("when the request body smuggles a foreign tenant id", () => {
+      /** @scenario "A tenant id supplied in the request body is ignored" */
       it("ignores it — the bound tenant is the session's, and the foreign id appears nowhere", () => {
         const rogue = {
           ...countTrace(),
@@ -87,6 +89,7 @@ describe("compileTraceQuery — security core", () => {
     });
 
     describe("when the filter drills into span/event attributes (subqueries)", () => {
+      /** @scenario "Every subquery, CTE, and UNION branch is independently tenant-scoped" */
       it("scopes every generated table reference to the tenant", () => {
         const { sql } = compileTraceQuery({
           request: countTrace({ filter: "span.attribute.http.method:GET" }),
@@ -99,6 +102,7 @@ describe("compileTraceQuery — security core", () => {
     });
 
     describe("when hostile filter text tries to break out of the value slot", () => {
+      /** @scenario "Tenant scope cannot be commented-out or terminated by filter text" */
       it("binds the payload as a parameter, leaving the tenant predicate intact", () => {
         const injection = `x' OR TenantId = 'globex' OR '1'='1`;
         const { sql, params } = compileTraceQuery({
@@ -118,6 +122,7 @@ describe("compileTraceQuery — security core", () => {
 
   describe("given SR-2 / SR-4 / SR-5: read-only by construction + allowlisting", () => {
     describe("when an unknown aggregation function is requested", () => {
+      /** @scenario "The query surface has no field that can carry a write" */
       it("fails validation before any SQL is generated", () => {
         expect(() =>
           compileTraceQuery({
@@ -131,6 +136,7 @@ describe("compileTraceQuery — security core", () => {
     });
 
     describe("when an unknown group-by column is requested", () => {
+      /** @scenario "Only allowlisted tables, columns, and functions are queryable" */
       it("rejects it — arbitrary identifiers cannot become SQL", () => {
         expect(() =>
           compileTraceQuery({
@@ -142,6 +148,7 @@ describe("compileTraceQuery — security core", () => {
     });
 
     describe("when a ClickHouse table function name is used as an identifier", () => {
+      /** @scenario "Table-function tokens cannot enter the emitted SQL" */
       it("is not in the allowlist and is rejected (no SSRF surface)", () => {
         for (const fn of ["url", "s3", "remote", "file", "executable"]) {
           expect(() =>
@@ -155,6 +162,7 @@ describe("compileTraceQuery — security core", () => {
     });
 
     describe("when a metric aggregates an unknown column", () => {
+      /** @scenario "Aggregation and column names are validated against an allowlist before SQL generation" */
       it("rejects it before SQL generation", () => {
         expect(() =>
           compileTraceQuery({
@@ -170,6 +178,7 @@ describe("compileTraceQuery — security core", () => {
 
   describe("given SR-3: injection safety", () => {
     describe("when a query carries literal filter values", () => {
+      /** @scenario "Filter and aggregation values are passed as bound parameters" */
       it("passes every literal as a bound parameter, none interpolated", () => {
         const { sql, params } = compileTraceQuery({
           request: countTrace({ filter: "status:error" }),
@@ -184,6 +193,7 @@ describe("compileTraceQuery — security core", () => {
 
   describe("given SR-6: resource governance", () => {
     describe("when no time range is supplied", () => {
+      /** @scenario "A query with no time range is rejected or auto-bounded" */
       it("rejects the query rather than scanning all partitions", () => {
         expect(() =>
           compileTraceQuery({
@@ -206,6 +216,7 @@ describe("compileTraceQuery — security core", () => {
     });
 
     describe("when the caller requests a huge or absent limit", () => {
+      /** @scenario "The emitted SQL carries a LIMIT ceiling" */
       it("clamps to the configured row-cap ceiling", () => {
         const { sql } = compileTraceQuery({
           request: countTrace({ limit: 10_000_000 }),
