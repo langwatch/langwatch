@@ -190,6 +190,21 @@ const DELIVERY_ITEMS: { value: SlackDeliveryMethod; label: string }[] = [
   { value: "bot", label: "Slack app (bot)" },
 ];
 
+/**
+ * Slack app manifest an author pastes into "Create app → From a manifest" to
+ * skip manual scope setup. One app serves the whole workspace (not per
+ * automation), so the name is generic. It grants `chat:write` (post messages)
+ * plus `channels:read`/`groups:read` so the channel picker works out of the box.
+ */
+const SLACK_APP_MANIFEST = `display_information:
+  name: LangWatch
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - channels:read
+      - groups:read`;
+
 /** Shown on a legacy webhook automation: nudges the author to move to a Slack
  *  app, which unlocks the richer templates a webhook can't render. */
 function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
@@ -567,15 +582,80 @@ function SlackBotFields({
 }) {
   const tokenRef = useRef<HTMLInputElement>(null);
   const [stepsOpen, setStepsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const tokenKept = slice.botTokenAlreadySet && slice.botToken.length === 0;
+
+  const copyManifest = () => {
+    void navigator.clipboard?.writeText(SLACK_APP_MANIFEST);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
     <VStack align="stretch" gap={3}>
-      <SlackChannelField
-        projectId={projectId}
-        slice={slice}
-        onChange={onChange}
-      />
+      <Box
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        bg="bg.subtle"
+        padding={3}
+      >
+        <VStack align="stretch" gap={2}>
+          <Text textStyle="xs" color="fg">
+            Post to your Slack workspace with a bot token. Create a Slack app,
+            then paste its token below.
+          </Text>
+          <HStack gap={3}>
+            <Link
+              href="https://api.slack.com/apps"
+              isExternal
+              textStyle="xs"
+              fontWeight="medium"
+              display="inline-flex"
+              alignItems="center"
+              gap={1}
+            >
+              Create a Slack app <ExternalLink size={12} />
+            </Link>
+            <Button
+              variant="plain"
+              size="xs"
+              height="auto"
+              paddingX={0}
+              color="fg.muted"
+              _hover={{ color: "fg" }}
+              onClick={copyManifest}
+            >
+              {copied ? "Manifest copied" : "Copy app manifest"}
+            </Button>
+          </HStack>
+          <TemplateDisclosure
+            triggerLabel="Setup steps"
+            open={stepsOpen}
+            onToggle={() => setStepsOpen((prev) => !prev)}
+          >
+            <List.Root as="ol" gap={1} paddingLeft={4}>
+              <List.Item>
+                <Text textStyle="xs" color="fg.muted">
+                  Create the app with &ldquo;From a manifest&rdquo; and paste the
+                  copied manifest — it sets the permissions for you.
+                </Text>
+              </List.Item>
+              <List.Item>
+                <Text textStyle="xs" color="fg.muted">
+                  Install it to your workspace and copy the Bot User OAuth Token
+                  (<Code size="sm">xoxb-</Code>).
+                </Text>
+              </List.Item>
+              <List.Item>
+                <Text textStyle="xs" color="fg.muted">
+                  Invite the bot to the channel you post to.
+                </Text>
+              </List.Item>
+            </List.Root>
+          </TemplateDisclosure>
+        </VStack>
+      </Box>
       <Field.Root>
         <Field.Label>Bot User OAuth Token</Field.Label>
         <Input
@@ -609,70 +689,11 @@ function SlackBotFields({
           </HStack>
         ) : null}
       </Field.Root>
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        bg="bg.subtle"
-        padding={3}
-      >
-        <VStack align="stretch" gap={2}>
-          <Text textStyle="xs" color="fg">
-            A Slack app unlocks the richer messages — charts, tables, and colored
-            alert banners — that a webhook can&rsquo;t show.
-          </Text>
-          <Text textStyle="xs" color="fg.muted">
-            It takes about two minutes: create an app, give it one permission,
-            and paste the token below. You only do it once.
-          </Text>
-          <Link
-            href="https://api.slack.com/apps"
-            isExternal
-            textStyle="xs"
-            fontWeight="medium"
-            display="inline-flex"
-            alignItems="center"
-            gap={1}
-            width="fit-content"
-          >
-            Create a Slack app <ExternalLink size={12} />
-          </Link>
-          <TemplateDisclosure
-            triggerLabel="Setup steps"
-            open={stepsOpen}
-            onToggle={() => setStepsOpen((prev) => !prev)}
-          >
-            <List.Root as="ol" gap={1} paddingLeft={4}>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Create an app in your workspace.
-                </Text>
-              </List.Item>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Add the <Code size="sm">chat:write</Code> bot scope.
-                </Text>
-              </List.Item>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Install the app to your workspace.
-                </Text>
-              </List.Item>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Copy the Bot User OAuth Token (starts with{" "}
-                  <Code size="sm">xoxb-</Code>).
-                </Text>
-              </List.Item>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Invite the bot to the channel you post to.
-                </Text>
-              </List.Item>
-            </List.Root>
-          </TemplateDisclosure>
-        </VStack>
-      </Box>
+      <SlackChannelField
+        projectId={projectId}
+        slice={slice}
+        onChange={onChange}
+      />
     </VStack>
   );
 }

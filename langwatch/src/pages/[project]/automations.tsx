@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Code,
   Button,
   Container,
   Heading,
@@ -847,8 +848,20 @@ function Automations() {
                                     ) ?? [],
                                   )}
 
-                                  {trigger.filters &&
-                                  typeof trigger.filters === "string" ? (
+                                  {trigger.filterQuery ? (
+                                    // ADR-043: a trace-subject automation shows
+                                    // its search query.
+                                    <Code
+                                      size="sm"
+                                      variant="surface"
+                                      whiteSpace="pre-wrap"
+                                      wordBreak="break-word"
+                                    >
+                                      {trigger.filterQuery}
+                                    </Code>
+                                  ) : trigger.filters &&
+                                    typeof trigger.filters === "string" &&
+                                    trigger.filters !== "{}" ? (
                                     <FilterDisplay
                                       filters={trigger.filters}
                                       hasBorder={true}
