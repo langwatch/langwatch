@@ -39,7 +39,6 @@ export const SendMessageCommand = defineCommand({
     "payload.message.id": d.messageId,
     "payload.role": d.role,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.conversationId}:message:${d.messageId}`,
 });
 
 /** StartAgentTurn → agent_turn_started. */
@@ -56,7 +55,6 @@ export const StartAgentTurnCommand = defineCommand({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.conversationId}:turn-start:${d.turnId}`,
 });
 
 // NOTE: status_reported / progress_reported are EPHEMERAL signals, not durable
@@ -82,8 +80,6 @@ export const RecordToolCallStartedCommand = defineCommand({
     "payload.turn.id": d.turnId,
     "payload.tool.name": d.toolName,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.conversationId}:tool-start:${d.toolCallId}`,
 });
 
 /** RecordToolCallCompleted → tool_call_completed (a durable turn milestone). */
@@ -101,8 +97,6 @@ export const RecordToolCallCompletedCommand = defineCommand({
     "payload.turn.id": d.turnId,
     "payload.tool.name": d.toolName,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.conversationId}:tool-done:${d.toolCallId}`,
 });
 
 /**
@@ -123,7 +117,6 @@ export const FailAgentTurnCommand = defineCommand({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.conversationId}:turn-failed:${d.turnId}`,
 });
 
 /** ReconcileAgentTurn → turn_finalized (the whole final answer, source of truth). */
@@ -141,7 +134,6 @@ export const ReconcileAgentTurnCommand = defineCommand({
     "payload.turn.id": d.turnId,
     "payload.outcome": d.outcome,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.conversationId}:turn-final:${d.turnId}`,
 });
 
 /** ArchiveConversation → conversation_archived (soft-delete). */
@@ -156,7 +148,6 @@ export const ArchiveConversationCommand = defineCommand({
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.conversationId}:archive`,
 });
 
 /**
@@ -180,7 +171,6 @@ export const GenerateConversationTitleCommand = defineCommand({
     "payload.title.source": d.source,
     "payload.model": d.model,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.conversationId}:title:${d.occurredAt}`,
 });
 
 /**
@@ -199,8 +189,6 @@ export const UpdateConversationMetadataCommand = defineCommand({
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.conversationId}:metadata:${d.occurredAt}`,
 });
 
 /**
@@ -222,7 +210,6 @@ export const RecordTurnHandoffCommand = defineCommand({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.conversationId}:handoff:${d.turnId}`,
 });
 
 /**
@@ -243,6 +230,4 @@ export const ConsumeTurnHandoffCommand = defineCommand({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.conversationId}:handoff-consumed:${d.turnId}`,
 });
