@@ -112,8 +112,10 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
    * cursor (or from the start when `after` is undefined). Lets a re-fold stream
    * a huge aggregate's history page-by-page instead of materialising every
    * event and payload at once — the difference between a bounded working set
-   * and OOMing on a 100k-event trace. Optional: callers fall back to
-   * {@link getEventsUpTo} when a store does not implement it.
+   * and OOMing on a 100k-event trace. Optional: callers must check for this
+   * method's presence and fall back to {@link getEventsUpTo} themselves —
+   * `AbstractEventStore.getEventsUpToPaged` throws if the underlying
+   * repository lacks paging support rather than silently degrading.
    *
    * **Security:** Implementations MUST call validateTenantId(context, ...).
    */

@@ -115,11 +115,15 @@ export class EventRepositoryMemory implements EventRepository {
       (record) => withinUpperBound(record) && afterCursor(record),
     );
 
+    // Plain relational comparison, not localeCompare: withinUpperBound and
+    // afterCursor above already order EventId with `<=`/`>`, so the sort must
+    // use the same (locale-independent) comparison or the cursor's boundary
+    // can disagree with where a record lands in the sorted page.
     const sorted = [...filtered].sort((a, b) => {
       if (a.EventTimestamp !== b.EventTimestamp) {
         return a.EventTimestamp - b.EventTimestamp;
       }
-      return a.EventId.localeCompare(b.EventId);
+      return a.EventId < b.EventId ? -1 : a.EventId > b.EventId ? 1 : 0;
     });
 
     return sorted.slice(0, limit).map((record) => ({ ...record }));

@@ -66,8 +66,10 @@ export interface EventRepository {
    * Bounds the working set so a re-fold of a huge aggregate (e.g. a 100k-span
    * trace) streams the history page-by-page instead of materialising every
    * EventPayload blob at once — which would blow `max_memory_usage_per_query`
-   * and OOM the ClickHouse instance. Optional: implementations without it fall
-   * back to the unbounded `getEventRecordsUpTo`.
+   * and OOM the ClickHouse instance. Optional: an implementation that doesn't
+   * support paging should leave this undefined so callers can detect its
+   * absence and use the unbounded `getEventRecordsUpTo` themselves — there is
+   * no automatic fallback once this method is called.
    */
   getEventRecordsUpToPaged?(request: {
     tenantId: string;
