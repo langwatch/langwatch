@@ -58,7 +58,14 @@ export function useLangyFreshness(activeConversationId: string | null): void {
           signal.messageCount !== undefined ||
           signal.lastActivityAtMs !== undefined;
 
-        if (known.has(signal.conversationId) && hasOperationalPayload) {
+        // A title change carries no title text on the wire (privacy), so an
+        // in-place apply can't pick it up — force a visibility-gated refetch
+        // that re-reads the new title from the server.
+        if (
+          known.has(signal.conversationId) &&
+          hasOperationalPayload &&
+          !signal.titleChanged
+        ) {
           // Apply in place — no network round-trip.
           trpcUtils.langy.list.setData(listInput, (old) => {
             if (!old) return old;

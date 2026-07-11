@@ -7,6 +7,8 @@ import type { FoldProjectionStore } from "../../../projections/foldProjection.ty
 import {
   LANGY_CONVERSATION_PROJECTION_VERSIONS,
   LANGY_CONVERSATION_STATUS,
+  LANGY_TITLE_SOURCE,
+  type LangyTitleSource,
 } from "../schemas/constants";
 import type {
   LangyAgentRespondedEvent,
@@ -17,6 +19,7 @@ import type {
   LangyConversationHandoffConsumedEvent,
   LangyConversationHandoffPendingEvent,
   LangyConversationMetadataUpdatedEvent,
+  LangyConversationTitleGeneratedEvent,
   LangyMessageSentEvent,
   LangyToolCallCompletedEvent,
   LangyToolCallStartedEvent,
@@ -31,6 +34,7 @@ import {
   LangyConversationHandoffConsumedEventSchema,
   LangyConversationHandoffPendingEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
+  LangyConversationTitleGeneratedEventSchema,
   LangyMessageSentEventSchema,
   LangyToolCallCompletedEventSchema,
   LangyToolCallStartedEventSchema,
@@ -51,6 +55,13 @@ export interface LangyConversationStateData {
   /** Owner. Set once, from the first message (first-writer-wins). */
   UserId: string;
   Title: string | null;
+  /**
+   * Where `Title` came from — governs auto-regeneration precedence:
+   * `derived` (first-message placeholder) → may be replaced by an auto title;
+   * `auto` (cheap-model regeneration) → may be refined by a later regeneration;
+   * `user` (manual rename) → sticky, never overridden by an auto title.
+   */
+  TitleSource: LangyTitleSource;
   Status: string;
   IsShared: boolean;
   SharedAt: number | null;
@@ -100,6 +111,7 @@ const langyConversationEvents = [
   LangyConversationMetadataUpdatedEventSchema,
   LangyConversationHandoffPendingEventSchema,
   LangyConversationHandoffConsumedEventSchema,
+  LangyConversationTitleGeneratedEventSchema,
 ] as const;
 
 /**
@@ -139,6 +151,7 @@ export class LangyConversationStateFoldProjection
       ConversationId: "",
       UserId: "",
       Title: null,
+      TitleSource: LANGY_TITLE_SOURCE.DERIVED,
       Status: LANGY_CONVERSATION_STATUS.ACTIVE,
       IsShared: false,
       SharedAt: null,
@@ -170,11 +183,17 @@ export class LangyConversationStateFoldProjection
     event: LangyMessageSentEvent,
     state: LangyConversationStateData,
   ): LangyConversationStateData {
-    const title =
-      state.Title ??
-      (event.data.title && event.data.title.length > 0
-        ? event.data.title
-        : null);
+    const derivedTitle =
+      event.data.title && event.data.title.length > 0 ? event.data.title : null;
+    // First non-empty title wins (a placeholder derived from the first message).
+    const title = state.Title ?? derivedTitle;
+    // Only stamp `derived` when THIS message is the one that first set the
+    // title. Once a title exists (derived/auto/user), the source is untouched —
+    // a later message must never demote a user/auto title back to derived.
+    const titleSource =
+      state.Title == null && derivedTitle != null
+        ? LANGY_TITLE_SOURCE.DERIVED
+        : state.TitleSource;
 
     return {
       ...state,
@@ -182,6 +201,7 @@ export class LangyConversationStateFoldProjection
       // First writer wins: the first message's userId owns the conversation.
       UserId: state.UserId || event.data.userId,
       Title: title,
+      TitleSource: titleSource,
       Status: this.nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE),
       MessageCount: state.MessageCount + 1,
       LastActivityAt: event.occurredAt,
@@ -306,6 +326,10 @@ export class LangyConversationStateFoldProjection
     next.ConversationId = state.ConversationId || event.data.conversationId;
     if (event.data.title !== undefined) {
       next.Title = event.data.title;
+      // A manual rename is sticky: mark the source `user` so no later auto
+      // regeneration can override it. Clearing the title (null) still counts
+      // as a deliberate user choice.
+      next.TitleSource = LANGY_TITLE_SOURCE.USER;
     }
     if (event.data.isShared !== undefined) {
       next.IsShared = event.data.isShared;
@@ -348,6 +372,32 @@ export class LangyConversationStateFoldProjection
       ConversationId: state.ConversationId || event.data.conversationId,
       PendingHandoffToken: null,
       PendingHandoffTurnId: null,
+    };
+  }
+
+  /**
+   * An auto title from the regeneration reactor. Updates the title ONLY when
+   * the user has not renamed the conversation — a `user` source is sticky and
+   * wins over any auto title, even on replay (the reactor already gates on
+   * this, but the fold enforces it so a stale/replayed title_generated can
+   * never clobber a manual rename). No activity bump / count change: an auto
+   * title is metadata refinement, not conversational activity.
+   */
+  handleLangyConversationConversationTitleGenerated(
+    event: LangyConversationTitleGeneratedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    const base = {
+      ...state,
+      ConversationId: state.ConversationId || event.data.conversationId,
+    };
+    if (state.TitleSource === LANGY_TITLE_SOURCE.USER) {
+      return base;
+    }
+    return {
+      ...base,
+      Title: event.data.title,
+      TitleSource: LANGY_TITLE_SOURCE.AUTO,
     };
   }
 }

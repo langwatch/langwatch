@@ -24,6 +24,7 @@ import { Menu } from "~/components/ui/menu";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangyConversationSummary } from "../data/useLangyConversations";
+import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 
 export function RecentChatsMenu({
   conversations,
@@ -128,7 +129,7 @@ export function RecentChatsMenu({
                   paddingX={2}
                   truncate
                 >
-                  {conv.title ?? "Untitled"}
+                  <AnimatedConversationTitle title={conv.title ?? "Untitled"} />
                 </Button>
                 <IconButton
                   className="row-delete"

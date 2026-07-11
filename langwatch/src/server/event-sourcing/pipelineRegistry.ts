@@ -101,6 +101,8 @@ import { LANGY_CONVERSATION_PROJECTION_VERSIONS } from "./pipelines/langy-conver
 import type { SpawnAgentReactorHandle } from "./pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
 import { createSpawnAgentReactor } from "./pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
 import { createReconcileAgentTurnReactor } from "./pipelines/langy-conversation-processing/reactors/reconcileAgentTurn.reactor";
+import type { LangyTitleGenerationReactorHandle } from "./pipelines/langy-conversation-processing/reactors/langyTitleGeneration.reactor";
+import { createLangyTitleGenerationReactor } from "./pipelines/langy-conversation-processing/reactors/langyTitleGeneration.reactor";
 import { createLangyTokenBuffer } from "../services/langy/streaming/langyTokenBuffer";
 import { createLangyTurnHandoffStore } from "../services/langy/streaming/langyTurnHandoff";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
@@ -300,8 +302,11 @@ export class PipelineRegistry {
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
     });
-    const { pipeline: langyConversationPipeline, spawnAgentHandle } =
-      this.registerLangyConversationPipeline();
+    const {
+      pipeline: langyConversationPipeline,
+      spawnAgentHandle,
+      langyTitleGenerationHandle,
+    } = this.registerLangyConversationPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -318,6 +323,8 @@ export class PipelineRegistry {
       scenarioExecutionHandle,
       /** Late-bind the worker pool for the langy spawnAgent reactor (ADR-044). */
       spawnAgentHandle,
+      /** Late-bind the model-backed title generator for the langy title reactor. */
+      langyTitleGenerationHandle,
     };
   }
 
@@ -375,6 +382,23 @@ export class PipelineRegistry {
         hasRedis: !!this.deps.eventSourcing.redisConnection,
       });
 
+    // Cheap-model title regeneration: dispatches generateConversationTitle, a
+    // command of THIS pipeline, so resolve it via a Deferred (like failTurn).
+    // The model-backed generator is late-bound at the composition root
+    // (presets.ts) via the returned handle's setGenerator — the event-sourcing
+    // layer stays free of model-provider / app-layer read dependencies.
+    const generateTitle = new Deferred<
+      (args: {
+        projectId: string;
+        conversationId: string;
+        title: string;
+        model: string;
+      }) => Promise<void>
+    >("langyGenerateTitle");
+    const langyTitleGenerationHandle = createLangyTitleGenerationReactor({
+      saveTitle: (args) => generateTitle.fn(args),
+    });
+
     const pipeline = this.deps.eventSourcing.register(
       createLangyConversationProcessingPipeline({
         langyConversationStateFoldStore,
@@ -382,6 +406,7 @@ export class PipelineRegistry {
         spawnAgentReactor: spawnAgentHandle.reactor,
         reconcileAgentTurnReactor,
         langyConversationUpdateBroadcastReactor,
+        langyTitleGenerationReactor: langyTitleGenerationHandle.reactor,
       }),
     );
 
@@ -395,8 +420,18 @@ export class PipelineRegistry {
         error: args.error,
       }),
     );
+    generateTitle.resolve((args) =>
+      langyCommands.generateConversationTitle({
+        tenantId: args.projectId,
+        occurredAt: Date.now(),
+        conversationId: args.conversationId,
+        title: args.title,
+        source: "auto",
+        model: args.model,
+      }),
+    );
 
-    return { pipeline, spawnAgentHandle };
+    return { pipeline, spawnAgentHandle, langyTitleGenerationHandle };
   }
 
   private registerEvaluationPipeline({

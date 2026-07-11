@@ -11,6 +11,7 @@ import {
   langyConversationHandoffConsumedEventDataSchema,
   langyConversationHandoffPendingEventDataSchema,
   langyConversationMetadataUpdatedEventDataSchema,
+  langyConversationTitleGeneratedEventDataSchema,
   langyAgentTurnStartedEventDataSchema,
   langyMessageSentEventDataSchema,
   langyToolCallCompletedEventDataSchema,
@@ -175,6 +176,30 @@ export const ArchiveConversationCommand = defineCommand({
     "payload.conversation.id": d.conversationId,
   }),
   makeJobId: (d) => `${d.tenantId}:${d.conversationId}:archive`,
+});
+
+/**
+ * GenerateConversationTitle → conversation_title_generated (auto title).
+ * Dispatched by the langyTitleGeneration reactor after a finalized turn.
+ * Idempotency is keyed on conversationId + occurredAt so a redelivered
+ * dispatch collapses; the reactor's own per-conversation dedup window is the
+ * primary throttle (see LANGY_TITLE_GENERATION.COOLDOWN_MS).
+ */
+export const GenerateConversationTitleCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.GENERATE_TITLE,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.TITLE_GENERATED,
+  aggregateType: "langy_conversation",
+  schema: langyConversationTitleGeneratedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:title:${d.occurredAt}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+    "payload.title.source": d.source,
+    "payload.model": d.model,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.conversationId}:title:${d.occurredAt}`,
 });
 
 /**

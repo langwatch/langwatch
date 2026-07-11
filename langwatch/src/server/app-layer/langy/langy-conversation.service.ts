@@ -11,6 +11,7 @@ import type {
   LangyConversationHandoffConsumedEventData,
   LangyConversationHandoffPendingEventData,
   LangyConversationMetadataUpdatedEventData,
+  LangyConversationTitleGeneratedEventData,
   LangyAgentTurnStartedEventData,
   LangyMessagePart,
   LangyMessageRole,
@@ -268,6 +269,7 @@ export interface LangyConversationCommands {
   updateConversationMetadata: Dispatch<LangyConversationMetadataUpdatedEventData>;
   recordTurnHandoff: Dispatch<LangyConversationHandoffPendingEventData>;
   consumeTurnHandoff: Dispatch<LangyConversationHandoffConsumedEventData>;
+  generateConversationTitle: Dispatch<LangyConversationTitleGeneratedEventData>;
 }
 
 function newConversationId(): string {
