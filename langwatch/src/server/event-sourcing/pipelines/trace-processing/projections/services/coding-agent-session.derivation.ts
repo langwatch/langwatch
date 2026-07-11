@@ -3,6 +3,12 @@ import type {
   MetricRecordReceivedEventData,
 } from "../../schemas/events";
 import { NormalizedStatusCode, type NormalizedSpan } from "../../schemas/spans";
+import {
+  detectCodingAgent,
+  isCodingAgentMetricName,
+  normalizeEventName,
+  parseMcpToolName,
+} from "./coding-agent-normalization";
 import type {
   CodingAgentSessionData,
   SessionStep,
@@ -49,6 +55,9 @@ const CLAUDE = {
     BLOCKED_ON_USER: "claude_code.tool.blocked_on_user",
     SUBAGENT_SPAWN: "claude_code.subagent.spawn",
   },
+  // Post-normalization CANONICAL event names (see coding-agent-normalization).
+  // These are what the switch matches, NOT the raw wire strings — the raw
+  // spellings differ per agent and are mapped before they reach here.
   EVENT: {
     USER_PROMPT: "user_prompt",
     ASSISTANT_RESPONSE: "assistant_response",
@@ -56,7 +65,7 @@ const CLAUDE = {
     TOOL_RESULT: "tool_result",
     TOOL_DECISION: "tool_decision",
     API_ERROR: "api_error",
-    RETRIES_EXHAUSTED: "api_retries_exhausted",
+    RETRIES_EXHAUSTED: "retries_exhausted",
     REFUSAL: "api_refusal",
     COMPACTION: "compaction",
     PERMISSION_MODE: "permission_mode_changed",
@@ -93,14 +102,51 @@ export const CODING_AGENT_SPAN_NAMES: ReadonlySet<string> = new Set([
   CLAUDE.SPAN.SUBAGENT_SPAWN,
 ]);
 
-/** The instrumentation scope a coding agent's log events arrive under. */
+/**
+ * The instrumentation scopes a coding agent's log events arrive under.
+ *
+ * A scope check ALONE is not enough, and cannot be: Codex names its scope after
+ * whatever `service_name` the user configured, so there is no stable string to
+ * match. Hence {@link isCodingAgentLogRecord} — scope first (cheap, and it covers
+ * the two agents that do have a stable one), then the event name.
+ */
 export const CODING_AGENT_LOG_SCOPES: ReadonlySet<string> = new Set([
   "com.anthropic.claude_code.events",
+  "com.opencode",
 ]);
 
-/** Metric names a coding agent emits. */
+/**
+ * Is this log record worth decoding?
+ *
+ * Every log in the project flows through this fold, so the gate has to be cheap
+ * AND it has to not exclude an agent by accident — which the scope-only version
+ * did: opencode's records were dropped wholesale, and Codex's always would be.
+ */
+export function isCodingAgentLogRecord({
+  scopeName,
+  eventName,
+}: {
+  scopeName?: string | null;
+  eventName?: string | null;
+}): boolean {
+  if (scopeName && CODING_AGENT_LOG_SCOPES.has(scopeName)) return true;
+  // A namespaced event name (`codex.tool_result`) identifies its agent on its
+  // own — which is the only thing Codex gives us to go on.
+  return (
+    detectCodingAgent({ scopeName, recordName: eventName }) !== "unknown" &&
+    normalizeEventName(eventName) !== null
+  );
+}
+
+/**
+ * Metric names a coding agent emits.
+ *
+ * Delegates to the shared vocabulary. It used to be
+ * `startsWith("claude_code.")`, which would have dropped every opencode, Codex
+ * and Gemini metric at the gate — after all the trouble of normalizing them.
+ */
 export function isCodingAgentMetric(metricName: string): boolean {
-  return metricName.startsWith("claude_code.");
+  return isCodingAgentMetricName(metricName);
 }
 
 /** HTTP 429 — the one failure worth telling apart from every other failure. */
@@ -476,24 +522,6 @@ export function applySpanToCodingAgentSession({
   return withTool;
 }
 
-/** `mcp__<server>__<tool>` — the convention every MCP tool name follows. */
-const MCP_TOOL_PREFIX = "mcp__";
-const MCP_NAME_SEPARATOR = "__";
-
-export function parseMcpToolName(
-  toolName: string | null,
-): { server: string; tool: string } | null {
-  if (toolName === null || !toolName.startsWith(MCP_TOOL_PREFIX)) return null;
-  const rest = toolName.slice(MCP_TOOL_PREFIX.length);
-  const separator = rest.indexOf(MCP_NAME_SEPARATOR);
-  // A server with no tool after it (or an empty server) is not a name we can
-  // trust — leave it out rather than inventing an empty server.
-  if (separator <= 0) return null;
-  const server = rest.slice(0, separator);
-  const tool = rest.slice(separator + MCP_NAME_SEPARATOR.length);
-  if (tool.length === 0) return null;
-  return { server, tool };
-}
 
 /**
  * Fold one LOG RECORD into the session.
@@ -510,7 +538,12 @@ export function applyLogToCodingAgentSession({
   data: LogRecordReceivedEventData;
 }): CodingAgentSessionData {
   const attrs = data.attributes;
-  const event = str(attrs["event.name"]);
+  // Normalize the agent's spelling into one vocabulary before matching. Claude
+  // Code and Codex namespace their event names (`claude_code.tool_result`,
+  // `codex.tool_result`); opencode sends a bare `tool_result` and dots its
+  // session events (`session.created`). Matching the raw string would have meant
+  // three switch statements that drift apart.
+  const event = normalizeEventName(str(attrs["event.name"]));
   if (event === null) return state;
 
   const base = withIdentity(state, attrs, data.resourceAttributes ?? {});

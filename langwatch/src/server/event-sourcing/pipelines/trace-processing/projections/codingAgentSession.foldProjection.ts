@@ -20,7 +20,7 @@ import {
   applyLogToCodingAgentSession,
   applyMetricToCodingAgentSession,
   applySpanToCodingAgentSession,
-  CODING_AGENT_LOG_SCOPES,
+  isCodingAgentLogRecord,
   CODING_AGENT_SPAN_NAMES,
   createInitCodingAgentSession,
   isCodingAgentMetric,
@@ -44,6 +44,14 @@ const codingAgentSessionEvents = [
   logRecordReceivedEventSchema,
   metricRecordReceivedEventSchema,
 ] as const;
+
+/** The `event.name` attribute off a raw log record, if it carries one. */
+function readEventName(attributes: unknown): string | null {
+  const value = (attributes as Record<string, unknown> | undefined)?.[
+    "event.name"
+  ];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes. */
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST =
@@ -158,10 +166,20 @@ export class CodingAgentSessionFoldProjection
     event: LogRecordReceivedEvent,
     state: CodingAgentSessionState,
   ): CodingAgentSessionState {
-    // Gate on the instrumentation scope: a Spring AI or Codex log record must
-    // not be read through the Claude adapter, and a non-agent trace must not be
-    // stamped with an agent name it never had.
-    if (!CODING_AGENT_LOG_SCOPES.has(event.data.scopeName)) return state;
+    // Scope FIRST (cheap), then the event name — because scope alone cannot
+    // work. Codex names its instrumentation scope after whatever `service_name`
+    // the user configured, so there is no stable string to match, and a
+    // scope-only gate silently drops every Codex record. It was already dropping
+    // every opencode record for the simpler reason that `com.opencode` was not
+    // in the set.
+    if (
+      !isCodingAgentLogRecord({
+        scopeName: event.data.scopeName,
+        eventName: readEventName(event.data.attributes),
+      })
+    ) {
+      return state;
+    }
 
     const next = applyLogToCodingAgentSession({ state, data: event.data });
     return {
