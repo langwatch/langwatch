@@ -64,6 +64,12 @@ func startAuthProxy(ctx context.Context, externalPort, internalPort int, bearerT
 	}
 	rev := httputil.NewSingleHostReverseProxy(target)
 
+	// -1 forces a flush after every write so opencode's SSE / ndjson stream is
+	// never buffered by the proxy, regardless of content-type detection. Without
+	// it, httputil.ReverseProxy only flushes eagerly for content types it
+	// recognises as streaming, which would stall the per-turn event stream.
+	rev.FlushInterval = -1
+
 	// Default ReverseProxy uses http.DefaultTransport — fine; it pools
 	// connections to the single backend. We DO want errors to come back as 502
 	// rather than half-written headers polluting the SSE stream.
@@ -103,14 +109,14 @@ func startAuthProxy(ctx context.Context, externalPort, internalPort int, bearerT
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	go func() {
+	clog.Go(ctx, "authproxy-serve", func() {
 		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
 			log.Error("authproxy serve exited",
 				zap.String("addr", addr),
 				zap.Error(err),
 			)
 		}
-	}()
+	})
 
 	return &authProxy{server: srv, listen: listener}, nil
 }

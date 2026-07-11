@@ -6,7 +6,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
@@ -285,4 +287,34 @@ func TestPool_Acquire_ReusesWorkerWithMatchingSignature(t *testing.T) {
 	if active, _ := p.Status(); active != 1 {
 		t.Fatalf("no new worker should have been spawned; active=%d", active)
 	}
+}
+
+// The overriding P0 guarantee: a background goroutine panicking — e.g. a
+// crashing worker-exit watcher — must NOT take the manager down. clog.Go (the
+// helper every pool goroutine now launches through) recovers the panic; the
+// pool stays alive and responsive afterwards.
+func TestPool_SurvivesPanicInBackgroundGoroutine(t *testing.T) {
+	p := newTestPool(4)
+
+	recovered := make(chan struct{})
+	clog.Go(p.baseCtx, "fake-crashing-watcher", func() {
+		// The deferred close runs during panic unwinding; if the process crashed
+		// instead of recovering, the test binary would die here and fail.
+		defer close(recovered)
+		panic("simulated worker-exit-watcher crash")
+	})
+
+	select {
+	case <-recovered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("panicking goroutine never unwound — clog.Go did not run it")
+	}
+
+	// The manager is still alive and responsive after the panic: Status takes the
+	// pool lock and returns, which a dead process could never do.
+	if active, max := p.Status(); active != 0 || max != 4 {
+		t.Fatalf("pool Status after a background panic = (%d,%d), want (0,4)", active, max)
+	}
+	// And the pool's internal sweep machinery still runs without deadlock.
+	p.reapIdle()
 }

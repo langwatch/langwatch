@@ -36,6 +36,7 @@ type Telemetry struct {
 
 	workerSpawns     metric.Int64Counter
 	workerKills      metric.Int64Counter
+	workerExits      metric.Int64Counter
 	workersActive    metric.Int64UpDownCounter
 	atCapacity       metric.Int64Counter
 	turnDuration     metric.Float64Histogram
@@ -66,6 +67,13 @@ func New() *Telemetry {
 	); err != nil {
 		slog.Warn("langy telemetry: worker.kills instrument", "err", err)
 		t.workerKills, _ = fallback.Int64Counter("langy.worker.kills")
+	}
+	if t.workerExits, err = meter.Int64Counter(
+		"langy.worker.exits",
+		metric.WithDescription("Count of workers that exited on their own (crash / self-exit, not an explicit kill), tagged by cause."),
+	); err != nil {
+		slog.Warn("langy telemetry: worker.exits instrument", "err", err)
+		t.workerExits, _ = fallback.Int64Counter("langy.worker.exits")
 	}
 	if t.workersActive, err = meter.Int64UpDownCounter(
 		"langy.workers.active",
@@ -159,5 +167,15 @@ func (t *Telemetry) ReadinessObserved(ctx context.Context, seconds float64, ok b
 // WorkerKilled records a kill and decrements the active-workers gauge.
 func (t *Telemetry) WorkerKilled(ctx context.Context, reason string) {
 	t.workerKills.Add(ctx, 1, metric.WithAttributes(attribute.String("reason", reason)))
+	t.workersActive.Add(ctx, -1)
+}
+
+// WorkerExited decrements the active-workers gauge for a worker that exited on
+// its own — a crash or self-exit that never went through kill(). kill() already
+// decrements via WorkerKilled, so this is called ONLY on the identity-owned exit
+// path in onWorkerExit (the branch that deletes our own registry entry). Without
+// it the gauge drifts upward every time a worker dies without an explicit kill.
+func (t *Telemetry) WorkerExited(ctx context.Context) {
+	t.workerExits.Add(ctx, 1, metric.WithAttributes(attribute.String("cause", "self_exit")))
 	t.workersActive.Add(ctx, -1)
 }

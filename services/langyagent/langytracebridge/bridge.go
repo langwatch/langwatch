@@ -29,6 +29,8 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 )
 
 // strippedContentKeys are the span attributes dropped before the internal
@@ -130,7 +132,13 @@ func Install(ctx context.Context, endpoint, headers string) (func(context.Contex
 	if err != nil {
 		return noop, err
 	}
-	bsp := sdktrace.NewBatchSpanProcessor(&dropContentExporter{inner: exp})
+	// Match the main pipeline's short scheduled delay so the tee's own loss
+	// window on an uncatchable SIGKILL/OOM is the same ~2s. The SIGTERM early
+	// flush covers this processor too: it is registered on the same global
+	// TracerProvider that otelsetup.ForceFlushGlobal flushes.
+	bsp := sdktrace.NewBatchSpanProcessor(&dropContentExporter{inner: exp},
+		sdktrace.WithBatchTimeout(otelsetup.BatchScheduledDelay),
+	)
 
 	// Tee onto the global provider if it is the SDK type (the common case —
 	// pkg/otelsetup installs an *sdktrace.TracerProvider). If it is not (a

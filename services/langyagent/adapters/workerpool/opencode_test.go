@@ -1,7 +1,9 @@
 package workerpool
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -135,43 +137,119 @@ func TestWaitForReadiness_SurvivesProxy502BeforeBackendListens(t *testing.T) {
 	}
 }
 
-func TestEventBelongsToSession_TopLevelKeys(t *testing.T) {
-	// OpenCode has emitted the sessionID under three different keys across
-	// versions. eventBelongsToSession must accept all three.
-	cases := []map[string]any{
-		{"sessionID": "s1"},
-		{"sessionId": "s1"},
-		{"session_id": "s1"},
+// decodeSSE mirrors the streaming decode path: unmarshal a raw /event payload
+// into the typed sseEvent used for routing + terminal detection.
+func decodeSSE(t *testing.T, payload string) *sseEvent {
+	t.Helper()
+	var ev sseEvent
+	if err := json.Unmarshal([]byte(payload), &ev); err != nil {
+		t.Fatalf("decode %q: %v", payload, err)
 	}
-	for _, ev := range cases {
-		if !eventBelongsToSession(ev, "s1") {
-			t.Errorf("expected match for %#v", ev)
-		}
-		if eventBelongsToSession(ev, "other") {
-			t.Errorf("expected mismatch with other id for %#v", ev)
-		}
-	}
+	return &ev
 }
 
-func TestEventBelongsToSession_PropertiesNested(t *testing.T) {
-	ev := map[string]any{
-		"type":       "message.part.delta",
-		"properties": map[string]any{"sessionID": "s2", "field": "text"},
+// OpenCode has emitted the session id under three top-level keys and two nested
+// under "properties" across versions. The typed decode + eventBelongsToSession
+// must route ALL of them (and only to the matching session).
+func TestEventBelongsToSession_DecodesEverySessionIDVariant(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload string
+	}{
+		{"top-level sessionID", `{"type":"message.part.delta","sessionID":"s1"}`},
+		{"top-level sessionId", `{"type":"message.part.delta","sessionId":"s1"}`},
+		{"top-level session_id", `{"type":"message.part.delta","session_id":"s1"}`},
+		{"properties.sessionID", `{"type":"message.part.delta","properties":{"sessionID":"s1"}}`},
+		{"properties.sessionId", `{"type":"message.part.delta","properties":{"sessionId":"s1"}}`},
 	}
-	if !eventBelongsToSession(ev, "s2") {
-		t.Errorf("expected match via properties.sessionID")
-	}
-	if eventBelongsToSession(ev, "other") {
-		t.Errorf("expected mismatch via properties.sessionID")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ev := decodeSSE(t, tc.payload)
+			if !eventBelongsToSession(ev, "s1") {
+				t.Errorf("expected %s to route to s1", tc.name)
+			}
+			if eventBelongsToSession(ev, "other") {
+				t.Errorf("expected %s NOT to route to a different session", tc.name)
+			}
+		})
 	}
 }
 
 func TestEventBelongsToSession_EmptyTargetRejects(t *testing.T) {
 	// An empty sessionID must never match — otherwise events from a worker whose
 	// session id we don't yet know would be forwarded blindly.
-	ev := map[string]any{"sessionID": "s1"}
+	ev := decodeSSE(t, `{"sessionID":"s1"}`)
 	if eventBelongsToSession(ev, "") {
 		t.Errorf("expected empty sessionID to reject")
+	}
+}
+
+func TestEventBelongsToSession_UnknownFieldsIgnored(t *testing.T) {
+	// The typed decode must skip the bulk of an opencode event (unknown fields)
+	// without error and still route by session + expose the type.
+	ev := decodeSSE(t, `{"type":"message.part.delta","sessionID":"s2","part":{"text":"hi"},"extra":123}`)
+	if !eventBelongsToSession(ev, "s2") {
+		t.Errorf("unknown fields must be ignored and the event still routed")
+	}
+	if ev.Type != "message.part.delta" {
+		t.Errorf("Type = %q, want message.part.delta", ev.Type)
+	}
+}
+
+// Terminal detection runs off the decoded Type — the decode must surface it for
+// each terminal variant so the stream closes (and NOT for a delta).
+func TestSSEDecode_TerminalTypeDetected(t *testing.T) {
+	for _, typ := range []string{"message.completed", "message.done", "session.idle", "session.completed", "error"} {
+		ev := decodeSSE(t, `{"type":"`+typ+`","sessionID":"s1"}`)
+		if _, terminal := terminalEventTypes[ev.Type]; !terminal {
+			t.Errorf("decoded type %q should be terminal", typ)
+		}
+	}
+	ev := decodeSSE(t, `{"type":"message.part.delta","sessionID":"s1"}`)
+	if _, terminal := terminalEventTypes[ev.Type]; terminal {
+		t.Errorf("message.part.delta must NOT be terminal")
+	}
+}
+
+// streamSessionEvents must forward OUR session's events verbatim as ndjson,
+// filter a sibling session's events (the isolation guarantee on the read side),
+// and stop at the terminal event.
+func TestStreamSessionEvents_ForwardsOwnSessionAndFiltersSibling(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/event" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		fl, _ := w.(http.Flusher)
+		emit := func(s string) {
+			fmt.Fprintf(w, "data: %s\n", s)
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+		emit(`{"type":"message.part.delta","sessionID":"mine","text":"hello"}`)
+		emit(`{"type":"message.part.delta","sessionID":"sibling","text":"leak?"}`)
+		emit(`{"type":"message.completed","sessionID":"mine"}`)
+	}))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	if err := streamSessionEvents(context.Background(), srv.URL, "bearer", "mine", &buf, nil); err != nil {
+		t.Fatalf("streamSessionEvents: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `"sessionID":"mine"`) || !strings.Contains(out, "hello") {
+		t.Errorf("our session's event should be forwarded verbatim, got %q", out)
+	}
+	if strings.Contains(out, "sibling") || strings.Contains(out, "leak?") {
+		t.Errorf("a sibling session's event must NOT be forwarded, got %q", out)
+	}
+	if !strings.Contains(out, "message.completed") {
+		t.Errorf("terminal event should be forwarded, got %q", out)
+	}
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) != 2 {
+		t.Errorf("expected exactly 2 ndjson lines (our delta + terminal), got %d: %q", len(lines), out)
 	}
 }
 
