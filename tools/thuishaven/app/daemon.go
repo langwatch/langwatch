@@ -118,7 +118,7 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 // reclaiming its memory (opt-in via StopClickHouseIdle). Data + endpoint stay on
 // disk, so the next `haven up` restarts it with every per-slug database intact.
 func (o *Orchestrator) reapClickHouse() {
-	if o.ch == nil || !o.cfg.StopClickHouseIdle {
+	if o.ch == nil || !o.cfg.ShouldStopClickHouseIdle {
 		return
 	}
 	if len(o.store.Stacks()) == 0 && o.ch.Running() {

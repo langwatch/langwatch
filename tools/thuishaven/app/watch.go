@@ -11,7 +11,7 @@ import (
 // stack and its per-service health. In agent mode it degrades to a single plain
 // `list` snapshot — no alt-screen, no colour, no redraws, no token waste.
 func (o *Orchestrator) Watch(ctx context.Context) error {
-	if o.cfg.Agent {
+	if o.cfg.IsAgent {
 		return o.List(false)
 	}
 	fmt.Print("\x1b[?1049h\x1b[?25l")              // enter alt-screen, hide cursor

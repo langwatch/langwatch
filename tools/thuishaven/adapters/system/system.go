@@ -14,6 +14,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/netports"
 )
 
 // System is the real OS-backed implementation of app.System.
@@ -24,23 +26,7 @@ func New() System { return System{} }
 
 // FreePorts grabs n distinct free loopback TCP ports (bind :0, read, close).
 func (System) FreePorts(n int) ([]int, error) {
-	var ports []int
-	var held []net.Listener
-	for i := 0; i < n; i++ {
-		l, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			for _, h := range held {
-				_ = h.Close()
-			}
-			return nil, err
-		}
-		held = append(held, l)
-		ports = append(ports, l.Addr().(*net.TCPAddr).Port)
-	}
-	for _, h := range held {
-		_ = h.Close()
-	}
-	return ports, nil
+	return netports.Free(n)
 }
 
 // PortInUse reports whether something is listening on a loopback port now.
@@ -81,12 +67,20 @@ func (System) SpawnDetached(argv []string, dir, logPath string) error {
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
-	if f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644); err == nil {
+	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if ferr == nil {
 		cmd.Stdout, cmd.Stderr = f, f
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
+		if ferr == nil {
+			_ = f.Close()
+		}
 		return err
+	}
+	// The child has its own dup'd fd; the parent must close its copy.
+	if ferr == nil {
+		_ = f.Close()
 	}
 	return cmd.Process.Release()
 }

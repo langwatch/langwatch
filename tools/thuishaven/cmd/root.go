@@ -28,23 +28,67 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// Root wires everything and runs a subcommand. logger is the injected zap logger.
+// Root parses the global flags, wires the object graph, and dispatches. The three
+// steps are separate so none of them grows the others: meta commands answer
+// before anything is built, wire() is the only place adapters are constructed,
+// and the command table is a table, not a ladder of branches.
 func Root(ctx context.Context, logger *zap.Logger, version string, args []string) error {
-	var agentFlag bool
-	args, agentFlag = stripFlag(args, "--agent")
-	agent := agentFlag || resolveAgent()
+	var hasAgentFlag bool
+	args, hasAgentFlag = stripFlag(args, "--agent")
+	isAgent := hasAgentFlag || resolveAgent()
 
-	if len(args) > 0 {
-		switch args[0] {
-		case "help", "-h", "--help":
-			fmt.Print(helpText)
-			return nil
-		case "version", "-v", "--version":
-			fmt.Println(version)
-			return nil
-		}
+	if handled := runMetaCommand(args, version); handled {
+		return nil
 	}
 
+	d := wire(logger, isAgent)
+
+	// SIGINT/SIGTERM cancel the context so up/daemon/watch clean up.
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Bare `haven`: the TUI in a terminal, help when driven by an agent/pipe.
+	if len(args) == 0 {
+		if isAgent {
+			fmt.Print(helpText)
+			return nil
+		}
+		return d.orch.Watch(ctx)
+	}
+	return d.dispatch(ctx, args[0], args[1:])
+}
+
+// runMetaCommand answers the subcommands that need no wiring at all, so `haven
+// help` works in a directory where git or the adapters would fail.
+func runMetaCommand(args []string, version string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	switch args[0] {
+	case "help", "-h", "--help":
+		fmt.Print(helpText)
+		return true
+	case "version", "-v", "--version":
+		fmt.Println(version)
+		return true
+	}
+	return false
+}
+
+// deps is the wired object graph a command runs against.
+type deps struct {
+	orch     *app.Orchestrator
+	dash     app.Dashboard
+	params   app.UpParams
+	opts     app.PlanOptions
+	worktree string
+	lwDir    string
+	isAgent  bool
+}
+
+// wire builds every adapter and injects them into the application core. It is the
+// only function that knows the full dependency graph.
+func wire(logger *zap.Logger, isAgent bool) deps {
 	cwd, _ := os.Getwd()
 	worktree := gitTopLevel(cwd)
 	lwDir := filepath.Join(worktree, "langwatch")
@@ -52,7 +96,7 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	naming := domain.DefaultNaming(os.Getenv("LANGWATCH_LOCAL_TLD"))
 	proxy := portlessproxy.New(naming, lwDir)
 	store := fileregistry.New(havenHome())
-	sup := procsupervisor.New(agent)
+	sup := procsupervisor.New(isAgent)
 	sys := system.New()
 	ch := clickhouseserver.New(havenHome(), os.Getenv("CLICKHOUSE_BIN"), envBytes("LANGWATCH_HAVEN_CH_MAX_MEMORY", 0))
 	hyg := hygiene.New()
@@ -61,80 +105,95 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		scheme, port := proxy.Endpoint()
 		return naming.URL(svc, "", scheme, port)
 	}
-	dash := dashboard.New(store.Stacks, sharedURL)
 
 	cfg := app.Config{
-		Naming:             naming,
-		Home:               havenHome(),
-		ObservabilityPort:  envInt("LANGWATCH_OBSERVABILITY_PORT", 3000),
-		IdleTTL:            envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
-		HeartbeatEvery:     30 * time.Second,
-		DaemonArgv:         selfArgv(worktree, "daemon"),
-		Agent:              agent,
-		ManageClickHouse:   os.Getenv("LANGWATCH_HAVEN_CH") != "0",
-		StopClickHouseIdle: os.Getenv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
-		LocalAPIKey:        envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
-		RepoRoot:           worktree,
-	}
-	orch := app.New(cfg, proxy, store, sup, sys, ch, hyg, sem, logger)
-
-	// SIGINT/SIGTERM cancel the context so up/daemon/watch clean up.
-	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	// Bare `haven`: the TUI in a terminal, help when driven by an agent/pipe.
-	if len(args) == 0 {
-		if agent {
-			fmt.Print(helpText)
-			return nil
-		}
-		return orch.Watch(ctx)
+		Naming:                   naming,
+		Home:                     havenHome(),
+		ObservabilityPort:        envInt("LANGWATCH_OBSERVABILITY_PORT", 3000),
+		IdleTTL:                  envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
+		HeartbeatEvery:           30 * time.Second,
+		DaemonArgv:               selfArgv(worktree, "daemon"),
+		IsAgent:                  isAgent,
+		ShouldManageClickHouse:   os.Getenv("LANGWATCH_HAVEN_CH") != "0",
+		ShouldStopClickHouseIdle: os.Getenv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
+		LocalAPIKey:              envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
+		RepoRoot:                 worktree,
 	}
 
-	params := app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), Baseline: os.Getenv("HAVEN_BASELINE") == "1"}
-	opts := optionsFromEnv(worktree)
-	sub, rest := args[0], args[1:]
-	switch sub {
-	case "up":
-		if opts.Stub {
-			return orch.UpStub(ctx, params, dashboard.StartEcho)
+	return deps{
+		orch:     app.New(cfg, proxy, store, sup, sys, ch, hyg, sem, logger),
+		dash:     dashboard.New(store.Stacks, sharedURL),
+		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1"},
+		opts:     optionsFromEnv(worktree),
+		worktree: worktree,
+		lwDir:    lwDir,
+		isAgent:  isAgent,
+	}
+}
+
+// command is one entry in the dispatch table.
+type command func(ctx context.Context, d deps, rest []string) error
+
+// commands is the subcommand table. A table rather than a switch so adding a
+// command is one line and dispatch itself stays branch-free.
+var commands = map[string]command{
+	"up": func(ctx context.Context, d deps, _ []string) error {
+		if d.opts.IsStub {
+			return d.orch.UpStub(ctx, d.params, dashboard.StartEcho)
 		}
-		return orch.Up(ctx, params, opts)
-	case "watch":
-		return orch.Watch(ctx)
-	case "daemon":
-		return orch.RunDaemon(ctx, dash)
-	case "down":
-		return orch.Down(ctx, params, hasFlag(rest, "--keep-db"))
-	case "clickhouse", "ch":
-		return orch.RunClickHouse(ctx, params, rest)
-	case "prune":
-		return orch.Prune(ctx, worktree, hasFlag(rest, "--yes"))
-	case "typecheck", "tc":
-		return orch.Typecheck(ctx, lwDir, rest, envInt("HAVEN_TYPECHECK_SLOTS", 0))
-	case "hmr":
-		return orch.RunHMR(ctx, lwDir, rest)
-	case "seed":
-		return orch.Seed(ctx, params)
-	case "list", "ls", "status":
-		return orch.List(agent || hasFlag(rest, "--json"))
-	case "doctor":
-		return orch.Doctor()
-	default:
+		return d.orch.Up(ctx, d.params, d.opts)
+	},
+	"watch":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Watch(ctx) },
+	"daemon": func(ctx context.Context, d deps, _ []string) error { return d.orch.RunDaemon(ctx, d.dash) },
+	"down": func(ctx context.Context, d deps, rest []string) error {
+		return d.orch.Down(ctx, d.params, hasFlag(rest, "--keep-db"))
+	},
+	"clickhouse": func(ctx context.Context, d deps, rest []string) error {
+		return d.orch.RunClickHouse(ctx, d.params, rest)
+	},
+	"prune": func(ctx context.Context, d deps, rest []string) error {
+		return d.orch.Prune(ctx, d.worktree, hasFlag(rest, "--yes"))
+	},
+	"typecheck": func(ctx context.Context, d deps, rest []string) error {
+		return d.orch.Typecheck(ctx, d.lwDir, rest, envInt("HAVEN_TYPECHECK_SLOTS", 0))
+	},
+	"hmr":  func(ctx context.Context, d deps, rest []string) error { return d.orch.RunHMR(ctx, d.lwDir, rest) },
+	"seed": func(ctx context.Context, d deps, _ []string) error { return d.orch.Seed(ctx, d.params) },
+	"list": func(_ context.Context, d deps, rest []string) error {
+		return d.orch.List(d.isAgent || hasFlag(rest, "--json"))
+	},
+	"doctor": func(_ context.Context, d deps, _ []string) error { return d.orch.Doctor() },
+}
+
+// aliases are the short forms accepted for a canonical command.
+var aliases = map[string]string{
+	"ch":     "clickhouse",
+	"tc":     "typecheck",
+	"ls":     "list",
+	"status": "list",
+}
+
+func (d deps) dispatch(ctx context.Context, sub string, rest []string) error {
+	if canonical, ok := aliases[sub]; ok {
+		sub = canonical
+	}
+	run, ok := commands[sub]
+	if !ok {
 		fmt.Fprintf(os.Stderr, "haven: unknown command %q\n\n%s", sub, helpText)
 		return fmt.Errorf("unknown command %q", sub)
 	}
+	return run(ctx, d, rest)
 }
 
 func optionsFromEnv(repoRoot string) app.PlanOptions {
 	return app.PlanOptions{
-		GoWatch:      os.Getenv("LANGWATCH_GO_WATCH") == "1",
-		StartWorkers: os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
-		SkipNLP:      os.Getenv("LANGWATCH_SKIP_NLP") == "1",
-		SkipGateway:  os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
-		Seed:         os.Getenv("LANGWATCH_SEED") == "1",
-		Stub:         os.Getenv("HAVEN_STUB") == "1",
-		RepoRoot:     repoRoot,
+		ShouldGoWatch:      os.Getenv("LANGWATCH_GO_WATCH") == "1",
+		ShouldStartWorkers: os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
+		ShouldSkipNLP:      os.Getenv("LANGWATCH_SKIP_NLP") == "1",
+		ShouldSkipGateway:  os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
+		ShouldSeed:         os.Getenv("LANGWATCH_SEED") == "1",
+		IsStub:             os.Getenv("HAVEN_STUB") == "1",
+		RepoRoot:           repoRoot,
 	}
 }
 

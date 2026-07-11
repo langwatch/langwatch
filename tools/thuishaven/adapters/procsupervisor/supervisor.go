@@ -20,14 +20,14 @@ import (
 )
 
 // Supervisor is the real process-backed implementation of app.Supervisor.
-type Supervisor struct{ plain bool }
+type Supervisor struct{ isPlain bool }
 
-// New returns a Supervisor. agent=true suppresses colour for token-free output.
-func New(agent bool) Supervisor { return Supervisor{plain: agent} }
+// New returns a Supervisor. isAgent=true suppresses colour for token-free output.
+func New(isAgent bool) Supervisor { return Supervisor{isPlain: isAgent} }
 
 // RunOnce runs a command to completion, streaming its output.
 func (s Supervisor) RunOnce(ctx context.Context, name, dir, shell string, env []string) error {
-	c := proc{name: name, dir: dir, shell: shell, env: env, color: "90", plain: s.plain}
+	c := proc{name: name, dir: dir, shell: shell, env: env, color: "90", isPlain: s.isPlain}
 	cmd := c.command(ctx)
 	c.pipe(cmd)
 	if err := cmd.Start(); err != nil {
@@ -44,46 +44,52 @@ func (s Supervisor) Supervise(ctx context.Context, children []app.Child) {
 		wg.Add(1)
 		go func(ac app.Child) {
 			defer wg.Done()
-			c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, plain: s.plain}
-			for ctx.Err() == nil {
-				cmd := c.command(ctx)
-				c.pipe(cmd)
-				if err := cmd.Start(); err != nil {
-					c.logln(fmt.Sprintf("failed to start: %v", err))
-					return
-				}
-				done := make(chan struct{})
-				go func() { _ = cmd.Wait(); close(done) }()
-				select {
-				case <-ctx.Done():
-					if cmd.Process != nil {
-						_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
-					}
-					select {
-					case <-done:
-					case <-time.After(5 * time.Second):
-						if cmd.Process != nil {
-							_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-						}
-					}
-					return
-				case <-done:
-					if ctx.Err() != nil {
-						return
-					}
-					c.logln("exited — restarting in 1s")
-					time.Sleep(time.Second)
-				}
-			}
+			s.superviseChild(ctx, ac)
 		}(ch)
 	}
 	wg.Wait()
 }
 
+// superviseChild runs one child, restarting it (1s backoff) on exit until ctx
+// is cancelled, then SIGTERMs the process group and SIGKILLs after 5s.
+func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
+	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain}
+	for ctx.Err() == nil {
+		cmd := c.command(ctx)
+		c.pipe(cmd)
+		if err := cmd.Start(); err != nil {
+			c.logln(fmt.Sprintf("failed to start: %v", err))
+			return
+		}
+		done := make(chan struct{})
+		go func() { _ = cmd.Wait(); close(done) }()
+		select {
+		case <-ctx.Done():
+			if cmd.Process != nil {
+				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+			}
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				if cmd.Process != nil {
+					_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+				}
+			}
+			return
+		case <-done:
+			if ctx.Err() != nil {
+				return
+			}
+			c.logln("exited — restarting in 1s")
+			time.Sleep(time.Second)
+		}
+	}
+}
+
 type proc struct {
 	name, dir, shell, color string
 	env                     []string
-	plain                   bool
+	isPlain                 bool
 }
 
 func (c proc) command(ctx context.Context) *exec.Cmd {
@@ -112,7 +118,7 @@ func (c proc) stream(r io.Reader) {
 
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\n")
-	if c.plain {
+	if c.isPlain {
 		fmt.Printf("%-8s | %s\n", c.name, line)
 		return
 	}

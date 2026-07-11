@@ -129,8 +129,7 @@ HAVEN = $$(command -v haven || echo "go run $(HAVEN_PKG)")
 # there is no /etc/hosts or DNS step.
 portless-setup:
 	@command -v portless >/dev/null 2>&1 || npm install -g portless
-	@portless service install 2>/dev/null || portless proxy start || true
-	@portless trust || true
+	@(portless service install 2>/dev/null || portless proxy start || true) && (portless trust || true)
 	@$(MAKE) haven
 	@echo ""
 	@echo "thuishaven ready. Run 'pnpm dev' in any worktree; open https://langwatch.localhost"

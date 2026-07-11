@@ -22,7 +22,7 @@ func (o *Orchestrator) Typecheck(ctx context.Context, lwDir string, extraArgs []
 		return err
 	}
 	defer release()
-	if !o.cfg.Agent {
+	if !o.cfg.IsAgent {
 		fmt.Printf("\x1b[2mhaven: typecheck slot %d/%d\x1b[0m\n", slot, slots)
 	} else {
 		fmt.Printf("haven: typecheck slot %d/%d\n", slot, slots)
