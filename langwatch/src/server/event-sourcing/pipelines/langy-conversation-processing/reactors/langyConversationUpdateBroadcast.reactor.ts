@@ -6,6 +6,10 @@ import type {
 } from "../../../reactors/reactor.types";
 import type { LangyConversationStateData } from "../projections/langyConversationState.foldProjection";
 import type { LangyConversationProcessingEvent } from "../schemas/events";
+import {
+  isLangyConversationMetadataUpdatedEvent,
+  isLangyConversationTitleGeneratedEvent,
+} from "../schemas/typeGuards";
 
 const logger = createLogger(
   "langwatch:langy-conversation-processing:update-broadcast-reactor",
@@ -47,10 +51,20 @@ export function createLangyConversationUpdateBroadcastReactor(
     },
 
     async handle(
-      _event: LangyConversationProcessingEvent,
+      event: LangyConversationProcessingEvent,
       context: ReactorContext<LangyConversationStateData>,
     ): Promise<void> {
       const { tenantId, aggregateId: conversationId, foldState } = context;
+
+      // Whether THIS event changed the title. The title text itself is NEVER
+      // put on the tenant-wide wire (privacy — a conversation is private to its
+      // owner); this is just a boolean hint so a subscriber re-reads the
+      // conversation through the server visibility gate to pick up the new
+      // title. Covers both the auto title and a manual rename that set a title.
+      const titleChanged =
+        isLangyConversationTitleGeneratedEvent(event) ||
+        (isLangyConversationMetadataUpdatedEvent(event) &&
+          event.data.title !== undefined);
 
       try {
         // Enrich the signal with the operational spine the fold already holds
@@ -74,6 +88,9 @@ export function createLangyConversationUpdateBroadcastReactor(
           isRunning: foldState?.Status === "running",
           ownerUserId: foldState?.UserId,
           isShared: foldState?.IsShared ?? false,
+          // Boolean-only title-change hint (never the title text). Routes the
+          // client to a visibility-gated refetch so the new title appears live.
+          ...(titleChanged ? { titleChanged: true } : {}),
         });
 
         await deps.broadcast.broadcastToTenant(

@@ -43,6 +43,7 @@ function makeCommands(
     updateConversationMetadata: vi.fn(async () => {}),
     recordTurnHandoff: vi.fn(async () => {}),
     consumeTurnHandoff: vi.fn(async () => {}),
+    generateConversationTitle: vi.fn(async () => {}),
     ...overrides,
   };
 }

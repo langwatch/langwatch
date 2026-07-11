@@ -5,6 +5,7 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_STATUS,
+  LANGY_TITLE_SOURCE,
 } from "../../schemas/constants";
 import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import {
@@ -205,6 +206,107 @@ describe("LangyConversationStateFoldProjection", () => {
       expect(state.SharedById).toBe("alice");
       expect(state.SharedAt).toBe(2000);
       expect(state.MessageCount).toBe(1);
+    });
+  });
+
+  describe("given the title's source is tracked on the fold", () => {
+    const titleGenerated = (
+      data: Record<string, unknown>,
+      occurredAt: number,
+    ): LangyConversationProcessingEvent =>
+      event(
+        "TITLE_GENERATED",
+        LANGY_CONVERSATION_EVENT_VERSIONS.TITLE_GENERATED,
+        { title: "Generated Title", source: "auto", model: "openai/gpt-5-mini", ...data },
+        occurredAt,
+      );
+
+    describe("when the first message derives a placeholder title", () => {
+      it("records the title source as derived", () => {
+        const state = fold.apply(
+          fold.init(),
+          messageSent({ title: "why are traces failing?" }, 1000),
+        );
+        expect(state.TitleSource).toBe(LANGY_TITLE_SOURCE.DERIVED);
+      });
+    });
+
+    describe("when the first message carries no title text", () => {
+      it("leaves the title unset but still derived-eligible", () => {
+        const state = fold.apply(
+          fold.init(),
+          messageSent({ title: null }, 1000),
+        );
+        expect(state.Title).toBeNull();
+        expect(state.TitleSource).toBe(LANGY_TITLE_SOURCE.DERIVED);
+      });
+    });
+
+    describe("when a title is generated over a derived placeholder", () => {
+      it("replaces the title and marks the source auto", () => {
+        const derived = fold.apply(
+          fold.init(),
+          messageSent({ title: "placeholder" }, 1000),
+        );
+        const state = fold.apply(derived, titleGenerated({}, 2000));
+        expect(state.Title).toBe("Generated Title");
+        expect(state.TitleSource).toBe(LANGY_TITLE_SOURCE.AUTO);
+        // A title is metadata, not activity — no count/activity change.
+        expect(state.MessageCount).toBe(1);
+        expect(state.LastActivityAt).toBe(1000);
+      });
+    });
+
+    describe("when the owner renames by hand", () => {
+      it("marks the source user (sticky)", () => {
+        const base = fold.apply(
+          fold.init(),
+          messageSent({ title: "placeholder" }, 1000),
+        );
+        const state = fold.apply(
+          base,
+          event(
+            "METADATA_UPDATED",
+            LANGY_CONVERSATION_EVENT_VERSIONS.METADATA_UPDATED,
+            { title: "My Own Name" },
+            2000,
+          ),
+        );
+        expect(state.Title).toBe("My Own Name");
+        expect(state.TitleSource).toBe(LANGY_TITLE_SOURCE.USER);
+      });
+    });
+
+    describe("when a title is generated after a manual rename", () => {
+      it("never overrides the user's title", () => {
+        const renamed = fold.apply(
+          fold.apply(fold.init(), messageSent({ title: "placeholder" }, 1000)),
+          event(
+            "METADATA_UPDATED",
+            LANGY_CONVERSATION_EVENT_VERSIONS.METADATA_UPDATED,
+            { title: "My Own Name" },
+            2000,
+          ),
+        );
+        const state = fold.apply(renamed, titleGenerated({}, 3000));
+        expect(state.Title).toBe("My Own Name");
+        expect(state.TitleSource).toBe(LANGY_TITLE_SOURCE.USER);
+      });
+    });
+
+    describe("when a later message arrives after an auto title", () => {
+      it("does not demote the source back to derived", () => {
+        const auto = fold.apply(
+          fold.apply(fold.init(), messageSent({ title: "placeholder" }, 1000)),
+          titleGenerated({}, 2000),
+        );
+        const state = fold.apply(
+          auto,
+          messageSent({ messageId: "m2", title: "another" }, 3000),
+        );
+        expect(state.Title).toBe("Generated Title");
+        expect(state.TitleSource).toBe(LANGY_TITLE_SOURCE.AUTO);
+      });
     });
   });
 
