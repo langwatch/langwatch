@@ -1548,4 +1548,54 @@ export const tracesV2Router = createTRPCRouter({
       const app = getApp();
       return app.evaluations.runs.findByTraceId(input.projectId, input.traceId);
     }),
+
+  /**
+   * Every log record correlated to one trace (generic — not Claude-specific).
+   * Logs key by traceId (to spans only via `request_id`), so this is a
+   * trace-level read: the raw-log inspector renders untruncated bodies on
+   * demand, and the dashboard frontend join composes span content client-side
+   * from these logs. `occurredAtMs` is threaded as a `TimeUnixMs`
+   * partition-pruning hint like the sibling span reads.
+   */
+  traceLogs: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...spanReadHintShape,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input }): Promise<TraceLogRecordDto[]> => {
+      const app = getApp();
+      const rows = await app.traces.logRecords.getLogsByTraceId(
+        input.projectId,
+        input.traceId,
+        input.occurredAtMs,
+      );
+      return rows.map((row) => ({
+        spanId: row.spanId,
+        timeUnixMs: row.timeUnixMs,
+        body: row.body,
+        attributes: row.attributes,
+        resourceAttributes: row.resourceAttributes,
+        scopeName: row.scopeName,
+        scopeVersion: row.scopeVersion,
+      }));
+    }),
 });
+
+/**
+ * One trace-correlated log record as returned to the frontend raw-log
+ * inspector. The `traceId` is implied by the query; `attributes` carries the
+ * emitter's event payload (`body`, `event.name`, `request_id`, `cost_usd`, …).
+ */
+export interface TraceLogRecordDto {
+  spanId: string;
+  timeUnixMs: number;
+  body: string;
+  attributes: Record<string, string>;
+  resourceAttributes: Record<string, string>;
+  scopeName: string;
+  scopeVersion: string | null;
+}

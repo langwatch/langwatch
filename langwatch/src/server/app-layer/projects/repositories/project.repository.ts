@@ -63,6 +63,17 @@ export interface ProjectRepository {
   getById(id: string): Promise<Project | null>;
   getWithTeam(id: string): Promise<ProjectWithTeam | null>;
   updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void>;
+  /**
+   * Reads the project's `claudeCodeEnhancedTelemetry` flag via a narrow select
+   * (this is on the log-ingest hot path — never pull the full row). Returns
+   * false when the project doesn't exist.
+   */
+  getClaudeCodeEnhancedTelemetry(id: string): Promise<boolean>;
+  /**
+   * Sets `claudeCodeEnhancedTelemetry = true` (write-once). No-op when the
+   * project doesn't exist. Idempotent — re-setting true is harmless.
+   */
+  setClaudeCodeEnhancedTelemetry(id: string): Promise<void>;
   getWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
   /**
    * Returns the presence-enabled flags for a project + its org, or null when
@@ -123,6 +134,14 @@ export class NullProjectRepository implements ProjectRepository {
   }
 
   async updateMetadata(_input: UpdateProjectMetadataInput): Promise<void> {
+    // no-op
+  }
+
+  async getClaudeCodeEnhancedTelemetry(_id: string): Promise<boolean> {
+    return false;
+  }
+
+  async setClaudeCodeEnhancedTelemetry(_id: string): Promise<void> {
     // no-op
   }
 

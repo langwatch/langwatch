@@ -531,6 +531,118 @@ describe("LogRequestCollectionService", () => {
     });
   });
 
+  describe("when the project's enhanced-telemetry gate is on", () => {
+    /**
+     * Plan §4.1 / C0. Once a project sends real Claude Code tracing spans, the
+     * gate reactor flips its flag; from then on ingest must NOT stamp
+     * `langwatch.claude_code.kind` on content logs. Unmarked ⇒ the synthesis
+     * fold finds nothing to fold (no double-count) and the log falls through to
+     * normal project retention. The record is still stored, just unmarked.
+     */
+    const scopeLogs = (records: Array<Record<string, any>>) => ({
+      resourceLogs: [
+        {
+          resource: { attributes: [] },
+          scopeLogs: [
+            {
+              scope: {
+                name: "com.anthropic.claude_code.events",
+                version: "2.1.162",
+              },
+              logRecords: records,
+            },
+          ],
+        },
+      ],
+    });
+
+    const apiRequest = () => ({
+      timeUnixNano: "1700000001000000000",
+      body: { stringValue: "claude_code.api_request" },
+      attributes: [
+        { key: "event.name", value: { stringValue: "api_request" } },
+        { key: "session.id", value: { stringValue: "sess_conv" } },
+        { key: "prompt.id", value: { stringValue: "p_1" } },
+        { key: "request_id", value: { stringValue: "req_a" } },
+        { key: "query_source", value: { stringValue: "repl_main_thread" } },
+      ],
+    });
+
+    function makeGatedService(enabled: boolean) {
+      const recordLog = vi.fn<(data: RecordLogCommandData) => Promise<void>>(
+        () => Promise.resolve(),
+      );
+      const isEnhancedTelemetryEnabled = vi.fn(async () => enabled);
+      const service = new LogRequestCollectionService({
+        recordLog,
+        isEnhancedTelemetryEnabled,
+      });
+      return { service, recordLog, isEnhancedTelemetryEnabled };
+    }
+
+    it("records the log unmarked (no kind / pii markers) when the gate is on", async () => {
+      const { service, recordLog } = makeGatedService(true);
+
+      await service.handleOtlpLogRequest({
+        tenantId: "project_gated",
+        logRequest: scopeLogs([apiRequest()]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+
+      expect(recordLog).toHaveBeenCalledTimes(1);
+      const data = recordLog.mock.calls[0]![0]!;
+      // Still stored, still carries its own event attributes...
+      expect(data.attributes["event.name"]).toBe("api_request");
+      // ...but NOT the synthesis markers.
+      expect(data.attributes[CLAUDE_CODE_KIND_ATTR]).toBeUndefined();
+      expect(data.attributes[CLAUDE_CODE_PII_ATTR]).toBeUndefined();
+    });
+
+    it("still marks the log when the gate is off (fallback behavior preserved)", async () => {
+      const { service, recordLog } = makeGatedService(false);
+
+      await service.handleOtlpLogRequest({
+        tenantId: "project_ungated",
+        logRequest: scopeLogs([apiRequest()]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+
+      const data = recordLog.mock.calls[0]![0]!;
+      expect(data.attributes[CLAUDE_CODE_KIND_ATTR]).toBe("model");
+      expect(data.attributes[CLAUDE_CODE_PII_ATTR]).toBe("ESSENTIAL");
+    });
+
+    it("looks up the gate once per request, not per record", async () => {
+      const { service, isEnhancedTelemetryEnabled } = makeGatedService(true);
+
+      await service.handleOtlpLogRequest({
+        tenantId: "project_gated",
+        logRequest: scopeLogs([apiRequest(), apiRequest(), apiRequest()]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+
+      expect(isEnhancedTelemetryEnabled).toHaveBeenCalledTimes(1);
+    });
+
+    it("caches the gate across requests within the TTL window", async () => {
+      const { service, isEnhancedTelemetryEnabled } = makeGatedService(true);
+
+      await service.handleOtlpLogRequest({
+        tenantId: "project_gated",
+        logRequest: scopeLogs([apiRequest()]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+      await service.handleOtlpLogRequest({
+        tenantId: "project_gated",
+        logRequest: scopeLogs([apiRequest()]),
+        piiRedactionLevel: "ESSENTIAL",
+      });
+
+      // Second request is served from the cache — no extra lookup.
+      expect(isEnhancedTelemetryEnabled).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("codex log records — trace_id / span_id synthesis", () => {
     /**
      * Codex emits its events (codex.user_prompt, codex.sse_event,

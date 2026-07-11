@@ -260,6 +260,127 @@ describe("computeClaudeSpanEnrichment", () => {
     });
   });
 
+  describe("given an api_request anchor with cost_usd sharing the span's request_id", () => {
+    it("attaches the authoritative cost to the span", () => {
+      const spans: ClaudeSpanRef[] = [
+        { spanId: "span-1", requestId: REQUEST_ID, querySource: REPL },
+      ];
+      const logs: ClaudeContentLog[] = [
+        {
+          eventName: "api_request",
+          requestId: REQUEST_ID,
+          querySource: REPL,
+          timeUnixMs: 1000,
+          body: null,
+          costUsd: 0.0421,
+        },
+      ];
+
+      const enrichment = computeClaudeSpanEnrichment({ spans, logs }).get(
+        "span-1",
+      );
+
+      expect(enrichment?.cost).toBe(0.0421);
+    });
+
+    it("does not attach cost to a span whose request_id matches no api_request", () => {
+      const spans: ClaudeSpanRef[] = [
+        { spanId: "span-1", requestId: "req_unmatched", querySource: REPL },
+      ];
+      const logs: ClaudeContentLog[] = [
+        {
+          eventName: "api_request",
+          requestId: REQUEST_ID,
+          querySource: REPL,
+          timeUnixMs: 1000,
+          body: null,
+          costUsd: 0.5,
+        },
+      ];
+
+      expect(
+        computeClaudeSpanEnrichment({ spans, logs }).get("span-1")?.cost ?? null,
+      ).toBeNull();
+    });
+  });
+
+  describe("given an api_request with an invalid cost_usd", () => {
+    it("does not attach a negative or non-finite cost", () => {
+      const spans: ClaudeSpanRef[] = [
+        { spanId: "span-neg", requestId: "req_neg", querySource: REPL },
+        { spanId: "span-nan", requestId: "req_nan", querySource: REPL },
+      ];
+      const logs: ClaudeContentLog[] = [
+        {
+          eventName: "api_request",
+          requestId: "req_neg",
+          querySource: REPL,
+          timeUnixMs: 1,
+          body: null,
+          costUsd: -1,
+        },
+        {
+          eventName: "api_request",
+          requestId: "req_nan",
+          querySource: REPL,
+          timeUnixMs: 2,
+          body: null,
+          costUsd: Number.NaN,
+        },
+      ];
+
+      const result = computeClaudeSpanEnrichment({ spans, logs });
+      expect(result.get("span-neg") ?? null).toBeNull();
+      expect(result.get("span-nan") ?? null).toBeNull();
+    });
+  });
+
+  describe("given the light events only (RAW_API_BODIES off: assistant_response + user_prompt + api_request)", () => {
+    it("joins output + cost exactly by request_id and input from the user_prompt, without any api_*_body", () => {
+      const spans: ClaudeSpanRef[] = [
+        { spanId: "span-1", requestId: REQUEST_ID, querySource: REPL },
+      ];
+      const logs: ClaudeContentLog[] = [
+        {
+          eventName: "user_prompt",
+          requestId: null,
+          querySource: REPL,
+          timeUnixMs: 100,
+          body: "summarise the repo",
+        },
+        {
+          eventName: "api_request",
+          requestId: REQUEST_ID,
+          querySource: REPL,
+          timeUnixMs: 200,
+          body: null,
+          costUsd: 0.0123,
+        },
+        {
+          eventName: "assistant_response",
+          requestId: REQUEST_ID,
+          querySource: REPL,
+          timeUnixMs: 210,
+          body: "Here is the summary.",
+        },
+      ];
+
+      const enrichment = computeClaudeSpanEnrichment({ spans, logs }).get(
+        "span-1",
+      );
+
+      expect(enrichment?.output).toEqual({
+        type: "text",
+        value: "Here is the summary.",
+      });
+      expect(enrichment?.cost).toBe(0.0123);
+      expect(enrichment?.input).toEqual({
+        type: "text",
+        value: "summarise the repo",
+      });
+    });
+  });
+
   describe("given both a request body and a response body for one span", () => {
     it("attaches input from the body and output from the matching response", () => {
       const spans: ClaudeSpanRef[] = [
