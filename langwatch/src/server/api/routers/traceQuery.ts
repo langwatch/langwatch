@@ -1,7 +1,5 @@
 import { z } from "zod";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import { compileTraceQuery } from "~/server/app-layer/traces/trace-query/compile";
-import { executeTraceQuery } from "~/server/app-layer/traces/trace-query/execute";
+import { runTraceQuery } from "~/server/app-layer/traces/trace-query/service";
 import { traceQueryRequestSchema } from "~/server/app-layer/traces/trace-query/schema";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -11,10 +9,9 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  *
  * The authz gate (`checkProjectPermission`) is load-bearing: it is the ONLY
  * place the caller's authorization for `input.projectId` is established. The
- * compiler then treats that RBAC-checked projectId as the tenant and injects
- * it into every table reference — the request never carries a tenant of its
- * own. This is the composition the spike validates: session auth → derive
- * tenant → compiler-injected scope → read-only execution.
+ * service then treats that RBAC-checked projectId as the tenant and the
+ * compiler injects it into every table reference — the request never carries a
+ * tenant of its own. The route stays thin; orchestration lives in the service.
  */
 export const traceQueryRouter = createTRPCRouter({
   run: protectedProcedure
@@ -25,28 +22,11 @@ export const traceQueryRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("analytics:view"))
-    .mutation(async ({ input, ctx }) => {
-      // The tenant is the authorized project — derived from the RBAC-checked
-      // input, never a separate tenant field on the body.
-      const tenantId = input.projectId;
-
-      const compiled = compileTraceQuery({ request: input.query, tenantId });
-
-      const client = await getClickHouseClientForProject(tenantId);
-      if (!client) {
-        throw new Error("ClickHouse is not configured for this project");
-      }
-
-      const { rows, audit } = await executeTraceQuery({
-        compiled,
-        client,
-        tenantId,
-        caller: ctx.session?.user?.id,
-      });
-
-      // The compiled SQL is returned for the spike demo so a human can SEE the
-      // compiler-injected tenant scope. `params` are withheld (they carry the
-      // bound literals); `audit` is the redacted shape that would be logged.
-      return { rows, sql: compiled.sql, audit, rowCount: rows.length };
-    }),
+    .mutation(({ input, ctx }) =>
+      runTraceQuery({
+        projectId: input.projectId,
+        request: input.query,
+        callerId: ctx.session?.user?.id,
+      }),
+    ),
 });
