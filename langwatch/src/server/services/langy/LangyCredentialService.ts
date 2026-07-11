@@ -68,11 +68,25 @@ export class LangyCredentialResolutionError extends Error {
 
 export type LangyCredentials = {
   /**
-   * Ephemeral per-session sk-lw-* key scoped to the requesting user's own
+   * Ephemeral per-WORKER sk-lw-* key scoped to the requesting user's own
    * permissions (ADR-047). Used by the MCP server in the worker to call the LW
    * API, so a Langy tool call can never exceed what the caller could do by hand.
+   *
+   * OPTIONAL, and its absence is meaningful: when the manager already has a live
+   * worker for this conversation, that worker holds its key in its process
+   * environment, and a new one would be minted only to be discarded unread. So we
+   * send none. The manager accepts a keyless bundle for a REUSE and refuses it
+   * for a spawn — see `Credentials.Spawnable` / ErrCredentialsRequired on the Go
+   * side, which is how the die-between-probe-and-turn race is resolved.
    */
-  langwatchApiKey: string;
+  langwatchApiKey?: string;
+  /**
+   * The id of the key above. Handed to the manager purely so it can ask us to
+   * REVOKE that key when the worker dies. It names a credential without
+   * conferring any power over it, which keeps the manager's authority at "destroy
+   * what I was given" rather than "mint whatever I name".
+   */
+  langwatchApiKeyId?: string;
   /** Project's Langy VK secret. Used by opencode as OPENAI_API_KEY against the AI gateway. */
   llmVirtualKey: string;
   /** Control plane base URL — set as LANGWATCH_ENDPOINT for the MCP server. */
@@ -128,12 +142,31 @@ export class LangyCredentialService {
     return new LangyCredentialService(prisma);
   }
 
+  /**
+   * Resolves the credential bundle for a turn.
+   *
+   * `mintSessionKey` is the seam that makes "probe before minting" possible.
+   *
+   * The session key lives in the WORKER's environment, injected at spawn, and a
+   * reused worker keeps the one it booted with. So on the common path — a
+   * follow-up message on a live worker — a freshly minted key is written to the
+   * database, pushed to the manager, discarded unread, and left valid for hours.
+   * Measured on a dev box: 41 keys minted, 14 ever used. That is credential
+   * sprawl, and the write was on the critical path of every message.
+   *
+   * The caller therefore resolves everything EXCEPT the key first (which is also
+   * everything the worker signature is made of — model, GitHub-token presence,
+   * egress allow-list), asks the manager whether a matching worker is already
+   * running, and only mints when the answer is no.
+   */
   async getOrProvision({
     projectId,
     session,
+    mintSessionKey = true,
   }: {
     projectId: string;
     session: Session;
+    mintSessionKey?: boolean;
   }): Promise<LangyCredentials> {
     const actorUserId = session.user.id;
     const projectRepo = new ProjectRepository(this.prisma);
@@ -164,14 +197,19 @@ export class LangyCredentialService {
     // wrap mint failures as LangyCredentialResolutionError so the route returns a
     // 409 rather than falling back to a broader key. A user who holds none of
     // Langy's permissions here gets a clean, actionable refusal.
-    let langwatchApiKey: string;
+    let langwatchApiKey: string | undefined;
+    let langwatchApiKeyId: string | undefined;
     try {
-      langwatchApiKey = await mintLangySessionApiKey({
-        prisma: this.prisma,
-        session,
-        projectId,
-        organizationId: project.organizationId,
-      });
+      if (mintSessionKey) {
+        const minted = await mintLangySessionApiKey({
+          prisma: this.prisma,
+          session,
+          projectId,
+          organizationId: project.organizationId,
+        });
+        langwatchApiKey = minted.token;
+        langwatchApiKeyId = minted.apiKeyId;
+      }
     } catch (error) {
       if (error instanceof LangySessionKeyScopeError) {
         // Carries a user-safe message (the caller holds no Langy permissions
@@ -229,7 +267,12 @@ export class LangyCredentialService {
     }
 
     return {
-      langwatchApiKey,
+      // Absent when the caller asked us not to mint because a live worker already
+      // holds a key. The manager accepts a keyless bundle for a REUSE and refuses
+      // it for a spawn (ErrCredentialsRequired), which is how the die-between-
+      // probe-and-turn race is resolved rather than guessed at.
+      ...(langwatchApiKey ? { langwatchApiKey } : {}),
+      ...(langwatchApiKeyId ? { langwatchApiKeyId } : {}),
       llmVirtualKey,
       langwatchEndpoint,
       gatewayBaseUrl: ensureGatewayV1BaseUrl(gatewayBaseUrl),
@@ -334,7 +377,9 @@ export class LangyCredentialService {
       select: { langyEgressAllowlist: true },
     });
     if (!project || project.langyEgressAllowlist == null) return null;
-    const parsed = langyEgressAllowlistSchema.parse(project.langyEgressAllowlist);
+    const parsed = langyEgressAllowlistSchema.parse(
+      project.langyEgressAllowlist,
+    );
     return parsed.length > 0 ? parsed : null;
   }
 

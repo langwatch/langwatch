@@ -16,8 +16,20 @@ import (
 // conversation. Implemented by adapters/workerpool.Pool.
 type WorkerPool interface {
 	// Acquire returns the worker for conversationID, spawning one if needed. A
-	// herr(domain.ErrMaxWorkers) is returned at capacity.
+	// herr(domain.ErrMaxWorkers) is returned at capacity. A herr with
+	// domain.ErrCredentialsRequired is returned when a spawn is needed but the
+	// credentials carry no session key — see HasLiveWorker.
 	Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (Worker, error)
+	// HasLiveWorker reports whether a worker matching `sig` is already running for
+	// this conversation. The control plane calls this BEFORE a turn to decide
+	// whether it needs to mint a session key at all: a reused worker already
+	// carries one in its environment, so minting a second would create a live
+	// credential that nothing ever reads.
+	//
+	// Advisory only — the worker may die immediately after we answer. Acquire is
+	// the authority, and it refuses a keyless spawn rather than booting a worker
+	// that cannot reach LangWatch.
+	HasLiveWorker(conversationID string, sig domain.CredentialSignature) bool
 	// Status returns the live worker count and the configured cap.
 	Status() (active, max int)
 	// KillSessionVanished recycles a worker whose opencode session disappeared.

@@ -21,6 +21,12 @@
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { Context } from "hono";
 import { z } from "zod";
+import { timingSafeEqual } from "crypto";
+import {
+  LangySessionKeyScopeError,
+  mintLangySessionApiKey,
+  revokeLangySessionApiKey,
+} from "~/server/services/langy/langyApiKey";
 import { env } from "~/env.mjs";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -219,6 +225,12 @@ const AGENT_HEALTH_CHECK_TIMEOUT_MS = 3_000;
 const AGENT_CHAT_TIMEOUT_MS = 120_000;
 /** The warm is fire-and-forget; don't let it hold a socket open. */
 const AGENT_WARM_TIMEOUT_MS = 3_000;
+/**
+ * The probe sits in front of EVERY message, so it gets a tight budget. It exists
+ * to save a ~70ms mint; spending longer than that waiting for the answer would
+ * make it a pessimisation. On timeout we fail open and mint, exactly as before.
+ */
+const AGENT_PROBE_TIMEOUT_MS = 1_000;
 
 // Preflight before reserving a PR permit or calling /chat: a 3s timeout
 // instead of the 120s chat budget, so a fully-down agent fails in seconds
@@ -258,6 +270,66 @@ async function isAgentHealthy(agentUrl: string): Promise<boolean> {
  * id and the credential signature matches (the caller warms only once the
  * credentials are final).
  */
+/**
+ * Asks the manager whether a worker with these capabilities is already running,
+ * so we can skip minting a session key it would only discard.
+ *
+ * FAILS OPEN, and that direction matters. If the manager is unreachable, slow, or
+ * answers nonsense, we return false and the caller mints — which is exactly the
+ * behaviour that existed before this optimisation. The worst outcome of a broken
+ * probe is the old cost, never a broken turn. Returning `true` on failure would
+ * send a keyless turn at a manager that may need to spawn, converting a probe
+ * outage into a user-visible retry storm.
+ *
+ * Short timeout for the same reason: this sits in front of every message, and a
+ * hung manager must cost us a spawn's worth of minting, not the whole turn.
+ */
+async function probeLangyWorker({
+  agentUrl,
+  internalSecret,
+  conversationId,
+  model,
+  hasGithubAuth,
+  egressAllowlist,
+}: {
+  agentUrl: string;
+  internalSecret: string;
+  conversationId: string;
+  model?: string;
+  hasGithubAuth: boolean;
+  egressAllowlist?: string[];
+}): Promise<boolean> {
+  try {
+    const response = await fetch(`${agentUrl}/worker/probe`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${internalSecret}`,
+      },
+      body: JSON.stringify({
+        conversationId,
+        // The capability fields, not a pre-computed signature: the manager owns
+        // the canonicalisation (egress sorting/normalising) and computing it here
+        // too would be a second copy of the rule, free to drift until every probe
+        // silently missed and we were back to minting every turn.
+        ...(model ? { model } : {}),
+        hasGithubAuth,
+        ...(egressAllowlist?.length ? { egressAllowlist } : {}),
+      }),
+      signal: AbortSignal.timeout(AGENT_PROBE_TIMEOUT_MS),
+    });
+    if (!response.ok) return false;
+    const body = (await response.json()) as { alive?: unknown };
+    return body.alive === true;
+  } catch (error) {
+    logger.debug(
+      { error, conversationId },
+      "langy worker probe failed — minting a session key as if cold",
+    );
+    return false;
+  }
+}
+
 async function warmLangyWorker({
   agentUrl,
   internalSecret,
@@ -430,7 +502,17 @@ langyRoute().post("/langy/chat", async (c) => {
             conversationId: requestedConversationId ?? null,
           }),
           getVercelAIModel({ projectId }),
-          credentialService.getOrProvision({ projectId, session }),
+          // `mintSessionKey: false` — everything EXCEPT the session key. We cannot
+          // yet know whether we need one: that depends on whether the manager
+          // already has a live worker, and the question we must ask it (the
+          // capability signature: model, GitHub-token presence, egress list) is
+          // itself made of the things this call resolves. So resolve first, probe
+          // second, mint only if we must. See the probe below.
+          credentialService.getOrProvision({
+            projectId,
+            session,
+            mintSessionKey: false,
+          }),
           credentialService.getEgressAllowlist({ projectId }),
         ]),
     );
@@ -584,6 +666,64 @@ langyRoute().post("/langy/chat", async (c) => {
         },
         { status: 400 },
       );
+    }
+  }
+
+  // ── MINT THE SESSION KEY ONLY IF A WORKER MUST ACTUALLY BE SPAWNED ────────
+  //
+  // The session key lives in the WORKER's process environment, injected at spawn.
+  // A reused worker keeps the key it booted with — the manager reads the incoming
+  // credentials only to compute the capability signature, and throws the rest
+  // away on a signature match. So minting on every turn produced a key that was
+  // written to the database, pushed over the wire, never read, and left valid for
+  // six hours. Measured: 41 keys minted, 14 ever used, none revoked.
+  //
+  // The signature is computable WITHOUT a key — model, whether a GitHub token is
+  // present, and the egress allow-list — which is precisely what lets us ask the
+  // question before paying for the answer. So: probe, then mint only on a miss.
+  //
+  // The probe is ADVISORY. The worker can die in the gap between it and the turn.
+  // We do not try to close that race here (we would only be guessing); the manager
+  // refuses a keyless spawn with `credentials_required` and the turn processor
+  // mints once and retries. A stale "alive" costs one round trip. Guessing wrong
+  // in the other direction — minting defensively every time — is the bug.
+  //
+  // Everything here is best-effort in the safe direction: if the probe itself
+  // fails, we mint, exactly as before this change.
+  // The model in the worker's signature is the OVERRIDE, or empty — never the
+  // resolved project default. The manager only ever assigns `creds.Model` from a
+  // non-empty `modelOverride` (handlers.go: `if mo != "" { creds.Model = mo }`),
+  // and the credentials envelope carries no model field of its own. Probing with
+  // the resolved default would therefore compute a signature the manager never
+  // holds, every probe would miss, and we would quietly mint on every turn again —
+  // the optimisation would look implemented and do nothing. Mirror the manager
+  // exactly.
+  const workerIsLive = await probeLangyWorker({
+    agentUrl,
+    internalSecret,
+    conversationId: conversation.id,
+    model: modelOverride,
+    hasGithubAuth: !!credentials.githubToken,
+    egressAllowlist: credentials.egressAllowlist,
+  });
+
+  if (!workerIsLive) {
+    try {
+      const minted = await mintLangySessionApiKey({
+        prisma,
+        session,
+        projectId,
+        organizationId: credentials.organizationId,
+      });
+      credentials.langwatchApiKey = minted.token;
+      credentials.langwatchApiKeyId = minted.apiKeyId;
+    } catch (error) {
+      if (error instanceof LangySessionKeyScopeError) {
+        // The caller holds none of Langy's permissions in this project. Same
+        // refusal as before, just reached later.
+        return c.json({ error: error.message }, { status: 409 });
+      }
+      throw error;
     }
   }
 
@@ -1321,5 +1461,86 @@ langyRoute().get("/langy/memory/export", async (c) => {
     conversations: conversationsWithMessages,
   });
 });
+
+/**
+ * The agent manager reports that a worker has died, so the session key that died
+ * with it can stop being a live credential.
+ *
+ * REVOKE ONLY. There is deliberately no minting counterpart here. The manager is
+ * trusted to *hold* a key it was handed, not to manufacture one: a mint endpoint
+ * behind this same secret would let whoever holds it create credentials for any
+ * user in any project they can name, which is a trust-boundary change and not
+ * something a latency optimisation gets to introduce. Revocation is fail-closed —
+ * the worst a compromised manager can do with this is destroy its own access.
+ *
+ * `revokeLangySessionApiKey` narrows it further still: it refuses any key that is
+ * not a Langy session key, so a bad or malicious id cannot take a customer's
+ * personal or ingestion keys offline.
+ *
+ * Idempotent, and "already gone" is a success: the manager races the expiry
+ * reaper, and a key the reaper collected first must not look like a failure.
+ */
+langyRoute().post("/langy/credentials/revoke", async (c) => {
+  const internalSecret = process.env.LANGY_INTERNAL_SECRET;
+  if (!internalSecret) {
+    logger.error("LANGY_INTERNAL_SECRET is not configured");
+    return c.json({ error: "Not configured" }, { status: 503 });
+  }
+  if (
+    !isLangyInternalCallerAuthorized(
+      c.req.header("authorization"),
+      internalSecret,
+    )
+  ) {
+    return c.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const parsed = revokeCredentialsSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    return c.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const outcome = await revokeLangySessionApiKey({
+    prisma,
+    apiKeyId: parsed.data.apiKeyId,
+  });
+
+  switch (outcome) {
+    case "revoked":
+    case "already_revoked":
+      return c.json({ outcome }, { status: 200 });
+    case "not_found":
+      // 404, which the manager treats as success — the key is in the state it
+      // asked for. Anything else would make the reaper winning the race look
+      // like a fault.
+      return c.json({ outcome }, { status: 404 });
+    case "refused":
+      // The id resolved to a key that is not ours. Refused, and loud: this should
+      // never happen in normal operation.
+      return c.json({ error: "Not a Langy session key" }, { status: 403 });
+  }
+});
+
+const revokeCredentialsSchema = z.object({
+  apiKeyId: z.string().min(1).max(128),
+});
+
+/**
+ * Constant-time bearer check against the shared manager secret. A plain `===`
+ * leaks the secret one byte at a time to anything that can time our responses,
+ * and this endpoint is reachable from inside the cluster.
+ */
+function isLangyInternalCallerAuthorized(
+  authorizationHeader: string | undefined,
+  expected: string,
+): boolean {
+  if (!authorizationHeader?.startsWith("Bearer ")) return false;
+  const presented = Buffer.from(authorizationHeader.slice("Bearer ".length));
+  const expectedBuf = Buffer.from(expected);
+  if (presented.length !== expectedBuf.length) return false;
+  return timingSafeEqual(presented, expectedBuf);
+}
 
 export const app = secured.hono;

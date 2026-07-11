@@ -1,64 +1,87 @@
 import { FEATURES } from "./featureMap";
+import GENERATED_SKILLS from "./langySkills.generated.json";
 
 /**
  * The skills a user can point Langy at — DERIVED, never hand-listed.
  *
- * ── WHY THIS IS DERIVED ────────────────────────────────────────────────────
- * The last round of this project shipped an AGENTS.md table advertising 13
- * tools that did not exist. The agent believed it, tried to call them, and the
- * cost was days. A hand-written catalogue of capabilities is a promise the code
- * does not keep, and there is no test that can catch it — the list is prose.
+ * ── WHY THIS IS DERIVED, AND WHY IT IS DERIVED FROM *THIS* ─────────────────
+ * This catalogue has been wrong twice, in opposite directions, for the same
+ * reason. It once advertised 13 tools that did not exist: the agent believed the
+ * list, tried to call them, and the cost was days. The fix — compute the list,
+ * never write it — was right. But the computation was then pointed at
+ * `services/langyagent/skills/`, which holds exactly one skill (`github`), while
+ * the image ships FOURTEEN. So the palette under-offered by 13 real capabilities.
  *
- * So this list is not written. It is COMPUTED, from the only two places a Langy
- * capability can actually come from:
+ * A hand-written catalogue over-promises. A catalogue derived from the wrong
+ * directory under-promises. Both are the same bug: the list did not come from the
+ * thing the worker actually installs.
  *
- *   1. `feature-map.json` — a feature is invocable iff it declares CLI commands
- *      (`surfaces.code.cli`). Langy's agent drives the `langwatch` CLI, so a
- *      feature with no CLI commands is a feature Langy cannot use, whatever the
- *      marketing site says. 19 features qualify today.
- *   2. `services/langyagent/skills/` — the agent's own skills. There is exactly
- *      ONE (`github`), and it is declared below with an explicit pointer to its
- *      SKILL.md. When a second skill lands, it is added here and the pointer
- *      makes the claim checkable.
+ * It does now. The two inputs are:
  *
- * If a feature loses its CLI commands, it disappears from this list on its own.
- * If someone invents a capability, it will not appear here, because it cannot.
+ *   1. AGENT SKILLS — `langySkills.generated.json`, produced by
+ *      `scripts/generate-langy-skills.ts` from the skill directories named in
+ *      `Dockerfile.langyagent`'s COPY set (`skills/_compiled/native/` +
+ *      `services/langyagent/skills/`) — i.e. from the image itself. Each entry's
+ *      words are its own `SKILL.md` front-matter, the same source behind the
+ *      public skill directory, so a skill cannot describe itself as something it
+ *      is not. `__tests__/langySkills.unit.test.ts` re-derives from disk and fails
+ *      if the committed file has drifted from the image, so a skill added to the
+ *      worker cannot go missing from the palette (or vice versa).
+ *
+ *   2. PLATFORM CAPABILITIES — `feature-map.json`. A feature is invocable iff it
+ *      declares CLI commands (`surfaces.code.cli`), because Langy's agent drives
+ *      the `langwatch` CLI. A feature with no CLI commands is one Langy cannot
+ *      use, whatever the marketing site says.
+ *
+ * If a feature loses its CLI commands, it leaves this list on its own. If someone
+ * invents a capability, it cannot appear here, because it cannot be derived.
  */
 
-/** Where a skill's ability actually comes from — and therefore how to verify it. */
-export type LangySkillSource = "cli" | "agent-skill";
+/** Where a skill's ability comes from — and therefore how to verify it. */
+export type LangySkillSource = "agent-skill" | "recipe" | "cli";
 
 export interface LangySkill {
-  /** Feature-map feature id, or agent skill directory name. */
+  /** opencode skill name, or feature-map feature id. */
   id: string;
   label: string;
   source: LangySkillSource;
   /**
-   * What this skill can actually do, in the user's words. For CLI features this
-   * is derived from the verbs the map declares, so it cannot over-promise.
+   * What this skill can actually do. For an agent skill this is the skill's OWN
+   * description, from its `SKILL.md`; for a CLI feature it is derived from the
+   * verbs the map declares. Neither is written by hand, so neither can promise
+   * something the agent cannot do.
    */
   summary: string;
   /** Matched against the `/` palette's query. */
   searchText: string;
 }
 
+interface GeneratedSkill {
+  id: string;
+  label: string;
+  description: string;
+  category: "skill" | "recipe";
+  userPrompt?: string;
+}
+
 /**
- * Agent skills, from `services/langyagent/skills/`.
- *
- * ONE entry, because there is one directory. `github/SKILL.md` describes the
- * whole of it: clone → branch → edit → commit → push → `gh pr create`. It cannot
- * open issues and it cannot validate a fix; the summary says only what the skill
- * file says.
+ * The skills the worker installs. A `recipe` is a task walkthrough rather than a
+ * standing capability, so it carries its own source and the palette can group it
+ * apart — but both are real, loadable, and offerable.
  */
-const AGENT_SKILLS: LangySkill[] = [
-  {
-    id: "github",
-    label: "GitHub",
-    source: "agent-skill",
-    summary: "Open a pull request on your behalf — branch, commit, push, PR.",
-    searchText: "github pr pull request commit branch ship fix",
-  },
-];
+const AGENT_SKILLS: LangySkill[] = (GENERATED_SKILLS as GeneratedSkill[]).map(
+  (skill) => ({
+    id: skill.id,
+    label: skill.label,
+    source:
+      skill.category === "recipe"
+        ? ("recipe" as const)
+        : ("agent-skill" as const),
+    summary: skill.description,
+    searchText:
+      `${skill.label} ${skill.id} ${skill.description} ${skill.userPrompt ?? ""}`.toLowerCase(),
+  }),
+);
 
 /** `trace search` / `dataset upload` → the bare verbs a feature really exposes. */
 function verbsOf(cli: string[]): string[] {
@@ -79,8 +102,27 @@ function summarize(name: string, cli: string[]): string {
   return verbs.length > 0 ? `${name} — ${verbs.join(", ")}.` : `${name}.`;
 }
 
+const AGENT_SKILL_IDS = new Set(AGENT_SKILLS.map((skill) => skill.id));
+
+/**
+ * A platform feature the agent ALSO has a real skill for is not offered twice.
+ *
+ * `library.datasets` ("Datasets") and the `datasets` skill are the same thing to
+ * the person reading the menu, and offering both makes the palette look padded
+ * and the product look confused. The skill wins: it is the curated, documented
+ * route, it is genuinely loadable by the agent, and its description is the copy
+ * from the public skill directory rather than a list of CLI verbs.
+ *
+ * The rule is mechanical — a feature is dropped iff its label IS a skill's name —
+ * so there is no judgement call here to rot. A feature with no skill behind it
+ * (Annotations, Dashboards, Triggers) is untouched and still offered.
+ */
+function supersededBySkill(featureName: string): boolean {
+  return AGENT_SKILL_IDS.has(featureName.toLowerCase().replace(/\s+/g, "-"));
+}
+
 const CLI_SKILLS: LangySkill[] = FEATURES.filter(
-  (feature) => feature.cli.length > 0,
+  (feature) => feature.cli.length > 0 && !supersededBySkill(feature.name),
 ).map((feature) => ({
   id: feature.id,
   label: feature.name,
@@ -92,15 +134,20 @@ const CLI_SKILLS: LangySkill[] = FEATURES.filter(
 
 /**
  * Everything Langy can be pointed at. Agent skills lead — they are the verbs a
- * user reaches for on purpose ("open a PR") — then the platform capabilities.
+ * user reaches for on purpose ("open a PR", "instrument my code") — then the
+ * recipes, then the remaining platform capabilities.
  */
-export const LANGY_SKILLS: LangySkill[] = [...AGENT_SKILLS, ...CLI_SKILLS];
+export const LANGY_SKILLS: LangySkill[] = [
+  ...AGENT_SKILLS.filter((skill) => skill.source === "agent-skill"),
+  ...AGENT_SKILLS.filter((skill) => skill.source === "recipe"),
+  ...CLI_SKILLS,
+];
 
 export function findSkill(id: string): LangySkill | undefined {
   return LANGY_SKILLS.find((skill) => skill.id === id);
 }
 
-/** Substring match over name, id and the CLI commands themselves. */
+/** Substring match over name, id, description and the CLI commands themselves. */
 export function searchSkills(query: string): LangySkill[] {
   const q = query.trim().toLowerCase();
   if (!q) return LANGY_SKILLS;

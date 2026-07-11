@@ -39,6 +39,13 @@ const startTurn = vi.fn();
 const getById = vi.fn();
 const getPendingHandoff = vi.fn();
 const stash = vi.fn(async (_handoff: { system?: string }) => undefined);
+// The route mints the session key DIRECTLY (it probes the manager first and only
+// mints when no live worker matches — see probeLangyWorker), so the mint has to
+// be mocked here rather than behind LangyCredentialService.
+const mintLangySessionApiKey = vi.fn(async () => ({
+  token: "sk-lw-session",
+  apiKeyId: "key-1",
+}));
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) => getServerAuthSession(...args),
@@ -69,6 +76,11 @@ vi.mock("~/server/middleware/rate-limit-langy-github-prs", () => ({
 }));
 vi.mock("~/server/modelProviders/utils", () => ({
   getVercelAIModel: (...args: unknown[]) => getVercelAIModel(...args),
+}));
+vi.mock("~/server/services/langy/langyApiKey", () => ({
+  LangySessionKeyScopeError: class extends Error {},
+  mintLangySessionApiKey: (...args: unknown[]) =>
+    (mintLangySessionApiKey as unknown as (...a: unknown[]) => unknown)(...args),
 }));
 vi.mock("~/server/services/langy/LangyCredentialService", () => ({
   LangyCredentialResolutionError: class extends Error {},
@@ -188,6 +200,10 @@ beforeEach(() => {
   getById.mockResolvedValue({ id: "conv-1", status: "failed" });
   getPendingHandoff.mockResolvedValue(null);
   stash.mockResolvedValue(undefined);
+  mintLangySessionApiKey.mockResolvedValue({
+    token: "sk-lw-session",
+    apiKeyId: "key-1",
+  });
 });
 
 /** The system block the worker is actually handed for this turn. */

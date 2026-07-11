@@ -28,6 +28,10 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       "langy_agent_session_lost",
       "langy_turn_timeout",
       "langy_worker_restarting",
+      // The manager tried to start a worker and it never came up. This was
+      // landing in `unknown` — a failure we can name exactly, shown to the user
+      // as "Something went wrong" plus a trace id.
+      "langy_worker_spawn_failed",
       // Raised from the TOOL STREAM (the agent reached for `gh` with no token),
       // never from the model's prose. It replaced the `[langy:connect-github]`
       // sentinel — see server/services/langy/execution/githubCommand.ts.

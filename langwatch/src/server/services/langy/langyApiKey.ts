@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import type { Session } from "~/server/auth";
-import { hasProjectPermission, type Permission } from "~/server/api/rbac";
+import { batchProjectPermissions, type Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { decrypt, encrypt } from "~/utils/encryption";
@@ -182,6 +182,136 @@ export async function provisionLangyApiKey({
 const LANGY_SESSION_KEY_TTL_MS = 6 * 60 * 60 * 1000; // 6h
 
 /**
+ * Mints a session key for a caller we know only by user id.
+ *
+ * This is the RETRY path. The manager told us it must spawn a worker but the turn
+ * arrived with no key (the worker died between our probe and the turn). By then we
+ * are in the turn processor, far from the browser session that started this — all
+ * we have is the actor's user id, off the handoff.
+ *
+ * Rehydrating a session object from that id grants NOTHING. Every permission
+ * decision `mintLangySessionApiKey` makes is resolved against the database:
+ * `hasProjectPermission` reads `session.user.id` and looks up the rest. So the
+ * minted key is still exactly the intersection of what this user genuinely holds.
+ * We are re-stating WHO the caller is, never asserting what they may do.
+ */
+export async function mintLangySessionApiKeyForUser({
+  prisma,
+  userId,
+  projectId,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  projectId: string;
+  organizationId: string;
+}): Promise<{ token: string; apiKeyId: string }> {
+  // RBAC's contract is `session.user.id` and nothing more — verified against
+  // resolveProjectPermission, which takes every other fact from Postgres.
+  const session = { user: { id: userId } } as unknown as Session;
+  return mintLangySessionApiKey({ prisma, session, projectId, organizationId });
+}
+
+/** Outcome of a system revocation. `refused` means "that was not ours to touch". */
+export type LangySessionKeyRevocation =
+  | "revoked"
+  | "already_revoked"
+  | "not_found"
+  | "refused";
+
+/**
+ * Revokes a Langy session key on behalf of the AGENT MANAGER, which reports a
+ * worker's death so the key that died with it stops being a live credential.
+ *
+ * This is deliberately NOT `ApiKeyService.revoke`: that one is the human path and
+ * asks "is the caller an admin, or the key's owner?" The manager is neither — it
+ * is a service with no user identity, and answering that question by handing it a
+ * synthetic admin would give it the power to revoke ANY key in the org. So the
+ * authority here is narrowed to the only thing the manager should ever be able to
+ * destroy:
+ *
+ *   - It can revoke ONLY keys named LANGY_SESSION_API_KEY_NAME. Anything else —
+ *     a user's personal key, the shared project key, an ingestion key — is
+ *     REFUSED, even with a valid internal secret and a real key id. A manager
+ *     that is compromised, confused, or fed a bad id cannot use this to take a
+ *     customer's API keys offline.
+ *   - It can only revoke. There is no minting counterpart, by design: revocation
+ *     is fail-closed (the worst outcome is the manager destroying its own
+ *     access), whereas a mint endpoint would let whoever holds the internal
+ *     secret manufacture credentials for any user they can name.
+ *
+ * Idempotent: a key already revoked is a success, because a caller retrying is
+ * asking for a state that already holds. The manager also races the reaper, so
+ * "already gone" must never look like a fault.
+ */
+export async function revokeLangySessionApiKey({
+  prisma,
+  apiKeyId,
+}: {
+  prisma: PrismaClient;
+  apiKeyId: string;
+}): Promise<LangySessionKeyRevocation> {
+  const key = await prisma.apiKey.findUnique({
+    where: { id: apiKeyId },
+    select: { id: true, name: true, revokedAt: true },
+  });
+  if (!key) return "not_found";
+
+  // Fail closed. The name is the ONLY thing that makes a key ours to revoke.
+  if (key.name !== LANGY_SESSION_API_KEY_NAME) {
+    logger.warn(
+      { apiKeyId, name: key.name },
+      "refusing to revoke a key that is not a Langy session key",
+    );
+    return "refused";
+  }
+
+  if (key.revokedAt) return "already_revoked";
+
+  await prisma.apiKey.update({
+    where: { id: apiKeyId },
+    data: { revokedAt: new Date() },
+  });
+  return "revoked";
+}
+
+/**
+ * Revokes every Langy session key whose lifetime has elapsed.
+ *
+ * THIS IS THE GUARANTEE, and revocation-on-worker-death is only the fast path.
+ * The manager revokes a key when it sees a worker die — but a manager that is
+ * SIGKILLed (OOM, node eviction, force-delete) sees nothing and runs no cleanup,
+ * and every key its workers held then stays valid for the rest of its TTL. No
+ * callback can close that hole, because the process that would make the call is
+ * the one that died.
+ *
+ * So the reaper is not redundant with revoke-on-death; it is the backstop that
+ * makes the whole scheme safe, and deleting it would reintroduce exactly the
+ * long tail of live, orphaned credentials this work set out to remove.
+ *
+ * Returns the number of keys revoked so the caller can log/meter it — a number
+ * that stays stubbornly high means workers are dying without their manager
+ * noticing, which is worth knowing.
+ */
+export async function reapExpiredLangySessionApiKeys({
+  prisma,
+  now = new Date(),
+}: {
+  prisma: PrismaClient;
+  now?: Date;
+}): Promise<number> {
+  const { count } = await prisma.apiKey.updateMany({
+    where: {
+      name: LANGY_SESSION_API_KEY_NAME,
+      revokedAt: null,
+      expiresAt: { not: null, lte: now },
+    },
+    data: { revokedAt: now },
+  });
+  return count;
+}
+
+/**
  * Thrown when the requesting user holds NONE of the permissions Langy can use
  * in the project, so there is no non-empty least-privilege key to mint. Carries
  * a user-safe message; the credential service surfaces it as a 409/403 to the
@@ -236,55 +366,65 @@ export async function mintLangySessionApiKey({
   session: Session;
   projectId: string;
   organizationId: string;
-}): Promise<string> {
+  // The id is returned alongside the token because it is the ONLY handle the
+  // agent manager gets: it names the key for revocation when the worker dies,
+  // without granting anything. The token itself is unrecoverable after this call
+  // (only its hash is stored), which is exactly why the key's lifetime has to be
+  // managed by whoever holds it — the worker — rather than re-derived later.
+}): Promise<{ token: string; apiKeyId: string }> {
   // Held subset = the intersection of the Langy candidate permissions with the
   // permissions this user actually holds at the project scope. `:manage` implies
   // `:view/:create/:update` via the rbac hierarchy, but `:update` does NOT imply
-  // `:view/:create`, so we must probe each candidate individually rather than
-  // assume a role grants the whole family.
+  // `:view/:create`, so each candidate must be decided individually.
   //
-  // FANNED OUT, not sequential. This runs on EVERY chat turn (the session key is
-  // minted per turn), so it is squarely hot-path — an earlier comment here
-  // claimed otherwise and used that to justify awaiting inside the loop. With
-  // ~3 queries per probe over a 27-item candidate list that was ~81 SERIALIZED
-  // round-trips, measured at 500-600ms per turn against a local Postgres, and
-  // worse the further the DB is. Promise.all makes it one round-trip deep.
+  // ONE batched resolution, not 27 scoped checks. This is a CORRECTNESS fix, not
+  // a speed-up, and the history is worth keeping:
   //
-  // `.map` preserves candidate order, so `heldPermissions` is deterministic.
+  //   - Originally: `await hasProjectPermission(...)` inside a `for` loop over 27
+  //     candidates. Each check costs ~3 queries, so ~81 SERIALIZED round-trips on
+  //     every chat turn — 500-600ms, on a comment that claimed chat "is not
+  //     hot-path traffic".
+  //   - Then: the same 27 checks under `Promise.all`. Faster in a quiet trace
+  //     (~15ms), and WORSE where it counted: 81 queries now wanted 81 Prisma
+  //     connections AT ONCE. Under real concurrency that starved the pool, and the
+  //     interactive transaction inside `ApiKeyService.create` below — which has a
+  //     5-second budget — could not get a connection and ABORTED. The turn died
+  //     with a 409 after ~90 seconds. Making the queries faster did not make them
+  //     safe; there were simply too many of them.
+  //   - Now: `batchProjectPermissions` loads the permission-INDEPENDENT facts once
+  //     (org membership, group memberships, role bindings, custom roles, the legacy
+  //     TeamUser fallback) and decides all 27 candidates in memory. ~4 queries,
+  //     flat, no matter how long the candidate list grows.
   //
-  // FOLLOW-UP (bigger win, deliberately not done here): this still issues ~81
-  // queries, just concurrently. Every lookup those probes make — organizationUser,
-  // groupMembership, roleBinding, customRole — is permission-INDEPENDENT, so the
-  // whole set can be fetched once and all 27 candidates resolved in memory,
-  // taking this to ~4 queries. `rbac.ts` already does exactly this for the other
-  // axis (`batchScopePermissions`: one permission across many scopes; we need
-  // many permissions across one scope) and its docstring already calls out this
-  // fan-out as the anti-pattern. Left alone because it means refactoring shared
-  // auth code, which deserves its own change and its own review.
+  // Order is preserved, so `heldPermissions` is deterministic.
   const heldPermissions: Permission[] = await tracer.withActiveSpan(
     "langy.mint.permission_probes",
     {
       attributes: {
         "tenant.id": projectId,
-        // The two numbers that explain this span's duration. `candidates` is the
-        // fan-out width; each probe is ~3 queries, so queries ≈ candidates * 3.
+        // Candidates is the width of the question; the query count no longer
+        // scales with it. If these ever diverge again, this span is where it shows.
         "langy.permission.candidates": LANGY_CANDIDATE_PERMISSIONS.length,
       },
     },
     async (span) => {
-      const probes = await Promise.all(
-        LANGY_CANDIDATE_PERMISSIONS.map(async (permission) => ({
-          permission,
-          held: await hasProjectPermission(
-            { prisma, session },
-            projectId,
-            permission,
-          ),
-        })),
+      // The project's team, because a TEAM-scoped binding inherits down to its
+      // projects. `hasProjectPermission` used to look this up inside every one of
+      // the 27 checks; once is enough.
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { teamId: true },
+      });
+
+      const held = await batchProjectPermissions(
+        { prisma, session },
+        {
+          organizationId,
+          projectId,
+          ...(project?.teamId ? { teamId: project.teamId } : {}),
+          permissions: LANGY_CANDIDATE_PERMISSIONS,
+        },
       );
-      const held = probes
-        .filter((probe) => probe.held)
-        .map((probe) => probe.permission);
       span.setAttribute("langy.permission.held", held.length);
       return held;
     },
@@ -302,7 +442,7 @@ export async function mintLangySessionApiKey({
   // the probes above is the point — a fat `mint` span tells you nothing, but
   // "probes 40ms / insert 8ms" tells you exactly which half to attack. It also
   // makes the per-turn row churn visible in the trace: one of these per turn.
-  const { token } = await tracer.withActiveSpan(
+  const { token, apiKey } = await tracer.withActiveSpan(
     "langy.mint.create_api_key",
     {
       attributes: {
@@ -332,5 +472,5 @@ export async function mintLangySessionApiKey({
       }),
   );
 
-  return token;
+  return { token, apiKeyId: apiKey.id };
 }

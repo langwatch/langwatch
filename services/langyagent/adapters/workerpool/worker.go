@@ -63,6 +63,18 @@ type Worker struct {
 	// worker rather than continue with stale env.
 	credSig domain.CredentialSignature
 
+	// apiKeyID + langwatchEndpoint are the two things needed to revoke this
+	// worker's session key when it dies, and nothing else. They are recorded at
+	// spawn because that is the only moment we have them: the key itself goes into
+	// the subprocess env and is never readable again, and later turns on a reused
+	// worker deliberately arrive with no credentials at all.
+	//
+	// The key's lifetime IS this worker's lifetime — it was injected at spawn and
+	// a reused worker keeps it — so the worker is the right thing to hang the
+	// revocation handle off.
+	apiKeyID          string
+	langwatchEndpoint string
+
 	mu sync.Mutex
 	// lastSeen drives the idle reaper.
 	lastSeen time.Time

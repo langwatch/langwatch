@@ -13,12 +13,27 @@ import (
 // pure value object: the workerpool adapter injects it into the subprocess
 // env, and the httpapi adapter decodes it off the wire.
 type Credentials struct {
-	// The four mandatory fields carry `validate:"required"` so the httpapi
-	// adapter can reject an incomplete bundle with a herr that names the offending
-	// field (see Complete for the equivalent boolean predicate). The validator
-	// descends into this struct automatically when the parent chatRequest is
-	// validated.
-	LangwatchAPIKey   string `json:"langwatchApiKey" validate:"required"`
+	// LangwatchAPIKey is deliberately NOT `validate:"required"`.
+	//
+	// The control plane probes us before a turn and, when we already have a live
+	// worker with the right capabilities, sends NO key at all — because a reused
+	// worker keeps the key it booted with (it lives in the subprocess env; see
+	// worker.go) and any key sent alongside a reuse would be minted, discarded
+	// unread, and left valid for hours. Requiring it here would reject exactly the
+	// requests we are trying to make cheap.
+	//
+	// The mandatory-ness moved to where it is actually true: a SPAWN needs a key.
+	// Acquire enforces that and answers ErrCredentialsRequired when a spawn is
+	// needed and no key came with the request, which the control plane resolves by
+	// minting once and retrying. See `Spawnable`.
+	LangwatchAPIKey string `json:"langwatchApiKey,omitempty"`
+	// LangwatchAPIKeyID names the key WITHOUT granting anything: it is the handle
+	// we hand back to the control plane when the worker dies so it can revoke the
+	// key. We can revoke, and only revoke — we can never ask for a key to be
+	// minted. That keeps the trust boundary where it was: the manager holds keys
+	// it was given, and the worst a compromised manager can do with this handle is
+	// destroy its own access.
+	LangwatchAPIKeyID string `json:"langwatchApiKeyId,omitempty"`
 	LLMVirtualKey     string `json:"llmVirtualKey" validate:"required"`
 	GatewayBaseURL    string `json:"gatewayBaseUrl" validate:"required"`
 	LangwatchEndpoint string `json:"langwatchEndpoint" validate:"required"`
@@ -41,6 +56,18 @@ type Credentials struct {
 func (c Credentials) Complete() bool {
 	return c.LangwatchAPIKey != "" && c.LLMVirtualKey != "" &&
 		c.GatewayBaseURL != "" && c.LangwatchEndpoint != ""
+}
+
+// Spawnable reports whether these credentials can boot a NEW worker — i.e. a
+// LangWatch key actually came with them.
+//
+// Reuse and spawn have different needs and this is the seam between them: a
+// reuse legitimately arrives with no key (the live worker already has one in its
+// env), whereas a spawn without a key would produce a worker that cannot call
+// LangWatch at all. Rather than let that worker boot broken, Acquire refuses with
+// ErrCredentialsRequired and the control plane mints and retries.
+func (c Credentials) Spawnable() bool {
+	return c.LangwatchAPIKey != ""
 }
 
 // CredentialSignature is a stable fingerprint of the credential capabilities a

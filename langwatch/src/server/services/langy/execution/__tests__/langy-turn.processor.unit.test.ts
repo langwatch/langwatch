@@ -24,7 +24,17 @@ function makeBuffer() {
     heartbeat: vi.fn(async () => {}),
     appendChunk: vi.fn(async () => {}),
     appendMilestone: vi.fn(async () => {}),
-    appendTool: vi.fn(async () => {}),
+    appendTool: vi.fn(
+      async (_args: {
+        phase: "start" | "end";
+        name: string;
+        // The shell command is the field the card labels itself from, so the
+        // mock names it rather than hiding it behind `unknown`.
+        input?: { command?: string };
+        output?: string;
+        isError?: boolean;
+      }) => {},
+    ),
     // The recovery loop pushes a calm status line onto the live stream before
     // each in-process retry (see langy-turn-recovery.ts).
     appendStatus: vi.fn(async (_args: { status: string }) => {}),
@@ -45,8 +55,29 @@ function makeConversations() {
     recordTurnHandoff: vi.fn(async () => {}),
     finalizeTurn: vi.fn(async () => ({ messageId: "m" })),
     failTurn: vi.fn(async () => {}),
-    recordToolCallStarted: vi.fn(async () => {}),
-    recordToolCallCompleted: vi.fn(async () => {}),
+    // Typed with the args they actually receive: a zero-arg `vi.fn` records its
+    // calls as `never`, so every assertion about WHAT was recorded has to be
+    // cast back into existence — which is how a test ends up asserting against a
+    // shape it invented rather than the one the code passes.
+    recordToolCallStarted: vi.fn(
+      async (_args: {
+        toolCallId: string;
+        toolName: string;
+        command?: string;
+        input?: unknown;
+      }) => {},
+    ),
+    recordToolCallCompleted: vi.fn(
+      async (_args: {
+        toolCallId: string;
+        toolName: string;
+        isError?: boolean;
+        command?: string;
+        input?: unknown;
+        durationMs?: number;
+        errorText?: string;
+      }) => {},
+    ),
   };
 }
 
@@ -447,23 +478,15 @@ describe("runTurn (tool events)", () => {
         }),
       );
 
-      const started = conversations.recordToolCallStarted.mock
-        .calls[0]?.[0] as {
-        toolName: string;
-        command?: string;
-      };
+      const started = conversations.recordToolCallStarted.mock.calls[0]?.[0]!;
       // Re-typed: the durable log says what the agent DID, not which binary it used.
       expect(started.toolName).toBe("langwatch.trace.search");
       expect(started.toolName).not.toBe("bash");
       // And it says WHICH one — the thing you would actually search the log for.
       expect(started.command).toBe(CMD);
 
-      const completed = conversations.recordToolCallCompleted.mock
-        .calls[0]?.[0] as {
-        toolName: string;
-        command?: string;
-        durationMs?: number;
-      };
+      const completed =
+        conversations.recordToolCallCompleted.mock.calls[0]?.[0]!;
       // The two halves of one call must not disagree about what it was.
       expect(completed.toolName).toBe("langwatch.trace.search");
       expect(completed.command).toBe(CMD);
@@ -471,14 +494,7 @@ describe("runTurn (tool events)", () => {
 
       // The live card gets the command too — this is what it labels itself with.
       const startEntry = buffer.appendTool.mock.calls
-        .map(
-          (c) =>
-            c[0] as {
-              phase: string;
-              name: string;
-              input?: { command?: string };
-            },
-        )
+        .map((c) => c[0]!)
         .find((e) => e.phase === "start");
       expect(startEntry?.name).toBe("langwatch.trace.search");
       expect(startEntry?.input?.command).toBe(CMD);
@@ -518,11 +534,8 @@ describe("runTurn (tool events)", () => {
         }),
       );
 
-      const completed = conversations.recordToolCallCompleted.mock
-        .calls[0]?.[0] as {
-        toolName: string;
-        command?: string;
-      };
+      const completed =
+        conversations.recordToolCallCompleted.mock.calls[0]?.[0]!;
       expect(completed.toolName).toBe("langwatch.trace.search");
       expect(completed.command).toBe(CMD);
     });
@@ -560,11 +573,8 @@ describe("runTurn (tool events)", () => {
         }),
       );
 
-      const completed = conversations.recordToolCallCompleted.mock
-        .calls[0]?.[0] as {
-        isError?: boolean;
-        errorText?: string;
-      };
+      const completed =
+        conversations.recordToolCallCompleted.mock.calls[0]?.[0]!;
       expect(completed.isError).toBe(true);
       // "It broke" is not debuggable. "Why it broke" is.
       expect(completed.errorText).toContain("permission denied");

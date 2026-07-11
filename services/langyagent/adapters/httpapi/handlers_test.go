@@ -32,7 +32,10 @@ func (w *stubWorker) StreamEvents(_ context.Context, sink app.ChatSink) error {
 type stubPool struct {
 	acquireErr error
 	worker     app.Worker
+	liveWorker bool
 }
+
+func (p *stubPool) HasLiveWorker(string, domain.CredentialSignature) bool { return p.liveWorker }
 
 func (p *stubPool) Acquire(context.Context, string, domain.Credentials) (app.Worker, error) {
 	if p.acquireErr != nil {

@@ -105,6 +105,18 @@ func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Cred
 	return nil
 }
 
+// HasLiveWorker answers the control plane's pre-flight: is there already a worker
+// for this conversation with these capabilities?
+//
+// It exists so the control plane can skip minting a session key on the common
+// path. A `true` means "do not bother minting — the running worker already holds
+// a key"; a `false` means "you will need to send one". Getting it wrong is safe
+// in one direction only, which is why Acquire, not this, is the authority: a
+// stale `true` is caught there and answered with ErrCredentialsRequired.
+func (a *App) HasLiveWorker(conversationID string, sig domain.CredentialSignature) bool {
+	return a.pool.HasLiveWorker(conversationID, sig)
+}
+
 // Chat runs one chat turn: acquire the worker, claim it, post the prompt, and
 // stream the reply into sink. It mirrors the flat handler's control flow
 // exactly — the only behavioural change is that operational telemetry is

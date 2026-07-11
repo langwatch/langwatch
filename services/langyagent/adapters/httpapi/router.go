@@ -61,12 +61,26 @@ func NewRouter(deps RouterDeps) http.Handler {
 		warmHandler(deps.App, deps.MaxRequestBodyBytes),
 	))
 
+	// Read-only pre-flight: "do you already have a worker with these
+	// capabilities?" The control plane uses the answer to skip minting a session
+	// key that a reused worker would only discard. Spawns nothing.
+	mux.Handle("POST /worker/probe", requireInternalSecret(
+		deps.InternalSecret,
+		probeHandler(deps.App, deps.MaxRequestBodyBytes),
+	))
+
 	// Middleware chain — applied so RequestID is outermost (mirrors aigateway).
 	var h http.Handler = mux
 	if deps.Version != "" {
 		h = httpmiddleware.Version("X-Langy-Agent-Version", deps.Version)(h)
 	}
 	h = httpmiddleware.Telemetry()(h)
+	// OUTSIDE Telemetry, so the request logger's context already carries the span
+	// and logs correlate to the trace by id. This is what adopts the control
+	// plane's `traceparent` (injected in langy.ts) as our parent — without it the
+	// manager's spans start a fresh, orphaned trace and the turn's two halves
+	// cannot be stitched into one waterfall.
+	h = httpmiddleware.Tracing("langwatch.langyagent.httpapi")(h)
 	h = httpmiddleware.Recover()(h)
 	h = httpmiddleware.RequestID(h)
 	return h
