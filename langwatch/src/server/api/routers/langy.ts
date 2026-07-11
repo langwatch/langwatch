@@ -1,4 +1,5 @@
 import { on } from "node:events";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
@@ -8,7 +9,7 @@ import type {
 } from "~/server/app-layer/langy/langy-conversation.service";
 import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
 import { trackServerEvent } from "~/server/posthog";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, isDemoProjectId } from "../rbac";
 import {
   langyConversationDetailSchema,
   langyConversationListItemSchema,
@@ -36,6 +37,28 @@ import {
  */
 
 const LANGY_READ_PERMISSION = "evaluations:view" as const;
+
+/**
+ * Read gate for every Langy procedure: the caller must be able to read the
+ * project AND it must not be the public demo project. `evaluations:view` alone
+ * PASSES on the demo for any authenticated user (`DEMO_VIEW_PERMISSIONS`),
+ * which would expose whichever user's Langy conversations live there — so
+ * refuse the demo explicitly, mirroring the Hono `requireSessionAndPermission`
+ * gate. Wraps `checkProjectPermission` so the demo check and the permission
+ * check stay in one place across all procedures.
+ */
+const langyReadGuard = () => {
+  const permissionCheck = checkProjectPermission(LANGY_READ_PERMISSION);
+  return (opts: Parameters<typeof permissionCheck>[0]) => {
+    if (isDemoProjectId(opts.input.projectId)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Langy is not available on the demo project.",
+      });
+    }
+    return permissionCheck(opts);
+  };
+};
 
 function toListItemDto(item: ConversationListItem): LangyConversationListItemDto {
   return {
@@ -71,7 +94,7 @@ export const langyRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(100).default(50),
       }),
     )
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .use(langyReadGuard())
     .query(
       async ({
         input,
@@ -92,7 +115,7 @@ export const langyRouter = createTRPCRouter({
    */
   detail: protectedProcedure
     .input(z.object({ projectId: z.string(), conversationId: z.string() }))
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .use(langyReadGuard())
     .query(
       async ({
         input,
@@ -114,8 +137,19 @@ export const langyRouter = createTRPCRouter({
    */
   messages: protectedProcedure
     .input(z.object({ projectId: z.string(), conversationId: z.string() }))
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
-    .query(async ({ input }): Promise<{ messages: LangyMessageDto[] }> => {
+    .use(langyReadGuard())
+    .query(async ({ input, ctx }): Promise<{ messages: LangyMessageDto[] }> => {
+      // Owner-or-shared gate, mirroring the Hono `GET /langy/conversations/:id`
+      // sibling: a project co-member must NOT read the transcript of a private
+      // (never-shared) conversation they don't own. `getById` returns null for
+      // that case; we surface it as an empty history, not the raw rows and not
+      // a 404 (which would leak existence of a known id).
+      const conversation = await getApp().langy.conversations.getById({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+      });
+      if (!conversation) return { messages: [] };
       const rows = await getApp().langy.messages.getAllByConversation({
         conversationId: input.conversationId,
         projectId: input.projectId,
@@ -144,7 +178,7 @@ export const langyRouter = createTRPCRouter({
    */
   deleteConversation: protectedProcedure
     .input(z.object({ projectId: z.string(), conversationId: z.string() }))
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .use(langyReadGuard())
     .mutation(async ({ input, ctx }): Promise<{ success: boolean }> => {
       const success = await getApp().langy.conversations.deleteById({
         id: input.conversationId,
@@ -162,7 +196,7 @@ export const langyRouter = createTRPCRouter({
    */
   newCount: protectedProcedure
     .input(z.object({ projectId: z.string(), since: z.number() }))
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .use(langyReadGuard())
     .query(async ({ input, ctx }): Promise<{ count: number }> => {
       const items = await getApp().langy.conversations.getAll({
         projectId: input.projectId,
@@ -207,7 +241,7 @@ export const langyRouter = createTRPCRouter({
         shareConversationConsent: z.boolean().optional(),
       }),
     )
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .use(langyReadGuard())
     .mutation(async ({ input, ctx }): Promise<void> => {
       trackServerEvent({
         userId: ctx.session.user.id,
@@ -235,7 +269,7 @@ export const langyRouter = createTRPCRouter({
    */
   onConversationUpdate: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .use(langyReadGuard())
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
       const userId = opts.ctx.session.user.id;

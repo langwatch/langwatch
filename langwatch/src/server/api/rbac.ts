@@ -1366,6 +1366,22 @@ export function isDemoProject(
   return DEMO_VIEW_PERMISSIONS.includes(permission);
 }
 
+/**
+ * Whether `projectId` is the public demo project, regardless of permission.
+ *
+ * `isDemoProject(projectId, permission)` answers "does the demo grant THIS
+ * permission" (true for the globally-readable view set); this answers the plain
+ * "is this the demo project" question that per-user feature surfaces use to
+ * refuse the shared demo. Langy needs it because `evaluations:view` PASSES on
+ * the demo for every authenticated user, which would expose whichever user's
+ * conversations live there (recurring #3323 trap).
+ */
+export function isDemoProjectId(projectId?: string | null): boolean {
+  if (!projectId) return false;
+  const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
+  return !!demoId && projectId === demoId;
+}
+
 // ============================================================================
 // SKIP PERMISSION CHECK (for public/special routes)
 // ============================================================================

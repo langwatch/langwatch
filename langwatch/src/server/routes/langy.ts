@@ -22,7 +22,7 @@ import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { Context } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
-import { hasProjectPermission } from "~/server/api/rbac";
+import { hasProjectPermission, isDemoProjectId } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
@@ -340,6 +340,18 @@ langyRoute().post("/langy/chat", async (c) => {
   // A regenerate RE-DRIVES the failed turn against the message already on
   // record. Anything else is a fresh send and persists its user message below.
   const isRetry = trigger === "regenerate-message";
+
+  // Refuse the public demo project before minting keys or reading anything:
+  // `evaluations:view` PASSES on the demo for every authenticated user
+  // (DEMO_VIEW_PERMISSIONS), so driving a turn there would run Langy — and
+  // touch per-user conversation state — on behalf of any logged-in caller.
+  // Same gate the conversation/memory REST surface applies (#3323 trap).
+  if (isDemoProjectId(projectId)) {
+    return c.json(
+      { error: "Langy is not available on the demo project." },
+      { status: 403 },
+    );
+  }
 
   const agentUrl = process.env.OPENCODE_AGENT_URL;
   if (!agentUrl) {
@@ -1135,8 +1147,7 @@ async function requireSessionAndPermission(
   // but per-user chat conversations on it should not be. Recurring #3323
   // trap — feature surfaces that look read-only-public still need to gate
   // user-owned data inside them.
-  const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
-  if (demoId && projectId === demoId) {
+  if (isDemoProjectId(projectId)) {
     return {
       error: c.json(
         { error: "Langy is not available on the demo project." },
