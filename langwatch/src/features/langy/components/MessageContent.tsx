@@ -387,7 +387,7 @@ export function ProposalCard({
               destructive ? "var(--chakra-colors-red-solid)" : "transparent"
             }
             color="white"
-            fontSize="12.5px"
+            fontSize="sm"
             fontWeight={500}
             cursor={isApplying ? "default" : "pointer"}
             opacity={isApplying ? 0.7 : 1}

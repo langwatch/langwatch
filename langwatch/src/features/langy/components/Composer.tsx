@@ -299,7 +299,7 @@ export function Composer({
             background="transparent"
             // Denser than the panel's body scale: the composer is a control, not
             // reading matter, and a wider panel made 14px input read shouty.
-            fontSize="12.5px"
+            fontSize="sm"
             lineHeight="1.5"
             color="fg"
             resize="none"

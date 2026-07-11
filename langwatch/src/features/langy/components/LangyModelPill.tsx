@@ -238,7 +238,7 @@ export function LangyModelPill({
                 borderStyle="solid"
                 borderColor="border"
                 background="bg.subtle"
-                fontSize="13px"
+                fontSize="sm"
                 color="fg"
                 _focusVisible={{
                   outline: "none",
@@ -273,7 +273,7 @@ export function LangyModelPill({
                   </Box>
                   <Combobox.ItemText
                     css={{ flex: 1, minWidth: 0 }}
-                    fontSize="13px"
+                    fontSize="sm"
                     truncate
                   >
                     {item.label}
