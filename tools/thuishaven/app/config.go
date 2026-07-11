@@ -11,15 +11,18 @@ import (
 type Config struct {
 	Naming                   domain.Naming
 	Home                     string        // thuishaven home dir (~/.langwatch/portless)
-	ObservabilityPort        int           // Grafana LGTM port to route (default 3000)
 	IdleTTL                  time.Duration // reap stacks whose heartbeat is older than this (0 = only reap dead launchers)
 	HeartbeatEvery           time.Duration // launcher heartbeat cadence
 	DaemonArgv               []string      // how to (re)launch `haven daemon`
 	IsAgent                  bool          // token-free plain output for AI drivers (no colour/TUI)
 	ShouldManageClickHouse   bool          // haven provisions a shared native clickhouse-server + per-slug DBs
 	ShouldStopClickHouseIdle bool          // daemon stops the managed CH server when the last stack is reaped
-	LocalAPIKey              string        // stable local dev API key seeded + injected into every stack
-	RepoRoot                 string        // repo root the daemon prunes orphaned git worktrees from
+	// ShouldStartObservability makes `up` boot the LGTM stack itself. Off by
+	// default: haven links a stack to a collector that is already running, but does
+	// not spend 2 GiB standing one up behind everyone's back on every `pnpm dev`.
+	ShouldStartObservability bool
+	LocalAPIKey              string // stable local dev API key seeded + injected into every stack
+	RepoRoot                 string // repo root the daemon prunes orphaned git worktrees from
 }
 
 // PlanOptions decide which services `up` runs and how.

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -17,9 +18,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhouseserver"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hygiene"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/otellgtm"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/portlessproxy"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
@@ -106,22 +109,34 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		return naming.URL(svc, "", scheme, port)
 	}
 
+	// The observability stack runs on colima, not Docker Desktop: its VM ceiling is
+	// explicit, so a background telemetry stack can never take the machine. Both the
+	// VM and the container are sized against this machine's RAM/CPU.
+	ram, cpus := sys.TotalMemory(), runtime.NumCPU()
+	obs := otellgtm.New(
+		colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), domain.DefaultColimaLimits(ram, cpus)),
+		havenHome(),
+		envOr("HAVEN_OBS_IMAGE", domain.ObservabilityImage),
+		observabilityEndpoints(),
+		domain.DefaultObservabilityLimits(ram, cpus),
+	)
+
 	cfg := app.Config{
 		Naming:                   naming,
 		Home:                     havenHome(),
-		ObservabilityPort:        envInt("LANGWATCH_OBSERVABILITY_PORT", 3000),
 		IdleTTL:                  envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
 		HeartbeatEvery:           30 * time.Second,
 		DaemonArgv:               selfArgv(worktree, "daemon"),
 		IsAgent:                  isAgent,
 		ShouldManageClickHouse:   os.Getenv("LANGWATCH_HAVEN_CH") != "0",
 		ShouldStopClickHouseIdle: os.Getenv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
+		ShouldStartObservability: os.Getenv("LANGWATCH_HAVEN_OBS") == "1",
 		LocalAPIKey:              envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
 		RepoRoot:                 worktree,
 	}
 
 	return deps{
-		orch:     app.New(cfg, proxy, store, sup, sys, ch, hyg, sem, logger),
+		orch:     app.New(cfg, proxy, store, sup, sys, ch, obs, hyg, sem, logger),
 		dash:     dashboard.New(store.Stacks, sharedURL),
 		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1"},
 		opts:     optionsFromEnv(worktree),
@@ -157,6 +172,9 @@ var commands = map[string]command{
 	"typecheck": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.Typecheck(ctx, d.lwDir, rest, envInt("HAVEN_TYPECHECK_SLOTS", 0))
 	},
+	"observability": func(ctx context.Context, d deps, rest []string) error {
+		return d.orch.RunObservability(ctx, rest)
+	},
 	"hmr":  func(ctx context.Context, d deps, rest []string) error { return d.orch.RunHMR(ctx, d.lwDir, rest) },
 	"seed": func(ctx context.Context, d deps, _ []string) error { return d.orch.Seed(ctx, d.params) },
 	"list": func(_ context.Context, d deps, rest []string) error {
@@ -168,9 +186,20 @@ var commands = map[string]command{
 // aliases are the short forms accepted for a canonical command.
 var aliases = map[string]string{
 	"ch":     "clickhouse",
+	"obs":    "observability",
 	"tc":     "typecheck",
 	"ls":     "list",
 	"status": "list",
+}
+
+// observabilityEndpoints are fixed ports rather than ephemeral ones: the Grafana
+// MCP, gcx and any agent all need to find the stack without asking haven first.
+func observabilityEndpoints() domain.ObservabilityEndpoints {
+	e := domain.DefaultObservabilityEndpoints()
+	e.GrafanaPort = envInt("LW_OBS_GRAFANA_PORT", e.GrafanaPort)
+	e.OTLPHTTPPort = envInt("LW_OBS_OTLP_HTTP_PORT", e.OTLPHTTPPort)
+	e.OTLPGRPCPort = envInt("LW_OBS_OTLP_GRPC_PORT", e.OTLPGRPCPort)
+	return e
 }
 
 func (d deps) dispatch(ctx context.Context, sub string, rest []string) error {

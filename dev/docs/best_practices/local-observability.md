@@ -10,17 +10,55 @@ This is **local-dev only**. Production logging stays on AWS CloudWatch (see
 `dev/docs/adr/003-logging.md`); this stack never touches the prod path. See
 `dev/docs/adr/042-local-observability-stack.md` for the rationale.
 
+## haven owns this stack
+
+The stack is **not a compose service**. `haven` (thuishaven — the hostname-based
+local-dev orchestrator) owns its lifecycle. That buys three things a raw
+`docker compose up` did not:
+
+- **It runs on colima, not Docker Desktop.** The VM has an explicit, per-profile
+  RAM/CPU/disk ceiling, so a background telemetry stack can never take the whole
+  machine. haven starts colima if it is down; a profile it creates is capped, one
+  that already exists is never resized out from under you.
+- **The container is capped, and the stores don't grow forever.** Memory, CPU,
+  pid count and log rotation are set on the container. And because the bundle
+  ships with **no retention at all** — Loki and Tempo keep every log and span
+  until the disk fills — haven derives a config for each of the three stores from
+  the image's own and mounts it back read-only with a short retention (default
+  **2h**) plus a Prometheus size cap and a Loki ingestion-rate cap. Deriving from
+  the image rather than vendoring means an image bump keeps upstream's defaults.
+- **Every worktree wires itself up automatically.** Once the stack is up, each
+  `pnpm dev` (i.e. `haven up`) writes the OTLP endpoint into that stack's
+  `.env.portless` overlay and tags its telemetry `langwatch.worktree=<slug>`. No
+  `.env` surgery, and one shared collector serves every worktree — filter Grafana
+  to `langwatch.worktree="<your-slug>"` to see only your own logs, traces and
+  metrics. `make observability-connect` remains for the Grafana MCP/token wiring
+  an agent needs.
+
 ## TL;DR
 
 ```bash
-make observability            # start the stack (OTLP :4318, Grafana :3000)
-make observability-connect    # point langwatch/.env at it + wire the Grafana MCP + gcx
-# restart your app so it picks up the .env changes:
-make quickstart <preset>      # or: cd langwatch && pnpm dev
+make observability            # start the capped stack on colima (OTLP :4318, Grafana :3000)
+                              #   (equivalently: haven observability up)
+make observability-connect    # mint a Grafana token + register the Grafana MCP
+# any pnpm dev stack you start while it is up exports to it automatically,
+# tagged by worktree — no .env changes needed. Already-running stacks need a
+# restart (pnpm dev) to pick it up.
+make observability-down        # stop it (haven observability down) — discards all telemetry
 ```
 
 Then open Grafana at http://localhost:3000 (anonymous Admin, or admin/admin), or
-ask your agent to query it.
+ask your agent to query it. `make portless-doctor` (or `haven doctor`) reports
+stack health and the image actually running.
+
+### Tuning the caps
+
+Retention and the resource ceilings live in `haven`'s
+`domain.DefaultObservabilityLimits` (a debugging window, not an archive). The
+stack keeps **no volume**, so `make observability-down` reclaims every byte
+regardless. Override the image or ports with `HAVEN_OBS_IMAGE`,
+`LW_OBS_GRAFANA_PORT`, `LW_OBS_OTLP_HTTP_PORT`; pick the colima profile with
+`HAVEN_COLIMA_PROFILE`.
 
 ## What ships where
 

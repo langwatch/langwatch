@@ -96,6 +96,25 @@ type ClickHouse interface {
 	Stop()
 }
 
+// Observability manages the shared local LGTM stack — one OTLP collector fronting
+// Loki, Tempo and Prometheus, with Grafana over all three — that every worktree
+// exports its logs, traces and metrics to. One stack for the machine, tagged per
+// worktree, so an agent can read what its own stack just did.
+type Observability interface {
+	// Ensure starts the stack if it is not already answering and returns the
+	// endpoints to export to. Idempotent across worktrees.
+	Ensure(ctx context.Context) (domain.ObservabilityEndpoints, error)
+	// Stop removes the stack, discarding the telemetry it collected (it keeps no
+	// volume — a debugging window, not an archive).
+	Stop(ctx context.Context) error
+	// IsRunning reports whether the stack is answering right now, without starting it.
+	IsRunning(ctx context.Context) bool
+	// Health returns a one-line status for `haven doctor`.
+	Health(ctx context.Context) (ok bool, detail string)
+	// Endpoints reports the stack's ports without touching the runtime.
+	Endpoints() domain.ObservabilityEndpoints
+}
+
 // Dashboard serves the daemon's HTTP surface (dashboard, registry API, telemetry
 // fan-out). It reads live state through the callbacks it is constructed with.
 type Dashboard interface {
