@@ -58,6 +58,9 @@ export async function fetchSpanTreePages({
       // 100k-span trace they would double the client-side footprint).
       { cacheTime: 0 },
     );
+    if (signal?.aborted) {
+      throw new DOMException("span tree fetch aborted", "AbortError");
+    }
     nodes.push(...page.nodes);
     if (!page.nextCursor) break;
     cursor = page.nextCursor;

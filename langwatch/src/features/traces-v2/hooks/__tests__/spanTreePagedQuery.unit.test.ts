@@ -132,6 +132,22 @@ describe("fetchSpanTreePages", () => {
       expect(fetch).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("when the request is aborted while the final page's fetch is pending", () => {
+    it("throws an AbortError instead of returning the stale final page", async () => {
+      const controller = new AbortController();
+      const { utils, fetch } = makeUtils([]);
+      fetch.mockImplementationOnce(async () => {
+        controller.abort();
+        return { nodes: [node("a")], nextCursor: null };
+      });
+
+      await expect(
+        fetchSpanTreePages({ utils, input, signal: controller.signal }),
+      ).rejects.toThrow(/aborted/i);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe("spanTreeQueryFn progressive publishing", () => {
