@@ -73,6 +73,11 @@ export interface SlackSlice {
    *  a flag, never the token itself), so the form can show "token set" and let
    *  the author keep it without retyping. */
   botTokenAlreadySet: boolean;
+  /** True only when editing an automation that was saved with a webhook. New
+   *  automations are bot-only (a webhook can't render the modern templates), so
+   *  the webhook option is offered ONLY to keep existing webhook automations
+   *  editable — they can stay on the webhook or upgrade to a Slack app. */
+  isLegacyWebhook: boolean;
   templateType: SlackTemplateType;
   template: FieldDraft;
 }
@@ -86,11 +91,15 @@ function initialSlice(): SlackSlice {
   // `slackTemplateType` is null are read as plain text upstream
   // (`fromTriggerRow`) so we don't accidentally retype historical configs.
   return {
-    deliveryMethod: "webhook",
+    // New Slack automations use a bot connection — it renders the modern
+    // templates (charts, tables, alerts) that a webhook can't. Webhooks are
+    // kept only for editing automations that already have one.
+    deliveryMethod: "bot",
     webhook: "",
     botToken: "",
     channelId: "",
     botTokenAlreadySet: false,
+    isLegacyWebhook: false,
     templateType: "block_kit",
     template: EMPTY_FIELD,
   };
@@ -117,8 +126,12 @@ function summary(slice: SlackSlice, identity: SummaryIdentity): string {
 
 function fromTriggerRow(row: SavedTriggerRow): SlackSlice {
   const params = (row.actionParams ?? {}) as Partial<SlackActionParams>;
+  const deliveryMethod = slackDeliveryMethodOf(params);
   return {
-    deliveryMethod: slackDeliveryMethodOf(params),
+    deliveryMethod,
+    // A saved webhook automation stays editable as a webhook (backward compat);
+    // this flag unlocks the webhook UI + the upgrade banner for it.
+    isLegacyWebhook: deliveryMethod === "webhook",
     webhook: typeof params.slackWebhook === "string" ? params.slackWebhook : "",
     // The token is never sent to the browser — start blank and rely on
     // `botTokenAlreadySet` to keep the stored one.
@@ -175,6 +188,34 @@ const DELIVERY_ITEMS: { value: SlackDeliveryMethod; label: string }[] = [
   { value: "webhook", label: "Incoming webhook" },
   { value: "bot", label: "Slack app (bot)" },
 ];
+
+/** Shown on a legacy webhook automation: nudges the author to move to a Slack
+ *  app, which unlocks the richer templates a webhook can't render. */
+function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      bg="bg.subtle"
+      padding={3}
+    >
+      <HStack justify="space-between" gap={3} align="center">
+        <VStack align="start" gap={0}>
+          <Text textStyle="xs" fontWeight="medium" color="fg">
+            Get charts, tables, and alert banners
+          </Text>
+          <Text textStyle="xs" color="fg.muted">
+            Move this automation to a Slack app to unlock the richer templates.
+          </Text>
+        </VStack>
+        <Button size="xs" variant="outline" flexShrink={0} onClick={onUpgrade}>
+          Switch to a Slack app
+        </Button>
+      </HStack>
+    </Box>
+  );
+}
 
 function templatesFromSlice(slice: SlackSlice) {
   return {
@@ -249,45 +290,52 @@ function SlackConfigForm({
 
   return (
     <VStack align="stretch" gap={4}>
-      {/* Destination first: choose how the message reaches Slack, then fill in
-          the fields for that method. Switching only flips `deliveryMethod`, so
-          the other method's fields survive a round-trip. */}
-      <Field.Root>
-        <Field.Label>Connection</Field.Label>
-        <SegmentedControl
-          size="sm"
-          value={slice.deliveryMethod}
-          onValueChange={({ value }) => {
-            if (value)
-              onChange({
-                ...slice,
-                deliveryMethod: value as SlackDeliveryMethod,
-              });
-          }}
-          items={DELIVERY_ITEMS}
-        />
-        <Field.HelperText>
-          {slice.deliveryMethod === "webhook"
-            ? "Quick to set up, but limited formatting. Switch to a Slack app for charts, tables, and alert banners."
-            : "Recommended — renders charts, tables, and alert banners. A quick one-time setup, below."}
-        </Field.HelperText>
-      </Field.Root>
+      {/* New Slack automations are bot-only, so no chooser is shown. The
+          chooser appears ONLY when editing a saved webhook automation, letting
+          it stay on the webhook or upgrade to a Slack app. */}
+      {slice.isLegacyWebhook ? (
+        <Field.Root>
+          <Field.Label>Connection</Field.Label>
+          <SegmentedControl
+            size="sm"
+            value={slice.deliveryMethod}
+            onValueChange={({ value }) => {
+              if (value)
+                onChange({
+                  ...slice,
+                  deliveryMethod: value as SlackDeliveryMethod,
+                });
+            }}
+            items={DELIVERY_ITEMS}
+          />
+          <Field.HelperText>
+            {slice.deliveryMethod === "webhook"
+              ? "This automation uses a webhook. Move it to a Slack app for charts, tables, and alert banners."
+              : "Renders charts, tables, and alert banners."}
+          </Field.HelperText>
+        </Field.Root>
+      ) : null}
       {slice.deliveryMethod === "bot" ? (
         <SlackBotFields slice={slice} onChange={onChange} />
       ) : (
-        <Field.Root>
-          <Field.Label>Slack webhook URL</Field.Label>
-          <Input
-            value={slice.webhook}
-            onChange={(e) => onChange({ ...slice, webhook: e.target.value })}
-            placeholder="https://hooks.slack.com/services/..."
+        <VStack align="stretch" gap={3}>
+          <UpgradeToBotBanner
+            onUpgrade={() => onChange({ ...slice, deliveryMethod: "bot" })}
           />
-          <ReuseSlackWebhook
-            projectId={ctx.projectId}
-            currentWebhook={slice.webhook}
-            onPick={(webhook) => onChange({ ...slice, webhook })}
-          />
-        </Field.Root>
+          <Field.Root>
+            <Field.Label>Slack webhook URL</Field.Label>
+            <Input
+              value={slice.webhook}
+              onChange={(e) => onChange({ ...slice, webhook: e.target.value })}
+              placeholder="https://hooks.slack.com/services/..."
+            />
+            <ReuseSlackWebhook
+              projectId={ctx.projectId}
+              currentWebhook={slice.webhook}
+              onPick={(webhook) => onChange({ ...slice, webhook })}
+            />
+          </Field.Root>
+        </VStack>
       )}
       {/* Alerts always deliver immediately (cadence is pinned server-side),
           so the cadence switch only renders for trace automations. */}

@@ -201,6 +201,7 @@ describe("provider slice round trips", () => {
       botToken: "",
       channelId: "",
       botTokenAlreadySet: false,
+      isLegacyWebhook: true,
       templateType: "block_kit",
       template: { value: "", usingDefault: true },
     };

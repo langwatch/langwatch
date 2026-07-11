@@ -67,6 +67,7 @@ describe("draftReducer", () => {
         botToken: "",
         channelId: "",
         botTokenAlreadySet: false,
+        isLegacyWebhook: false,
         templateType: "string" as const,
         template: { value: "", usingDefault: true },
       };

@@ -202,45 +202,53 @@ describe("SlackConfigForm authoring tiers", () => {
 describe("SlackConfigForm delivery method", () => {
   afterEach(() => cleanup());
 
-  describe("given the webhook default", () => {
-    it("shows the webhook URL field", () => {
+  describe("given a fresh draft (a new automation)", () => {
+    it("is bot-only — channel + token fields, no webhook option", () => {
       renderForm();
+
+      expect(
+        screen.getByPlaceholderText(/#alerts or c0123/i),
+      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/xoxb-/i)).toBeInTheDocument();
+      // A new automation cannot pick a webhook — no field, no connection toggle.
+      expect(
+        screen.queryByPlaceholderText(/hooks\.slack\.com/i),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("radio", { name: /incoming webhook/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a saved webhook automation (legacy)", () => {
+    const legacySlice = (): SlackSlice => ({
+      ...slackClient.initialSlice(),
+      deliveryMethod: "webhook",
+      isLegacyWebhook: true,
+      webhook: "https://hooks.slack.com/services/T000/B000/xyz",
+    });
+
+    it("keeps the webhook editable and offers an upgrade to a Slack app", () => {
+      renderForm({ initial: legacySlice() });
 
       expect(
         screen.getByPlaceholderText(/hooks\.slack\.com/i),
       ).toBeInTheDocument();
-    });
-  });
-
-  describe("when the author switches to a bot connection", () => {
-    it("swaps in the channel and bot token fields", async () => {
-      const user = userEvent.setup();
-      renderForm();
-
-      await user.click(screen.getByRole("radio", { name: /slack app/i }));
-
       expect(
-        await screen.findByPlaceholderText(/#alerts or c0123/i),
+        screen.getByRole("radio", { name: /incoming webhook/i }),
       ).toBeInTheDocument();
-      expect(screen.getByPlaceholderText(/xoxb-/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /switch to a slack app/i }),
+      ).toBeInTheDocument();
     });
 
-    it("keeps a typed webhook when toggling back", async () => {
+    it("can switch to a bot connection", async () => {
       const user = userEvent.setup();
-      renderForm();
+      renderForm({ initial: legacySlice() });
 
-      const url = "https://hooks.slack.com/services/T000/B000/xyz";
-      fireEvent.change(screen.getByPlaceholderText(/hooks\.slack\.com/i), {
-        target: { value: url },
-      });
       await user.click(screen.getByRole("radio", { name: /slack app/i }));
-      // Confirm we actually switched before toggling back.
-      await screen.findByPlaceholderText(/xoxb-/i);
-      await user.click(screen.getByRole("radio", { name: /incoming webhook/i }));
 
-      expect(
-        await screen.findByPlaceholderText(/hooks\.slack\.com/i),
-      ).toHaveValue(url);
+      expect(await screen.findByPlaceholderText(/xoxb-/i)).toBeInTheDocument();
     });
   });
 
