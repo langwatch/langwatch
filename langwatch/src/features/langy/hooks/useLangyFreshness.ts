@@ -1,11 +1,10 @@
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type {
   LangyConversationListItemDto,
   LangyConversationUpdateSignal,
 } from "../data/langy.dtos";
-import { useLangySseStatusStore } from "../stores/langySseStatusStore";
 import { useLangyConversationUpdateListener } from "./useLangyConversationUpdateListener";
 
 /**
@@ -28,20 +27,11 @@ import { useLangyConversationUpdateListener } from "./useLangyConversationUpdate
 export function useLangyFreshness(activeConversationId: string | null): void {
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useContext();
-  const requestFastPoll = useLangySseStatusStore((s) => s.requestFastPoll);
-  const setSseConnectionState = useLangySseStatusStore(
-    (s) => s.setSseConnectionState,
-  );
-  const setLastEventAt = useLangySseStatusStore((s) => s.setLastEventAt);
 
   const onConversationUpdated = useCallback(
     (signals: LangyConversationUpdateSignal[]) => {
       const projectId = project?.id;
       if (!projectId) return;
-
-      // Keep the "N new" pill accurate regardless of apply-vs-invalidate.
-      void trpcUtils.langy.newCount.cancel();
-      void trpcUtils.langy.newCount.invalidate();
 
       const listInput = { projectId };
       const known = new Set(
@@ -106,27 +96,17 @@ export function useLangyFreshness(activeConversationId: string | null): void {
         void trpcUtils.langy.list.cancel();
         void trpcUtils.langy.list.invalidate();
       }
-
-      requestFastPoll();
     },
-    [trpcUtils, project?.id, activeConversationId, requestFastPoll],
+    [trpcUtils, project?.id, activeConversationId],
   );
 
-  const { connectionState, lastEventAt } = useLangyConversationUpdateListener({
+  useLangyConversationUpdateListener({
     projectId: project?.id ?? "",
     enabled: !!project?.id,
     onConversationUpdated,
     debounceMs: 1500,
     maxWaitMs: 1500,
   });
-
-  useEffect(() => {
-    setSseConnectionState(connectionState);
-  }, [connectionState, setSseConnectionState]);
-
-  useEffect(() => {
-    if (lastEventAt > 0) setLastEventAt(lastEventAt);
-  }, [lastEventAt, setLastEventAt]);
 }
 
 /** Patch a list item with a freshness signal's operational fields. */

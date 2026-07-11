@@ -23,7 +23,7 @@ import { useState } from "react";
 import { Menu } from "~/components/ui/menu";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { LangyConversationSummary } from "../data/useLangyConversations";
+import type { LangyConversationListItemDto } from "../data/langy.dtos";
 import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 
 export function RecentChatsMenu({
@@ -33,7 +33,7 @@ export function RecentChatsMenu({
   onSelect,
   onDelete,
 }: {
-  conversations: LangyConversationSummary[];
+  conversations: LangyConversationListItemDto[];
   isLoading: boolean;
   hasError: boolean;
   onSelect: (id: string) => void;

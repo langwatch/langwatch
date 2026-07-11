@@ -17,7 +17,7 @@ import type React from "react";
 import { useState } from "react";
 import { ModelSelector } from "~/components/ModelSelector";
 import { Menu } from "~/components/ui/menu";
-import type { LangyContextChip } from "../stores/langyComposerStore";
+import type { LangyContextChip } from "../stores/langyStore";
 
 // Icon per context kind, so a chip reads as its resource at a glance.
 const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {

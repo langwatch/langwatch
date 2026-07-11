@@ -1,17 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { decodeFastFrame } from "~/server/services/langy/streaming/langyFastStream";
+import { useLangyStore } from "../stores/langyStore";
 
 /**
  * Stream B consumer (ADR-048): subscribes to a turn's raw-token fast-path SSE
  * (`GET /api/langy/conversations/:id/fast`) and accumulates the optimistic
- * answer text token-by-token. This is the SPEED channel — ephemeral, no replay;
- * a mid-stream refresh loses it and Stream A's durable buffer replays instead.
+ * answer text token-by-token DIRECTLY INTO `useLangyStore.optimisticText`. This
+ * is the SPEED channel — ephemeral, no replay; a mid-stream refresh loses it
+ * and Stream A's durable buffer replays instead.
  *
- * Returns just the accumulated `text`. The panel reconciles it against the
+ * The panel reads `optimisticText` from the store and reconciles it against the
  * durable useChat text via `reconcileOptimisticText` before rendering, so a
- * dropped token or a late subscribe can never show corrupted prose.
+ * dropped token or a late subscribe can never show corrupted prose. Both
+ * streams thus land in one place (the store); nothing here returns render state.
  *
- * `.ts` (not `.tsx`): a hook returns state, never JSX.
+ * `.ts` (not `.tsx`): a hook returns nothing, never JSX.
  */
 export function useLangyFastStream({
   projectId,
@@ -23,14 +26,14 @@ export function useLangyFastStream({
   conversationId: string | null;
   turnId: string | null;
   enabled: boolean;
-}): { text: string } {
-  const [text, setText] = useState("");
+}): void {
+  const setOptimisticText = useLangyStore((s) => s.setOptimisticText);
   const textRef = useRef("");
 
   useEffect(() => {
     // Reset for each new (conversation, turn) — the optimistic view is per-turn.
     textRef.current = "";
-    setText("");
+    setOptimisticText("");
 
     if (!enabled || !projectId || !conversationId || !turnId) return;
 
@@ -70,7 +73,7 @@ export function useLangyFastStream({
             if (!frame) continue;
             if ("token" in frame) {
               textRef.current += frame.token;
-              setText(textRef.current);
+              setOptimisticText(textRef.current);
             } else {
               // Terminal frame — the turn ended; stop reading.
               controller.abort();
@@ -85,7 +88,5 @@ export function useLangyFastStream({
     })();
 
     return () => controller.abort();
-  }, [projectId, conversationId, turnId, enabled]);
-
-  return { text };
+  }, [projectId, conversationId, turnId, enabled, setOptimisticText]);
 }
