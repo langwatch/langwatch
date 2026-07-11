@@ -30,8 +30,15 @@ type Options struct {
 	ReadinessTimeout   time.Duration
 	ReaperInterval     time.Duration
 	SessionsRoot       string
+	WorkspaceRoot      string
 	OpenCodeBinaryPath string
 	OTelPluginVersion  string
+	// DisableUIDIsolation turns off the ADR-033 per-worker UID sandbox (no chown,
+	// no setuid Credential) so opencode can spawn as the manager's own user on a
+	// non-root dev box. Sourced from Config.UnsafeDevDisableIsolation, which
+	// LoadConfig refuses to set outside local-like environments. NEVER true in
+	// production.
+	DisableUIDIsolation bool
 	// Telemetry and Egress are injected; nil falls back to a working default
 	// (no-op instruments / pass-through guard) so tests and partial wiring boot.
 	Telemetry *telemetry.Telemetry
@@ -55,13 +62,15 @@ type Options struct {
 //
 // It satisfies app.WorkerPool.
 type Pool struct {
-	maxWorkers         int
-	workerIdle         time.Duration
-	readinessTimeout   time.Duration
-	reaperInterval     time.Duration
-	sessionsRoot       string
-	openCodeBinaryPath string
-	otelPluginVersion  string
+	maxWorkers          int
+	workerIdle          time.Duration
+	readinessTimeout    time.Duration
+	reaperInterval      time.Duration
+	sessionsRoot        string
+	workspaceRoot       string
+	openCodeBinaryPath  string
+	otelPluginVersion   string
+	disableUIDIsolation bool
 
 	telemetry *telemetry.Telemetry
 	egress    egress.Guard
@@ -112,21 +121,23 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 	}
 	baseCtx, baseCancel := context.WithCancel(ctx)
 	return &Pool{
-		maxWorkers:         opts.MaxWorkers,
-		workerIdle:         opts.WorkerIdle,
-		readinessTimeout:   opts.ReadinessTimeout,
-		reaperInterval:     opts.ReaperInterval,
-		sessionsRoot:       opts.SessionsRoot,
-		openCodeBinaryPath: opts.OpenCodeBinaryPath,
-		otelPluginVersion:  opts.OTelPluginVersion,
-		telemetry:          tel,
-		egress:             guard,
-		baseCtx:            baseCtx,
-		baseCancel:         baseCancel,
-		workers:            make(map[string]*Worker),
-		spawnLocks:         make(map[string]chan struct{}),
-		uidToConv:          make(map[uint32]string),
-		stopCh:             make(chan struct{}),
+		maxWorkers:          opts.MaxWorkers,
+		workerIdle:          opts.WorkerIdle,
+		readinessTimeout:    opts.ReadinessTimeout,
+		reaperInterval:      opts.ReaperInterval,
+		sessionsRoot:        opts.SessionsRoot,
+		workspaceRoot:       opts.WorkspaceRoot,
+		openCodeBinaryPath:  opts.OpenCodeBinaryPath,
+		otelPluginVersion:   opts.OTelPluginVersion,
+		disableUIDIsolation: opts.DisableUIDIsolation,
+		telemetry:           tel,
+		egress:              guard,
+		baseCtx:             baseCtx,
+		baseCancel:          baseCancel,
+		workers:             make(map[string]*Worker),
+		spawnLocks:          make(map[string]chan struct{}),
+		uidToConv:           make(map[uint32]string),
+		stopCh:              make(chan struct{}),
 	}, nil
 }
 
@@ -352,7 +363,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		cleanupUID()
 		return nil, fmt.Errorf("mkdir worker home: %w", err)
 	}
-	if err := setupWorkerHome(workerHome, creds, uid, p.otelPluginVersion); err != nil {
+	if err := setupWorkerHome(workerHome, p.workspaceRoot, creds, uid, p.otelPluginVersion, p.disableUIDIsolation); err != nil {
 		_ = os.RemoveAll(workerHome)
 		p.egress.ReleaseWorker(ctx, conversationID)
 		cleanupUID()
@@ -435,7 +446,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	// alive across turns and only dies on idle/shutdown. Binding to baseCtx
 	// (rather than context.Background, as the flat manager did) means a pool
 	// Shutdown / deadline propagates to the subprocess.
-	cmd, err := spawnOpenCode(p.baseCtx, p.openCodeBinaryPath, conversationID, workerHome, uid, internalPort, creds, openCodePassword)
+	cmd, err := spawnOpenCode(p.baseCtx, p.openCodeBinaryPath, conversationID, workerHome, uid, internalPort, creds, openCodePassword, p.disableUIDIsolation)
 	if err != nil {
 		proxy.shutdown()
 		_ = os.RemoveAll(workerHome)

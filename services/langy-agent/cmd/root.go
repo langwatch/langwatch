@@ -40,15 +40,17 @@ func Root(ctx context.Context, _ []string) error {
 	// accepting traffic and binds worker subprocesses to the pool-lifetime
 	// context. The egress guard is consulted around each worker's lifecycle.
 	pool, err := workerpool.New(ctx, workerpool.Options{
-		MaxWorkers:         cfg.MaxWorkers,
-		WorkerIdle:         cfg.WorkerIdle(),
-		ReadinessTimeout:   cfg.ReadinessTimeout(),
-		ReaperInterval:     cfg.ReaperInterval(),
-		SessionsRoot:       cfg.SessionsRoot,
-		OpenCodeBinaryPath: cfg.OpenCodeBinaryPath,
-		OTelPluginVersion:  cfg.OTelPluginVersion,
-		Telemetry:          deps.Telemetry,
-		Egress:             mgr.EgressGuard(),
+		MaxWorkers:          cfg.MaxWorkers,
+		WorkerIdle:          cfg.WorkerIdle(),
+		ReadinessTimeout:    cfg.ReadinessTimeout(),
+		ReaperInterval:      cfg.ReaperInterval(),
+		SessionsRoot:        cfg.SessionsRoot,
+		WorkspaceRoot:       cfg.WorkspaceRoot,
+		OpenCodeBinaryPath:  cfg.OpenCodeBinaryPath,
+		OTelPluginVersion:   cfg.OTelPluginVersion,
+		DisableUIDIsolation: cfg.UnsafeDevDisableIsolation,
+		Telemetry:           deps.Telemetry,
+		Egress:              mgr.EgressGuard(),
 	})
 	if err != nil {
 		return err

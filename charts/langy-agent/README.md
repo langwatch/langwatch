@@ -58,6 +58,7 @@ helm install langy-agent ./charts/langy-agent -n langwatch -f values.prod.yaml
 | Path                          | Purpose                                                                 |
 |-------------------------------|-------------------------------------------------------------------------|
 | `chartManaged`                | Master on/off switch for the agent (umbrella: `langy-agent.chartManaged`) |
+| `environment`                 | Deployment environment reported as `ENVIRONMENT` (empty → inherits `global.env` → `production`). Security-load-bearing: prod pods must report a production environment so the manager refuses `LANGY_UNSAFE_DEV_DISABLE_ISOLATION` |
 | `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                     |
 | `replicaCount`                | **Keep at 1** — see Scaling below                                       |
 | `manager.maxWorkers`          | Max concurrent OpenCode subprocesses before the pod returns 503         |
