@@ -41,7 +41,7 @@ export function LangyRecoveringLine({ message }: { message: string }) {
             key={message}
             role="status"
             aria-live="polite"
-            fontSize="13px"
+            fontSize="sm"
             fontWeight="500"
             letterSpacing="-0.005em"
             lineHeight="1.5"

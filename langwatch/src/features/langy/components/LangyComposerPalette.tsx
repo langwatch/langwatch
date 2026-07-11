@@ -181,7 +181,7 @@ export function LangyComposerPalette({
             minWidth={0}
             border="none"
             background="transparent"
-            fontSize="12.5px"
+            fontSize="sm"
             color="fg"
             _focusVisible={{ outline: "none" }}
             onKeyDown={(event) => {

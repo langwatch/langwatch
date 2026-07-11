@@ -84,7 +84,7 @@ export function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
         <LangyMark size={44} />
         <Text
           fontFamily="var(--langy-font-serif)"
-          fontSize="24px"
+          fontSize="2xl"
           fontWeight="500"
           letterSpacing="-0.02em"
           color="fg"
