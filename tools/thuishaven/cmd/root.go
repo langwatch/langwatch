@@ -17,14 +17,16 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhouseserver"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousedocker"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hygiene"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/otellgtm"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/portlessproxy"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/postgresbrew"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/redisbrew"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/system"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
@@ -101,7 +103,6 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	store := fileregistry.New(havenHome())
 	sup := procsupervisor.New(isAgent)
 	sys := system.New()
-	ch := clickhouseserver.New(havenHome(), os.Getenv("CLICKHOUSE_BIN"), envBytes("LANGWATCH_HAVEN_CH_MAX_MEMORY", 0))
 	hyg := hygiene.New()
 	sem := semaphore.New(havenHome())
 	sharedURL := func(svc string) string {
@@ -109,12 +110,16 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		return naming.URL(svc, "", scheme, port)
 	}
 
-	// The observability stack runs on colima, not Docker Desktop: its VM ceiling is
-	// explicit, so a background telemetry stack can never take the machine. Both the
-	// VM and the container are sized against this machine's RAM/CPU.
+	// ClickHouse and observability share one colima VM (not Docker Desktop): its
+	// ceiling is explicit and per-profile, so neither container can quietly take
+	// the machine. Both containers are sized against this machine's RAM/CPU.
 	ram, cpus := sys.TotalMemory(), runtime.NumCPU()
+	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), domain.DefaultColimaLimits(ram, cpus))
+	ch := clickhousedocker.New(rt, havenHome(), envOr("HAVEN_CH_IMAGE", domain.ClickHouseImage), clickHouseLimits())
+	pg := postgresbrew.New(envOr("HAVEN_PG_FORMULA", domain.DefaultPostgresFormula), envInt("HAVEN_PG_PORT", domain.DefaultPostgresPort))
+	rds := redisbrew.New(envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula), envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort))
 	obs := otellgtm.New(
-		colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), domain.DefaultColimaLimits(ram, cpus)),
+		rt,
 		havenHome(),
 		envOr("HAVEN_OBS_IMAGE", domain.ObservabilityImage),
 		observabilityEndpoints(),
@@ -130,13 +135,17 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		IsAgent:                  isAgent,
 		ShouldManageClickHouse:   os.Getenv("LANGWATCH_HAVEN_CH") != "0",
 		ShouldStopClickHouseIdle: os.Getenv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
-		ShouldStartObservability: os.Getenv("LANGWATCH_HAVEN_OBS") == "1",
+		ShouldManagePostgres:     os.Getenv("LANGWATCH_HAVEN_PG") != "0",
+		ShouldManageRedis:        os.Getenv("LANGWATCH_HAVEN_REDIS") != "0",
+		// Observability shares CH's colima VM, so it defaults ON now — the VM is
+		// already paying for itself. LANGWATCH_HAVEN_OBS=0 opts out.
+		ShouldStartObservability: os.Getenv("LANGWATCH_HAVEN_OBS") != "0",
 		LocalAPIKey:              envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
 		RepoRoot:                 worktree,
 	}
 
 	return deps{
-		orch:     app.New(cfg, proxy, store, sup, sys, ch, obs, hyg, sem, logger),
+		orch:     app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, logger),
 		dash:     dashboard.New(store.Stacks, sharedURL),
 		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1"},
 		opts:     optionsFromEnv(worktree),
@@ -166,11 +175,14 @@ var commands = map[string]command{
 	"clickhouse": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.RunClickHouse(ctx, d.params, rest)
 	},
+	"postgres": func(ctx context.Context, d deps, rest []string) error {
+		return d.orch.RunPostgres(ctx, d.params, rest)
+	},
 	"prune": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.Prune(ctx, d.worktree, hasFlag(rest, "--yes"))
 	},
 	"typecheck": func(ctx context.Context, d deps, rest []string) error {
-		return d.orch.Typecheck(ctx, d.lwDir, rest, envInt("HAVEN_TYPECHECK_SLOTS", 0))
+		return d.orch.Typecheck(ctx, d.lwDir, rest, envInt("HAVEN_TYPECHECK_SLOTS", 0), envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0))
 	},
 	"observability": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.RunObservability(ctx, rest)
@@ -186,20 +198,32 @@ var commands = map[string]command{
 // aliases are the short forms accepted for a canonical command.
 var aliases = map[string]string{
 	"ch":     "clickhouse",
+	"pg":     "postgres",
 	"obs":    "observability",
 	"tc":     "typecheck",
 	"ls":     "list",
 	"status": "list",
 }
 
-// observabilityEndpoints are fixed ports rather than ephemeral ones: the Grafana
-// MCP, gcx and any agent all need to find the stack without asking haven first.
+// observabilityEndpoints are fixed ports rather than ephemeral ones: the gcx CLI
+// and any agent all need to find the stack without asking haven first.
 func observabilityEndpoints() domain.ObservabilityEndpoints {
 	e := domain.DefaultObservabilityEndpoints()
 	e.GrafanaPort = envInt("LW_OBS_GRAFANA_PORT", e.GrafanaPort)
 	e.OTLPHTTPPort = envInt("LW_OBS_OTLP_HTTP_PORT", e.OTLPHTTPPort)
 	e.OTLPGRPCPort = envInt("LW_OBS_OTLP_GRPC_PORT", e.OTLPGRPCPort)
 	return e
+}
+
+// clickHouseLimits applies the proven-in-production memory tuning, with the
+// container ceiling overridable for a machine that needs more (or less).
+func clickHouseLimits() domain.ClickHouseLimits {
+	l := domain.DefaultClickHouseLimits()
+	if mb := envInt("LANGWATCH_HAVEN_CH_MEMORY_MB", 0); mb > 0 {
+		l.ContainerMemoryMB = mb
+		l.MaxServerMemory = int64(mb) * 9 / 10 * (1 << 20)
+	}
+	return l
 }
 
 func (d deps) dispatch(ctx context.Context, sub string, rest []string) error {
@@ -308,17 +332,6 @@ func envOr(key, def string) string {
 func envInt(key string, def int) int {
 	if v := os.Getenv(key); v != "" {
 		var n int
-		if _, err := fmt.Sscanf(v, "%d", &n); err == nil {
-			return n
-		}
-	}
-	return def
-}
-
-// envBytes parses a byte count (plain integer) from an env var; def when unset.
-func envBytes(key string, def int64) int64 {
-	if v := os.Getenv(key); v != "" {
-		var n int64
 		if _, err := fmt.Sscanf(v, "%d", &n); err == nil {
 			return n
 		}

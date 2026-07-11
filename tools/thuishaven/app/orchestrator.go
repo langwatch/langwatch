@@ -19,6 +19,8 @@ type Orchestrator struct {
 	sup   Supervisor
 	sys   System
 	ch    ClickHouse
+	pg    Postgres
+	rds   Redis
 	obs   Observability
 	hyg   Hygiene
 	sem   Semaphore
@@ -26,8 +28,8 @@ type Orchestrator struct {
 }
 
 // New builds an Orchestrator from its injected dependencies.
-func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, obs Observability, hyg Hygiene, sem Semaphore, log *zap.Logger) *Orchestrator {
-	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, obs: obs, hyg: hyg, sem: sem, log: log}
+func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, pg Postgres, rds Redis, obs Observability, hyg Hygiene, sem Semaphore, log *zap.Logger) *Orchestrator {
+	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, pg: pg, rds: rds, obs: obs, hyg: hyg, sem: sem, log: log}
 }
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).
@@ -58,10 +60,10 @@ func (o *Orchestrator) resolveSlug(p UpParams) (string, error) {
 // provision resolves the slug, allocates ports, registers the hostnames, writes
 // the overlay + registry entry, and starts the heartbeat. It returns the stack
 // and a cleanup that deregisters the routes and drops the registry entry. When
-// shouldManageCH is set it also ensures the shared ClickHouse server + this stack's
-// database before the overlay is written, so CLICKHOUSE_URL is in the overlay and
-// the printed stack from the very first line.
-func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptions, shouldManageCH bool) (domain.Stack, func(), error) {
+// shouldManageDBs is set it also ensures the shared ClickHouse + Postgres servers
+// and this stack's databases on them before the overlay is written, so
+// CLICKHOUSE_URL/DATABASE_URL are in the overlay from the printed stack's first line.
+func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptions, shouldManageDBs bool) (domain.Stack, func(), error) {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return domain.Stack{}, nil, err
@@ -99,8 +101,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 			}
 		}
 	}
-	if shouldManageCH {
+	if shouldManageDBs {
 		o.ensureClickHouse(ctx, &st)
+		o.ensurePostgres(ctx, &st)
+		o.ensureRedis(ctx, &st)
 	}
 	o.linkObservability(ctx, &st)
 	st.UpdatedAt = o.sys.Now()
@@ -207,12 +211,21 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldKeepDB bool) 
 		o.proxy.Remove(r.Name, slug)
 	}
 	o.proxy.Remove(domain.ClickHouseService, slug)
+	o.proxy.Remove(domain.PostgresService, slug)
 	if o.ch != nil && o.cfg.ShouldManageClickHouse && !shouldKeepDB {
 		db := domain.DatabaseForSlug(slug)
 		if err := o.ch.DropDatabase(ctx, db); err != nil {
 			o.log.Warn("could not drop clickhouse database", zap.String("db", db), zap.Error(err))
 		} else {
 			fmt.Printf("dropped clickhouse database %q\n", db)
+		}
+	}
+	if o.pg != nil && o.cfg.ShouldManagePostgres && !shouldKeepDB {
+		db := domain.DatabaseForSlug(slug)
+		if err := o.pg.DropDatabase(ctx, db); err != nil {
+			o.log.Warn("could not drop postgres database", zap.String("db", db), zap.Error(err))
+		} else {
+			fmt.Printf("dropped postgres database %q\n", db)
 		}
 	}
 	o.store.RemoveStack(slug)
@@ -250,6 +263,51 @@ func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
 	if err := o.proxy.Register(domain.ClickHouseService, st.Slug, port); err != nil {
 		o.log.Warn("clickhouse alias registration failed", zap.Error(err))
 	}
+}
+
+// ensurePostgres starts (or reuses) the shared brew-managed Postgres, creates
+// this stack's isolated database, registers the always-resolving postgres.<slug>
+// route, and records the endpoint on the stack so OverlayEnv emits DATABASE_URL.
+// Failures are non-fatal: haven warns and leaves the app to fall back to
+// whatever DATABASE_URL is pinned in .env.
+func (o *Orchestrator) ensurePostgres(ctx context.Context, st *domain.Stack) {
+	if o.pg == nil || !o.cfg.ShouldManagePostgres {
+		return
+	}
+	port, err := o.pg.Ensure(ctx)
+	if err != nil {
+		o.log.Warn("postgres unavailable — falling back to .env DATABASE_URL", zap.Error(err))
+		return
+	}
+	db := domain.DatabaseForSlug(st.Slug)
+	if err := o.pg.EnsureDatabase(ctx, db); err != nil {
+		o.log.Warn("could not create postgres database", zap.String("db", db), zap.Error(err))
+		return
+	}
+	st.PostgresPort = port
+	st.PostgresDatabase = db
+	// No portless route: unlike ClickHouse (HTTP), Postgres speaks its own wire
+	// protocol, so an https://postgres.<slug>... URL through the HTTP proxy would
+	// just 502 — confirmed live (curl returns 502, portless can't speak Postgres
+	// wire protocol). The app already connects straight to loopback via
+	// DATABASE_URL (see OverlayEnv); `haven postgres url` prints the same.
+}
+
+// ensureRedis starts (or reuses) the shared brew-managed Redis and records its
+// port on the stack so OverlayEnv emits REDIS_URL. No per-slug database is
+// needed — RedisDB (set in provision) already partitions worktrees by DB index
+// on the one server. Failures are non-fatal: haven warns and leaves the app to
+// fall back to whatever REDIS_URL is pinned in .env.
+func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
+	if o.rds == nil || !o.cfg.ShouldManageRedis {
+		return
+	}
+	port, err := o.rds.Ensure(ctx)
+	if err != nil {
+		o.log.Warn("redis unavailable — falling back to .env REDIS_URL", zap.Error(err))
+		return
+	}
+	st.RedisPort = port
 }
 
 // Seed reseeds the current stack's database — the "give me a fresh DB" affordance.

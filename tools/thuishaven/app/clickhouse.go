@@ -75,7 +75,7 @@ func (o *Orchestrator) clickHouseURL(ctx context.Context, p UpParams) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("http://127.0.0.1:%d/%s\n", port, db)
+	fmt.Printf("http://%s:%s@127.0.0.1:%d/%s\n", domain.ClickHouseUser, domain.ClickHousePassword, port, db)
 	return nil
 }
 
@@ -93,7 +93,8 @@ func (o *Orchestrator) clickHouseStatus(ctx context.Context, p UpParams) error {
 	}
 	if slug != "" {
 		db := domain.DatabaseForSlug(slug)
-		fmt.Printf("  this stack     : %s  ->  http://127.0.0.1:%d/%s\n", db, o.ch.HTTPPort(), db)
+		fmt.Printf("  this stack     : %s  ->  http://%s:%s@127.0.0.1:%d/%s\n",
+			db, domain.ClickHouseUser, domain.ClickHousePassword, o.ch.HTTPPort(), db)
 	}
 	if dbs, err := o.ch.Databases(ctx); err == nil && len(dbs) > 0 {
 		fmt.Printf("  databases (%d) : %v\n", len(dbs), dbs)

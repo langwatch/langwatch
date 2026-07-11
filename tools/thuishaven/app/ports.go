@@ -44,7 +44,18 @@ type Store interface {
 // long-running, restart-on-crash service set.
 type Supervisor interface {
 	RunOnce(ctx context.Context, name, dir, shell string, env []string) error
+	// RunOnceBounded is RunOnce plus a reaper: it kills the process (group) if
+	// limits.MaxRSSBytes or limits.MaxDuration is crossed, rather than letting a
+	// runaway one-shot (tsgo) sit on a slot forever.
+	RunOnceBounded(ctx context.Context, name, dir, shell string, env []string, limits ReapLimits) error
 	Supervise(ctx context.Context, children []Child)
+}
+
+// ReapLimits bounds a RunOnceBounded call. Either field left at 0 disables that
+// particular check.
+type ReapLimits struct {
+	MaxRSSBytes int64
+	MaxDuration time.Duration
 }
 
 // Child is one supervised process.
@@ -69,15 +80,13 @@ type System interface {
 	TotalMemory() uint64
 }
 
-// ClickHouse manages one shared, single-node, memory-capped clickhouse-server on
-// the host and the per-slug databases on it. Every worktree shares the one server
-// but reads/writes only its own database (lw_<slug>) — so migration counts are
-// always this worktree's own, and parallel stacks can't OOM the box. No S3 /
-// cold-storage tiering and no zero-copy replication (prod-only concerns that only
-// cause pain locally).
+// ClickHouse manages one shared, memory-capped Altinity ClickHouse container (on
+// colima) and the per-slug databases on it. Every worktree shares the one
+// container but reads/writes only its own database (lw_<slug>) — so migration
+// counts are always this worktree's own, and parallel stacks can't OOM the box.
 type ClickHouse interface {
-	// Ensure starts the shared server if it is not already running and returns its
-	// loopback HTTP port. Safe to call concurrently across worktrees (file-locked).
+	// Ensure starts the shared container if it is not already running and returns
+	// its loopback HTTP port. Safe to call concurrently across worktrees.
 	Ensure(ctx context.Context) (httpPort int, err error)
 	// EnsureDatabase creates a stack's database if it does not exist.
 	EnsureDatabase(ctx context.Context, database string) error
@@ -93,6 +102,50 @@ type ClickHouse interface {
 	// Databases lists the lw_* databases currently on the server.
 	Databases(ctx context.Context) ([]string, error)
 	// Stop halts the managed server (the daemon calls this when no stacks remain).
+	Stop()
+}
+
+// Postgres manages one shared, brew-services Postgres and the per-slug
+// databases on it — the same one-server-many-databases pattern as ClickHouse.
+// Unlike ClickHouse, haven does not own the server's full lifecycle: a
+// brew-managed Postgres is a machine-wide resource other local work may
+// already depend on, so Stop is expected to be a no-op in real adapters.
+type Postgres interface {
+	// Ensure starts (or reuses an already-running) shared server and ensures the
+	// shared role exists. Returns the loopback port. Safe to call concurrently.
+	Ensure(ctx context.Context) (port int, err error)
+	// EnsureDatabase creates a stack's database if it does not exist.
+	EnsureDatabase(ctx context.Context, database string) error
+	// DropDatabase removes a stack's database — the "give me a fresh DB" affordance.
+	DropDatabase(ctx context.Context, database string) error
+	// Port returns the configured port, without starting anything.
+	Port() int
+	// Running reports whether the server answers right now (no start).
+	Running() bool
+	// Health pings the server and returns a one-line status for `haven doctor`.
+	Health(ctx context.Context) (ok bool, detail string)
+	// Databases lists the lw_* databases currently on the server.
+	Databases(ctx context.Context) ([]string, error)
+	// Stop is a no-op in the real adapter (see type doc); kept for symmetry with
+	// ClickHouse and so a future adapter that DOES own the server can implement it.
+	Stop()
+}
+
+// Redis ensures a shared Redis server exists. No per-slug database is needed —
+// domain.RedisDBForSlug already partitions worktrees by DB index on the one
+// server — so this port is deliberately smaller than ClickHouse/Postgres.
+type Redis interface {
+	// Ensure starts (or reuses an already-running) shared server. Returns the
+	// loopback port. Safe to call concurrently.
+	Ensure(ctx context.Context) (port int, err error)
+	// Port returns the configured port, without starting anything.
+	Port() int
+	// Running reports whether the server answers right now (no start).
+	Running() bool
+	// Health pings the server and returns a one-line status for `haven doctor`.
+	Health(ctx context.Context) (ok bool, detail string)
+	// Stop is a no-op in the real adapter — a brew-managed Redis is a
+	// machine-wide resource other local work may already depend on.
 	Stop()
 }
 

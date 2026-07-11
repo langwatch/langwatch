@@ -1,5 +1,5 @@
 // Package netports grabs free loopback TCP ports for adapters that need to
-// pre-allocate ports before spawning a process (system.System, clickhouseserver.Server).
+// pre-allocate ports before spawning a process (system.System, clickhousedocker.Server).
 package netports
 
 import "net"

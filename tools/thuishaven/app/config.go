@@ -15,11 +15,13 @@ type Config struct {
 	HeartbeatEvery           time.Duration // launcher heartbeat cadence
 	DaemonArgv               []string      // how to (re)launch `haven daemon`
 	IsAgent                  bool          // token-free plain output for AI drivers (no colour/TUI)
-	ShouldManageClickHouse   bool          // haven provisions a shared native clickhouse-server + per-slug DBs
-	ShouldStopClickHouseIdle bool          // daemon stops the managed CH server when the last stack is reaped
-	// ShouldStartObservability makes `up` boot the LGTM stack itself. Off by
-	// default: haven links a stack to a collector that is already running, but does
-	// not spend 2 GiB standing one up behind everyone's back on every `pnpm dev`.
+	ShouldManageClickHouse   bool          // haven provisions a shared ClickHouse container (colima) + per-slug DBs
+	ShouldStopClickHouseIdle bool          // daemon stops the managed CH container when the last stack is reaped
+	ShouldManagePostgres     bool          // haven ensures a shared brew-services Postgres + per-slug DBs
+	ShouldManageRedis        bool          // haven ensures a shared brew-services Redis is running
+	// ShouldStartObservability makes `up` boot the LGTM stack itself. On by
+	// default: it shares ClickHouse's colima VM, so the VM is already paying for
+	// itself — opt out with LANGWATCH_HAVEN_OBS=0.
 	ShouldStartObservability bool
 	LocalAPIKey              string // stable local dev API key seeded + injected into every stack
 	RepoRoot                 string // repo root the daemon prunes orphaned git worktrees from

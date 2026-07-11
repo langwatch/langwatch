@@ -36,6 +36,81 @@ func (s Supervisor) RunOnce(ctx context.Context, name, dir, shell string, env []
 	return cmd.Wait()
 }
 
+// RunOnceBounded is RunOnce plus a reaper: a background poll kills the whole
+// process group (the child owns its own group via Setpgid, same as every other
+// supervised child) if its total RSS or wall-clock time crosses limits. Reaping
+// returns a descriptive error rather than letting the caller see a bare "killed"
+// exit status.
+func (s Supervisor) RunOnceBounded(ctx context.Context, name, dir, shell string, env []string, limits app.ReapLimits) error {
+	c := proc{name: name, dir: dir, shell: shell, env: env, color: "90", isPlain: s.isPlain}
+	cmd := c.command(ctx)
+	c.pipe(cmd)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	reapCtx, cancelReap := context.WithCancel(ctx)
+	defer cancelReap()
+	reaped := make(chan string, 1)
+	if limits.MaxRSSBytes > 0 || limits.MaxDuration > 0 {
+		go reap(reapCtx, cmd.Process.Pid, limits, reaped)
+	}
+
+	err := cmd.Wait()
+	select {
+	case reason := <-reaped:
+		return fmt.Errorf("%s: %s", name, reason)
+	default:
+		return err
+	}
+}
+
+// reap polls the process group's total RSS every 2s and enforces MaxDuration,
+// killing the group (SIGKILL — a runaway tsgo has already ignored its chance to
+// exit cleanly) the first time either bound is crossed.
+func reap(ctx context.Context, pgid int, limits app.ReapLimits, reaped chan<- string) {
+	start := time.Now()
+	t := time.NewTicker(2 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if limits.MaxDuration > 0 && time.Since(start) > limits.MaxDuration {
+				reaped <- fmt.Sprintf("killed — running longer than %s", limits.MaxDuration)
+				_ = syscall.Kill(-pgid, syscall.SIGKILL)
+				return
+			}
+			if limits.MaxRSSBytes > 0 {
+				if rss := groupRSSBytes(pgid); rss > limits.MaxRSSBytes {
+					reaped <- fmt.Sprintf("killed — %dMB RSS over the %dMB limit", rss>>20, limits.MaxRSSBytes>>20)
+					_ = syscall.Kill(-pgid, syscall.SIGKILL)
+					return
+				}
+			}
+		}
+	}
+}
+
+// groupRSSBytes sums RSS (in bytes) across every process in the group. Shells
+// out to `ps` rather than reading /proc (this runs on macOS, which has none) —
+// the same "ask the OS's own tool" approach adapters/system already uses.
+func groupRSSBytes(pgid int) int64 {
+	out, err := exec.Command("ps", "-o", "rss=", "-g", fmt.Sprint(pgid)).Output()
+	if err != nil {
+		return 0
+	}
+	var total int64
+	for _, line := range strings.Fields(string(out)) {
+		var kb int64
+		if _, err := fmt.Sscanf(line, "%d", &kb); err == nil {
+			total += kb * 1024
+		}
+	}
+	return total
+}
+
 // Supervise runs every child concurrently, restarting any that exit until the
 // context is cancelled, then SIGTERMs (and finally SIGKILLs) the whole tree.
 func (s Supervisor) Supervise(ctx context.Context, children []app.Child) {

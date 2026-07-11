@@ -67,6 +67,14 @@ func (o *Orchestrator) Doctor() error {
 		chOK, detail := o.ch.Health(context.Background())
 		fmt.Printf("%s managed clickhouse — %s\n", ok(chOK), detail)
 	}
+	if o.pg != nil && o.cfg.ShouldManagePostgres {
+		pgOK, detail := o.pg.Health(context.Background())
+		fmt.Printf("%s managed postgres — %s\n", ok(pgOK), detail)
+	}
+	if o.rds != nil && o.cfg.ShouldManageRedis {
+		rdsOK, detail := o.rds.Health(context.Background())
+		fmt.Printf("%s managed redis — %s\n", ok(rdsOK), detail)
+	}
 	fmt.Printf("     stacks running: %d   tld: .%s\n", len(o.store.Stacks()), o.cfg.Naming.TLD)
 	return nil
 }

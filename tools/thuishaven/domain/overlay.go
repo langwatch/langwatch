@@ -61,11 +61,36 @@ func (s Stack) OverlayEnv() []string {
 	if s.LocalAPIKey != "" {
 		env = append(env, "LANGWATCH_API_KEY="+s.LocalAPIKey)
 	}
-	// haven manages one shared clickhouse-server; this stack gets its own database
-	// on it. The app connects straight to loopback (native CH HTTP, no proxy) at
+	// The rest of the static seeded identity (see prisma/seed.ts's header comment
+	// for the full rationale) — same story: fixed values so any worktree or agent
+	// can log in / authenticate without rediscovering them.
+	env = append(env,
+		"LANGWATCH_ADMIN_EMAIL="+DefaultAdminEmail,
+		"LANGWATCH_ADMIN_PASSWORD="+DefaultAdminPassword,
+		"LANGWATCH_PRIVATE_ACCESS_TOKEN="+DefaultPrivateAccessToken,
+		"LANGWATCH_PUBLIC_ACCESS_TOKEN="+DefaultPublicAccessToken,
+		// ee/admin/isAdmin.ts gates platform-admin (impersonation etc.) on this
+		// comma-separated list. The seeded admin needs to be in it, or logging in
+		// as admin@haven.localhost gets a normal user, not a platform admin.
+		"ADMIN_EMAILS="+DefaultAdminEmail,
+	)
+	// haven manages one shared ClickHouse container; this stack gets its own
+	// database on it. The app connects straight to loopback (HTTP, no proxy) at
 	// the per-slug database, so migration counts are always this worktree's own.
 	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" {
-		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://127.0.0.1:%d/%s", s.ClickHouseHTTPPort, s.ClickHouseDatabase))
+		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://%s:%s@127.0.0.1:%d/%s",
+			ClickHouseUser, ClickHousePassword, s.ClickHouseHTTPPort, s.ClickHouseDatabase))
+	}
+	// Same story for Postgres: one shared brew-managed server, a database per
+	// slug, connected straight to loopback.
+	if s.PostgresPort != 0 && s.PostgresDatabase != "" {
+		env = append(env, fmt.Sprintf("DATABASE_URL=postgresql://%s:%s@127.0.0.1:%d/%s",
+			PostgresRole, PostgresRolePassword, s.PostgresPort, s.PostgresDatabase))
+	}
+	// Redis needs no per-slug database — REDIS_DB_INDEX above already partitions
+	// worktrees by DB index on the one shared server.
+	if s.RedisPort != 0 {
+		env = append(env, fmt.Sprintf("REDIS_URL=redis://127.0.0.1:%d", s.RedisPort))
 	}
 	env = append(env, s.observabilityEnv()...)
 	return env

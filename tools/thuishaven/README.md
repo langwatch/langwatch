@@ -104,9 +104,14 @@ registry, and dashboard stay the same.
   are always this worktree's own. Light local config (memory cap, no S3 tiering,
   no zero-copy). `haven clickhouse status|up|url|stop|drop`; `haven up` migrates
   the per-slug DB and `haven down` drops it.
-- **Always migrate + seed, stable key.** Every `up` migrates *and* seeds
-  idempotently with a stable local API key (`sk-lw-local-development-key`, override
-  `LANGWATCH_LOCAL_API_KEY`) so a fresh stack is instantly usable.
+- **Always migrate + seed, fully static identity.** Every `up` migrates *and*
+  seeds idempotently. Nothing about the local dev identity is ever randomly
+  generated — the same admin login, org/team/project/user IDs, and API
+  tokens exist on every worktree and every machine. See the doc comment at
+  the top of `langwatch/prisma/seed.ts` for the exact values (admin email +
+  password, ingestion key `sk-lw-local-development-key` (override
+  `LANGWATCH_LOCAL_API_KEY`), a private full-access personal access token,
+  and a public ingestion-only token).
 - **Shared-baseline fallback.** Every stack defines all hostnames; a service a
   worktree doesn't run itself (`LANGWATCH_SKIP_AIGATEWAY` / `LANGWATCH_SKIP_NLP`)
   resolves to a shared baseline stack (`HAVEN_BASELINE=1`, off `main`) instead of

@@ -12,7 +12,16 @@ hostname through the portless proxy — predictable, no ports to juggle:
     app.portless.langwatch.localhost         App — the UI, and its API at /api
     gateway.portless.langwatch.localhost     AI Gateway (Go)
     nlp.portless.langwatch.localhost         NLP engine (Go)
-    clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB)
+    clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
+
+Postgres has no routed hostname: unlike ClickHouse (HTTP), it speaks its own
+wire protocol, which the HTTP proxy can't carry — "haven postgres url" (or
+DATABASE_URL in .env.portless) is the real, loopback connection string.
+
+Every service defaults ON — opt out per-service with LANGWATCH_SKIP_*/
+LANGWATCH_HAVEN_*=0 (see ENVIRONMENT). ClickHouse, Postgres and Redis are
+singletons: ONE shared server each, a database per worktree (Redis: a DB
+index — see RedisDB). Only app is never optional.
 
 The app and its API share ONE origin: open app.<slug>.langwatch.localhost for the
 UI and hit app.<slug>.langwatch.localhost/api for the API — one URL, not two.
@@ -34,17 +43,23 @@ COMMANDS
     watch         Live TUI of every running stack + service health (bare 'haven'
                   in a terminal does the same). --agent gives a plain snapshot.
     down          Tear this worktree's routes + registry entry down, and drop this
-                  stack's ClickHouse database (pass --keep-db to keep it).
-    clickhouse    Manage the shared native ClickHouse (haven runs one server, one
-                  database per slug). Subcommands: status | up | url | stop |
-                  drop [--all]. "haven clickhouse url" prints this stack's
-                  CLICKHOUSE_URL; "drop" gives you a fresh, correctly-counted DB.
+                  stack's ClickHouse + Postgres databases (pass --keep-db to keep
+                  them).
+    clickhouse    Manage the shared ClickHouse (haven runs one Altinity container
+                  on colima, one database per slug). Subcommands: status | up |
+                  url | stop | drop [--all]. "haven clickhouse url" prints this
+                  stack's CLICKHOUSE_URL; "drop" gives you a fresh, correctly-
+                  counted DB. Alias: ch.
+    postgres      Manage the shared Postgres (haven starts it via brew services,
+                  or reuses one already running — never fights an existing
+                  instance for the port). Subcommands: status | up | url | drop
+                  [--all]. Same per-slug-database story as clickhouse. Alias: pg.
     observability Manage the shared LGTM stack (OTLP collector -> Loki + Tempo +
                   Prometheus, with Grafana over all three) that every worktree's
                   logs, traces and metrics land in. Subcommands: status | up |
-                  down. Runs as one resource-capped container on colima. Once it
-                  is up, every stack you start exports to it automatically,
-                  tagged langwatch.worktree=<slug>. Alias: obs.
+                  down. Runs as one resource-capped container on the same colima
+                  VM as ClickHouse. Once it is up, every stack you start exports
+                  to it automatically, tagged langwatch.worktree=<slug>. Alias: obs.
     seed          Reseed this stack's database (fresh DB on demand).
     prune [--yes] Reclaim regenerable disk (node_modules, dist, .vite, caches)
                   from worktrees that are neither up nor dirty. Dry-run without
@@ -71,23 +86,36 @@ ENVIRONMENT
                                  back to for services they don't run themselves.
     HAVEN_TYPECHECK_SLOTS=N      Cap concurrent "haven typecheck" runs (default:
                                  one per ~4 GiB RAM, capped at CPU count).
+    HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
+                                 = 6 GiB) or over 10 minutes wall-clock — a
+                                 runaway tsgo shouldn't sit on a slot forever.
     START_WORKERS=false          Do not start background workers.
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
     LANGWATCH_HAVEN_CH=0         Do not manage ClickHouse (use .env CLICKHOUSE_URL).
-    LANGWATCH_HAVEN_CH_STOP_IDLE=1  Daemon stops the CH server when no stacks run.
-    LANGWATCH_HAVEN_CH_MAX_MEMORY   CH server memory ceiling in bytes (default 4GiB).
-    CLICKHOUSE_BIN=/path/clickhouse  Override the clickhouse binary location.
+    LANGWATCH_HAVEN_CH_STOP_IDLE=1  Daemon stops the CH container when no stacks run.
+    LANGWATCH_HAVEN_CH_MEMORY_MB    CH container memory ceiling in MB (default 1536).
+    HAVEN_CH_IMAGE=<image>       Override the pinned Altinity ClickHouse image.
+    LANGWATCH_HAVEN_PG=0         Do not manage Postgres (use .env DATABASE_URL).
+    HAVEN_PG_FORMULA=postgresql@16  brew formula to start if none is running
+                                 (an already-running postgresql@NN, any version,
+                                 is always reused as-is instead).
+    HAVEN_PG_PORT=5432           Port to expect/start Postgres on.
+    LANGWATCH_HAVEN_REDIS=0      Do not manage Redis (use .env REDIS_URL).
+    HAVEN_REDIS_FORMULA=redis    brew formula to start if none is running.
+    HAVEN_REDIS_PORT=6379        Port to expect/start Redis on.
     LANGWATCH_LOCAL_API_KEY      Stable local dev API key haven seeds + injects
                                  (default sk-lw-local-development-key) — every
-                                 worktree and agent authenticates with the same key.
-    LANGWATCH_HAVEN_OBS=1        Have "up" start the observability stack too. Off
-                                 by default: haven links to a collector that is
-                                 already running, but won't spend 2 GiB standing
-                                 one up on every pnpm dev.
-    HAVEN_COLIMA_PROFILE=name    colima profile the stack runs on (default:
-                                 default). A profile haven creates is capped; one
-                                 that already exists is never resized.
+                                 worktree and agent authenticates with the same
+                                 key. Same story for the rest of the seeded
+                                 identity (admin login, PATs) — see
+                                 langwatch/prisma/seed.ts's header comment.
+    LANGWATCH_HAVEN_OBS=0        Skip starting the observability stack on "up".
+                                 On by default: it shares ClickHouse's colima VM,
+                                 which is already paying for itself.
+    HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + observability run on
+                                 (default: default). A profile haven creates is
+                                 capped; one that already exists is never resized.
     HAVEN_OBS_IMAGE=<image>      Override the pinned LGTM bundle image.
     LW_OBS_GRAFANA_PORT=3000     Grafana port (also LW_OBS_OTLP_HTTP_PORT=4318,
                                  LW_OBS_OTLP_GRPC_PORT=4317).

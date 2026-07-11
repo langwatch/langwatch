@@ -142,9 +142,40 @@ func TestOverlayEmitsClickHouseURLOnlyWhenManaged(t *testing.T) {
 	managed := base
 	managed.ClickHouseHTTPPort = 18123
 	managed.ClickHouseDatabase = "lw_brave_otter"
-	want := "http://127.0.0.1:18123/lw_brave_otter"
+	want := "http://default:langwatch@127.0.0.1:18123/lw_brave_otter"
 	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_URL"); got != want {
 		t.Errorf("CLICKHOUSE_URL = %q, want %q", got, want)
+	}
+}
+
+func TestOverlayEmitsPostgresURLOnlyWhenManaged(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	if hasKey(base.OverlayEnv(), "DATABASE_URL") {
+		t.Fatalf("unmanaged stack must not set DATABASE_URL")
+	}
+	managed := base
+	managed.PostgresPort = 5432
+	managed.PostgresDatabase = "lw_brave_otter"
+	want := "postgresql://prisma:prisma@127.0.0.1:5432/lw_brave_otter"
+	if got := valueOf(managed.OverlayEnv(), "DATABASE_URL"); got != want {
+		t.Errorf("DATABASE_URL = %q, want %q", got, want)
+	}
+}
+
+func TestOverlayEmitsRedisURLOnlyWhenManagedWithNoDatabaseSuffix(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	if hasKey(base.OverlayEnv(), "REDIS_URL") {
+		t.Fatalf("unmanaged stack must not set REDIS_URL")
+	}
+	managed := base
+	managed.RedisPort = 6379
+	want := "redis://127.0.0.1:6379"
+	if got := valueOf(managed.OverlayEnv(), "REDIS_URL"); got != want {
+		t.Errorf("REDIS_URL = %q, want %q (must have no /<db> suffix — REDIS_DB_INDEX carries that separately)", got, want)
 	}
 }
 
