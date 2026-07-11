@@ -79,11 +79,19 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 func (o *Orchestrator) monitorLoop(ctx context.Context) {
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
+	cycles := 0
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			cycles++
+			// Every ~10 min, prune orphaned git worktree admin entries — the only
+			// disk hygiene safe to do unattended (it never touches a live tree).
+			// node_modules reclamation stays explicit (`haven prune --yes`).
+			if o.hyg != nil && o.cfg.RepoRoot != "" && cycles%60 == 1 {
+				o.hyg.PruneGitWorktrees(o.cfg.RepoRoot)
+			}
 			now := o.sys.Now()
 			for _, s := range o.store.Stacks() {
 				dead := s.LauncherPID != 0 && !o.sys.ProcessAlive(s.LauncherPID)

@@ -96,6 +96,23 @@ type Dashboard interface {
 	Serve(ctx context.Context, port int) error
 }
 
+// Hygiene is the disk-reclamation surface: enumerating a repo's worktrees,
+// checking for uncommitted work, sizing reclaimable artefacts, removing them, and
+// pruning orphaned git worktree admin entries.
+type Hygiene interface {
+	Worktrees(repoRoot string) ([]Worktree, error)
+	Dirty(worktreeDir string) bool
+	DirSize(path string) (bytes int64, exists bool)
+	Remove(path string) error
+	PruneGitWorktrees(repoRoot string)
+}
+
+// Worktree is one entry from `git worktree list`.
+type Worktree struct {
+	Dir    string
+	Branch string
+}
+
 // DaemonInfo is the little record `up` reads to find (or spawn) the daemon.
 type DaemonInfo struct {
 	PID  int    `json:"pid"`

@@ -19,6 +19,7 @@ type Config struct {
 	ManageClickHouse   bool          // haven provisions a shared native clickhouse-server + per-slug DBs
 	StopClickHouseIdle bool          // daemon stops the managed CH server when the last stack is reaped
 	LocalAPIKey        string        // stable local dev API key seeded + injected into every stack
+	RepoRoot           string        // repo root the daemon prunes orphaned git worktrees from
 }
 
 // PlanOptions decide which services `up` runs and how.

@@ -40,6 +40,9 @@ COMMANDS
                   drop [--all]. "haven clickhouse url" prints this stack's
                   CLICKHOUSE_URL; "drop" gives you a fresh, correctly-counted DB.
     seed          Reseed this stack's database (fresh DB on demand).
+    prune [--yes] Reclaim regenerable disk (node_modules, dist, .vite, caches)
+                  from worktrees that are neither up nor dirty. Dry-run without
+                  --yes. Also prunes orphaned git worktree admin entries.
     list [--json] Show every running stack: slug, branch, worktree, hostnames.
     doctor        Check proxy / daemon / observability / stack health.
     daemon        Run the singleton daemon (auto-spawned by up; rarely by hand).
