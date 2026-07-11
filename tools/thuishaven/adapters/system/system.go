@@ -4,10 +4,14 @@
 package system
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -90,3 +94,32 @@ func (System) SpawnDetached(argv []string, dir, logPath string) error {
 // Now returns the current time. Getpid returns this process's pid.
 func (System) Now() time.Time { return time.Now() }
 func (System) Getpid() int    { return os.Getpid() }
+
+// TotalMemory returns the machine's physical RAM in bytes (0 if undetectable).
+// darwin: sysctl hw.memsize; linux: /proc/meminfo MemTotal.
+func (System) TotalMemory() uint64 {
+	switch runtime.GOOS {
+	case "darwin":
+		out, err := exec.Command("sysctl", "-n", "hw.memsize").Output()
+		if err != nil {
+			return 0
+		}
+		n, _ := strconv.ParseUint(strings.TrimSpace(string(out)), 10, 64)
+		return n
+	case "linux":
+		f, err := os.Open("/proc/meminfo")
+		if err != nil {
+			return 0
+		}
+		defer f.Close()
+		sc := bufio.NewScanner(f)
+		for sc.Scan() {
+			fields := strings.Fields(sc.Text())
+			if len(fields) >= 2 && fields[0] == "MemTotal:" {
+				kb, _ := strconv.ParseUint(fields[1], 10, 64)
+				return kb * 1024
+			}
+		}
+	}
+	return 0
+}

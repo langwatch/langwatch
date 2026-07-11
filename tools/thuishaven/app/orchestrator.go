@@ -20,13 +20,14 @@ type Orchestrator struct {
 	sys   System
 	ch    ClickHouse
 	hyg   Hygiene
+	sem   Semaphore
 	log   *zap.Logger
 }
 
 // New builds an Orchestrator from its injected dependencies. ch may be nil when
 // ClickHouse management is disabled.
-func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, hyg Hygiene, log *zap.Logger) *Orchestrator {
-	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, hyg: hyg, log: log}
+func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, hyg Hygiene, sem Semaphore, log *zap.Logger) *Orchestrator {
+	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, hyg: hyg, sem: sem, log: log}
 }
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).

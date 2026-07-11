@@ -245,3 +245,19 @@ func TestBaselinePortFallsBackToLiveBaselineOnly(t *testing.T) {
 		t.Errorf("a fallback service must not be offered as a baseline source")
 	}
 }
+
+func TestTypecheckSlotsBoundsByMemoryAndCPU(t *testing.T) {
+	gib := uint64(1) << 30
+	if got := TypecheckSlots(0, 8, 3); got != 3 {
+		t.Errorf("explicit override should win: got %d, want 3", got)
+	}
+	if got := TypecheckSlots(16*gib, 8, 0); got != 4 {
+		t.Errorf("16GiB/4 = 4 slots: got %d", got)
+	}
+	if got := TypecheckSlots(64*gib, 4, 0); got != 4 {
+		t.Errorf("capped at CPU count (4): got %d", got)
+	}
+	if got := TypecheckSlots(1*gib, 8, 0); got != 1 {
+		t.Errorf("tiny RAM still gets 1 slot: got %d", got)
+	}
+}

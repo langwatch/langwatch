@@ -43,6 +43,8 @@ COMMANDS
     prune [--yes] Reclaim regenerable disk (node_modules, dist, .vite, caches)
                   from worktrees that are neither up nor dirty. Dry-run without
                   --yes. Also prunes orphaned git worktree admin entries.
+    typecheck     Run "pnpm typecheck" under a machine-wide slot so parallel tsgo
+                  runs across worktrees don't exhaust RAM (args forwarded).
     list [--json] Show every running stack: slug, branch, worktree, hostnames.
     doctor        Check proxy / daemon / observability / stack health.
     daemon        Run the singleton daemon (auto-spawned by up; rarely by hand).
@@ -59,6 +61,8 @@ ENVIRONMENT
                                  resolves to the baseline stack, if one is up).
     HAVEN_BASELINE=1             Mark this stack as the shared default others fall
                                  back to for services they don't run themselves.
+    HAVEN_TYPECHECK_SLOTS=N      Cap concurrent "haven typecheck" runs (default:
+                                 one per ~4 GiB RAM, capped at CPU count).
     START_WORKERS=false          Do not start background workers.
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.

@@ -22,6 +22,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hygiene"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/portlessproxy"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/system"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -55,6 +56,7 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	sys := system.New()
 	ch := clickhouseserver.New(havenHome(), os.Getenv("CLICKHOUSE_BIN"), envBytes("LANGWATCH_HAVEN_CH_MAX_MEMORY", 0))
 	hyg := hygiene.New()
+	sem := semaphore.New(havenHome())
 	sharedURL := func(svc string) string {
 		scheme, port := proxy.Endpoint()
 		return naming.URL(svc, "", scheme, port)
@@ -74,7 +76,7 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		LocalAPIKey:        envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
 		RepoRoot:           worktree,
 	}
-	orch := app.New(cfg, proxy, store, sup, sys, ch, hyg, logger)
+	orch := app.New(cfg, proxy, store, sup, sys, ch, hyg, sem, logger)
 
 	// SIGINT/SIGTERM cancel the context so up/daemon/watch clean up.
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
@@ -108,6 +110,8 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		return orch.RunClickHouse(ctx, params, rest)
 	case "prune":
 		return orch.Prune(ctx, worktree, hasFlag(rest, "--yes"))
+	case "typecheck", "tc":
+		return orch.Typecheck(ctx, lwDir, rest, envInt("HAVEN_TYPECHECK_SLOTS", 0))
 	case "seed":
 		return orch.Seed(ctx, params)
 	case "list", "ls", "status":
