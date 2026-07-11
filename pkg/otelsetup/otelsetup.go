@@ -112,6 +112,13 @@ var AutoStampedBaggageKeys = []string{
 	BaggageKeyCausalityDepth,
 }
 
+// BatchScheduledDelay is the BatchSpanProcessor scheduled export delay used by
+// the default (single-tenant) pipeline when Options.BatchTimeout is unset. Kept
+// short — vs the OTel ~5s default — so an uncatchable SIGKILL/OOM loses at most
+// this window of buffered spans; the SIGTERM path force-flushes earlier still.
+// This stays BATCH export (async, no per-span latency) — NOT synchronous export.
+const BatchScheduledDelay = 2 * time.Second
+
 // Options configures the telemetry provider. Fields left empty are filled from
 // the context's ServiceInfo when available.
 type Options struct {
@@ -314,7 +321,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 
 			batchTimeout := opts.BatchTimeout
 			if batchTimeout == 0 {
-				batchTimeout = 5 * time.Second
+				batchTimeout = BatchScheduledDelay
 			}
 			queueSize := opts.MaxQueueSize
 			if queueSize == 0 {
@@ -465,4 +472,33 @@ func (h *healthyExporter) ExportSpans(ctx context.Context, spans []sdktrace.Read
 
 func (h *healthyExporter) Shutdown(ctx context.Context) error {
 	return h.inner.Shutdown(ctx)
+}
+
+// ForceFlushGlobal force-flushes whatever tracer and meter providers are
+// currently installed as the OTel globals, best-effort and bounded by ctx. It
+// exists for callers that do NOT hold a *Provider handle but must still ship
+// buffered telemetry before the process may die — the process root on a fatal
+// panic, or an early-shutdown hook that wants to flush before a slow drain.
+//
+// Because pkg/otelsetup installs its *sdktrace.TracerProvider as the global,
+// this also flushes every span processor registered on it — including the
+// langyagent internal-tee's BatchSpanProcessor, which is attached to the same
+// global provider. A no-op provider (no endpoint configured) or one without
+// ForceFlush is silently skipped.
+//
+// HONEST LIMIT: SIGKILL and OOM are uncatchable, so this cannot guarantee
+// zero loss. It narrows the window for the failures the process CAN observe
+// (SIGTERM, recovered-then-fatal panic); the short BatchScheduledDelay covers
+// the rest.
+func ForceFlushGlobal(ctx context.Context) {
+	if tp, ok := otelapi.GetTracerProvider().(interface {
+		ForceFlush(context.Context) error
+	}); ok {
+		_ = tp.ForceFlush(ctx)
+	}
+	if mp, ok := otelapi.GetMeterProvider().(interface {
+		ForceFlush(context.Context) error
+	}); ok {
+		_ = mp.ForceFlush(ctx)
+	}
 }
