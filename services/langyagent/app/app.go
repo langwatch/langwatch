@@ -7,10 +7,16 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/telemetry"
 )
+
+// errStreamConsumerCrashed unblocks the handler when the SSE stream goroutine
+// panics. Its message is user-safe (surfaced as an ndjson error event) and
+// carries no internals — the stack is logged by the goroutine's recover.
+var errStreamConsumerCrashed = errors.New("stream ended unexpectedly")
 
 // App is the langyagent application. It composes the worker pool and the
 // telemetry seam. All fields are injected via Options so tests can swap any
@@ -107,7 +113,8 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 	// wait" notice. This must happen BEFORE Begin() commits the 200.
 	if !worker.Claim() {
 		a.turnObserved(ctx, start, "busy")
-		return herr.New(ctx, domain.ErrConversationBusy, nil)
+		// Expected hot-path control-flow outcome — no stack capture needed.
+		return herr.NewLight(ctx, domain.ErrConversationBusy, nil)
 	}
 	defer worker.Release()
 	worker.Touch()
@@ -121,21 +128,35 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 	defer cancelStream()
 
 	// Kick the SSE consumer first so we don't lose the first delta if opencode
-	// is fast to start producing.
+	// is fast to start producing. The goroutine is panic-guarded: a panic in
+	// StreamEvents is recovered + logged (via HandlePanic) AND a sentinel is
+	// pushed into errCh so the handler below never hangs on <-errCh — one crashed
+	// turn can't wedge the request or the manager.
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- worker.StreamEvents(streamCtx, sink)
+		streamed := false
+		defer func() {
+			if !streamed {
+				errCh <- errStreamConsumerCrashed
+			}
+		}()
+		defer clog.HandlePanic(streamCtx, false)
+		err := worker.StreamEvents(streamCtx, sink)
+		streamed = true
+		errCh <- err
 	}()
 
 	if err := worker.PostMessage(ctx, req.System, req.Prompt); err != nil {
-		// Cancel the SSE consumer so <-errCh unblocks immediately instead of
-		// waiting on the outer request ctx. Worker stays claimed until the
-		// deferred Release — keep that window small.
+		// Cancel the SSE consumer, then DRAIN it (<-errCh) BEFORE writing any error
+		// event. StreamEvents writes to the same http.ResponseWriter as the sink;
+		// waiting for it to return first avoids a concurrent write on the ndjson
+		// stream. Worker stays claimed until the deferred Release — keep that
+		// window small.
 		cancelStream()
+		<-errCh // the stream consumer has now fully returned.
 		if errors.Is(err, domain.ErrSessionNotFound) {
 			a.pool.KillSessionVanished(req.ConversationID)
 			sink.ErrorEvent("session-not-found")
-			<-errCh // let the stream consumer unwind.
 			a.turnObserved(ctx, start, "session-not-found")
 			return nil
 		}
@@ -144,7 +165,6 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 			zap.Error(err),
 		)
 		sink.ErrorEvent(err.Error())
-		<-errCh
 		a.turnObserved(ctx, start, "post-error")
 		return nil
 	}

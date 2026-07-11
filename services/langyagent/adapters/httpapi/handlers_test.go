@@ -127,6 +127,59 @@ func TestChat_ValidationErrors(t *testing.T) {
 	}
 }
 
+// Validation failures must be a herr(ErrBadRequest) whose diagnostics NAME the
+// offending field (in Meta.fields), while the user-facing message stays generic.
+func TestChat_ValidationNamesOffendingField(t *testing.T) {
+	router := newTestRouter(&stubPool{worker: &stubWorker{claimOK: true}})
+	auth := "Bearer " + internalSecret
+
+	cases := []struct {
+		name      string
+		body      string
+		wantField string
+	}{
+		{"missing conversationId", `{"prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, "ConversationID"},
+		{"missing prompt", `{"conversationId":"c1","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, "Prompt"},
+		{"missing credential field", `{"conversationId":"c1","prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g"}}`, "Credentials.LangwatchEndpoint"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := postChat(t, router, auth, tc.body)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400", rec.Code)
+			}
+			var env struct {
+				Error struct {
+					Type    string `json:"type"`
+					Message string `json:"message"`
+					Meta    struct {
+						Fields []string `json:"fields"`
+					} `json:"meta"`
+				} `json:"error"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
+				t.Fatalf("decode envelope: %v (%q)", err, rec.Body.String())
+			}
+			if env.Error.Type != string(domain.ErrBadRequest) {
+				t.Errorf("error.type = %q, want bad_request", env.Error.Type)
+			}
+			// The user message must NOT echo the raw field name.
+			if strings.Contains(env.Error.Message, tc.wantField) {
+				t.Errorf("user message %q leaked the internal field path", env.Error.Message)
+			}
+			found := false
+			for _, f := range env.Error.Meta.Fields {
+				if f == tc.wantField {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("validation must name field %q in diagnostics, got fields=%v", tc.wantField, env.Error.Meta.Fields)
+			}
+		})
+	}
+}
+
 func TestChat_ConversationBusyReturns409(t *testing.T) {
 	router := newTestRouter(&stubPool{worker: &stubWorker{claimOK: false}})
 	rec := postChat(t, router, "Bearer "+internalSecret, validBody)
