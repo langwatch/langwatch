@@ -49,10 +49,13 @@ export {
 
 export {
   CARDS_BY_RESOURCE,
+  CLI_COLLECTION_VERBS,
   asJsonDocument,
   cardKindFor,
   cardSchemaFor,
+  cliVerbTone,
   parseCliResult,
+  type CliVerbTone,
   type ParsedCliResult,
 } from "./registry.js";
 

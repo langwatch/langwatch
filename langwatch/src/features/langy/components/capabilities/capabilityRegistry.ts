@@ -26,17 +26,25 @@
  *
  * TRANSPORT: Langy calls the `langwatch` CLI, so a live tool call arrives as
  * `langwatch.<resource>.<verb>` — rewritten server-side by the CLI envelope out
- * of the `bash` call opencode actually made. Those resolve through `cliCardMap`,
- * which derives the structure from `feature-map.json`; this module words them.
- * The older MCP transport (`platform_*` / `search_traces`) has been retired: a
- * name that is not a CLI call now falls straight through to the raw view.
+ * of the `bash` call opencode actually made. `resolveCliCapability` (below) gates
+ * those on `feature-map.json` and reads WHICH card / verb tone from the shared
+ * `@langwatch/cli-cards` contract, so the panel and the CLI share one grammar;
+ * this module only adds the view binding (surface, wording) on top. The older MCP
+ * transport (`platform_*` / `search_traces`) has been retired: a name that is not
+ * a CLI call now falls straight through to the raw view.
  */
 
 import {
   CLI_COLLECTION_VERBS,
-  resolveCliCapability,
-  type CliCapability,
-} from "./cliCardMap";
+  cardKindFor,
+  cliVerbTone,
+  type CardKind,
+} from "@langwatch/cli-cards";
+import {
+  featureForCliCommand,
+  parseCliToolName,
+  type CliCommand,
+} from "~/shared/langy/featureMap";
 
 export type CapabilitySurface =
   | "traces"
@@ -59,29 +67,14 @@ export type CapabilitySurface =
 /** Visual tone of the shared capability-card shell. */
 export type CapabilityTone = "read" | "created" | "updated" | "removed";
 
-/** Which bespoke renderer draws the card. */
-export type CapabilityRenderKind =
-  | "traces"
-  /**
-   * A trace SEARCH: a sample of the matched traces, each clickable through to
-   * its drawer, plus a "View in Trace Explorer" link carrying the agent's actual
-   * query. Distinct from `traces` (the older id-and-snippet list), which the
-   * legacy MCP transport still resolves to.
-   */
-  | "traceSample"
-  | "trace"
-  | "metrics"
-  | "evalRun"
-  | "dataset"
-  | "scenario"
-  | "promptDiff"
-  | "resourceRead"
-  | "resourceCreated"
-  | "resourceUpdated"
-  | "resourceRemoved";
-
 export interface CapabilityDescriptor {
-  render: CapabilityRenderKind;
+  /**
+   * Which bespoke renderer draws the card. The vocabulary is the shared CLI
+   * contract's `CardKind` (`@langwatch/cli-cards`) — one name per card, resolved
+   * once by `cardKindFor` and rendered by {@link LangyCapabilityRenderer}. A
+   * `traces` kind is a trace SEARCH (the sample card), `trace` a single get.
+   */
+  render: CardKind;
   tone: CapabilityTone;
   surface: CapabilitySurface;
   /** Mono overline label, e.g. "Traces", "New evaluator", "Delete dashboard". */
@@ -192,9 +185,10 @@ export function buildSurfaceHref({
  * A read verb has no past-tense label — a read card is titled by its surface,
  * not its verb — so its `past` is empty.
  *
- * The verb's TONE (read / create / update / remove) is `cliCardMap`'s to decide;
- * it classifies verbs for the whole card catalogue and stays the single source
- * of that truth, so it is deliberately not duplicated here.
+ * The verb's TONE (read / create / update / remove) is the shared contract's to
+ * decide (`cliVerbTone` in `@langwatch/cli-cards`); it classifies verbs for the
+ * whole card catalogue and stays the single source of that truth, so it is
+ * deliberately not duplicated here.
  */
 const VERB_WORDING: Record<string, { past: string; present: string }> = {
   search: { past: "", present: "Searching" },
@@ -237,11 +231,79 @@ function nounLabel(noun: string): string {
   return singular.replace(/[_-]/g, " ");
 }
 
+/** A resolved CLI call: the card to draw, the surface it opens, its verb tone. */
+export interface CliCapability {
+  command: CliCommand;
+  surface: CapabilitySurface;
+  render: CardKind;
+  tone: CapabilityTone;
+}
+
 /**
- * Word a CLI capability. The CLI's verb grammar is resolved in `cliCardMap`;
- * how it READS is decided here, alongside the MCP wording, so both transports
- * speak with one voice: a collection read is titled by its surface ("Traces"),
- * a single read by its resource ("trace"), a write by what it did.
+ * The platform surface each mapped feature deep-links to. This is the one fact
+ * `feature-map.json` deliberately withholds — how a result LOOKS, which page it
+ * opens — so it is stated here, keyed by feature id. A feature absent from this
+ * map has no Langy card, and its calls fall through to the raw activity view.
+ *
+ * WHICH card, and the verb's tone, are NOT here: those are CLI grammar, resolved
+ * once in `@langwatch/cli-cards` (`cardKindFor`, `cliVerbTone`) and shared with
+ * the CLI itself. This module owns only the view binding layered on top of them,
+ * so the panel and the CLI can never disagree about what a command produced.
+ */
+export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
+  "observability.tracing": "traces",
+  "observability.analytics": "analytics",
+  "observability.annotations": "annotations",
+  "evaluations.experiments": "experiments",
+  "evaluations.online-evaluation": "evaluations",
+  "agent-simulations.scenarios": "simulations",
+  "agent-simulations.runs": "simulations",
+  "agent-simulations.suites": "simulations",
+  "prompt-management.prompts": "prompts",
+  "library.agents": "agents",
+  "library.workflows": "workflows",
+  "library.evaluators": "evaluations",
+  "library.datasets": "datasets",
+  dashboards: "dashboards",
+  triggers: "automations",
+  "settings.projects": "projects",
+  "settings.api-keys": "apiKeys",
+  "settings.model-providers": "modelProviders",
+  "settings.secrets": "secrets",
+};
+
+/**
+ * Resolve a CLI tool name (`langwatch.<resource>.<verb>`) to its card, surface
+ * and tone, or null when it is not a mapped LangWatch CLI call (a raw `bash`, a
+ * command no feature owns) so the caller falls through to the raw activity view.
+ *
+ * The feature map is the gate — a name it does not list has no card — while the
+ * card and tone come straight from the shared contract, so this resolver is now
+ * just "which surface, is it real" rather than a second copy of the CLI grammar.
+ */
+export function resolveCliCapability(rawName: string): CliCapability | null {
+  const command = parseCliToolName(rawName);
+  if (!command) return null;
+
+  const feature = featureForCliCommand(command);
+  if (!feature) return null;
+
+  const surface = SURFACE_BY_FEATURE[feature.id];
+  if (!surface) return null;
+
+  return {
+    command,
+    surface,
+    render: cardKindFor(command),
+    tone: cliVerbTone(command.verb),
+  };
+}
+
+/**
+ * Word a CLI capability. The CLI's verb grammar is resolved in the shared
+ * contract; how it READS is decided here, alongside the MCP wording, so both
+ * transports speak with one voice: a collection read is titled by its surface
+ * ("Traces"), a single read by its resource ("trace"), a write by what it did.
  */
 function cliOverline({ command, tone, surface }: CliCapability): string {
   const noun = nounLabel(command.resource);
@@ -297,8 +359,9 @@ export function resolveCapabilityProgress(
 
 /**
  * Resolve a CLI tool name (`langwatch.<resource>.<verb>`) to the card that
- * should render it, or null to fall through to the raw-JSON view. The feature
- * map (via `cliCardMap`) decides the structure; `cliOverline` words it.
+ * should render it, or null to fall through to the raw-JSON view.
+ * `resolveCliCapability` decides the structure (gate + shared contract);
+ * `cliOverline` words it.
  */
 export function resolveCapability(
   rawName: string,

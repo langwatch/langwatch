@@ -24,8 +24,8 @@
  * and `cliJson` (noisy stdout -> the JSON document).
  *
  * @see specs/langy/langy-cli-tool-envelope.feature
- * @see src/features/langy/components/capabilities/cliCardMap.ts — the other half:
- *      `langwatch.<resource>.<verb>` -> the card that renders it.
+ * @see src/features/langy/components/capabilities/capabilityRegistry.ts — the
+ *      other half: `langwatch.<resource>.<verb>` -> the card that renders it.
  */
 import { parseCliJson } from "./cliJson";
 import {

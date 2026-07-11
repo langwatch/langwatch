@@ -40,6 +40,51 @@ const CARD_BY_WRITE_VERB: Record<string, CardKind> = {
   archive: "resourceRemoved",
 };
 
+/** The visual tone a CLI verb carries: reads are inert, writes are not. */
+export type CliVerbTone = "read" | "created" | "updated" | "removed";
+
+const CREATE_VERBS = new Set(["create", "add", "upload", "init"]);
+const UPDATE_VERBS = new Set([
+  "update",
+  "rename",
+  "set",
+  "assign",
+  "restore",
+  "sync",
+  "push",
+  "pull",
+  "duplicate",
+]);
+const REMOVE_VERBS = new Set(["delete", "remove", "revoke", "archive"]);
+
+/**
+ * The tone a verb reads in: a create is `created`, a delete `removed`, a read
+ * inert. This is CLI grammar, so a `sync` reads as `updated` here even though its
+ * CARD is the prompt diff — tone and card answer different questions of the same
+ * verb, and both stay in this one place rather than being re-derived per view.
+ */
+export const cliVerbTone = (verb: string): CliVerbTone => {
+  if (CREATE_VERBS.has(verb)) return "created";
+  if (UPDATE_VERBS.has(verb)) return "updated";
+  if (REMOVE_VERBS.has(verb)) return "removed";
+  return "read";
+};
+
+/**
+ * CLI verbs that read a COLLECTION rather than one resource. Used only for
+ * wording ("Traces" vs "Trace") — the plural title a list earns and a get does
+ * not — which is why it lives beside the grammar it belongs to and is exported.
+ */
+export const CLI_COLLECTION_VERBS: ReadonlySet<string> = new Set([
+  "list",
+  "search",
+  "query",
+  "versions",
+  "list-runs",
+  "records",
+  "tag",
+]);
+
 /** A resource's default card, and the verbs that deviate from it. */
 interface ResourceCards {
   read: CardKind;
