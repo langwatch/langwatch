@@ -12,6 +12,7 @@ import {
   normalizeOtlpAttributeMap,
   TraceRequestUtils,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import { deriveLogContentAttributes } from "./log-content-derivation";
 import { synthesizeTraceContext } from "./synthesize-trace-context";
 
 /**
@@ -142,10 +143,17 @@ export class LogRequestCollectionService {
                   : Date.now();
 
                 // Every log record is recorded as-is; the event payload rides
-                // the `body` attribute, already in logAttrs. The only
-                // attributes the receiver adds are the synthetic-id markers
-                // below.
-                const attributes: Record<string, string> = { ...logAttrs };
+                // the `body` attribute, already in logAttrs. The receiver adds
+                // the synthetic-id markers below, plus the content derived from
+                // any raw API body — parsed ONCE here rather than by every
+                // consumer on every read (see `deriveLogContentAttributes`).
+                const attributes: Record<string, string> = {
+                  ...logAttrs,
+                  ...deriveLogContentAttributes({
+                    scopeName,
+                    attributes: logAttrs,
+                  }),
+                };
                 // A minted trace_id badges the whole trace synthetic (and
                 // records which correlation key grouped it). A real trace_id
                 // with only an invented span_id badges just the span — never

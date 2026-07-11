@@ -24,6 +24,7 @@ import {
   type ClaudeContentLog,
   type ClaudeSpanRef,
 } from "./claude-code-span-enrichment";
+import { DERIVED_ATTRS } from "./log-content-derivation";
 import type { LogRecordStorageService } from "./log-record-storage.service";
 import type { StoredLogRecordRow } from "./repositories/log-record-storage.repository";
 
@@ -133,6 +134,7 @@ export function mapLogRowsToClaudeContentLogs(
     const eventName = attrs[EVENT_NAME_ATTR] ?? "";
     const costRaw = attrs[COST_USD_ATTR];
     const cost = costRaw !== undefined ? Number(costRaw) : null;
+    const toolCallCount = Number(attrs[DERIVED_ATTRS.OUTPUT_TOOL_CALL_COUNT]);
     return {
       eventName,
       requestId: nonEmptyOrNull(attrs[REQUEST_ID_ATTR]),
@@ -140,6 +142,13 @@ export function mapLogRowsToClaudeContentLogs(
       timeUnixMs: row.timeUnixMs,
       body: readContentBody(eventName, attrs),
       costUsd: cost !== null && Number.isFinite(cost) ? cost : null,
+      // Parsed out of the raw body once, at ingest, so the read path can skip
+      // re-parsing it. Absent on records ingested before that existed, which is
+      // why every consumer keeps its parse as a fallback.
+      derivedOutputText: nonEmptyOrNull(attrs[DERIVED_ATTRS.OUTPUT_TEXT]),
+      derivedToolCallCount: Number.isFinite(toolCallCount)
+        ? toolCallCount
+        : null,
     };
   });
 }

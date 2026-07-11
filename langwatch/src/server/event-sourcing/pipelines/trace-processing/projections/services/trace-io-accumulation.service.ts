@@ -3,6 +3,7 @@ import {
   isConversationalQuerySource,
 } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { DERIVED_ATTRS } from "~/server/app-layer/traces/log-content-derivation";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { LogRecordReceivedEventData } from "../../schemas/events";
@@ -120,9 +121,15 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
           : null,
       )
     ) {
-      const responseText = extractAssistantTextFromResponseBody(
-        data.attributes.body,
-      );
+      // Ingest already parsed the 60 KB body once and stamped the reply text on
+      // the record (`deriveLogContentAttributes`), so read it rather than
+      // re-parsing here. The parse stays as the fallback for records ingested
+      // before that derivation existed.
+      const derived = data.attributes[DERIVED_ATTRS.OUTPUT_TEXT];
+      const responseText =
+        typeof derived === "string" && derived.length > 0
+          ? derived
+          : extractAssistantTextFromResponseBody(data.attributes.body);
       if (responseText !== null) {
         return { input: null, output: responseText };
       }
