@@ -293,6 +293,52 @@ export class EnvelopeBlobLifecycle {
   }
 
   /**
+   * Deletes the s3 object of a blob whose LAST hold was already dropped inside
+   * a stage eval (the dedup-squash hold transfer runs in Lua, which cannot
+   * reach s3 — the eval reports `reclaimS3` and this finishes the job).
+   * Fire-and-forget with the same failure telemetry as the release path.
+   */
+  reclaimOrphanedS3({
+    value,
+    groupId,
+  }: {
+    value: string;
+    groupId: string;
+  }): void {
+    const hold = readEnvelopeHold(value);
+    if (!hold || hold.ref.tier !== "s3" || !this.tieredBlobs) return;
+    // Same guard as release(): never delete an object whose ref isn't this
+    // group's tenant (ADR-030 §5).
+    if (hold.ref.projectId !== this.projectIdFor(groupId)) {
+      logger.warn(
+        {
+          projectId: this.projectIdFor(groupId),
+          refProjectId: hold.ref.projectId,
+          blobHash: hold.ref.hash,
+          groupId,
+        },
+        "Skipping S3 reclaim for a tenant-mismatched ref",
+      );
+      return;
+    }
+    void this.tieredBlobs.delete(hold.ref).catch((err: unknown) => {
+      gqBlobReclaimS3FailuresTotal.inc({ queue_name: this.queueName });
+      // Tenant-attributed (never a bare hash, never the bucket): every blob
+      // log line carries the owning projectId so logs can't cross tenants.
+      logger.warn(
+        {
+          projectId: hold.ref.projectId,
+          blobHash: hold.ref.hash,
+          err: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
+        },
+        "S3 blob reclaim failed after squash-transfer holder drop — orphaned until bucket lifecycle sweeps",
+      );
+    });
+  }
+
+  /**
    * Atomically moves the hold from a retired value to its replacement (retry
    * re-encode or dedup squash): one eval adds the new hold, drops the old, and
    * reclaims the old blob if newly unreferenced — no acquire-then-release gap in

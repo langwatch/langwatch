@@ -403,7 +403,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       groupId,
     });
 
-    const { isNew, orphanedValue } = await this.scripts.stage({
+    const { isNew, orphanedValue, reclaimS3 } = await this.scripts.stage({
       stagedJobId,
       groupId,
       dispatchAfterMs,
@@ -415,18 +415,24 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       shouldSurviveDispatch,
     });
 
-    // Acquire this occupancy's hold BEFORE releasing any payload a dedup squash
-    // displaced, so a squash re-staging identical content never drops the shared
-    // blob to zero holders. Both are no-ops for inline/legacy values.
+    // Blob holds for a dedup squash move INSIDE the stage eval, atomic with
+    // the displacement — a post-eval transfer can reorder against a concurrent
+    // squash of the same dedup id and leave a phantom hold that pins the blob
+    // until its TTL (the 2026-07-09 leak). Two cases remain on this side:
+    //   - a squash whose displaced blob is s3-tier and newly unreferenced
+    //     (Lua can't reach s3, so the eval reports it for deletion here);
+    //   - a genuine new stage, whose hold the eval doesn't manage — acquire it
+    //     now. When the squash DISCARDED the new value instead (replace off,
+    //     or a post-dispatch survive-dispatch squash: orphanedValue equals
+    //     jobDataJson), it was never staged and gets no hold: a discarded GQ1
+    //     blob (uniquely owned by this value) was already UNLINKed directly
+    //     inside the eval, while a GQ2 blob is content-addressed and left to
+    //     the holders of staged jobs sharing its content, or to the TTL
+    //     backstop.
     if (orphanedValue) {
-      // Atomic hold transfer: a dedup squash moves the hold from the displaced
-      // value to the new one in one eval, so a partial failure can't reclaim a
-      // live blob (ADR-030 §4).
-      this.blobLifecycle.transfer({
-        newValue: jobDataJson,
-        oldValue: orphanedValue,
-        groupId,
-      });
+      if (reclaimS3) {
+        this.blobLifecycle.reclaimOrphanedS3({ value: orphanedValue, groupId });
+      }
     } else {
       this.blobLifecycle.acquire(jobDataJson);
     }
@@ -548,22 +554,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }),
     );
 
-    const { newStagedCount, orphanedValues } =
+    const { newStagedCount, orphanedValues, reclaimS3Flags } =
       await this.scripts.stageBatch(jobsToStage);
 
-    // Atomically transfer the hold from any in-batch dedup-squashed value to the
-    // job that displaced it (orphanedValues is index-aligned with jobsToStage);
-    // otherwise just acquire. Matches send()'s atomic path, so a partial failure
-    // can't reclaim a live blob the way a separate acquire+release pair can
-    // (ADR-030 §4).
+    // Dedup-squash holds moved inside the stage eval (see send()); here we
+    // only delete s3 objects the eval reported newly unreferenced, and acquire
+    // holds for genuinely new stages. A squash that discarded the NEW value
+    // (orphan === the job's own value) staged nothing and gets no hold.
     jobsToStage.forEach((job, i) => {
       const orphan = orphanedValues[i];
       if (orphan && orphan.length > 0) {
-        this.blobLifecycle.transfer({
-          newValue: job.jobDataJson,
-          oldValue: orphan,
-          groupId: job.groupId,
-        });
+        if (reclaimS3Flags[i]) {
+          this.blobLifecycle.reclaimOrphanedS3({
+            value: orphan,
+            groupId: job.groupId,
+          });
+        }
       } else {
         this.blobLifecycle.acquire(job.jobDataJson);
       }

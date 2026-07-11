@@ -2,6 +2,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
 import { CachedLuaScript } from "./cachedLuaScript";
+import { BLOB_HOLDER_TTL_SECONDS } from "./blobConstants";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -401,7 +402,103 @@ local function gqRoutingMeta(jobDataJson)
 end
 `;
 
+// Lua side of the GQ2 blob-hold lifecycle for the dedup squash. A squash
+// displaces one staged value with another; the displaced value's hold must be
+// released and the replacement's acquired ATOMICALLY WITH THE DISPLACEMENT.
+// The old design returned the displaced value and let send() fire a transfer
+// eval afterwards, fire-and-forget — concurrent squashes of the same dedup id
+// could reorder at Redis, and a late transfer re-added a token an earlier one
+// had displaced, pinning the blob under a phantom hold until its TTL (the
+// 2026-07-09 leak: ~279k orphaned blobs, ~1.9 GB). Doing the hold move inside
+// the stage eval serializes it with the squash it accounts for.
+//
+// Envelope hold parse mirrors the TS readEnvelopeHold: "GQ2|<len>|<headerJson>"
+// with header.ref = {tier, projectId, hash} and header.h = the stage token.
+// GQ1 values ("GQ1|", header.r = blob id) have no refcount — their blob is
+// UNLINKed directly. Legacy bare-JSON / inline values carry no blob at all.
+const BLOB_HOLD_HELPER_LUA = `
+local function gqParseHold(value)
+  local prefix = string.sub(value, 1, 4)
+  if prefix ~= "GQ2|" and prefix ~= "GQ1|" then return nil end
+  local barIdx = string.find(value, "|", 5, true)
+  if not barIdx then return nil end
+  local headerLen = tonumber(string.sub(value, 5, barIdx - 1))
+  if not headerLen or headerLen <= 0 then return nil end
+  local ok, header = pcall(cjson.decode, string.sub(value, barIdx + 1, barIdx + headerLen))
+  if not ok or type(header) ~= "table" then return nil end
+  if prefix == "GQ1|" then
+    if type(header["r"]) == "string" then return { kind = "gq1", blobId = header["r"] } end
+    return nil
+  end
+  local ref = header["ref"]
+  if type(ref) == "table" and type(header["h"]) == "string"
+     and type(ref["projectId"]) == "string" and type(ref["hash"]) == "string" then
+    return {
+      kind = "gq2",
+      projectId = ref["projectId"],
+      hash = ref["hash"],
+      tier = ref["tier"],
+      token = header["h"],
+    }
+  end
+  return nil
+end
+
+-- Acquire the replacement value's hold and release the displaced value's, in
+-- the caller's (atomic) eval. Tenant-guarded like the TS release path: a hold
+-- whose ref is not this group's tenant is skipped and left to its TTL.
+-- Returns the displaced blob's reclaim outcome:
+--   0  nothing to reclaim here (still held, inline value, or skipped)
+--   1  redis-tier blob UNLINKed in this eval (GQ2 last-holder or GQ1)
+--   2  s3-tier blob newly unreferenced — the CALLER must delete the object
+local function gqSquashTransferHolds(keyPrefix, tenant, newValue, oldValue)
+  local newHold = gqParseHold(newValue)
+  local oldHold = gqParseHold(oldValue)
+  if newHold and newHold.kind == "gq2" and newHold.projectId == tenant then
+    local holderKey = keyPrefix .. "blobholders:" .. newHold.projectId .. "/" .. newHold.hash
+    redis.call("SADD", holderKey, newHold.token)
+    redis.call("EXPIRE", holderKey, ${BLOB_HOLDER_TTL_SECONDS})
+  end
+  if not oldHold then return 0 end
+  if oldHold.kind == "gq1" then
+    redis.call("UNLINK", keyPrefix .. "blob:" .. oldHold.blobId)
+    return 1
+  end
+  if oldHold.projectId ~= tenant then return 0 end
+  -- A same-set same-token pair is a self-transfer: keep the hold (mirror of
+  -- the standalone TRANSFER eval's guard).
+  if newHold and newHold.kind == "gq2" and newHold.projectId == oldHold.projectId
+     and newHold.hash == oldHold.hash and newHold.token == oldHold.token then
+    return 0
+  end
+  local oldHolderKey = keyPrefix .. "blobholders:" .. oldHold.projectId .. "/" .. oldHold.hash
+  if redis.call("SREM", oldHolderKey, oldHold.token) == 1 and redis.call("SCARD", oldHolderKey) == 0 then
+    redis.call("DEL", oldHolderKey)
+    if oldHold.tier == "redis" then
+      redis.call("UNLINK", keyPrefix .. "blob:" .. oldHold.projectId .. "/" .. oldHold.hash)
+      return 1
+    end
+    return 2
+  end
+  return 0
+end
+
+-- Reclaim the blob of a squash-DISCARDED new value (replace off, or a
+-- post-dispatch survive-dispatch squash). Only a GQ1 blob is safe to delete
+-- here: its randomUUID id belongs to this value alone. A GQ2 blob is
+-- content-addressed and possibly shared with concurrently-staging producers
+-- whose holds are acquired after their stage returns, so it is left to the
+-- holders of staged jobs sharing its content or to the TTL backstop.
+local function gqReclaimDiscardedNew(keyPrefix, value)
+  local hold = gqParseHold(value)
+  if hold and hold.kind == "gq1" then
+    redis.call("UNLINK", keyPrefix .. "blob:" .. hold.blobId)
+  end
+end
+`;
+
 const STAGE_LUA =
+  BLOB_HOLD_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   `
@@ -455,18 +552,27 @@ if dedupId ~= "" and dedupTtlMs > 0 then
     local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
     if rank then
       -- Still in staging: squash in place (net zero pending count change). The
-      -- squash drops one payload on the floor; if it carried an offloaded blob
-      -- (ADR-026) that blob is now unreferenced and would leak until its TTL
-      -- (the 2026-06-11 capacity incident). Report the displaced value so the
-      -- caller can reclaim its blob. On replace the OLD stored value is dropped;
-      -- otherwise the NEW value we were just handed is the one discarded.
+      -- squash drops one payload on the floor. On replace the OLD stored value
+      -- is displaced and its blob hold is moved to the replacement HERE, in
+      -- the same eval as the displacement — a fire-and-forget transfer after
+      -- the eval can reorder against a concurrent squash of the same dedup id
+      -- and leave a phantom hold (the 2026-07-09 leak). Without replace the
+      -- NEW value we were just handed is the one discarded; it was never
+      -- staged, so no hold may be recorded for it: a discarded GQ1 blob
+      -- (uniquely owned by this value) is unlinked directly, while a GQ2 blob
+      -- is content-addressed and left to the holders of jobs sharing its
+      -- content, or to the TTL backstop.
       local orphanedValue = jobDataJson
+      local reclaimS3 = 0
       if shouldExtend == 1 then
         redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
       end
       if shouldReplace == 1 then
         orphanedValue = redis.call("HGET", dataKey, existingJobId) or ""
         redis.call("HSET", dataKey, existingJobId, jobDataJson)
+        reclaimS3 = gqSquashTransferHolds(parkKeyPrefixOf(readyKey), parkTenantOf(groupId), jobDataJson, orphanedValue)
+      else
+        gqReclaimDiscardedNew(parkKeyPrefixOf(readyKey), jobDataJson)
       end
       redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
       -- Score = earliest pending dispatchAfter (LT keeps the smallest score per group)
@@ -476,15 +582,19 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
       redis.call("LPUSH", signalKey, "1")
       redis.call("LTRIM", signalKey, 0, 999)
-      return {0, orphanedValue}
+      return {0, orphanedValue, reclaimS3}
     end
     -- Already dispatched. Default: the dedup key is stale, clean it up and let a
     -- new job stage (the historical TOCTOU behavior). When shouldSurviveDispatch is
     -- set, HONOR the still-alive TTL instead — squash the new job and report its
-    -- payload as the orphaned value (same {0, orphanedValue} shape the in-staging
-    -- squash returns) so a late re-trigger after dispatch cannot re-run it (#3912).
+    -- payload as the orphaned value (same {code, orphanedValue, reclaimS3}
+    -- three-element shape the in-staging squash returns, reclaimS3 always 0
+    -- here) so a late re-trigger after dispatch cannot re-run it (#3912).
+    -- The discarded value was never staged: no hold is recorded for it, and a
+    -- GQ1 blob (uniquely owned by this value) is reclaimed here.
     if shouldSurviveDispatch == 1 then
-      return {0, jobDataJson}
+      gqReclaimDiscardedNew(parkKeyPrefixOf(readyKey), jobDataJson)
+      return {0, jobDataJson, 0}
     end
     redis.call("DEL", dedupKey)
   end
@@ -510,10 +620,11 @@ redis.call("LTRIM", signalKey, 0, 999)
 redis.call("INCR", totalPendingKey)
 
 -- A genuinely new stage displaces nothing, so there is no blob to reclaim.
-return {1, ""}
+return {1, "", 0}
 `;
 
 const STAGE_BATCH_LUA =
+  BLOB_HOLD_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   `
@@ -532,9 +643,11 @@ local nowMs        = tonumber(ARGV[#ARGV - 1])
 
 local newStagedCount = 0
 local affectedGroups = {}
--- Per-job (index-aligned) displaced values whose offloaded blob the caller must
--- reclaim; "" for a genuine new stage. Mirrors STAGE_LUA's single-job report.
+-- Per-job (index-aligned) displaced values; "" for a genuine new stage.
+-- Mirrors STAGE_LUA's single-job report. Holds are transferred in this eval;
+-- reclaimS3Flags marks (per job) an s3-tier blob the CALLER must delete.
 local orphanedValues = {}
+local reclaimS3Flags = {}
 
 for i = 1, count do
   -- Per-job stride is 9: stagedJobId..shouldReplace (8) + shouldSurviveDispatch
@@ -559,6 +672,7 @@ for i = 1, count do
 
   local isDeduped = false
   local orphanedValue = ""
+  local reclaimS3 = 0
   -- True only for the post-dispatch squash (already-dispatched dedup honored):
   -- that item stages no job AND the deduped job is already gone, so it must NOT
   -- contribute this group to the post-loop ready bookkeeping (see below).
@@ -568,9 +682,10 @@ for i = 1, count do
     if existingJobId then
       local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
       if rank then
-        -- Still in staging: squash in place. The displaced payload's blob would
-        -- leak (see STAGE_LUA) — on replace it is the OLD stored value, else the
-        -- NEW value we were handed is the one dropped.
+        -- Still in staging: squash in place. On replace the OLD stored value is
+        -- displaced and its hold moved to the replacement here, atomic with the
+        -- displacement (see STAGE_LUA); else the NEW value we were handed is
+        -- dropped, was never staged, and gets no hold.
         orphanedValue = jobDataJson
         if shouldExtend == 1 then
           redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
@@ -578,6 +693,9 @@ for i = 1, count do
         if shouldReplace == 1 then
           orphanedValue = redis.call("HGET", dataKey, existingJobId) or ""
           redis.call("HSET", dataKey, existingJobId, jobDataJson)
+          reclaimS3 = gqSquashTransferHolds(keyPrefix, parkTenantOf(groupId), jobDataJson, orphanedValue)
+        else
+          gqReclaimDiscardedNew(keyPrefix, jobDataJson)
         end
         redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
         isDeduped = true
@@ -591,6 +709,7 @@ for i = 1, count do
           orphanedValue = jobDataJson
           isDeduped = true
           squashedPostDispatch = true
+          gqReclaimDiscardedNew(keyPrefix, jobDataJson)
         else
           redis.call("DEL", dedupKey)
         end
@@ -607,6 +726,7 @@ for i = 1, count do
     newStagedCount = newStagedCount + 1
   end
   orphanedValues[i] = orphanedValue
+  reclaimS3Flags[i] = reclaimS3
 
   refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
@@ -646,7 +766,7 @@ if newStagedCount > 0 then
   redis.call("INCRBY", totalPendingKey, newStagedCount)
 end
 
-return {newStagedCount, orphanedValues}
+return {newStagedCount, orphanedValues, reclaimS3Flags}
 `;
 
 const DISPATCH_LUA =
@@ -1554,12 +1674,15 @@ export class GroupStagingScripts {
    * stale dedup key is cleaned up and the new job is staged as genuinely new.
    *
    * A squash drops one payload (the replaced old value, or the discarded new
-   * value when `replace` is off); `orphanedValue` reports it so the caller can
-   * reclaim its offloaded blob (ADR-026) instead of leaking it. It is `""` for a
-   * genuine new stage, which displaces nothing.
+   * value when `replace` is off). Blob holds move INSIDE the eval, atomic with
+   * the displacement (a post-eval transfer can reorder against a concurrent
+   * squash and leave a phantom hold — the 2026-07-09 leak). `orphanedValue`
+   * reports the displaced value ("" for a genuine new stage); when its blob is
+   * s3-tier and newly unreferenced, `reclaimS3` is true and the CALLER must
+   * delete the object (Lua cannot reach s3).
    *
-   * @returns `isNew` (true if staged fresh, false if deduped) plus the displaced
-   *   `orphanedValue` whose blob the caller must reclaim.
+   * @returns `isNew` (true if staged fresh, false if deduped), the displaced
+   *   `orphanedValue`, and whether its s3 object needs out-of-band reclaim.
    */
   async stage({
     stagedJobId,
@@ -1581,7 +1704,7 @@ export class GroupStagingScripts {
     shouldExtend?: boolean;
     shouldReplace?: boolean;
     shouldSurviveDispatch?: boolean;
-  }): Promise<{ isNew: boolean; orphanedValue: string }> {
+  }): Promise<{ isNew: boolean; orphanedValue: string; reclaimS3: boolean }> {
     const groupJobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
@@ -1620,23 +1743,26 @@ export class GroupStagingScripts {
       String(shouldSurviveDispatch ? 1 : 0),
     );
 
-    // STAGE_LUA returns [code, orphanedValue]. Tolerate a bare integer reply
-    // defensively (e.g. a stale cached script during a rolling deploy).
-    const [code, orphanedValue] = Array.isArray(result)
-      ? (result as [number, unknown])
-      : [result as number, ""];
+    // STAGE_LUA returns [code, orphanedValue, reclaimS3]. Tolerate a bare
+    // integer reply defensively (e.g. a stale cached script during a rolling
+    // deploy).
+    const [code, orphanedValue, reclaimS3] = Array.isArray(result)
+      ? (result as [number, unknown, unknown])
+      : [result as number, "", 0];
     return {
       isNew: Number(code) === 1,
       orphanedValue: orphanedValue == null ? "" : String(orphanedValue),
+      reclaimS3: Number(reclaimS3) === 2,
     };
   }
 
   /**
    * Stage a batch of jobs into their respective group queues.
    *
-   * @returns `newStagedCount` (new jobs, excluding deduped) plus the
-   *   index-aligned `orphanedValues` of squashed jobs whose offloaded blobs the
-   *   caller must reclaim (`""` where nothing was displaced). See {@link stage}.
+   * @returns `newStagedCount` (new jobs, excluding deduped), the index-aligned
+   *   `orphanedValues` of squashed jobs (`""` where nothing was displaced), and
+   *   index-aligned `reclaimS3Flags` marking displaced s3-tier blobs the caller
+   *   must delete out of band. Holds move inside the eval — see {@link stage}.
    */
   async stageBatch(
     jobs: Array<{
@@ -1650,8 +1776,13 @@ export class GroupStagingScripts {
       shouldReplace?: boolean;
       shouldSurviveDispatch?: boolean;
     }>,
-  ): Promise<{ newStagedCount: number; orphanedValues: string[] }> {
-    if (jobs.length === 0) return { newStagedCount: 0, orphanedValues: [] };
+  ): Promise<{
+    newStagedCount: number;
+    orphanedValues: string[];
+    reclaimS3Flags: boolean[];
+  }> {
+    if (jobs.length === 0)
+      return { newStagedCount: 0, orphanedValues: [], reclaimS3Flags: [] };
 
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
@@ -1689,18 +1820,21 @@ export class GroupStagingScripts {
       ...args,
     );
 
-    // STAGE_BATCH_LUA returns [newStagedCount, orphanedValues[]]. Tolerate a
-    // bare integer reply defensively (stale cached script mid-deploy).
+    // STAGE_BATCH_LUA returns [newStagedCount, orphanedValues[], reclaimS3Flags[]].
+    // Tolerate a bare integer reply defensively (stale cached script mid-deploy).
     if (Array.isArray(result)) {
-      const [count, orphans] = result as [number, unknown];
+      const [count, orphans, s3Flags] = result as [number, unknown, unknown];
       return {
         newStagedCount: Number(count),
         orphanedValues: Array.isArray(orphans)
           ? orphans.map((v) => (v == null ? "" : String(v)))
           : [],
+        reclaimS3Flags: Array.isArray(s3Flags)
+          ? s3Flags.map((v) => Number(v) === 2)
+          : [],
       };
     }
-    return { newStagedCount: Number(result), orphanedValues: [] };
+    return { newStagedCount: Number(result), orphanedValues: [], reclaimS3Flags: [] };
   }
 
   /**
