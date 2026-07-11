@@ -169,6 +169,38 @@ describe("otlp schemas", () => {
       });
     });
 
+    describe("when a span carries a link without droppedAttributesCount", () => {
+      it("parses the span instead of rejecting it (Claude Code links)", () => {
+        // Claude Code enhanced-telemetry spans (e.g. the `claude_code.interaction`
+        // root) emit links with only trace_id/span_id — no
+        // droppedAttributesCount, no attributes. Requiring those fields made
+        // linkSchema reject the WHOLE span at `/api/otel` ingest, silently
+        // dropping the root of every real Claude Code trace. This exercises the
+        // actual spanSchema parse path and observes the span now survives.
+        const span = makeValidSpan({
+          name: "claude_code.interaction",
+          links: [
+            {
+              traceId: "aaaa0000000000000000000000000002",
+              spanId: "bbbb000000000002",
+            },
+          ],
+        });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.links).toHaveLength(1);
+          expect(result.data.links[0]).toMatchObject({
+            traceId: "aaaa0000000000000000000000000002",
+            spanId: "bbbb000000000002",
+            attributes: [],
+          });
+        }
+      });
+    });
+
     describe("when status has empty object (no code/message)", () => {
       it("accepts empty status object", () => {
         const span = makeValidSpan({ status: {} });

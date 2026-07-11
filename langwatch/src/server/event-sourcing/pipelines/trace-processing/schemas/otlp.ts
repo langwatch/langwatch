@@ -175,8 +175,15 @@ export const linkSchema = z.object({
   traceId: idSchema,
   spanId: idSchema,
   traceState: z.string().optional().nullable(),
-  attributes: z.array(keyValueSchema),
-  droppedAttributesCount: z.number().nullable(),
+  // `attributes` and `droppedAttributesCount` are OPTIONAL per the OTLP proto
+  // (trace.proto Span.Link) — only trace_id/span_id are load-bearing. Claude
+  // Code's enhanced-telemetry spans (e.g. the `claude_code.interaction` root)
+  // emit links WITHOUT `droppedAttributesCount`; requiring it here rejected the
+  // whole span at `/api/otel` ingest, silently dropping the root of every real
+  // Claude Code trace. Match the rest of this file (resource/scope/event/span
+  // all use `.optional().nullable()` for the count) so a spec-valid link parses.
+  attributes: z.array(keyValueSchema).optional().default([]),
+  droppedAttributesCount: z.number().optional().nullable(),
   flags: z.number().optional().nullable(),
 });
 
