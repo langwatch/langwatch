@@ -211,6 +211,96 @@ func (p *Pool) Shutdown() {
 	p.baseCancel()
 }
 
+// ShutdownHandoff is the ADR-048 pre-drain SIGTERM step. For each live worker it
+// posts a shutdown-imminent notice (so opencode checkpoints the in-flight turn
+// and emits a terminal `handoff` frame), then waits — bounded by deadline — for
+// every in-flight turn to quiesce, so the frames flush to the control plane over
+// the still-open /chat responses before Shutdown kills the process groups.
+//
+// It runs BEFORE Shutdown (registered as a lifecycle Closer after the
+// worker-pool, so reverse-order stop fires it first). Best-effort by design: a
+// worker that cannot be notified, or a turn that does not quiesce before the
+// deadline, falls back to a cold restart on its next turn — the honest
+// SIGKILL/OOM limit stated in ADR-048. The deadline caps the whole step so a
+// slow/dead worker can never eat the drain budget out from under the kill.
+func (p *Pool) ShutdownHandoff(ctx context.Context, deadline time.Time) {
+	// Snapshot the live workers under the lock; do all network I/O outside it.
+	p.mu.Lock()
+	workers := make([]*Worker, 0, len(p.workers))
+	for _, w := range p.workers {
+		workers = append(workers, w)
+	}
+	p.mu.Unlock()
+	if len(workers) == 0 {
+		return
+	}
+
+	hctx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+
+	log := clog.Get(p.baseCtx)
+	log.Info("shutdown handoff: notifying live workers",
+		zap.Int("workers", len(workers)),
+		zap.Time("deadline", deadline),
+	)
+
+	// Notify each worker in parallel. Bare goroutine guarded by HandlePanic so a
+	// panic in one POST can never take the manager down mid-shutdown (PR4 has no
+	// clog.Go yet; this is exactly what it would do — composes when it lands).
+	var wg sync.WaitGroup
+	for _, w := range workers {
+		wg.Add(1)
+		w := w
+		// clog.Go panic-guards the goroutine so a panic in one notify can never
+		// take the manager down mid-shutdown (PR3).
+		clog.Go(hctx, "shutdown-handoff-notify", func() {
+			defer wg.Done()
+			// Cap a single hung notify so it cannot consume the whole budget.
+			nctx, ncancel := context.WithTimeout(hctx, 2*time.Second)
+			defer ncancel()
+			if err := w.NotifyShutdownImminent(nctx, deadline); err != nil {
+				log.Warn("shutdown handoff: notify failed",
+					zap.String("conversation", w.conversationID),
+					zap.Error(err),
+				)
+			}
+		})
+	}
+	wg.Wait()
+
+	// Wait for in-flight turns to drain (their StreamEvents saw the terminal
+	// handoff frame and Released the worker) or the deadline. Polling keeps this
+	// lock-light; the deadline caps it.
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if p.countInFlight(workers) == 0 {
+			log.Info("shutdown handoff: all in-flight turns quiesced")
+			return
+		}
+		select {
+		case <-hctx.Done():
+			log.Warn("shutdown handoff: deadline reached with turns still in flight — falling back to cold restart",
+				zap.Int("still_in_flight", p.countInFlight(workers)),
+			)
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// countInFlight reports how many of the given workers still have a turn in
+// flight. Used by ShutdownHandoff to wait for the in-flight turns to quiesce.
+func (p *Pool) countInFlight(workers []*Worker) int {
+	n := 0
+	for _, w := range workers {
+		if w.isInFlight() {
+			n++
+		}
+	}
+	return n
+}
+
 // Acquire returns the worker for conversationID, spawning one if needed. Two
 // concurrent callers for the same conversationID share the same spawn promise —
 // only one subprocess is ever created.

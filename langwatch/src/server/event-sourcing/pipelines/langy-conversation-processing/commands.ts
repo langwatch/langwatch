@@ -8,6 +8,8 @@ import {
   langyAgentRespondedEventDataSchema,
   langyAgentTurnFailedEventDataSchema,
   langyConversationArchivedEventDataSchema,
+  langyConversationHandoffConsumedEventDataSchema,
+  langyConversationHandoffPendingEventDataSchema,
   langyConversationMetadataUpdatedEventDataSchema,
   langyAgentTurnStartedEventDataSchema,
   langyMessageSentEventDataSchema,
@@ -193,4 +195,48 @@ export const UpdateConversationMetadataCommand = defineCommand({
   }),
   makeJobId: (d) =>
     `${d.tenantId}:${d.conversationId}:metadata:${d.occurredAt}`,
+});
+
+/**
+ * RecordTurnHandoff → conversation_handoff_pending (ADR-048). Persists the
+ * opaque, worker-authored resume token for a turn that checkpointed on pod
+ * termination. Idempotency keyed on the turn so a retried handoff writes one
+ * event.
+ */
+export const RecordTurnHandoffCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TURN_HANDOFF,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_PENDING,
+  aggregateType: "langy_conversation",
+  schema: langyConversationHandoffPendingEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:handoff:${d.turnId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+    "payload.turn.id": d.turnId,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.conversationId}:handoff:${d.turnId}`,
+});
+
+/**
+ * ConsumeTurnHandoff → conversation_handoff_consumed (ADR-048). Clears the
+ * pending token once the next turn has threaded it to a fresh worker.
+ * Idempotency keyed on the turn so a double-consume collapses to one event.
+ */
+export const ConsumeTurnHandoffCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.CONSUME_TURN_HANDOFF,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED,
+  aggregateType: "langy_conversation",
+  schema: langyConversationHandoffConsumedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:handoff-consumed:${d.turnId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+    "payload.turn.id": d.turnId,
+  }),
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.conversationId}:handoff-consumed:${d.turnId}`,
 });

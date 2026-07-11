@@ -1074,6 +1074,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           reconcileAgentTurn: noop,
           archiveConversation: noop,
           updateConversationMetadata: noop,
+          recordTurnHandoff: noop,
+          consumeTurnHandoff: noop,
         },
         async () => {
           throw new Error("ClickHouse not available in test app");
@@ -1158,6 +1160,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         reconcileAgentTurn: noop,
         archiveConversation: noop,
         updateConversationMetadata: noop,
+        recordTurnHandoff: noop,
+        consumeTurnHandoff: noop,
       } as AppCommands["langy"],
       billing: {
         reportUsageForMonth: noop,

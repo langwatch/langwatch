@@ -102,9 +102,30 @@ func (w *Worker) Release() {
 	w.mu.Unlock()
 }
 
-// PostMessage queues a turn on the worker's opencode session.
-func (w *Worker) PostMessage(ctx context.Context, system, prompt string) error {
-	return postMessage(ctx, w.baseURL, w.bearerToken, w.openCodeSessionID, system, prompt)
+// PostMessage queues a turn on the worker's opencode session. resumeToken
+// (ADR-048) is the opaque checkpoint from a prior turn that handed off on
+// shutdown; empty on a normal cold start. It is forwarded verbatim to opencode,
+// never parsed by the manager.
+func (w *Worker) PostMessage(ctx context.Context, system, prompt, resumeToken string) error {
+	return postMessage(ctx, w.baseURL, w.bearerToken, w.openCodeSessionID, system, prompt, resumeToken)
+}
+
+// NotifyShutdownImminent posts a shutdown-imminent notice to this worker's
+// opencode control API (ADR-048), asking it to checkpoint the in-flight turn and
+// emit a terminal `handoff` frame before the process-group kill. deadline is the
+// absolute instant the worker must checkpoint before.
+func (w *Worker) NotifyShutdownImminent(ctx context.Context, deadline time.Time) error {
+	return notifyShutdownImminent(ctx, w.baseURL, w.bearerToken, w.openCodeSessionID, deadline)
+}
+
+// isInFlight reports whether a turn currently owns this worker (Claimed but not
+// yet Released). The shutdown-handoff step waits on this clearing so the
+// in-flight turn's StreamEvents can forward the terminal `handoff` frame to the
+// control plane before the drain kills the process group (ADR-048).
+func (w *Worker) isInFlight() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.inFlight
 }
 
 // StreamEvents tails the worker's /event stream and forwards this session's

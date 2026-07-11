@@ -23,6 +23,7 @@ function makeRepo(overrides?: Partial<LangyConversationReadRepository>) {
     findById: vi.fn(),
     findAllForUser: vi.fn(),
     findActiveOwnedIds: vi.fn(),
+    findPendingHandoff: vi.fn(async () => null),
     ...overrides,
   } as unknown as LangyConversationReadRepository;
 }
@@ -33,9 +34,15 @@ function makeCommands(
   return {
     sendMessage: vi.fn(async () => {}),
     startAgentTurn: vi.fn(async () => {}),
+    recordToolCallStarted: vi.fn(async () => {}),
+    recordToolCallCompleted: vi.fn(async () => {}),
+    recordAgentResponded: vi.fn(async () => {}),
+    failAgentTurn: vi.fn(async () => {}),
     reconcileAgentTurn: vi.fn(async () => {}),
     archiveConversation: vi.fn(async () => {}),
     updateConversationMetadata: vi.fn(async () => {}),
+    recordTurnHandoff: vi.fn(async () => {}),
+    consumeTurnHandoff: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -270,6 +277,80 @@ describe("LangyConversationService", () => {
           title: "hi",
         }),
       );
+    });
+  });
+
+  describe("given a turn checkpointed on shutdown (ADR-048 handoff)", () => {
+    describe("when the handoff token is recorded", () => {
+      it("dispatches recordTurnHandoff with the opaque token", async () => {
+        const recordTurnHandoff = vi.fn(async () => {});
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands({ recordTurnHandoff }),
+        );
+
+        await svc.recordTurnHandoff({
+          projectId: "p1",
+          conversationId: "c1",
+          turnId: "t1",
+          token: "opaque-resume-token",
+        });
+
+        expect(recordTurnHandoff).toHaveBeenCalledTimes(1);
+        expect(recordTurnHandoff).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tenantId: "p1",
+            conversationId: "c1",
+            turnId: "t1",
+            token: "opaque-resume-token",
+          }),
+        );
+      });
+    });
+
+    describe("when the next turn reads the pending handoff", () => {
+      it("returns the token and turn threaded off the fold, then round-trips to consume", async () => {
+        const findPendingHandoff = vi.fn(async () => ({
+          token: "opaque-resume-token",
+          turnId: "t1",
+        }));
+        const consumeTurnHandoff = vi.fn(async () => {});
+        const svc = new LangyConversationService(
+          makeRepo({ findPendingHandoff }),
+          makeCommands({ consumeTurnHandoff }),
+        );
+
+        const pending = await svc.getPendingHandoff({
+          projectId: "p1",
+          conversationId: "c1",
+        });
+        expect(pending).toEqual({ token: "opaque-resume-token", turnId: "t1" });
+
+        // Resume consumes the handoff, keyed on the handed-off turn.
+        await svc.consumeHandoff({
+          projectId: "p1",
+          conversationId: "c1",
+          turnId: pending!.turnId,
+        });
+        expect(consumeTurnHandoff).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tenantId: "p1",
+            conversationId: "c1",
+            turnId: "t1",
+          }),
+        );
+      });
+    });
+
+    describe("when there is no pending handoff", () => {
+      it("returns null so the next turn cold-starts", async () => {
+        const svc = new LangyConversationService(makeRepo(), makeCommands());
+        const pending = await svc.getPendingHandoff({
+          projectId: "p1",
+          conversationId: "c1",
+        });
+        expect(pending).toBeNull();
+      });
     });
   });
 });
