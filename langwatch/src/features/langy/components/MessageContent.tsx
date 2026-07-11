@@ -17,7 +17,7 @@ import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
 import { parseLangyFeedbackDirective } from "../logic/langyFeedbackDirective";
 import { LangyFeedback } from "./LangyFeedback";
-import { LangyToolActivity, toActivityGroups } from "./LangyToolActivity";
+import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
 import { StreamingText } from "./StreamingText";
 import { reconcileOptimisticText } from "../logic/langyOptimisticText";
 
@@ -115,17 +115,18 @@ export function MessageContent({
 
   const proposals = extractProposals(message);
   const prLinks = isUser ? [] : extractGithubPrLinks(text);
-  // Generic CLI/tool-call activity ("Coding", "Analysing traces") for the
-  // assistant turn — counts toward "has something to render" so a turn that is
-  // still running tools (no prose yet) still surfaces its activity.
-  const toolGroups = isUser ? [] : toActivityGroups(message);
+  // Tool-call activity for the assistant turn: generic lines ("Coding",
+  // "Analysing traces") AND settled domain-capability cards. Counts toward
+  // "has something to render" so a turn whose only output is a running tool or
+  // a settled capability card (no prose yet) still surfaces it.
+  const showsActivity = isUser ? false : hasLangyActivity(message);
   if (
     !displayText &&
     proposals.length === 0 &&
     !showConnectCard &&
     prLinks.length === 0 &&
     progress.events.length === 0 &&
-    toolGroups.length === 0
+    !showsActivity
   )
     return null;
 

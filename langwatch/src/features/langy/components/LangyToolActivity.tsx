@@ -32,6 +32,12 @@ import { useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
+import { isProposalOutput } from "./capabilities/capabilityRegistry";
+import {
+  type CapabilityToolCall,
+  hasCapabilityCard,
+  LangyCapabilityRenderer,
+} from "./capabilities/LangyCapabilityRenderer";
 
 const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }
@@ -93,6 +99,57 @@ export type ActivityGroup = {
   calls: ToolCall[];
 };
 
+/** The tool name behind a part: `dynamic-tool` carries it, `tool-<name>` encodes it. */
+function partToolName(part: ToolPartLike): string | undefined {
+  const type = part.type;
+  if (!type) return undefined;
+  if (type === "dynamic-tool") return part.toolName;
+  if (type.startsWith("tool-")) return type.slice("tool-".length);
+  return undefined;
+}
+
+/** Shape a part into the minimal call the capability layer reasons about. */
+function partToCall(part: ToolPartLike, name: string): CapabilityToolCall {
+  return {
+    name,
+    state: part.state ?? "unknown",
+    input: part.input,
+    output: part.output,
+  };
+}
+
+/**
+ * The settled tool calls in a message that render as bespoke domain-capability
+ * cards (task #12), in first-seen order. The complement of the activity groups:
+ * a call is EITHER a capability card OR an activity line, never both.
+ */
+export function toCapabilityCalls(
+  message: UIMessage,
+): Array<{ id: string; call: CapabilityToolCall }> {
+  const result: Array<{ id: string; call: CapabilityToolCall }> = [];
+  for (const rawPart of message.parts) {
+    const part = rawPart as ToolPartLike;
+    const name = partToolName(part);
+    if (!name) continue;
+    const call = partToCall(part, name);
+    if (!hasCapabilityCard(call)) continue;
+    result.push({ id: part.toolCallId ?? `${name}:${result.length}`, call });
+  }
+  return result;
+}
+
+/**
+ * True when a message has anything for LangyToolActivity to render — an
+ * activity line OR a capability card. MessageContent uses this in its
+ * "is there anything to show?" guard so a turn whose only output is a settled
+ * capability card (no prose, no proposal) still renders.
+ */
+export function hasLangyActivity(message: UIMessage): boolean {
+  return (
+    toCapabilityCalls(message).length > 0 || toActivityGroups(message).length > 0
+  );
+}
+
 /**
  * Collapse a message's tool parts into ordered activity groups. First-seen
  * order is preserved; a group is `done` only once every tool call in it has
@@ -104,20 +161,14 @@ export function toActivityGroups(message: UIMessage): ActivityGroup[] {
 
   for (const rawPart of message.parts) {
     const part = rawPart as ToolPartLike;
-    const type = part.type;
-    if (!type) continue;
-
-    const name =
-      type === "dynamic-tool"
-        ? part.toolName
-        : type.startsWith("tool-")
-          ? type.slice("tool-".length)
-          : undefined;
+    const name = partToolName(part);
     if (!name) continue;
 
     // A tool call whose output is a staged proposal renders as a ProposalCard,
-    // not an activity line — skip it here to avoid double-surfacing.
-    if (isLangyProposalOutput(part.output)) continue;
+    // and one whose name maps to a settled domain card renders as that card —
+    // both are surfaced elsewhere, so skip them here to avoid double-surfacing.
+    if (isProposalOutput(part.output)) continue;
+    if (hasCapabilityCard(partToCall(part, name))) continue;
 
     const mapped = TOOL_ACTIVITY[name];
     const key = mapped?.key ?? `tool:${name}`;
@@ -154,13 +205,69 @@ export function toActivityGroups(message: UIMessage): ActivityGroup[] {
 export function LangyToolActivity({ message }: { message: UIMessage }) {
   const [devMode] = useLangyDevMode();
   const groups = toActivityGroups(message);
-  if (groups.length === 0) return null;
+  const capabilityCalls = toCapabilityCalls(message);
+  if (groups.length === 0 && capabilityCalls.length === 0) return null;
 
   return (
-    <VStack align="stretch" gap={1.5} role="list" aria-label="Langy activity">
-      {groups.map((group) => (
-        <ActivityRow key={group.key} group={group} devMode={devMode} />
+    <VStack align="stretch" gap={2} aria-label="Langy activity">
+      {groups.length > 0 ? (
+        <VStack align="stretch" gap={1.5} role="list">
+          {groups.map((group) => (
+            <ActivityRow key={group.key} group={group} devMode={devMode} />
+          ))}
+        </VStack>
+      ) : null}
+      {capabilityCalls.map(({ id, call }) => (
+        <CapabilityCardRow key={id} call={call} devMode={devMode} />
       ))}
+    </VStack>
+  );
+}
+
+/**
+ * One capability card, plus (in developer mode) a toggle to reveal the raw
+ * tool payload behind it — the same inspect affordance the generic activity
+ * rows offer, so the whole event stream stays inspectable.
+ */
+function CapabilityCardRow({
+  call,
+  devMode,
+}: {
+  call: CapabilityToolCall;
+  devMode: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <VStack align="stretch" gap={1}>
+      <Box position="relative">
+        <LangyCapabilityRenderer call={call} />
+        {devMode ? (
+          <Box position="absolute" top={2} right={2}>
+            <Tooltip content={open ? "Hide raw data" : "Show raw data"} showArrow>
+              <IconButton
+                size="2xs"
+                variant="ghost"
+                color={open ? "orange.solid" : "fg.subtle"}
+                aria-label={open ? "Hide raw data" : "Show raw data"}
+                aria-expanded={open}
+                onClick={() => setOpen((v) => !v)}
+              >
+                <Braces size={12} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : null}
+      </Box>
+      {devMode && open ? (
+        <RawCallJson
+          call={{
+            name: call.name,
+            state: call.state,
+            input: call.input,
+            output: call.output,
+          }}
+        />
+      ) : null}
     </VStack>
   );
 }
@@ -279,12 +386,4 @@ function humanizeTool(name: string): string {
   const spaced = name.replace(/[_-]+/g, " ").trim();
   if (!spaced) return "Working";
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-function isLangyProposalOutput(output: unknown): boolean {
-  return (
-    !!output &&
-    typeof output === "object" &&
-    (output as { langyProposal?: unknown }).langyProposal === true
-  );
 }
