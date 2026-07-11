@@ -1,10 +1,15 @@
-// Command migrationorder fails when a pull request adds a migration that sorts
-// at or before a migration already on the base branch.
+// Command migrationorder reports migrations that sort at or before a migration
+// already on the base branch.
 //
-// Usage: migrationorder [baseRef] [repoRoot]
+// It is advisory: findings never fail the run, they are surfaced as a comment on
+// the pull request. A non-zero exit means the check itself broke, not that the
+// migrations are wrong.
+//
+// Usage: migrationorder [-base origin/main] [-root .] [-json]
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -15,34 +20,43 @@ import (
 func main() {
 	baseRef := flag.String("base", "origin/main", "ref to check the migrations against")
 	root := flag.String("root", ".", "repository root")
+	asJSON := flag.Bool("json", false, "emit findings as JSON on stdout")
 	flag.Parse()
 
-	if err := run(*baseRef, *root); err != nil {
+	findings, err := findings(*baseRef, *root)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
+	if *asJSON {
+		if err := json.NewEncoder(os.Stdout).Encode(findings); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if len(findings) == 0 {
+		fmt.Printf("No migration ordering problems against %s\n", *baseRef)
+		return
+	}
+
+	fmt.Printf("Migration ordering findings against %s:\n", *baseRef)
+	for _, finding := range findings {
+		fmt.Printf("- %s\n", finding)
+	}
 }
 
-func run(baseRef, root string) error {
+func findings(baseRef, root string) ([]string, error) {
 	inputs, err := migrationorder.Repo{Root: root}.Inputs(baseRef)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	var errs []string
+	findings := []string{}
 	for _, input := range inputs {
-		errs = append(errs, migrationorder.Check(input)...)
+		findings = append(findings, migrationorder.Check(input)...)
 	}
-
-	if len(errs) > 0 {
-		fmt.Fprintf(os.Stderr, "Migration ordering check failed against %s:\n", baseRef)
-		for _, err := range errs {
-			fmt.Fprintf(os.Stderr, "- %s\n", err)
-		}
-		return fmt.Errorf("\nMigrations run in key order, so a migration that sorts before something already merged " +
-			"would be skipped on any database that is already up to date. Rebase on the base branch and renumber your migrations.")
-	}
-
-	fmt.Printf("Migration ordering check passed against %s\n", baseRef)
-	return nil
+	return findings, nil
 }

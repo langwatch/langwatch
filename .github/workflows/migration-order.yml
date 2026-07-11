@@ -1,15 +1,39 @@
 name: migration-order
 
+# Flags migrations that sort at or before something already merged into the base
+# branch. Both migration sets run in key order — Prisma by timestamp, ClickHouse
+# by goose sequence number — so a branch that was opened before another migration
+# merged can land one that goose skips outright and Prisma applies out of order.
+#
+# Deliberately advisory: it comments, it never gates. The findings are a heads-up
+# for the author and for review, and a reviewer can disagree. React 👎 to the
+# comment to dismiss it — it goes quiet until the findings themselves change.
+#
+# Ordering is judged against the *tip* of the base branch, not the merge base:
+# a branch is stale exactly when the base branch moved ahead of it, which is the
+# one thing a merge-base comparison cannot see.
+#
+# Spec: specs/ci/migration-order.feature
+
 on:
   pull_request:
-  merge_group:
-  workflow_dispatch:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
+  pull-requests: write
+
+# Two pushes in quick succession would otherwise race: both runs read "no
+# existing comment" and both POST, leaving duplicates on the thread.
+concurrency:
+  group: migration-order-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   migration-order:
+    # Fork PRs get a read-only GITHUB_TOKEN, so the comment POST would 403.
+    # Skip quietly rather than paint a red X on a contributor's first PR.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -21,7 +45,7 @@ jobs:
 
       - name: Fetch base branch
         env:
-          BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
       - name: Setup Go
@@ -32,5 +56,116 @@ jobs:
 
       - name: Check migration ordering
         env:
-          BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
-        run: go run ./cmd/migrationorder -base "origin/${BASE_REF}"
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: go run ./cmd/migrationorder -base "origin/${BASE_REF}" -json > findings.json
+
+      - name: Upsert migration ordering comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { readFileSync } = require("node:fs");
+            const { createHash } = require("node:crypto");
+
+            const MARKER = "<!-- migration-order -->";
+            const findings = JSON.parse(readFileSync("findings.json", "utf8"));
+
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.user?.login === "github-actions[bot]" && c.body?.includes(MARKER)
+            );
+
+            // Nothing to say. Drop the comment rather than leave a stale warning
+            // or a "resolved" tombstone on the thread.
+            if (findings.length === 0) {
+              if (existing) {
+                await github.rest.issues.deleteComment({ owner, repo, comment_id: existing.id });
+                core.info(`Deleted resolved migration-order comment on PR #${pr.number}.`);
+              }
+              core.info("No migration ordering findings.");
+              return;
+            }
+
+            // The findings themselves are the identity of the comment. A 👎
+            // dismisses *those* findings — if the migrations change, so does the
+            // fingerprint, and the dismissal does not carry over to a problem
+            // nobody has looked at yet.
+            const fingerprint = createHash("sha256")
+              .update(findings.join("\n"))
+              .digest("hex")
+              .slice(0, 12);
+            const stamp = `<!-- fingerprint: ${fingerprint} -->`;
+            const DISMISSED = "<!-- dismissed -->";
+
+            if (existing?.body?.includes(stamp)) {
+              if (existing.body.includes(DISMISSED)) {
+                core.info("Findings unchanged and already dismissed.");
+                return;
+              }
+
+              const reactions = await github.paginate(github.rest.reactions.listForIssueComment, {
+                owner,
+                repo,
+                comment_id: existing.id,
+                per_page: 100,
+              });
+              if (!reactions.some((r) => r.content === "-1")) {
+                // Same findings, still standing. Re-posting would only re-notify
+                // everyone with a comment they have already read.
+                core.info("Findings unchanged — leaving the existing comment in place.");
+                return;
+              }
+
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body: [
+                  MARKER,
+                  DISMISSED,
+                  `<sub>Migration ordering: ${findings.length} finding(s) dismissed. ` +
+                    "Push a migration change and the check speaks up again.</sub>",
+                  stamp,
+                ].join("\n"),
+              });
+              core.info(`Dismissed migration-order comment on PR #${pr.number}.`);
+              return;
+            }
+
+            const body = [
+              MARKER,
+              "### Migration ordering",
+              "",
+              `Against \`${pr.base.ref}\` as it stands right now:`,
+              "",
+              ...findings.map((finding) => `- ${finding}`),
+              "",
+              "Migrations run in key order. A migration that sorts before something already merged is " +
+                "skipped outright by goose on any database that is already up to date, and applied out of " +
+                "order by Prisma — it works on your machine and never runs on a deployed database. " +
+                "Rebase on the base branch and renumber.",
+              "",
+              "<sub>Advisory, not a gate — this never fails your build. React 👎 if you disagree and " +
+                "it will drop the comment.</sub>",
+              stamp,
+            ].join("\n");
+
+            // Replaced rather than edited: findings that changed deserve a fresh
+            // notification, and dropping the old comment drops its stale 👎 too.
+            if (existing) {
+              await github.rest.issues.deleteComment({ owner, repo, comment_id: existing.id });
+            }
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pr.number,
+              body,
+            });
+            core.info(`Reported ${findings.length} migration ordering finding(s) on PR #${pr.number}.`);
