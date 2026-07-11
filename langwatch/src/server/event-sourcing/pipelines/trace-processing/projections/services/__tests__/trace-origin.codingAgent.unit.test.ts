@@ -24,7 +24,7 @@ import {
 } from "@ee/governance/services/ingestKeyProvenance.utils";
 import { CLAUDE_CODE_TRACING_SCOPE } from "~/server/app-layer/traces/claude-code-log-events";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { CODING_AGENT_ORIGIN } from "~/server/traces/claude-code-log-enrichment";
+import { CODING_AGENT_ORIGIN } from "~/server/app-layer/traces/claude-code-log-enrichment";
 
 import type { NormalizedSpan } from "../../../schemas/spans";
 import { TraceOriginService } from "../trace-origin.service";

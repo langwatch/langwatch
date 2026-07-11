@@ -128,15 +128,35 @@ function logRow(
   };
 }
 
-/** The light events: user_prompt (input), api_request (cost), assistant_response (output). */
+/**
+ * The light events: user_prompt (input), api_request (cost), assistant_response
+ * (output) — i.e. the shape emitted WITHOUT `OTEL_LOG_RAW_API_BODIES`.
+ *
+ * Each event carries its content under its OWN attribute key — there is no
+ * shared `body` convention (https://code.claude.com/docs/en/monitoring-usage):
+ *   user_prompt        → `prompt`
+ *   assistant_response → `response`
+ *   api_*_body         → `body`
+ * Enrichment used to read `body` for all of them, so on this light path the span
+ * came back with NO input and NO output, silently. Keep this fixture on the real
+ * wire keys so that regression stays caught.
+ */
 const CLAUDE_LOG_ROWS: StoredLogRecordRow[] = [
-  logRow({ "event.name": "user_prompt", body: "summarise the repo", query_source: REPL }, 100),
+  logRow(
+    { "event.name": "user_prompt", prompt: "summarise the repo", query_source: REPL },
+    100,
+  ),
   logRow(
     { "event.name": "api_request", request_id: REQUEST_ID, query_source: REPL, cost_usd: "0.0421" },
     200,
   ),
   logRow(
-    { "event.name": "assistant_response", request_id: REQUEST_ID, query_source: REPL, body: "Here is the summary." },
+    {
+      "event.name": "assistant_response",
+      request_id: REQUEST_ID,
+      query_source: REPL,
+      response: "Here is the summary.",
+    },
     210,
   ),
 ];

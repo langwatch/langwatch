@@ -201,6 +201,45 @@ describe("otlp schemas", () => {
       });
     });
 
+    describe("when a span omits attributes entirely", () => {
+      it("parses the span and defaults attributes to an empty array", () => {
+        // OTLP/JSON omits empty repeated fields (proto3), so a span with no
+        // attributes arrives with no `attributes` key at all. Requiring it
+        // rejected the whole span at `/api/otel` ingest — real Claude Code
+        // spans were being dropped with "expected array, received undefined".
+        const span = makeValidSpan({ name: "claude_code.interaction" });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (span as any).attributes;
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.attributes).toEqual([]);
+        }
+      });
+    });
+
+    describe("when a span carries an event without attributes", () => {
+      it("parses the span instead of rejecting it", () => {
+        // Same proto3 omission as above, one level down: an event with no
+        // attributes rejected the entire enclosing span.
+        const span = makeValidSpan({
+          events: [{ timeUnixNano: "1700000000500000000", name: "exception" }],
+        });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.events[0]).toMatchObject({
+            name: "exception",
+            attributes: [],
+          });
+        }
+      });
+    });
+
     describe("when status has empty object (no code/message)", () => {
       it("accepts empty status object", () => {
         const span = makeValidSpan({ status: {} });

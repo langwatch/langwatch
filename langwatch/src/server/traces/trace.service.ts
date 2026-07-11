@@ -15,8 +15,8 @@ import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
 import {
   CODING_AGENT_ORIGIN,
-  enrichSpansWithClaudeLogContent,
-} from "./claude-code-log-enrichment";
+  enrichCodingAgentSpansFromLogs,
+} from "~/server/app-layer/traces/claude-code-log-enrichment";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 
@@ -344,29 +344,15 @@ export class TraceService {
     if (trace.metadata?.["langwatch.origin"] !== CODING_AGENT_ORIGIN) {
       return trace;
     }
-    try {
-      const logRows = await this.logRecordStorageService().getLogsByTraceId(
-        projectId,
-        trace.trace_id,
-        trace.timestamps.started_at,
-      );
-      if (logRows.length === 0) return trace;
-      const spans = enrichSpansWithClaudeLogContent({
-        spans: trace.spans,
-        logRows,
-      });
-      return spans === trace.spans ? trace : { ...trace, spans };
-    } catch (error) {
-      this.logger.warn(
-        {
-          projectId,
-          traceId: trace.trace_id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Claude Code log enrichment skipped: failed to read trace logs",
-      );
-      return trace;
-    }
+    const spans = await enrichCodingAgentSpansFromLogs({
+      logRecords: this.logRecordStorageService(),
+      tenantId: projectId,
+      traceId: trace.trace_id,
+      spans: trace.spans,
+      occurredAtMs: trace.timestamps.started_at,
+      logger: this.logger,
+    });
+    return spans === trace.spans ? trace : { ...trace, spans };
   }
 
   /**
