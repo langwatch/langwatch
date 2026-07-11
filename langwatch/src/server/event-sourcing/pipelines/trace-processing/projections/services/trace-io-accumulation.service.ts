@@ -127,6 +127,30 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
         return { input: null, output: responseText };
       }
     }
+
+    // The LIGHT path: without OTEL_LOG_RAW_API_BODIES there is no
+    // api_response_body at all, and the assistant's reply arrives instead on
+    // `assistant_response` — under a `response` attribute, not `body` (each
+    // claude_code event names its own content key; see
+    // https://code.claude.com/docs/en/monitoring-usage). We read neither, so a
+    // trace ingested on the light path had a NULL output: the trace list showed
+    // the prompt and nothing back.
+    //
+    // Same query_source gate as above — ComputedOutput is last-write-wins, so a
+    // title/autosuggest utility reply must not clobber the real one.
+    if (
+      data.attributes["event.name"] === "assistant_response" &&
+      isConversationalQuerySource(
+        typeof data.attributes.query_source === "string"
+          ? data.attributes.query_source
+          : null,
+      )
+    ) {
+      const response = data.attributes.response;
+      if (typeof response === "string" && response.length > 0) {
+        return { input: null, output: response };
+      }
+    }
   }
 
   // Codex emits the user's text on a separate codex.user_prompt event.
