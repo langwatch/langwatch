@@ -309,7 +309,18 @@ export class EnvelopeBlobLifecycle {
     if (!hold || hold.ref.tier !== "s3" || !this.tieredBlobs) return;
     // Same guard as release(): never delete an object whose ref isn't this
     // group's tenant (ADR-030 §5).
-    if (hold.ref.projectId !== this.projectIdFor(groupId)) return;
+    if (hold.ref.projectId !== this.projectIdFor(groupId)) {
+      logger.warn(
+        {
+          projectId: this.projectIdFor(groupId),
+          refProjectId: hold.ref.projectId,
+          blobHash: hold.ref.hash,
+          groupId,
+        },
+        "Skipping S3 reclaim for a tenant-mismatched ref",
+      );
+      return;
+    }
     void this.tieredBlobs.delete(hold.ref).catch((err: unknown) => {
       gqBlobReclaimS3FailuresTotal.inc({ queue_name: this.queueName });
       // Tenant-attributed (never a bare hash, never the bucket): every blob
