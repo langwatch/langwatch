@@ -1,7 +1,7 @@
 /**
  * In-band progress events for the GitHub PR-opening flow.
  *
- * The worker (services/langy-agent) doesn't currently have a structured
+ * The worker (services/langyagent) doesn't currently have a structured
  * channel back to the manager — it streams OpenCode SSE events that this
  * codebase opens as text deltas. Rather than invent a new wire protocol and
  * version-coordinate worker/manager, we ride the existing text channel:

@@ -2,7 +2,7 @@
  * In-process worker pool for Langy turns (ADR-044 part 1).
  *
  * A direct analog of `ScenarioExecutionPool`, with one difference: it does NOT
- * spawn a child process. Its spawn function calls the Go langy-agent manager
+ * spawn a child process. Its spawn function calls the Go langyagent manager
  * (`POST {OPENCODE_AGENT_URL}/chat`) and bridges the response. The HARD capacity
  * gate stays the manager's `ErrMaxWorkers` → "at-capacity"; this pool's
  * concurrency only bounds how many manager calls one control-plane worker makes

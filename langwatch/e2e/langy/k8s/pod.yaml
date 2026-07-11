@@ -1,13 +1,13 @@
 # =============================================================================
 # LOCAL E2E ONLY — DO NOT USE IN PRODUCTION.
 #
-# The authoritative production posture is `charts/langy-agent/`. This manifest
+# The authoritative production posture is `charts/langyagent/`. This manifest
 # mirrors that chart's pod/container securityContext so the per-worker UID
 # isolation actually functions locally, but deliberately DIFFERS from prod in
 # two ways for local kind/minikube testing:
 #   (1) `runtimeClassName: gvisor` is OMITTED because local clusters rarely
 #       define the gVisor RuntimeClass — prod REQUIRES it (see ADR-033 and
-#       charts/langy-agent/values.yaml).
+#       charts/langyagent/values.yaml).
 #   (2) no NetworkPolicy (a single local test pod has no siblings to isolate on
 #       the network).
 # Do not copy this file into a real cluster.
@@ -19,7 +19,7 @@
 # process holds inside a container. As UID 1000 with all caps dropped (the OLD,
 # BROKEN config this file used to ship) the manager physically CANNOT hand each
 # worker a distinct UID, so worker A could read worker B's project API key +
-# GitHub token off disk. This mirrors charts/langy-agent/values.yaml exactly.
+# GitHub token off disk. This mirrors charts/langyagent/values.yaml exactly.
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -37,7 +37,7 @@ spec:
       labels:
         app: opencode-agent
     spec:
-      # Pod-level securityContext — mirrors charts/langy-agent (podSecurityContext).
+      # Pod-level securityContext — mirrors charts/langyagent (podSecurityContext).
       # fsGroup is intentionally OMITTED: setting it would group-share every
       # worker's files and re-open the cross-worker boundary the per-UID
       # isolation exists to close.
@@ -51,7 +51,7 @@ spec:
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
-          # NO user credentials at pod level. The manager (services/langy-agent) injects
+          # NO user credentials at pod level. The manager (services/langyagent) injects
           # per-session credentials when it spawns each worker subprocess, so
           # there's no shared key to fall back to or leak across sessions.
           # The ONE env var here is the service-to-service auth secret —
@@ -71,7 +71,7 @@ spec:
             limits:
               memory: "4Gi"
               cpu: "2"
-          # Container-level securityContext — mirrors charts/langy-agent
+          # Container-level securityContext — mirrors charts/langyagent
           # (containerSecurityContext). Root + a narrow cap set is what makes
           # per-worker UID isolation function: the manager chowns each per-session
           # dir to a unique UID, writes 0600 config blobs as that UID, and spawns
