@@ -75,6 +75,60 @@ export class EventRepositoryMemory implements EventRepository {
     return sortedRecords.map((record) => ({ ...record }));
   }
 
+  async getEventRecordsUpToPaged(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }): Promise<EventRecord[]> {
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      after,
+      limit,
+    } = request;
+    const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
+    const records = this.eventsByKey.get(key) ?? [];
+
+    const withinUpperBound = (record: EventRecord): boolean =>
+      record.EventTimestamp < upToTimestamp ||
+      (record.EventTimestamp === upToTimestamp &&
+        record.EventId <= upToEventId);
+
+    // Strict cursor: only records ordered AFTER (after.timestamp, after.eventId).
+    const afterCursor = (record: EventRecord): boolean => {
+      if (!after) return true;
+      if (record.EventTimestamp > after.timestamp) return true;
+      return (
+        record.EventTimestamp === after.timestamp &&
+        record.EventId > after.eventId
+      );
+    };
+
+    const filtered = records.filter(
+      (record) => withinUpperBound(record) && afterCursor(record),
+    );
+
+    // Plain relational comparison, not localeCompare: withinUpperBound and
+    // afterCursor above already order EventId with `<=`/`>`, so the sort must
+    // use the same (locale-independent) comparison or the cursor's boundary
+    // can disagree with where a record lands in the sorted page.
+    const sorted = [...filtered].sort((a, b) => {
+      if (a.EventTimestamp !== b.EventTimestamp) {
+        return a.EventTimestamp - b.EventTimestamp;
+      }
+      return a.EventId < b.EventId ? -1 : a.EventId > b.EventId ? 1 : 0;
+    });
+
+    return sorted.slice(0, limit).map((record) => ({ ...record }));
+  }
+
   async countEventRecords(
     tenantId: string,
     aggregateType: string,

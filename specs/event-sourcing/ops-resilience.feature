@@ -22,7 +22,7 @@ Feature: Tenant-scoped bulk drain (post-2026-05-11 incident)
   # `pipeline name` (e.g. `trace_processing`) is NOT in the groupId
   # (it lives in job data) — we deliberately do not pretend otherwise.
   # Use the groupId-fragment patterns operators actually see:
-  #   "/fold/projectDailySdkUsage/" — only this fold's groups
+  #   "/fold/traceSummary/" — only this fold's groups
   #   "/reactor/customEvaluationSync/" — only this reactor's groups
   #   "/map/spanStorage/" — only the span-storage map groups
   # No filter = drop everything for that tenant.
@@ -46,7 +46,7 @@ Feature: Tenant-scoped bulk drain (post-2026-05-11 incident)
   @integration @v1 @bulk-drain
   Scenario: drainTenant supports an optional groupIdContains substring filter
     Given tenant A has groups across multiple projections
-    When the operator calls drainTenant with groupIdContains="/fold/projectDailySdkUsage/"
+    When the operator drains only tenant A's trace-summary groups
     Then only groups whose groupId contains that substring are drained
     And groups in tenant A's other projections are preserved
     And the filter is a plain substring match (no pretense of pipeline-name resolution)

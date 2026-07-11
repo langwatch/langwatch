@@ -116,12 +116,6 @@ export const FEATURE_FLAGS = [
 
   // ----- PRODUCT -----
   {
-    key: "release_ui_sdk_radar_banner_card_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description: "Shows the SDK radar banner card on the home page.",
-  },
-  {
     key: "release_ui_ai_gateway_menu_enabled",
     scope: "PRODUCT",
     defaultValue: true,

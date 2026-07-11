@@ -52,7 +52,6 @@ yarn-error.log*
 
 *.generated.ts
 !src/server/evaluations/evaluators.generated.ts
-src/server/sdk-radar/sdk-versions.json
 
 quickwit
 quickwit-*

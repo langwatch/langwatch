@@ -100,6 +100,27 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
     aggregateId: string;
     upToEvent: Event;
   }) => Promise<Event[]>;
+
+  /**
+   * Cursor-paginated variant of `eventLoaderUpTo`: returns ONE page of the
+   * aggregate's history up to AND INCLUDING `upToEvent`, ordered by
+   * (timestamp, eventId), strictly after the `after` cursor, at most `limit`
+   * events. Lets the executor stream a store-miss re-fold of a huge aggregate
+   * (a hot trace can carry 100k+ events) page-by-page instead of loading the
+   * whole history — and every payload — into memory at once.
+   *
+   * Auto-wired by EventSourcingService when the event store supports paginated
+   * reads. The executor only uses it for order-insensitive folds
+   * (`refoldOnOutOfOrder: false`), for which the (timestamp, eventId) page
+   * order is as valid as occurredAt order.
+   */
+  eventLoaderUpToPaged?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    upToEvent: Event;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }) => Promise<Event[]>;
 }
 
 /**

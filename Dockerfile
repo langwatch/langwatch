@@ -36,9 +36,6 @@ COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.ya
 COPY langwatch/vendor ./langwatch/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
 RUN cd langwatch && CI=true pnpm install --frozen-lockfile
-# SDK package files needed by generate-sdk-versions.sh during build
-COPY typescript-sdk/package.json ./typescript-sdk/package.json
-COPY python-sdk/pyproject.toml ./python-sdk/pyproject.toml
 COPY langwatch ./langwatch
 RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 
