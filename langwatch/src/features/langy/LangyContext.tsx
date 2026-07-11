@@ -10,11 +10,15 @@ import {
   useState,
 } from "react";
 import type { ProposalHandlers } from "./components/MessageContent";
-import type { LangyContextChip } from "./stores/langyComposerStore";
+import type { LangyContextChip } from "./stores/langyStore";
 
+/**
+ * Per-page registration surface for Langy (proposal handlers + precise page
+ * context). Panel/composer/conversation UI STATE does NOT live here — that is
+ * the `useLangyStore` singleton. This context carries only the things a page
+ * registers on mount and clears on unmount, so they follow the page.
+ */
 interface LangyContextValue {
-  isOpen: boolean;
-  setIsOpen: (open: boolean) => void;
   // A ref, not state: pages re-derive their handlers object on most
   // renders (see useRegisterLangyHandlers), and Langy only ever needs the
   // latest value at proposal-click time, never during render. Storing it
@@ -41,7 +45,6 @@ interface LangyContextValue {
 const LangyContext = createContext<LangyContextValue | null>(null);
 
 export function LangyProvider({ children }: { children: ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
   const proposalHandlersRef = useRef<ProposalHandlers>({});
   const [experimentSlug, setExperimentSlug] = useState<string | undefined>();
   const [pageContext, setPageContext] = useState<LangyContextChip[]>([]);
@@ -69,8 +72,6 @@ export function LangyProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<LangyContextValue>(
     () => ({
-      isOpen,
-      setIsOpen,
       proposalHandlersRef,
       experimentSlug,
       registerHandlers,
@@ -80,7 +81,6 @@ export function LangyProvider({ children }: { children: ReactNode }) {
       clearPageContext,
     }),
     [
-      isOpen,
       experimentSlug,
       registerHandlers,
       clearHandlers,

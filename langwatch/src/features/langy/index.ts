@@ -26,7 +26,6 @@ export { useLangyConversationList } from "./data/useLangyConversationList";
 export { useLangyConversationListQuery } from "./data/useLangyConversationListQuery";
 export { useLangyConversationDetail } from "./data/useLangyConversationDetail";
 export { useLangyMessages } from "./data/useLangyMessages";
-export { useLangyNewCount } from "./data/useLangyNewCount";
 export { useLangyFeedback } from "./data/useLangyFeedback";
 
 export { useLangyFreshness } from "./hooks/useLangyFreshness";

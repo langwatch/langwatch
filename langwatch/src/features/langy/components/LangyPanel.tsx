@@ -10,14 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { ChevronsRight, Plus, Sparkles, X } from "lucide-react";
-import {
-  type RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isLangyManagedVk } from "~/components/gateway/langyVk";
 import { allModelOptions } from "~/components/ModelSelector";
 import { Kbd } from "~/components/ops/shared/Kbd";
@@ -41,6 +34,7 @@ import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import { LANGY_THINKING_VERBS } from "./langyThinkingVerbs";
 import { LangyDevModeToggle } from "./LangyDevModeToggle";
+import { LangyFoundryMenu } from "./LangyFoundryMenu";
 import { LangyGitHubMenu } from "./github/LangyGitHubMenu";
 import {
   type LangyProposal,
@@ -49,15 +43,14 @@ import {
 } from "./MessageContent";
 import { RecentChatsMenu } from "./RecentChatsMenu";
 import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
-import {
-  type LangyConversationSummary,
-  type LangyMessageRecord,
-  useLangyConversations,
-} from "../data/useLangyConversations";
+import { useLangyConversationList } from "../data/useLangyConversationList";
+import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
+import { useLangyMessages } from "../data/useLangyMessages";
+import type { LangyMessageDto } from "../data/langy.dtos";
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
 import { useLangyFastStream } from "../hooks/useLangyFastStream";
 import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
-import { useLangyComposerStore } from "../stores/langyComposerStore";
+import { useLangyStore } from "../stores/langyStore";
 import { useLangyPageContext } from "../hooks/useLangyPageContext";
 import { LangyError } from "./LangyError";
 import { StreamingStatusLine } from "./StreamingStatusLine";
@@ -79,33 +72,23 @@ const PILL_WIDTH = 30;
 // The panel docks flush against the right edge of the viewport. Page
 // layouts coordinate via LANGY_DOCKED_OFFSET to keep content visible
 // when the panel is open.
-export const LANGY_DOCKED_OFFSET = PANEL_WIDTH;
+// Reserve room for the panel AND the collapse handle, so the handle sits in a
+// gutter between the page content and the panel — overlapping neither (it used
+// to stick through the panel's left edge over the content).
+export const LANGY_DOCKED_OFFSET = PANEL_WIDTH + PILL_WIDTH;
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
-interface LangyDrawerProps {
-  proposalHandlersRef?: RefObject<ProposalHandlers>;
+interface LangySidecarProps {
+  proposalHandlersRef?: React.RefObject<ProposalHandlers>;
   experimentSlug?: string;
-  isOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
 }
 
-export function LangyDrawer({
+export function LangySidecar({
   proposalHandlersRef,
   experimentSlug,
-  isOpen: isOpenProp,
-  onOpenChange,
-}: LangyDrawerProps) {
-  const isControlled = isOpenProp !== undefined;
-  const [internalOpen, setInternalOpen] = useState(false);
-  const isOpen = isControlled ? isOpenProp : internalOpen;
-  const setIsOpen = useCallback(
-    (next: boolean) => {
-      if (!isControlled) setInternalOpen(next);
-      onOpenChange?.(next);
-    },
-    [isControlled, onOpenChange],
-  );
-  const toggle = useCallback(() => setIsOpen(!isOpen), [isOpen, setIsOpen]);
+}: LangySidecarProps) {
+  const isOpen = useLangyStore((s) => s.isOpen);
+  const toggle = useLangyStore((s) => s.togglePanel);
   useGlobalLangyShortcut(toggle);
 
   return (
@@ -113,8 +96,6 @@ export function LangyDrawer({
       <SparkleGradientDefs />
       <LangyHandle isOpen={isOpen} onToggle={toggle} />
       <LangyPanel
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
         proposalHandlersRef={proposalHandlersRef}
         experimentSlug={experimentSlug}
       />
@@ -167,7 +148,7 @@ function LangyHandle({
             : AI_SHADOW_SOFT
       }
       _hover={isOpen ? { background: "bg.muted", color: "fg" } : undefined}
-      transform={hover ? "translate(-2px, -50%)" : "translateY(-50%)"}
+      transform={hover && !isOpen ? "translate(-2px, -50%)" : "translateY(-50%)"}
       transition={`right ${LANGY_TRANSITION}, background 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease`}
       overflow="hidden"
     >
@@ -222,14 +203,10 @@ function LangyHandle({
 }
 
 function LangyPanel({
-  isOpen,
-  onClose,
   proposalHandlersRef,
   experimentSlug,
 }: {
-  isOpen: boolean;
-  onClose: () => void;
-  proposalHandlersRef?: RefObject<ProposalHandlers>;
+  proposalHandlersRef?: React.RefObject<ProposalHandlers>;
   experimentSlug?: string;
 }) {
   const { organization, project } = useOrganizationTeamProject();
@@ -237,51 +214,66 @@ function LangyPanel({
   const organizationId = organization?.id;
   const utils = api.useUtils();
 
-  const [input, setInput] = useState("");
-  // Per-session model override for the next send. Empty string = "use whatever
-  // the project DEFAULT resolves to" — i.e. don't pass modelOverride. The
-  // composer's picker writes here, and `send()` reads + forwards it as the
-  // body's `modelOverride` field for the chat route to honor.
-  const [modelOverride, setModelOverride] = useState<string>("");
-  const [appliedOutcomes, setAppliedOutcomes] = useState<
-    Record<string, { href?: string; label?: string; onOpen?: () => void }>
-  >({});
-  const [discardedProposals, setDiscardedProposals] = useState<Set<string>>(
-    new Set(),
+  // ── Client/UI state (single store) ────────────────────────────────────────
+  const isOpen = useLangyStore((s) => s.isOpen);
+  const closePanel = useLangyStore((s) => s.closePanel);
+  const draft = useLangyStore((s) => s.draft);
+  const setDraft = useLangyStore((s) => s.setDraft);
+  const modelOverride = useLangyStore((s) => s.modelOverride);
+  const setModelOverride = useLangyStore((s) => s.setModelOverride);
+  const activeConversationId = useLangyStore((s) => s.activeConversationId);
+  const historyLoadConversationId = useLangyStore(
+    (s) => s.historyLoadConversationId,
   );
-  const [applyingProposals, setApplyingProposals] = useState<Set<string>>(
-    new Set(),
-  );
+  const selectConversation = useLangyStore((s) => s.selectConversation);
+  const startNewConversation = useLangyStore((s) => s.startNewConversation);
+  const consumeHistoryLoad = useLangyStore((s) => s.consumeHistoryLoad);
+  const activeTurnId = useLangyStore((s) => s.activeTurnId);
+  const optimisticStreamText = useLangyStore((s) => s.optimisticText);
+  const appliedOutcomes = useLangyStore((s) => s.appliedOutcomes);
+  const discardedProposalIds = useLangyStore((s) => s.discardedProposalIds);
+  const applyingProposalIds = useLangyStore((s) => s.applyingProposalIds);
+  const markProposalApplying = useLangyStore((s) => s.markProposalApplying);
+  const markProposalApplied = useLangyStore((s) => s.markProposalApplied);
+  const clearProposalApplying = useLangyStore((s) => s.clearProposalApplying);
+  const discardProposalInStore = useLangyStore((s) => s.discardProposal);
+  const dismissChip = useLangyStore((s) => s.dismissChip);
+  const restoreChip = useLangyStore((s) => s.restoreChip);
+
+  // Conversation-scoped client state belongs to the active project only; the
+  // store is a module singleton that survives the per-project panel remount, so
+  // wipe it on mount (a panel mount happens on first project entry / a project
+  // switch — never on same-project navigation, which keeps the layout mounted).
+  useEffect(() => {
+    useLangyStore.getState().resetForProject();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Stream B (ADR-048): the chat route returns the turn id in `x-langy-turn-id`.
-  // We capture it to open the raw-token fast-path SSE. `setActiveTurnId` is a
-  // stable useState setter, so the transport (memoised once) can close over it.
-  const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
-
-  // Filled in below once useLangyConversations runs; the transport's fetch
-  // closes over the ref so the transport itself never needs recreating.
-  const adoptConversationRef = useRef<(id: string) => void>(() => undefined);
-
+  // The chat transport (memoised once) writes conversation-adoption + the
+  // Stream-B turn id straight into the store via getState(), so it never needs
+  // recreating and no ref plumbing is required.
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/langy/chat",
-        // The chat route returns the conversation it created (or reused) in
-        // this header. Adopt it so the NEXT send carries `conversationId` —
-        // without this every message forks a fresh conversation (and a fresh
-        // OpenCode worker, which is keyed by conversation id).
         fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
           const response = await fetch(input, init);
+          // Adopt the conversation the server created / reused so the NEXT send
+          // stays in it instead of forking a fresh one (and a fresh worker,
+          // keyed by conversation id).
           const conversationId = response.headers.get(
             "x-langy-conversation-id",
           );
-          if (conversationId) adoptConversationRef.current(conversationId);
-          // Capture the turn id for the Stream B fast-path (ADR-048). Available
-          // as soon as the response headers arrive — before body streaming —
-          // so we subscribe during spawn latency and miss no visible tokens.
+          if (conversationId) {
+            useLangyStore.getState().adoptConversation(conversationId);
+          }
+          // Capture the turn id for the Stream B fast-path (ADR-048), available
+          // as soon as the headers arrive — before body streaming — so we
+          // subscribe during spawn latency and miss no visible tokens.
           const turnId = response.headers.get("x-langy-turn-id");
-          if (turnId) setActiveTurnId(turnId);
+          if (turnId) useLangyStore.getState().setActiveTurnId(turnId);
           return response;
         }) as typeof fetch,
       }),
@@ -298,19 +290,15 @@ function LangyPanel({
 
   // No model resolves for Langy's gate key => the chat route will 409 ("no
   // model configured"). Surface an inline setup instead of letting the user
-  // type into a dead composer. The onboarding model-provider screen writes
-  // BOTH the key and the project default for LANGY_GATE_FEATURE_KEY — exactly
-  // what the gate resolves against — so saving unblocks Langy with no reload.
+  // type into a dead composer.
   const langyNeedsModel =
     !!projectId &&
     !resolvedDefaultQuery.isLoading &&
     !resolvedDefaultQuery.data?.model;
 
-  // The project's Langy VK carries an optional `modelsAllowed` allowlist
-  // (configured in the VK editor). When set, the composer's picker is
-  // narrowed to exactly those models; when null/empty it falls back to all
-  // of the project's provider models. VKs are org-scoped, so we list the
-  // org's keys and pick the auto-managed Langy VK scoped to THIS project.
+  // The project's Langy VK carries an optional `modelsAllowed` allowlist. When
+  // set, the composer's picker is narrowed to exactly those models; when
+  // null/empty it falls back to all of the project's provider models.
   const virtualKeysQuery = api.virtualKeys.list.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId },
@@ -328,15 +316,6 @@ function LangyPanel({
     return allowed && allowed.length > 0 ? allowed : null;
   }, [virtualKeysQuery.data, projectId]);
 
-  // Options the picker offers. Two-stage filter:
-  //   1. langyModelsAllowed (VK allowlist) narrows the universe to admin-
-  //      approved models when set; null = "no explicit allowlist".
-  //   2. ModelSelector internally further narrows by the project's actually-
-  //      enabled providers (getCustomModels → enabled+mode filter), so even
-  //      when the VK is unconstrained the dropdown shows ONLY models the
-  //      project can run today.
-  // The /langy/chat route mirrors the VK-allowlist check server-side so
-  // tampered clients can't pick something that's been disallowed.
   const modelOptions = useMemo(
     () => langyModelsAllowed ?? allModelOptions,
     [langyModelsAllowed],
@@ -356,24 +335,28 @@ function LangyPanel({
     } else if (langyModelsAllowed) {
       setModelOverride(langyModelsAllowed[0]!);
     }
-  }, [resolvedDefaultQuery.data?.model, modelOverride, langyModelsAllowed]);
+  }, [
+    resolvedDefaultQuery.data?.model,
+    modelOverride,
+    langyModelsAllowed,
+    setModelOverride,
+  ]);
 
-  // Race fix: if the allowlist lands AFTER we seeded an out-of-list model,
-  // snap to the first allowed model. Safe because under an allowlist the
-  // picker only offers allowed models, so an out-of-list value can only be a
-  // stale seed, never a user choice.
+  // Race fix: if the allowlist lands AFTER we seeded an out-of-list model, snap
+  // to the first allowed model.
   useEffect(() => {
     if (!langyModelsAllowed) return;
     if (modelOverride && !langyModelsAllowed.includes(modelOverride)) {
       setModelOverride(langyModelsAllowed[0]!);
     }
-  }, [langyModelsAllowed, modelOverride]);
+  }, [langyModelsAllowed, modelOverride, setModelOverride]);
+
   const { messages, sendMessage, stop, status, setMessages, error } = useChat({
     transport,
     onError: (error) => {
       if (isHandledByGlobalHandler(error)) return;
-      // A structured domain error renders as an inline <LangyError> card
-      // (see turnError below); don't also toast it — one calm surface only.
+      // A structured domain error renders as an inline <LangyError> card (see
+      // turnError below); don't also toast it — one calm surface only.
       if (readLangyStreamError(error.message)) return;
       toaster.create({
         title: "Langy error",
@@ -385,65 +368,87 @@ function LangyPanel({
     },
   });
 
-  const surfaceConversationError = useCallback((message: string) => {
-    toaster.create({
-      title: "Langy",
-      description: message,
-      type: "error",
-      duration: 5000,
-      meta: { closable: true },
-    });
-  }, []);
+  // ── Server state (React Query, via the langy tRPC router) ─────────────────
+  const {
+    items: conversations,
+    isLoading: isLoadingConversations,
+    isError: hasListError,
+  } = useLangyConversationList();
+  const { remove: removeConversation } = useLangyConversationCommands();
+  const { messages: historyMessages, isFetching: isFetchingHistory } =
+    useLangyMessages(activeConversationId);
 
-  const applyMessagesFromHistory = useCallback(
-    (history: LangyMessageRecord[]) => {
-      const uiMessages = history.map((m) => ({
-        id: m.id,
-        role: m.role,
-        parts: [{ type: "text" as const, text: m.content }],
-      }));
+  // Push a settled server history into the chat engine. Gated on a USER
+  // selection (`historyLoadConversationId`) so a background refetch — or the
+  // server's projection of a conversation we just created — never clobbers the
+  // live in-flight stream. `keepPreviousData` means the query can briefly hold
+  // the prior conversation's rows, so we wait for the fetch to settle.
+  // useChat's setMessages identity is not guaranteed stable across renders.
+  // Capture it in a ref so the hydrate/clear effects key on real state changes
+  // (a conversation-id transition) without re-firing every render — which would
+  // loop against setMessages and wipe the in-flight turn.
+  const setMessagesRef = useRef(setMessages);
+  setMessagesRef.current = setMessages;
+
+  const applyHistoryToEngine = useCallback(
+    (history: LangyMessageDto[]) => {
+      const uiMessages = history
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ id: m.id, role: m.role, parts: m.parts }));
       // Cast to setMessages's own parameter type rather than `ai`'s UIMessage:
       // useChat is typed via @ai-sdk/react's nested `ai`, a different version
-      // than the app's direct `ai`, so an `ai` UIMessage[] isn't assignable here.
-      setMessages(uiMessages as unknown as Parameters<typeof setMessages>[0]);
+      // than the app's direct `ai`, so an `ai` UIMessage[] isn't assignable.
+      setMessagesRef.current(
+        uiMessages as unknown as Parameters<typeof setMessages>[0],
+      );
     },
-    [setMessages],
+    [],
   );
 
-  // Wipe everything tied to the previous conversation when the active one
-  // goes away (delete-active or "New chat"). Without this, proposal caches
-  // keyed by message id from the deleted chat survive into the fresh one,
-  // and an in-flight stream keeps writing into the empty messages array.
-  const resetActivePanelState = useCallback(() => {
-    setAppliedOutcomes({});
-    setDiscardedProposals(new Set());
-    setApplyingProposals(new Set());
-    // Drop the fast-path subscription for the abandoned turn (ADR-048).
-    setActiveTurnId(null);
-    void stop();
-  }, [stop]);
+  useEffect(() => {
+    if (!historyLoadConversationId) return;
+    if (historyLoadConversationId !== activeConversationId) return;
+    if (isFetchingHistory) return;
+    applyHistoryToEngine(historyMessages);
+    consumeHistoryLoad();
+  }, [
+    historyLoadConversationId,
+    activeConversationId,
+    isFetchingHistory,
+    historyMessages,
+    applyHistoryToEngine,
+    consumeHistoryLoad,
+  ]);
 
-  const {
-    conversations,
-    currentConversationId,
-    isLoading: isLoadingConversations,
-    hasListError,
-    select: selectConversation,
-    startNew: startNewConversation,
-    remove: removeConversation,
-    adopt: adoptConversation,
-  } = useLangyConversations({
-    projectId,
-    setMessages: applyMessagesFromHistory,
-    onError: surfaceConversationError,
-    onActiveCleared: resetActivePanelState,
-  });
-  adoptConversationRef.current = adoptConversation;
+  // When the active conversation clears (New chat / delete-active / fresh
+  // project), empty the engine. Fires only on the transition to null, so a
+  // first send (still null until the server adopts an id) is never wiped.
+  useEffect(() => {
+    if (activeConversationId === null) {
+      applyHistoryToEngine([]);
+    }
+  }, [activeConversationId, applyHistoryToEngine]);
+
+  // Surface a one-time toast if the recents list fails to load.
+  const listErrorToastedRef = useRef(false);
+  useEffect(() => {
+    if (hasListError && !listErrorToastedRef.current) {
+      listErrorToastedRef.current = true;
+      toaster.create({
+        title: "Langy",
+        description: "Failed to load Langy conversations.",
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
+    }
+    if (!hasListError) listErrorToastedRef.current = false;
+  }, [hasListError]);
 
   // Real-time coordinator: one SSE subscription for the whole panel. Applies
   // the pushed operational spine in place (or invalidates) so the recents list
   // and the open conversation's status stay fresh without heavy polling.
-  useLangyFreshness(currentConversationId);
+  useLangyFreshness(activeConversationId);
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -453,29 +458,22 @@ function LangyPanel({
   const isBusy = status === "submitted" || status === "streaming";
   const isEmpty = messages.length === 0;
 
-  // Stream B optimistic tokens for the in-flight turn (ADR-048). Enabled only
-  // while a turn is streaming; the hook resets per (conversation, turn). The
-  // text is reconciled against the durable useChat text inside MessageContent,
-  // so a dropped/late token never renders corrupted prose.
-  const { text: optimisticStreamText } = useLangyFastStream({
+  // Stream B optimistic tokens for the in-flight turn (ADR-048). The hook
+  // writes them into the store; enabled only while a turn is streaming.
+  useLangyFastStream({
     projectId,
-    conversationId: currentConversationId,
+    conversationId: activeConversationId,
     turnId: activeTurnId,
     enabled: isBusy,
   });
+
   // Page context (task #14): the experiment / trace / dataset / project the
   // user is viewing, surfaced as removable composer chips and forwarded with
-  // the turn. `dismissChip` hides one; `restoreChip` (the "+ context" control)
-  // adds it back.
-  const dismissChip = useLangyComposerStore((s) => s.dismissChip);
-  const restoreChip = useLangyComposerStore((s) => s.restoreChip);
+  // the turn.
   const { chips: contextChips, addableChips } = useLangyPageContext();
 
   const send = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
-    // modelOverride is empty until the resolved-default query lands OR until
-    // the user picks; in either case the chat route falls back to the project
-    // DEFAULT-role resolution when this field is absent.
     try {
       await sendMessage(
         { role: "user", parts: [{ type: "text", text }] },
@@ -484,14 +482,12 @@ function LangyPanel({
             projectId,
             // Stay in the active conversation; null/absent means "start a new
             // one" and the transport adopts the id the server returns.
-            ...(currentConversationId
-              ? { conversationId: currentConversationId }
+            ...(activeConversationId
+              ? { conversationId: activeConversationId }
               : {}),
             ...(modelOverride ? { modelOverride } : {}),
             // What the user is looking at, so the agent can resolve "this
-            // experiment / trace" without an explicit id. The chat route
-            // ignores unknown body fields today; this is the transport seam
-            // that lights up when the route reads it (cf. useLangyTurnSignals).
+            // experiment / trace" without an explicit id.
             ...(contextChips.length > 0
               ? {
                   pageContext: contextChips.map((chip) => ({
@@ -504,28 +500,47 @@ function LangyPanel({
           },
         },
       );
-      // Clear AFTER success so a failed send (network drop, 5xx) leaves
-      // the user's typed text in the composer where they can retry it.
-      // Clearing eagerly was losing input on every transient failure.
-      setInput("");
+      // Clear AFTER success so a failed send leaves the typed text in place.
+      setDraft("");
     } catch {
-      // sendMessage surfaces the error via the useChat() error channel; we
-      // keep the input populated so the user can retry without retyping.
+      // sendMessage surfaces the error via the useChat() error channel; keep
+      // the draft populated so the user can retry without retyping.
     }
   };
 
   const handleNewChat = () => {
+    void stop();
     startNewConversation();
   };
 
   const handleSelectConversation = (id: string) => {
-    void selectConversation(id);
+    void stop();
+    selectConversation(id);
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    const wasActive = id === activeConversationId;
+    try {
+      await removeConversation(id);
+      if (wasActive) {
+        void stop();
+        startNewConversation();
+      }
+    } catch {
+      toaster.create({
+        title: "Langy",
+        description: "Failed to delete conversation.",
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
+    }
   };
 
   const applyProposal = async (proposalId: string, proposal: LangyProposal) => {
-    if (applyingProposals.has(proposalId)) return;
+    if (applyingProposalIds.has(proposalId)) return;
     if (proposalId in appliedOutcomes) return;
-    if (discardedProposals.has(proposalId)) return;
+    if (discardedProposalIds.has(proposalId)) return;
     const handler = proposalHandlersRef?.current?.[proposal.kind];
     if (!handler) {
       toaster.create({
@@ -537,13 +552,10 @@ function LangyPanel({
       });
       return;
     }
-    setApplyingProposals((prev) => new Set(prev).add(proposalId));
+    markProposalApplying(proposalId);
     try {
       const outcome = await handler(proposal.payload);
-      setAppliedOutcomes((prev) => ({
-        ...prev,
-        [proposalId]: outcome ?? {},
-      }));
+      markProposalApplied(proposalId, outcome ?? {});
       toaster.create({
         title: "Applied",
         description: proposal.summary,
@@ -562,16 +574,8 @@ function LangyPanel({
         });
       }
     } finally {
-      setApplyingProposals((prev) => {
-        const next = new Set(prev);
-        next.delete(proposalId);
-        return next;
-      });
+      clearProposalApplying(proposalId);
     }
-  };
-
-  const discardProposal = (proposalId: string) => {
-    setDiscardedProposals((prev) => new Set(prev).add(proposalId));
   };
 
   // Default (non-directive) feedback is throttled so we don't nag; a
@@ -579,20 +583,13 @@ function LangyPanel({
   const canAskFeedback = useMemo(() => shouldAskFeedback(), [messages.length]);
 
   // Granular streaming state (PR3 transport seam) + domain-error rendering.
-  const turnSignals = useLangyTurnSignals(currentConversationId);
-  // Once the turn reports live status / progress / metrics we show the detailed
-  // streaming block (brand-dot status, statcard, mesh progress) and retire the
-  // generic shimmer thinking indicator — they're the two halves of one moment,
-  // never both at once. Until the PR3 transport lands, no signal arrives and the
-  // shimmer covers the whole "working" gap.
+  const turnSignals = useLangyTurnSignals(activeConversationId);
   const hasTurnDetail =
     !!turnSignals.status ||
     turnSignals.progress !== null ||
     (turnSignals.metrics?.length ?? 0) > 0;
   const turnError = useMemo(() => {
     if (!error) return null;
-    // The stream now carries a serialized domain error; fall back to a calm
-    // generic "unknown" for a plain-string legacy error.
     const domain = readLangyStreamError(error.message) ?? {
       kind: "unknown",
       meta: {},
@@ -604,15 +601,13 @@ function LangyPanel({
   const onErrorAction = useCallback(
     (kind: "connect-github" | "configure-model" | "retry") => {
       if (kind !== "retry") return;
-      const lastUser = [...messages]
-        .reverse()
-        .find((m) => m.role === "user");
+      const lastUser = [...messages].reverse().find((m) => m.role === "user");
       const textPart = lastUser?.parts.find(
         (p): p is { type: "text"; text: string } => p.type === "text",
       );
       if (textPart?.text) void send(textPart.text);
     },
-    // `send` is defined below in render scope; it closes over stable refs.
+    // `send` is defined in render scope; it closes over stable refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [messages],
   );
@@ -635,8 +630,6 @@ function LangyPanel({
       borderLeftWidth="1px"
       borderLeftStyle="solid"
       borderLeftColor="border.muted"
-      // No corner radius and no drop shadow — the panel reads as part of
-      // the page chrome (a docked drawer), not a floating popover.
       overflow="hidden"
       transition={`transform ${LANGY_TRANSITION}, opacity 220ms ease`}
       transform={isOpen ? "translateX(0)" : `translateX(${PANEL_WIDTH}px)`}
@@ -650,13 +643,13 @@ function LangyPanel({
         <PanelHeader
           subtitle={subtitle}
           onNewChat={handleNewChat}
-          onClose={onClose}
+          onClose={closePanel}
           organizationId={organizationId}
           conversations={conversations}
           isLoadingConversations={isLoadingConversations}
           hasListError={hasListError}
           onSelectConversation={handleSelectConversation}
-          onDeleteConversation={(id) => void removeConversation(id)}
+          onDeleteConversation={(id) => void handleDeleteConversation(id)}
         />
         <Box ref={scrollRef} flex={1} overflowY="auto" aria-live="polite">
           {langyNeedsModel ? (
@@ -689,20 +682,16 @@ function LangyPanel({
                   message={message}
                   organizationId={organizationId}
                   appliedOutcomes={appliedOutcomes}
-                  discardedProposals={discardedProposals}
-                  applyingProposals={applyingProposals}
+                  discardedProposals={discardedProposalIds}
+                  applyingProposals={applyingProposalIds}
                   onApply={applyProposal}
-                  onDiscard={discardProposal}
-                  conversationId={currentConversationId}
-                  // The in-flight assistant turn streams tokens with the
-                  // blur-reveal; feedback only shows under a settled reply.
+                  onDiscard={discardProposalInStore}
+                  conversationId={activeConversationId}
                   isStreaming={
                     isBusy &&
                     index === messages.length - 1 &&
                     message.role === "assistant"
                   }
-                  // Stream B optimistic lead — only for the in-flight assistant
-                  // turn; reconciled against the durable text (ADR-048).
                   optimisticText={
                     isBusy &&
                     index === messages.length - 1 &&
@@ -725,9 +714,6 @@ function LangyPanel({
               ))}
               {isBusy ? (
                 hasTurnDetail ? (
-                  // Detailed streaming block: brand-dot status, rolling-number
-                  // statcard, and the mesh progress bar — driven by the live
-                  // turn signals (PR3 transport).
                   <StreamingStatusLine
                     status={turnSignals.status}
                     progress={turnSignals.progress}
@@ -735,8 +721,6 @@ function LangyPanel({
                     segment={turnSignals.segment}
                   />
                 ) : (
-                  // No live detail yet — the shimmer thinking indicator covers
-                  // the gap between send and the first token / signal.
                   <ThinkingIndicator messages={messages} />
                 )
               ) : null}
@@ -747,16 +731,16 @@ function LangyPanel({
           )}
         </Box>
         <Composer
-          input={input}
-          onInputChange={setInput}
+          input={draft}
+          onInputChange={setDraft}
           model={modelOverride}
           modelOptions={modelOptions}
           onModelChange={setModelOverride}
-          onSend={() => void send(input)}
+          onSend={() => void send(draft)}
           onStop={() => void stop()}
           isBusy={isBusy}
           disabled={!projectId}
-          canSend={!!input.trim() && !isBusy && !!projectId}
+          canSend={!!draft.trim() && !isBusy && !!projectId}
           contextChips={contextChips}
           onRemoveChip={dismissChip}
           addableChips={addableChips}
@@ -782,7 +766,7 @@ function PanelHeader({
   onNewChat: () => void;
   onClose: () => void;
   organizationId?: string;
-  conversations: LangyConversationSummary[];
+  conversations: React.ComponentProps<typeof RecentChatsMenu>["conversations"];
   isLoadingConversations: boolean;
   hasListError: boolean;
   onSelectConversation: (id: string) => void;
@@ -823,6 +807,7 @@ function PanelHeader({
         {organizationId ? (
           <LangyGitHubMenu organizationId={organizationId} />
         ) : null}
+        <LangyFoundryMenu />
         <LangyDevModeToggle />
         <IconButton
           size="xs"
@@ -856,10 +841,8 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
       ? last.parts.findLast((part) => part.type?.startsWith("tool-"))
       : undefined;
   // Map raw tool ids to human-readable verbs so the indicator doesn't read
-  // like dev console output ("Langy is search traces…" → "Langy is reading
-  // your traces…"). Unknown tools fall through to a stripped/spaced shape
-  // so we always say SOMETHING rather than blanking out, but ids that ship
-  // unbranded are an indication a new tool needs a copy entry here.
+  // like dev console output. Unknown tools fall through to a stripped/spaced
+  // shape so we always say SOMETHING rather than blanking out.
   const TOOL_VERBS: Record<string, string> = {
     search_traces: "reading your traces",
     get_trace: "loading a trace",
@@ -876,14 +859,13 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
     ? (TOOL_VERBS[rawId] ?? `using ${rawId.replace(/_/g, " ")}`)
     : null;
 
-  // While a tool is active, surface what it is — that's higher-signal
-  // than a generic verb. Otherwise cycle through the AI thinking verbs
-  // so the panel doesn't feel frozen during long generations.
+  // While a tool is active, surface what it is — that's higher-signal than a
+  // generic verb. Otherwise cycle through the AI thinking verbs so the panel
+  // doesn't feel frozen during long generations.
   const cyclingVerb = useCyclingVerb(!toolLabel, LANGY_THINKING_VERBS);
   const text = toolLabel ? `Langy is ${toolLabel}…` : `${cyclingVerb}…`;
 
-  // Reduced-motion: drop the keyframes animation but keep the static
-  // gradient so the text still reads as "AI activity" without sweep.
+  // Reduced-motion: drop the keyframes animation but keep the static gradient.
   const shimmerCss = reduceMotion
     ? { ...thinkingShimmerStyles, animation: "none" }
     : thinkingShimmerStyles;
