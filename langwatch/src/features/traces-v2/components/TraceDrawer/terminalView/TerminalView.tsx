@@ -16,6 +16,7 @@ import {
 import { TERMINAL_TOKENS } from "./palette";
 import { TerminalDiff } from "./TerminalDiff";
 import { TerminalOutput } from "./TerminalOutput";
+import { TerminalPatch } from "./TerminalPatch";
 import {
   buildTimeline,
   extractDiffFromToolInput,
@@ -23,6 +24,11 @@ import {
   type TerminalStep,
   toolPrimaryArg,
 } from "./terminalSession";
+import { parsePatchHunks, type TerminalToolSpan } from "./toolSpans";
+
+/** What actually ran, keyed by the `tool_use_id` the model called it with. */
+export type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;
+const NO_TOOL_SPANS: ToolSpanIndex = new Map();
 
 /**
  * The glyphs Claude Code actually draws with. Kept together because they ARE
@@ -52,6 +58,13 @@ const CELL = {
 interface TerminalViewProps {
   /** Session beats, in order. Build from the trace's spans at the wiring site. */
   steps: TerminalStep[];
+  /**
+   * What each tool call actually did, from Claude's real tool spans. The
+   * transcript only carries what the model was TOLD a tool returned; these
+   * carry what ran — real stdout, a real patch, how long it took, whether it
+   * failed. Optional: without it the view falls back to the transcript.
+   */
+  toolSpans?: ToolSpanIndex;
   meta?: {
     model?: string;
     cwd?: string;
@@ -72,6 +85,7 @@ interface TerminalViewProps {
  */
 export const TerminalView = memo(function TerminalView({
   steps,
+  toolSpans = NO_TOOL_SPANS,
   meta,
 }: TerminalViewProps) {
   const timeline = useMemo(() => buildTimeline(steps), [steps]);
@@ -123,7 +137,7 @@ export const TerminalView = memo(function TerminalView({
       >
         <VStack align="stretch" gap={2.5}>
           {revealed.map((step, index) => (
-            <StepView key={index} step={step} />
+            <StepView key={index} step={step} toolSpans={toolSpans} />
           ))}
         </VStack>
       </Box>
@@ -142,11 +156,17 @@ export const TerminalView = memo(function TerminalView({
   );
 });
 
-function StepView({ step }: { step: TerminalStep }) {
+function StepView({
+  step,
+  toolSpans,
+}: {
+  step: TerminalStep;
+  toolSpans: ToolSpanIndex;
+}) {
   const { turn } = step;
   if (turn.kind === "user") return <PromptLine turn={turn} />;
   if (turn.kind === "system") return <SystemNote turn={turn} />;
-  return <AssistantBlocks turn={turn} />;
+  return <AssistantBlocks turn={turn} toolSpans={toolSpans} />;
 }
 
 /** The user's prompt: `❯ what they typed`. */
@@ -194,8 +214,10 @@ function SystemNote({
 /** One assistant beat: prose, thinking, and its tool calls with output. */
 function AssistantBlocks({
   turn,
+  toolSpans,
 }: {
   turn: Extract<ConversationTurn, { kind: "assistant" }>;
+  toolSpans: ToolSpanIndex;
 }) {
   const items = useMemo(() => pairToolBlocks(turn.blocks), [turn.blocks]);
   return (
@@ -208,6 +230,11 @@ function AssistantBlocks({
               name={item.use.name}
               input={item.use.input}
               result={item.result}
+              ran={
+                item.use.id !== undefined
+                  ? toolSpans.get(item.use.id) ?? null
+                  : null
+              }
             />
           );
         }
@@ -285,17 +312,36 @@ function ToolCall({
   name,
   input,
   result,
+  ran,
 }: {
   name: string;
   input: unknown;
   result: Extract<ContentBlock, { kind: "tool_result" }> | null;
+  /** The tool's real span, when we have it. */
+  ran: TerminalToolSpan | null;
 }) {
-  const arg = useMemo(() => toolPrimaryArg(input), [input]);
-  const isError = result?.isError === true;
-  const diff = useMemo(
-    () => (isDiffTool(name) ? extractDiffFromToolInput(input) : null),
-    [name, input],
+  // The span knows the command it really ran; the transcript only has what the
+  // model asked for. Prefer the former.
+  const arg = useMemo(
+    () => ran?.bashCommand ?? ran?.filePath ?? toolPrimaryArg(input),
+    [ran, input],
   );
+  const isError = ran?.isError ?? result?.isError === true;
+
+  // Edit emits a real structured patch on its span. Only fall back to diffing
+  // the tool's own `old_string` → `new_string` when that patch isn't there.
+  const patch = useMemo(() => parsePatchHunks(ran?.diff ?? null), [ran?.diff]);
+  const synthesizedDiff = useMemo(
+    () =>
+      patch === null && isDiffTool(name)
+        ? extractDiffFromToolInput(input)
+        : null,
+    [patch, name, input],
+  );
+
+  // Bash stdout / a file's content, as it actually came back — not the capped
+  // echo the model was handed.
+  const ranOutput = ran?.output ?? ran?.content ?? null;
 
   return (
     <VStack align="stretch" gap={0.5}>
@@ -303,7 +349,7 @@ function ToolCall({
         <Glyph char={GLYPH.bullet} color={isError ? "red.fg" : "green.fg"} />
         <Text {...CELL} color={TERMINAL_TOKENS.screenFg} flex={1} minWidth={0}>
           <Text as="span" fontWeight="bold">
-            {name}
+            {ran?.toolName ?? name}
           </Text>
           {arg ? (
             <Text as="span" color={TERMINAL_TOKENS.faint}>
@@ -311,15 +357,24 @@ function ToolCall({
             </Text>
           ) : null}
         </Text>
+        {ran !== null && ran.durationMs > 0 && (
+          <Text {...CELL} color={TERMINAL_TOKENS.faint} flexShrink={0}>
+            {formatDuration(ran.durationMs)}
+          </Text>
+        )}
       </HStack>
 
       <ResultLine>
-        {diff ? (
+        {patch ? (
+          <TerminalPatch hunks={patch} filePath={ran?.filePath} />
+        ) : synthesizedDiff ? (
           <TerminalDiff
-            oldText={diff.oldText}
-            newText={diff.newText}
-            filePath={diff.filePath}
+            oldText={synthesizedDiff.oldText}
+            newText={synthesizedDiff.newText}
+            filePath={synthesizedDiff.filePath}
           />
+        ) : ranOutput !== null ? (
+          <TerminalOutput text={ranOutput} isError={isError} maxHeight="360px" />
         ) : result ? (
           <ToolResultBody content={result.content} isError={result.isError} />
         ) : (
