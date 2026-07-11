@@ -4,6 +4,7 @@ import {
   coerceToChatMessages,
   groupMessagesIntoTurns,
 } from "../transcript";
+import { groupSpansByAgent } from "./agents";
 import type { TerminalStep } from "./terminalSession";
 
 /**
@@ -36,7 +37,13 @@ const LLM_REQUEST_SPAN = "claude_code.llm_request";
 export function buildTerminalStepsFromSpans(
   spans: SpanDetail[],
 ): TerminalStep[] {
-  const modelCalls = spans
+  // Only the MAIN thread's model calls. A turn can spawn sub-agents, each
+  // running its own conversation with its own rolling history — so "the last
+  // model call carries the whole turn" holds per AGENT, not per trace. Reading
+  // the trace's last llm_request would happily hand back a sub-agent's
+  // transcript and pass it off as the turn.
+  const { main } = groupSpansByAgent(spans);
+  const modelCalls = main.spans
     .filter((span) => span.name === LLM_REQUEST_SPAN)
     .slice()
     .sort((a, b) => a.startTimeMs - b.startTimeMs);
