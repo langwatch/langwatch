@@ -5,6 +5,10 @@ import type { TopicService } from "~/server/app-layer/topics/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { createLogger } from "~/utils/logger/server";
 import {
+  deriveTraceOrigin,
+  TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
+} from "./derive-trace-origin";
+import {
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
 } from "./derive-trace-status";
@@ -450,7 +454,7 @@ const SORT_COLUMN_MAP: Record<string, TraceListSort["column"]> = {
 };
 
 const FACET_EXPRESSIONS: Record<string, string> = {
-  origin: "Attributes['langwatch.origin']",
+  origin: TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   status: TRACE_STATUS_CLICKHOUSE_EXPRESSION,
   service: "Attributes['service.name']",
 };
@@ -461,7 +465,7 @@ const SUGGEST_COLUMN_MAP: Record<string, string> = {
   model: "arrayJoin(Models)",
   service: "Attributes['service.name']",
   user: "Attributes['langwatch.user_id']",
-  origin: "Attributes['langwatch.origin']",
+  origin: TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
 };
 
 export class TraceListService {
@@ -1265,7 +1269,7 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     error: row.errorMessage,
     conversationId: row.attributes["gen_ai.conversation.id"] ?? null,
     userId: row.attributes["langwatch.user_id"] ?? null,
-    origin: row.attributes["langwatch.origin"] ?? "application",
+    origin: deriveTraceOrigin(row.attributes),
     tokensEstimated: row.tokensEstimated,
     ttft: row.timeToFirstTokenMs,
     traceName: row.traceName,

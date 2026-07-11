@@ -28,6 +28,8 @@ const {
   mockGetTriggerByIdQuery,
   mockCloseDrawer,
   mockInvalidate,
+  mockGraphsGetAllInvalidate,
+  mockGraphsGetByIdInvalidate,
   mockUpsertMutate,
 } = vi.hoisted(() => ({
   mockGetTriggerByIdQuery: vi.fn(() => ({
@@ -37,6 +39,8 @@ const {
   })),
   mockCloseDrawer: vi.fn(),
   mockInvalidate: vi.fn(),
+  mockGraphsGetAllInvalidate: vi.fn(),
+  mockGraphsGetByIdInvalidate: vi.fn(),
   mockUpsertMutate: vi.fn(),
 }));
 
@@ -133,6 +137,10 @@ vi.mock("~/utils/api", () => ({
     },
     useContext: () => ({
       automation: { getTriggers: { invalidate: mockInvalidate } },
+      graphs: {
+        getAll: { invalidate: mockGraphsGetAllInvalidate },
+        getById: { invalidate: mockGraphsGetByIdInvalidate },
+      },
     }),
   },
 }));
@@ -173,8 +181,10 @@ function savedRow(overrides: Record<string, unknown> = {}) {
     name: "Saved automation",
     action: "SEND_EMAIL",
     alertType: null,
+    triggerKind: "AUTOMATION",
     customGraphId: null,
     filters: JSON.stringify({ "metadata.labels": ["production"] }),
+    filterQuery: null,
     notificationCadence: "immediate",
     traceDebounceMs: 5000,
     actionParams: {},
@@ -184,6 +194,27 @@ function savedRow(overrides: Record<string, unknown> = {}) {
     slackTemplateType: null,
     ...overrides,
   };
+}
+
+/** A saved scheduled REPORT (ADR-042): the row the Reports table opens this
+ *  same drawer with — schedule + content source live in `actionParams`, the
+ *  trace scope in `filterQuery`. */
+function savedReportRow(overrides: Record<string, unknown> = {}) {
+  const { actionParams, ...rest } = overrides;
+  return savedRow({
+    name: "Weekly error digest",
+    triggerKind: "REPORT",
+    filters: JSON.stringify({}),
+    filterQuery: "status:error",
+    actionParams: {
+      members: ["ops@acme.com"],
+      source: { kind: "traceQuery", filters: {}, topN: 10 },
+      schedule: { cron: "0 9 * * 1", timezone: "Europe/Amsterdam" },
+      compareToPrevious: false,
+      ...(actionParams as Record<string, unknown> | undefined),
+    },
+    ...rest,
+  });
 }
 
 describe("AutomationDrawer", () => {
@@ -428,6 +459,160 @@ describe("AutomationDrawer", () => {
           expect(draft.customGraphId).toBe("graph-1");
           expect(draft.graphAlert.seriesName).toBe("0/latency/p95");
         });
+      });
+    });
+  });
+
+  describe("given a saved report row in edit mode", () => {
+    describe("when the saved row first resolves", () => {
+      it("hydrates the report source, schedule, and trace query from the row", async () => {
+        mockTriggerRow = savedReportRow();
+        renderDrawer({ automationId: "trigger-1" });
+
+        await waitFor(() => {
+          const draft = useAutomationStore.getState().draft;
+          expect(draft.source).toBe("report");
+          expect(draft.report).toEqual({
+            sourceKind: "traceQuery",
+            customGraphId: null,
+            dashboardId: null,
+            topN: 10,
+            cron: "0 9 * * 1",
+            timezone: "Europe/Amsterdam",
+          });
+        });
+        // The trace scope of a "top matching traces" report lives on the row's
+        // filterQuery — losing it would silently send the newest traces.
+        expect(useAutomationStore.getState().draft.filterQuery).toBe(
+          "status:error",
+        );
+        expect(screen.getByText("Edit report")).toBeInTheDocument();
+      });
+
+      it("hydrates a graph-source report without stranding a graph alert", async () => {
+        mockTriggerRow = savedReportRow({
+          actionParams: {
+            source: { kind: "customGraph", customGraphId: "graph-9" },
+          },
+          filterQuery: null,
+        });
+        renderDrawer({ automationId: "trigger-1" });
+
+        await waitFor(() => {
+          const draft = useAutomationStore.getState().draft;
+          expect(draft.source).toBe("report");
+          expect(draft.report.sourceKind).toBe("customGraph");
+          expect(draft.report.customGraphId).toBe("graph-9");
+        });
+        // The report's graph is its CONTENT, not a watched metric — the draft
+        // must not read as a graph alert.
+        expect(useAutomationStore.getState().draft.customGraphId).toBeNull();
+      });
+    });
+
+    describe("when the author saves it unchanged", () => {
+      it("sends the report source, schedule, and the authored trace query", async () => {
+        const user = userEvent.setup();
+        mockTriggerRow = savedReportRow();
+        renderDrawer({ automationId: "trigger-1" });
+
+        const saveButton = await screen.findByRole("button", {
+          name: "Save report",
+        });
+        await waitFor(() => expect(saveButton).toBeEnabled());
+        await user.click(saveButton);
+
+        expect(mockUpsertMutate).toHaveBeenCalledTimes(1);
+        expect(mockUpsertMutate.mock.calls[0]?.[0]).toMatchObject({
+          triggerId: "trigger-1",
+          projectId: "project-1",
+          name: "Weekly error digest",
+          action: "SEND_EMAIL",
+          customGraphId: null,
+          graphAlert: undefined,
+          filterQuery: "status:error",
+          report: {
+            source: { kind: "traceQuery", filters: {}, topN: 10 },
+            schedule: { cron: "0 9 * * 1", timezone: "Europe/Amsterdam" },
+            compareToPrevious: false,
+          },
+          actionParams: { members: ["ops@acme.com"] },
+        });
+      });
+
+      it("refreshes the automations list and the dashboard graph cards", async () => {
+        const user = userEvent.setup();
+        mockUpsertMutate.mockImplementation(
+          (_input: unknown, opts?: { onSuccess?: () => void }) =>
+            opts?.onSuccess?.(),
+        );
+        mockTriggerRow = savedReportRow();
+        renderDrawer({ automationId: "trigger-1" });
+
+        const saveButton = await screen.findByRole("button", {
+          name: "Save report",
+        });
+        await waitFor(() => expect(saveButton).toBeEnabled());
+        await user.click(saveButton);
+
+        expect(mockInvalidate).toHaveBeenCalled();
+        // A chart card reads its alert state off the graph, not off the
+        // trigger list — without these it still offers "Add alert".
+        expect(mockGraphsGetAllInvalidate).toHaveBeenCalled();
+        expect(mockGraphsGetByIdInvalidate).toHaveBeenCalled();
+        mockUpsertMutate.mockReset();
+      });
+    });
+
+    describe("when the saved schedule fires more often than the floor", () => {
+      it("blocks the save instead of scheduling 1440 sends a day", async () => {
+        mockTriggerRow = savedReportRow({
+          actionParams: {
+            schedule: { cron: "* * * * *", timezone: "Europe/Amsterdam" },
+          },
+        });
+        renderDrawer({ automationId: "trigger-1" });
+
+        // The author's cron rehydrates verbatim — a schedule too tight to run
+        // is blocked, never silently swapped for a default.
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.report.cron).toBe(
+            "* * * * *",
+          );
+        });
+        expect(
+          await screen.findByRole("button", { name: "Save report" }),
+        ).toBeDisabled();
+        // And says why, in the cadence field itself.
+        expect(
+          screen.getByText(/can send at most every 15 minutes/i),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a trace query is authored before the type is picked", () => {
+    describe("when the type switches to report", () => {
+      it("keeps the query as the report's trace scope", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        const input = await screen.findByPlaceholderText(/status:error/i);
+        fireEvent.change(input, { target: { value: "status:error" } });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.filterQuery).toBe(
+            "status:error",
+          );
+        });
+
+        await user.click(screen.getByRole("button", { name: /^Report/ }));
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.source).toBe("report");
+        });
+        expect(useAutomationStore.getState().draft.filterQuery).toBe(
+          "status:error",
+        );
       });
     });
   });

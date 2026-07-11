@@ -8,6 +8,31 @@ const logger = createLogger("langwatch:outbox:pg-audit-adapter");
 const SETTLE_NO_MATCH_REASON = "settle: no match";
 
 /**
+ * Every key the audit row is allowed to carry, drawn from the `OutboxJob`
+ * union: identity and routing (`stage`, `projectId`, `triggerId`,
+ * `reactorName`, `auditDedupKey`, `actionClass`, `traceId`), why the job woke
+ * up (`reason`, on graphEval), and how it ended (`dropReason`,
+ * `renderDiagnostics`).
+ *
+ * `renderDiagnostics` is deliberately included: it names the template variables
+ * that failed to resolve, never their values.
+ *
+ * `match` is not here — it is a nested object and is rebuilt key-by-key below.
+ */
+const AUDIT_PAYLOAD_KEYS = [
+  "stage",
+  "projectId",
+  "triggerId",
+  "reactorName",
+  "auditDedupKey",
+  "actionClass",
+  "traceId",
+  "reason",
+  "dropReason",
+  "renderDiagnostics",
+] as const;
+
+/**
  * The audit row is an OPERATOR record, not a copy of the customer's data.
  *
  * `ReactorOutbox` is durable, backed up, and — unlike the queue — not pruned by
@@ -15,29 +40,32 @@ const SETTLE_NO_MATCH_REASON = "settle: no match";
  * duplicated from ClickHouse, outliving the trace it came from, and surviving
  * that trace's deletion.
  *
- * Payloads are identities now, so in the normal case there is nothing to strip.
- * This stays as the LAST line of defence: the payload type is open
- * (`Record<string, unknown>`), so a future field could carry content onto this
- * table without anyone noticing. Whatever the queue chooses to carry, the audit
- * row keeps only what an operator uses to answer "did this get out, and if not,
- * why" — identity, routing, and outcome.
- *
- * `renderDiagnostics` is deliberately kept: it names the template variables
- * that failed to resolve, never their values.
+ * So this is an ALLOW-list, not a deny-list: the audit object is built key by
+ * key from `AUDIT_PAYLOAD_KEYS`, and anything else on the payload is dropped —
+ * including keys that did not exist when this was written. That is the whole
+ * point. The payload type is open (`Record<string, unknown>`), so a field
+ * carrying trace content can be added upstream and type-check clean; a
+ * deny-list would wave it through onto this table, an allow-list drops it.
+ * Whatever the queue chooses to carry, the audit row keeps only what an
+ * operator uses to answer "did this get out, and if not, why".
  */
-const CONTENT_KEYS = new Set(["input", "output"]);
-
 export function redactOutboxPayloadForAudit(payload: OutboxJob): object {
-  const { match, ...rest } = payload as OutboxJob & {
-    match?: Record<string, unknown>;
-  };
-  if (!match) return { ...rest };
-  // The trace id is the dispatch's identity (already the row's `dedupKey`), not
-  // content — an operator needs it. Everything else on `match` is dropped.
-  const safeMatch = Object.fromEntries(
-    Object.entries(match).filter(([key]) => !CONTENT_KEYS.has(key)),
-  );
-  return { ...rest, match: safeMatch };
+  const source = payload as Record<string, unknown>;
+
+  const audit: Record<string, unknown> = {};
+  for (const key of AUDIT_PAYLOAD_KEYS) {
+    if (source[key] !== undefined) audit[key] = source[key];
+  }
+
+  // Cadence's `match`. The trace id is the dispatch's identity (already the
+  // row's `dedupKey`), not content — an operator needs it. Rebuilt rather than
+  // spread so nothing else riding on `match` reaches the row.
+  const match = source.match;
+  if (match !== null && typeof match === "object") {
+    audit.match = { traceId: (match as { traceId?: unknown }).traceId };
+  }
+
+  return audit;
 }
 
 /**

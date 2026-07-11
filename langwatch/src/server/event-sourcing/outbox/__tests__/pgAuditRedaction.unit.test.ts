@@ -75,9 +75,39 @@ describe("redactOutboxPayloadForAudit", () => {
   });
 
   describe("given a settle payload", () => {
-    it("passes through unchanged — it never carried content in the first place", () => {
-      const payload = makeSettle();
-      expect(redactOutboxPayloadForAudit(payload)).toEqual({ ...payload });
+    it("keeps the identity an operator needs to trace the dispatch", () => {
+      expect(redactOutboxPayloadForAudit(makeSettle())).toEqual({
+        stage: "settle",
+        projectId: "proj-1",
+        triggerId: "trig-1",
+        traceId: "trace-1",
+        reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
+        auditDedupKey: "proj-1/trig-1:trace:trace-1",
+        actionClass: "notify",
+      });
+    });
+  });
+
+  describe("given a settle payload widened with a snapshot of the trace's fold", () => {
+    it("drops the fold snapshot", () => {
+      // No cast needed, and that is the hazard: `SettleStagePayload` extends
+      // `Record<string, unknown>`, so a field carrying the trace's prompt and
+      // response can be stamped onto the payload and type-check clean. A
+      // deny-list of known content keys would wave this onto a durable,
+      // unpruned Postgres table; the allow-list drops it.
+      const payload: SettleStagePayload = {
+        ...makeSettle(),
+        foldSnapshotAtEnqueue: {
+          computedInput: SECRET_INPUT,
+          computedOutput: SECRET_OUTPUT,
+        },
+      };
+
+      const serialized = JSON.stringify(redactOutboxPayloadForAudit(payload));
+      expect(serialized).not.toContain(SECRET_INPUT);
+      expect(serialized).not.toContain(SECRET_OUTPUT);
+      expect(serialized).not.toContain("patient");
+      expect(serialized).not.toContain("foldSnapshotAtEnqueue");
     });
   });
 

@@ -34,6 +34,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [040](./040-webhook-http-request-automation-channel.md) | Webhook (generic HTTP request) automation channel | Proposed |
 | [041](./041-modern-block-kit-notification-template-suite.md) | Modern Block Kit notification template suite | Proposed |
 | [042](./042-scheduled-reports-automation-kind.md) | Scheduled reports — a schedule-triggered automation kind + generic event-sourcing scheduler | Proposed |
+| [043](./043-automation-facet-model.md) | Automations as orthogonal facets (name / type / subject / cadence / severity / delivery) | Proposed |
 
 ## When to Write an ADR
 

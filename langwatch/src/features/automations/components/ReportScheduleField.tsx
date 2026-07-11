@@ -11,6 +11,7 @@ import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Switch } from "~/components/ui/switch";
 import {
   cronFromParts,
+  cronScheduleError,
   DEFAULT_PARTS,
   defaultTimezone,
   describeCron,
@@ -105,7 +106,9 @@ export function ReportScheduleField({
     emitParts({ hour, minute });
   };
 
-  const cronInvalid = advanced && cron.trim() === "";
+  // The friendly picker can only emit schedules we already accept, so only the
+  // raw editor can produce one the scheduler would choke on.
+  const cronError = advanced ? cronScheduleError({ cron, timezone }) : null;
 
   return (
     <VStack align="stretch" gap={4}>
@@ -121,7 +124,7 @@ export function ReportScheduleField({
       </HStack>
 
       {advanced ? (
-        <Field.Root invalid={cronInvalid}>
+        <Field.Root invalid={cronError !== null}>
           <Field.Label>Cron expression</Field.Label>
           <Input
             fontFamily="mono"
@@ -132,8 +135,8 @@ export function ReportScheduleField({
           <Field.HelperText>
             Five fields: minute, hour, day-of-month, month, day-of-week.
           </Field.HelperText>
-          {cronInvalid ? (
-            <Field.ErrorText>Enter a cron schedule.</Field.ErrorText>
+          {cronError !== null ? (
+            <Field.ErrorText>{cronError}</Field.ErrorText>
           ) : null}
         </Field.Root>
       ) : (

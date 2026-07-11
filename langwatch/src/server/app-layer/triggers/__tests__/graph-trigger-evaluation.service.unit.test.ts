@@ -99,6 +99,9 @@ function timeseries(value: number | null): TimeseriesResult {
 
 class FakeTriggerSentRepo implements GraphTriggerSentRepository {
   openRows: OpenGraphTriggerSent[] = [];
+  /** Every incident ever created, open or resolved — the fire generation the
+   *  per-recipient idempotency digest is keyed on. */
+  allRows: OpenGraphTriggerSent[] = [];
   createCalls = 0;
   resolveCalls: Array<{ id: string; projectId: string; now: Date }> = [];
 
@@ -117,6 +120,21 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     );
   }
 
+  async findLatestForGraphAlert(params: {
+    triggerId: string;
+    projectId: string;
+    customGraphId: string;
+  }): Promise<{ id: string } | null> {
+    const matches = this.allRows.filter(
+      (r) =>
+        r.triggerId === params.triggerId &&
+        r.projectId === params.projectId &&
+        r.customGraphId === params.customGraphId,
+    );
+    const latest = matches[matches.length - 1];
+    return latest ? { id: latest.id } : null;
+  }
+
   async createOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
@@ -124,10 +142,11 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
   }): Promise<OpenGraphTriggerSent> {
     this.createCalls++;
     const row: OpenGraphTriggerSent = {
-      id: `sent-${this.openRows.length + 1}`,
+      id: `sent-${this.allRows.length + 1}`,
       ...params,
     };
     this.openRows.push(row);
+    this.allRows.push(row);
     return row;
   }
 
@@ -559,6 +578,163 @@ describe("evaluateGraphTrigger", () => {
       expect(harness.triggerSent.resolveCalls).toHaveLength(1);
       expect(harness.triggerSent.resolveCalls[0]?.id).toBe("sent-prior");
       expect(harness.dispatch).not.toHaveBeenCalled();
+    });
+  });
+
+  // Regression (dispatch5015-P1, Finding 3): the dispatch result used to be
+  // discarded, so an alert that delivered NOTHING still opened its incident.
+  // The UI then showed it "currently firing", nobody had been told, and the open
+  // incident suppressed every future notification until the metric recovered.
+  // The scheduled-report path deliberately does the opposite (`report-dispatch.ts`
+  // gates `recordFire` on delivery) — this pins the alert path to match.
+  describe("given a breach whose dispatch delivers nothing", () => {
+    beforeEach(() => {
+      harness.dispatch.mockResolvedValue({
+        channel: "slack",
+        didSend: false,
+        missingVariables: [],
+        renderErrors: [],
+      });
+    });
+
+    it("does not open an incident, so future notifications are not suppressed", async () => {
+      const result = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.status).toBe("not_delivered");
+      expect(result.didSend).toBe(false);
+      expect(harness.dispatch).toHaveBeenCalledTimes(1);
+      expect(harness.triggerSent.createCalls).toBe(0);
+      expect(harness.triggerSent.openRows).toHaveLength(0);
+    });
+
+    it("re-dispatches on the next evaluation instead of reporting already_firing", async () => {
+      await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+      // A real second breach: had the first (undelivered) evaluation opened an
+      // incident, this would short-circuit to `already_firing` and the customer
+      // would never hear about the breach at all.
+      harness.dispatch.mockResolvedValue({
+        channel: "slack",
+        didSend: true,
+        missingVariables: [],
+        renderErrors: [],
+      });
+      const second = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(second.status).toBe("fired");
+      expect(harness.dispatch).toHaveBeenCalledTimes(2);
+      expect(harness.triggerSent.createCalls).toBe(1);
+    });
+  });
+
+  describe("given a breach whose dispatch reports render diagnostics", () => {
+    it("surfaces missingVariables and renderErrors on the result", async () => {
+      harness.dispatch.mockResolvedValue({
+        channel: "email",
+        didSend: true,
+        missingVariables: ["metric.p99"],
+        renderErrors: ["unknown filter: sparkline"],
+      });
+
+      const result = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.status).toBe("fired");
+      expect(result.didSend).toBe(true);
+      expect(result.missingVariables).toEqual(["metric.p99"]);
+      expect(result.renderErrors).toEqual(["unknown filter: sparkline"]);
+    });
+  });
+
+  // Regression (dispatch5015-P1, Finding 3): a `bot`-delivery Slack alert whose
+  // token or channel cannot be resolved used to fall through to the WEBHOOK
+  // branch. Bot params carry no `slackWebhook`, so the dispatcher logged "no
+  // Slack webhook configured" and returned didSend false — a silent hole.
+  describe("given a bot-delivery Slack alert whose connection cannot be resolved", () => {
+    it("throws rather than falling through to the webhook branch", async () => {
+      harness = makeHarness({
+        trigger: makeTrigger({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          actionParams: {
+            threshold: 10,
+            operator: "gt",
+            timePeriod: 60,
+            seriesName: "0/metadata.trace_id/cardinality",
+            slackDelivery: "bot",
+            // No slackBotToken, no slackChannelId — and no slackWebhook either.
+          },
+        }),
+        series: timeseries(15),
+      });
+
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).rejects.toThrow(/missing its token or channel/);
+
+      expect(harness.dispatch).not.toHaveBeenCalled();
+      expect(harness.triggerSent.createCalls).toBe(0);
+    });
+  });
+
+  describe("given a fire that is retried after its incident write failed", () => {
+    it("carries the same fire digest, so the ledger can suppress the re-send", async () => {
+      harness.triggerSent.createOpenForGraphAlert = async () => {
+        throw new Error("postgres is down");
+      };
+
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).rejects.toThrow(/postgres is down/);
+
+      // The outbox retries the whole evaluation. No incident row was written,
+      // so the fire generation has not moved and the digest is unchanged —
+      // which is what lets the dispatcher's per-recipient gate recognise the
+      // recipients the first attempt already reached.
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).rejects.toThrow(/postgres is down/);
+
+      const first = harness.dispatch.mock.calls[0]?.[0] as {
+        fireDigest: string;
+      };
+      const retry = harness.dispatch.mock.calls[1]?.[0] as {
+        fireDigest: string;
+      };
+      expect(first.fireDigest).toBeTruthy();
+      expect(retry.fireDigest).toBe(first.fireDigest);
     });
   });
 

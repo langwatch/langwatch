@@ -12,6 +12,7 @@ import {
   likeMatch,
   nextParam,
   parseJsonStringArray,
+  readAttribute,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   type TranslationContext,
   validateValueLength,
@@ -222,7 +223,11 @@ function evaluateExistence(
   if (traceAttrKey !== null) {
     // Empty key throws on the SQL side (422) — fail closed here.
     if (!traceAttrKey) return UNSUPPORTED;
-    return polarise((attrs[traceAttrKey] ?? "") !== "");
+    // Own-key read: the key is user-supplied, and a plain `attrs[key]` made
+    // `has:attribute.constructor` truthy on *every* trace (inherited
+    // `Object.prototype.constructor`) while the compiled
+    // `Attributes['constructor'] != ''` matched none of them.
+    return polarise(readAttribute(attrs, traceAttrKey) !== "");
   }
 
   switch (value) {

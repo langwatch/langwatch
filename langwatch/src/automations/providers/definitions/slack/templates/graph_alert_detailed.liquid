@@ -11,18 +11,28 @@
 *Current value*
 {{ currentValue }}{% if previousValue != nil %} (was {{ previousValue }}){% endif %}
 {%- endcapture -%}
+{%- comment -%}
+`history` runs oldest-first and can hold far more points than the chart shows.
+A plain `limit: 20` would plot the OLDEST 20 buckets — the breach that fired the
+alert would be missing from its own chart. So skip ahead to the last 20 buckets
+with an offset, keeping the series chronological for the x-axis.
+{%- endcomment -%}
+{%- assign _history_size = history | size -%}
+{%- assign _chart_offset = _history_size | minus: 20 -%}
+{%- if _chart_offset < 0 -%}{%- assign _chart_offset = 0 -%}{%- endif -%}
 {%- capture _points -%}
-{%- for point in history limit: 20 -%}
+{%- for point in history offset: _chart_offset limit: 20 -%}
 {% unless forloop.first %},{% endunless %}{ "label": {{ point.timestamp | date: "%H:%M" | json }}, "value": {{ point.value }} }
 {%- endfor -%}
 {%- endcapture -%}
 {%- capture _categories -%}
-{%- for point in history limit: 20 -%}
+{%- for point in history offset: _chart_offset limit: 20 -%}
 {% unless forloop.first %},{% endunless %}{{ point.timestamp | date: "%H:%M" | json }}
 {%- endfor -%}
 {%- endcapture -%}
+{%- assign _newest_first = history | reverse -%}
 {%- capture _recent -%}
-Recent: {% for point in history reversed limit: 8 %}`{{ point.timestamp | date: "%H:%M" }}` {{ point.value }}{% unless forloop.last %} · {% endunless %}{% endfor %}
+Recent: {% for point in _newest_first limit: 8 %}`{{ point.timestamp | date: "%H:%M" }}` {{ point.value }}{% unless forloop.last %} · {% endunless %}{% endfor %}
 {%- endcapture -%}
 {%- capture _links -%}
 <{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>

@@ -22,6 +22,7 @@ export class PrismaTriggerRepository implements TriggerRepository {
         projectId: true,
         name: true,
         action: true,
+        triggerKind: true,
         actionParams: true,
         filters: true,
         filterQuery: true,
@@ -150,6 +151,26 @@ export class PrismaGraphTriggerSentRepository
       projectId: row.projectId,
       customGraphId: row.customGraphId,
     };
+  }
+
+  async findLatestForGraphAlert({
+    triggerId,
+    projectId,
+    customGraphId,
+  }: {
+    triggerId: string;
+    projectId: string;
+    customGraphId: string;
+  }): Promise<{ id: string } | null> {
+    // Deliberately NOT filtered on `resolvedAt` — the caller wants the latest
+    // incident whether it is still open or long resolved, because the id is
+    // used as the alert's fire generation, not as its firing state.
+    const row = await this.prisma.triggerSent.findFirst({
+      where: { triggerId, projectId, customGraphId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    return row ? { id: row.id } : null;
   }
 
   async createOpenForGraphAlert({

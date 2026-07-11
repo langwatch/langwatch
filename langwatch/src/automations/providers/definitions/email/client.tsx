@@ -17,12 +17,7 @@ import {
   LiquidEditor,
   TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
-import {
-  DEFAULT_ALERT_EMAIL_BODY_TEMPLATE,
-  DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE,
-  DEFAULT_EMAIL_BODY_TEMPLATE,
-  DEFAULT_EMAIL_SUBJECT_TEMPLATE,
-} from "~/shared/templating/defaults";
+import { defaultsForSourceKind } from "~/shared/templating/defaults";
 import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
 import { api } from "~/utils/api";
 import { InlineCadenceSelect } from "../../components/InlineCadenceSelect";
@@ -159,19 +154,19 @@ function EmailConfigForm({
     onChange({ ...slice, members: slice.members.filter((m) => m !== email) });
   };
 
-  // Graph-alert drafts dispatch with the alert defaults, so the editor
-  // must seed the same templates — otherwise the shown template and the
-  // rendered email disagree.
   const isGraphAlert = ctx.sourceKind === "graphAlert";
+  const isReport = ctx.sourceKind === "report";
+  // Each source kind dispatches with its own defaults — a report sends the
+  // report subject and body, an alert the alert ones. The editor must seed the
+  // SAME set: an author who opens the wording editor and types one character
+  // persists whatever it was showing, so seeding the wrong kind's template
+  // freezes copy that renders empty against the context it will be sent with.
+  const defaults = defaultsForSourceKind(ctx.sourceKind);
   const subjectValue = slice.subject.usingDefault
-    ? isGraphAlert
-      ? DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE
-      : DEFAULT_EMAIL_SUBJECT_TEMPLATE
+    ? defaults.emailSubject
     : slice.subject.value;
   const bodyValue = slice.body.usingDefault
-    ? isGraphAlert
-      ? DEFAULT_ALERT_EMAIL_BODY_TEMPLATE
-      : DEFAULT_EMAIL_BODY_TEMPLATE
+    ? defaults.emailBody
     : slice.body.value;
 
   const emailPreview = ctx.preview;
@@ -194,9 +189,10 @@ function EmailConfigForm({
 
   return (
     <VStack align="stretch" gap={4}>
-      {/* Alerts always deliver immediately (cadence is pinned server-side),
-          so the cadence switch only renders for trace automations. */}
-      {!isGraphAlert ? (
+      {/* Alerts always deliver immediately (cadence is pinned server-side) and
+          reports run on their own schedule — so the digest-cadence switch only
+          makes sense for trace automations. */}
+      {!isGraphAlert && !isReport ? (
         <InlineCadenceSelect
           value={ctx.notificationCadence}
           onChange={ctx.setNotificationCadence}

@@ -6,14 +6,14 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
+import { createLogger } from "~/utils/logger/server";
 import {
   MAX_NODE_COUNT,
   normalizeQuery,
   translateFilterToClickHouse,
 } from "./ast";
-import { FIELD_DEFS } from "./build-handlers";
+import { FIELD_DEF_BY_NAME } from "./build-handlers";
 import {
-  type FieldDef,
   type FieldNeeds,
   type InMemoryTrace,
   UNSUPPORTED,
@@ -24,12 +24,13 @@ import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
   extractStringValue,
+  readAttribute,
   SPAN_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
 } from "./value-helpers";
 
-const FIELD_DEF_BY_NAME = FIELD_DEFS as Record<string, FieldDef | undefined>;
+const logger = createLogger("langwatch:traces:filter-evaluate");
 
 /**
  * Evaluate a liqe query against an in-memory trace, mirroring the ClickHouse
@@ -67,13 +68,34 @@ export function evaluateQueryInMemory(
     return false;
   }
 
-  const result = evaluateNode(ast, false, trace, { nodeCount: 0 });
+  const state: WalkState = { nodeCount: 0, unsupportedFields: [] };
+  const result = evaluateNode(ast, false, trace, state);
+
+  // A field that can never evaluate positively at dispatch (span-scoped fields,
+  // `size`, the scenario dimensions) compiles to valid SQL and passes the
+  // save-time gate, so the query looks healthy — it just fails closed on every
+  // trace, forever, and the automation silently never fires. Whether that
+  // should be rejected at save time or made evaluable is a product call; until
+  // then, at least make the silence audible.
+  if (state.unsupportedFields.length > 0) {
+    logger.warn(
+      {
+        traceId: trace.summary.traceId,
+        // Field names only — filter *values* can carry customer content.
+        unsupportedFields: [...new Set(state.unsupportedFields)],
+      },
+      "Filter query fails closed: field(s) cannot be evaluated at dispatch, so this query never matches any trace",
+    );
+  }
+
   // UNSUPPORTED anywhere ⇒ the query can't be positively evaluated ⇒ false.
   return result === true;
 }
 
 interface WalkState {
   nodeCount: number;
+  /** Fields that returned {@link UNSUPPORTED}, for the fail-closed warning. */
+  unsupportedFields: string[];
 }
 
 function evaluateNode(
@@ -89,8 +111,14 @@ function evaluateNode(
     case "EmptyExpression":
       return true;
 
-    case "Tag":
-      return evaluateTag(node as TagToken, negated, trace);
+    case "Tag": {
+      const tag = node as TagToken;
+      const result = evaluateTag(tag, negated, trace);
+      if (result === UNSUPPORTED && tag.field.type !== "ImplicitField") {
+        state.unsupportedFields.push(tag.field.name);
+      }
+      return result;
+    }
 
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
@@ -172,7 +200,10 @@ function evaluateTag(
     );
   }
 
-  const def = FIELD_DEF_BY_NAME[fieldName];
+  // `.get()` — own keys only, so `constructor` / `toString` / `__proto__` are
+  // unknown fields rather than inherited `Object.prototype` members that pass
+  // this guard and then blow up on `def.evaluateInMemory(...)`.
+  const def = FIELD_DEF_BY_NAME.get(fieldName);
   // Unknown field — the gate already rejected it; defensive fail-closed.
   if (!def) return UNSUPPORTED;
   return def.evaluateInMemory(tag, negated, trace);
@@ -200,7 +231,7 @@ function evaluateTraceAttribute(
   // Empty key throws on the SQL side (422) — fail closed.
   if (!key) return UNSUPPORTED;
   const value = extractStringValue(tag);
-  const matched = (trace.summary.attributes[key] ?? "") === value;
+  const matched = readAttribute(trace.summary.attributes, key) === value;
   return negated ? !matched : matched;
 }
 
@@ -214,7 +245,7 @@ function evaluateEventAttribute(
   if (trace.events == null) return UNSUPPORTED;
   const value = extractStringValue(tag);
   const matched = trace.events.some(
-    (e) => (e.attributes[key] ?? "") === value,
+    (e) => readAttribute(e.attributes, key) === value,
   );
   return negated ? !matched : matched;
 }
@@ -292,6 +323,6 @@ function collectTagNeeds(tag: TagToken, needs: Set<FieldNeeds>): void {
     return;
   }
 
-  const def = FIELD_DEF_BY_NAME[fieldName];
+  const def = FIELD_DEF_BY_NAME.get(fieldName);
   if (def?.needs) needs.add(def.needs);
 }

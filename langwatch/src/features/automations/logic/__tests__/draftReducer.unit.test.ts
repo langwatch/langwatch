@@ -343,7 +343,7 @@ describe("SET_FILTER_QUERY", () => {
     expect(next.filterQuery).toBe("model:gpt-4o");
   });
 
-  it("is cleared when switching away from the trace source", () => {
+  it("is cleared when switching to an alert, which watches a metric", () => {
     const withQuery = reducer(INITIAL_DRAFT, {
       type: "SET_FILTER_QUERY",
       value: "status:error",
@@ -352,9 +352,18 @@ describe("SET_FILTER_QUERY", () => {
       reducer(withQuery, { type: "SET_SOURCE", value: "customGraph" })
         .filterQuery,
     ).toBeNull();
+  });
+
+  it("survives a switch to a report, which sends the traces it matches", () => {
+    const withQuery = reducer(INITIAL_DRAFT, {
+      type: "SET_FILTER_QUERY",
+      value: "status:error",
+    });
+    // A trace-query report is scoped by exactly this query — clearing it here
+    // left the report sending the newest traces instead of the matching ones.
     expect(
       reducer(withQuery, { type: "SET_SOURCE", value: "report" }).filterQuery,
-    ).toBeNull();
+    ).toBe("status:error");
   });
 });
 

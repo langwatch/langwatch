@@ -1,5 +1,5 @@
 import { Box, Button, Heading, HStack, Spacer, Text } from "@chakra-ui/react";
-import { AlertType, type TriggerAction } from "@prisma/client";
+import { AlertType, TriggerKind, type TriggerAction } from "@prisma/client";
 import { Mail } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -31,8 +31,7 @@ import {
   type TriggerFilterValue,
 } from "~/server/filters/types";
 import {
-  ALERT_TRIGGER_DEFAULTS,
-  REPORT_TRIGGER_DEFAULTS,
+  defaultsForSourceKind,
 } from "~/shared/templating/defaults";
 import {
   EXAMPLE_MATCHES,
@@ -58,6 +57,7 @@ import {
   buildTestFirePayload,
   cadenceIsSet,
   extractGraphAlertFromTriggerRow,
+  extractReportFromTriggerRow,
   filtersAreSet,
   INITIAL_DRAFT,
   notifyChannel,
@@ -195,10 +195,12 @@ export function AutomationDrawer({
     prefilledGraphId ? "customGraph" : draft.source,
     !!automationId,
   );
-  // A saved graph alert can't become a trace automation mid-edit, and a
-  // drawer opened from a specific chart is pinned to that alert — lock the
-  // Type cards visibly in both cases.
-  const sourceLocked = (!!automationId && isGraphAlert) || !!prefilledGraphId;
+  // A saved graph alert or report can't become a trace automation mid-edit
+  // (the kind decides the row's whole shape — schedule, source, dispatcher),
+  // and a drawer opened from a specific chart is pinned to that alert — lock
+  // the Type cards visibly in all three cases.
+  const sourceLocked =
+    (!!automationId && (isGraphAlert || isReport)) || !!prefilledGraphId;
   const dispatch = useAutomationStore((s) => s.dispatch);
   const setSection = useAutomationStore((s) => s.setSection);
   const hydrate = useAutomationStore((s) => s.hydrate);
@@ -364,21 +366,36 @@ export function AutomationDrawer({
       }
     }
     const { sanitized } = sanitizeTriggerFilters(filtersRaw);
+    // The row's KIND is what it is — a REPORT hydrated as a trace automation
+    // would lose its schedule and content source on the next Save (the router
+    // rewrites the row from what the drawer sends). `customGraphId` is only a
+    // reliable signal for alerts, so read `triggerKind` first.
+    const isReportRow = row.triggerKind === TriggerKind.REPORT;
     const next: AutomationDraft = {
       ...INITIAL_DRAFT,
       action,
       name: row.name,
       alertType: row.alertType,
-      source: row.customGraphId ? "customGraph" : "trace",
+      source: isReportRow
+        ? "report"
+        : row.customGraphId
+          ? "customGraph"
+          : "trace",
       customGraphId: row.customGraphId,
-      // ADR-043: a trace automation edited from a saved row keeps its liqe
-      // query so the Subject editor rehydrates it (null for legacy rows).
+      // ADR-043: a trace automation — and a trace-query report — edited from a
+      // saved row keeps its liqe query so the Subject editor rehydrates it
+      // (null for legacy rows and for graph/dashboard sources).
       filterQuery: row.filterQuery ?? null,
       // Pull the threshold rule out of actionParams when this row is a
       // graph alert so the threshold form pre-populates on edit.
       graphAlert: row.customGraphId
         ? extractGraphAlertFromTriggerRow(row.actionParams)
         : INITIAL_DRAFT.graphAlert,
+      // Same for a report's content source + schedule, so the Subject and
+      // Cadence facets open on what was saved rather than the blank defaults.
+      report: isReportRow
+        ? extractReportFromTriggerRow(row.actionParams)
+        : INITIAL_DRAFT.report,
       filters: sanitized as Partial<Record<FilterField, FilterParam>>,
       // Defensive narrow: column is a free-form TEXT (see the repo parser).
       notificationCadence: (
@@ -563,12 +580,11 @@ export function AutomationDrawer({
     const templates = templatesFromDraft(draft);
     // A report renders against the report defaults, an alert against the alert
     // defaults — otherwise the preview shows a message the dispatcher would
-    // never send.
-    const previewDefaults = isGraphAlert
-      ? ALERT_TRIGGER_DEFAULTS
-      : isReport
-        ? REPORT_TRIGGER_DEFAULTS
-        : undefined;
+    // never send. Same resolver the providers and dispatch use, so the three
+    // surfaces cannot drift apart.
+    const previewDefaults = defaultsForSourceKind(
+      isGraphAlert ? "graphAlert" : isReport ? "report" : "trace"
+    );
     // Mirror the provider's delivery rules (Slack: modern blocks render only
     // over a bot connection) so the preview never promises more than the
     // configured channel will deliver.
@@ -728,11 +744,14 @@ export function AutomationDrawer({
         action: draft.action,
         alertType: draft.alertType ?? undefined,
         filters: draft.source === "customGraph" ? {} : draft.filters,
-        // ADR-043 Subject facet: send the liqe query for a trace automation;
-        // when set the router persists `filters` as `{}` and matches this
-        // in-memory. Null for alert/report (and legacy filter-only edits).
+        // ADR-043 Subject facet: send the liqe query for a trace automation AND
+        // for a report — a trace-query report is scoped by exactly this query,
+        // and the router persists it for that source (it nulls the column for
+        // graph/dashboard report sources itself). Only a graph alert never has
+        // one. When set the router persists `filters` as `{}` and matches the
+        // query in-memory.
         filterQuery:
-          draft.source === "trace" ? draft.filterQuery || null : null,
+          draft.source === "customGraph" ? null : draft.filterQuery || null,
         customGraphId:
           draft.source === "customGraph" ? draft.customGraphId : null,
         // The graph-alert threshold rule travels alongside the destination
@@ -756,6 +775,12 @@ export function AutomationDrawer({
             meta: { closable: true },
           });
           void queryClient.automation.getTriggers.invalidate();
+          // The dashboard chart card reads its alert state off the graph, not
+          // off the trigger list: without these the card still offers "Add
+          // alert" after one was just created, and clicking it re-enters CREATE
+          // mode — whose upsert overwrites the trigger that was just saved.
+          void queryClient.graphs.getAll.invalidate();
+          void queryClient.graphs.getById.invalidate();
           closeDrawer();
         },
         onError: (err) => {

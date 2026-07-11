@@ -18,7 +18,12 @@ import type { Trace } from "~/server/tracer/types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { handleSendEmail } from "./actions/sendEmail";
 import { handleSendSlackMessage } from "./actions/sendSlackMessage";
-import type { ActionParams, TriggerData, TriggerResult } from "./types";
+import type {
+  ActionParams,
+  TriggerContext,
+  TriggerData,
+  TriggerResult,
+} from "./types";
 import { addTriggersSent, checkThreshold, updateAlert } from "./utils";
 
 // Graph config stored in database (subset of CustomGraphInput)
@@ -219,7 +224,17 @@ export const processCustomGraphTrigger = async (
           },
         ];
 
-        const context = {
+        // The alert's most recent incident row, open or resolved. Its id is the
+        // fire generation the per-recipient idempotency ledger is keyed on — see
+        // `graphAlertFireDigest`. No open row exists on this branch, so this
+        // reads the last RESOLVED one (null on the alert's first-ever fire).
+        const previousFire = await prisma.triggerSent.findFirst({
+          where: { triggerId, projectId, customGraphId },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        });
+
+        const context: TriggerContext = {
           trigger: {
             ...trigger,
             message:
@@ -231,6 +246,21 @@ export const processCustomGraphTrigger = async (
           projects,
           triggerData,
           projectSlug: project.slug,
+          // The measured facts, so the action handlers can render the alert
+          // templates instead of re-parsing the prose strings above.
+          graphAlert: {
+            graph: { id: customGraphId, name: customGraph.name },
+            metric: { label: series.name, seriesName },
+            condition: {
+              operator,
+              threshold,
+              timePeriodMinutes: timePeriod,
+            },
+            currentValue,
+            window: { start: startDate, end: endDate },
+            occurredAt: endDate,
+            previousFireId: previousFire?.id ?? null,
+          },
         };
 
         // Execute the appropriate action

@@ -11,8 +11,16 @@
 *Current value*
 {{ currentValue }}{% if previousValue != nil %} (was {{ previousValue }}){% endif %}
 {%- endcapture -%}
+{%- comment -%}
+`history` runs oldest-first and can hold far more points than a message should
+carry, so reverse it FIRST and take from the newest end. `limit` applies before
+`reversed` in a Liquid for-tag, so `for point in history reversed limit: 20`
+would take the OLDEST 20 and show them under a "Recent values" caption — the
+breach that fired the alert would not appear in its own message.
+{%- endcomment -%}
+{%- assign _newest_first = history | reverse -%}
 {%- capture _rows -%}
-{%- for point in history reversed limit: 20 -%}
+{%- for point in _newest_first limit: 20 -%}
 ,[
   { "type": "raw_text", "text": {{ point.timestamp | date: "%H:%M" | json }} },
   { "type": "raw_number", "value": {{ point.value }}, "text": {{ point.value | append: "" | json }} }
@@ -20,7 +28,7 @@
 {%- endfor -%}
 {%- endcapture -%}
 {%- capture _recent -%}
-Recent: {% for point in history reversed limit: 8 %}`{{ point.timestamp | date: "%H:%M" }}` {{ point.value }}{% unless forloop.last %} · {% endunless %}{% endfor %}
+Recent: {% for point in _newest_first limit: 8 %}`{{ point.timestamp | date: "%H:%M" }}` {{ point.value }}{% unless forloop.last %} · {% endunless %}{% endfor %}
 {%- endcapture -%}
 {%- capture _links -%}
 <{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>

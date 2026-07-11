@@ -11,11 +11,17 @@ import {
   type SlackPayload,
   type SlackTemplateType,
 } from "~/shared/templating/renderSlack";
-import { ALERT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
+import {
+  defaultsForSourceKind,
+  type TemplateSourceKind,
+} from "~/shared/templating/defaults";
 import {
   buildExampleGraphAlertTemplateContext,
+  buildExampleReportTemplateContext,
   buildTemplateContext,
   type GraphAlertTemplateContext,
+  type ReportSourceKind,
+  type ReportTemplateContext,
   type TemplateContext,
 } from "~/shared/templating/templateContext";
 import { validateLiquid } from "~/shared/templating/validate";
@@ -145,11 +151,8 @@ export function validateTemplateDraft(draft: TemplateDraft): void {
  * `~/shared/templating/*` so both sides see identical output for any given
  * draft.
  *
- * Was a class holding two immutable fields (`baseHost`, `notifier`); the
- * class shape earned nothing over a plain function so simp-011 collapsed
- * it. `TestFireTrigger` is the dependency-bag; `testFireTrigger` is the
- * call. Callers pass the two composition-time deps alongside the per-call
- * inputs.
+ * `TestFireTriggerDeps` holds the two composition-time dependencies
+ * (`baseHost`, `notifier`); callers pass them alongside the per-call inputs.
  */
 export interface TestFireTriggerDeps {
   baseHost: string;
@@ -170,6 +173,23 @@ export interface TestFireGraphAlertInput {
   timePeriodMinutes?: number;
 }
 
+/**
+ * Marks the test-fired draft as a scheduled REPORT so the test message renders
+ * the report-shaped example context + `REPORT_TRIGGER_DEFAULTS` — the same pair
+ * `dispatchScheduledReport` renders on a real fire, and the same pair the
+ * drawer's live preview shows. Without it a report's test fire rendered the
+ * TRACE example context, where every report variable resolves empty: the author
+ * got a blank message that agreed with neither the preview nor the real send.
+ * `sourceKind` picks the example data (traces for a trace query, charts for a
+ * graph or dashboard), exactly as the preview does.
+ */
+export interface TestFireReportInput {
+  sourceKind: ReportSourceKind;
+  /** The draft's own cadence, rendered for `report.scheduleLabel`. Without it
+   *  the test fire would advertise an example cadence the author never chose. */
+  scheduleLabel?: string;
+}
+
 export interface TestFireTriggerInput {
   channel: TemplateChannel;
   trigger: DraftIdentity;
@@ -182,38 +202,75 @@ export interface TestFireTriggerInput {
   botDestination?: { token: string; channel: string } | null;
   /** Present when the draft is a custom-graph alert. */
   graphAlert?: TestFireGraphAlertInput | null;
+  /** Present when the draft is a scheduled report. */
+  report?: TestFireReportInput | null;
 }
 
-function buildTestFireContext(
-  identity: DraftIdentity,
-  project: DraftProject,
-  baseHost: string,
-  graphAlert: TestFireGraphAlertInput | null | undefined,
-): TemplateContext | GraphAlertTemplateContext {
-  if (graphAlert) {
-    return buildExampleGraphAlertTemplateContext({
-      baseHost,
-      project,
-      trigger: { name: identity.name, alertType: identity.alertType },
-      graph: { name: graphAlert.graphName },
-      metricLabel: graphAlert.metricLabel,
-      condition: {
-        operator: graphAlert.operator,
-        threshold: graphAlert.threshold,
-        timePeriodMinutes: graphAlert.timePeriodMinutes,
-      },
-    });
+/**
+ * The example context a test fire renders against — the one its REAL fire would
+ * use — together with the source kind that context belongs to. Returning both
+ * from one branch is what keeps them in step: the framework defaults are then
+ * resolved from that same kind, so a report can't render report data against the
+ * trace defaults and test-fire a message it will never actually send.
+ */
+function buildTestFireContext({
+  identity,
+  project,
+  baseHost,
+  graphAlert,
+  report,
+}: {
+  identity: DraftIdentity;
+  project: DraftProject;
+  baseHost: string;
+  graphAlert?: TestFireGraphAlertInput | null;
+  report?: TestFireReportInput | null;
+}): {
+  sourceKind: TemplateSourceKind;
+  context: TemplateContext | GraphAlertTemplateContext | ReportTemplateContext;
+} {
+  if (report) {
+    return {
+      sourceKind: "report",
+      context: buildExampleReportTemplateContext({
+        baseHost,
+        project,
+        trigger: { name: identity.name },
+        sourceKind: report.sourceKind,
+        scheduleLabel: report.scheduleLabel,
+      }),
+    };
   }
-  return buildTemplateContext({
-    trigger: {
-      id: "preview",
-      name: identity.name,
-      alertType: identity.alertType,
-    },
-    project,
-    baseHost,
-    matches: EXAMPLE_MATCHES,
-  });
+  if (graphAlert) {
+    return {
+      sourceKind: "graphAlert",
+      context: buildExampleGraphAlertTemplateContext({
+        baseHost,
+        project,
+        trigger: { name: identity.name, alertType: identity.alertType },
+        graph: { name: graphAlert.graphName },
+        metricLabel: graphAlert.metricLabel,
+        condition: {
+          operator: graphAlert.operator,
+          threshold: graphAlert.threshold,
+          timePeriodMinutes: graphAlert.timePeriodMinutes,
+        },
+      }),
+    };
+  }
+  return {
+    sourceKind: "trace",
+    context: buildTemplateContext({
+      trigger: {
+        id: "preview",
+        name: identity.name,
+        alertType: identity.alertType,
+      },
+      project,
+      baseHost,
+      matches: EXAMPLE_MATCHES,
+    }),
+  };
 }
 
 export async function testFireTrigger(
@@ -221,13 +278,14 @@ export async function testFireTrigger(
   input: TestFireTriggerInput,
 ): Promise<TestFireResult> {
   const { channel, trigger, project, draft, recipients, webhook } = input;
-  const context = buildTestFireContext(
-    trigger,
+  const { sourceKind, context } = buildTestFireContext({
+    identity: trigger,
     project,
-    deps.baseHost,
-    input.graphAlert,
-  );
-  const defaults = input.graphAlert ? ALERT_TRIGGER_DEFAULTS : undefined;
+    baseHost: deps.baseHost,
+    graphAlert: input.graphAlert,
+    report: input.report,
+  });
+  const defaults = defaultsForSourceKind(sourceKind);
 
   // Run the same validation save uses so a Test Fire can't bypass the
   // discriminator contract — without this, a draft with `slackTemplate`

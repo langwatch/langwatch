@@ -1,10 +1,18 @@
-import { type AlertType, TriggerAction } from "@prisma/client";
+import { type AlertType, type Project, TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerContext } from "../../types";
 import { handleSendEmail } from "../sendEmail";
 
 vi.mock("~/server/mailer/triggerEmail", () => ({
-  sendTriggerEmail: vi.fn(),
+  sendRenderedTriggerEmail: vi.fn(),
+}));
+
+vi.mock("~/server/triggers/sendSlackWebhook", () => ({
+  sendRenderedSlackMessage: vi.fn(),
+}));
+
+vi.mock("~/server/triggers/slackWebApi", () => ({
+  postSlackChatMessage: vi.fn(),
 }));
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
@@ -27,8 +35,8 @@ const claimSend = vi.fn().mockResolvedValue(true);
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     emailSuppressions: { filterSuppressed },
-    // FIX 4: the cron path backs the mailer's per-recipient idempotency gate
-    // with the same TriggerSent claim store the outbox path uses, reached via
+    // The cron path backs the mailer's per-recipient idempotency gate with the
+    // same TriggerSent claim store the outbox path uses, reached via
     // getApp().triggers — so a mid-loop failure doesn't re-send on the next tick.
     triggers: { isSendClaimed, claimSend },
   }),
@@ -42,8 +50,59 @@ vi.mock("~/server/event-sourcing/outbox/emailHourlyCap", () => ({
     consumeTenantEmailCapSlot(...args),
 }));
 
-import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
+import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { captureException } from "~/utils/posthogErrorCapture";
+
+const PROJECT: Project = {
+  id: "project-1",
+  name: "Demo",
+  slug: "test-project",
+} as unknown as Project;
+
+function makeContext({
+  members,
+  alertType = "CRITICAL" as AlertType,
+  emailSubjectTemplate = null,
+  emailBodyTemplate = null,
+  previousFireId = null,
+}: {
+  members?: string[];
+  alertType?: AlertType | null;
+  emailSubjectTemplate?: string | null;
+  emailBodyTemplate?: string | null;
+  previousFireId?: string | null;
+}): TriggerContext {
+  return {
+    trigger: {
+      id: "trigger-1",
+      projectId: "project-1",
+      name: "Test Trigger",
+      action: TriggerAction.SEND_EMAIL,
+      actionParams: members ? { members } : {},
+      alertType,
+      message: "Custom alert message",
+      slackTemplateType: null,
+      slackTemplate: null,
+      emailSubjectTemplate,
+      emailBodyTemplate,
+    } as any,
+    projects: [PROJECT],
+    triggerData: [],
+    projectSlug: "test-project",
+    graphAlert: {
+      graph: { id: "graph-1", name: "Latency p95" },
+      metric: { label: "Latency p95", seriesName: "0/duration/p95" },
+      condition: { operator: "gt", threshold: 500, timePeriodMinutes: 60 },
+      currentValue: 712,
+      window: {
+        start: new Date("2026-06-21T09:00:00Z"),
+        end: new Date("2026-06-21T10:00:00Z"),
+      },
+      occurredAt: new Date("2026-06-21T10:00:00Z"),
+      previousFireId,
+    },
+  };
+}
 
 describe("handleSendEmail", () => {
   beforeEach(() => {
@@ -54,77 +113,144 @@ describe("handleSendEmail", () => {
     );
     consumeEmailCapSlot.mockResolvedValue({ allowed: true, count: 1 });
     consumeTenantEmailCapSlot.mockResolvedValue({ allowed: true, count: 1 });
+    isSendClaimed.mockResolvedValue(false);
+    claimSend.mockResolvedValue(true);
   });
 
   describe("when email is sent successfully", () => {
-    it("calls sendTriggerEmail with correct parameters", async () => {
-      const context: TriggerContext = {
-        trigger: {
-          id: "trigger-1",
-          projectId: "project-1",
-          name: "Test Trigger",
-          actionParams: { members: ["user1@example.com", "user2@example.com"] },
-          alertType: "CRITICAL" as AlertType,
-          message: "Custom alert message",
-        } as any,
-        projects: [],
-        triggerData: [
-          {
-            input: "test input",
-            output: "test output",
-            traceId: "trace-1",
-            projectId: "project-1",
-            fullTrace: {} as any,
-          },
-        ],
-        projectSlug: "test-project",
+    it("renders the alert templates and mails every recipient", async () => {
+      await handleSendEmail(
+        makeContext({ members: ["user1@example.com", "user2@example.com"] }),
+      );
+
+      expect(sendRenderedTriggerEmail).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(sendRenderedTriggerEmail).mock.calls[0]?.[0] as {
+        triggerEmails: string[];
+        triggerId: string;
+        projectId: string;
+        subject: string;
+        html: string;
+        isRecipientSent?: (hash: string) => Promise<boolean>;
+        recordRecipientSent?: (hash: string) => Promise<void>;
       };
+      expect(call.triggerEmails).toEqual([
+        "user1@example.com",
+        "user2@example.com",
+      ]);
+      expect(call.triggerId).toBe("trigger-1");
+      expect(call.projectId).toBe("project-1");
+      expect(call.isRecipientSent).toEqual(expect.any(Function));
+      expect(call.recordRecipientSent).toEqual(expect.any(Function));
+    });
+  });
 
-      await handleSendEmail(context);
+  // Regression (dispatch5015-P1, Finding 2): the cron used to call the legacy
+  // `sendTriggerEmail` React tree and never read the trigger's Liquid template
+  // columns. With the firing flag OFF — the shipped default — an author's saved
+  // template, and the alert-shaped copy they previewed in the drawer, were
+  // silently dropped at send time.
+  describe("given the alert defaults (no custom template)", () => {
+    it("renders the metric-crossed-threshold subject, not the legacy trace subject", async () => {
+      await handleSendEmail(makeContext({ members: ["user@example.com"] }));
 
-      expect(sendTriggerEmail).toHaveBeenCalledWith({
-        triggerEmails: ["user1@example.com", "user2@example.com"],
-        triggerData: context.triggerData,
-        triggerName: "Test Trigger",
-        triggerId: "trigger-1",
-        projectId: "project-1",
-        projectSlug: "test-project",
-        triggerType: "CRITICAL",
-        triggerMessage: "Custom alert message",
-        // FIX 4: per-recipient idempotency callbacks, wired like the outbox path.
-        isRecipientSent: expect.any(Function),
-        recordRecipientSent: expect.any(Function),
+      const call = vi.mocked(sendRenderedTriggerEmail).mock.calls[0]?.[0] as {
+        subject: string;
+        html: string;
+      };
+      expect(call.subject).toBe(
+        "[Alert] Test Trigger — Latency p95 is greater than 500",
+      );
+      expect(call.html).toContain("Latency p95");
+      expect(call.html).toContain("712");
+    });
+  });
+
+  describe("given a trigger with custom email templates", () => {
+    it("renders the author's Liquid instead of the defaults", async () => {
+      await handleSendEmail(
+        makeContext({
+          members: ["user@example.com"],
+          emailSubjectTemplate:
+            "Custom: {{ trigger.name }} hit {{ currentValue }}",
+          emailBodyTemplate:
+            "## Heads up\n\n{{ metric.label }} vs {{ condition.threshold }}",
+        }),
+      );
+
+      const call = vi.mocked(sendRenderedTriggerEmail).mock.calls[0]?.[0] as {
+        subject: string;
+        html: string;
+      };
+      expect(call.subject).toBe("Custom: Test Trigger hit 712");
+      expect(call.html).toContain("<h2>Heads up</h2>");
+      expect(call.html).toContain("Latency p95");
+      expect(call.html).toContain("500");
+    });
+  });
+
+  describe("when action params has no members", () => {
+    it("skips the send without consulting the cap", async () => {
+      await handleSendEmail(makeContext({}));
+
+      expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
+      expect(consumeEmailCapSlot).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when some recipients are suppressed", () => {
+    it("only sends to the surviving recipients", async () => {
+      filterSuppressed.mockResolvedValue(["keep@example.com"]);
+
+      await handleSendEmail(
+        makeContext({ members: ["keep@example.com", "gone@example.com"] }),
+      );
+
+      expect(sendRenderedTriggerEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ triggerEmails: ["keep@example.com"] }),
+      );
+    });
+  });
+
+  describe("when the trigger is over its hourly cap", () => {
+    it("drops the dispatch without sending", async () => {
+      consumeEmailCapSlot.mockResolvedValueOnce({ allowed: false, count: 101 });
+
+      await handleSendEmail(makeContext({ members: ["user@example.com"] }));
+
+      expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
+      // Hourly cap drops first; the project daily cap is never reached.
+      expect(consumeTenantEmailCapSlot).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project is over its daily email cap (ADR-031)", () => {
+    it("consults the daily cap by recipient count and drops without sending", async () => {
+      consumeTenantEmailCapSlot.mockResolvedValueOnce({
+        allowed: false,
+        count: 10001,
       });
+
+      await handleSendEmail(
+        makeContext({ members: ["a@example.com", "b@example.com"] }),
+      );
+
+      // The daily cap counts RECIPIENTS, so recipientCount is the surviving
+      // recipient-list length.
+      expect(consumeTenantEmailCapSlot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project-1",
+          recipientCount: 2,
+        }),
+      );
+      expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
     });
   });
 
   describe("when the per-recipient idempotency callbacks are passed to the mailer", () => {
     it("backs them with the TriggerSent claim store under a rcpt:-prefixed key", async () => {
-      const context: TriggerContext = {
-        trigger: {
-          id: "trigger-1",
-          projectId: "project-1",
-          name: "Test Trigger",
-          actionParams: { members: ["user@example.com"] },
-          alertType: null,
-          message: "",
-        } as any,
-        projects: [],
-        triggerData: [
-          {
-            input: "i",
-            output: "o",
-            traceId: "trace-1",
-            projectId: "project-1",
-            fullTrace: {} as any,
-          },
-        ],
-        projectSlug: "test-project",
-      };
+      await handleSendEmail(makeContext({ members: ["user@example.com"] }));
 
-      await handleSendEmail(context);
-
-      const args = vi.mocked(sendTriggerEmail).mock.calls[0]?.[0];
+      const args = vi.mocked(sendRenderedTriggerEmail).mock.calls[0]?.[0];
       // Invoke the wired callbacks the way the mailer would and assert they
       // delegate to getApp().triggers with the rcpt:-prefixed dedup key.
       await args!.isRecipientSent!("deadbeefdeadbeef");
@@ -141,137 +267,44 @@ describe("handleSendEmail", () => {
       // the recorded delivery.
       expect(writeKey).toEqual(readKey);
     });
-  });
 
-  describe("when action params has no members", () => {
-    it("skips the send without consulting the cap", async () => {
-      const context: TriggerContext = {
-        trigger: {
-          id: "trigger-1",
-          projectId: "project-1",
-          name: "Test Trigger",
-          actionParams: {},
-          alertType: null,
-          message: "",
-        } as any,
-        projects: [],
-        triggerData: [],
-        projectSlug: "test-project",
-      };
+    // Regression: the dispatch digest used to hash `traceId ?? graphId`, and a
+    // graph alert's only "match" IS the graph — so the key was constant for the
+    // life of the graph and, after the very first fire, every recipient was
+    // permanently claimed. Keying on the fire generation moves the digest
+    // forward with each delivered incident.
+    describe("when the alert fires a second time", () => {
+      it("keys the ledger under a different digest, so recipients are not permanently claimed", async () => {
+        await handleSendEmail(
+          makeContext({ members: ["user@example.com"], previousFireId: null }),
+        );
+        const first = vi.mocked(sendRenderedTriggerEmail).mock.calls[0]?.[0];
+        await first!.recordRecipientSent!("deadbeefdeadbeef");
+        const firstKey = (claimSend.mock.calls[0]?.[0] as { traceId: string })
+          .traceId;
 
-      await handleSendEmail(context);
+        await handleSendEmail(
+          makeContext({
+            members: ["user@example.com"],
+            previousFireId: "sent-1",
+          }),
+        );
+        const second = vi.mocked(sendRenderedTriggerEmail).mock.calls[1]?.[0];
+        await second!.recordRecipientSent!("deadbeefdeadbeef");
+        const secondKey = (claimSend.mock.calls[1]?.[0] as { traceId: string })
+          .traceId;
 
-      expect(sendTriggerEmail).not.toHaveBeenCalled();
-      expect(consumeEmailCapSlot).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when some recipients are suppressed", () => {
-    it("only sends to the surviving recipients", async () => {
-      filterSuppressed.mockResolvedValueOnce(["keep@example.com"]);
-      const context: TriggerContext = {
-        trigger: {
-          id: "trigger-1",
-          projectId: "project-1",
-          name: "Test Trigger",
-          actionParams: {
-            members: ["keep@example.com", "gone@example.com"],
-          },
-          alertType: null,
-          message: "",
-        } as any,
-        projects: [],
-        triggerData: [],
-        projectSlug: "test-project",
-      };
-
-      await handleSendEmail(context);
-
-      expect(sendTriggerEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ triggerEmails: ["keep@example.com"] }),
-      );
-    });
-  });
-
-  describe("when the trigger is over its hourly cap", () => {
-    it("drops the dispatch without sending", async () => {
-      consumeEmailCapSlot.mockResolvedValueOnce({ allowed: false, count: 101 });
-      const context: TriggerContext = {
-        trigger: {
-          id: "trigger-1",
-          projectId: "project-1",
-          name: "Test Trigger",
-          actionParams: { members: ["user@example.com"] },
-          alertType: null,
-          message: "",
-        } as any,
-        projects: [],
-        triggerData: [],
-        projectSlug: "test-project",
-      };
-
-      await handleSendEmail(context);
-
-      expect(sendTriggerEmail).not.toHaveBeenCalled();
-      // Hourly cap drops first; the project daily cap is never reached.
-      expect(consumeTenantEmailCapSlot).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the project is over its daily email cap (ADR-031)", () => {
-    it("consults the daily cap by recipient count and drops without sending", async () => {
-      consumeTenantEmailCapSlot.mockResolvedValueOnce({
-        allowed: false,
-        count: 10001,
+        expect(secondKey).not.toBe(firstKey);
       });
-      const context: TriggerContext = {
-        trigger: {
-          id: "trigger-1",
-          projectId: "project-1",
-          name: "Test Trigger",
-          actionParams: {
-            members: ["a@example.com", "b@example.com"],
-          },
-          alertType: null,
-          message: "",
-        } as any,
-        projects: [],
-        triggerData: [],
-        projectSlug: "test-project",
-      };
-
-      await handleSendEmail(context);
-
-      // The daily cap counts RECIPIENTS, so recipientCount is the surviving
-      // recipient-list length.
-      expect(consumeTenantEmailCapSlot).toHaveBeenCalledWith(
-        expect.objectContaining({
-          projectId: "project-1",
-          recipientCount: 2,
-        }),
-      );
-      expect(sendTriggerEmail).not.toHaveBeenCalled();
     });
   });
 
-  describe("when sendTriggerEmail throws an error", () => {
+  describe("when the mailer throws an error", () => {
     it("captures the exception with full context", async () => {
       const error = new Error("Email send failed");
-      vi.mocked(sendTriggerEmail).mockRejectedValue(error);
+      vi.mocked(sendRenderedTriggerEmail).mockRejectedValue(error);
 
-      const context: TriggerContext = {
-        trigger: {
-          id: "trigger-1",
-          projectId: "project-1",
-          name: "Test Trigger",
-          actionParams: { members: ["user@example.com"] },
-        } as any,
-        projects: [],
-        triggerData: [],
-        projectSlug: "test-project",
-      };
-
-      await handleSendEmail(context);
+      await handleSendEmail(makeContext({ members: ["user@example.com"] }));
 
       expect(captureException).toHaveBeenCalledWith(error, {
         extra: {

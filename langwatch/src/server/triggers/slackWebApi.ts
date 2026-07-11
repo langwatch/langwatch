@@ -1,8 +1,12 @@
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import type { SlackPayload } from "~/shared/templating/renderSlack";
+import { createLogger } from "~/utils/logger";
 import { sendHttpDestination } from "./httpDestination";
 
+const logger = createLogger("langwatch:triggers:slackWebApi");
+
 const CHAT_POST_MESSAGE_URL = "https://slack.com/api/chat.postMessage";
+const CONVERSATIONS_LIST_URL = "https://slack.com/api/conversations.list";
 
 /**
  * Slack Web API errors that clear on their own — a retry is worth taking. Rate
@@ -104,7 +108,24 @@ interface SlackConversationsResponse {
   ok: boolean;
   error?: string;
   channels?: { id: string; name: string; is_private?: boolean }[];
+  response_metadata?: { next_cursor?: string };
 }
+
+/**
+ * Conversations per page. Slack's own guidance is to stay well under its 1000
+ * ceiling — large pages routinely time out server-side — and a smaller page
+ * keeps each response comfortably inside {@link CHANNEL_LIST_MAX_RESPONSE_BYTES}.
+ */
+const CHANNEL_PAGE_SIZE = 200;
+/** Hard stop on paging, so a pathological workspace can't spin the request. */
+const MAX_CHANNEL_PAGES = 10;
+/**
+ * A conversations.list entry is ~0.7-1.5 KB of JSON, so a full page can run to
+ * ~300 KB — far past the shared 64 KiB default, which would truncate the body
+ * mid-string and make it unparseable. This body is PARSED, not just logged, so
+ * it needs a cap sized for the payload (with headroom), not for a log snippet.
+ */
+const CHANNEL_LIST_MAX_RESPONSE_BYTES = 1024 * 1024;
 
 /**
  * List the channels a bot token can see (`conversations.list`) so the config
@@ -112,36 +133,72 @@ interface SlackConversationsResponse {
  * `groups:read` for private) scope on the app — WITHOUT it Slack returns
  * `missing_scope`, which is surfaced (not thrown) so the UI degrades to manual
  * channel entry rather than erroring.
+ *
+ * Slack pages this endpoint by cursor, so a real workspace needs the full walk:
+ * one page is only ever a prefix of the channel list. A failure part-way through
+ * returns the channels gathered so far ALONGSIDE the error, so the picker offers
+ * what it has instead of collapsing to nothing.
  */
 export async function listSlackChannels(
   token: string,
 ): Promise<{ channels: SlackChannel[]; error: string | null }> {
-  let response: { status: number; body: string };
-  try {
-    response = await sendHttpDestination({
-      url: "https://slack.com/api/conversations.list",
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: "types=public_channel,private_channel&exclude_archived=true&limit=1000",
-      contextLabel: "Slack conversations.list",
+  const collected: SlackChannel[] = [];
+  const done = (error: string | null) => ({
+    channels: [...collected].sort((a, b) => a.name.localeCompare(b.name)),
+    error,
+  });
+
+  let cursor: string | undefined;
+
+  for (let page = 0; page < MAX_CHANNEL_PAGES; page++) {
+    const params = new URLSearchParams({
+      types: "public_channel,private_channel",
+      exclude_archived: "true",
+      limit: String(CHANNEL_PAGE_SIZE),
     });
-  } catch {
-    return { channels: [], error: "request_failed" };
+    if (cursor) params.set("cursor", cursor);
+
+    let response: { status: number; body: string };
+    try {
+      response = await sendHttpDestination({
+        url: CONVERSATIONS_LIST_URL,
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+        maxResponseBytes: CHANNEL_LIST_MAX_RESPONSE_BYTES,
+        contextLabel: "Slack conversations.list",
+      });
+    } catch {
+      return done("request_failed");
+    }
+
+    let body: SlackConversationsResponse;
+    try {
+      body = JSON.parse(response.body) as SlackConversationsResponse;
+    } catch {
+      return done("bad_response");
+    }
+    if (!body.ok) return done(body.error ?? "unknown_error");
+
+    for (const channel of body.channels ?? []) {
+      collected.push({
+        id: channel.id,
+        name: channel.name,
+        isPrivate: !!channel.is_private,
+      });
+    }
+
+    // Slack signals "no more pages" with an absent or empty next_cursor.
+    cursor = body.response_metadata?.next_cursor || undefined;
+    if (!cursor) return done(null);
   }
 
-  let body: SlackConversationsResponse;
-  try {
-    body = JSON.parse(response.body) as SlackConversationsResponse;
-  } catch {
-    return { channels: [], error: "bad_response" };
-  }
-  if (!body.ok) return { channels: [], error: body.error ?? "unknown_error" };
-
-  const channels = (body.channels ?? [])
-    .map((c) => ({ id: c.id, name: c.name, isPrivate: !!c.is_private }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return { channels, error: null };
+  logger.warn(
+    { pages: MAX_CHANNEL_PAGES, channels: collected.length },
+    "Slack conversations.list page cap reached; returning a partial channel list",
+  );
+  return done(null);
 }

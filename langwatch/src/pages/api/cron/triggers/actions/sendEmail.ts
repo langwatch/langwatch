@@ -1,30 +1,47 @@
 import { TriggerAction } from "@prisma/client";
-import { createHash } from "crypto";
 import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import {
   consumeEmailCapSlot,
   consumeTenantEmailCapSlot,
 } from "~/server/event-sourcing/outbox/emailHourlyCap";
-import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
+import { dispatchGraphAlertAction } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import type { ActionParams, TriggerContext } from "../types";
+import type { TriggerContext } from "../types";
+import {
+  buildCronGraphAlertInput,
+  cronGraphAlertDeps,
+} from "./graphAlertDispatch";
 
 const logger = createLogger("langwatch:cron:triggers:sendEmail");
 
+/**
+ * Email a custom-graph alert from the cron path.
+ *
+ * The send itself goes through the shared `dispatchGraphAlertAction`, so the
+ * cron renders the author's saved Liquid templates against `ALERT_TRIGGER_DEFAULTS`
+ * — the very copy they previewed in the drawer — instead of the legacy React
+ * email tree, which ignored the four template columns entirely.
+ *
+ * The email-only guards stay here, because Slack has no equivalent: the ADR-031
+ * suppression list (sized here so the per-project cap can count recipients) and
+ * the two hard caps.
+ */
 export const handleSendEmail = async (context: TriggerContext) => {
-  const { trigger, triggerData, projectSlug } = context;
-  const actionParams = trigger.actionParams as unknown as ActionParams;
+  const { trigger } = context;
 
   try {
-    // ADR-031: the custom-graph cron path renders the same unsubscribe footer
-    // as the outbox path, so it must honour the same suppression list and
-    // hourly cap — otherwise those footers' links would be dead.
+    const input = buildCronGraphAlertInput(context);
+
+    // ADR-031: the alert's unsubscribe footer must mean something — drop
+    // recipients who used it before anything else runs. The dispatcher re-checks
+    // (it is the single gate both paths share); this call is what sizes the
+    // per-project cap below.
     const recipients = await getApp().emailSuppressions.filterSuppressed({
       projectId: trigger.projectId,
       triggerId: trigger.id,
-      emails: actionParams.members ?? [],
+      emails: input.recipients,
     });
     if (recipients.length === 0) {
       logger.info(
@@ -34,27 +51,18 @@ export const handleSendEmail = async (context: TriggerContext) => {
       return;
     }
 
-    // Stable per-dispatch digest over this run's trace/graph ids — identical
-    // across cron ticks for the same matched set, distinct across runs. Backs
-    // both the cap claim (so a re-tick doesn't burn a second slot) and the
-    // per-recipient idempotency key prefix (ADR-031), mirroring the outbox
-    // dispatcher's `dispatchDigest`.
-    const dispatchDigest = createHash("sha256")
-      .update(
-        triggerData
-          .map((d) => d.traceId ?? d.graphId ?? "")
-          .sort()
-          .join(","),
-      )
-      .digest("hex")
-      .slice(0, 16);
-
+    // `input.fireDigest` is the stable identity of THIS fire (see
+    // `graphAlertFireDigest`): identical across cron re-ticks that have not yet
+    // recorded the incident, distinct once the next incident opens. It backs
+    // both cap claims — so a re-tick re-reads the count instead of burning a
+    // second slot — and, inside the dispatcher, the per-recipient idempotency
+    // keys.
     const capSlot = await consumeEmailCapSlot({
       projectId: trigger.projectId,
       triggerId: trigger.id,
       now: new Date(),
       cap: env.TRIGGER_EMAIL_HOURLY_CAP,
-      dedupKey: `${trigger.projectId}/${trigger.id}:digest:${dispatchDigest}`,
+      dedupKey: `${trigger.projectId}/${trigger.id}:digest:${input.fireDigest}`,
     });
     if (!capSlot.allowed) {
       logger.error(
@@ -73,14 +81,13 @@ export const handleSendEmail = async (context: TriggerContext) => {
     // cap, run only once the hourly cap has passed and the recipient set is
     // known. Counts RECIPIENTS (`recipients.length`), the actual outbound email
     // volume, not dispatches. Over the cap this dispatch is dropped (WARN, no
-    // send); the same `dispatchDigest`-derived dedupKey makes the count
-    // idempotent across cron re-ticks.
+    // send); the same fire digest makes the count idempotent across re-ticks.
     const tenantSlot = await consumeTenantEmailCapSlot({
       projectId: trigger.projectId,
       now: new Date(),
       cap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
       recipientCount: recipients.length,
-      dedupKey: `${trigger.projectId}:tenant:${dispatchDigest}`,
+      dedupKey: `${trigger.projectId}:tenant:${input.fireDigest}`,
     });
     if (!tenantSlot.allowed) {
       logger.warn(
@@ -96,42 +103,10 @@ export const handleSendEmail = async (context: TriggerContext) => {
       return;
     }
 
-    // Per-recipient idempotency (ADR-031): back the mailer's recipient gate
-    // with the same TriggerSent claim store the outbox path uses, reachable
-    // here via `getApp().triggers` (no new cross-module exports). A mid-loop
-    // failure means the next cron tick skips recipients already delivered
-    // instead of re-sending to them. Key shape matches the outbox dispatcher:
-    // `rcpt:{dispatchDigest}:{recipientHash}` in the traceId field.
-    const recipientClaimKey = (recipientHash: string) =>
-      `rcpt:${dispatchDigest}:${recipientHash}`;
-    const isRecipientSent = (recipientHash: string) =>
-      getApp().triggers.isSendClaimed({
-        triggerId: trigger.id,
-        traceId: recipientClaimKey(recipientHash),
-        projectId: trigger.projectId,
-      });
-    const recordRecipientSent = async (recipientHash: string) => {
-      await getApp().triggers.claimSend({
-        triggerId: trigger.id,
-        traceId: recipientClaimKey(recipientHash),
-        projectId: trigger.projectId,
-      });
-    };
-
-    const triggerInfo = {
-      triggerEmails: recipients,
-      triggerData,
-      triggerName: trigger.name,
-      triggerId: trigger.id,
-      projectId: trigger.projectId,
-      projectSlug,
-      triggerType: trigger.alertType ?? null,
-      triggerMessage: trigger.message ?? "",
-      isRecipientSent,
-      recordRecipientSent,
-    };
-
-    await sendTriggerEmail(triggerInfo);
+    await dispatchGraphAlertAction({
+      deps: cronGraphAlertDeps(),
+      input: { ...input, recipients },
+    });
   } catch (error) {
     captureException(toError(error), {
       extra: {

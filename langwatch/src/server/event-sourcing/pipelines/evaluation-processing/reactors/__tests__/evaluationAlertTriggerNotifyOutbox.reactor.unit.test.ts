@@ -1,4 +1,4 @@
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -58,6 +58,7 @@ function createTrigger(
     projectId: "tenant-1",
     name: "Quality Alert",
     action: TriggerAction.SEND_EMAIL,
+    triggerKind: TriggerKind.AUTOMATION,
     actionParams: { members: ["user@example.com"] },
     filters: {
       "evaluations.passed": { "evaluator-1": ["true"] },

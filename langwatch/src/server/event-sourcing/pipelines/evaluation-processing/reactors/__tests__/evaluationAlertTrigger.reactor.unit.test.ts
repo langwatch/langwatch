@@ -1,4 +1,4 @@
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -116,6 +116,7 @@ function createTrigger(
     projectId: "tenant-1",
     name: "Quality Alert",
     action: TriggerAction.ADD_TO_DATASET,
+    triggerKind: TriggerKind.AUTOMATION,
     actionParams: {
       datasetId: "dataset-1",
       datasetMapping: { mapping: {}, expansions: [] },

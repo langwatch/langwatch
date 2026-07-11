@@ -16,7 +16,9 @@ import {
   type GraphAlertTimePeriod,
   extractGraphAlertFromTriggerRow as parseGraphAlertRow,
 } from "~/server/app-layer/triggers/graph-alert.builder";
+import { reportSourceSchema } from "~/server/app-layer/triggers/report.builder";
 import type { FilterField } from "~/server/filters/types";
+import { describeCron, isValidCron } from "./reportSchedule";
 
 /**
  * Pure state machine for the staged automation drawer (ADR-036). Lives
@@ -204,11 +206,14 @@ export function reducer(
       }
       if (action.value === "report") {
         // Reports send a rendered notification on a schedule — notify only.
+        // `filterQuery` SURVIVES the switch: a trace-query report is scoped by
+        // exactly that query (the Subject editor writes it, the router persists
+        // it), so clearing it here would silently drop the author's scope and
+        // send the newest traces instead of the ones they asked for.
         return {
           ...state,
           source: "report",
           filters: {},
-          filterQuery: null,
           customGraphId: null,
           action:
             state.action === "SEND_EMAIL" ||
@@ -332,10 +337,12 @@ export function templatesFromDraft(draft: AutomationDraft) {
 
 /**
  * Build the `automation.testFireTemplate` mutation input from a draft.
- * Extracted from the drawer so the graph-alert discriminator is unit-testable:
- * a `customGraph` draft MUST carry a non-null `graphAlert` or the server
- * renders the alert template against the trace context, producing the blank
- * "Metric / Condition / <|Open dashboard>" message (the field-5015 bug).
+ * Extracted from the drawer so the source discriminators are unit-testable:
+ * a `customGraph` draft MUST carry a non-null `graphAlert`, and a `report`
+ * draft a non-null `report`, or the server renders that template against the
+ * TRACE context — producing the blank "Metric / Condition / <|Open dashboard>"
+ * message (the field-5015 bug) or a report with every variable empty.
+ * Exactly one of the two discriminators is ever non-null.
  */
 export function buildTestFirePayload({
   draft,
@@ -359,6 +366,7 @@ export function buildTestFirePayload({
   seriesLabel?: string | null;
 }) {
   const isGraphAlert = draft.source === "customGraph";
+  const isReport = draft.source === "report";
   return {
     projectId,
     channel,
@@ -377,6 +385,14 @@ export function buildTestFirePayload({
           operator: draft.graphAlert.operator,
           threshold: draft.graphAlert.threshold,
           timePeriodMinutes: draft.graphAlert.timePeriod,
+        }
+      : null,
+    report: isReport
+      ? {
+          sourceKind: draft.report.sourceKind,
+          // Sentence-form, already timezone-qualified — the report templates
+          // print the schedule, they don't re-derive it from a cron.
+          scheduleLabel: describeCron(draft.report.cron, draft.report.timezone),
         }
       : null,
   };
@@ -429,14 +445,20 @@ export function filterQueryIsSet(filterQuery: string | null): boolean {
  * - Automation: always — the digest cadence and settle window carry valid
  *   defaults, so there is nothing to block on.
  * - Alert: a finite threshold to compare the metric against.
- * - Report: a cron schedule.
+ * - Report: a cron the scheduler can actually run, no more often than the
+ *   frequency floor. Non-empty is not enough — "every monday" saved an active
+ *   report whose scheduler sync then threw, and `* * * * *` scheduled 1440
+ *   sends a day to free-form recipients.
  */
 export function cadenceIsSet(draft: AutomationDraft): boolean {
   if (draft.source === "customGraph") {
     return Number.isFinite(draft.graphAlert.threshold);
   }
   if (draft.source === "report") {
-    return draft.report.cron.trim().length > 0;
+    return isValidCron({
+      cron: draft.report.cron,
+      timezone: draft.report.timezone,
+    });
   }
   return true;
 }
@@ -519,6 +541,56 @@ export function extractGraphAlertFromTriggerRow(
     timePeriod: parsed.timePeriod,
     threshold: parsed.threshold,
     seriesName: parsed.seriesName,
+  };
+}
+
+/**
+ * Pull the report content + schedule out of a saved Trigger row's
+ * `actionParams` JSON — the inverse of `reportInputFromDraft`, flattened back
+ * onto the form-shaped `ReportDraft`. Without it, editing a saved report
+ * hydrated an empty draft and Save rewrote the row as a plain automation:
+ * schedule and content source gone, the report silently stopped sending.
+ *
+ * The content source goes through the SSOT `reportSourceSchema` so this can't
+ * drift from what the router writes. The schedule is read VERBATIM rather than
+ * through `reportScheduleSchema`: a row written before the send-frequency floor
+ * existed would fail that schema, and swapping the author's schedule for a
+ * default is the same silent-destruction bug in a smaller costume. An invalid
+ * cron rehydrates into the field, shows its error, and blocks Save until the
+ * author fixes it. Seeded defaults fill only what the row doesn't carry.
+ */
+export function extractReportFromTriggerRow(
+  actionParams: unknown,
+): ReportDraft {
+  if (typeof actionParams !== "object" || actionParams === null) {
+    return INITIAL_REPORT_DRAFT;
+  }
+  const { source, schedule } = actionParams as {
+    source?: unknown;
+    schedule?: { cron?: unknown; timezone?: unknown };
+  };
+  const draft: ReportDraft = {
+    ...INITIAL_REPORT_DRAFT,
+    cron:
+      typeof schedule?.cron === "string"
+        ? schedule.cron
+        : INITIAL_REPORT_DRAFT.cron,
+    timezone:
+      typeof schedule?.timezone === "string" && schedule.timezone.trim() !== ""
+        ? schedule.timezone
+        : INITIAL_REPORT_DRAFT.timezone,
+  };
+  const parsed = reportSourceSchema.safeParse(source);
+  if (!parsed.success) return draft;
+  const content = parsed.data;
+  return {
+    ...draft,
+    sourceKind: content.kind,
+    customGraphId:
+      content.kind === "customGraph" ? content.customGraphId : null,
+    dashboardId: content.kind === "dashboard" ? content.dashboardId : null,
+    topN:
+      content.kind === "traceQuery" ? content.topN : INITIAL_REPORT_DRAFT.topN,
   };
 }
 

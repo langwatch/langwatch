@@ -1,3 +1,4 @@
+import { TriggerKind } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
 import { SchedulerService } from "~/server/app-layer/scheduler/scheduler.service";
@@ -44,11 +45,25 @@ export class TriggerService {
     return all;
   }
 
+  /**
+   * Active TRACE automations for a project: the ones the trace/evaluation
+   * pipelines fire per ingested trace.
+   *
+   * REPORTs are excluded (ADR-042). A report persists `filters: {}` and no
+   * `customGraphId` — byte-identical to a match-everything trace automation —
+   * so without the kind check every scheduled report would ALSO fire once per
+   * ingested trace: the notify reactor enqueues a settle for any NOTIFY trigger
+   * with no evaluation filters, and the settle dispatcher skips the filter
+   * guard entirely when `filters` is empty. A report fires from its scheduler
+   * calendar entry (`syncReportSchedule`) and nowhere else.
+   */
   async getActiveTraceTriggersForProject(
     projectId: string,
   ): Promise<TriggerSummary[]> {
     const all = await this.loadAll(projectId);
-    return all.filter((t) => !t.customGraphId);
+    return all.filter(
+      (t) => !t.customGraphId && t.triggerKind !== TriggerKind.REPORT,
+    );
   }
 
   /**
@@ -56,12 +71,19 @@ export class TriggerService {
    * Counterpart to `getActiveTraceTriggersForProject`: filters the
    * SAME `findActiveForProject` read down to rows with `customGraphId`,
    * which is the cron's definition of a graph trigger.
+   *
+   * REPORTs are excluded here too: a report whose source is a custom graph is
+   * still schedule-fired, and converting an existing graph alert into a report
+   * leaves the old `customGraphId` on the row — which would otherwise re-arm it
+   * as a threshold alert on the heartbeat path.
    */
   async getActiveGraphTriggersForProject(
     projectId: string,
   ): Promise<TriggerSummary[]> {
     const all = await this.loadAll(projectId);
-    return all.filter((t) => t.customGraphId != null);
+    return all.filter(
+      (t) => t.customGraphId != null && t.triggerKind !== TriggerKind.REPORT,
+    );
   }
 
   /**

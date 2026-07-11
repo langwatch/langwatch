@@ -1,4 +1,5 @@
 import type { Project, Trigger } from "@prisma/client";
+import { Cron } from "croner";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import { extractReportFromTriggerRow } from "~/server/app-layer/triggers/report.builder";
 import type { ReportSource } from "~/server/app-layer/triggers/report.builder";
@@ -81,22 +82,45 @@ export interface ReportDispatchDeps {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
 
+/** A fire summarises at least a minute and at most a year, whatever the cron. */
+const MIN_WINDOW_MS = 60 * 1000;
+const MAX_WINDOW_MS = 366 * DAY_MS;
+
 /**
- * Derive a report's trailing look-back window from its cron cadence — the span
- * a fire should summarise ("since the last fire"). Deliberately a shape lookup
- * on the standard 5-field cron, not a full parser:
- *  - a weekday-pinned cron (`m h * * N`) → trailing 7 days;
- *  - a plain daily cron    (`m h * * *`) → trailing 1 day;
- *  - anything else (malformed / day-of-month pinned) → 7 days.
+ * The span a fire summarises: everything since the report's PREVIOUS scheduled
+ * slot, up to the slot being fired. Asking the schedule itself (in the report's
+ * own timezone) is the only way to get this right — the previous version
+ * pattern-matched the cron's SHAPE, so a monthly report (`0 9 1 * *`) fell
+ * through to a 7-day window and quietly dropped three weeks of its own data,
+ * while a six-hourly one looked back a full day and re-sent the same day four
+ * times over.
+ *
+ * DST comes out right for free: a daily 09:00 report spanning a spring-forward
+ * summarises 23 hours, because that is genuinely how long ago its last slot was.
+ *
+ * Falls back to a week only when the schedule cannot be read at all (a row we
+ * can no longer parse) — dispatch still sends something rather than nothing.
  */
-export function reportWindowMs(cron: string): number {
-  const fields = cron.trim().split(/\s+/);
-  if (fields.length < 5) return WEEK_MS;
-  const dayOfMonth = fields[2];
-  const dayOfWeek = fields[4];
-  if (dayOfWeek !== "*") return WEEK_MS; // e.g. "0 9 * * 1" — weekly
-  if (dayOfMonth === "*") return DAY_MS; // e.g. "0 7 * * *" — daily
-  return WEEK_MS; // day-of-month pinned / anything else — default
+export function reportWindowMs({
+  cron,
+  timezone,
+  slot,
+}: {
+  cron: string;
+  timezone: string;
+  slot: Date;
+}): number {
+  let previous: Date | undefined;
+  try {
+    [previous] = new Cron(cron, { timezone }).previousRuns(1, slot);
+  } catch {
+    return WEEK_MS;
+  }
+  if (!previous) return WEEK_MS;
+
+  const span = slot.getTime() - previous.getTime();
+  if (!Number.isFinite(span) || span <= 0) return WEEK_MS;
+  return Math.min(Math.max(span, MIN_WINDOW_MS), MAX_WINDOW_MS);
 }
 
 /** Human summary of what a report renders (context `report.sourceLabel`). */
@@ -175,11 +199,18 @@ export async function dispatchScheduledReport({
   };
 
   // Every report carries its DATA, not just a link to it, over the window
-  // `[slot - windowMs, slot]` (windowMs tracks the cron cadence). A trace-query
-  // report sends the traces matching its search query; a graph or dashboard
-  // report sends the plotted series of each panel.
+  // `[previous slot, this slot]` — exactly the period this fire is responsible
+  // for, so a monthly report summarises its month and a daily one its day. A
+  // trace-query report sends the traces matching its search query; a graph or
+  // dashboard report sends the plotted series of each panel.
   const to = fire.slot.getTime();
-  const from = to - reportWindowMs(report.schedule.cron);
+  const from =
+    to -
+    reportWindowMs({
+      cron: report.schedule.cron,
+      timezone: report.schedule.timezone,
+      slot: fire.slot,
+    });
 
   let traces: ReportTraceRow[] = [];
   let charts: ReportChart[] = [];
@@ -238,10 +269,7 @@ export async function dispatchScheduledReport({
         subjectTemplate: trigger.emailSubjectTemplate,
         bodyTemplate: trigger.emailBodyTemplate,
         context,
-        defaults: {
-          emailSubject: REPORT_TRIGGER_DEFAULTS.emailSubject,
-          emailBody: REPORT_TRIGGER_DEFAULTS.emailBody,
-        },
+        defaults: REPORT_TRIGGER_DEFAULTS,
       });
       await deps.sendEmail({
         triggerEmails: allowed,
@@ -256,10 +284,6 @@ export async function dispatchScheduledReport({
     if (trigger.action === "SEND_SLACK_MESSAGE") {
       const templateType: SlackTemplateType | null =
         trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
-      const slackDefaults = {
-        slackString: REPORT_TRIGGER_DEFAULTS.slackString,
-        slackBlockKit: REPORT_TRIGGER_DEFAULTS.slackBlockKit,
-      };
 
       // ADR-041: a bot connection posts via the Web API with the gate open.
       const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
@@ -271,7 +295,7 @@ export async function dispatchScheduledReport({
           templateType,
           template: trigger.slackTemplate,
           context,
-          defaults: slackDefaults,
+          defaults: REPORT_TRIGGER_DEFAULTS,
           allowGatedBlocks: true,
         });
         await deps.sendSlackBot({
@@ -289,7 +313,7 @@ export async function dispatchScheduledReport({
         templateType,
         template: trigger.slackTemplate,
         context,
-        defaults: slackDefaults,
+        defaults: REPORT_TRIGGER_DEFAULTS,
       });
       await deps.sendSlack({
         triggerWebhook: webhook,

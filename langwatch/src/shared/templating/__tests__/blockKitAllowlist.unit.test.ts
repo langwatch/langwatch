@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterBlockKit } from "../blockKitAllowlist";
+import { filterBlockKit, MAX_SECTION_TEXT_CHARS } from "../blockKitAllowlist";
 
 describe("filterBlockKit", () => {
   describe("when given a mix of allowed and disallowed blocks", () => {
@@ -85,6 +85,118 @@ describe("filterBlockKit", () => {
         { type: "mrkdwn", text: "keep-me" },
         { type: "plain_text", text: "keep-me-too" },
       ]);
+    });
+  });
+
+  // Slack rejects a `context` / `rich_text` / `rich_text_section` block whose
+  // `elements` array is empty with `400 invalid_blocks` — which fails the WHOLE
+  // message and is not retryable. Emitting the emptied block would therefore
+  // lose the entire notification (and keep `blocks` non-empty, so the plain-text
+  // fallback would never fire). The block must be dropped instead.
+  describe("when a context block holds only elements the allowlist strips", () => {
+    it("drops the block rather than emitting an empty elements array", () => {
+      const blocks = filterBlockKit([
+        {
+          type: "context",
+          elements: [
+            { type: "image", image_url: "https://tracker/", alt_text: "z" },
+          ],
+        },
+        { type: "section", text: { type: "mrkdwn", text: "keep me" } },
+      ]);
+      expect(blocks.map((b) => b.type)).toEqual(["section"]);
+    });
+
+    it("drops a context block that carries no elements array at all", () => {
+      expect(filterBlockKit([{ type: "context" }])).toEqual([]);
+    });
+  });
+
+  describe("when a rich_text section holds only a mention", () => {
+    it("drops the emptied section, and the rich_text block with it", () => {
+      const blocks = filterBlockKit([
+        {
+          type: "rich_text",
+          elements: [
+            {
+              type: "rich_text_section",
+              elements: [{ type: "user", user_id: "U123" }],
+            },
+          ],
+        },
+      ]);
+      expect(blocks).toEqual([]);
+    });
+
+    it("keeps the rich_text block when a sibling section survives", () => {
+      const [block] = filterBlockKit([
+        {
+          type: "rich_text",
+          elements: [
+            {
+              type: "rich_text_section",
+              elements: [{ type: "broadcast", range: "channel" }],
+            },
+            {
+              type: "rich_text_quote",
+              elements: [{ type: "text", text: "kept" }],
+            },
+          ],
+        },
+      ]);
+      expect(block?.elements).toEqual([
+        { type: "rich_text_quote", elements: [{ type: "text", text: "kept" }] },
+      ]);
+    });
+  });
+
+  describe("when a section is left with no text or fields", () => {
+    it("drops it (Slack rejects a section with neither)", () => {
+      const blocks = filterBlockKit([
+        { type: "section", accessory: { type: "button", text: "Click" } },
+      ]);
+      expect(blocks).toEqual([]);
+    });
+  });
+
+  // A report with a high row count packs every row into one section. Past
+  // Slack's 3000-character section limit the message is rejected outright, so
+  // the text is cut here — and the cut is visible, never silent.
+  describe("when a section text runs past Slack's character limit", () => {
+    it("cuts it to the cap and marks it as truncated", () => {
+      const [block] = filterBlockKit([
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: "x".repeat(5000) },
+        },
+      ]);
+      const text = (block?.text as { text: string }).text;
+      expect(text.length).toBeLessThanOrEqual(MAX_SECTION_TEXT_CHARS);
+      expect(text).toContain("truncated");
+    });
+
+    it("leaves a section within the cap untouched", () => {
+      const [block] = filterBlockKit([
+        { type: "section", text: { type: "mrkdwn", text: "short" } },
+      ]);
+      expect(block?.text).toEqual({ type: "mrkdwn", text: "short" });
+    });
+  });
+
+  describe("when a section carries more fields than Slack accepts", () => {
+    it("keeps the first ten and caps each field's text", () => {
+      const [block] = filterBlockKit([
+        {
+          type: "section",
+          fields: Array.from({ length: 14 }, () => ({
+            type: "mrkdwn",
+            text: "y".repeat(2400),
+          })),
+        },
+      ]);
+      const fields = block?.fields as { text: string }[];
+      expect(fields).toHaveLength(10);
+      expect(fields.every((f) => f.text.length <= 2000)).toBe(true);
     });
   });
 

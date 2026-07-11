@@ -26,14 +26,7 @@ import {
   LiquidEditor,
   TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
-import {
-  DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE,
-  DEFAULT_ALERT_SLACK_TEMPLATE,
-  DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE,
-  DEFAULT_REPORT_SLACK_TEMPLATE,
-  DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
-  DEFAULT_SLACK_TEMPLATE,
-} from "~/shared/templating/defaults";
+import { defaultsForSourceKind } from "~/shared/templating/defaults";
 import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
 import { api } from "~/utils/api";
 import { InlineCadenceSelect } from "../../components/InlineCadenceSelect";
@@ -60,6 +53,11 @@ import {
 } from "./templates/registry";
 import { SlackBlockKitTemplatePicker } from "./templates/TemplatePicker";
 
+/** A template field. `usingDefault` means "the author has not customised this"
+ *  — it is what the Reset affordance and the default badge read. `value` is the
+ *  template that will actually be sent: empty while the framework default
+ *  applies, and pre-filled for a report (whose layout follows its content
+ *  source, so the draft carries the matching layout from the start). */
 interface FieldDraft {
   value: string;
   usingDefault: boolean;
@@ -323,7 +321,12 @@ function templatesFromSlice(slice: SlackSlice) {
   return {
     emailSubjectTemplate: null,
     emailBodyTemplate: null,
-    slackTemplate: slice.template.usingDefault ? null : slice.template.value,
+    // The template the author is looking at is the template we store — whether
+    // they wrote it, picked it from the gallery, or it was seeded from the
+    // report's content source. An empty field means no template of our own, so
+    // the framework default applies.
+    slackTemplate:
+      slice.template.value.trim().length > 0 ? slice.template.value : null,
     // Always carry the toggle. A null `slackTemplate` paired with a
     // non-null `slackTemplateType` means "use the framework default for
     // this type" — without this the server can't tell apart a user who
@@ -359,20 +362,14 @@ function SlackConfigForm({
   const autoLayout = isReport && reportSourceIsAutoLayout(ctx.reportSourceKind);
   // The editor must seed the same default dispatch renders for this kind —
   // otherwise the shown template and the sent message disagree.
+  const defaults = defaultsForSourceKind(ctx.sourceKind);
   const templateDefault = isBlockKit
-    ? isGraphAlert
-      ? DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE
-      : isReport
-        ? DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE
-        : DEFAULT_SLACK_BLOCK_KIT_TEMPLATE
-    : isGraphAlert
-      ? DEFAULT_ALERT_SLACK_TEMPLATE
-      : isReport
-        ? DEFAULT_REPORT_SLACK_TEMPLATE
-        : DEFAULT_SLACK_TEMPLATE;
-  const templateValue = slice.template.usingDefault
-    ? templateDefault
-    : slice.template.value;
+    ? defaults.slackBlockKit
+    : defaults.slackString;
+  // A report draft carries its layout from the start (see the seeding effect
+  // below) while still counting as un-customised, so a filled field always wins
+  // over the framework default.
+  const templateValue = slice.template.value || templateDefault;
   const slackPreview = ctx.preview;
   const variables = useMemo(
     () => filterVariablesForCadence(ctx.variables, ctx.cadenceMode),
@@ -397,8 +394,11 @@ function SlackConfigForm({
   // A report's CONTENT source counts the same way: a chart layout has no series
   // to plot once the report switches to matching traces, and a table of traces
   // has no rows once it switches to a graph.
+  //
+  // Only a BUNDLED layout is reset this way — whether the author picked it or a
+  // report seeded it. A template the author wrote themselves is never one of
+  // ours, so it is never thrown away from under them.
   useEffect(() => {
-    if (slice.template.usingDefault) return;
     const preset = findTemplateOptionBySource(slice.template.value);
     if (!preset) return;
     const cadenceMismatch =
@@ -418,6 +418,11 @@ function SlackConfigForm({
   // and relying on a framework default that can't know the source, seed the
   // matching layout concretely. What the author sees here is then exactly what
   // is stored and sent.
+  //
+  // The draft stays on `usingDefault: true` while it holds the seeded layout:
+  // the author has customised nothing yet, so the field must still read as the
+  // default and Reset must bring the bundled layout back rather than being a
+  // no-op on a draft that only LOOKS hand-written.
   useEffect(() => {
     if (!isReport || !isBlockKit || !slice.template.usingDefault) return;
     const id = pickDefaultSlackBlockKitTemplateId({
@@ -427,10 +432,10 @@ function SlackConfigForm({
       reportSource: ctx.reportSourceKind,
     });
     const option = SLACK_BLOCK_KIT_TEMPLATES.find((opt) => opt.id === id);
-    if (!option) return;
+    if (!option || slice.template.value === option.source) return;
     onChange({
       ...slice,
-      template: { value: option.source, usingDefault: false },
+      template: { value: option.source, usingDefault: true },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

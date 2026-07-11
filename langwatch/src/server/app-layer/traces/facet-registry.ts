@@ -1,4 +1,8 @@
 import {
+  deriveTraceOrigin,
+  TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
+} from "./derive-trace-origin";
+import {
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
 } from "./derive-trace-status";
@@ -121,13 +125,8 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Origin",
     group: "trace",
     table: "trace_summaries",
-    expression: "Attributes['langwatch.origin']",
-    // Deferred origin stamping defaults unset traces to "application" at fold
-    // projection; apply the same `origin ?? "application"` default (mirroring
-    // normalizePreconditionTraceData) so `origin:application` matches them.
-    read: (t) =>
-      (t.summary.attributes["langwatch.origin"] as string | undefined) ??
-      "application",
+    expression: TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
+    read: (t) => deriveTraceOrigin(t.summary.attributes),
   },
   {
     key: "service",
@@ -239,7 +238,13 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Annotation",
     group: "trace",
     table: "trace_summaries",
-    expression: "if(HasAnnotation, 'annotated', 'unannotated')",
+    // `HasAnnotation` is `Nullable(Bool)` and is written as NULL for traces
+    // that were never annotated, so a bare `if(HasAnnotation, ...)` returns
+    // NULL — not `'unannotated'` — and those traces drop out of both the facet
+    // counts and the `annotation:unannotated` filter, while the `read` below
+    // calls them unannotated. Coalesce, matching the analytics filter's
+    // `HasAnnotation = false OR HasAnnotation IS NULL`.
+    expression: "if(ifNull(HasAnnotation, false), 'annotated', 'unannotated')",
     read: (t) =>
       t.summary.annotationIds.length > 0 ? "annotated" : "unannotated",
   },

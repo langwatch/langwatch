@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import { FilterFieldUnknownError } from "../../errors";
+import {
+  type ExpressionCategoricalDef,
+  FACET_REGISTRY,
+  type RangeFacetDef,
+} from "../../facet-registry";
 import type { TraceSummaryData } from "../../types";
+import { translateFilterToClickHouse } from "../ast";
 import { evaluateQueryInMemory, queryNeeds } from "../evaluate";
-import type { InMemoryTrace } from "../field-def";
+import { type InMemoryTrace, UNSUPPORTED } from "../field-def";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -497,6 +504,166 @@ describe("evaluateQueryInMemory", () => {
       );
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// Both-sides parity: the table above only pins the in-memory half against
+// hand-written booleans, which is how `origin`'s SQL/read divergence shipped
+// (the `read` defaulted a missing origin to "application", the `expression`
+// was the bare map access, which ClickHouse resolves to '' — so the dispatcher
+// matched every unstamped trace and the identical trace-list query matched
+// none). These tests run the ClickHouse compiler too, and tie the two halves of
+// each FieldDef together so that class of drift can't come back.
+//
+// Executing the compiled SQL against real rows needs a ClickHouse container —
+// that lives in `filter-parity.integration.test.ts`.
+// ---------------------------------------------------------------------------
+
+type ExpressionFacet = ExpressionCategoricalDef | RangeFacetDef;
+
+const hasExpression = (d: unknown): d is ExpressionFacet =>
+  typeof d === "object" && d !== null && "expression" in d;
+
+/** The facets `build-handlers` auto-derives BOTH sides from (SQL + read). */
+const autoDerived = FACET_REGISTRY.filter(
+  (d): d is ExpressionFacet => hasExpression(d) && d.read != null,
+);
+
+/** A trace with nothing set — every read falls back to whatever it defaults. */
+const emptyTrace = makeTrace({});
+
+describe("FieldDef SQL/read parity", () => {
+  it("covers every auto-derived facet", () => {
+    expect(autoDerived.length).toBeGreaterThan(10);
+  });
+
+  describe("when a facet's in-memory read applies a default", () => {
+    it.each(autoDerived.map((d) => [d.key, d] as const))(
+      "[%s] spells that default out in the ClickHouse expression too",
+      (_key, def) => {
+        const value = def.read!(emptyTrace);
+        // No default (bare column: CH yields '' or NULL, and the read agrees),
+        // an array-valued read, or a field that can't be read at dispatch.
+        if (
+          value === UNSUPPORTED ||
+          value === null ||
+          value === "" ||
+          Array.isArray(value) ||
+          typeof value === "number"
+        ) {
+          return;
+        }
+        // A read that invents a value for an unset trace is only honest if the
+        // SQL invents the same one — otherwise the two halves disagree on
+        // exactly the rows nobody stamped.
+        expect(def.expression).toContain(`'${value}'`);
+      },
+    );
+  });
+
+  describe("when a field is compiled to ClickHouse", () => {
+    it.each(autoDerived.map((d) => [d.key, d] as const))(
+      "[%s] compiles against its registry expression",
+      (key, def) => {
+        const literal = def.kind === "range" ? "1" : "x";
+        const compiled = translateFilterToClickHouse(
+          `${key}:${literal}`,
+          "tenant-1",
+          { from: 0, to: 1 },
+        );
+        expect(compiled?.sql).toContain(def.expression);
+      },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Prototype-pollution regression: field names come from a user-authored filter
+// string, so `constructor` / `toString` / `__proto__` used to resolve off
+// `Object.prototype`. The inherited value is truthy, so it slipped past the
+// `!def` / `!handler` guards on BOTH paths: the save-time gate accepted the
+// query, and the dispatcher's "fail-closed" evaluator threw
+// `def.evaluateInMemory is not a function` out of `handleSettle` — one saved
+// automation poisoning trigger dispatch for the whole project.
+//
+// These execute the paths; asserting on generated strings would not have caught
+// the throw.
+// ---------------------------------------------------------------------------
+
+const PROTOTYPE_FIELDS = [
+  "constructor",
+  "toString",
+  "__proto__",
+  "hasOwnProperty",
+  "valueOf",
+  "isPrototypeOf",
+  "propertyIsEnumerable",
+];
+
+describe("given a filter field that collides with an Object.prototype member", () => {
+  describe("when the dispatcher evaluates it in memory", () => {
+    it.each(PROTOTYPE_FIELDS)(
+      "[%s] fails closed instead of throwing",
+      (field) => {
+        expect(() =>
+          evaluateQueryInMemory(`${field}:x`, makeTrace({})),
+        ).not.toThrow();
+        expect(evaluateQueryInMemory(`${field}:x`, makeTrace({}))).toBe(false);
+      },
+    );
+
+    it("fails closed when the poisoned tag is OR-ed with a matching one", () => {
+      expect(
+        evaluateQueryInMemory("topic:t1 OR constructor:x", makeTrace({ topicId: "t1" })),
+      ).toBe(false);
+    });
+  });
+
+  describe("when the save-time gate compiles it", () => {
+    it.each(PROTOTYPE_FIELDS)("[%s] is rejected as an unknown field", (field) => {
+      expect(() =>
+        translateFilterToClickHouse(`${field}:x`, "tenant-1", {
+          from: 0,
+          to: 1,
+        }),
+      ).toThrow(FilterFieldUnknownError);
+    });
+  });
+
+  describe("when the value of has/none names a prototype member", () => {
+    it("reads an absent attribute as absent, matching Attributes['constructor'] = ''", () => {
+      // `Attributes['constructor'] != ''` is false in ClickHouse for every
+      // trace that never carried the key; the in-memory read must agree rather
+      // than hand back the inherited `Object.prototype.constructor`.
+      expect(
+        evaluateQueryInMemory("has:attribute.constructor", makeTrace({})),
+      ).toBe(false);
+      expect(
+        evaluateQueryInMemory("none:attribute.constructor", makeTrace({})),
+      ).toBe(true);
+    });
+
+    it("still matches an attribute genuinely named constructor", () => {
+      expect(
+        evaluateQueryInMemory(
+          "has:attribute.constructor",
+          makeTrace({ attributes: { constructor: "yes" } }),
+        ),
+      ).toBe(true);
+      expect(
+        evaluateQueryInMemory(
+          "trace.attribute.constructor:yes",
+          makeTrace({ attributes: { constructor: "yes" } }),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe("when the needs collector walks it", () => {
+    it.each(PROTOTYPE_FIELDS)("[%s] resolves no auxiliary needs", (field) => {
+      expect(queryNeeds(`${field}:x`).size).toBe(0);
+    });
+  });
 });
 
 describe("queryNeeds", () => {

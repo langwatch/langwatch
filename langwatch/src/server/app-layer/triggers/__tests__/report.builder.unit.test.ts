@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReportTriggerData,
   extractReportFromTriggerRow,
+  reportScheduleSchema,
   reportSourceSchema,
   type ReportActionParams,
 } from "../report.builder";
@@ -37,6 +38,62 @@ describe("buildReportTriggerData", () => {
       expect(
         (data.actionParams as { slackWebhook: string }).slackWebhook,
       ).toBe("https://hooks.slack.com/services/x");
+    });
+  });
+});
+
+describe("reportScheduleSchema", () => {
+  const issuePaths = (cron: string, timezone: string): string[] => {
+    const parsed = reportScheduleSchema.safeParse({ cron, timezone });
+    return parsed.success
+      ? []
+      : parsed.error.issues.map((issue) => issue.path.join("."));
+  };
+
+  describe("given a schedule the scheduler can actually run", () => {
+    it.each([
+      { cron: "0 9 * * 1", timezone: "Europe/Amsterdam" },
+      { cron: "0 7 * * *", timezone: "UTC" },
+      { cron: "0 9 1 * *", timezone: "America/New_York" },
+      { cron: "0 */6 * * *", timezone: "UTC" },
+      { cron: "*/15 * * * *", timezone: "UTC" },
+    ])("accepts $cron ($timezone)", ({ cron, timezone }) => {
+      expect(reportScheduleSchema.safeParse({ cron, timezone }).success).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("given a cron the scheduler would choke on", () => {
+    it("rejects it here, before an active report row is ever written", () => {
+      // Previously these sailed through the router and only blew up inside
+      // computeNextRunAt — after the active Trigger row was committed, leaving
+      // a report that shows as live and can never fire.
+      expect(issuePaths("not a cron", "UTC")).toEqual(["cron"]);
+      expect(issuePaths("99 99 * * *", "UTC")).toEqual(["cron"]);
+      // Parses, but there is no February 30th — it would never come due.
+      expect(issuePaths("0 9 30 2 *", "UTC")).toEqual(["cron"]);
+    });
+  });
+
+  describe("given a seconds-granularity cron", () => {
+    it("rejects the 6-field form croner would otherwise happily run every second", () => {
+      expect(issuePaths("* * * * * *", "UTC")).toEqual(["cron"]);
+      expect(issuePaths("0 0 9 * * 1", "UTC")).toEqual(["cron"]);
+    });
+  });
+
+  describe("given a schedule that sends more often than every 15 minutes", () => {
+    it("rejects it — a report mails a document to an arbitrary recipient list", () => {
+      expect(issuePaths("* * * * *", "UTC")).toEqual(["cron"]);
+      expect(issuePaths("*/5 * * * *", "UTC")).toEqual(["cron"]);
+      expect(issuePaths("0,1 9 * * *", "UTC")).toEqual(["cron"]);
+    });
+  });
+
+  describe("given a timezone Intl has never heard of", () => {
+    it("rejects it against the timezone field, not the cron", () => {
+      expect(issuePaths("0 9 * * 1", "Mars/Olympus")).toEqual(["timezone"]);
     });
   });
 });

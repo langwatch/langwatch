@@ -39,7 +39,10 @@ vi.mock("~/utils/api", () => ({
 
 import slackClient, { type SlackSlice } from "../client";
 import { SLACK_BOT_TOKEN_KEPT, type SlackPreview } from "../shared";
-import { templateOptionsFor } from "../templates/registry";
+import {
+  SLACK_BLOCK_KIT_TEMPLATES,
+  templateOptionsFor,
+} from "../templates/registry";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -175,6 +178,44 @@ describe("SlackConfigForm authoring tiers", () => {
         templateType: "block_kit",
         template: { value: firstOption!.source, usingDefault: false },
       });
+    });
+  });
+
+  // A report's layout follows its content source, so the draft carries the
+  // matching layout from the start. It is still the DEFAULT, though — the author
+  // has customised nothing. A draft that claimed otherwise would show a
+  // hand-customised field on a pristine report and turn Reset into a no-op.
+  describe("given a fresh report draft", () => {
+    const reportCtx = () =>
+      makeCtx({ sourceKind: "report", reportSourceKind: "traceQuery" });
+    const layoutFor = (id: string) =>
+      SLACK_BLOCK_KIT_TEMPLATES.find((opt) => opt.id === id)!;
+
+    it("seeds the layout that matches what the report sends", () => {
+      const onChangeSpy = vi.fn();
+      renderForm({ ctx: reportCtx(), onChangeSpy });
+
+      expect(onChangeSpy).toHaveBeenCalledTimes(1);
+      expect(onChangeSpy.mock.calls[0]![0]).toMatchObject({
+        template: {
+          value: layoutFor("report_table").source,
+          usingDefault: true,
+        },
+      });
+    });
+
+    it("stores the seeded layout, so the message sent is the one shown", () => {
+      const seeded: SlackSlice = {
+        ...slackClient.initialSlice(),
+        template: {
+          value: layoutFor("report_table").source,
+          usingDefault: true,
+        },
+      };
+
+      expect(slackClient.templatesFromSlice(seeded).slackTemplate).toBe(
+        layoutFor("report_table").source,
+      );
     });
   });
 

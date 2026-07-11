@@ -267,12 +267,24 @@ Nothing to show for this period.
 {% endfor %}{% endif %}
 [View in LangWatch ↗]({{ viewUrl }})`;
 
+/**
+ * How many rows the default Slack report message lists inline. A report can
+ * match up to 100 traces, and Slack rejects a `section` whose text runs past
+ * 3000 characters — with a non-retryable `invalid_blocks`, so an over-long
+ * message is not delivered at all. The default therefore lists the first rows
+ * and tells the reader how many more there are; the full set is one click away
+ * in LangWatch.
+ */
+const REPORT_SLACK_ROW_LIMIT = 10;
+
 export const DEFAULT_REPORT_SLACK_TEMPLATE = `:bar_chart: *{{ trigger.name | mrkdwn_escape }}*
 {{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}{% if report.isEmpty %}
 _Nothing to show for this period._{% else %}
-{% for t in traces %}• <{{ t.url }}|{{ t.traceId }}> {{ t.input | mrkdwn_escape }}
-{% endfor %}{% for chart in charts %}• *{{ chart.title | mrkdwn_escape }}* — {% if chart.isEmpty %}_no data_{% else %}{{ chart.total | round: 2 }}{% endif %}
-{% endfor %}{% endif %}
+{% for t in traces limit: ${REPORT_SLACK_ROW_LIMIT} %}• <{{ t.url }}|{{ t.traceId }}> {{ t.input | mrkdwn_escape }}
+{% endfor %}{% if traces.size > ${REPORT_SLACK_ROW_LIMIT} %}_…and {{ traces.size | minus: ${REPORT_SLACK_ROW_LIMIT} }} more_
+{% endif %}{% for chart in charts limit: ${REPORT_SLACK_ROW_LIMIT} %}• *{{ chart.title | mrkdwn_escape }}* — {% if chart.isEmpty %}_no data_{% else %}{{ chart.total | round: 2 }}{% endif %}
+{% endfor %}{% if charts.size > ${REPORT_SLACK_ROW_LIMIT} %}_…and {{ charts.size | minus: ${REPORT_SLACK_ROW_LIMIT} }} more_
+{% endif %}{% endif %}
 <{{ viewUrl }}|View in LangWatch>`;
 
 export const DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE = `[
@@ -291,9 +303,11 @@ export const DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE = `[
     "text": { "type": "mrkdwn", "text": "_Nothing to show for this period._" }
   },
   {%- else -%}
-  {%- capture _rows -%}{% for t in traces %}• <{{ t.url }}|{{ t.traceId }}> {{ t.input | mrkdwn_escape }}
-{% endfor %}{% for chart in charts %}• *{{ chart.title | mrkdwn_escape }}* — {% if chart.isEmpty %}_no data_{% else %}{{ chart.total | round: 2 }}{% endif %}
-{% endfor %}{%- endcapture -%}
+  {%- capture _rows -%}{% for t in traces limit: ${REPORT_SLACK_ROW_LIMIT} %}• <{{ t.url }}|{{ t.traceId }}> {{ t.input | mrkdwn_escape }}
+{% endfor %}{% if traces.size > ${REPORT_SLACK_ROW_LIMIT} %}_…and {{ traces.size | minus: ${REPORT_SLACK_ROW_LIMIT} }} more_
+{% endif %}{% for chart in charts limit: ${REPORT_SLACK_ROW_LIMIT} %}• *{{ chart.title | mrkdwn_escape }}* — {% if chart.isEmpty %}_no data_{% else %}{{ chart.total | round: 2 }}{% endif %}
+{% endfor %}{% if charts.size > ${REPORT_SLACK_ROW_LIMIT} %}_…and {{ charts.size | minus: ${REPORT_SLACK_ROW_LIMIT} }} more_
+{% endif %}{%- endcapture -%}
   {
     "type": "section",
     "text": { "type": "mrkdwn", "text": {{ _rows | json }} }
@@ -311,3 +325,28 @@ export const REPORT_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
   slackString: DEFAULT_REPORT_SLACK_TEMPLATE,
   slackBlockKit: DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE,
 };
+
+/** What a trigger is about — trace data, a custom-graph threshold alert, or a
+ *  scheduled report. Each renders against its own variable contract, so each
+ *  has its own default template set. */
+export type TemplateSourceKind = "trace" | "graphAlert" | "report";
+
+/**
+ * The single answer to "which default templates apply to this source kind".
+ * Every surface that seeds, previews, or dispatches a template asks here — the
+ * editor an author types into, the preview beside it, and the message that is
+ * actually sent must all resolve the same set, or the author is shown a
+ * template that will never be sent.
+ */
+export function defaultsForSourceKind(
+  sourceKind: TemplateSourceKind,
+): TriggerTemplateDefaults {
+  switch (sourceKind) {
+    case "graphAlert":
+      return ALERT_TRIGGER_DEFAULTS;
+    case "report":
+      return REPORT_TRIGGER_DEFAULTS;
+    case "trace":
+      return TRACE_TRIGGER_DEFAULTS;
+  }
+}

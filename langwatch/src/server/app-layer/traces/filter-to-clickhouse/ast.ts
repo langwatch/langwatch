@@ -7,7 +7,7 @@ import {
   type UnaryOperatorToken,
 } from "liqe";
 import { FilterFieldUnknownError, FilterParseError } from "../errors";
-import { FIELD_HANDLERS, KNOWN_FIELDS } from "./build-handlers";
+import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./build-handlers";
 import { boundedSubquery } from "./subqueries";
 import {
   EVENT_ATTRIBUTE_PREFIX,
@@ -167,13 +167,16 @@ function translateTag(
     return translateEventAttribute(key, tag, negated, ctx);
   }
 
-  const handler = FIELD_HANDLERS[fieldName];
+  // `.get()` — own keys only. A plain-object index would resolve a field named
+  // `constructor` / `toString` / `__proto__` off `Object.prototype`, sail past
+  // this guard, and persist a filter no reader can evaluate.
+  const def = FIELD_DEF_BY_NAME.get(fieldName);
 
-  if (!handler) {
+  if (!def) {
     throw new FilterFieldUnknownError(fieldName, KNOWN_FIELDS);
   }
 
-  return handler(tag, negated, ctx);
+  return def.toClickHouse(tag, negated, ctx);
 }
 
 function translateTraceAttribute(

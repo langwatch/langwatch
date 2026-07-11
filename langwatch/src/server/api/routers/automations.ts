@@ -37,6 +37,7 @@ import {
 } from "~/server/app-layer/triggers/graph-alert.builder";
 import {
   buildReportTriggerData,
+  extractReportFromTriggerRow,
   reportActionParamsSchema,
 } from "~/server/app-layer/triggers/report.builder";
 import { TriggerFireHistoryService } from "~/server/app-layer/triggers/trigger-fire-history.service";
@@ -500,6 +501,34 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.trigger.findUnique({
+        where: { id: input.triggerId, projectId: input.projectId },
+        select: { triggerKind: true, actionParams: true },
+      });
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Automation not found in this project.",
+        });
+      }
+
+      // A report's schedule does not live on `Trigger.active` — it lives on the
+      // scheduler. Flipping the flag alone left the `ScheduledJob` claiming its
+      // slot every cadence (stamping a "last run" for a report that delivers
+      // nothing) and still advertising a next run on the automations page.
+      // Pausing retires the calendar entry; resuming puts it back.
+      const isReport = existing.triggerKind === TriggerKind.REPORT;
+      const report = isReport
+        ? extractReportFromTriggerRow(existing.actionParams)
+        : null;
+      if (isReport && input.active && !report) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "This report has no valid schedule. Edit it and pick a schedule before resuming it.",
+        });
+      }
+
       const trigger = await ctx.prisma.trigger.update({
         where: {
           id: input.triggerId,
@@ -509,6 +538,22 @@ export const automationRouter = createTRPCRouter({
           active: input.active,
         },
       });
+
+      if (isReport) {
+        if (input.active && report) {
+          await getApp().triggers.syncReportSchedule({
+            projectId: input.projectId,
+            triggerId: input.triggerId,
+            cron: report.schedule.cron,
+            timezone: report.schedule.timezone,
+          });
+        } else {
+          await getApp().triggers.removeReportSchedule({
+            projectId: input.projectId,
+            triggerId: input.triggerId,
+          });
+        }
+      }
 
       await getApp().triggers.invalidate(input.projectId);
 
@@ -627,6 +672,16 @@ export const automationRouter = createTRPCRouter({
           })
           .nullable()
           .default(null),
+        // Present when the draft is a scheduled report: the test message then
+        // renders the report example context + report defaults, the same pair a
+        // scheduled fire sends. `sourceKind` picks the example data, matching
+        // the drawer's own preview.
+        report: z
+          .object({
+            sourceKind: z.enum(["traceQuery", "customGraph", "dashboard"]),
+          })
+          .nullable()
+          .default(null),
       }),
     )
     .use(checkProjectPermission("triggers:update"))
@@ -702,6 +757,7 @@ export const automationRouter = createTRPCRouter({
           webhook: input.webhook,
           botDestination,
           graphAlert: input.graphAlert,
+          report: input.report,
         });
       } catch (err) {
         throw toTemplateTRPCError(err);
@@ -951,6 +1007,10 @@ export const automationRouter = createTRPCRouter({
           action: built.action,
           triggerKind: TriggerKind.REPORT,
           filters: built.filters,
+          // Converting an existing graph alert into a report must release the
+          // graph: a left-behind `customGraphId` re-arms the row as a threshold
+          // alert on the heartbeat path, so the report fires as an alert too.
+          customGraphId: null,
           // A trace-query report sends the traces matching the author's Subject
           // query — without this the report would only ever send the newest
           // traces in the window. A graph/dashboard report has no trace query,

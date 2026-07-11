@@ -342,6 +342,9 @@ let analyticsService: AnalyticsService;
 
 class FakeTriggerSentRepo implements GraphTriggerSentRepository {
   openRows: OpenGraphTriggerSent[] = [];
+  /** Every incident ever created, open or resolved — the alert's fire
+   *  generation, which keys the per-recipient idempotency digest. */
+  allRows: OpenGraphTriggerSent[] = [];
 
   async findOpenForGraphAlert(params: {
     triggerId: string;
@@ -358,16 +361,32 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     );
   }
 
+  async findLatestForGraphAlert(params: {
+    triggerId: string;
+    projectId: string;
+    customGraphId: string;
+  }): Promise<{ id: string } | null> {
+    const matches = this.allRows.filter(
+      (r) =>
+        r.triggerId === params.triggerId &&
+        r.projectId === params.projectId &&
+        r.customGraphId === params.customGraphId,
+    );
+    const latest = matches[matches.length - 1];
+    return latest ? { id: latest.id } : null;
+  }
+
   async createOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
   }): Promise<OpenGraphTriggerSent> {
     const row: OpenGraphTriggerSent = {
-      id: `sent-${this.openRows.length + 1}`,
+      id: `sent-${this.allRows.length + 1}`,
       ...params,
     };
     this.openRows.push(row);
+    this.allRows.push(row);
     return row;
   }
 

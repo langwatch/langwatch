@@ -8,7 +8,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalyticsMetricSource } from "~/server/app-layer/analytics/routing/field-availability";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
@@ -34,6 +34,7 @@ function makeTrigger(
     projectId: PROJECT,
     name: id,
     action: TriggerAction.SEND_EMAIL,
+    triggerKind: TriggerKind.ALERT,
     actionParams,
     filters: {},
     alertType: null,

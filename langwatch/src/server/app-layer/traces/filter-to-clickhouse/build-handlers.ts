@@ -19,7 +19,6 @@ import {
   range,
 } from "./generic-translators";
 import { META_FIELD_DEFS } from "./meta-handlers";
-import type { FieldHandler } from "./value-helpers";
 
 // ---------------------------------------------------------------------------
 // Registry lookup — single-sources the SQL `expression` from FACET_REGISTRY so
@@ -296,9 +295,20 @@ export const FIELD_DEFS = {
   ),
 } satisfies Record<KnownField, FieldDef>;
 
-/** ClickHouse compilers keyed by field name, derived from {@link FIELD_DEFS}. */
-export const FIELD_HANDLERS: Record<string, FieldHandler> = Object.fromEntries(
-  Object.entries(FIELD_DEFS).map(([key, def]) => [key, def.toClickHouse]),
+/**
+ * Field lookup for both the ClickHouse compiler and the in-memory evaluator.
+ *
+ * A `Map`, not a plain object: field names come straight from a user-authored
+ * filter string, and a plain-object index resolves `constructor` / `toString` /
+ * `__proto__` off `Object.prototype`. That inherited value is truthy, so it
+ * slipped past both `if (!handler)` (the save-time unknown-field gate, which
+ * then compiled `constructor:x` into nonsense instead of rejecting it) and
+ * `if (!def)` in the evaluator (which then threw `def.evaluateInMemory is not a
+ * function` straight out of the supposedly fail-closed matcher). `Map.get`
+ * has own-key semantics, so an inherited name is simply an unknown field.
+ */
+export const FIELD_DEF_BY_NAME: ReadonlyMap<string, FieldDef> = new Map(
+  Object.entries(FIELD_DEFS),
 );
 
 /** All known filter field names, in registry + meta order. */

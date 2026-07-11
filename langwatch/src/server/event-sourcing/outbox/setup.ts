@@ -217,6 +217,15 @@ export function buildOutboxRuntime({
                 triggerId,
                 emails,
               }),
+            // ADR-031 per-recipient at-most-once ledger — the SAME TriggerSent
+            // claim store the trace cadence dispatcher threads into the mailer.
+            // The graph-alert incident row is written after the send, so an
+            // outbox retry of a fire that crashed mid-bookkeeping would
+            // otherwise re-notify every recipient.
+            isRecipientSent: (params) => triggers.isSendClaimed(params),
+            recordRecipientSent: async (params) => {
+              await triggers.claimSend(params);
+            },
           },
           input,
         }),

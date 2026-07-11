@@ -43,7 +43,7 @@ export function createAlertTriggerNotifyOutboxReactor(
     name: "alertTriggerNotifyOutbox",
     jobIdPrefix: "alert-trigger-notify-outbox",
     async decide(_event, context) {
-      const { tenantId, aggregateId: traceId, foldState } = context;
+      const { tenantId, aggregateId: traceId } = context;
 
       const triggers =
         await deps.triggers.getActiveTraceTriggersForProject(tenantId);
@@ -71,10 +71,6 @@ export function createAlertTriggerNotifyOutboxReactor(
             triggerId: trigger.id,
             traceId,
           }),
-          foldSnapshotAtEnqueue: {
-            computedInput: foldState.computedInput ?? "",
-            computedOutput: foldState.computedOutput ?? "",
-          },
         };
         requests.push({
           dedupKey: payload.auditDedupKey,

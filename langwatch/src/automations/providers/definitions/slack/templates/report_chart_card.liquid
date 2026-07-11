@@ -9,6 +9,14 @@ No data for this period.
 *{{ chart.total | round: 2 }}* · {{ chart.title | truncate: 60 | mrkdwn_escape }}
 {%- endif -%}
 {%- endcapture -%}
+{%- comment -%}
+Slack plots at most 20 points per series. A `limit: 20` would chart only the
+FIRST 20 buckets of the period, so take every Nth bucket instead — the chart
+still spans the whole period, at a coarser resolution.
+{%- endcomment -%}
+{%- assign _bucket_count = chart.categories | size -%}
+{%- assign _stride = _bucket_count | divided_by: 20.0 | ceil -%}
+{%- if _stride < 1 -%}{%- assign _stride = 1 -%}{%- endif -%}
 {%- capture _chart_json -%}
 {%- if chart.type == "pie" -%}
 { "type": "pie", "segments": [
@@ -20,14 +28,16 @@ No data for this period.
 { "type": {{ chart.type | json }}, "series": [
 {%- for s in chart.series limit: 5 -%}
 {% unless forloop.first %},{% endunless %}{ "name": {{ s.name | truncate: 20 | json }}, "data": [
-{%- for p in s.data limit: 20 -%}
-{% unless forloop.first %},{% endunless %}{ "label": {{ p.label | json }}, "value": {{ p.value }} }
+{%- for p in s.data -%}
+{%- assign _keep = forloop.index0 | modulo: _stride -%}
+{%- if _keep == 0 -%}{% unless forloop.first %},{% endunless %}{ "label": {{ p.label | json }}, "value": {{ p.value }} }{%- endif -%}
 {%- endfor -%}
 ] }
 {%- endfor -%}
 ], "axis_config": { "categories": [
-{%- for c in chart.categories limit: 20 -%}
-{% unless forloop.first %},{% endunless %}{{ c | json }}
+{%- for c in chart.categories -%}
+{%- assign _keep = forloop.index0 | modulo: _stride -%}
+{%- if _keep == 0 -%}{% unless forloop.first %},{% endunless %}{{ c | json }}{%- endif -%}
 {%- endfor -%}
 ], "x_label": "Time", "y_label": {{ chart.title | truncate: 50 | json }} } }
 {%- endif -%}

@@ -45,9 +45,11 @@ import type {
   TimeseriesInputType,
 } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import type {
-  GraphAlertDispatchInput,
-  GraphAlertDispatchResult,
+import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import {
+  graphAlertFireDigest,
+  type GraphAlertDispatchInput,
+  type GraphAlertDispatchResult,
 } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
 import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
 import {
@@ -76,7 +78,11 @@ export type GraphTriggerEvaluationStatus =
   | "already_firing"
   | "resolved"
   | "not_breached"
-  | "skipped";
+  | "skipped"
+  /** The threshold was crossed but the notification reached nobody (no
+   *  recipients, all unsubscribed, no Slack webhook). No incident is opened —
+   *  see the `didSend` gate in `evaluateGraphTrigger`. */
+  | "not_delivered";
 
 export interface EvaluateGraphTriggerResult {
   triggerId: string;
@@ -87,6 +93,13 @@ export interface EvaluateGraphTriggerResult {
   detail?: string;
   /** Current metric value; null when there were no buckets at all. */
   value?: number;
+  /** Whether a provider call actually carried the alert to a customer. Only
+   *  set on a breach that dispatched. */
+  didSend?: boolean;
+  /** Render errors a custom template hit and fell back from (ADR-036/037). */
+  renderErrors?: string[];
+  /** Variables a custom template referenced that the context did not supply. */
+  missingVariables?: string[];
 }
 
 export type StoredGraphConfig = Pick<
@@ -367,22 +380,73 @@ export async function evaluateGraphTrigger({
 
     // ADR-041: a bot connection posts via the Web API (gated blocks render);
     // extract + decrypt the token here so the dispatch helper stays crypto-free.
-    const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
+    //
+    // An unresolvable bot connection FAILS LOUD. Falling through to the webhook
+    // branch would be worse than useless: bot params carry no `slackWebhook`, so
+    // the dispatcher would log "no Slack webhook configured", report didSend
+    // false, and the customer would never learn their alert is broken. A
+    // non-retryable DispatchError dead-letters the row with an actionable signal.
     let botDestination: { token: string; channel: string } | null = null;
-    if (slackDeliveryMethodOf(slackParams) === "bot") {
-      const token = decryptSlackBotToken(slackParams);
-      const channel = slackParams.slackChannelId?.trim();
-      if (token && channel) botDestination = { token, channel };
+    if (trigger.action === "SEND_SLACK_MESSAGE") {
+      const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
+      if (slackDeliveryMethodOf(slackParams) === "bot") {
+        const token = decryptSlackBotToken(slackParams);
+        const channel = slackParams.slackChannelId?.trim();
+        if (!token || !channel) {
+          throw new DispatchError({
+            message: `Slack bot connection for alert "${trigger.name}" is missing its token or channel — the alert cannot be delivered.`,
+            retryable: false,
+          });
+        }
+        botDestination = { token, channel };
+      }
     }
 
-    await deps.notifier.dispatch({
+    // The alert's most recent incident (open or resolved) is its fire
+    // generation — it keys the per-recipient idempotency ledger so an outbox
+    // retry of THIS fire doesn't re-notify anyone the previous attempt reached.
+    // There is no open incident on this branch, so this reads the last resolved
+    // one (null on the alert's very first fire).
+    const previousFire = await deps.triggerSent.findLatestForGraphAlert({
+      triggerId,
+      projectId,
+      customGraphId,
+    });
+
+    const dispatchResult = await deps.notifier.dispatch({
       trigger,
       project,
       context,
       recipients: params.members ?? [],
       slackWebhook: params.slackWebhook ?? null,
       botDestination,
+      fireDigest: graphAlertFireDigest({
+        triggerId,
+        customGraphId,
+        previousFireId: previousFire?.id ?? null,
+      }),
     });
+
+    // An alert that told nobody is not "currently firing". Opening the incident
+    // here would light the alert up in the UI, stamp a last-fired time, and —
+    // worst of all — suppress every future notification until the metric
+    // recovers, because `findOpenForGraphAlert` would keep returning this row.
+    // The scheduled-report path gates `recordFire` on delivery for exactly this
+    // reason (see `report-dispatch.ts`).
+    if (!dispatchResult.didSend) {
+      await deps.updateLastRunAt({ triggerId, projectId });
+      return {
+        triggerId,
+        projectId,
+        reason,
+        status: "not_delivered",
+        value: currentValue,
+        detail: `threshold crossed but nothing was delivered on the ${dispatchResult.channel} channel`,
+        didSend: false,
+        renderErrors: dispatchResult.renderErrors,
+        missingVariables: dispatchResult.missingVariables,
+      };
+    }
 
     // Record the fire BEFORE updateLastRunAt — same order as the cron
     // (`addTriggersSent` then `updateAlert`).
@@ -400,6 +464,9 @@ export async function evaluateGraphTrigger({
       status: "fired",
       value: currentValue,
       detail: noteIfNoData(operator, threshold),
+      didSend: true,
+      renderErrors: dispatchResult.renderErrors,
+      missingVariables: dispatchResult.missingVariables,
     };
   }
 
@@ -467,4 +534,3 @@ function noteIfNoData(operator: string, threshold: number): string | undefined {
     ? "no-data predicate"
     : undefined;
 }
-

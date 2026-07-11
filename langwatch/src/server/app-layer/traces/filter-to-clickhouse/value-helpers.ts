@@ -114,6 +114,24 @@ export function wrap(sql: string, negated: boolean): string {
 // In-memory helpers (used by the field defs' `evaluateInMemory` side)
 // ---------------------------------------------------------------------------
 
+/**
+ * Own-property read of an attribute map, mirroring ClickHouse's
+ * `Attributes[<key>]` — own keys only, `''` when the key is absent.
+ *
+ * Filter keys are user-supplied, so a bare `attrs[key]` resolves `constructor`
+ * / `toString` / `__proto__` off `Object.prototype` and hands back a function
+ * (or the prototype object) that ClickHouse would never produce. That is not
+ * cosmetic: `has:attribute.constructor` read `(attrs[key] ?? "") !== ""` as
+ * `true` on every trace while the compiled `Attributes['constructor'] != ''`
+ * matched none of them.
+ */
+export function readAttribute(
+  attrs: Record<string, string>,
+  key: string,
+): string {
+  return Object.hasOwn(attrs, key) ? (attrs[key] ?? "") : "";
+}
+
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

@@ -5,7 +5,13 @@ Stacked on PR #5014 — merge PR #5014 first.
 
 ## What shipped
 
-The user-facing layer of the graph-trigger migration.
+The user-facing layer of the graph-trigger migration (ADR-034), plus
+four features the branch grew after the original scope was written:
+scheduled reports and the `ScheduledJob` scheduler (ADR-042), the
+facet-shaped automations drawer and trace-query subjects (ADR-043),
+the Block Kit template suite and Slack bot-token delivery
+(ADR-040 / ADR-041), and the outbox payload slimming that stopped
+customer trace content being written into `ReactorOutbox.payload`.
 
 - **Phase 5.1.** The automations drawer supports graph-threshold
   alerts. `automation.upsert` accepts a discriminated `graphAlert`
@@ -69,6 +75,16 @@ pnpm dev                            # from langwatch/
 
 - All prior PR migrations must be applied (PR #4498's `ReactorOutbox`
   + Trigger columns; PR #5012/#5014's slim + rollup tables).
+- **This PR ships three Postgres migrations of its own.** Run
+  `prisma migrate deploy` before testing:
+  - `20260710120000_add_scheduled_job` — new `ScheduledJob` table
+    (backs the reports scheduler).
+  - `20260710130000_add_trigger_kind` — new `TriggerKind` enum plus a
+    NOT NULL `Trigger.triggerKind` column, **with a data backfill**
+    (`UPDATE "Trigger" SET "triggerKind" = 'ALERT' WHERE
+    "customGraphId" IS NOT NULL`).
+  - `20260711100000_add_trigger_filter_query` — nullable
+    `Trigger.filterQuery` column.
 - Test tenant prep: one project with `release_es_graph_triggers_firing`
   ON, one dashboard with at least one custom-graph chart. Have an
   email address you can inbox and a Slack webhook you can watch.
@@ -152,6 +168,54 @@ Expected:
 2. Server-side gate: even if you smuggle one through in the wire
    payload, `automation.upsert` throws `BAD_REQUEST` on those
    actions when `customGraphId` is set.
+
+### 7. Scheduled report, end to end (ADR-042)
+
+1. Create a report from the drawer: pick a dashboard or a trace query
+   as the subject, a cadence, and a delivery channel.
+2. Confirm a `ScheduledJob` row appears with `targetType = 'REPORT'`
+   and a `nextRunAt` matching the cadence in the project's timezone.
+3. Wait for (or hand-advance `nextRunAt` to) the slot and confirm the
+   report is delivered exactly once, with real tables/charts in it.
+4. **Pause the report.** Confirm the `ScheduledJob` goes inactive and
+   the list stops showing a ticking next-run. Re-enable and confirm
+   the schedule comes back.
+5. **Edit the saved report.** Confirm the drawer hydrates it as a
+   report — the subject, cadence, and topN all come back — and that
+   saving does not silently convert it into a trace automation.
+6. Confirm a report does **not** notify on every ingested trace: send
+   traffic to the project and confirm the report's channel stays
+   quiet until its slot.
+7. Reject the bad cadences: an unparseable cron and a sub-15-minute
+   cadence must both fail at save with a clear message, and must not
+   leave an active report behind.
+
+### 8. Slack bot-token delivery (ADR-040 / ADR-041)
+
+1. Connect the Slack app, then author an alert with bot delivery and
+   pick a channel from the picker (verify the picker actually lists a
+   real workspace's channels, not an empty list).
+2. Fire it and confirm it posts via `chat.postMessage`, rendering the
+   Block Kit layout.
+3. **With `release_es_graph_triggers_firing` OFF** — the shipped
+   default — confirm a bot-delivery graph alert still delivers via the
+   cron path, and that a failed delivery does not mark the alert as
+   "currently firing".
+
+### 9. Trace-query subjects (ADR-043)
+
+1. Author an automation with a trace-query subject and confirm the
+   live "N traces matched" preview agrees with what the trace list
+   returns for the same query.
+2. Fire it and confirm the automation matches the same traces the
+   preview showed — in particular for an `origin:` filter, where the
+   in-memory dispatch evaluator and the compiled SQL must agree.
+
+### 10. The outbox carries no customer content
+
+After any trace automation fires, inspect the `ReactorOutbox` rows for
+the project and confirm no payload contains the trace's input or
+output text. The payload carries identities (ids) only.
 
 ## Regression traps — what to specifically re-verify
 

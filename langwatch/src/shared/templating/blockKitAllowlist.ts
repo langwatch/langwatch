@@ -128,6 +128,24 @@ const MAX_TABLE_ROWS = 30;
 const MAX_TABLE_COLUMNS = 20;
 const MAX_TABLE_CHARS = 10_000;
 
+/**
+ * Slack rejects the whole message with `invalid_blocks` when a `section` text
+ * runs past 3000 characters, a section field past 2000, or a block carries more
+ * than 10 fields / 10 context elements. `invalid_blocks` is NOT retryable, so
+ * one over-long block costs the entire notification rather than degrading it.
+ * A template that packs N rows into one section (a report with a high row
+ * count, a hand-written layout) trips this, so the caps are enforced here —
+ * over-long text is cut with a visible marker, never silently.
+ */
+export const MAX_SECTION_TEXT_CHARS = 3000;
+const MAX_SECTION_FIELDS = 10;
+const MAX_SECTION_FIELD_CHARS = 2000;
+const MAX_CONTEXT_ELEMENTS = 10;
+
+/** Appended to any text this module cuts, so the reader knows the block is
+ *  showing part of the content rather than all of it. */
+const TRUNCATION_MARKER = "\n…(truncated)";
+
 function isBlock(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -149,26 +167,74 @@ function isGatedType(type: unknown): type is GatedBlockType {
 function stripInteractiveAccessory(
   block: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (block.type !== "section" || !isBlock(block.accessory)) {
-    return block;
-  }
-  if (ALLOWED_ACCESSORY_TYPES.has(block.accessory.type as string)) {
-    return block;
-  }
+  if (!isBlock(block.accessory)) return block;
+  if (ALLOWED_ACCESSORY_TYPES.has(block.accessory.type as string)) return block;
   const { accessory: _stripped, ...rest } = block;
   return rest;
 }
 
-function sanitizeContextElements(
+/** Cut `text` to `max` characters, ending on the truncation marker so the
+ *  reader can tell the block is partial. */
+function capText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - TRUNCATION_MARKER.length)}${TRUNCATION_MARKER}`;
+}
+
+function capTextObject(
+  value: unknown,
+  max: number,
+): Record<string, unknown> | null {
+  const text = sanitizeTextObject(value);
+  if (!text) return null;
+  return { ...text, text: capText(text.text as string, max) };
+}
+
+/**
+ * `section` — the workhorse block. Interactive accessories are stripped
+ * (ADR-036) and the text / fields are capped to Slack's documented maxima so a
+ * template that packs an unbounded list into one section degrades to a cut
+ * section instead of a rejected message. A section left with neither text nor a
+ * field is unusable, so it is dropped (→ the caller's fallback delivers).
+ */
+function sanitizeSection(
   block: Record<string, unknown>,
-): Record<string, unknown> {
-  if (block.type !== "context" || !Array.isArray(block.elements)) return block;
-  const elements = block.elements.filter(
-    (el) =>
-      isBlock(el) &&
-      typeof el.type === "string" &&
-      ALLOWED_CONTEXT_ELEMENT_TYPES.has(el.type),
-  );
+): Record<string, unknown> | null {
+  const out = stripInteractiveAccessory(block);
+  const text = capTextObject(out.text, MAX_SECTION_TEXT_CHARS);
+  const fields = Array.isArray(out.fields)
+    ? out.fields
+        .map((field) => capTextObject(field, MAX_SECTION_FIELD_CHARS))
+        .filter((x): x is Record<string, unknown> => x !== null)
+        .slice(0, MAX_SECTION_FIELDS)
+    : [];
+  if (!text && fields.length === 0) return null;
+  const sanitized: Record<string, unknown> = { ...out };
+  if (text) sanitized.text = text;
+  else delete sanitized.text;
+  if (fields.length > 0) sanitized.fields = fields;
+  else delete sanitized.fields;
+  return sanitized;
+}
+
+/**
+ * `context` — text-only footnotes. Slack rejects a context block whose
+ * `elements` array is empty, so a block whose every element was filtered out
+ * (an image element, say) is DROPPED rather than emitted empty — an empty
+ * `elements` array fails the whole message with `invalid_blocks`.
+ */
+function sanitizeContext(
+  block: Record<string, unknown>,
+): Record<string, unknown> | null {
+  if (!Array.isArray(block.elements)) return null;
+  const elements = block.elements
+    .filter(
+      (el) =>
+        isBlock(el) &&
+        typeof el.type === "string" &&
+        ALLOWED_CONTEXT_ELEMENT_TYPES.has(el.type),
+    )
+    .slice(0, MAX_CONTEXT_ELEMENTS);
+  if (elements.length === 0) return null;
   return { ...block, elements };
 }
 
@@ -188,53 +254,64 @@ function sanitizeRichTextInline(
   return el;
 }
 
+// Every rich_text sub-block carries its own `elements` array, and Slack rejects
+// one that is empty — so a sub-block whose every child was filtered out (a
+// section holding only a mention, say) is DROPPED, not emitted empty.
 function sanitizeRichTextElement(
   el: unknown,
 ): Record<string, unknown> | null {
   if (!isBlock(el) || typeof el.type !== "string") return null;
   if (!ALLOWED_RICH_TEXT_ELEMENT_TYPES.has(el.type)) return null;
+  if (!Array.isArray(el.elements)) return null;
   // A rich_text_list's `elements` are themselves rich_text_section sub-blocks,
   // so recurse through the same element sanitiser rather than the inline one.
-  if (el.type === "rich_text_list") {
-    const nested = Array.isArray(el.elements)
+  const elements =
+    el.type === "rich_text_list"
       ? el.elements
           .map(sanitizeRichTextElement)
           .filter((x): x is Record<string, unknown> => x !== null)
-      : [];
-    return { ...el, elements: nested };
-  }
-  const inline = Array.isArray(el.elements)
-    ? el.elements
-        .map(sanitizeRichTextInline)
-        .filter((x): x is Record<string, unknown> => x !== null)
-    : [];
-  return { ...el, elements: inline };
+      : el.elements
+          .map(sanitizeRichTextInline)
+          .filter((x): x is Record<string, unknown> => x !== null);
+  if (elements.length === 0) return null;
+  return { ...el, elements };
 }
 
 // Recursively sanitise a rich_text block: keep only allowed sub-block types,
 // and within each keep only text-shaped inline elements (mention elements that
 // ping recipients are dropped). Mirrors the context-element sanitiser but for
-// the nested rich_text tree (ADR-041).
+// the nested rich_text tree (ADR-041) — including its empty-`elements` rule: a
+// rich_text block with nothing left is dropped so Slack never sees an empty
+// array (`invalid_blocks` fails the WHOLE message, it doesn't skip the block).
 function sanitizeRichText(
   block: Record<string, unknown>,
-): Record<string, unknown> {
-  if (block.type !== "rich_text" || !Array.isArray(block.elements)) return block;
+): Record<string, unknown> | null {
+  if (!Array.isArray(block.elements)) return null;
   const elements = block.elements
     .map(sanitizeRichTextElement)
     .filter((x): x is Record<string, unknown> => x !== null);
+  if (elements.length === 0) return null;
   return { ...block, elements };
 }
 
 function sanitizeVerifiedBlock(
   block: Record<string, unknown>,
 ): Record<string, unknown> | null {
-  // `card` is allowlisted for delivery but still needs its own sanitiser to
-  // drop fetch-on-render icons and callback actions (returns null if the card
-  // has neither a title nor a body).
-  if (block.type === "card") return sanitizeCard(block);
-  return sanitizeRichText(
-    sanitizeContextElements(stripInteractiveAccessory(block)),
-  );
+  switch (block.type) {
+    // `card` is allowlisted for delivery but still needs its own sanitiser to
+    // drop fetch-on-render icons and callback actions (returns null if the card
+    // has neither a title nor a body).
+    case "card":
+      return sanitizeCard(block);
+    case "section":
+      return sanitizeSection(block);
+    case "context":
+      return sanitizeContext(block);
+    case "rich_text":
+      return sanitizeRichText(block);
+    default:
+      return block;
+  }
 }
 
 // A text composition object, trimmed to its shape + boolean flags. Anything not
@@ -399,7 +476,9 @@ function sanitizeTableCell(cell: unknown): Record<string, unknown> {
     return { type: "raw_number", value: cell.value, text };
   }
   if (cell.type === "rich_text") {
-    return sanitizeRichText(cell);
+    // A cell whose content was entirely stripped (only an image / a mention)
+    // becomes the placeholder — the row must keep its column count.
+    return sanitizeRichText(cell) ?? placeholder;
   }
   return placeholder;
 }
@@ -476,6 +555,13 @@ function sanitizeGatedBlock(
  * When allowed, each is run through its defensive sanitiser (callback actions
  * stripped, nested cells recursively sanitised, sizes capped). `card` is
  * delivery-verified and lives in the allowed tier, sanitised in-line.
+ *
+ * Every sanitiser returns null for a block Slack would REJECT — an empty
+ * `elements` array, a section with no text left, sizes past the documented
+ * maxima — and the block is dropped here. That matters because `invalid_blocks`
+ * fails the WHOLE message (and is not retryable): emitting one invalid block
+ * loses the notification entirely, whereas dropping it lets the message deliver
+ * with what survived, or fall back to plain text when nothing does.
  */
 export function filterBlockKit(
   blocks: unknown,

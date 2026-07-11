@@ -8,8 +8,13 @@ import type {
 } from "~/shared/templating/templateContext";
 import {
   dispatchScheduledReport,
+  reportWindowMs,
   type ReportDispatchDeps,
 } from "../report-dispatch";
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
 
 const PROJECT: Project = {
   id: "proj-1",
@@ -127,6 +132,78 @@ const fire: ScheduledJobFire = {
   slot: new Date("2026-07-13T09:00:00.000Z"),
 };
 
+describe("reportWindowMs", () => {
+  describe("given a schedule and the slot it is firing", () => {
+    const cases: Array<{
+      name: string;
+      cron: string;
+      timezone: string;
+      slot: string;
+      expected: number;
+    }> = [
+      {
+        name: "daily — the day since its last slot",
+        cron: "0 7 * * *",
+        timezone: "UTC",
+        slot: "2026-07-14T07:00:00.000Z",
+        expected: DAY_MS,
+      },
+      {
+        name: "weekly — the week since its last slot",
+        cron: "0 9 * * 1",
+        timezone: "UTC",
+        slot: "2026-07-13T09:00:00.000Z",
+        expected: WEEK_MS,
+      },
+      {
+        // The regression: shape-matching sent a monthly report a 7-day window,
+        // silently dropping three weeks of the data it exists to summarise.
+        name: "monthly — the whole month, not a week",
+        cron: "0 9 1 * *",
+        timezone: "UTC",
+        slot: "2026-08-01T09:00:00.000Z",
+        expected: 31 * DAY_MS,
+      },
+      {
+        // The mirror image: a six-hourly report got a 24h window and re-sent
+        // the same day four times over.
+        name: "six-hourly — six hours, not a day",
+        cron: "0 */6 * * *",
+        timezone: "UTC",
+        slot: "2026-07-13T12:00:00.000Z",
+        expected: 6 * HOUR_MS,
+      },
+      {
+        name: "daily across a spring-forward — the 23 hours that really elapsed",
+        cron: "0 9 * * *",
+        timezone: "America/New_York",
+        slot: "2026-03-08T13:00:00.000Z",
+        expected: 23 * HOUR_MS,
+      },
+      {
+        name: "malformed — falls back to a week rather than sending nothing",
+        cron: "not a cron",
+        timezone: "UTC",
+        slot: "2026-07-13T09:00:00.000Z",
+        expected: WEEK_MS,
+      },
+      {
+        name: "unknown timezone — falls back to a week",
+        cron: "0 9 * * 1",
+        timezone: "Mars/Olympus",
+        slot: "2026-07-13T09:00:00.000Z",
+        expected: WEEK_MS,
+      },
+    ];
+
+    it.each(cases)("$name", ({ cron, timezone, slot, expected }) => {
+      expect(reportWindowMs({ cron, timezone, slot: new Date(slot) })).toBe(
+        expected,
+      );
+    });
+  });
+});
+
 describe("dispatchScheduledReport", () => {
   describe("given a Slack report is due", () => {
     it("renders the report default and posts to the webhook with a view link", async () => {
@@ -221,6 +298,31 @@ describe("dispatchScheduledReport", () => {
         const payload = JSON.stringify(sendSlack.mock.calls[0]![0].payload);
         expect(payload).toContain("Weekly errors");
       });
+    });
+  });
+
+  describe("given a MONTHLY report is due", () => {
+    it("summarises the whole month, not the trailing week", async () => {
+      const { deps, listReportTraces } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "traceQuery", filters: {}, topN: 5 },
+            schedule: { cron: "0 9 1 * *", timezone: "UTC" },
+            slackWebhook: "https://hooks.slack.com/services/x",
+          },
+        } as Partial<Trigger>),
+      );
+      const monthlyFire: ScheduledJobFire = {
+        ...fire,
+        slot: new Date("2026-08-01T09:00:00.000Z"),
+      };
+
+      await dispatchScheduledReport({ deps, fire: monthlyFire });
+
+      const args = listReportTraces.mock.calls[0]![0];
+      expect(args.to).toBe(monthlyFire.slot.getTime());
+      // July's slot, a month earlier — not `to - 7 days`.
+      expect(args.from).toBe(new Date("2026-07-01T09:00:00.000Z").getTime());
     });
   });
 

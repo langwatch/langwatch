@@ -9,12 +9,42 @@
  * wrapper test ids.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "~/automations/providers/types";
+import {
+  ALERT_TRIGGER_DEFAULTS,
+  REPORT_TRIGGER_DEFAULTS,
+  TRACE_TRIGGER_DEFAULTS,
+} from "~/shared/templating/defaults";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
+/** The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that
+ *  one export as a textarea carrying its `value`, so a test can read back the
+ *  template the editor was seeded with — the template an author's first
+ *  keystroke would persist. Everything else in the module stays real. */
+vi.mock(
+  "~/features/automations/editors/templateAuthoring",
+  async (original) => {
+    const actual =
+      await original<
+        typeof import("~/features/automations/editors/templateAuthoring")
+      >();
+    return {
+      ...actual,
+      LiquidEditor: ({ value }: { value: string }) => (
+        <textarea readOnly value={value} />
+      ),
+    };
+  },
+);
 vi.mock("~/components/ui/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
@@ -107,6 +137,73 @@ describe("EmailConfigForm authoring tiers", () => {
 
       expect(screen.getByTestId("email-subject-editor")).toBeInTheDocument();
       expect(screen.getByTestId("email-body-editor")).toBeInTheDocument();
+    });
+  });
+});
+
+/**
+ * The editor is seeded with the template dispatch will really render — the
+ * author's first keystroke persists whatever it was showing. Seed the wrong
+ * kind and a report author saves trace copy (`{% for m in matches %}`) that
+ * renders empty against the report context, next to a preview showing something
+ * else entirely.
+ */
+describe("EmailConfigForm default wording", () => {
+  afterEach(() => cleanup());
+
+  function openedEditors(ctx: ConfigFormCtx<EmailPreview>) {
+    renderForm(ctx);
+    fireEvent.click(screen.getByRole("button", { name: /customize wording/i }));
+    return {
+      subject: within(screen.getByTestId("email-subject-editor")).getByRole(
+        "textbox",
+      ),
+      body: within(screen.getByTestId("email-body-editor")).getByRole(
+        "textbox",
+      ),
+    };
+  }
+
+  describe("given a report draft", () => {
+    it("seeds the report subject and body, not the trace ones", () => {
+      const { subject, body } = openedEditors(
+        makeCtx({ sourceKind: "report" }),
+      );
+
+      expect(subject).toHaveValue(REPORT_TRIGGER_DEFAULTS.emailSubject);
+      expect(body).toHaveValue(REPORT_TRIGGER_DEFAULTS.emailBody);
+    });
+
+    it("drops the cadence switch — a report runs on its own schedule", () => {
+      renderForm(makeCtx({ sourceKind: "report" }));
+
+      expect(screen.queryByText(/cadence/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a graph-alert draft", () => {
+    it("seeds the alert subject and body", () => {
+      const { subject, body } = openedEditors(
+        makeCtx({ sourceKind: "graphAlert" }),
+      );
+
+      expect(subject).toHaveValue(ALERT_TRIGGER_DEFAULTS.emailSubject);
+      expect(body).toHaveValue(ALERT_TRIGGER_DEFAULTS.emailBody);
+    });
+  });
+
+  describe("given a trace draft", () => {
+    it("seeds the trace subject and body", () => {
+      const { subject, body } = openedEditors(makeCtx());
+
+      expect(subject).toHaveValue(TRACE_TRIGGER_DEFAULTS.emailSubject);
+      expect(body).toHaveValue(TRACE_TRIGGER_DEFAULTS.emailBody);
+    });
+
+    it("keeps the cadence switch — a trace automation can digest", () => {
+      renderForm(makeCtx());
+
+      expect(screen.getByText(/cadence/i)).toBeInTheDocument();
     });
   });
 });

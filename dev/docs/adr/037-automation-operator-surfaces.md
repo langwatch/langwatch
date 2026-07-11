@@ -91,7 +91,7 @@ Enrich the automations list, plus a per-automation detail panel, with an operati
 
 `ReactorOutbox` rows are keyed by `(reactorName, dedupKey)` and grouped by `groupKey`, both `projectId`-prefixed and embedding the `triggerId` (`${projectId}/${reactorName}:${triggerId}...`). Counting per-trigger health via a `LIKE` on `dedupKey` is unindexed and slow.
 
-**Implementation status (2026-06-24):** the `subjectId` column proposed here has NOT shipped. The operator-surface query falls back to a `LIKE` scan on `dedupKey`; performance is acceptable at current volumes but should be reconsidered before a per-trigger health list becomes a hot page. Adding the column + backfilling is a small extension to the ADR-030 schema — track as follow-up.
+**Implementation status (2026-07-11):** the `subjectId` column proposed here has NOT shipped, and neither has the per-trigger health read — nothing queries `ReactorOutbox` for trigger health today, by `LIKE` on `dedupKey` or otherwise. (An earlier note claimed a `LIKE`-scan fallback was in place; it never was.) Both the column and the read remain follow-up work, and the column should land before the read does, so the health list is never built on an unindexed scan.
 
 ### Layering
 

@@ -1,3 +1,5 @@
+import { reportScheduleSchema } from "~/server/app-layer/triggers/report.builder";
+
 /**
  * Pure schedule <-> cron helpers for the Report cadence facet. Kept out of
  * the React component so the round-trip (friendly picker -> cron -> friendly
@@ -12,6 +14,45 @@
  */
 
 export type Frequency = "daily" | "weekly" | "monthly";
+
+/**
+ * Why this schedule can't be saved, or null when it's fine. Delegates to the
+ * SSOT `reportScheduleSchema` the router validates the upsert with — the same
+ * schema proves the cron parses, repeats, and stays above the send-frequency
+ * floor, so a schedule the drawer lets you save is a schedule the server
+ * accepts and the scheduler can register. Before this, "every monday" saved an
+ * active report whose scheduler sync then threw (an orphan report that never
+ * sent), and `* * * * *` scheduled 1440 sends a day to free-form recipients.
+ *
+ * Only the empty case is worded here — an empty field is a not-yet, not a
+ * mistake, and the schema's "at least 1 character" is the wrong thing to say.
+ */
+export function cronScheduleError({
+  cron,
+  timezone,
+}: {
+  cron: string;
+  timezone: string;
+}): string | null {
+  if (cron.trim() === "") return "Enter a cron schedule.";
+  const parsed = reportScheduleSchema.safeParse({
+    cron,
+    timezone: timezone.trim() || "UTC",
+  });
+  if (parsed.success) return null;
+  return parsed.error.issues[0]?.message ?? "This schedule can't be saved.";
+}
+
+/** A schedule the server accepts and the scheduler can actually run. */
+export function isValidCron({
+  cron,
+  timezone,
+}: {
+  cron: string;
+  timezone: string;
+}): boolean {
+  return cronScheduleError({ cron, timezone }) === null;
+}
 
 export interface ScheduleParts {
   frequency: Frequency;

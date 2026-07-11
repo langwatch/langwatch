@@ -1,4 +1,4 @@
-import type { AlertType, TriggerAction } from "@prisma/client";
+import type { AlertType, TriggerAction, TriggerKind } from "@prisma/client";
 import type { NotificationCadence } from "~/automations/cadences";
 import type { TriggerFilters } from "~/server/filters/types";
 
@@ -7,6 +7,12 @@ export interface TriggerSummary {
   projectId: string;
   name: string;
   action: TriggerAction;
+  /** ADR-042 automation kind. Load-bearing at dispatch: a REPORT fires on its
+   *  calendar schedule only, so it must never be treated as a trace automation.
+   *  A report persists `filters: {}` and no `customGraphId`, which is exactly
+   *  the shape of a match-everything trace trigger — the kind is the ONLY thing
+   *  that tells them apart. */
+  triggerKind: TriggerKind;
   actionParams: unknown;
   filters: TriggerFilters;
   /** ADR-043 Subject facet: the Traces-V2 liqe query the automation is about.
@@ -95,6 +101,24 @@ export interface GraphTriggerSentRepository {
     projectId: string;
     customGraphId: string;
   }): Promise<OpenGraphTriggerSent | null>;
+
+  /**
+   * The most recent incident row for this (trigger, graph) — OPEN OR
+   * RESOLVED. Its id is the alert's fire GENERATION: a new row appears only
+   * once a fire has actually been delivered, so the id is stable while a fire
+   * is still being retried and changes exactly once the next incident opens.
+   * Null before the alert has ever fired.
+   *
+   * That is precisely what a per-recipient idempotency key needs. Keying the
+   * ledger on the alert's identity alone would suppress every future fire
+   * forever; keying it on wall-clock would re-send across a retry that crosses
+   * the bucket boundary. See `graphAlertFireDigest`.
+   */
+  findLatestForGraphAlert(params: {
+    triggerId: string;
+    projectId: string;
+    customGraphId: string;
+  }): Promise<{ id: string } | null>;
 
   /**
    * Mirror of cron's `addTriggersSent` graph branch

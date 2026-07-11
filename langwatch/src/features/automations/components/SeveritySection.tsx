@@ -1,6 +1,5 @@
 import { createListCollection } from "@chakra-ui/react";
 import { AlertType } from "@prisma/client";
-import { useMemo } from "react";
 import { Select } from "~/components/ui/select";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";

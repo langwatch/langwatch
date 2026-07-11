@@ -1,4 +1,4 @@
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it } from "vitest";
 import type {
   TriggerRepository,
@@ -13,6 +13,7 @@ function makeSummary(
     projectId: "p1",
     name: overrides.id,
     action: TriggerAction.SEND_EMAIL,
+    triggerKind: TriggerKind.AUTOMATION,
     actionParams: {},
     filters: {},
     alertType: null,
@@ -116,6 +117,59 @@ describe("TriggerService", () => {
           await service.invalidate("p1");
           await service.getActiveTraceTriggersForProject("p1");
           expect(repo.findActiveCalls).toBe(2);
+        });
+      });
+    });
+
+    // A scheduled report persists `filters: {}` and no `customGraphId` — the
+    // exact shape of a match-everything trace automation. Before ADR-042's
+    // `triggerKind` reached this read, every weekly report was a candidate
+    // trace trigger, so the notify reactor enqueued a settle (and the settle
+    // dispatcher waved it through, its filter guard being a no-op on empty
+    // filters) for EVERY ingested trace: one report => one notification per
+    // trace. The report's real firing path is its scheduler calendar entry.
+    describe("given the project has a scheduled report alongside a trace trigger", () => {
+      beforeEach(() => {
+        repo.rowsByProject.set("p1", [
+          makeSummary({ id: "trace_trigger" }),
+          makeSummary({
+            id: "weekly_report",
+            triggerKind: TriggerKind.REPORT,
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            filters: {},
+            customGraphId: null,
+          }),
+        ]);
+      });
+
+      describe("when fetching the active trace triggers", () => {
+        it("excludes the report so it never fires per ingested trace", async () => {
+          const result = await service.getActiveTraceTriggersForProject("p1");
+          expect(result.map((t) => t.id)).toEqual(["trace_trigger"]);
+        });
+      });
+    });
+  });
+
+  describe("getActiveGraphTriggersForProject", () => {
+    // Converting a graph alert into a report leaves the old `customGraphId` on
+    // the row, so kind — not the column — has to be what disarms it here too.
+    describe("given a report row that still carries a customGraphId", () => {
+      beforeEach(() => {
+        repo.rowsByProject.set("p1", [
+          makeSummary({ id: "graph_alert", customGraphId: "graph_1" }),
+          makeSummary({
+            id: "graph_report",
+            triggerKind: TriggerKind.REPORT,
+            customGraphId: "graph_1",
+          }),
+        ]);
+      });
+
+      describe("when fetching the active graph triggers", () => {
+        it("excludes the report so it never fires as a threshold alert", async () => {
+          const result = await service.getActiveGraphTriggersForProject("p1");
+          expect(result.map((t) => t.id)).toEqual(["graph_alert"]);
         });
       });
     });

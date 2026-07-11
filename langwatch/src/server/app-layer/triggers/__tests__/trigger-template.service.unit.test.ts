@@ -245,6 +245,75 @@ describe("testFireTrigger", () => {
     });
   });
 
+  describe("given a REPORT draft with null templates (framework defaults)", () => {
+    it("falls back to the REPORT defaults and the report example context, not the trace ones", async () => {
+      const { notifier, sentSlack } = makeNotifier();
+      const service = makeService(notifier);
+
+      const result = await service.testFire({
+        channel: "slack",
+        trigger: { name: "Weekly errors", alertType: null },
+        project: PROJECT,
+        draft: {},
+        recipients: [],
+        webhook: "https://hooks.slack.com/services/abc",
+        report: { sourceKind: "traceQuery" },
+      });
+
+      expect(result.usedDefault).toBe(true);
+      const payload = JSON.stringify(sentSlack[0]?.payload);
+      expect(payload).toContain("Weekly errors");
+      // The report example context populated — the trace context would have
+      // left every report variable empty.
+      expect(payload).toContain("trace_a1b2c3");
+      expect(payload).toContain("/acme/messages");
+    });
+
+    describe("when the report renders a dashboard", () => {
+      it("renders the chart-shaped example, matching what a scheduled fire sends", async () => {
+        const { notifier, sentSlack } = makeNotifier();
+        const service = makeService(notifier);
+
+        await service.testFire({
+          channel: "slack",
+          trigger: { name: "Monthly board", alertType: null },
+          project: PROJECT,
+          draft: {},
+          recipients: [],
+          webhook: "https://hooks.slack.com/services/abc",
+          report: { sourceKind: "dashboard" },
+        });
+
+        const payload = JSON.stringify(sentSlack[0]?.payload);
+        expect(payload).toContain("Monthly board");
+        expect(payload).toContain("Traces per hour");
+        // No trace example leaked in from the trace context.
+        expect(payload).not.toContain("trace_a1b2c3");
+      });
+    });
+
+    describe("when the channel is email", () => {
+      it("renders the report subject line, not the trace one", async () => {
+        const { notifier, sentEmails } = makeNotifier();
+        const service = makeService(notifier);
+
+        const result = await service.testFire({
+          channel: "email",
+          trigger: { name: "Weekly errors", alertType: null },
+          project: PROJECT,
+          draft: {},
+          recipients: ["author@acme.test"],
+          webhook: null,
+          report: { sourceKind: "traceQuery" },
+        });
+
+        expect(result.usedDefault).toBe(true);
+        expect(sentEmails[0]?.subject).toContain("Weekly errors");
+        expect(sentEmails[0]?.html).toContain("trace_a1b2c3");
+      });
+    });
+  });
+
   describe("testFire", () => {
     describe("when the channel is email and recipients are configured", () => {
       it("sends a banner-marked email to the recipients", async () => {

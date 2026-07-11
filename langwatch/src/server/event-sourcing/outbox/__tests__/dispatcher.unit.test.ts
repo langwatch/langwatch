@@ -1,4 +1,4 @@
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import {
@@ -54,6 +54,7 @@ function makeTrigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary {
     projectId: PROJECT_ID,
     name: "Test trigger",
     action: TriggerAction.SEND_EMAIL,
+    triggerKind: TriggerKind.AUTOMATION,
     actionParams: { members: ["ops@example.com"] },
     filters: {},
     alertType: null,

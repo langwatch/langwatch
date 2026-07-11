@@ -95,6 +95,44 @@ describe("renderTriggerSlack", () => {
     });
   });
 
+  // The allowlist drops a block Slack would reject outright (an emptied
+  // `context` / `rich_text`), rather than emitting it. That keeps this fallback
+  // reachable: a template whose blocks ALL get dropped degrades to the plain
+  // text message instead of shipping a payload Slack answers with
+  // `invalid_blocks` — which fails the whole notification and is not retryable.
+  describe("when every block is stripped by the allowlist", () => {
+    it("falls back to the plain-text default rather than sending empty blocks", async () => {
+      const template = JSON.stringify([
+        {
+          type: "context",
+          elements: [
+            { type: "image", image_url: "https://tracker/p.png", alt_text: "" },
+          ],
+        },
+        {
+          type: "rich_text",
+          elements: [
+            {
+              type: "rich_text_section",
+              elements: [{ type: "user", user_id: "U123" }],
+            },
+          ],
+        },
+      ]);
+      const slack = await renderTriggerSlack({
+        templateType: "block_kit",
+        template,
+        context: makeContext(),
+      });
+      const text = asText(slack.payload);
+      expect(text).toContain("High latency");
+      expect(slack.usedDefault).toBe(true);
+      expect(slack.errors).toEqual([
+        "Block Kit template produced no allowed blocks",
+      ]);
+    });
+  });
+
   describe("when a Block Kit template renders invalid JSON", () => {
     it("falls back to the default text and surfaces the error", async () => {
       const slack = await renderTriggerSlack({

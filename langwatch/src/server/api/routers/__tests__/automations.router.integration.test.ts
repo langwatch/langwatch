@@ -14,6 +14,7 @@ const {
   mockTriggerCreate,
   mockTriggerFindFirst,
   mockTriggerFindMany,
+  mockTriggerFindUnique,
   mockMonitorFindMany,
   mockCustomGraphFindUnique,
   mockCustomGraphFindMany,
@@ -28,6 +29,7 @@ const {
   mockTriggerCreate: vi.fn(),
   mockTriggerFindFirst: vi.fn(),
   mockTriggerFindMany: vi.fn(),
+  mockTriggerFindUnique: vi.fn(),
   mockMonitorFindMany: vi.fn(),
   mockCustomGraphFindUnique: vi.fn(),
   mockCustomGraphFindMany: vi.fn(),
@@ -81,6 +83,7 @@ function createTestCaller() {
         create: mockTriggerCreate,
         findFirst: mockTriggerFindFirst,
         findMany: mockTriggerFindMany,
+        findUnique: mockTriggerFindUnique,
       },
       monitor: {
         findMany: mockMonitorFindMany,
@@ -484,6 +487,127 @@ describe("automationRouter", () => {
           cron: "0 9 * * 1",
           timezone: "UTC",
         });
+      });
+    });
+
+    describe("when the schedule is one the scheduler cannot run", () => {
+      // The row used to be committed ACTIVE first and the cron only parsed
+      // afterwards, inside computeNextRunAt — so a bad cron threw a 500 and
+      // left a live report with no calendar entry that could never fire.
+      it.each([
+        { name: "a malformed cron", cron: "every monday", timezone: "UTC" },
+        { name: "a seconds-granularity cron", cron: "* * * * * *", timezone: "UTC" },
+        { name: "a cron that sends every minute", cron: "* * * * *", timezone: "UTC" },
+        { name: "an unknown timezone", cron: "0 9 * * 1", timezone: "Mars/Olympus" },
+      ])("rejects $name before anything is written", async ({ cron, timezone }) => {
+        await expect(
+          caller.upsert({
+            ...baseReportInput,
+            report: {
+              ...baseReportInput.report,
+              schedule: { cron, timezone },
+            },
+          } as any),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(mockTriggerCreate).not.toHaveBeenCalled();
+        expect(mockTriggerUpdate).not.toHaveBeenCalled();
+        expect(mockSyncReportSchedule).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("toggleTrigger", () => {
+    const reportRow = {
+      triggerKind: "REPORT",
+      actionParams: {
+        source: { kind: "traceQuery", filters: {}, topN: 5 },
+        schedule: { cron: "0 9 * * 1", timezone: "Europe/Amsterdam" },
+        compareToPrevious: false,
+      },
+    };
+
+    describe("when a REPORT is paused", () => {
+      it("retires its scheduler job, so it stops claiming slots it will never send", async () => {
+        mockTriggerFindUnique.mockResolvedValueOnce(reportRow);
+        mockTriggerUpdate.mockResolvedValueOnce({
+          id: "report_trig",
+          active: false,
+        });
+
+        await caller.toggleTrigger({
+          projectId: "proj_123",
+          triggerId: "report_trig",
+          active: false,
+        });
+
+        expect(mockRemoveReportSchedule).toHaveBeenCalledWith({
+          projectId: "proj_123",
+          triggerId: "report_trig",
+        });
+        expect(mockSyncReportSchedule).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a REPORT is resumed", () => {
+      it("puts it back on the calendar with its own cron and timezone", async () => {
+        mockTriggerFindUnique.mockResolvedValueOnce(reportRow);
+        mockTriggerUpdate.mockResolvedValueOnce({
+          id: "report_trig",
+          active: true,
+        });
+
+        await caller.toggleTrigger({
+          projectId: "proj_123",
+          triggerId: "report_trig",
+          active: true,
+        });
+
+        expect(mockSyncReportSchedule).toHaveBeenCalledWith({
+          projectId: "proj_123",
+          triggerId: "report_trig",
+          cron: "0 9 * * 1",
+          timezone: "Europe/Amsterdam",
+        });
+        expect(mockRemoveReportSchedule).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a non-report automation is toggled", () => {
+      it("leaves the scheduler alone", async () => {
+        mockTriggerFindUnique.mockResolvedValueOnce({
+          triggerKind: "AUTOMATION",
+          actionParams: { slackWebhook: "https://hooks.slack.com/services/x" },
+        });
+        mockTriggerUpdate.mockResolvedValueOnce({
+          id: "trigger_test_123",
+          active: false,
+        });
+
+        await caller.toggleTrigger({
+          projectId: "proj_123",
+          triggerId: "trigger_test_123",
+          active: false,
+        });
+
+        expect(mockRemoveReportSchedule).not.toHaveBeenCalled();
+        expect(mockSyncReportSchedule).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the automation does not belong to the project", () => {
+      it("rejects instead of toggling another tenant's row", async () => {
+        mockTriggerFindUnique.mockResolvedValueOnce(null);
+
+        await expect(
+          caller.toggleTrigger({
+            projectId: "proj_123",
+            triggerId: "someone_elses_trigger",
+            active: false,
+          }),
+        ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        expect(mockTriggerUpdate).not.toHaveBeenCalled();
       });
     });
   });

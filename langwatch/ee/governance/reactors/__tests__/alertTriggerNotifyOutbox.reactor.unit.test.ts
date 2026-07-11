@@ -1,7 +1,11 @@
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
+import type {
+  TriggerRepository,
+  TriggerSummary,
+} from "~/server/app-layer/triggers/repositories/trigger.repository";
+import { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -21,6 +25,7 @@ function createTrigger(
     projectId: "tenant-1",
     name: "Latency Alert",
     action: TriggerAction.SEND_EMAIL,
+    triggerKind: TriggerKind.AUTOMATION,
     actionParams: { members: ["user@example.com"] },
     filters: { "traces.origin": ["playground"] },
     alertType: "WARNING",
@@ -39,6 +44,13 @@ function createTrigger(
   };
 }
 
+/**
+ * The trace's prompt and response, as the fold holds them. Distinctive strings
+ * so the "no content on the payload" assertion below cannot pass by accident.
+ */
+const TRACE_INPUT = "What is the patient's diagnosis?";
+const TRACE_OUTPUT = "The patient has a suspected fracture.";
+
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
 ): TraceSummaryData {
@@ -47,8 +59,8 @@ function createFoldState(
     tenantId: "tenant-1",
     occurredAt: Date.now(),
     spanCount: 1,
-    computedInput: "in",
-    computedOutput: "out",
+    computedInput: TRACE_INPUT,
+    computedOutput: TRACE_OUTPUT,
     attributes: { "langwatch.origin": "playground" },
     ...overrides,
   } as TraceSummaryData;
@@ -119,19 +131,33 @@ describe("alertTriggerNotifyOutbox reactor", () => {
           projectId: string;
           triggerId: string;
           traceId: string;
-          foldSnapshotAtEnqueue: {
-            computedInput: string;
-            computedOutput: string;
-          };
         };
         expect(payload.stage).toBe("settle");
         expect(payload.projectId).toBe("tenant-1");
         expect(payload.triggerId).toBe("trigger-notify");
         expect(payload.traceId).toBe("trace-1");
-        expect(payload.foldSnapshotAtEnqueue).toEqual({
-          computedInput: "in",
-          computedOutput: "out",
-        });
+      });
+
+      it("carries no trace content on the payload", async () => {
+        const trigger = createTrigger();
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
+
+        const reactor = createAlertTriggerNotifyOutboxReactor(deps);
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
+
+        // A settle payload carries an IDENTITY, never trace content: settle
+        // re-reads the fold at fire time, so a copy here would be unread
+        // customer text living in Redis and (via the audit projection) at rest
+        // in Postgres, outliving the trace it came from.
+        const serialized = JSON.stringify(requests[0]!.payload);
+        expect(serialized).not.toContain(TRACE_INPUT);
+        expect(serialized).not.toContain(TRACE_OUTPUT);
+        expect(serialized).not.toContain("patient");
       });
     });
 
@@ -245,6 +271,75 @@ describe("alertTriggerNotifyOutbox reactor", () => {
         );
 
         expect(requests).toHaveLength(1);
+      });
+    });
+  });
+
+  /**
+   * ADR-042 regression. A scheduled report is persisted as a Trigger row with
+   * `triggerKind: REPORT`, `filters: {}` and no `customGraphId` — structurally
+   * identical to a match-everything trace automation with a NOTIFY action. This
+   * reactor enqueues a settle for exactly that shape, and the settle dispatcher
+   * skips its filter guard when `filters` is empty, so a leaked report became
+   * ONE NOTIFICATION PER INGESTED TRACE on top of its weekly schedule.
+   *
+   * The real TriggerService is wired over the repository here — mocking the
+   * service would mock away the very filter under test, so this drives the
+   * genuine repository -> service -> reactor path.
+   */
+  describe("given the project's only active row is a scheduled report", () => {
+    function repositoryReturning(rows: TriggerSummary[]): TriggerRepository {
+      return {
+        findActiveForProject: async () => rows,
+        claimSend: async () => true,
+        isSendClaimed: async () => false,
+        updateLastRunAt: async () => undefined,
+      };
+    }
+
+    const reportRow = createTrigger({
+      id: "weekly-report",
+      name: "Weekly dashboard report",
+      triggerKind: TriggerKind.REPORT,
+      action: TriggerAction.SEND_SLACK_MESSAGE,
+      filters: {},
+      filterQuery: null,
+      customGraphId: null,
+    });
+
+    describe("when a trace is ingested", () => {
+      it("enqueues no settle — a report fires on its schedule, never per trace", async () => {
+        const reactor = createAlertTriggerNotifyOutboxReactor({
+          triggers: new TriggerService(repositoryReturning([reportRow])),
+        });
+
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
+
+        expect(requests).toEqual([]);
+      });
+    });
+
+    describe("when a genuine trace automation sits alongside the report", () => {
+      it("enqueues a settle for the automation only", async () => {
+        const reactor = createAlertTriggerNotifyOutboxReactor({
+          triggers: new TriggerService(
+            repositoryReturning([
+              reportRow,
+              createTrigger({ id: "trace-automation", filters: {} }),
+            ]),
+          ),
+        });
+
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
+
+        expect(requests).toHaveLength(1);
+        expect(requests[0]!.groupKey).toContain("trace-automation");
       });
     });
   });
