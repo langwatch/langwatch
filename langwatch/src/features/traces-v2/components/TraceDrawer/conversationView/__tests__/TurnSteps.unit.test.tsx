@@ -1,4 +1,7 @@
 /**
+ * @vitest-environment jsdom
+ */
+/**
  * The per-turn steps strip in the conversation view.
  *
  * A Claude Code turn is an agentic loop — model, tool, model, tool, answer — and
