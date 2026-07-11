@@ -1,35 +1,51 @@
-import { Box, Button, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
-import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { Button, chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import type React from "react";
 import { useState } from "react";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useLangyFeedback } from "../data/useLangyFeedback";
 import {
   type LangyFeedbackSentiment,
   markFeedbackAsked,
 } from "../logic/langyFeedbackDirective";
 
+/**
+ * The four-point ordinal Langy scores each final answer on. Selecting a
+ * segment is the whole signal; the label is what the customer reads.
+ *
+ * The backend feedback model only stores an up/down `rating` (+ sentiment)
+ * today, so we DERIVE both from the ordinal: score >= 2 reads as a thumbs-up.
+ *
+ * TODO(backend slice): add a first-class `score` (0-3) field to the Langy
+ * feedback model / event so we stop flattening this ordinal to up/down and
+ * can trend "okay vs great" over time. Until then the derivation below is the
+ * lossy bridge that keeps the existing data path working.
+ */
+const SCALE = [
+  { label: "Bad", rating: "down", sentiment: "frustrated" },
+  { label: "Okay", rating: "down", sentiment: "neutral" },
+  { label: "Good", rating: "up", sentiment: "neutral" },
+  { label: "Great", rating: "up", sentiment: "delighted" },
+] as const;
+
 /** Copy tailored to the moment Langy classified via its feedback directive. */
 function promptFor(sentiment?: LangyFeedbackSentiment): string {
   switch (sentiment) {
     case "delighted":
-      return "Did that land well?";
+      return "Did that land?";
     case "frustrated":
       return "That looked rough — how did Langy do?";
     default:
-      return "How's Langy doing?";
+      return "How did Langy do?";
   }
 }
 
 /**
- * Modern, low-chrome in-agent feedback under a completed assistant message.
+ * Low-chrome, four-point feedback under a completed assistant answer.
  *
- * A quiet thumbs up / down that only asserts itself on hover. Thumbs-up records
- * silently. Thumbs-down expands a small "what went wrong?" prompt AND — since a
- * down usually means friction — offers a consent toggle to share the full
- * conversation so we can debug it (routed into LangWatch itself as a feedback
- * event on the conversation's trace). Nothing is forced: the comment and the
- * consent are both optional. Once submitted it collapses to a calm
- * acknowledgement.
+ * A subtle card (hairline border, no bright fill) with four ghost segments —
+ * bad / okay / good / great. Picking one reveals an optional one-line note,
+ * then everything collapses to a quiet "Thanks — noted". The ordinal is
+ * derived to the backend's up/down rating (see SCALE) so the data path keeps
+ * working ahead of a real `score` field.
  */
 export function LangyFeedback({
   conversationId,
@@ -44,144 +60,125 @@ export function LangyFeedback({
   sentiment?: LangyFeedbackSentiment;
 }) {
   const { submit } = useLangyFeedback();
-  const [state, setState] = useState<"idle" | "expanded" | "done">("idle");
+  const [selected, setSelected] = useState<number | null>(null);
   const [comment, setComment] = useState("");
-  const [shareConsent, setShareConsent] = useState(false);
+  const [done, setDone] = useState(false);
 
-  const sendUp = () => {
+  const send = (score: number) => {
+    const point = SCALE[score]!;
     submit({
       conversationId,
       messageId,
       traceId,
-      rating: "up",
-      sentiment: "delighted",
-    });
-    markFeedbackAsked();
-    setState("done");
-  };
-
-  const sendDown = () => {
-    submit({
-      conversationId,
-      messageId,
-      traceId,
-      rating: "down",
-      sentiment: "frustrated",
+      rating: point.rating,
+      sentiment: point.sentiment,
       comment: comment.trim() || undefined,
-      shareConversationConsent: shareConsent,
     });
     markFeedbackAsked();
-    setState("done");
+    setDone(true);
   };
 
-  if (state === "done") {
+  if (done) {
     return (
       <Text textStyle="2xs" color="fg.subtle" alignSelf="flex-start">
-        Thanks — that helps Langy get better.
+        Thanks — noted.
       </Text>
     );
   }
 
   return (
-    <VStack align="stretch" gap={2} alignSelf="flex-start" maxWidth="100%">
-      <HStack
-        gap={1}
-        opacity={0.55}
-        _hover={{ opacity: 1 }}
-        transition="opacity 150ms ease"
-      >
-        <Text textStyle="2xs" color="fg.muted" marginRight={1}>
-          {promptFor(sentiment)}
-        </Text>
-        <Tooltip content="Good answer" openDelay={200}>
-          <Button
-            aria-label="Good answer"
-            size="2xs"
-            variant="ghost"
-            color="fg.muted"
-            _hover={{ color: "orange.solid", bg: "bg.subtle" }}
-            onClick={sendUp}
+    <VStack
+      align="stretch"
+      gap={2.5}
+      alignSelf="flex-start"
+      maxWidth="100%"
+      padding={2.5}
+      borderRadius="lg"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      background="transparent"
+    >
+      <Text textStyle="2xs" color="fg.muted">
+        {promptFor(sentiment)}
+      </Text>
+      <HStack gap={1}>
+        {SCALE.map((point, score) => (
+          <Segment
+            key={point.label}
+            isSelected={selected === score}
+            onClick={() => setSelected(score)}
           >
-            <ThumbsUp size={13} />
-          </Button>
-        </Tooltip>
-        <Tooltip content="Needs work" openDelay={200}>
-          <Button
-            aria-label="Needs work"
-            size="2xs"
-            variant="ghost"
-            color="fg.muted"
-            _hover={{ color: "fg", bg: "bg.subtle" }}
-            onClick={() =>
-              setState((s) => (s === "expanded" ? "idle" : "expanded"))
-            }
-          >
-            <ThumbsDown size={13} />
-          </Button>
-        </Tooltip>
+            {point.label}
+          </Segment>
+        ))}
       </HStack>
 
-      {state === "expanded" ? (
-        <VStack
-          align="stretch"
-          gap={2}
-          padding={3}
-          borderRadius="lg"
-          borderWidth="1px"
-          borderStyle="solid"
-          borderColor="border.emphasized"
-          background="bg.subtle"
-        >
-          <Textarea
+      {selected !== null ? (
+        <HStack gap={1.5}>
+          <Input
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="What went wrong? (optional)"
-            rows={2}
-            autoresize
-            textStyle="xs"
-            maxHeight="120px"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                send(selected);
+              }
+            }}
+            placeholder="Add a note (optional)"
+            size="xs"
+            borderColor="border.muted"
+            textStyle="2xs"
+            flex={1}
           />
-          <HStack
-            as="label"
-            gap={2}
-            cursor="pointer"
-            onClick={() => setShareConsent((v) => !v)}
+          <Button
+            size="2xs"
+            variant="outline"
+            borderColor="orange.emphasized"
+            color="orange.fg"
+            _hover={{ background: "orange.subtle" }}
+            onClick={() => send(selected)}
           >
-            <Box
-              width="14px"
-              height="14px"
-              borderRadius="sm"
-              borderWidth="1px"
-              borderStyle="solid"
-              borderColor={shareConsent ? "orange.solid" : "border.emphasized"}
-              background={shareConsent ? "orange.solid" : "transparent"}
-              flexShrink={0}
-            />
-            <Text textStyle="2xs" color="fg.muted" lineHeight="1.35">
-              Let the LangWatch team view this conversation to debug it.
-            </Text>
-          </HStack>
-          <HStack justify="flex-end">
-            <Button
-              size="xs"
-              variant="ghost"
-              color="fg.muted"
-              onClick={() => setState("idle")}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="xs"
-              variant="outline"
-              borderColor="orange.solid"
-              color="orange.solid"
-              onClick={sendDown}
-            >
-              Send feedback
-            </Button>
-          </HStack>
-        </VStack>
+            Send
+          </Button>
+        </HStack>
       ) : null}
     </VStack>
+  );
+}
+
+function Segment({
+  children,
+  isSelected,
+  onClick,
+}: {
+  children: React.ReactNode;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      onClick={onClick}
+      flex={1}
+      paddingY={1}
+      borderRadius="md"
+      borderWidth="1px"
+      borderStyle="solid"
+      textStyle="2xs"
+      fontWeight="500"
+      cursor="pointer"
+      transition="color 120ms ease, background 120ms ease, border-color 120ms ease"
+      background={isSelected ? "orange.subtle" : "transparent"}
+      color={isSelected ? "orange.fg" : "fg.muted"}
+      borderColor={isSelected ? "orange.emphasized" : "border.muted"}
+      _hover={
+        isSelected
+          ? undefined
+          : { color: "fg", borderColor: "border.emphasized" }
+      }
+    >
+      {children}
+    </chakra.button>
   );
 }

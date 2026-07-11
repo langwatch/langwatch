@@ -114,12 +114,15 @@ export function MessageContent({
         <Box
           paddingX={3}
           paddingY={2}
-          background="#1c1917"
-          color="white"
-          borderRadius="lg"
-          borderBottomRightRadius="sm"
+          background="bg.muted"
+          color="fg"
+          borderWidth="1px"
+          borderStyle="solid"
+          borderColor="border.muted"
+          borderRadius="15px"
+          borderBottomRightRadius="5px"
           textStyle="sm"
-          lineHeight="1.45"
+          lineHeight="1.5"
           whiteSpace="pre-wrap"
         >
           {text}
@@ -150,9 +153,9 @@ export function MessageContent({
                 "& ul, & ol": { paddingLeft: "18px", margin: "4px 0" },
                 "& code": {
                   fontSize: "12px",
-                  padding: "1px 5px",
-                  borderRadius: "4px",
-                  background: "var(--chakra-colors-bg-subtle)",
+                  padding: "1px 6px",
+                  borderRadius: "5px",
+                  background: "var(--chakra-colors-bg-muted)",
                   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                 },
               }}

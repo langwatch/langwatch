@@ -146,7 +146,12 @@ export function MeshGradientLayer({
   );
 }
 
-/** Small rounded tile housing a gradient sparkle — Langy's avatar. */
+/**
+ * Small rounded tile housing a gradient sparkle — Langy's avatar. The tile is
+ * tinted in the LangWatch brand (soft orange fill + orange hairline); the
+ * mesh (orange→pink→violet) survives only on the sparkle icon itself, the
+ * single AI moment. Both are semantic tokens — no raw hex.
+ */
 export function SparkleTile({
   size,
   sparkleSize,
@@ -159,10 +164,10 @@ export function SparkleTile({
       width={`${size}px`}
       height={`${size}px`}
       borderRadius="8px"
-      background={AI_BG_SUBTLE}
+      background="orange.subtle"
       borderWidth="1px"
       borderStyle="solid"
-      borderColor={AI_BORDER}
+      borderColor="orange.emphasized"
       display="grid"
       placeItems="center"
       flexShrink={0}
