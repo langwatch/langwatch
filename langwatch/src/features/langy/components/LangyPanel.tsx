@@ -59,11 +59,8 @@ import {
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
 import { useLangyFastStream } from "../hooks/useLangyFastStream";
 import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
-import {
-  type LangyContextChip,
-  selectVisibleChips,
-  useLangyComposerStore,
-} from "../stores/langyComposerStore";
+import { useLangyComposerStore } from "../stores/langyComposerStore";
+import { useLangyPageContext } from "../hooks/useLangyPageContext";
 import { LangyError } from "./LangyError";
 import { StreamingStatusLine } from "./StreamingStatusLine";
 import {
@@ -459,6 +456,13 @@ function LangyPanel({
     turnId: activeTurnId,
     enabled: isBusy,
   });
+  // Page context (task #14): the experiment / trace / dataset / project the
+  // user is viewing, surfaced as removable composer chips and forwarded with
+  // the turn. `dismissChip` hides one; `restoreChip` (the "+ context" control)
+  // adds it back.
+  const dismissChip = useLangyComposerStore((s) => s.dismissChip);
+  const restoreChip = useLangyComposerStore((s) => s.restoreChip);
+  const { chips: contextChips, addableChips } = useLangyPageContext();
 
   const send = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
@@ -477,6 +481,19 @@ function LangyPanel({
               ? { conversationId: currentConversationId }
               : {}),
             ...(modelOverride ? { modelOverride } : {}),
+            // What the user is looking at, so the agent can resolve "this
+            // experiment / trace" without an explicit id. The chat route
+            // ignores unknown body fields today; this is the transport seam
+            // that lights up when the route reads it (cf. useLangyTurnSignals).
+            ...(contextChips.length > 0
+              ? {
+                  pageContext: contextChips.map((chip) => ({
+                    kind: chip.kind,
+                    ref: chip.ref,
+                    label: chip.label,
+                  })),
+                }
+              : {}),
           },
         },
       );
@@ -549,23 +566,6 @@ function LangyPanel({
   const discardProposal = (proposalId: string) => {
     setDiscardedProposals((prev) => new Set(prev).add(proposalId));
   };
-
-  // Page-context chips that ride inside the composer. Derived from the current
-  // page context (the experiment the workbench registered); dismissals persist
-  // until the underlying context changes.
-  const dismissedChipIds = useLangyComposerStore((s) => s.dismissedChipIds);
-  const dismissChip = useLangyComposerStore((s) => s.dismissChip);
-  const contextChips = useMemo(() => {
-    const candidates: LangyContextChip[] = [];
-    if (experimentSlug) {
-      candidates.push({
-        id: `experiment:${experimentSlug}`,
-        kind: "experiment",
-        label: experimentSlug,
-      });
-    }
-    return selectVisibleChips(candidates, dismissedChipIds);
-  }, [experimentSlug, dismissedChipIds]);
 
   // Default (non-directive) feedback is throttled so we don't nag; a
   // [langy:feedback] directive from Langy bypasses this in MessageContent.
@@ -752,6 +752,8 @@ function LangyPanel({
           canSend={!!input.trim() && !isBusy && !!projectId}
           contextChips={contextChips}
           onRemoveChip={dismissChip}
+          addableChips={addableChips}
+          onAddChip={restoreChip}
         />
       </VStack>
     </Box>
