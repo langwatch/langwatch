@@ -62,20 +62,12 @@ export const langyEphemeralSignalSchema = z.discriminatedUnion("type", [
 export type LangyEphemeralSignal = z.infer<typeof langyEphemeralSignalSchema>;
 
 /**
- * Publishes an ephemeral signal to the live transport (Redis buffer in PR3).
- * The contract PR3 implements; PR2 wires the no-op below.
+ * Publishes an ephemeral signal to the live transport (the per-turn Redis
+ * buffer). The seam the pipeline declares so it never depends on the transport;
+ * `RedisLangyEphemeralPublisher` (services layer) is the implementation, and it
+ * is also the type a turn's `ephemeral` dep is injected as, so a test can hand
+ * the processor a fake without reaching for the concrete class.
  */
 export interface LangyEphemeralPublisher {
   publish(tenantId: string, signal: LangyEphemeralSignal): Promise<void>;
-}
-
-/**
- * PR2 default — drops signals. There is no live transport yet and no worker
- * producing signals, so dropping is correct (not silent data loss): ephemeral
- * signals are non-durable by definition.
- */
-export class NoopLangyEphemeralPublisher implements LangyEphemeralPublisher {
-  async publish(): Promise<void> {
-    /* no-op until PR3 wires the Redis transport */
-  }
 }

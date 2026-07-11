@@ -15,10 +15,7 @@ export {
   UpdateConversationMetadataCommand,
 } from "./commands";
 
-export {
-  NoopLangyEphemeralPublisher,
-  langyEphemeralSignalSchema,
-} from "./ephemeral";
+export { langyEphemeralSignalSchema } from "./ephemeral";
 export type {
   LangyEphemeralPublisher,
   LangyEphemeralSignal,
