@@ -97,21 +97,35 @@ cluster with per-worktree Helm value overlays: standard services off `main`,
 worktrees overriding select ones) is a change *behind* haven — the routing,
 registry, and dashboard stay the same.
 
+## More of what haven does
+
+- **Managed ClickHouse.** haven runs one shared native `clickhouse-server` and
+  gives every worktree its own database (`lw_<slug>`) on it — so migration counts
+  are always this worktree's own. Light local config (memory cap, no S3 tiering,
+  no zero-copy). `haven clickhouse status|up|url|stop|drop`; `haven up` migrates
+  the per-slug DB and `haven down` drops it.
+- **Always migrate + seed, stable key.** Every `up` migrates *and* seeds
+  idempotently with a stable local API key (`sk-lw-local-development-key`, override
+  `LANGWATCH_LOCAL_API_KEY`) so a fresh stack is instantly usable.
+- **Shared-baseline fallback.** Every stack defines all hostnames; a service a
+  worktree doesn't run itself (`LANGWATCH_SKIP_AIGATEWAY` / `LANGWATCH_SKIP_NLP`)
+  resolves to a shared baseline stack (`HAVEN_BASELINE=1`, off `main`) instead of
+  dead-ending. ClickHouse embodies this: one server, `clickhouse.<slug>` always
+  resolves, only the database is per-worktree.
+- **`haven prune`.** Reclaim regenerable disk (node_modules, dist, caches) from
+  worktrees that are neither up nor dirty. Dry-run by default; `--yes` to act.
+- **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
+  tsgo runs across worktrees don't exhaust RAM (bounded by memory / CPU).
+- **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an
+  agent edits, then fires one catch-up reload — a human's browser isn't thrashed
+  through broken intermediate states. Opt-in and always time-bounded.
+
 ## Forward ideas
 
-- **AI-gated HMR.** When an agent makes many rapid edits, constant Vite rebuilds
-  are wasted work (and catch broken intermediate states). haven supervises Vite,
-  so it can gate reloads — debounced, periodic, or on an explicit `haven reload` —
-  instead of firing on every save.
-- **Shared baseline + per-worktree overrides.** Every stack defines *all* service
-  hostnames; a service a worktree doesn't run itself resolves to a shared baseline
-  stack instead of dead-ending. Mark the baseline with `HAVEN_BASELINE=1` (run it
-  off `main`); other worktrees that pass `LANGWATCH_SKIP_AIGATEWAY=1` /
-  `LANGWATCH_SKIP_NLP=1` get `gateway.<slug>` / `nlp.<slug>` pointed at the
-  baseline's copy. ClickHouse is the same idea taken further: one shared server,
-  so `clickhouse.<slug>` always resolves and only the *database* is per-worktree.
-  This keeps the routing model uniform as the backend evolves toward a shared
-  `kind` cluster with per-worktree Helm value overlays.
-- **Deeper DB orchestration.** The registry already carries each stack's Redis DB;
-  extend it to provision/seed per-stack Postgres/ClickHouse on demand (`haven seed`
-  is the first step).
+- **Per-worktree Postgres.** Today Postgres is the shared singleton and ClickHouse
+  is per-slug; extending per-worktree isolation to PG would let "a new DB is always
+  migrated + seeded" cover Postgres too.
+- **Shared `kind` cluster.** The baseline fallback already routes across a
+  heterogeneous set, so the backend can become a shared `kind` cluster with
+  per-worktree Helm value overlays *behind* haven — the routing, registry, and
+  dashboard stay the same.
