@@ -52,7 +52,20 @@ export interface CodingAgentSessionData {
   // ── Shape ─────────────────────────────────────────────────────────────
   modelCalls: number;
   toolCalls: number;
+  /**
+   * How many distinct sub-agents ran — counted from the `agent_id` the agent
+   * stamps on every sub-agent span, NOT from a spawn event.
+   *
+   * Measured against real data: `claude_code.subagent.spawn` is essentially
+   * never emitted, so counting spawns reported ZERO sub-agents for a session
+   * that had clearly run four of them (44, 20, 20 and 14 tool spans, each under
+   * its own agent_id). Their work then vanished from the step sequence with
+   * nothing to explain where it went. The ids are what actually arrive, so the
+   * ids are what we count.
+   */
   subAgents: number;
+  /** The distinct sub-agent ids seen. Bounded. */
+  subAgentIds: string[];
   /** In the order they happened, batched, failures marked in place. */
   steps: SessionStep[];
   /** How many prompts the human sent, and how much they typed. Not the text. */

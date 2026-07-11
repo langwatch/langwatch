@@ -128,6 +128,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     modelCalls: 0,
     toolCalls: 0,
     subAgents: 0,
+    subAgentIds: [],
     steps: [],
     prompts: 0,
     promptChars: 0,
@@ -295,6 +296,23 @@ function appendStep(
   ];
 }
 
+/**
+ * Record a sub-agent by its id.
+ *
+ * `claude_code.subagent.spawn` turns out not to be emitted in practice, so the
+ * only reliable evidence a sub-agent ran is the `agent_id` stamped on its own
+ * spans. Counting distinct ids is therefore the count.
+ */
+function seenSubAgent(
+  state: CodingAgentSessionData,
+  agentId: string,
+): Partial<CodingAgentSessionData> {
+  if (state.subAgentIds.includes(agentId)) return {};
+  if (state.subAgentIds.length >= MAX_SET) return {};
+  const subAgentIds = [...state.subAgentIds, agentId];
+  return { subAgentIds, subAgents: subAgentIds.length };
+}
+
 /** Identity that rides on every signal, so any of them can establish it. */
 function withIdentity(
   state: CodingAgentSessionData,
@@ -327,6 +345,8 @@ export function applySpanToCodingAgentSession({
 
   if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
     const next = withIdentity(state, attrs);
+    const agentId = str(attrs.agent_id);
+    if (agentId !== null) Object.assign(next, seenSubAgent(next, agentId));
     const stopReason = str(attrs.stop_reason);
     const ttft = num(attrs.ttft_ms);
     const model = str(attrs.model) ?? str(attrs["gen_ai.request.model"]);
@@ -363,9 +383,10 @@ export function applySpanToCodingAgentSession({
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
     const next = withIdentity(state, attrs);
     const agentType = str(attrs.agent_type) ?? str(attrs.subagent_type);
+    const agentId = str(attrs.agent_id);
     return {
       ...next,
-      subAgents: next.subAgents + 1,
+      ...(agentId !== null ? seenSubAgent(next, agentId) : {}),
       subAgentTypes:
         agentType !== null
           ? addTo(next.subAgentTypes, agentType)
@@ -410,7 +431,11 @@ export function applySpanToCodingAgentSession({
   // represented by the step that SPAWNED it. `agent_id` is absent on the main
   // thread and present on every sub-agent span, so it is exactly the
   // discriminator. The work still counts toward the totals — it happened.
-  if (str(attrs.agent_id) === null) {
+  const toolAgentId = str(attrs.agent_id);
+  if (toolAgentId !== null) {
+    Object.assign(withTool, seenSubAgent(withTool, toolAgentId));
+  }
+  if (toolAgentId === null) {
     withTool.steps = appendStep(next.steps, {
       name: toolName,
       startedAtMs: span.startTimeUnixMs,

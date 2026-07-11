@@ -217,7 +217,10 @@ export class CodingAgentSessionClickHouseRepository
     row: CodingAgentSessionRow,
     retentionDays?: number,
   ): Promise<void> {
-    EventUtils.validateTenantId(row.tenantId);
+    EventUtils.validateTenantId(
+      { tenantId: row.tenantId },
+      "CodingAgentSessionClickHouseRepository.upsert",
+    );
     const client = await this.resolveClient(row.tenantId);
     try {
       await client.insert({
@@ -241,7 +244,10 @@ export class CodingAgentSessionClickHouseRepository
     if (entries.length === 0) return;
 
     const tenantId = entries[0]!.row.tenantId;
-    EventUtils.validateTenantId(tenantId);
+    EventUtils.validateTenantId(
+      { tenantId },
+      "CodingAgentSessionClickHouseRepository.upsertBatch",
+    );
     // A batch insert resolves ONE client, so a row from another tenant would be
     // written into this tenant's ClickHouse. Refuse rather than cross the line.
     for (const { row } of entries) {
@@ -292,7 +298,10 @@ export class CodingAgentSessionClickHouseRepository
     traceId: string;
     startedAtMs?: number;
   }): Promise<CodingAgentSessionRow | null> {
-    EventUtils.validateTenantId(tenantId);
+    EventUtils.validateTenantId(
+      { tenantId },
+      "CodingAgentSessionClickHouseRepository.getByTraceId",
+    );
     const client = await this.resolveClient(tenantId);
 
     const partitionFilter =

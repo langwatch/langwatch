@@ -100,7 +100,12 @@ describe("coding agent session", () => {
         { span: tool("Read", 1000) },
         { span: tool("Read", 2000) },
         { span: tool("Bash", 3000, { durationMs: 2400 }) },
-        { span: span("claude_code.subagent.spawn", { agent_type: "Explore" }) },
+        {
+          span: span("claude_code.subagent.spawn", {
+            agent_id: "agent_a",
+            agent_type: "Explore",
+          }),
+        },
       ]);
 
       expect(state.modelCalls).toBe(2);
@@ -607,5 +612,38 @@ describe("the gate: a trace that is not a coding agent must cost nothing", () =>
     expect(isCodingAgentSession(state)).toBe(false);
     expect(state.agent).toBeNull();
     expect(state.modelCalls).toBe(0);
+  });
+});
+
+describe("counting sub-agents from what is actually emitted", () => {
+  // Measured against real telemetry: claude_code.subagent.spawn is essentially
+  // never emitted. Counting spawns reported ZERO sub-agents for a session that
+  // had clearly run several (44, 20, 20 and 14 tool spans, each under its own
+  // agent_id), and their work then vanished from the step sequence with nothing
+  // to explain where it went. The agent_id IS emitted, so that is what we count.
+  it("counts distinct sub-agents by agent_id, with no spawn span present", () => {
+    const state = fold([
+      { span: tool("Task", 1000) },
+      { span: tool("Read", 1100, { agentId: "agent_a" }) },
+      { span: tool("Read", 1200, { agentId: "agent_a" }) },
+      { span: tool("Grep", 1300, { agentId: "agent_b" }) },
+      { span: tool("Edit", 2000) },
+    ]);
+
+    expect(state.subAgents).toBe(2);
+    expect(state.toolCalls).toBe(5);
+    // Their work still stays OUT of the main thread's sequence.
+    expect(stepNames(state)).toEqual(["Task", "Edit"]);
+  });
+
+  it("counts a sub-agent that only made model calls", () => {
+    const state = fold([
+      { span: span("claude_code.llm_request", { agent_id: "agent_x" }) },
+      { span: span("claude_code.llm_request", { agent_id: "agent_x" }) },
+      { span: span("claude_code.llm_request") },
+    ]);
+
+    expect(state.subAgents).toBe(1);
+    expect(state.modelCalls).toBe(3);
   });
 });
