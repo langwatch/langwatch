@@ -5,6 +5,7 @@ import {
 import type { TriggerNotifier } from "~/server/app-layer/triggers/trigger-template.service";
 import { sendEmail } from "~/server/mailer/emailSender";
 import { isSlackWebhookUrl } from "./slackWebhookGuard";
+import { postSlackChatMessage } from "./slackWebApi";
 
 /**
  * Production delivery for trigger test fires: the email path reuses the shared
@@ -27,5 +28,15 @@ export const liveTriggerNotifier: TriggerNotifier = {
     await new IncomingWebhook(webhook).send(
       payload as IncomingWebhookSendArguments,
     );
+  },
+  async sendSlackBot({ token, channel, payload }) {
+    // The Web API surface — renders the gated chart/table/alert blocks. Posts to
+    // a fixed, trusted host (slack.com) via the shared SSRF-fenced sender.
+    await postSlackChatMessage({
+      token,
+      channel,
+      payload,
+      triggerName: "test fire",
+    });
   },
 };

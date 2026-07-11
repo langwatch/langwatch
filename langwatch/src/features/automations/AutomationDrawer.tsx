@@ -608,6 +608,8 @@ export function AutomationDrawer({
         projectId,
         channel,
         webhook: target.webhook,
+        botDestination: target.botDestination,
+        automationId,
         graphName,
         seriesLabel,
       }),
@@ -626,7 +628,7 @@ export function AutomationDrawer({
             description:
               r.channel === "email"
                 ? "Sent to your inbox."
-                : "Posted to the Slack webhook.",
+                : "Posted to Slack.",
             meta: { closable: true },
           });
         },

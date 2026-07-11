@@ -342,6 +342,8 @@ export function buildTestFirePayload({
   projectId,
   channel,
   webhook,
+  botDestination,
+  automationId,
   graphName,
   seriesLabel,
 }: {
@@ -349,6 +351,10 @@ export function buildTestFirePayload({
   projectId: string;
   channel: "email" | "slack";
   webhook: string | null;
+  /** Slack bot connection: test-fires via the Web API to this channel. */
+  botDestination?: { channelId: string; botToken: string | null } | null;
+  /** The saved automation being edited, so a kept bot token can be resolved. */
+  automationId?: string;
   graphName?: string | null;
   seriesLabel?: string | null;
 }) {
@@ -362,6 +368,8 @@ export function buildTestFirePayload({
     },
     draft: templatesFromDraft(draft),
     webhook,
+    botDestination: botDestination ?? null,
+    ...(automationId ? { automationId } : {}),
     graphAlert: isGraphAlert
       ? {
           graphName: graphName ?? undefined,

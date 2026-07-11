@@ -157,10 +157,18 @@ function toActionParams(slice: SlackSlice): SlackActionParams {
 }
 
 function testFireTarget(slice: SlackSlice) {
-  // Test-fire only posts to a webhook server-side; a bot connection has no
-  // webhook, so return null and let the drawer's null-webhook guard skip it.
-  if (slice.deliveryMethod === "bot") return { webhook: null };
-  return { webhook: slice.webhook || null };
+  // Bot mode test-fires via the Web API: hand the channel + the freshly-typed
+  // token (null when kept — the server loads the saved one by automation id).
+  if (slice.deliveryMethod === "bot") {
+    return {
+      webhook: null,
+      botDestination: {
+        channelId: slice.channelId,
+        botToken: slice.botToken.trim() || null,
+      },
+    };
+  }
+  return { webhook: slice.webhook || null, botDestination: null };
 }
 
 const DELIVERY_ITEMS: { value: SlackDeliveryMethod; label: string }[] = [

@@ -186,7 +186,13 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
   /** Webhook for the test-fire mutation. ADR-031: email test fires resolve
    *  their recipient server-side (the requester's own inbox), so no provider
    *  contributes a recipient list here — only Slack contributes its webhook. */
-  testFireTarget(slice: S): { webhook: string | null };
+  testFireTarget(slice: S): {
+    webhook: string | null;
+    /** Slack bot connection: test-fire posts via the Web API instead of the
+     *  webhook. `botToken` is the freshly-typed token, or null to reuse the
+     *  saved automation's stored token. */
+    botDestination?: { channelId: string; botToken: string | null } | null;
+  };
   /** Template strings contributed to the save payload (`templates`). */
   templatesFromSlice(slice: S): TemplateDraft;
 }

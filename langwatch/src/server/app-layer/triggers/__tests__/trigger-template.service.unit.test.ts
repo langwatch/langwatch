@@ -32,6 +32,11 @@ function makeNotifier() {
     html: string;
   }> = [];
   const sentSlack: Array<{ webhook: string; payload: unknown }> = [];
+  const sentSlackBot: Array<{
+    token: string;
+    channel: string;
+    payload: unknown;
+  }> = [];
   const notifier: TriggerNotifier = {
     sendEmail: async (args) => {
       sentEmails.push(args);
@@ -39,8 +44,11 @@ function makeNotifier() {
     sendSlack: async (args) => {
       sentSlack.push(args);
     },
+    sendSlackBot: async (args) => {
+      sentSlackBot.push(args);
+    },
   };
-  return { notifier, sentEmails, sentSlack };
+  return { notifier, sentEmails, sentSlack, sentSlackBot };
 }
 
 function makeService(notifier: TriggerNotifier) {
@@ -99,6 +107,48 @@ describe("validateTemplateDraft", () => {
 });
 
 describe("testFireTrigger", () => {
+  describe("given a Slack bot destination", () => {
+    it("posts via the Web API with gated blocks kept, not the webhook", async () => {
+      const { notifier, sentSlack, sentSlackBot } = makeNotifier();
+      const service = makeService(notifier);
+
+      // A data_table hero (gated) + a section fallback. Over a webhook the
+      // table would be dropped; the bot path keeps it (gate open).
+      const gatedTemplate = JSON.stringify([
+        {
+          type: "data_table",
+          caption: "matches",
+          rows: [
+            [{ type: "raw_text", text: "Trace" }],
+            [{ type: "raw_text", text: "t-1" }],
+          ],
+        },
+        { type: "section", text: { type: "mrkdwn", text: "fallback" } },
+      ]);
+
+      const result = await service.testFire({
+        channel: "slack",
+        trigger: TRIGGER,
+        project: PROJECT,
+        draft: { slackTemplateType: "block_kit", slackTemplate: gatedTemplate },
+        recipients: [],
+        webhook: null,
+        botDestination: { token: "xoxb-live", channel: "C1" },
+      });
+
+      expect(result.errors).toEqual([]);
+      // Delivered via the Web API, not the incoming webhook.
+      expect(sentSlack).toHaveLength(0);
+      expect(sentSlackBot).toHaveLength(1);
+      expect(sentSlackBot[0]).toMatchObject({
+        token: "xoxb-live",
+        channel: "C1",
+      });
+      // The gated block survived — proof the gate was opened for bot delivery.
+      expect(JSON.stringify(sentSlackBot[0]?.payload)).toContain("data_table");
+    });
+  });
+
   describe("given a graph-alert draft rendering a gallery Block Kit template", () => {
     it("renders the alert example context — metric, condition, dashboard URL all populated", async () => {
       const { notifier, sentSlack } = makeNotifier();

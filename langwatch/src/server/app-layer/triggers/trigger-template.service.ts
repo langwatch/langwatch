@@ -38,6 +38,12 @@ export interface TriggerNotifier {
     html: string;
   }): Promise<void>;
   sendSlack(args: { webhook: string; payload: SlackPayload }): Promise<void>;
+  /** Web API (bot-token) delivery — renders the gated Block Kit blocks. */
+  sendSlackBot(args: {
+    token: string;
+    channel: string;
+    payload: SlackPayload;
+  }): Promise<void>;
 }
 
 /** The four template columns, as edited in the drawer. Each may be null
@@ -171,6 +177,9 @@ export interface TestFireTriggerInput {
   draft: TemplateDraft;
   recipients: string[];
   webhook: string | null;
+  /** Present when the Slack automation delivers via a bot connection: the
+   *  resolved token + channel. Test-fires via the Web API with gated blocks. */
+  botDestination?: { token: string; channel: string } | null;
   /** Present when the draft is a custom-graph alert. */
   graphAlert?: TestFireGraphAlertInput | null;
 }
@@ -255,6 +264,31 @@ export async function testFireTrigger(
     return {
       channel: "email",
       recipientCount: recipients.length,
+      usedDefault: rendered.usedDefault,
+      missingVariables: rendered.missingVariables,
+      errors: rendered.errors,
+    };
+  }
+
+  // Bot connection: post via the Web API with the gate OPEN so the author sees
+  // the real chart/table/alert blocks render, exactly as a live fire would.
+  if (input.botDestination) {
+    const rendered = await renderTriggerSlack({
+      templateType: normalizeSlackType(draft.slackTemplateType),
+      template: draft.slackTemplate ?? null,
+      context,
+      defaults,
+      testFire: true,
+      allowGatedBlocks: true,
+    });
+    await deps.notifier.sendSlackBot({
+      token: input.botDestination.token,
+      channel: input.botDestination.channel,
+      payload: rendered.payload,
+    });
+    return {
+      channel: "slack",
+      recipientCount: 1,
       usedDefault: rendered.usedDefault,
       missingVariables: rendered.missingVariables,
       errors: rendered.errors,

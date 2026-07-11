@@ -1124,6 +1124,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           sendSlack: async () => {
             /* test no-op */
           },
+          sendSlackBot: async () => {
+            /* test no-op */
+          },
         },
       };
       return {

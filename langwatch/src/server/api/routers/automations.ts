@@ -20,6 +20,7 @@ import {
   ProjectNotFoundError,
 } from "~/server/app-layer/triggers/errors";
 import {
+  decryptSlackBotToken,
   persistSlackActionParams,
   redactSlackActionParams,
   slackBotTokenMissing,
@@ -539,6 +540,19 @@ export const automationRouter = createTRPCRouter({
           .startsWith("https://hooks.slack.com/")
           .nullable()
           .default(null),
+        /** Set when the Slack automation uses a bot connection. `botToken` is
+         *  the freshly-typed token (fresh draft); null means "use the saved
+         *  automation's stored token", resolved server-side via `automationId`. */
+        botDestination: z
+          .object({
+            channelId: z.string(),
+            botToken: z.string().nullable().default(null),
+          })
+          .nullable()
+          .default(null),
+        /** The saved automation being edited, so a kept (un-retyped) bot token
+         *  can be loaded + decrypted for the test fire. */
+        automationId: z.string().optional(),
         // Present when the draft is a custom-graph alert: the test message
         // then renders the alert-shaped example context + alert defaults,
         // matching what a real fire sends. Detail fields only shape the
@@ -593,6 +607,31 @@ export const automationRouter = createTRPCRouter({
           }
           recipients = [email];
         }
+        // Resolve the Slack bot destination: the freshly-typed token, or the
+        // saved automation's stored (encrypted) token when it was kept on edit.
+        let botDestination: { token: string; channel: string } | null = null;
+        if (input.channel === "slack" && input.botDestination) {
+          const channel = input.botDestination.channelId.trim();
+          let token = input.botDestination.botToken?.trim() || null;
+          if (!token && input.automationId) {
+            const saved = await ctx.prisma.trigger.findUnique({
+              where: { id: input.automationId, projectId: input.projectId },
+              select: { actionParams: true },
+            });
+            token = decryptSlackBotToken(
+              (saved?.actionParams ?? {}) as SlackActionParams,
+            );
+          }
+          if (!token || !channel) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "Add a Slack bot token and channel before sending a test fire.",
+            });
+          }
+          botDestination = { token, channel };
+        }
+
         const project = await resolveProjectIdentity(input.projectId);
         return await getApp().triggerTemplates.testFire({
           channel: input.channel,
@@ -601,6 +640,7 @@ export const automationRouter = createTRPCRouter({
           draft: input.draft,
           recipients,
           webhook: input.webhook,
+          botDestination,
           graphAlert: input.graphAlert,
         });
       } catch (err) {
