@@ -75,4 +75,27 @@ export class PrismaTriggerFireHistoryRepository
       },
     });
   }
+
+  async findAllRecentForProject({
+    projectId,
+    limit,
+  }: {
+    projectId: string;
+    limit: number;
+  }): Promise<TriggerFire[]> {
+    return this.prisma.triggerSent.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      // Same metadata-only contract as the per-trigger read: widening the
+      // scope to the whole project must not widen what a fire reveals.
+      select: {
+        id: true,
+        triggerId: true,
+        customGraphId: true,
+        createdAt: true,
+        resolvedAt: true,
+      },
+    });
+  }
 }

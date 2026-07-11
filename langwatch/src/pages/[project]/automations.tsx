@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Monitor, TriggerAction } from "@prisma/client";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Edit2,
   Eye,
@@ -32,7 +32,9 @@ import {
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { HoverableBigText } from "~/components/HoverableBigText";
+import { AutomationsHistory } from "~/features/automations/components/page/AutomationsHistory";
 import { UseCaseStrip } from "~/features/automations/components/page/AutomationsEducation";
+import { SegmentedControl } from "~/components/ui/segmented-control";
 import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
@@ -53,6 +55,8 @@ import { formatTimeAgo } from "../../utils/formatTimeAgo";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 type TriggerStats = RouterOutputs["automation"]["getTriggerStats"][number];
+type ReportSchedule =
+  RouterOutputs["automation"]["getReportSchedules"][number];
 
 /** Column header with a help tooltip explaining the metric. */
 function MetricHeader({ label, help }: { label: string; help: string }) {
@@ -217,6 +221,71 @@ function SectionHeader({
   );
 }
 
+/**
+ * A report's next and last run, straight from the scheduler.
+ *
+ * The cron stored on the trigger only DESCRIBES the schedule — the scheduler
+ * owns the instants — so these two cells are the only honest answer to "when
+ * does this actually go out?". A report with no scheduler row has never been
+ * scheduled (it was created before the schedule synced, or the scheduler is
+ * not wired in this environment), which is different from one that is simply
+ * paused, so the two say different things.
+ */
+function ReportRunCells({
+  schedule,
+  loading,
+}: {
+  schedule?: ReportSchedule;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <>
+        <Table.Cell>
+          <Text textStyle="sm" color="fg.muted">
+            …
+          </Text>
+        </Table.Cell>
+        <Table.Cell>
+          <Text textStyle="sm" color="fg.muted">
+            …
+          </Text>
+        </Table.Cell>
+      </>
+    );
+  }
+  return (
+    <>
+      <Table.Cell whiteSpace="nowrap">
+        {schedule?.nextRunAt ? (
+          <Tooltip content={new Date(schedule.nextRunAt).toLocaleString()}>
+            <Text textStyle="sm" cursor="help">
+              {formatTimeAgo(new Date(schedule.nextRunAt).getTime())}
+            </Text>
+          </Tooltip>
+        ) : (
+          <Text textStyle="sm" color="fg.muted">
+            {schedule ? "Paused" : "Not scheduled"}
+          </Text>
+        )}
+      </Table.Cell>
+      <Table.Cell whiteSpace="nowrap">
+        {schedule?.lastRunAt ? (
+          <Tooltip content={new Date(schedule.lastRunAt).toLocaleString()}>
+            <Text textStyle="sm" cursor="help">
+              {formatTimeAgo(new Date(schedule.lastRunAt).getTime())}
+            </Text>
+          </Tooltip>
+        ) : (
+          <Text textStyle="sm" color="fg.muted">
+            Not yet
+          </Text>
+        )}
+      </Table.Cell>
+    </>
+  );
+}
+
 /** Bordered table frame that scrolls horizontally instead of squishing
  *  columns on narrow viewports. */
 function TableShell({ children }: { children: React.ReactNode }) {
@@ -274,6 +343,30 @@ function Automations() {
     [triggerStats.data],
   );
 
+  // The three lenses the page answers: what runs on a clock, what reacts to
+  // events, and what has already happened.
+  const [lens, setLens] = useState<"triggered" | "scheduled" | "history">(
+    "triggered",
+  );
+
+  // A report's cron only DESCRIBES its schedule — the scheduler owns the real
+  // instants, so next/last run come from there, not from the trigger row.
+  const reportSchedules = api.automation.getReportSchedules.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+  const scheduleByTriggerId = useMemo(
+    () => new Map((reportSchedules.data ?? []).map((s) => [s.triggerId, s])),
+    [reportSchedules.data],
+  );
+
+  // What every automation in the project has actually been doing. Only fetched
+  // when the reader asks for it — it is the one query the other lenses never need.
+  const activity = api.automation.getRecentActivity.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id && lens === "history" },
+  );
+
   // Alerts react to a custom graph's metric; automations react to traces.
   // Distinct shapes, so they get distinct tables.
   const alerts = useMemo(
@@ -290,6 +383,11 @@ function Automations() {
         (t) => !t.customGraphId && t.triggerKind !== "REPORT",
       ),
     [triggers.data],
+  );
+  // Everything that fires in reaction to something, as opposed to on a clock.
+  const triggered = useMemo(
+    () => [...alerts, ...traceAutomations],
+    [alerts, traceAutomations],
   );
 
   // Only needed to resolve dataset names on ADD_TO_DATASET rows. Gated on
@@ -600,14 +698,41 @@ function Automations() {
             </Text>
           </VStack>
 
+          <SegmentedControl
+            value={lens}
+            onValueChange={(e) =>
+              setLens(e.value as "triggered" | "scheduled" | "history")
+            }
+            size="sm"
+            alignSelf="start"
+            items={[
+              { value: "triggered", label: `Triggered (${triggered.length})` },
+              { value: "scheduled", label: `Scheduled (${reports.length})` },
+              { value: "history", label: "History" },
+            ]}
+          />
+
           {isLoading ? (
             <Text textStyle="sm" color="fg.muted">
               Loading...
             </Text>
+          ) : lens === "history" ? (
+            <AutomationsHistory
+              fires={activity.data ?? []}
+              triggers={triggers.data ?? []}
+              isLoading={activity.isLoading}
+              onOpenAutomation={(triggerId) =>
+                openDrawer("viewAutomation", { automationId: triggerId })
+              }
+            />
           ) : (
             <>
               {/* Alerts — fire when a graph's metric crosses a threshold */}
-              <VStack align="stretch" gap={4}>
+              <VStack
+                align="stretch"
+                gap={4}
+                display={lens === "triggered" ? "flex" : "none"}
+              >
                 <SectionHeader
                   icon={<TrendingUp size={18} />}
                   accent="orange"
@@ -700,14 +825,18 @@ function Automations() {
               </VStack>
 
               {/* Reports — send something on a recurring schedule */}
-              <VStack align="stretch" gap={4}>
+              <VStack
+                align="stretch"
+                gap={4}
+                display={lens === "scheduled" ? "flex" : "none"}
+              >
                 <SectionHeader
                   icon={<Calendar size={18} />}
                   accent="purple"
                   title="Reports"
                   count={reports.length}
                   summary="Send a dashboard, a graph, or a table of traces on a recurring schedule."
-                  details="A report bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set. Upcoming send times are visible in Ops → Scheduler."
+                  details="A report bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
                   addLabel="New report"
                   onAdd={() =>
                     openDrawer("automation", { initialSource: "report" })
@@ -727,6 +856,18 @@ function Automations() {
                           <Table.ColumnHeader>Sends</Table.ColumnHeader>
                           <Table.ColumnHeader whiteSpace="nowrap">
                             Schedule
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader whiteSpace="nowrap">
+                            <MetricHeader
+                              label="Next run"
+                              help="When this report next goes out, straight from the scheduler. A paused report has no next run."
+                            />
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader whiteSpace="nowrap">
+                            <MetricHeader
+                              label="Last run"
+                              help="The last time this report was sent."
+                            />
                           </Table.ColumnHeader>
                           <Table.ColumnHeader>Delivery</Table.ColumnHeader>
                           <Table.ColumnHeader>Active</Table.ColumnHeader>
@@ -773,6 +914,10 @@ function Automations() {
                                     : "—"}
                                 </Text>
                               </Table.Cell>
+                              <ReportRunCells
+                                schedule={scheduleByTriggerId.get(trigger.id)}
+                                loading={reportSchedules.isLoading}
+                              />
                               <Table.Cell>
                                 {trigger.action === "SEND_SLACK_MESSAGE"
                                   ? "Slack"
@@ -790,7 +935,11 @@ function Automations() {
               </VStack>
 
               {/* Automations — act on each incoming trace that matches */}
-              <VStack align="stretch" gap={4}>
+              <VStack
+                align="stretch"
+                gap={4}
+                display={lens === "triggered" ? "flex" : "none"}
+              >
                 <SectionHeader
                   icon={<Zap size={18} />}
                   accent="blue"

@@ -111,6 +111,18 @@ export interface ScheduledJobRepository {
   }): Promise<void>;
 
   /**
+   * Every schedule a project owns for one consumer — the read that lets a
+   * product surface answer "when does this next run, and when did it last
+   * run?" without sending the customer to the cross-tenant ops dashboard.
+   * Project-scoped (unlike `findDue` / `listForOps`), so it is safe to expose
+   * under a customer-facing permission.
+   */
+  findAllForProject(params: {
+    projectId: string;
+    targetType: string;
+  }): Promise<ScheduledJobRecord[]>;
+
+  /**
    * Cross-tenant read for the ops dashboard: the most-imminent scheduled jobs
    * (active first, soonest `nextRunAt` first), bounded by `limit`. Read-only
    * operator visibility — never a firing path.

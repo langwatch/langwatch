@@ -87,19 +87,23 @@ function makeDeps(
   sendSlackBot: ReturnType<typeof vi.fn>;
   listReportTraces: ReturnType<typeof vi.fn>;
   loadReportCharts: ReturnType<typeof vi.fn>;
+  recordFire: ReturnType<typeof vi.fn>;
 } {
   const sendEmail = vi.fn(async () => undefined);
   const sendSlack = vi.fn(async () => undefined);
   const sendSlackBot = vi.fn(async () => undefined);
   const listReportTraces = vi.fn(async () => opts.traces ?? []);
   const loadReportCharts = vi.fn(async () => opts.charts ?? []);
+  const recordFire = vi.fn(async () => undefined);
   return {
     sendEmail,
     sendSlack,
     sendSlackBot,
     listReportTraces,
     loadReportCharts,
+    recordFire,
     deps: {
+      recordFire: recordFire as unknown as ReportDispatchDeps["recordFire"],
       loadTrigger: vi.fn(async () => trigger),
       loadProject: vi.fn(async () => PROJECT),
       sendEmail: sendEmail as unknown as ReportDispatchDeps["sendEmail"],
@@ -279,6 +283,74 @@ describe("dispatchScheduledReport", () => {
       const missing = makeDeps(null);
       await dispatchScheduledReport({ deps: missing.deps, fire });
       expect(missing.sendSlack).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the report is delivered", () => {
+    it("records the fire, so the automations page can show it ran", async () => {
+      const { deps, recordFire } = makeDeps(makeReportTrigger());
+
+      await dispatchScheduledReport({ deps, fire });
+
+      expect(recordFire).toHaveBeenCalledTimes(1);
+      expect(recordFire.mock.calls[0]![0]).toEqual({
+        projectId: "proj-1",
+        triggerId: "trig-1",
+        firedAt: fire.slot,
+      });
+    });
+
+    describe("when recording the fire fails", () => {
+      it("does not fail the dispatch — the report already reached the customer", async () => {
+        const { deps, recordFire, sendSlack } = makeDeps(makeReportTrigger());
+        recordFire.mockRejectedValueOnce(new Error("postgres is down"));
+
+        await expect(
+          dispatchScheduledReport({ deps, fire }),
+        ).resolves.toBeUndefined();
+        expect(sendSlack).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given the report delivers nothing", () => {
+    it("records no fire for a Slack report with no destination", async () => {
+      const { deps, sendSlack, recordFire } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "traceQuery", filters: {}, topN: 5 },
+            schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+            // No webhook and no bot connection — nothing is sent.
+          },
+        } as Partial<Trigger>),
+      );
+
+      await dispatchScheduledReport({ deps, fire });
+
+      expect(sendSlack).not.toHaveBeenCalled();
+      // A fire here would be a lie in the history.
+      expect(recordFire).not.toHaveBeenCalled();
+    });
+
+    it("records no fire for an email report whose recipients are all suppressed", async () => {
+      const { deps, sendEmail, recordFire } = makeDeps(
+        makeReportTrigger({
+          action: TriggerAction.SEND_EMAIL,
+          actionParams: {
+            source: { kind: "traceQuery", filters: {}, topN: 5 },
+            schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+            members: ["a@acme.test"],
+          },
+        } as Partial<Trigger>),
+      );
+      (
+        deps.filterSuppressedRecipients as unknown as ReturnType<typeof vi.fn>
+      ).mockResolvedValueOnce([]);
+
+      await dispatchScheduledReport({ deps, fire });
+
+      expect(sendEmail).not.toHaveBeenCalled();
+      expect(recordFire).not.toHaveBeenCalled();
     });
   });
 });

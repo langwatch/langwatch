@@ -52,4 +52,18 @@ export class TriggerFireHistoryService {
   }): Promise<TriggerFire[]> {
     return this.repo.findAllRecentByTriggerId({ projectId, triggerId, limit });
   }
+
+  /**
+   * Latest fires across every trigger in the project, newest first — the
+   * activity feed on the automations page. Metadata only.
+   */
+  async getAllRecentFiresForProject({
+    projectId,
+    limit,
+  }: {
+    projectId: string;
+    limit: number;
+  }): Promise<TriggerFire[]> {
+    return this.repo.findAllRecentForProject({ projectId, limit });
+  }
 }

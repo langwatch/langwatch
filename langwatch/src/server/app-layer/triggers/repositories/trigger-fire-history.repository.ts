@@ -49,4 +49,14 @@ export interface TriggerFireHistoryRepository {
     triggerId: string;
     limit: number;
   }): Promise<TriggerFire[]>;
+
+  /**
+   * Every trigger's recent fires across the project, newest first — the feed
+   * behind "what have my automations actually been doing?". Same metadata-only
+   * contract as `findAllRecentByTriggerId`: no trace ids, no trace content.
+   */
+  findAllRecentForProject(params: {
+    projectId: string;
+    limit: number;
+  }): Promise<TriggerFire[]>;
 }

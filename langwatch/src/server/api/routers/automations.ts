@@ -461,6 +461,35 @@ export const automationRouter = createTRPCRouter({
         limit: input.limit,
       });
     }),
+  /** The activity feed: what every automation in the project has been doing. */
+  getRecentActivity: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        limit: z.number().int().min(1).max(200).default(100),
+      }),
+    )
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
+      return fireHistory.getAllRecentFiresForProject({
+        projectId: input.projectId,
+        limit: input.limit,
+      });
+    }),
+  /**
+   * When each report next runs and last ran. The cron on the trigger only
+   * DESCRIBES the schedule — the scheduler owns the actual instants, so this
+   * is the only honest answer to "when does this next send?".
+   */
+  getReportSchedules: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ input }) => {
+      return getApp().triggers.getReportSchedules({
+        projectId: input.projectId,
+      });
+    }),
   toggleTrigger: protectedProcedure
     .input(
       z.object({

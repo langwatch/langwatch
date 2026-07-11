@@ -11,6 +11,7 @@ function makeScheduledJobs(): ScheduledJobRepository {
     claim: vi.fn(async () => true),
     upsertForTarget: vi.fn(async () => undefined),
     deactivateForTarget: vi.fn(async () => undefined),
+    findAllForProject: vi.fn(async () => []),
     listForOps: vi.fn(async () => []),
   };
 }

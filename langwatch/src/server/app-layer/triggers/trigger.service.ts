@@ -142,4 +142,38 @@ export class TriggerService {
       targetId: params.triggerId,
     });
   }
+
+  /**
+   * When each of the project's reports next runs, and when it last ran —
+   * keyed by report trigger id. The scheduler owns these instants (the cron on
+   * the trigger is only a description of them), so a report's real next run can
+   * only be answered from here. Empty where no scheduler is wired.
+   */
+  async getReportSchedules(params: {
+    projectId: string;
+  }): Promise<ReportSchedule[]> {
+    if (!this.scheduledJobs) return [];
+    const jobs = await this.scheduledJobs.findAllForProject({
+      projectId: params.projectId,
+      targetType: REPORT_SCHEDULER_TARGET_TYPE,
+    });
+    return jobs.map((job) => ({
+      triggerId: job.targetId,
+      // A deactivated schedule keeps its stale `nextRunAt` in the row; a paused
+      // report must not claim a next run it will never take.
+      nextRunAt: job.active ? job.nextRunAt : null,
+      lastRunAt: job.lastSlot,
+      active: job.active,
+    }));
+  }
+}
+
+/** When a report next runs and when it last ran, as the page shows it. */
+export interface ReportSchedule {
+  triggerId: string;
+  /** Null when the report is paused — a paused schedule never comes due. */
+  nextRunAt: Date | null;
+  /** The last calendar slot fired; null until the report first runs. */
+  lastRunAt: Date | null;
+  active: boolean;
 }

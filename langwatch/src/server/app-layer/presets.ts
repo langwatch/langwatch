@@ -770,6 +770,22 @@ export function initializeDefaultApp(options?: {
                 toReportTraceRow({ item, projectUrl }),
               );
             },
+            // A report's fire is a completed EVENT, not an open incident, so
+            // `resolvedAt` is stamped at write time. The list's "currently
+            // firing" read looks for `customGraphId != null AND resolvedAt IS
+            // NULL`, so a report row can never masquerade as a live alert.
+            recordFire: async ({ projectId, triggerId, firedAt }) => {
+              await prisma.triggerSent.create({
+                data: {
+                  projectId,
+                  triggerId,
+                  traceId: null,
+                  customGraphId: null,
+                  createdAt: firedAt,
+                  resolvedAt: firedAt,
+                },
+              });
+            },
             loadReportCharts: ({ projectId, source, from, to }) =>
               loadReportCharts({
                 deps: {

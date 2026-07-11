@@ -65,6 +65,16 @@ export interface ReportDispatchDeps {
     from: number;
     to: number;
   }): Promise<ReportChart[]>;
+  /**
+   * Record that the report was sent, so it shows up in the automations page's
+   * history and last-sent alongside everything else. Without this a report can
+   * run for a month and leave no trace that it ever did.
+   */
+  recordFire(params: {
+    projectId: string;
+    triggerId: string;
+    firedAt: Date;
+  }): Promise<void>;
   baseHost: string;
 }
 
@@ -211,82 +221,106 @@ export async function dispatchScheduledReport({
     baseHost: deps.baseHost,
   });
 
-  if (trigger.action === "SEND_EMAIL") {
-    const recipients = params.members ?? [];
-    if (recipients.length === 0) return;
-    const allowed = await deps.filterSuppressedRecipients({
-      projectId: project.id,
-      triggerId: trigger.id,
-      emails: recipients,
-    });
-    if (allowed.length === 0) return;
-    const rendered = await renderTriggerEmail({
-      subjectTemplate: trigger.emailSubjectTemplate,
-      bodyTemplate: trigger.emailBodyTemplate,
-      context,
-      defaults: {
-        emailSubject: REPORT_TRIGGER_DEFAULTS.emailSubject,
-        emailBody: REPORT_TRIGGER_DEFAULTS.emailBody,
-      },
-    });
-    await deps.sendEmail({
-      triggerEmails: allowed,
-      triggerId: trigger.id,
-      projectId: project.id,
-      subject: rendered.subject,
-      html: rendered.html,
-    });
-    return;
-  }
+  // `deliver` reports whether the message actually went out — a report with no
+  // recipients, no webhook, or an unusable bot connection silently delivers
+  // nothing, and recording a fire for it would put a lie in the history.
+  const deliver = async (): Promise<boolean> => {
+    if (trigger.action === "SEND_EMAIL") {
+      const recipients = params.members ?? [];
+      if (recipients.length === 0) return false;
+      const allowed = await deps.filterSuppressedRecipients({
+        projectId: project.id,
+        triggerId: trigger.id,
+        emails: recipients,
+      });
+      if (allowed.length === 0) return false;
+      const rendered = await renderTriggerEmail({
+        subjectTemplate: trigger.emailSubjectTemplate,
+        bodyTemplate: trigger.emailBodyTemplate,
+        context,
+        defaults: {
+          emailSubject: REPORT_TRIGGER_DEFAULTS.emailSubject,
+          emailBody: REPORT_TRIGGER_DEFAULTS.emailBody,
+        },
+      });
+      await deps.sendEmail({
+        triggerEmails: allowed,
+        triggerId: trigger.id,
+        projectId: project.id,
+        subject: rendered.subject,
+        html: rendered.html,
+      });
+      return true;
+    }
 
-  if (trigger.action === "SEND_SLACK_MESSAGE") {
-    const templateType: SlackTemplateType | null =
-      trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
-    const slackDefaults = {
-      slackString: REPORT_TRIGGER_DEFAULTS.slackString,
-      slackBlockKit: REPORT_TRIGGER_DEFAULTS.slackBlockKit,
-    };
+    if (trigger.action === "SEND_SLACK_MESSAGE") {
+      const templateType: SlackTemplateType | null =
+        trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
+      const slackDefaults = {
+        slackString: REPORT_TRIGGER_DEFAULTS.slackString,
+        slackBlockKit: REPORT_TRIGGER_DEFAULTS.slackBlockKit,
+      };
 
-    // ADR-041: a bot connection posts via the Web API with the gate open.
-    const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
-    if (slackDeliveryMethodOf(slackParams) === "bot") {
-      const token = decryptSlackBotToken(slackParams);
-      const channel = slackParams.slackChannelId?.trim();
-      if (!token || !channel) return;
+      // ADR-041: a bot connection posts via the Web API with the gate open.
+      const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
+      if (slackDeliveryMethodOf(slackParams) === "bot") {
+        const token = decryptSlackBotToken(slackParams);
+        const channel = slackParams.slackChannelId?.trim();
+        if (!token || !channel) return false;
+        const rendered = await renderTriggerSlack({
+          templateType,
+          template: trigger.slackTemplate,
+          context,
+          defaults: slackDefaults,
+          allowGatedBlocks: true,
+        });
+        await deps.sendSlackBot({
+          token,
+          channel,
+          payload: rendered.payload,
+          triggerName: trigger.name,
+        });
+        return true;
+      }
+
+      const webhook = params.slackWebhook ?? null;
+      if (!webhook) return false;
       const rendered = await renderTriggerSlack({
         templateType,
         template: trigger.slackTemplate,
         context,
         defaults: slackDefaults,
-        allowGatedBlocks: true,
       });
-      await deps.sendSlackBot({
-        token,
-        channel,
-        payload: rendered.payload,
+      await deps.sendSlack({
+        triggerWebhook: webhook,
         triggerName: trigger.name,
+        payload: rendered.payload,
       });
-      return;
+      return true;
     }
 
-    const webhook = params.slackWebhook ?? null;
-    if (!webhook) return;
-    const rendered = await renderTriggerSlack({
-      templateType,
-      template: trigger.slackTemplate,
-      context,
-      defaults: slackDefaults,
-    });
-    await deps.sendSlack({
-      triggerWebhook: webhook,
-      triggerName: trigger.name,
-      payload: rendered.payload,
-    });
-    return;
-  }
+    logger.warn(
+      { triggerId: trigger.id, action: trigger.action },
+      "Report trigger action is not a notify channel — skipping",
+    );
+    return false;
+  };
 
-  logger.warn(
-    { triggerId: trigger.id, action: trigger.action },
-    "Report trigger action is not a notify channel — skipping",
-  );
+  if (!(await deliver())) return;
+
+  // The report went out — record it, so the automations page can show when it
+  // last sent and what it has been doing. Best-effort: a bookkeeping failure
+  // must not fail (and so re-run) a report that already reached the customer.
+  try {
+    await deps.recordFire({
+      projectId: project.id,
+      triggerId: trigger.id,
+      firedAt: fire.slot,
+    });
+  } catch (error) {
+    logger.warn(
+      { triggerId: trigger.id, projectId: project.id, error },
+      "Report delivered but recording its fire failed",
+    );
+  }
 }

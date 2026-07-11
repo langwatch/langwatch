@@ -173,6 +173,20 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     });
   }
 
+  async findAllForProject({
+    projectId,
+    targetType,
+  }: {
+    projectId: string;
+    targetType: string;
+  }): Promise<ScheduledJobRecord[]> {
+    // Single index hit: `@@index([projectId])` plus a small targetType filter.
+    return this.prisma.scheduledJob.findMany({
+      where: { projectId, targetType },
+      orderBy: { nextRunAt: "asc" },
+    });
+  }
+
   async listForOps({ limit }: { limit: number }): Promise<ScheduledJobRecord[]> {
     // Cross-tenant operator read (all projects): active jobs first, then by
     // soonest next fire. The `-- @tenancy:` marker is the guard's sanctioned
@@ -206,6 +220,9 @@ export class NullScheduledJobRepository implements ScheduledJobRepository {
   }
   async upsertForTarget(): Promise<void> {}
   async deactivateForTarget(): Promise<void> {}
+  async findAllForProject(): Promise<ScheduledJobRecord[]> {
+    return [];
+  }
   async listForOps(): Promise<ScheduledJobRecord[]> {
     return [];
   }
