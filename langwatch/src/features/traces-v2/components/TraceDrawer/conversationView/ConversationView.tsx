@@ -26,15 +26,18 @@ import type { RouterOutputs } from "~/utils/api";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
 import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
+import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import type { TraceListItem } from "../../../types/trace";
 import { RenderedMarkdown } from "../markdownView";
 import { SegmentedToggle } from "../SegmentedToggle";
+import { type TerminalStep, TerminalView } from "../terminalView";
 import {
   extractReadableText,
   extractReasoningText,
   extractSystemText,
 } from "../transcript";
 import { AnnotationsView } from "./AnnotationsView";
+import { buildTerminalSteps } from "./buildTerminalSteps";
 import { ChatTurnRow } from "./ChatTurnRow";
 import { ConversationExpandContext } from "./expandContext";
 import { SystemPromptBanner } from "./SystemPromptBanner";
@@ -71,6 +74,7 @@ const ESTIMATED_TURN_HEIGHT = 220;
 const MARKDOWN_CHUNK_ESTIMATE_PX = 360;
 
 const EMPTY_CHUNKS: ConversationMarkdownChunk[] = [];
+const EMPTY_STEPS: TerminalStep[] = [];
 
 interface ConversationViewProps {
   conversationId: string;
@@ -108,6 +112,18 @@ export const ConversationView = memo(function ConversationView({
     }
     return map;
   }, [annotationsQuery.data]);
+
+  // A coding-agent session (Claude Code / terminal origin) unlocks the
+  // Terminal view — a CLI-style recreation of the session. Normal LLM
+  // conversations never see the tab. Permissive by design: any turn carrying
+  // the signal is enough.
+  const isTerminalSession = useMemo(
+    () =>
+      turns.some((t) =>
+        isTerminalOrigin({ serviceName: t.serviceName, origin: t.origin }),
+      ),
+    [turns],
+  );
 
   // Single pass over `turns`: pre-parse the latest user message and the
   // wall-clock gap to the previous turn. Without this, every ChatTurnRow
@@ -172,6 +188,21 @@ export const ConversationView = memo(function ConversationView({
     return buildConversationMarkdownChunks(conversationId, parsedTurns);
   }, [hasViewedMarkdown, conversationId, parsedTurns]);
 
+  // A remembered "terminal" mode must not leak onto a normal conversation
+  // (mode is sticky across navigations); fall back to the thread view when the
+  // current thread isn't a terminal session.
+  const effectiveMode: Mode =
+    mode === "terminal" && !isTerminalSession ? "thread" : mode;
+
+  // Build the terminal session only when it's actually being viewed — the
+  // shaping walks every turn's payloads, so bubbles-mode first render pays
+  // nothing.
+  const terminalSteps = useMemo(
+    () => (effectiveMode === "terminal" ? buildTerminalSteps(turns) : EMPTY_STEPS),
+    [effectiveMode, turns],
+  );
+  const terminalModel = turns[turns.length - 1]?.models[0];
+
   // Only show the skeleton on the very first load. With keepPreviousData
   // the previous conversation's turns stay rendered while the new query
   // fetches in the background, so re-clicking a cached conversation no
@@ -195,17 +226,22 @@ export const ConversationView = memo(function ConversationView({
       <ConversationHeader
         conversationId={conversationId}
         turnCount={turns.length}
-        mode={mode}
+        mode={effectiveMode}
         onModeChange={setMode}
         isExpandAllEnabled={isExpandAllEnabled}
         onToggleExpandAll={() => setIsExpandAllEnabled((v) => !v)}
+        showTerminal={isTerminalSession}
       />
-      {mode === "thread" || mode === "bubbles" ? (
+      {effectiveMode === "terminal" ? (
+        <Box flex={1} minHeight={0}>
+          <TerminalView steps={terminalSteps} meta={{ model: terminalModel }} />
+        </Box>
+      ) : effectiveMode === "thread" || effectiveMode === "bubbles" ? (
         <ConversationExpandContext.Provider
           value={{ isExpandable: true, shouldExpandAll: isExpandAllEnabled }}
         >
           <TurnsView
-            layout={mode}
+            layout={effectiveMode}
             parsedTurns={parsedTurns}
             systemPromptInput={turns[0]?.input}
             currentTraceId={currentTraceId}
@@ -213,7 +249,7 @@ export const ConversationView = memo(function ConversationView({
             annotationsByTrace={annotationsByTrace}
           />
         </ConversationExpandContext.Provider>
-      ) : mode === "annotations" ? (
+      ) : effectiveMode === "annotations" ? (
         <AnnotationsView
           parsedTurns={parsedTurns}
           currentTraceId={currentTraceId}
@@ -340,6 +376,13 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({
   );
 };
 
+const CONVERSATION_MODES: Mode[] = [
+  "thread",
+  "bubbles",
+  "markdown",
+  "annotations",
+];
+
 const ConversationHeader: React.FC<{
   conversationId: string;
   turnCount: number;
@@ -347,6 +390,8 @@ const ConversationHeader: React.FC<{
   onModeChange: (m: Mode) => void;
   isExpandAllEnabled: boolean;
   onToggleExpandAll: () => void;
+  /** Terminal view is offered only for coding-agent (terminal-origin) threads. */
+  showTerminal: boolean;
 }> = ({
   conversationId,
   turnCount,
@@ -354,9 +399,14 @@ const ConversationHeader: React.FC<{
   onModeChange,
   isExpandAllEnabled,
   onToggleExpandAll,
+  showTerminal,
 }) => {
   // Expand-all only applies to the message layouts that truncate.
   const isExpandAllVisible = mode === "thread" || mode === "bubbles";
+  const modeOptions = useMemo<Mode[]>(
+    () => (showTerminal ? [...CONVERSATION_MODES, "terminal"] : CONVERSATION_MODES),
+    [showTerminal],
+  );
   return (
     <HStack
       gap={2}
@@ -399,7 +449,7 @@ const ConversationHeader: React.FC<{
       <SegmentedToggle
         value={mode}
         onChange={(v) => onModeChange(v as Mode)}
-        options={["thread", "bubbles", "markdown", "annotations"]}
+        options={modeOptions}
       />
     </HStack>
   );
