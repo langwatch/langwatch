@@ -1,6 +1,7 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
+.PHONY: observability observability-down observability-connect observability-logs observability-status
 .PHONY: _dev-up-deprecation-warning
 
 # Surface every target — boxd-* are pulled in via include below.
@@ -20,6 +21,12 @@ help:
 	@echo "    make quickstart-help                non-interactive preset reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
+	@echo ""
+	@echo "  Local observability (logs/traces/metrics → Grafana for agent debugging):"
+	@echo "    make observability                  start the LGTM stack (OTLP :4318, Grafana :3000)"
+	@echo "    make observability-connect          wire .env at the collector + register the Grafana MCP"
+	@echo "    make observability-logs             tail the stack logs"
+	@echo "    make observability-down             stop the stack (discards all telemetry)"
 	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
 	@echo "    make down                           stop all services"
 	@echo "    make test-scripts                   run bats unit tests under scripts/__tests__/"
@@ -51,6 +58,11 @@ include boxd.mk
 # App is volume-mounted for hot reload.
 
 COMPOSE = docker compose -f compose.dev.yml
+
+# Local observability stack — the `otel-lgtm` service in compose.dev.yml under
+# the optional `observability` profile. Targeted by service name so it comes
+# up/down without touching the rest of the dev stack.
+OBS_COMPOSE = docker compose -f compose.dev.yml
 
 # Sources scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
 # NEXTAUTH_URL / BASE_HOST exports to the compose-derived APP_PORT (default
@@ -105,6 +117,47 @@ service-watch:
 			--build.bin "./tmp/$(svc) $(svc)" \
 			--build.include_ext "go" \
 			--build.exclude_dir "tmp,vendor,node_modules"
+
+# =============================================================================
+# LOCAL OBSERVABILITY STACK (compose.dev.yml, `observability` profile)
+# =============================================================================
+# A lightweight, ephemeral OTLP Collector + Loki + Tempo + Prometheus + Grafana
+# for reading local logs/traces/metrics — including from an agent over the
+# Grafana MCP. See dev/docs/best_practices/local-observability.md and
+# dev/docs/adr/042-local-observability-stack.md.
+
+# Start the stack and wait until Grafana is healthy.
+observability:
+	$(OBS_COMPOSE) --profile observability up -d otel-lgtm
+	@echo "Waiting for Grafana to become healthy..."
+	@for i in $$(seq 1 30); do \
+		if curl -sf -o /dev/null http://localhost:$${LW_OBS_GRAFANA_PORT:-3000}/api/health; then \
+			echo "Grafana ready → http://localhost:$${LW_OBS_GRAFANA_PORT:-3000}  (anonymous Admin, or admin/admin)"; \
+			echo "OTLP collector → http://localhost:$${LW_OBS_OTLP_HTTP_PORT:-4318}"; \
+			echo "Next: make observability-connect   # point .env at it + register the Grafana MCP"; \
+			exit 0; \
+		fi; \
+		sleep 2; \
+	done; \
+	echo "Grafana did not become healthy in time — check 'make observability-logs'." >&2; exit 1
+
+# Point langwatch/.env at the collector + mint a Grafana token + register the
+# grafana-local MCP server. Idempotent; backs up .env first.
+observability-connect:
+	@bash scripts/observability/connect.sh
+
+# Tail the stack logs.
+observability-logs:
+	$(OBS_COMPOSE) logs -f otel-lgtm
+
+# Show the stack status.
+observability-status:
+	$(OBS_COMPOSE) ps otel-lgtm
+
+# Stop ONLY the observability stack (never the rest of the dev stack). Data is
+# ephemeral, so this discards all collected telemetry.
+observability-down:
+	$(OBS_COMPOSE) rm -sf otel-lgtm
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`
 # (interactive) or `./scripts/dev.sh <preset>` directly. Preset list:

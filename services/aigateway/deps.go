@@ -60,6 +60,12 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	if err != nil {
 		return ctx, nil, fmt.Errorf("otel init: %w", err)
 	}
+	// When the debug collector is enabled, tee stdout logs into it too,
+	// before the adapters below capture `logger`. No-op otherwise.
+	if lp := otelProvider.LoggerProvider(); lp != nil {
+		logger = clog.WithCollector(ctx, cfg.Log, logger, lp)
+		ctx = clog.Set(ctx, logger)
+	}
 
 	projectRegistry := customertracebridge.NewRegistry()
 	bridge, err := customertracebridge.NewEmitter(ctx, customertracebridge.EmitterOptions{
