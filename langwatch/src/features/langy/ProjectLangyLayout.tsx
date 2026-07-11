@@ -13,8 +13,9 @@ import { LangyProvider, useLangy } from "./LangyContext";
 import {
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
-  LangyDrawer,
+  LangySidecar,
 } from "./components/LangyPanel";
+import { useLangyStore } from "./stores/langyStore";
 
 /**
  * Layout route that mounts Langy once per project, above the swapping page.
@@ -101,7 +102,7 @@ function LangyShiftedRoot({
   showLangy: boolean;
   children: ReactNode;
 }) {
-  const { isOpen } = useLangy();
+  const isOpen = useLangyStore((s) => s.isOpen);
   const shifted = showLangy && isOpen;
   return (
     <>
@@ -112,17 +113,15 @@ function LangyShiftedRoot({
       >
         {children}
       </Box>
-      {showLangy && <LangyDrawerConnected />}
+      {showLangy && <LangySidecarConnected />}
     </>
   );
 }
 
-function LangyDrawerConnected() {
-  const { isOpen, setIsOpen, proposalHandlersRef, experimentSlug } = useLangy();
+function LangySidecarConnected() {
+  const { proposalHandlersRef, experimentSlug } = useLangy();
   return (
-    <LangyDrawer
-      isOpen={isOpen}
-      onOpenChange={setIsOpen}
+    <LangySidecar
       proposalHandlersRef={proposalHandlersRef}
       experimentSlug={experimentSlug}
     />

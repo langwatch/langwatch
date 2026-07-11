@@ -6,8 +6,8 @@ import {
   type LangyContextChip,
   selectDismissedChips,
   selectVisibleChips,
-  useLangyComposerStore,
-} from "../stores/langyComposerStore";
+  useLangyStore,
+} from "../stores/langyStore";
 
 /**
  * Captures what the user is currently viewing and turns it into composer
@@ -39,7 +39,7 @@ export function useLangyPageContext(): {
   const inRouter = useInRouterContext();
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const pathname = inRouter ? useLocation().pathname : "";
-  const dismissed = useLangyComposerStore((s) => s.dismissedChipIds);
+  const dismissed = useLangyStore((s) => s.dismissedChipIds);
 
   const candidates = useMemo<LangyContextChip[]>(() => {
     const out: LangyContextChip[] = [];

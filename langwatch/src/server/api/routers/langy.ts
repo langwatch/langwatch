@@ -132,6 +132,29 @@ export const langyRouter = createTRPCRouter({
     }),
 
   /**
+   * Soft-delete (archive) a conversation the current user owns.
+   *
+   * Routes through the same app-layer command the REST surface uses
+   * (`conversations.deleteById`), which dispatches the event-sourced
+   * `archiveConversation` command — never a raw row delete. Exposing it here
+   * means the whole Langy conversation surface (reads AND this write) goes
+   * through this one defined tRPC API instead of ad-hoc client `fetch`es. A
+   * non-owner (shared) conversation is visible but not deletable and reports
+   * `success: false`; the client invalidates the list either way.
+   */
+  deleteConversation: protectedProcedure
+    .input(z.object({ projectId: z.string(), conversationId: z.string() }))
+    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .mutation(async ({ input, ctx }): Promise<{ success: boolean }> => {
+      const success = await getApp().langy.conversations.deleteById({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+      });
+      return { success };
+    }),
+
+  /**
    * Count of conversations touched since a timestamp — the "N new" pill. The
    * client only polls this when the freshness SSE is disconnected (adaptive
    * backoff), mirroring `tracesV2.newCount`. Derived from the already-bounded

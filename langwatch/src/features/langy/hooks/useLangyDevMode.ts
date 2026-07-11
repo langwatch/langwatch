@@ -1,4 +1,4 @@
-import { useLocalStorage } from "usehooks-ts";
+import { useLangyStore } from "../stores/langyStore";
 
 /**
  * Persistent, per-browser "developer mode" for the Langy panel.
@@ -9,12 +9,13 @@ import { useLocalStorage } from "usehooks-ts";
  * mapping yet always fall back to this raw JSON view regardless of the flag —
  * developer mode additionally exposes it for the ones that DO have a card.
  *
- * Backed by localStorage so it survives reloads and never touches a user's
- * server-side settings. Off by default.
+ * Backed by the persisted slice of `useLangyStore` (localStorage), so it
+ * survives reloads and never touches a user's server-side settings. Off by
+ * default. Kept as a hook with the `[value, setter]` shape so consumers read
+ * like `useState` and don't couple to the store's action names.
  */
-const STORAGE_KEY = "langy:devMode";
-
 export function useLangyDevMode(): [boolean, (next: boolean) => void] {
-  const [devMode, setDevMode] = useLocalStorage<boolean>(STORAGE_KEY, false);
+  const devMode = useLangyStore((s) => s.devMode);
+  const setDevMode = useLangyStore((s) => s.setDevMode);
   return [devMode, setDevMode];
 }
