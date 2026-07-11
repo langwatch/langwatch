@@ -763,6 +763,9 @@ export function AutomationDrawer({
       // Providers seed editor defaults from this so the template shown in
       // the editor matches the one dispatch renders for the draft's kind.
       sourceKind: isGraphAlert ? "graphAlert" : "trace",
+      // Lets a notify provider offer a "Send test" button inside its config.
+      onTestFire,
+      testFireLoading: testFire.isLoading,
     }),
     [
       projectId,
@@ -775,6 +778,8 @@ export function AutomationDrawer({
       dispatch,
       hasEvaluationFilter,
       isGraphAlert,
+      onTestFire,
+      testFire.isLoading,
     ],
   );
 

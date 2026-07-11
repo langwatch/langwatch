@@ -26,6 +26,7 @@ import {
 import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
 import { api } from "~/utils/api";
 import { InlineCadenceSelect } from "../../components/InlineCadenceSelect";
+import { TestFireButton } from "../../components/TestFireButton";
 import type {
   ConfigFormProps,
   NotifyClientDef,
@@ -287,6 +288,14 @@ function EmailConfigForm({
           </Text>
         ) : null}
       </Box>
+
+      {/* Try the real message straight from the recipients section. */}
+      <TestFireButton
+        onTestFire={ctx.onTestFire}
+        loading={ctx.testFireLoading}
+        disabled={!isComplete(slice)}
+        hint={isComplete(slice) ? undefined : "Add a recipient first"}
+      />
 
       <VStack align="stretch" gap={2}>
         <Text textStyle="sm" fontWeight="semibold">

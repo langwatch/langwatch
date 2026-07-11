@@ -35,6 +35,7 @@ import {
 import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
 import { api } from "~/utils/api";
 import { InlineCadenceSelect } from "../../components/InlineCadenceSelect";
+import { TestFireButton } from "../../components/TestFireButton";
 import type {
   ConfigFormProps,
   NotifyClientDef,
@@ -435,6 +436,19 @@ function SlackConfigForm({
           </Field.Root>
         </VStack>
       )}
+      {/* Try the real message straight from the destination section. */}
+      <TestFireButton
+        onTestFire={ctx.onTestFire}
+        loading={ctx.testFireLoading}
+        disabled={!isComplete(slice)}
+        hint={
+          isComplete(slice)
+            ? undefined
+            : slice.deliveryMethod === "bot"
+              ? "Add a token and channel first"
+              : "Add a webhook URL first"
+        }
+      />
       {/* Alerts always deliver immediately (cadence is pinned server-side),
           so the cadence switch only renders for trace automations. */}
       {!isGraphAlert ? (

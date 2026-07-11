@@ -125,6 +125,11 @@ export interface ConfigFormCtx<TPreview = unknown> {
    *  Notify providers seed their template defaults from this so the editor
    *  shows the same template dispatch will render. */
   sourceKind: "trace" | "graphAlert";
+  /** Send a test notification with the current draft, so the author can try it
+   *  from inside the config section. No-op / absent when the draft isn't
+   *  test-fireable yet. `testFireLoading` reflects the in-flight send. */
+  onTestFire?: () => void;
+  testFireLoading?: boolean;
 }
 
 /** Mirrors `editors/liquidMonaco#VariableInfo`. Defined here too so the
