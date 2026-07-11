@@ -161,6 +161,17 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
     recoveringMessage: "Taking another run at that…",
   },
 
+  // The worker died mid-turn and the sweep noticed. Same shape as a restart:
+  // nothing was lost, so re-drive it rather than making the user re-ask.
+  langy_turn_stalled: {
+    kind: "langy_turn_stalled",
+    disposition: "auto",
+    retry: true,
+    attempts: SPAWN_RETRY_WAITS.length,
+    delayMs: schedule(SPAWN_RETRY_WAITS),
+    recoveringMessage: "Langy stopped — picking your reply back up…",
+  },
+
   // A spawn that failed is usually transient (a slow skill install, a readiness
   // timeout under load) and the next one succeeds. Retry it here, bounded — the
   // SERVER cannot, because the spawn it would retry is the one that just died.

@@ -21,6 +21,10 @@ import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/lan
 import type { LangyConversationService } from "~/server/app-layer/langy/langy-conversation.service";
 import { LANGY_LIVENESS } from "../streaming/langy.streaming.constants";
 import type { LangyTokenBuffer } from "../streaming/langyTokenBuffer";
+import {
+  LangyTurnStalledError,
+  serializeLangyTurnError,
+} from "./langy-turn-errors";
 
 const logger = createLogger("langwatch:langy:turn-reconciler");
 
@@ -195,8 +199,8 @@ export async function reconcileLangyTurns(
         projectId: candidate.projectId,
         conversationId: candidate.conversationId,
         turnId: candidate.turnId,
-        error:
-          "Reconciled: turn stalled with no live worker (heartbeat lapsed)",
+        // Serialized, not prose: `LastError` is rendered on history load.
+        error: serializeLangyTurnError(new LangyTurnStalledError()),
       });
       failed++;
     } catch (err) {

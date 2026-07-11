@@ -27,6 +27,10 @@ import { LANGY_LIVENESS } from "~/server/services/langy/streaming/langy.streamin
 import type { LangyConversationStateData } from "../projections/langyConversationState.foldProjection";
 import type { LangyConversationProcessingEvent } from "../schemas/events";
 import {
+  LangyTurnStalledError,
+  serializeLangyTurnError,
+} from "~/server/services/langy/execution/langy-turn-errors";
+import {
   isLangyAgentRespondedEvent,
   isLangyAgentTurnStartedEvent,
   isLangyToolCallCompletedEvent,
@@ -105,7 +109,9 @@ export function createReconcileAgentTurnReactor(deps: {
         projectId: context.tenantId,
         conversationId,
         turnId: currentTurn,
-        error: "Reconciled: turn stalled with no live worker (heartbeat lapsed)",
+        // Serialized: `LastError` is rendered on history load, so it carries a
+        // vetted domain error, never prose.
+        error: serializeLangyTurnError(new LangyTurnStalledError()),
       });
     },
   };

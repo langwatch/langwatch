@@ -39,6 +39,13 @@ export type ConversationListItem = {
 /** Detail shape returned when opening / mutating a single conversation. */
 export type ConversationDetail = ConversationListItem & {
   status: string;
+  /**
+   * Why the last turn failed, when it did (`agent_turn_failed` sets it on the
+   * fold). DURABLE, unlike the browser's `useChat` error — which is why a refresh
+   * after a failed turn used to leave the user's question sitting there with no
+   * answer and no explanation at all.
+   */
+  lastError: string | null;
 };
 
 /** How many months of conversations the list scan spans (ADR-046 open Q2). */
@@ -53,6 +60,8 @@ interface LangyConversationRow {
   title: string | null;
   isShared: boolean;
   status: string;
+  /** The last turn's failure, or null. Detail read only. */
+  lastError: string | null;
   messageCount: number;
   /** 0 when the fold never set it (fall back to createdAt for the UI). */
   lastActivityAtMs: number;
@@ -67,6 +76,8 @@ interface LangyConversationQueryRow {
   IsShared: boolean | number;
   /** Present only on the detail read (findById); the list path omits it. */
   Status?: string;
+  /** Present only on the detail read (findById). */
+  LastError?: string | null;
   MessageCount: string | number;
   LastActivityAtMs: string | number;
   CreatedAtMs: string | number;
@@ -109,6 +120,7 @@ export class LangyConversationReadRepository {
       title: r.Title,
       isShared: Boolean(Number(r.IsShared)),
       status: r.Status ?? "",
+      lastError: r.LastError ? String(r.LastError) : null,
       messageCount: Number(r.MessageCount ?? 0),
       lastActivityAtMs: Number(r.LastActivityAtMs ?? 0),
       createdAtMs: Number(r.CreatedAtMs ?? 0),
@@ -132,7 +144,8 @@ export class LangyConversationReadRepository {
         SELECT
           ConversationId,
           ${LIST_LATEST_COLUMNS},
-          argMax(Status, UpdatedAt) AS Status
+          argMax(Status, UpdatedAt) AS Status,
+          argMax(LastError, UpdatedAt) AS LastError
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND ConversationId = {conversationId:String}
@@ -307,6 +320,27 @@ export class LangyConversationService {
     };
   }
 
+  /**
+   * A conversation the caller may see.
+   *
+   * THROWS `LangyConversationNotFoundError` when there is no such conversation —
+   * it does not return null, and that is the whole point of this method's shape.
+   *
+   * The old signature returned `null` for THREE different situations: the
+   * conversation does not exist, the caller may not see it, and — the one that
+   * hid — the conversation exists but its ClickHouse fold has not been projected
+   * yet. Three call sites hand-rolled a 404 out of that ambiguous null, and so
+   * the live-stream routes answered 404 on the first turn of every conversation,
+   * because "not yet" and "never" were indistinguishable. Stream B never ran once.
+   *
+   * A repository saying "not found" when it means "not yet" is how a bug lives
+   * for the lifetime of a feature. So the absence is now a NAMED error, and a
+   * caller who wants to tolerate it has to say so out loud.
+   *
+   * Not-visible is reported as not-found ON PURPOSE: a conversation you may not
+   * see must not be distinguishable from one that does not exist, or the error
+   * itself becomes an existence oracle across users.
+   */
   async getById({
     id,
     projectId,
@@ -315,12 +349,44 @@ export class LangyConversationService {
     id: string;
     projectId: string;
     userId: string;
-  }): Promise<ConversationDetail | null> {
+  }): Promise<ConversationDetail> {
     const row = await this.repository.findById({ id, projectId });
-    if (!row) return null;
-    // Visibility: owner always; others only when shared.
-    if (row.userId !== userId && !row.isShared) return null;
-    return { ...this.toListItem(row, userId), status: row.status };
+    if (!row) throw new LangyConversationNotFoundError(id);
+    // Visibility: owner always; others only when shared. Reported as not-found
+    // so the error can't be used to probe for other people's conversations.
+    if (row.userId !== userId && !row.isShared) {
+      throw new LangyConversationNotFoundError(id);
+    }
+    return {
+      ...this.toListItem(row, userId),
+      status: row.status,
+      lastError: row.lastError,
+    };
+  }
+
+  /**
+   * `getById`, but absence is an answer rather than an error.
+   *
+   * For the callers that genuinely want to tolerate "there is no fold yet" — the
+   * chat route's busy-guard, which asks "is a turn already running?" and for
+   * which an unprojected conversation correctly means "no". Every OTHER caller
+   * should use `getById` and let the domain error travel.
+   */
+  async findByIdVisible({
+    id,
+    projectId,
+    userId,
+  }: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }): Promise<ConversationDetail | null> {
+    try {
+      return await this.getById({ id, projectId, userId });
+    } catch (error) {
+      if (LangyConversationNotFoundError.is(error)) return null;
+      throw error;
+    }
   }
 
   async getAll({
@@ -655,7 +721,7 @@ export class LangyConversationService {
     projectId: string;
     userId: string;
   }): Promise<boolean> {
-    const conv = await this.getById({ id, projectId, userId });
+    const conv = await this.findByIdVisible({ id, projectId, userId });
     // Only the owner may archive — a shared conversation is visible, not deletable.
     if (!conv || !conv.isOwn) return false;
     await this.commands.archiveConversation({
@@ -679,7 +745,7 @@ export class LangyConversationService {
     title?: string | null;
     isShared?: boolean;
   }): Promise<ConversationDetail | null> {
-    const conv = await this.getById({ id, projectId, userId });
+    const conv = await this.findByIdVisible({ id, projectId, userId });
     if (!conv || !conv.isOwn) {
       // A shared conversation is visible but not editable by a non-owner; we do
       // not leak that distinction — both read as "not found" to the caller.

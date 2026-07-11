@@ -802,7 +802,11 @@ export async function runTurn(
         projectId,
         conversationId,
         turnId,
-        error: message,
+        // The CLASSIFIED error, not the raw message. `LastError` is read back on
+        // history load and rendered, so it must carry only what the taxonomy has
+        // vetted for the wire (a kind + safe meta) — never the manager's internal
+        // text. The raw message stays in the log line above, where it belongs.
+        error: serializeLangyTurnError(error),
       });
     } catch (dispatchError) {
       turnLogger.error({ error: dispatchError }, "failed to dispatch failTurn");
@@ -978,7 +982,7 @@ export async function startLangyTurnProcessor(
           projectId: job.projectId,
           conversationId: job.conversationId,
           turnId: job.turnId,
-          error: restarting.message,
+          error: serializeLangyTurnError(restarting),
         });
         await deps.buffer
           .markError({

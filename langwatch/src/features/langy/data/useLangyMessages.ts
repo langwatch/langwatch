@@ -4,6 +4,17 @@ import type { LangyMessageDto } from "./langy.dtos";
 
 export interface LangyMessagesResult {
   messages: LangyMessageDto[];
+  /**
+   * The last turn's failure, serialized (a domain-error kind + safe meta, never
+   * raw text) — or null if it didn't fail.
+   *
+   * Turn errors used to live ONLY in `useChat`'s state, so a refresh after a
+   * failed turn left the user's question sitting there with no answer and no
+   * explanation. The failure was durable on the conversation fold the whole
+   * time; nobody read it back. Now the history load carries it, and the panel
+   * renders the same card it would have shown live.
+   */
+  lastError: string | null;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -34,6 +45,7 @@ export function useLangyMessages(
 
   return {
     messages: (query.data?.messages ?? []) as LangyMessageDto[],
+    lastError: query.data?.lastError ?? null,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,
