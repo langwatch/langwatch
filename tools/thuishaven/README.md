@@ -103,10 +103,15 @@ registry, and dashboard stay the same.
   are wasted work (and catch broken intermediate states). haven supervises Vite,
   so it can gate reloads — debounced, periodic, or on an explicit `haven reload` —
   instead of firing on every save.
-- **Shared baseline + per-worktree overrides.** Standard services run once off
-  `main`; a worktree overrides only the ones it's changing. haven already routes
-  across a heterogeneous set, so the backend can become a shared `kind` cluster
-  with per-worktree Helm value overlays without changing the routing model.
+- **Shared baseline + per-worktree overrides.** Every stack defines *all* service
+  hostnames; a service a worktree doesn't run itself resolves to a shared baseline
+  stack instead of dead-ending. Mark the baseline with `HAVEN_BASELINE=1` (run it
+  off `main`); other worktrees that pass `LANGWATCH_SKIP_AIGATEWAY=1` /
+  `LANGWATCH_SKIP_NLP=1` get `gateway.<slug>` / `nlp.<slug>` pointed at the
+  baseline's copy. ClickHouse is the same idea taken further: one shared server,
+  so `clickhouse.<slug>` always resolves and only the *database* is per-worktree.
+  This keeps the routing model uniform as the backend evolves toward a shared
+  `kind` cluster with per-worktree Helm value overlays.
 - **Deeper DB orchestration.** The registry already carries each stack's Redis DB;
   extend it to provision/seed per-stack Postgres/ClickHouse on demand (`haven seed`
   is the first step).

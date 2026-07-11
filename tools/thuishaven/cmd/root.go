@@ -86,7 +86,7 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		return orch.Watch(ctx)
 	}
 
-	params := app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG")}
+	params := app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), Baseline: os.Getenv("HAVEN_BASELINE") == "1"}
 	opts := optionsFromEnv(worktree)
 	sub, rest := args[0], args[1:]
 	switch sub {

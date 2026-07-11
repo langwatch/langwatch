@@ -222,3 +222,26 @@ func TestOverlayEmitsStableAPIKey(t *testing.T) {
 		t.Errorf("LANGWATCH_API_KEY = %q, want the stable default %q", got, DefaultLocalAPIKey)
 	}
 }
+
+func TestBaselinePortFallsBackToLiveBaselineOnly(t *testing.T) {
+	alive := func(pid int) bool { return pid == 1 } // pid 1 live, others dead
+	stacks := []Stack{
+		{Slug: "feature", Baseline: false, LauncherPID: 1, Services: []Service{{Name: "gateway", Port: 5000}}},
+		{Slug: "main", Baseline: true, LauncherPID: 1, Services: []Service{{Name: "gateway", Port: 6000}, {Name: "nlp", Port: 6001}}},
+		{Slug: "dead-main", Baseline: true, LauncherPID: 2, Services: []Service{{Name: "gateway", Port: 7000}}},
+	}
+	if port, ok := BaselinePort(stacks, "gateway", alive); !ok || port != 6000 {
+		t.Errorf("gateway baseline = %d,%v; want 6000,true (the live baseline)", port, ok)
+	}
+	if port, ok := BaselinePort(stacks, "nlp", alive); !ok || port != 6001 {
+		t.Errorf("nlp baseline = %d,%v; want 6001,true", port, ok)
+	}
+	if _, ok := BaselinePort(stacks, "app", alive); ok {
+		t.Errorf("no baseline runs app → must not resolve")
+	}
+	// A baseline whose own service is itself a fallback is not a valid source.
+	fbOnly := []Stack{{Baseline: true, LauncherPID: 1, Services: []Service{{Name: "gateway", Port: 8000, Fallback: true}}}}
+	if _, ok := BaselinePort(fbOnly, "gateway", alive); ok {
+		t.Errorf("a fallback service must not be offered as a baseline source")
+	}
+}
