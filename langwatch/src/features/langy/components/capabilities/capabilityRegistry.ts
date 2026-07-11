@@ -28,9 +28,8 @@
  * `langwatch.<resource>.<verb>` — rewritten server-side by the CLI envelope out
  * of the `bash` call opencode actually made. Those resolve through `cliCardMap`,
  * which derives the structure from `feature-map.json`; this module words them.
- * The `platform_*` / `search_traces` names below are the older MCP transport,
- * kept resolving so a conversation recorded under it still replays — new work
- * goes on the CLI path, and this block retires with the transport.
+ * The older MCP transport (`platform_*` / `search_traces`) has been retired: a
+ * name that is not a CLI call now falls straight through to the raw view.
  */
 
 import {
@@ -185,181 +184,51 @@ export function buildSurfaceHref({
   return base;
 }
 
-// Nouns this registry knows a surface for. A tool whose noun is absent here is
-// unmapped and falls to the JSON view (only the docs/schema helpers do so now).
-const SURFACE_BY_NOUN: Record<string, CapabilitySurface> = {
-  evaluator: "evaluations",
-  evaluators: "evaluations",
-  monitor: "evaluations",
-  monitors: "evaluations",
-  trigger: "automations",
-  triggers: "automations",
-  dashboard: "dashboards",
-  dashboards: "dashboards",
-  agent: "agents",
-  agents: "agents",
-  dataset: "datasets",
-  datasets: "datasets",
-  dataset_record: "datasets",
-  dataset_records: "datasets",
-  prompt: "prompts",
-  prompts: "prompts",
-  prompt_tag: "prompts",
-  prompt_tags: "prompts",
-  scenario: "simulations",
-  scenarios: "simulations",
-  suite: "simulations",
-  suites: "simulations",
-  simulation_run: "simulations",
-  simulation_runs: "simulations",
-  experiment: "experiments",
-  experiments: "experiments",
-  workflow: "workflows",
-  workflows: "workflows",
-  annotation: "annotations",
-  annotations: "annotations",
-  secret: "secrets",
-  secrets: "secrets",
-  project: "projects",
-  projects: "projects",
-  api_key: "apiKeys",
-  api_keys: "apiKeys",
-  model_provider: "modelProviders",
-  model_providers: "modelProviders",
-};
-
-// The datasets / simulations surfaces have bespoke read cards; other reads use
-// the generic resource-read card.
-const READ_RENDER_BY_SURFACE: Partial<
-  Record<CapabilitySurface, CapabilityRenderKind>
-> = {
-  datasets: "dataset",
-  simulations: "scenario",
-};
-
-// Tool names that don't follow the plain `platform_<verb>_<noun>` shape, or
-// that want a card other than the verb/noun default.
-const EXPLICIT: Record<string, CapabilityDescriptor> = {
-  search_traces: {
-    render: "traces",
-    tone: "read",
-    surface: "traces",
-    overline: "Traces",
-  },
-  get_trace: {
-    render: "trace",
-    tone: "read",
-    surface: "traces",
-    overline: "Trace",
-  },
-  get_analytics: {
-    render: "metrics",
-    tone: "read",
-    surface: "analytics",
-    overline: "Analytics",
-  },
-  platform_run_experiment: {
-    render: "evalRun",
-    tone: "read",
-    surface: "experiments",
-    overline: "Experiment run",
-  },
-  platform_run_suite: {
-    render: "evalRun",
-    tone: "read",
-    surface: "simulations",
-    overline: "Suite run",
-  },
-  platform_experiment_results: {
-    render: "evalRun",
-    tone: "read",
-    surface: "experiments",
-    overline: "Experiment results",
-  },
-  platform_experiment_status: {
-    render: "evalRun",
-    tone: "read",
-    surface: "experiments",
-    overline: "Experiment run",
-  },
-  // `platform_experiment_list` / `_list_runs` parse as verb=`experiment`,
-  // noun=`list` under the generic rule (which has no `experiment` verb) and
-  // would fall through — pin them explicitly to the experiments surface.
-  platform_experiment_list: {
-    render: "resourceRead",
-    tone: "read",
-    surface: "experiments",
-    overline: "Experiments",
-  },
-  platform_experiment_list_runs: {
-    render: "evalRun",
-    tone: "read",
-    surface: "experiments",
-    overline: "Experiment runs",
-  },
-  platform_update_prompt: {
-    render: "promptDiff",
-    tone: "updated",
-    surface: "prompts",
-    overline: "Prompt update",
-  },
-};
-
 /**
- * Strip an MCP namespace prefix a router may prepend (`mcp__langwatch__foo`,
- * `langwatch.foo`) so classification works whether the stream carries the bare
- * tool name (as today's activity map assumes) or a namespaced one.
+ * How a CLI verb READS, in both tenses. `past` titles a SETTLED write card ("New
+ * evaluator", "Delete trigger"); `present` titles a RUNNING one ("Creating
+ * evaluator"). Keeping the two tenses in ONE row is the point: the two switch
+ * statements this replaced could word the same verb inconsistently, and did.
+ * A read verb has no past-tense label — a read card is titled by its surface,
+ * not its verb — so its `past` is empty.
+ *
+ * The verb's TONE (read / create / update / remove) is `cliCardMap`'s to decide;
+ * it classifies verbs for the whole card catalogue and stays the single source
+ * of that truth, so it is deliberately not duplicated here.
  */
-export function normalizeToolName(name: string): string {
-  let n = name.trim();
-  const mcp = n.match(/^mcp__[^_]+__(.+)$/);
-  if (mcp) n = mcp[1]!;
-  n = n.replace(/^langwatch[._]/, "");
-  return n;
-}
+const VERB_WORDING: Record<string, { past: string; present: string }> = {
+  search: { past: "", present: "Searching" },
+  query: { past: "", present: "Searching" },
+  list: { past: "", present: "Listing" },
+  versions: { past: "", present: "Listing" },
+  "list-runs": { past: "", present: "Listing" },
+  records: { past: "", present: "Listing" },
+  get: { past: "", present: "Loading" },
+  show: { past: "", present: "Loading" },
+  view: { past: "", present: "Loading" },
+  create: { past: "New", present: "Creating" },
+  init: { past: "New", present: "Creating" },
+  add: { past: "Add to", present: "Adding to" },
+  upload: { past: "Upload to", present: "Uploading to" },
+  update: { past: "Update", present: "Updating" },
+  set: { past: "Set", present: "Updating" },
+  rename: { past: "Rename", present: "Updating" },
+  assign: { past: "Assign", present: "Updating" },
+  restore: { past: "Restore", present: "Restoring" },
+  sync: { past: "Sync", present: "Syncing" },
+  push: { past: "Push", present: "Pushing" },
+  pull: { past: "Pull", present: "Pulling" },
+  duplicate: { past: "Duplicate", present: "Duplicating" },
+  delete: { past: "Delete", present: "Deleting" },
+  remove: { past: "Delete", present: "Deleting" },
+  archive: { past: "Delete", present: "Deleting" },
+  revoke: { past: "Delete", present: "Deleting" },
+  run: { past: "Run", present: "Running" },
+};
 
-/**
- * `create` → "New", `delete`/`archive`/`revoke` → "Delete", etc. Covers both
- * transports' verbs — the MCP tool names and the CLI's — so a capability is
- * worded in exactly one place.
- */
+/** `create` → "New", `delete`/`archive`/`revoke` → "Delete", etc. */
 function verbLabel(verb: string): string {
-  switch (verb) {
-    case "create":
-    case "init":
-      return "New";
-    case "add":
-      return "Add to";
-    case "upload":
-      return "Upload to";
-    case "update":
-      return "Update";
-    case "rename":
-      return "Rename";
-    case "set":
-      return "Set";
-    case "assign":
-      return "Assign";
-    case "restore":
-      return "Restore";
-    case "sync":
-      return "Sync";
-    case "push":
-      return "Push";
-    case "pull":
-      return "Pull";
-    case "duplicate":
-      return "Duplicate";
-    case "delete":
-    case "remove":
-    case "archive":
-    case "revoke":
-      return "Delete";
-    case "run":
-      return "Run";
-    default:
-      return "";
-  }
+  return VERB_WORDING[verb]?.past ?? "";
 }
 
 /** `dataset_records` / `simulation-run` → "dataset records" / "simulation run". */
@@ -386,55 +255,11 @@ function cliOverline({ command, tone, surface }: CliCapability): string {
 
 /**
  * `search` → "Searching", `create` → "Creating". The present-tense twin of
- * {@link verbLabel}: the same verb grammar, worded for a call that is still
- * RUNNING. Kept beside it so the two never drift out of sync.
+ * {@link verbLabel}, read off the same {@link VERB_WORDING} row so the two
+ * tenses can never drift.
  */
 function progressVerb(verb: string): string {
-  switch (verb) {
-    case "search":
-    case "query":
-      return "Searching";
-    case "list":
-    case "versions":
-    case "list-runs":
-    case "records":
-      return "Listing";
-    case "get":
-    case "show":
-    case "view":
-      return "Loading";
-    case "create":
-    case "init":
-      return "Creating";
-    case "add":
-      return "Adding to";
-    case "upload":
-      return "Uploading to";
-    case "update":
-    case "set":
-    case "rename":
-    case "assign":
-      return "Updating";
-    case "delete":
-    case "remove":
-    case "archive":
-    case "revoke":
-      return "Deleting";
-    case "restore":
-      return "Restoring";
-    case "run":
-      return "Running";
-    case "sync":
-      return "Syncing";
-    case "push":
-      return "Pushing";
-    case "pull":
-      return "Pulling";
-    case "duplicate":
-      return "Duplicating";
-    default:
-      return "Working on";
-  }
+  return VERB_WORDING[verb]?.present ?? "Working on";
 }
 
 /** A capability call that is still in flight, worded for its in-progress card. */
@@ -471,86 +296,22 @@ export function resolveCapabilityProgress(
 }
 
 /**
- * Resolve a tool name to the card that should render it, or null to fall
- * through to the raw-JSON view.
+ * Resolve a CLI tool name (`langwatch.<resource>.<verb>`) to the card that
+ * should render it, or null to fall through to the raw-JSON view. The feature
+ * map (via `cliCardMap`) decides the structure; `cliOverline` words it.
  */
 export function resolveCapability(
   rawName: string,
 ): CapabilityDescriptor | null {
-  // Langy's transport is the CLI, so this is the live path: a call arrives as
-  // `langwatch.<resource>.<verb>` and resolves off the feature map. It runs
-  // before `normalizeToolName`, which would strip the `langwatch.` prefix that
-  // identifies it.
   const cli = resolveCliCapability(rawName);
-  if (cli) {
-    return {
-      render: cli.render,
-      tone: cli.tone,
-      surface: cli.surface,
-      overline: cliOverline(cli),
-    };
-  }
+  if (!cli) return null;
 
-  const name = normalizeToolName(rawName);
-  if (EXPLICIT[name]) return EXPLICIT[name];
-
-  const platform = name.startsWith("platform_")
-    ? name.slice("platform_".length)
-    : name;
-  const underscore = platform.indexOf("_");
-  if (underscore === -1) return null;
-  const verb = platform.slice(0, underscore);
-  const noun = platform.slice(underscore + 1);
-
-  const surface = SURFACE_BY_NOUN[noun];
-  if (!surface) return null;
-
-  const readable = nounLabel(noun);
-  switch (verb) {
-    case "create":
-      return {
-        render: "resourceCreated",
-        tone: "created",
-        surface,
-        overline: `New ${readable}`,
-      };
-    case "update":
-    case "rename":
-    case "set":
-    case "assign":
-      return {
-        render: "resourceUpdated",
-        tone: "updated",
-        surface,
-        overline: `${verbLabel(verb)} ${readable}`,
-      };
-    case "delete":
-    case "archive":
-    case "revoke":
-      return {
-        render: "resourceRemoved",
-        tone: "removed",
-        surface,
-        overline: `${verbLabel(verb)} ${readable}`,
-      };
-    case "run":
-      return {
-        render: "evalRun",
-        tone: "read",
-        surface,
-        overline: `Run ${readable}`,
-      };
-    case "list":
-    case "get":
-      return {
-        render: READ_RENDER_BY_SURFACE[surface] ?? "resourceRead",
-        tone: "read",
-        surface,
-        overline: verb === "list" ? SURFACE_LABEL[surface] : readable,
-      };
-    default:
-      return null;
-  }
+  return {
+    render: cli.render,
+    tone: cli.tone,
+    surface: cli.surface,
+    overline: cliOverline(cli),
+  };
 }
 
 /**
