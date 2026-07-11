@@ -1,18 +1,11 @@
 import { Button, Circle, HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import {
-  AI_BG_SUBTLE,
-  AI_BORDER,
-  AI_SHADOW_SOFT,
-  GradientSparkle,
-} from "~/features/traces-v2/components/ai/aiBrandVisuals";
+import { GradientSparkle } from "~/features/traces-v2/components/ai/aiBrandVisuals";
 
 const SUGGESTION_CHIPS = [
-  "Summarize my experiment",
   "Find failing traces",
   "Suggest an evaluator",
   "Compare two runs",
-  "Explain a low score",
 ];
 
 export function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
@@ -27,14 +20,14 @@ export function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
       height="full"
     >
       <Circle
-        size="64px"
-        bg={AI_BG_SUBTLE}
+        size="60px"
+        borderRadius="16px"
+        bg="orange.subtle"
         borderWidth="1px"
         borderStyle="solid"
-        borderColor={AI_BORDER}
-        boxShadow={AI_SHADOW_SOFT}
+        borderColor="orange.emphasized"
       >
-        <GradientSparkle size={28} />
+        <GradientSparkle size={30} />
       </Circle>
       <Text
         textStyle="lg"
@@ -85,7 +78,7 @@ function Chip({
       fontWeight="500"
       color="fg"
       borderColor="border.emphasized"
-      bg="bg.subtle"
+      bg="bg.surface"
       _hover={{
         bg: "orange.subtle",
         borderColor: "orange.emphasized",

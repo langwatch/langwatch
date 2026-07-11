@@ -636,10 +636,10 @@ function LangyPanel({
             <EmptyState onPick={(prompt) => void send(prompt)} />
           ) : (
             <VStack
-              gap="14px"
+              gap="16px"
               align="stretch"
-              paddingX="18px"
-              paddingTop="18px"
+              paddingX="19px"
+              paddingTop="19px"
               paddingBottom="12px"
             >
               {messages.map((message, index) => (
@@ -734,15 +734,16 @@ function PanelHeader({
   return (
     <>
       <HStack
-        paddingY={3}
-        paddingLeft={4}
-        paddingRight={3}
+        paddingTop="15px"
+        paddingBottom="14px"
+        paddingLeft="17px"
+        paddingRight="13px"
         gap={2.5}
         flexShrink={0}
       >
-        <SparkleTile size={28} sparkleSize={15} />
+        <SparkleTile size={30} sparkleSize={15} />
         <VStack align="start" gap={0} flex={1} minWidth={0}>
-          <Text textStyle="sm" fontWeight="600" lineHeight="1.2" color="fg">
+          <Text textStyle="sm" fontWeight="650" lineHeight="1.2" color="fg">
             Langy
           </Text>
           <Text
