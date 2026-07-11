@@ -564,10 +564,3 @@ function stringifyCall(call: ToolCall): string {
     )} }`;
   }
 }
-
-/** `format_code` / `run-tests` → "Format code" / "Run tests". */
-function humanizeTool(name: string): string {
-  const spaced = name.replace(/[_-]+/g, " ").trim();
-  if (!spaced) return "Working";
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}

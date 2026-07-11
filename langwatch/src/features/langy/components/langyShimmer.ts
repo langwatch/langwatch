@@ -20,7 +20,7 @@ const sweep = keyframes`
  * slowly: one gentle pass every 6s. The stops are the theme's `--langy-ai-*`
  * vars, so the sweep lifts on dark grounds along with the rest of the skin.
  *
- * Reduced motion: callers drop `animation` (see ThinkingIndicator), leaving the
+ * Reduced motion: callers drop `animation` (see LangyThinkingLine), leaving the
  * static gradient — the text stays legible, nothing moves.
  */
 export const langyThinkingShimmerStyles = {
