@@ -24,6 +24,11 @@ import {
   type TerminalStep,
   toolPrimaryArg,
 } from "./terminalSession";
+import type {
+  SessionEvents,
+  SessionNote,
+  ToolRejection,
+} from "./sessionEvents";
 import { parsePatchHunks, type TerminalToolSpan } from "./toolSpans";
 
 /** What actually ran, keyed by the `tool_use_id` the model called it with. */
@@ -65,11 +70,23 @@ interface TerminalViewProps {
    * failed. Optional: without it the view falls back to the transcript.
    */
   toolSpans?: ToolSpanIndex;
+  /**
+   * The parts of the session that exist only as LOGS — a tool the user denied
+   * (which produces no span at all), API errors, refusals, a mid-session
+   * compaction. Spans and logs complement each other; without these the turn is
+   * missing its most interesting moments.
+   */
+  sessionEvents?: SessionEvents;
   meta?: {
     model?: string;
     cwd?: string;
   };
 }
+
+const NO_SESSION_EVENTS: SessionEvents = {
+  rejectionsByToolUseId: new Map(),
+  notes: [],
+};
 
 /**
  * A recreation of how a Claude Code session looked in the terminal.
@@ -86,6 +103,7 @@ interface TerminalViewProps {
 export const TerminalView = memo(function TerminalView({
   steps,
   toolSpans = NO_TOOL_SPANS,
+  sessionEvents = NO_SESSION_EVENTS,
   meta,
 }: TerminalViewProps) {
   const timeline = useMemo(() => buildTimeline(steps), [steps]);
@@ -136,8 +154,16 @@ export const TerminalView = memo(function TerminalView({
         paddingY={3}
       >
         <VStack align="stretch" gap={2.5}>
+          {sessionEvents.notes.map((note, index) => (
+            <SessionNoteLine key={`note-${index}`} note={note} />
+          ))}
           {revealed.map((step, index) => (
-            <StepView key={index} step={step} toolSpans={toolSpans} />
+            <StepView
+              key={index}
+              step={step}
+              toolSpans={toolSpans}
+              rejections={sessionEvents.rejectionsByToolUseId}
+            />
           ))}
         </VStack>
       </Box>
@@ -159,14 +185,22 @@ export const TerminalView = memo(function TerminalView({
 function StepView({
   step,
   toolSpans,
+  rejections,
 }: {
   step: TerminalStep;
   toolSpans: ToolSpanIndex;
+  rejections: ReadonlyMap<string, ToolRejection>;
 }) {
   const { turn } = step;
   if (turn.kind === "user") return <PromptLine turn={turn} />;
   if (turn.kind === "system") return <SystemNote turn={turn} />;
-  return <AssistantBlocks turn={turn} toolSpans={toolSpans} />;
+  return (
+    <AssistantBlocks
+      turn={turn}
+      toolSpans={toolSpans}
+      rejections={rejections}
+    />
+  );
 }
 
 /** The user's prompt: `❯ what they typed`. */
@@ -215,9 +249,11 @@ function SystemNote({
 function AssistantBlocks({
   turn,
   toolSpans,
+  rejections,
 }: {
   turn: Extract<ConversationTurn, { kind: "assistant" }>;
   toolSpans: ToolSpanIndex;
+  rejections: ReadonlyMap<string, ToolRejection>;
 }) {
   const items = useMemo(() => pairToolBlocks(turn.blocks), [turn.blocks]);
   return (
@@ -233,6 +269,11 @@ function AssistantBlocks({
               ran={
                 item.use.id !== undefined
                   ? toolSpans.get(item.use.id) ?? null
+                  : null
+              }
+              rejected={
+                item.use.id !== undefined
+                  ? rejections.get(item.use.id) ?? null
                   : null
               }
             />
@@ -313,12 +354,19 @@ function ToolCall({
   input,
   result,
   ran,
+  rejected,
 }: {
   name: string;
   input: unknown;
   result: Extract<ContentBlock, { kind: "tool_result" }> | null;
   /** The tool's real span, when we have it. */
   ran: TerminalToolSpan | null;
+  /**
+   * Set when the user DENIED this tool. It never ran, so there is no span and no
+   * result — only a `tool_decision` log. Without this the call would render as a
+   * tool that mysteriously produced no output.
+   */
+  rejected: ToolRejection | null;
 }) {
   // The span knows the command it really ran; the transcript only has what the
   // model asked for. Prefer the former.
@@ -326,7 +374,7 @@ function ToolCall({
     () => ran?.bashCommand ?? ran?.filePath ?? toolPrimaryArg(input),
     [ran, input],
   );
-  const isError = ran?.isError ?? result?.isError === true;
+  const isError = rejected !== null || (ran?.isError ?? result?.isError === true);
 
   // Edit emits a real structured patch on its span. Only fall back to diffing
   // the tool's own `old_string` → `new_string` when that patch isn't there.
@@ -365,7 +413,13 @@ function ToolCall({
       </HStack>
 
       <ResultLine>
-        {patch ? (
+        {rejected ? (
+          <Text {...CELL} color="red.fg">
+            {rejected.source === "user_abort"
+              ? "Aborted by the user — this tool never ran"
+              : "Denied by the user — this tool never ran"}
+          </Text>
+        ) : patch ? (
           <TerminalPatch hunks={patch} filePath={ran?.filePath} />
         ) : synthesizedDiff ? (
           <TerminalDiff
@@ -384,6 +438,32 @@ function ToolCall({
         )}
       </ResultLine>
     </VStack>
+  );
+}
+
+/**
+ * A session-level fact with no span of its own — an API error, a refusal, a
+ * mid-session context compaction. These live only in the logs, so without them
+ * the session reads as if they never happened.
+ */
+function SessionNoteLine({ note }: { note: SessionNote }) {
+  const isError = note.kind !== "compaction";
+  return (
+    <HStack align="flex-start" gap={2}>
+      <Glyph
+        char={isError ? GLYPH.bullet : GLYPH.note}
+        color={isError ? "red.fg" : TERMINAL_TOKENS.faint}
+      />
+      <Text
+        {...CELL}
+        color={isError ? "red.fg" : TERMINAL_TOKENS.faint}
+        flex={1}
+        minWidth={0}
+        wordBreak="break-word"
+      >
+        {note.text}
+      </Text>
+    </HStack>
   );
 }
 
