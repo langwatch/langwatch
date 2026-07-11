@@ -14,9 +14,8 @@ func TestPassThrough_PrepareWorkerIsNoOp(t *testing.T) {
 	if we.ProxyPort != 0 {
 		t.Fatalf("pass-through must run no proxy, got ProxyPort=%d", we.ProxyPort)
 	}
-	// Close + ReleaseWorker must not panic.
+	// Close must not panic.
 	we.Close()
-	g.ReleaseWorker(context.Background(), "c")
 }
 
 func TestPassThrough_SatisfiesGuard(t *testing.T) {

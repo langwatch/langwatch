@@ -70,13 +70,6 @@ type Config struct {
 	LangyInternalOTLPEndpoint string `env:"LANGY_INTERNAL_OTLP_ENDPOINT"`
 	LangyInternalOTLPHeaders  string `env:"LANGY_INTERNAL_OTLP_HEADERS"`
 
-	// Egress monitoring (ADR-044 part 5). Comma-separated hosts a worker may
-	// legitimately reach (control plane, gateway, git / gh / registry). Calls
-	// outside this set are FLAGGED (never blocked) by the observe-only
-	// MonitoringGuard/scorer. Empty = flag every non-IP-literal host as
-	// unexpected; operators should set the real hosts.
-	EgressAllowedHosts string `env:"LANGY_EGRESS_ALLOWED_HOSTS"`
-
 	// ShutdownHandoffDeadlineMS (ADR-048) is the wall-clock budget the manager
 	// gives each live worker to checkpoint on SIGTERM before the process-group
 	// kill. The `deadline` posted to a worker is now + this. MUST leave room for
