@@ -7,7 +7,6 @@ import {
   NativeSelect,
   Spinner,
   Text,
-  Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
@@ -34,6 +33,7 @@ import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { FacetSection } from "./FacetSection";
+import { QueryFilterInput } from "./QueryFilterInput";
 
 const SUBJECT_HELP = {
   trace:
@@ -398,14 +398,10 @@ function TraceQuerySubject({
         The automation fires on every incoming trace that matches this search
         query — the same one you use in the traces view.
       </Text>
-      <Textarea
+      <QueryFilterInput
         value={query}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder='e.g. status:error AND model:gpt-4o'
-        fontFamily="mono"
-        fontSize="sm"
-        rows={2}
-        autoresize
+        onChange={onChange}
+        placeholder="e.g. status:error AND model:gpt-4o"
       />
       <HStack gap={1} flexWrap="wrap">
         <Text textStyle="xs" color="fg.muted">
