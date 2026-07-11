@@ -1,0 +1,37 @@
+name: migration-order
+
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migration-order:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch base branch
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref || 'main' }}
+        run: git fetch --no-tags origin "+refs/heads/${BASE_REF#refs/heads/}:refs/remotes/origin/${BASE_REF#refs/heads/}"
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+
+      - name: Check migration ordering
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref || 'main' }}
+        run: node --experimental-strip-types .github/scripts/check-migration-order.ts "origin/${BASE_REF#refs/heads/}"
+
+      - name: Check migration ordering tests
+        run: node --test --experimental-strip-types .github/scripts/check-migration-order.test.ts
