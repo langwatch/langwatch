@@ -2,11 +2,13 @@ package domain
 
 import "testing"
 
-func TestDeriveSlugIsDeterministicPerWorktree(t *testing.T) {
+func TestDeriveSlugIsTheWorktreeName(t *testing.T) {
+	if got := DeriveSlug("/work/trees/portless", nil); got != "portless" {
+		t.Fatalf("slug should be the worktree name: got %q, want portless", got)
+	}
 	a := DeriveSlug("/work/trees/portless", nil)
-	b := DeriveSlug("/work/trees/portless", nil)
-	if a != b {
-		t.Fatalf("same worktree must derive the same slug: %q vs %q", a, b)
+	if DeriveSlug("/work/trees/portless", nil) != a {
+		t.Fatalf("same worktree must derive the same slug")
 	}
 	if !ValidSlug(a) {
 		t.Fatalf("derived slug %q is not well-formed", a)
@@ -16,14 +18,31 @@ func TestDeriveSlugIsDeterministicPerWorktree(t *testing.T) {
 	}
 }
 
-func TestDeriveSlugAppendsPlaceOnCollision(t *testing.T) {
+func TestDeriveSlugSanitisesMessyNames(t *testing.T) {
+	cases := map[string]string{
+		"/x/adr-domain-errors":  "adr-domain-errors",
+		"/x/My_Feature Branch":  "my-feature-branch",
+		"/x/feat/nested":        "nested",
+		"/x/__weird__.name__":   "weird-name",
+	}
+	for path, want := range cases {
+		if got := DeriveSlug(path, nil); got != want {
+			t.Errorf("DeriveSlug(%q) = %q, want %q", path, got, want)
+		}
+		if !ValidSlug(DeriveSlug(path, nil)) {
+			t.Errorf("DeriveSlug(%q) = %q is not a valid slug", path, DeriveSlug(path, nil))
+		}
+	}
+}
+
+func TestDeriveSlugAppendsHashOnCollision(t *testing.T) {
 	base := DeriveSlug("/work/trees/portless", nil)
-	withCollision := DeriveSlug("/work/trees/portless", map[string]bool{base: true})
+	withCollision := DeriveSlug("/other/path/portless", map[string]bool{base: true})
 	if withCollision == base {
-		t.Fatalf("collision should append a place word, got %q", withCollision)
+		t.Fatalf("collision should append a hash suffix, got %q", withCollision)
 	}
 	if !ValidSlug(withCollision) {
-		t.Fatalf("collision slug %q is not well-formed (want 2-3 words)", withCollision)
+		t.Fatalf("collision slug %q is not well-formed", withCollision)
 	}
 }
 

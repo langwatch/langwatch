@@ -10,8 +10,9 @@ sudo** for name resolution.
 
 ## The scheme
 
-Each worktree gets a stable, random slug (e.g. `happy-tiger`, derived from the
-worktree path and cached in `.langwatch-slug`). Its services are reached at:
+Each worktree's slug is simply its own directory name, sanitised (a checkout at
+`.../worktrees/portless` is the `portless` stack), cached in `.langwatch-slug`.
+Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 
 | Hostname | Service |
 | --- | --- |
