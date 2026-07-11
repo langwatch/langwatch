@@ -37,10 +37,9 @@ import {
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
-  accumulateClaudeSummaryFromLog,
-  accumulateClaudeSummaryFromSpan,
-} from "./services/claude-code-summary.service";
-import { accumulateInteractionSummary } from "./services/interaction-summary.service";
+  accumulateCodeAgentSummaryFromLog,
+  accumulateCodeAgentSummaryFromSpan,
+} from "./services/code-agent-summary.service";
 import {
   SpanTimingService,
   SpanStatusService,
@@ -225,14 +224,7 @@ export function applySpanToSummary({
   // comparison.
   Object.assign(
     attributes,
-    accumulateInteractionSummary({ attributes, span }),
-  );
-  // Claude-specific facts you cannot get from a prompt/reply pair — above all
-  // the final stop_reason, since a reply cut off by max_tokens is a truncation,
-  // not an answer, and would otherwise render as though the agent finished.
-  Object.assign(
-    attributes,
-    accumulateClaudeSummaryFromSpan({ attributes, span }),
+    accumulateCodeAgentSummaryFromSpan({ attributes, span }),
   );
 
   const newModels = spanCostService.extractModelsFromSpan(span);
@@ -504,7 +496,7 @@ export class TraceSummaryFoldProjection
     // exist ONLY as logs — no span carries them.
     Object.assign(
       mergedAttributes,
-      accumulateClaudeSummaryFromLog({
+      accumulateCodeAgentSummaryFromLog({
         attributes: mergedAttributes,
         data: event.data,
       }),
