@@ -162,7 +162,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import { LangyDrawer } from "../components/LangyPanel";
+import { LangySidecar } from "../components/LangyPanel";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -173,7 +173,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 function renderPanel() {
-  return render(<LangyDrawer isOpen={true} onOpenChange={() => undefined} />, {
+  return render(<LangySidecar isOpen={true} onOpenChange={() => undefined} />, {
     wrapper: Wrapper,
   });
 }
