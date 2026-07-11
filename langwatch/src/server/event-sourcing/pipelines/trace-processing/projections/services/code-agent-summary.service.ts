@@ -62,7 +62,29 @@ export const CODE_AGENT_ATTRS = {
   PERMISSION_MODE: "langwatch.code_agent.permission_mode",
   /** Which interaction this is within its session (1-based). */
   SEQUENCE: "langwatch.code_agent.interaction_sequence",
+  /**
+   * The steps IN THE ORDER THEY HAPPENED, e.g.
+   * `["Read","Read","Bash","Edit!","Bash"]`.
+   *
+   * Counts tell you an interaction ran five Bash commands. The order tells you
+   * it read two files, ran the tests, edited one, and re-ran them — which is the
+   * thing a human actually wants to know, and the thing a failure needs in order
+   * to make sense (a Bash that failed BEFORE an edit means something different
+   * from one that failed after). A trailing `!` marks a step that failed, so the
+   * failure shows up where it happened instead of being hoisted out of sequence.
+   */
+  STEPS: "langwatch.code_agent.steps",
 } as const;
+
+/**
+ * How many steps we keep in order. Long enough for the shape of almost any
+ * interaction to survive; bounded so a runaway loop cannot grow the attribute
+ * without limit. Past the cap the counts still tell the true magnitude.
+ */
+const MAX_STEPS_TRACKED = 60;
+
+/** Marks a step that failed, so a failure reads in the sequence it happened. */
+const FAILED_STEP_SUFFIX = "!";
 
 /** A reply that stopped for one of these did NOT finish answering. */
 const TRUNCATING_STOP_REASONS = new Set(["max_tokens", "refusal"]);
@@ -127,6 +149,65 @@ function readList(attributes: Record<string, string>, key: string): string[] {
   }
 }
 
+/**
+ * One step in the interaction, kept in the order it happened. Serialized as a
+ * compact `[startedAtMs, name]` pair (a failed step's name carries a trailing
+ * `!`) so the ordered list stays small enough to live on an attribute.
+ */
+type SerializedStep = [number, string];
+
+/**
+ * Append a step, keeping the list in the order the steps actually HAPPENED.
+ *
+ * Load-bearing: the fold sees spans in ARRIVAL order, which is not start order —
+ * spans are exported in batches and a slow tool's span can land after a later
+ * one's. Appending as they fold would silently produce a plausible-looking but
+ * wrong sequence, which is worse than no sequence at all. So each step carries
+ * its start time and is inserted in position.
+ */
+function appendStep({
+  attributes,
+  name,
+  startedAtMs,
+  failed,
+}: {
+  attributes: Record<string, string>;
+  name: string;
+  startedAtMs: number;
+  failed: boolean;
+}): Record<string, string> {
+  const steps = readSteps(attributes);
+  if (steps.length >= MAX_STEPS_TRACKED) return {};
+
+  const label = failed ? `${name}${FAILED_STEP_SUFFIX}` : name;
+  const step: SerializedStep = [startedAtMs, label];
+
+  // Insert in start-time position. The common case is already-in-order, so this
+  // walks a step or two from the end.
+  let i = steps.length;
+  while (i > 0 && (steps[i - 1]?.[0] ?? 0) > startedAtMs) i--;
+  steps.splice(i, 0, step);
+
+  return { [CODE_AGENT_ATTRS.STEPS]: JSON.stringify(steps) };
+}
+
+function readSteps(attributes: Record<string, string>): SerializedStep[] {
+  const raw = attributes[CODE_AGENT_ATTRS.STEPS];
+  if (typeof raw !== "string" || raw.length === 0) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (s): s is SerializedStep =>
+        Array.isArray(s) &&
+        typeof s[0] === "number" &&
+        typeof s[1] === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
 /** Add to a JSON string-set attribute, if not already there. */
 function addToList(
   attributes: Record<string, string>,
@@ -186,6 +267,16 @@ export function accumulateCodeAgentSummaryFromSpan({
     const tools = readJsonRecord(attributes, CODE_AGENT_ATTRS.TOOLS);
     tools[toolName] = (tools[toolName] ?? 0) + 1;
     next[CODE_AGENT_ATTRS.TOOLS] = JSON.stringify(tools);
+
+    Object.assign(
+      next,
+      appendStep({
+        attributes,
+        name: toolName,
+        startedAtMs: span.startTimeUnixMs,
+        failed: span.statusCode === "error",
+      }),
+    );
   }
 
   // `file_path` only rides the span when tool details are on; without them we

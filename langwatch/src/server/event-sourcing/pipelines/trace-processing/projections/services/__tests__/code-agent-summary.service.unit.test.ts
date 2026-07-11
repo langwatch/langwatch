@@ -21,6 +21,25 @@ function span(name: string, spanAttributes: Record<string, string> = {}) {
   return { name, spanAttributes } as unknown as NormalizedSpan;
 }
 
+function toolSpan(
+  toolName: string,
+  startTimeUnixMs: number,
+  statusCode: string | null = null,
+) {
+  return {
+    name: "claude_code.tool",
+    spanAttributes: { tool_name: toolName },
+    startTimeUnixMs,
+    statusCode,
+  } as unknown as NormalizedSpan;
+}
+
+function stepNames(attributes: Record<string, string>): string[] {
+  return JSON.parse(attributes[CODE_AGENT_ATTRS.STEPS] ?? "[]").map(
+    ([, name]: [number, string]) => name,
+  );
+}
+
 function spanWithStatus(
   name: string,
   spanAttributes: Record<string, string>,
@@ -225,6 +244,65 @@ describe("the work an interaction did", () => {
 
       expect(attributes[CODE_AGENT_ATTRS.FAILED_TOOLS]).toBe("1");
       expect(attributes[CODE_AGENT_ATTRS.TOOL_CALLS]).toBe("2");
+    });
+  });
+});
+
+describe("the ORDER things happened", () => {
+  describe("given tools that ran one after another", () => {
+    it("keeps them in the order they happened, not just their counts", () => {
+      const attributes = foldAll({
+        spans: [
+          toolSpan("Read", 1000),
+          toolSpan("Read", 2000),
+          toolSpan("Bash", 3000),
+          toolSpan("Edit", 4000),
+          toolSpan("Bash", 5000),
+        ],
+      });
+
+      // Counts alone would say "Bash 2, Read 2, Edit 1" and lose the story:
+      // it read the files, ran the tests, fixed one, and re-ran them.
+      expect(stepNames(attributes)).toEqual([
+        "Read",
+        "Read",
+        "Bash",
+        "Edit",
+        "Bash",
+      ]);
+    });
+  });
+
+  describe("given spans that ARRIVE out of order", () => {
+    // The fold sees spans in arrival order, which is not start order: spans are
+    // exported in batches, so a slow tool's span can land after a later one's.
+    // Appending as they fold would produce a plausible-looking but WRONG
+    // sequence, which is worse than showing no sequence at all.
+    it("still records the order they actually ran in", () => {
+      const attributes = foldAll({
+        spans: [
+          toolSpan("Edit", 4000),
+          toolSpan("Read", 1000),
+          toolSpan("Bash", 3000),
+          toolSpan("Read", 2000),
+        ],
+      });
+
+      expect(stepNames(attributes)).toEqual(["Read", "Read", "Bash", "Edit"]);
+    });
+  });
+
+  describe("given a step that failed", () => {
+    it("marks it in place, so the failure reads where it happened", () => {
+      const attributes = foldAll({
+        spans: [
+          toolSpan("Read", 1000),
+          toolSpan("Bash", 2000, "error"),
+          toolSpan("Edit", 3000),
+        ],
+      });
+
+      expect(stepNames(attributes)).toEqual(["Read", "Bash!", "Edit"]);
     });
   });
 });
