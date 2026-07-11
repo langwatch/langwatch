@@ -4,8 +4,7 @@ export type Mode =
   | "thread"
   | "bubbles"
   | "markdown"
-  | "annotations"
-  | "terminal";
+  | "annotations";
 
 /** Chat-turn presentation: ChatGPT-style full-width thread vs side bubbles. */
 export type TurnLayout = "thread" | "bubbles";

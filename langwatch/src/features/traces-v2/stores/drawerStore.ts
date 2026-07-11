@@ -1,6 +1,10 @@
 import { create } from "zustand";
 
-export type DrawerViewMode = "trace" | "summary" | "conversation";
+export type DrawerViewMode =
+  | "trace"
+  | "summary"
+  | "conversation"
+  | "terminal";
 // Flame was retired during the trace-view redesign on the grounds that
 // Waterfall already showed depth/parent/child — then brought back in
 // Round 3 because the time-weighted block layout reads completely

@@ -1,5 +1,4 @@
-import { Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { CornerDownRight, TerminalSquare } from "lucide-react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { SimpleSlider } from "~/components/ui/slider";
 import {
@@ -14,7 +13,6 @@ import {
   pairToolBlocks,
   toolResultBodyToString,
 } from "../transcript";
-import { AnsiText } from "./AnsiText";
 import { TERMINAL_TOKENS } from "./palette";
 import { TerminalDiff } from "./TerminalDiff";
 import { TerminalOutput } from "./TerminalOutput";
@@ -26,28 +24,51 @@ import {
   toolPrimaryArg,
 } from "./terminalSession";
 
+/**
+ * The glyphs Claude Code actually draws with. Kept together because they ARE
+ * the visual language — the CLI has no window chrome, no panels and no icons;
+ * a bullet, a result elbow and a prompt caret carry the whole hierarchy.
+ */
+const GLYPH = {
+  /** Opens a tool call and an assistant message. */
+  bullet: "⏺",
+  /** The result elbow, indented under the call it belongs to. */
+  elbow: "⎿",
+  /** The user's prompt caret. */
+  caret: "❯",
+  /** Thinking / extended reasoning. */
+  thinking: "✻",
+  /** Session-level notes (system prompt, recap). */
+  note: "※",
+} as const;
+
+/** Everything on the screen is one monospace size — a terminal has one font. */
+const CELL = {
+  fontFamily: "mono",
+  fontSize: "12px",
+  lineHeight: "1.55",
+} as const;
+
 interface TerminalViewProps {
-  /** Session beats, in order. Build from the trace's turns at the wiring site. */
+  /** Session beats, in order. Build from the trace's spans at the wiring site. */
   steps: TerminalStep[];
   meta?: {
     model?: string;
-    osType?: string;
-    terminalType?: string;
     cwd?: string;
-    title?: string;
   };
 }
 
 /**
- * A terminal-style recreation of how a Claude Code session looked: a window
- * frame, the user's prompts, the assistant's replies, and each tool call with
- * its output rendered the way the CLI shows it (ANSI-coloured output, red/green
- * code diffs). A timeline scrubber replays the session beat by beat, ticking up
- * the running token and cost totals as you travel through it.
+ * A recreation of how a Claude Code session looked in the terminal.
  *
- * Takes the already-shaped `ConversationTurn` data (the transcript module's
- * shape, produced by `groupMessagesIntoTurns`) so it reuses the exact turn
- * model the conversation view uses rather than reinventing one.
+ * Deliberately NOT a "terminal widget": no window frame, no traffic lights, no
+ * title bar. Claude Code doesn't draw those — it prints into the terminal you
+ * already have, and its entire hierarchy is carried by four glyphs (see
+ * {@link GLYPH}) at one monospace size. Adding chrome around it makes it read
+ * as a screenshot of a terminal rather than as the session itself.
+ *
+ * A timeline scrubber replays the session beat by beat, ticking the running
+ * token + cost totals up as you travel through it.
  */
 export const TerminalView = memo(function TerminalView({
   steps,
@@ -73,14 +94,23 @@ export const TerminalView = memo(function TerminalView({
     if (el) el.scrollTop = el.scrollHeight;
   }, [revealIndex]);
 
-  const title =
-    meta?.title ??
-    ["claude", meta?.cwd, meta?.terminalType].filter(Boolean).join("  ");
+  if (steps.length === 0) {
+    return (
+      <VStack
+        align="center"
+        justify="center"
+        height="full"
+        bg={TERMINAL_TOKENS.screenBg}
+      >
+        <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+          No terminal session recorded for this turn
+        </Text>
+      </VStack>
+    );
+  }
 
   return (
     <VStack align="stretch" gap={0} height="full" minHeight={0}>
-      <TitleBar title={title} osType={meta?.osType} />
-
       <Box
         ref={screenRef}
         flex={1}
@@ -88,17 +118,17 @@ export const TerminalView = memo(function TerminalView({
         overflow="auto"
         bg={TERMINAL_TOKENS.screenBg}
         color={TERMINAL_TOKENS.screenFg}
-        paddingX={3}
+        paddingX={4}
         paddingY={3}
       >
-        <VStack align="stretch" gap={3}>
+        <VStack align="stretch" gap={2.5}>
           {revealed.map((step, index) => (
             <StepView key={index} step={step} />
           ))}
         </VStack>
       </Box>
 
-      <TimelineBar
+      <StatusLine
         stepCount={steps.length}
         revealIndex={revealIndex}
         onScrub={setRevealIndex}
@@ -106,57 +136,21 @@ export const TerminalView = memo(function TerminalView({
         costUsd={point?.cumulativeCostUsd ?? 0}
         elapsedMs={point?.elapsedMs ?? 0}
         model={steps[revealIndex]?.model ?? meta?.model}
+        cwd={meta?.cwd}
       />
     </VStack>
   );
 });
 
-function TitleBar({ title, osType }: { title: string; osType?: string }) {
-  return (
-    <HStack
-      gap={2}
-      paddingX={3}
-      paddingY={2}
-      borderBottomWidth="1px"
-      borderColor={TERMINAL_TOKENS.border}
-      bg={TERMINAL_TOKENS.frameBg}
-      flexShrink={0}
-    >
-      {/* Traffic-light window dots — pure chrome, semantic tokens. */}
-      <HStack gap={1.5} flexShrink={0}>
-        <Circle size="10px" bg="red.solid" opacity={0.85} />
-        <Circle size="10px" bg="yellow.solid" opacity={0.85} />
-        <Circle size="10px" bg="green.solid" opacity={0.85} />
-      </HStack>
-      <Icon as={TerminalSquare} boxSize="13px" color={TERMINAL_TOKENS.faint} />
-      <Text
-        textStyle="2xs"
-        fontFamily="mono"
-        color={TERMINAL_TOKENS.faint}
-        truncate
-        flex={1}
-        minWidth={0}
-      >
-        {title}
-      </Text>
-      {osType && (
-        <Text textStyle="2xs" fontFamily="mono" color={TERMINAL_TOKENS.faint}>
-          {osType}
-        </Text>
-      )}
-    </HStack>
-  );
-}
-
 function StepView({ step }: { step: TerminalStep }) {
   const { turn } = step;
-  if (turn.kind === "user") return <PromptBlock turn={turn} />;
+  if (turn.kind === "user") return <PromptLine turn={turn} />;
   if (turn.kind === "system") return <SystemNote turn={turn} />;
   return <AssistantBlocks turn={turn} />;
 }
 
-/** The user's prompt, in Claude Code's bordered `>` input box. */
-function PromptBlock({
+/** The user's prompt: `❯ what they typed`. */
+function PromptLine({
   turn,
 }: {
   turn: Extract<ConversationTurn, { kind: "user" }>;
@@ -164,38 +158,20 @@ function PromptBlock({
   const text = useMemo(() => textOf(turn.blocks), [turn.blocks]);
   if (!text.trim()) return null;
   return (
-    <Box
-      borderWidth="1px"
-      borderColor={TERMINAL_TOKENS.border}
-      borderRadius="md"
-      bg={TERMINAL_TOKENS.frameBg}
-      paddingX={2.5}
-      paddingY={1.5}
-    >
-      <HStack align="flex-start" gap={2}>
-        <Text
-          fontFamily="mono"
-          fontSize="12px"
-          color="blue.fg"
-          fontWeight="bold"
-          flexShrink={0}
-          userSelect="none"
-        >
-          {">"}
-        </Text>
-        <Text
-          fontFamily="mono"
-          fontSize="12px"
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-          color={TERMINAL_TOKENS.screenFg}
-          flex={1}
-          minWidth={0}
-        >
-          {text}
-        </Text>
-      </HStack>
-    </Box>
+    <HStack align="flex-start" gap={2} paddingTop={1}>
+      <Glyph char={GLYPH.caret} color="blue.fg" bold />
+      <Text
+        {...CELL}
+        whiteSpace="pre-wrap"
+        wordBreak="break-word"
+        color={TERMINAL_TOKENS.screenFg}
+        fontWeight="medium"
+        flex={1}
+        minWidth={0}
+      >
+        {text}
+      </Text>
+    </HStack>
   );
 }
 
@@ -205,16 +181,13 @@ function SystemNote({
   turn: Extract<ConversationTurn, { kind: "system" }>;
 }) {
   const text = useMemo(() => textOf(turn.blocks), [turn.blocks]);
-  const chars = text.length;
   return (
-    <Text
-      fontFamily="mono"
-      fontSize="12px"
-      color={TERMINAL_TOKENS.faint}
-      fontStyle="italic"
-    >
-      {`⚙ system prompt (${chars} chars)`}
-    </Text>
+    <HStack align="flex-start" gap={2}>
+      <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
+      <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+        {`system prompt (${text.length.toLocaleString()} chars)`}
+      </Text>
+    </HStack>
   );
 }
 
@@ -226,11 +199,11 @@ function AssistantBlocks({
 }) {
   const items = useMemo(() => pairToolBlocks(turn.blocks), [turn.blocks]);
   return (
-    <VStack align="stretch" gap={2}>
+    <VStack align="stretch" gap={2.5}>
       {items.map((item, index) => {
         if (item.kind === "tool_pair") {
           return (
-            <ToolCallBlock
+            <ToolCall
               key={index}
               name={item.use.name}
               input={item.use.input}
@@ -240,11 +213,12 @@ function AssistantBlocks({
         }
         if (item.kind === "orphan_result") {
           return (
-            <ToolResultBody
-              key={index}
-              content={item.result.content}
-              isError={item.result.isError}
-            />
+            <ResultLine key={index}>
+              <ToolResultBody
+                content={item.result.content}
+                isError={item.result.isError}
+              />
+            </ResultLine>
           );
         }
         return <BlockLine key={index} block={item.block} />;
@@ -255,56 +229,59 @@ function AssistantBlocks({
 
 function BlockLine({ block }: { block: ContentBlock }) {
   if (block.kind === "text") {
-    return (
-      <Text
-        fontFamily="mono"
-        fontSize="12px"
-        whiteSpace="pre-wrap"
-        wordBreak="break-word"
-        color={TERMINAL_TOKENS.screenFg}
-        userSelect="text"
-      >
-        {block.text}
-      </Text>
-    );
-  }
-  if (block.kind === "thinking") {
+    // Assistant prose opens with the same bullet a tool call does — in the CLI
+    // they're peers in one stream, not separate kinds of thing.
     return (
       <HStack align="flex-start" gap={2}>
+        <Glyph char={GLYPH.bullet} color="green.fg" />
         <Text
-          fontFamily="mono"
-          fontSize="12px"
-          color={TERMINAL_TOKENS.faint}
-          flexShrink={0}
-          userSelect="none"
-        >
-          {"✻"}
-        </Text>
-        <Text
-          fontFamily="mono"
-          fontSize="12px"
-          fontStyle="italic"
+          {...CELL}
           whiteSpace="pre-wrap"
           wordBreak="break-word"
-          color={TERMINAL_TOKENS.faint}
+          color={TERMINAL_TOKENS.screenFg}
           flex={1}
           minWidth={0}
-          userSelect="text"
         >
           {block.text}
         </Text>
       </HStack>
     );
   }
-  // media / raw — render a compact JSON-ish line rather than dropping it.
-  return (
-    <Text fontFamily="mono" fontSize="12px" color={TERMINAL_TOKENS.faint}>
-      {block.kind === "media" ? "[media]" : safeStringify(block.data)}
-    </Text>
-  );
+  if (block.kind === "thinking") {
+    return (
+      <HStack align="flex-start" gap={2}>
+        <Glyph char={GLYPH.thinking} color={TERMINAL_TOKENS.faint} />
+        <Text
+          {...CELL}
+          fontStyle="italic"
+          whiteSpace="pre-wrap"
+          wordBreak="break-word"
+          color={TERMINAL_TOKENS.faint}
+          flex={1}
+          minWidth={0}
+        >
+          {block.text}
+        </Text>
+      </HStack>
+    );
+  }
+  // Anything the transcript couldn't classify still gets printed rather than
+  // dropped — a terminal shows you what came back, even when it's odd.
+  if (block.kind === "raw") {
+    return (
+      <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+        {safeStringify(block.data)}
+      </Text>
+    );
+  }
+  return null;
 }
 
-function ToolCallBlock({
+/**
+ * `⏺ Tool(arg)` with its result hanging underneath on the `⎿` elbow. The bullet
+ * is the only status signal — green ran, red failed — exactly as in the CLI.
+ */
+function ToolCall({
   name,
   input,
   result,
@@ -321,23 +298,10 @@ function ToolCallBlock({
   );
 
   return (
-    <VStack align="stretch" gap={1}>
-      {/* ⏺ Tool(primaryArg) — the call line, bullet green (ok) or red (error). */}
-      <HStack align="baseline" gap={2}>
-        <Text
-          fontSize="12px"
-          lineHeight="1.55"
-          color={isError ? "red.fg" : "green.fg"}
-          flexShrink={0}
-          userSelect="none"
-        >
-          {"⏺"}
-        </Text>
-        <Text
-          fontFamily="mono"
-          fontSize="12px"
-          color={TERMINAL_TOKENS.screenFg}
-        >
+    <VStack align="stretch" gap={0.5}>
+      <HStack align="flex-start" gap={2}>
+        <Glyph char={GLYPH.bullet} color={isError ? "red.fg" : "green.fg"} />
+        <Text {...CELL} color={TERMINAL_TOKENS.screenFg} flex={1} minWidth={0}>
           <Text as="span" fontWeight="bold">
             {name}
           </Text>
@@ -349,37 +313,34 @@ function ToolCallBlock({
         </Text>
       </HStack>
 
-      {/* ⎿ result, indented under the call. */}
-      <HStack align="stretch" gap={2} paddingLeft={1}>
-        <Icon
-          as={CornerDownRight}
-          boxSize="13px"
-          color={TERMINAL_TOKENS.faint}
-          flexShrink={0}
-          marginTop="2px"
-        />
-        <Box flex={1} minWidth={0}>
-          {diff ? (
-            <TerminalDiff
-              oldText={diff.oldText}
-              newText={diff.newText}
-              filePath={diff.filePath}
-            />
-          ) : result ? (
-            <ToolResultBody content={result.content} isError={result.isError} />
-          ) : (
-            <Text
-              fontFamily="mono"
-              fontSize="12px"
-              color={TERMINAL_TOKENS.faint}
-              fontStyle="italic"
-            >
-              (no output)
-            </Text>
-          )}
-        </Box>
-      </HStack>
+      <ResultLine>
+        {diff ? (
+          <TerminalDiff
+            oldText={diff.oldText}
+            newText={diff.newText}
+            filePath={diff.filePath}
+          />
+        ) : result ? (
+          <ToolResultBody content={result.content} isError={result.isError} />
+        ) : (
+          <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+            (no output)
+          </Text>
+        )}
+      </ResultLine>
     </VStack>
+  );
+}
+
+/** The `⎿` elbow row: a result, indented under the call it belongs to. */
+function ResultLine({ children }: { children: React.ReactNode }) {
+  return (
+    <HStack align="flex-start" gap={2} paddingLeft={4}>
+      <Glyph char={GLYPH.elbow} color={TERMINAL_TOKENS.faint} />
+      <Box flex={1} minWidth={0}>
+        {children}
+      </Box>
+    </HStack>
   );
 }
 
@@ -393,12 +354,7 @@ function ToolResultBody({
   const text = useMemo(() => toolResultBodyToString(content), [content]);
   if (!text.trim()) {
     return (
-      <Text
-        fontFamily="mono"
-        fontSize="12px"
-        color={TERMINAL_TOKENS.faint}
-        fontStyle="italic"
-      >
+      <Text {...CELL} color={TERMINAL_TOKENS.faint}>
         (empty)
       </Text>
     );
@@ -406,7 +362,39 @@ function ToolResultBody({
   return <TerminalOutput text={text} isError={isError} maxHeight="360px" />;
 }
 
-function TimelineBar({
+/**
+ * A leading glyph. Fixed-width and unselectable so copying the screen yields
+ * clean text rather than a column of bullets.
+ */
+function Glyph({
+  char,
+  color,
+  bold,
+}: {
+  char: string;
+  color: string;
+  bold?: boolean;
+}) {
+  return (
+    <Text
+      {...CELL}
+      color={color}
+      fontWeight={bold ? "bold" : undefined}
+      flexShrink={0}
+      userSelect="none"
+      aria-hidden
+    >
+      {char}
+    </Text>
+  );
+}
+
+/**
+ * The bottom status line — the CLI's own idiom (`⏵⏵ auto mode on · …`), doing
+ * real work here: it's the scrubber, and it reports what the session had cost
+ * by the beat you're parked on.
+ */
+function StatusLine({
   stepCount,
   revealIndex,
   onScrub,
@@ -414,6 +402,7 @@ function TimelineBar({
   costUsd,
   elapsedMs,
   model,
+  cwd,
 }: {
   stepCount: number;
   revealIndex: number;
@@ -422,55 +411,68 @@ function TimelineBar({
   costUsd: number;
   elapsedMs: number;
   model?: string;
+  cwd?: string;
 }) {
   const scrubbable = stepCount > 1;
   return (
     <VStack
       align="stretch"
       gap={1.5}
-      paddingX={3}
+      paddingX={4}
       paddingY={2}
       borderTopWidth="1px"
       borderColor={TERMINAL_TOKENS.border}
       bg={TERMINAL_TOKENS.frameBg}
       flexShrink={0}
     >
-      <HStack gap={3} justify="space-between">
-        <Text textStyle="2xs" color={TERMINAL_TOKENS.faint} fontFamily="mono">
-          {`step ${Math.min(revealIndex + 1, stepCount)}/${stepCount}`}
-        </Text>
+      {scrubbable && (
+        // Chakra's Slider.Root doesn't take `aria-label` (it lands on the thumb
+        // via the hidden input), so the accessible name goes on the group.
+        <Box role="group" aria-label="Scrub session timeline">
+          <SimpleSlider
+            size="sm"
+            min={0}
+            max={stepCount - 1}
+            step={1}
+            value={[revealIndex]}
+            onValueChange={(details) => {
+              const next = details.value[0];
+              if (typeof next === "number") onScrub(next);
+            }}
+          />
+        </Box>
+      )}
+      <HStack gap={2} justify="space-between" flexWrap="wrap">
+        <HStack gap={2} minWidth={0}>
+          <Text {...CELL} color="blue.fg" flexShrink={0} aria-hidden>
+            ⏵⏵
+          </Text>
+          <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+            {`step ${Math.min(revealIndex + 1, stepCount)}/${stepCount}`}
+          </Text>
+          {cwd && (
+            <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate minWidth={0}>
+              {`· ${cwd}`}
+            </Text>
+          )}
+        </HStack>
         <HStack gap={3} flexWrap="wrap" justify="flex-end">
-          {model && <HudStat label={abbreviateModel(model)} />}
-          {elapsedMs > 0 && <HudStat label={formatDuration(elapsedMs)} />}
-          {tokens > 0 && <HudStat label={`${formatTokens(tokens)} tok`} />}
-          {costUsd > 0 && <HudStat label={formatCost(costUsd)} accent />}
+          {model && <Stat label={abbreviateModel(model)} />}
+          {elapsedMs > 0 && <Stat label={formatDuration(elapsedMs)} />}
+          {tokens > 0 && <Stat label={`${formatTokens(tokens)} tok`} />}
+          {costUsd > 0 && <Stat label={formatCost(costUsd)} accent />}
         </HStack>
       </HStack>
-      {scrubbable && (
-        <SimpleSlider
-          size="sm"
-          min={0}
-          max={stepCount - 1}
-          step={1}
-          value={[revealIndex]}
-          onValueChange={(details) => {
-            const next = details.value[0];
-            if (typeof next === "number") onScrub(next);
-          }}
-          aria-label="Scrub session timeline"
-        />
-      )}
     </VStack>
   );
 }
 
-function HudStat({ label, accent }: { label: string; accent?: boolean }) {
+function Stat({ label, accent }: { label: string; accent?: boolean }) {
   return (
     <Text
-      textStyle="2xs"
-      fontFamily="mono"
+      {...CELL}
       color={accent ? "green.fg" : TERMINAL_TOKENS.faint}
-      fontWeight={accent ? "600" : undefined}
+      fontWeight={accent ? "semibold" : undefined}
     >
       {label}
     </Text>
@@ -489,7 +491,7 @@ function textOf(blocks: ContentBlock[]): string {
 
 function truncateArg(arg: string): string {
   const oneLine = arg.replace(/\s+/g, " ").trim();
-  return oneLine.length > 120 ? `${oneLine.slice(0, 117)}...` : oneLine;
+  return oneLine.length > 120 ? `${oneLine.slice(0, 117)}…` : oneLine;
 }
 
 function safeStringify(value: unknown): string {
