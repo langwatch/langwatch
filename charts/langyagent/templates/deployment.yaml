@@ -43,6 +43,12 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
+      # The manager makes zero kube-apiserver calls, so the auto-mounted
+      # default-ServiceAccount token is pure attack surface: it is projected
+      # at /var/run/secrets/kubernetes.io/serviceaccount/token (mode 0644),
+      # readable by the worker UID, and never used. Drop it so a compromised
+      # opencode worker cannot read a namespace identity off disk.
+      automountServiceAccountToken: false
       securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
       # Give the manager time to drain workers on SIGTERM (it kills each
       # OpenCode subprocess in its shutdown handler).

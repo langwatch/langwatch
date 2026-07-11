@@ -67,6 +67,9 @@ helm install langyagent ./charts/langyagent -n langwatch -f values.prod.yaml
 | `resources`                   | Pod CPU/memory requests + limits                                        |
 | `networkPolicy.ingressFrom`   | Which pods may call the agent (default: `app.kubernetes.io/name: langwatch`) |
 | `networkPolicy.allowExternalHttps` | Allow egress :443 to anywhere (OpenCode update/telemetry); tighten once pinned |
+| `networkPolicy.privateExcept` / `privateExceptV6` | Private/link-local/CGNAT CIDRs carved out of the `:443`-to-anywhere rule so a worker cannot pivot to internal services. Includes `100.64.0.0/10` (EKS CGNAT). Append your cluster's CIDR if it lives outside RFC1918 |
+| `egress.fqdnFloor` / `requireTls` / `enforceFloor` / `sniCrossCheck` / `cilium.enabled` | ADR-043 per-worker L7 egress adapter: operator FQDN floor + enforcement toggles. Stock posture is monitor-only; `cilium.enabled` ships a bypass-proof datapath `toFQDNs` policy |
+| `nodeSelector` / `affinity` / `tolerations` | Node placement. Opt-in **public-subnet** pinning is a defence-in-depth wall (a node with no route to private RDS/ElastiCache). Needs a Terraform-side node group; see Network policy below |
 
 ## Probes
 
@@ -102,7 +105,33 @@ scale-downs would hang forever. Only enable it after you have raised
 ## Network policy
 
 `networkPolicy.enabled: true` by default. Ingress admits only pods matching
-`networkPolicy.ingressFrom` (the control plane). Egress allows DNS, the
-control plane (`controlPlanePort`), the AI gateway (`gatewayPort`), and —
-unless you set `allowExternalHttps: false` — `:443` to anywhere. Adjust the
-selectors if your `langwatch-app` pod labels differ from the defaults.
+`networkPolicy.ingressFrom` (the control plane). Egress is default-deny and
+allows only: DNS, the control plane (`controlPlanePort`), the AI gateway
+(`gatewayPort`), and — only when `allowExternalHttps: true` — `:443` to
+anywhere. Adjust the selectors if your `langwatch-app` pod labels differ.
+
+**`:443` public egress and the private carve-outs.** `allowExternalHttps` is
+`false` by default; enable it only when workers must `git clone` / call `gh` /
+`npm install`. When enabled, the `:443` rule denies `networkPolicy.privateExcept`
+(v4) and `networkPolicy.privateExceptV6` (v6) so a compromised worker cannot use
+public egress to reach internal services on `:443`. The v4 defaults include
+`100.64.0.0/10` (RFC 6598 CGNAT) because EKS *custom networking* / secondary
+CIDRs place pods — and sometimes nodes and the apiserver ENI — in that range,
+which the RFC1918 ranges do NOT cover. **If your service CIDR or a VPC CIDR lives
+outside RFC1918, append it to `privateExcept`.** The metadata service over plain
+`:80` (IMDSv2) is denied by default-deny — there is no `:80` egress rule at all.
+
+**FQDN egress (ADR-043).** FQDN bounding ("only github/npm/…") is enforced at L7
+by the per-worker egress adapter (worker tools egress via `HTTPS_PROXY`), tuned
+by `egress.*`. For bypass-proof datapath FQDN egress on a Cilium CNI, set
+`egress.cilium.enabled: true` (renders a `CiliumNetworkPolicy` enforcing the same
+`egress.fqdnFloor`); the non-Cilium equivalent is the ADR-033 Fix B per-worker
+netns.
+
+**Defence-in-depth: public-subnet placement (opt-in).** Because workers run
+LLM-driven arbitrary shell, you can pin the pod to a node group whose subnet has
+no route to the private data tier (RDS/ElastiCache/internal ALBs) via
+`nodeSelector` + `tolerations`. Then even a full NetworkPolicy + gVisor bypass
+leaves the node unable to reach private services. This needs a matching public
+node group provisioned in the Terraform/EKS repo (labelled + tainted); the chart
+only selects and tolerates it. See the commented example in `values.yaml`.
