@@ -21,6 +21,12 @@ interface SeedSpansOptions {
   traceCount: number;
   /** If set, each trace gets this TotalCost for result verification */
   knownCost?: number;
+  /**
+   * Models array written to each trace summary. Defaults to `["gpt-5-mini"]`.
+   * Override to give two seeded tenants distinguishable models so a
+   * cross-tenant `group by model` leak is trivially observable.
+   */
+  models?: string[];
 }
 
 /**
@@ -59,6 +65,7 @@ export async function seedSpans(
     attributeValueSize = 100,
     traceCount,
     knownCost,
+    models = ["gpt-5-mini"],
   } = opts;
 
   const now = Date.now();
@@ -103,7 +110,7 @@ export async function seedSpans(
     ContainsErrorStatus: 0,
     ContainsOKStatus: 1,
     ErrorMessage: null,
-    Models: ["gpt-5-mini"],
+    Models: models,
     TotalCost: knownCost ?? 0.01,
     TokensEstimated: false,
     TotalPromptTokenCount: 100,
