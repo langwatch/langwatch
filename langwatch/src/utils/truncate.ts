@@ -51,8 +51,6 @@ const truncateWithSizeLimit = (
     }
   }
 
-  // If still too large, start dropping keys.
-  //
   // The serialised length of an object is the sum of its entries' lengths plus
   // the separators, so we can track the running total by serialising each value
   // exactly once. Re-serialising the whole accumulated object on every key (as
@@ -74,14 +72,25 @@ const truncateWithSizeLimit = (
         maxTotalLength,
       });
 
-      // JSON.stringify returns undefined for undefined/function values; those
-      // keys vanish from the serialised form, so they cost nothing and must not
-      // be measured with `.length`.
-      const serializedValue = JSON.stringify(truncated);
+      // Serialize within the real property-key context, not standalone:
+      // `JSON.stringify(truncated)` alone always invokes a custom `toJSON()`
+      // with key `""`, so a key-sensitive `toJSON()` could measure smaller (or
+      // larger) here than it renders inside the final object, letting an
+      // oversized entry slip past `maxTotalLength`. Wrapping in `{ [key]: ... }`
+      // reproduces the exact key `JSON.stringify` will call `toJSON()` with.
+      //
+      // `JSON.stringify` drops undefined/function/symbol values from an
+      // object entirely, which is indistinguishable from key `""` here, so
+      // the wrapped form comes back as the literal string `"{}"` — those keys
+      // cost nothing and must not be measured with `.length`.
+      const quotedKey = JSON.stringify(key);
+      const wrapped = JSON.stringify({ [key]: truncated });
+      const serializedValue =
+        wrapped === "{}" ? undefined : wrapped.slice(quotedKey.length + 2, -1);
       const entryLength =
         serializedValue === undefined
           ? 0
-          : JSON.stringify(key).length +
+          : quotedKey.length +
             ":".length +
             serializedValue.length +
             (kept > 0 ? ",".length : 0);

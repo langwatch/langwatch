@@ -33,6 +33,17 @@ export type PayloadCodec = "json" | "msgpack";
 /** How those bytes were compressed. */
 export type CompressionCodec = "none" | "gzip" | "zstd";
 
+const COMPRESSION_MEDIA_TYPES: Record<CompressionCodec, string> = {
+  none: "application/octet-stream",
+  gzip: "application/gzip",
+  zstd: "application/zstd",
+};
+
+/** Durable-storage media type matching what {@link compress} actually wrote. */
+export function compressionMediaType(codec: CompressionCodec): string {
+  return COMPRESSION_MEDIA_TYPES[codec];
+}
+
 /**
  * msgpack pays off only on large payloads. Below this, `JSON.stringify` beats
  * `msgpackr.pack` outright (measured ~1.7-1.9x on 1.5-6KB job bodies): our
@@ -129,14 +140,12 @@ export function decodePayload(buf: Buffer): Record<string, unknown> {
 /**
  * The dedup key for a content-addressed blob.
  *
- * The codec MUST be part of the hash. Blobs are content-addressed, so a hash
- * collision means "reuse the stored copy" — and during a rollout one pod may
- * encode a payload as JSON while another encodes the same payload as msgpack. If
- * both hashed only the payload they would land on the same key with *different
- * bytes*, and the second writer would silently dedup onto the first, handing a
- * reader bytes in a codec it wasn't expecting. Folding the codec in keeps the two
- * representations on separate keys, at the cost of storing both during the
- * transition.
+ * JSON and msgpack representations of the same payload are already different
+ * byte sequences (UTF-8 JSON text vs. msgpackr's binary map encoding), so the
+ * two codecs never land on the same key without an explicit prefix — hashing
+ * the raw JSON string keeps this call byte-for-byte the same hash a pre-rollout
+ * pod would have computed, so cross-version dedup during the msgpack rollout
+ * isn't degraded by a hash that only this pod's code produces.
  */
 export function contentHashSource({
   codec,
@@ -149,5 +158,5 @@ export function contentHashSource({
 }): string | Buffer {
   // Hash the raw payload representation, never the compressed output: gzip/zstd
   // determinism varies with library version and level (ADR-030 §1).
-  return codec === "json" && json !== null ? `json:${json}` : bytes;
+  return codec === "json" && json !== null ? json : bytes;
 }

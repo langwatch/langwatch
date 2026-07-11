@@ -6,8 +6,9 @@ import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 
 import { MAX_BLOB_BYTES } from "./blobConstants";
 import {
-  type CompressionCodec,
   compress,
+  compressionMediaType,
+  type CompressionCodec,
   contentHashSource,
   decodePayload,
   decompress,
@@ -333,15 +334,17 @@ export async function encodeJobEnvelope({
     assertPayloadWithinCap(payloadBytes, { projectId, queueName, logger });
 
     if (payloadBytes > INLINE_CEILING_BYTES) {
+      const compression = writeCompression();
       const ref = await tieredBlobs.put({
         projectId,
-        data: await compress(bytes, writeCompression()),
+        data: await compress(bytes, compression),
         // Hash the RAW payload, never the compressed output — the dedup key must
         // not depend on gzip/zstd determinism (library version/level; ADR-030
         // §1). The codec is folded in so a JSON-encoded and a msgpack-encoded
         // copy of the same payload can't collide on one key with different bytes
         // mid-rollout.
         hashSource: contentHashSource({ codec, json: payloadJson, bytes }),
+        mediaType: compressionMediaType(compression),
       });
       header.e = ref.tier;
       header.ref = ref;

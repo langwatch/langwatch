@@ -234,6 +234,7 @@ export class TieredBlobStore {
     projectId,
     data,
     hashSource,
+    mediaType = "application/gzip",
   }: {
     projectId: TenantId;
     data: Buffer;
@@ -243,13 +244,20 @@ export class TieredBlobStore {
      * `data`, i.e. hash exactly what is stored.
      */
     hashSource?: Buffer | string;
+    /**
+     * Media type stored alongside the s3-tier object. Defaults to the
+     * historical `application/gzip` for callers that don't compress with
+     * anything else; a caller writing zstd (or another codec) must pass the
+     * matching media type so durable storage isn't mislabeled.
+     */
+    mediaType?: string;
   }): Promise<BlobRef> {
     const hash = contentHash(hashSource ?? data);
     if (data.length > this.s3ThresholdBytes) {
       const uri = await this.mintUri({ projectId, hash });
       // Idempotent: identical content mints the same URI, so a racing or retried
       // PUT overwrites the same object instead of duplicating it.
-      await this.objectStoreFor(projectId).put(uri, data, "application/gzip");
+      await this.objectStoreFor(projectId).put(uri, data, mediaType);
       return { tier: "s3", projectId, hash };
     }
     // GQ2 blobs are refcounted (holder-set eager reclaim), so the TTL is only
