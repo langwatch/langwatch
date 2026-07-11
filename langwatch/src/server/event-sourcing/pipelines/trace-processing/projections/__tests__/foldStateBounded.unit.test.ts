@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   applySpanToSummary,
-  MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -70,31 +69,31 @@ describe("trace summary fold state size", () => {
     });
   });
 
-  describe("given a trace that exceeds the processing cap", () => {
-    describe("when another span is received past MAX_PROCESSED_SPANS", () => {
-      it("keeps counting but stops deriving", () => {
-        const projection = new TraceSummaryFoldProjection({ store: {} as any });
-        const atCap: TraceSummaryData = {
-          ...createInitState(),
-          spanCount: MAX_PROCESSED_SPANS,
-          models: ["gpt-5-mini"],
-          totalCost: 1.23,
-        };
-        // The span body is intentionally minimal: past the cap the handler
-        // short-circuits before normalizing it.
-        const event = {
-          tenantId: "tenant-1",
-          data: { span: { name: "should-not-be-processed" } },
-        } as any;
+  describe("given a very large trace", () => {
+    // Derivation used to STOP at 512 spans to bound the fold's cost. That cap
+    // silently froze cost/tokens partway through every Claude Code session (a
+    // real one measured 796 spans), so it is gone. What made the cap safe to
+    // remove is THIS invariant, which the rest of this file exists to protect:
+    // the fold's state does not grow with the number of spans. Deriving span
+    // 10,000 costs the same state as deriving span 10 — so an unbounded trace
+    // cannot grow the state unboundedly, which is what the cap was really
+    // guarding. (The runaway-trace guard that actually mattered — not
+    // re-running every monitor per span — now lives in MAX_EVAL_DISPATCH_SPANS.)
+    it("keeps the fold state bounded no matter how many spans it has folded", () => {
+      const small: TraceSummaryData = {
+        ...createInitState(),
+        spanCount: 10,
+      };
+      const huge: TraceSummaryData = {
+        ...createInitState(),
+        spanCount: 100_000,
+      };
 
-        const result = projection.handleTraceSpanReceived(event, atCap);
+      const growth =
+        JSON.stringify(huge).length - JSON.stringify(small).length;
 
-        // Still counted, so the true magnitude stays visible.
-        expect(result.spanCount).toBe(MAX_PROCESSED_SPANS + 1);
-        // Derived fields frozen — the span was not folded in.
-        expect(result.models).toEqual(["gpt-5-mini"]);
-        expect(result.totalCost).toBe(1.23);
-      });
+      // Only the span counter itself gets wider; nothing scales with span count.
+      expect(growth).toBeLessThan(50);
     });
   });
 });

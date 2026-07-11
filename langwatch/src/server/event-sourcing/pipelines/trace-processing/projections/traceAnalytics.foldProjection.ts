@@ -49,7 +49,6 @@ import {
 } from "./services";
 import { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.service";
 import {
-  MAX_PROCESSED_SPANS,
   mergeModelsMostRecentFirst,
   RESERVED_CACHE_CREATION_TOKENS,
   RESERVED_CACHE_READ_TOKENS,
@@ -217,8 +216,7 @@ export const TRACE_ANALYTICS_ATTR_KEYS = {
 export interface TraceAnalyticsData {
   // Keys
   traceId: string;
-  /** Count of spans seen; used for the MAX_PROCESSED_SPANS cap + the
-   *  persistable-signal check in the store. */
+  /** Count of spans seen; used for the persistable-signal check in the store. */
   spanCount: number;
 
   // Hoisted dims (the projection function reads these straight off state)
@@ -652,13 +650,6 @@ export class TraceAnalyticsFoldProjection
     event: SpanReceivedEvent,
     state: TraceAnalyticsData,
   ): TraceAnalyticsData {
-    // Past the processing cap, keep counting but skip the expensive
-    // normalization + derivation. Mirrors the trace-summary fold so the cap
-    // boundary triggers in both folds at the same span.
-    if (state.spanCount >= MAX_PROCESSED_SPANS) {
-      return { ...state, spanCount: state.spanCount + 1 };
-    }
-
     const normalizedSpan =
       spanNormalizationPipelineService.normalizeSpanReceived(
         event.tenantId,

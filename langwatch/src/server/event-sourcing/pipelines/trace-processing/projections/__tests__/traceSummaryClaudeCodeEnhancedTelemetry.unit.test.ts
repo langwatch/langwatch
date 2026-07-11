@@ -38,7 +38,6 @@ import type { LogRecordReceivedEvent } from "../../schemas/events";
 import type { NormalizedSpan } from "../../schemas/spans";
 import {
   applySpanToSummary,
-  MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -395,53 +394,48 @@ describe("TraceSummaryFoldProjection — Claude Code enhanced-telemetry mix", ()
     });
   });
 
-  describe("given a Claude session trace larger than the processing cap", () => {
-    describe("when an llm_request span arrives past MAX_PROCESSED_SPANS", () => {
-      it("keeps counting spans but freezes cost/tokens (documented under-count)", () => {
-        // A long Claude session (native tracer groups the whole session, and
-        // sub-agents currently share its traceId) can exceed 512 spans. Past the
-        // cap the fold stops deriving to bound runaway-trace cost, so cost/tokens
-        // FREEZE at the first MAX_PROCESSED_SPANS spans — the session under-counts.
-        // This is intentional (see MAX_PROCESSED_SPANS docs); the real fix is C6,
-        // splitting sub-agents into their own traces via native parent_of /
-        // agent_id linking so each trace stays well under the cap.
-        const projection = makeProjection();
-        const sessionAtCap: TraceSummaryData = {
+  describe("given a Claude session trace with thousands of spans", () => {
+    describe("when an llm_request span arrives far past the old 512-span cap", () => {
+      it("keeps deriving, so a long session's usage is not under-counted", () => {
+        // Claude's native tracer groups a whole SESSION under one traceId — a
+        // real session measured against this branch had 796 spans, 34 model
+        // calls and 192 tool runs, so an ordinary session sails past 512.
+        //
+        // Derivation used to STOP at that cap, which meant a Claude session's
+        // cost and tokens silently froze partway through, and the coding-agent
+        // summary never saw the FINAL llm_request — which is exactly where
+        // `stop_reason` lives, so a truncated reply could never be detected. The
+        // cap corrupted the traces it was least equipped to describe.
+        //
+        // The runaway-trace guard the cap was really for now lives where it
+        // belongs: MAX_EVAL_DISPATCH_SPANS, which drops the eval WORK, never the
+        // DATA.
+        const longSession: TraceSummaryData = {
           ...createInitState(),
           traceId: REAL_TRACE_ID,
-          spanCount: MAX_PROCESSED_SPANS,
+          spanCount: 2_000,
           models: ["claude-opus-4-8"],
-          totalCost: 4.2,
           totalPromptTokenCount: 1_000_000,
           totalCompletionTokenCount: 50_000,
         };
 
-        // A genuine llm_request span with real usage — if it were folded it
-        // would add cost + tokens. Past the cap the handler short-circuits
-        // before normalizing it, so the span body is intentionally minimal.
-        const overflowSpanEvent = {
-          tenantId: createTenantId("tenant-1"),
-          data: {
-            span: { name: "claude_code.llm_request" },
-            resource: {},
-            instrumentationScope: {
-              name: "com.anthropic.claude_code.tracing",
-            },
-          },
-        } as any;
+        // The 2001st span of the session — a real model call with real usage.
+        const after = applySpanToSummary({
+          state: longSession,
+          span: realLlmSpan({
+            spanId: "llm-2001",
+            startTimeUnixMs: 900_000,
+            endTimeUnixMs: 901_000,
+            inputTokens: 900,
+            outputTokens: 100,
+            cost: 0.05,
+          }),
+        });
 
-        const after = projection.handleTraceSpanReceived(
-          overflowSpanEvent,
-          sessionAtCap,
-        );
-
-        // True magnitude stays visible.
-        expect(after.spanCount).toBe(MAX_PROCESSED_SPANS + 1);
-        // Cost + tokens frozen — the overflow span's usage is NOT counted.
-        expect(after.totalCost).toBe(4.2);
-        expect(after.totalPromptTokenCount).toBe(1_000_000);
-        expect(after.totalCompletionTokenCount).toBe(50_000);
-        expect(after.models).toEqual(["claude-opus-4-8"]);
+        // The late span's usage is COUNTED — no freeze.
+        expect(after.totalPromptTokenCount).toBe(1_000_900);
+        expect(after.totalCompletionTokenCount).toBe(50_100);
+        expect(after.totalCost).toBeCloseTo(0.05);
       });
     });
   });
