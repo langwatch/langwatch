@@ -34,6 +34,7 @@ type UpParams struct {
 	LwDir        string
 	Branch       string
 	ExplicitSlug string // from LANGWATCH_SLUG; wins over the derived/cached slug
+	Baseline     bool   // this stack is the shared default others fall back to
 }
 
 // resolveSlug applies the precedence: explicit > cache > derived (then cached).
@@ -58,7 +59,7 @@ func (o *Orchestrator) resolveSlug(p UpParams) (string, error) {
 // manageCH is set it also ensures the shared ClickHouse server + this stack's
 // database before the overlay is written, so CLICKHOUSE_URL is in the overlay and
 // the printed stack from the very first line.
-func (o *Orchestrator) provision(ctx context.Context, p UpParams, manageCH bool) (domain.Stack, func(), error) {
+func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptions, manageCH bool) (domain.Stack, func(), error) {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return domain.Stack{}, nil, err
@@ -73,19 +74,27 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, manageCH bool)
 	st := domain.Stack{
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
 		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
-		APIPort: ports[3], WorkerMetricsPort: ports[4], LocalAPIKey: o.cfg.LocalAPIKey,
+		APIPort: ports[3], WorkerMetricsPort: ports[4], LocalAPIKey: o.cfg.LocalAPIKey, Baseline: p.Baseline,
 	}
 	for i, r := range domain.PerWorktreeServices {
-		st.Services = append(st.Services, domain.Service{
+		svc := domain.Service{
 			Name: r.Name, Role: r.Role, Port: ports[i],
 			Hostname: o.cfg.Naming.Hostname(r.Name, slug),
 			URL:      o.cfg.Naming.URL(r.Name, slug, scheme, pport),
-		})
-	}
-
-	for _, s := range st.Services {
-		if err := o.proxy.Register(s.Name, slug, s.Port); err != nil {
-			o.log.Warn("alias registration failed", zap.String("host", s.Hostname), zap.Error(err))
+		}
+		// A service this worktree opts out of (gateway/nlp) still gets a hostname —
+		// it resolves to the shared baseline stack's copy, so every URL is always
+		// defined. The app is always local.
+		if !runsLocally(r.Name, opts) {
+			if bp, ok := o.baselinePort(r.Name); ok {
+				svc.Port, svc.Fallback = bp, true
+			}
+		}
+		st.Services = append(st.Services, svc)
+		if svc.Port != 0 {
+			if err := o.proxy.Register(svc.Name, slug, svc.Port); err != nil {
+				o.log.Warn("alias registration failed", zap.String("host", svc.Hostname), zap.Error(err))
+			}
 		}
 	}
 	if manageCH {
@@ -136,7 +145,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		return fmt.Errorf("portless proxy is not running — run `make portless-setup` once to route by hostname")
 	}
 	o.ensureDaemon(p.WorktreeDir)
-	st, cleanup, err := o.provision(ctx, p, true)
+	st, cleanup, err := o.provision(ctx, p, opts, true)
 	if err != nil {
 		return err
 	}
@@ -168,7 +177,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 // dashboard -> routing chain is exercised without Postgres/ClickHouse/Redis.
 func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports []int)) error {
 	o.ensureDaemon(p.WorktreeDir)
-	st, cleanup, err := o.provision(ctx, p, false)
+	st, cleanup, err := o.provision(ctx, p, PlanOptions{}, false)
 	if err != nil {
 		return err
 	}
@@ -245,10 +254,32 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams) error {
 	return o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", nil)
 }
 
+// runsLocally reports whether this worktree runs the service itself (vs falling
+// back to the baseline). Only gateway and nlp are opt-out; app is always local.
+func runsLocally(name string, opts PlanOptions) bool {
+	switch name {
+	case "gateway":
+		return !opts.SkipGateway
+	case "nlp":
+		return !opts.SkipNLP
+	default:
+		return true
+	}
+}
+
+// baselinePort routes an opted-out service's hostname to a live baseline stack.
+func (o *Orchestrator) baselinePort(service string) (int, bool) {
+	return domain.BaselinePort(o.store.Stacks(), service, o.sys.ProcessAlive)
+}
+
 func (o *Orchestrator) printStack(st domain.Stack) {
 	fmt.Printf("\n  thuishaven: stack %q  (redis db %d)\n", st.Slug, st.RedisDB)
 	for _, s := range st.Services {
-		fmt.Printf("    %-10s %s  ->  127.0.0.1:%d\n", s.Name, s.URL, s.Port)
+		target := fmt.Sprintf("127.0.0.1:%d", s.Port)
+		if s.Fallback {
+			target = fmt.Sprintf("baseline :%d", s.Port)
+		}
+		fmt.Printf("    %-10s %s  ->  %s\n", s.Name, s.URL, target)
 		// The API shares app's origin — surface it right under app so the single
 		// URL is obvious (no separate api.<slug> hostname to reach for).
 		if s.Name == "app" && st.APIPort != 0 {

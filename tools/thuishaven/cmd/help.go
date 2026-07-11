@@ -52,7 +52,10 @@ ENVIRONMENT
     LANGWATCH_LOCAL_TLD=test     Use a different TLD (default: localhost).
     LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
     LANGWATCH_SKIP_NLP=1         Do not start the NLP engine.
-    LANGWATCH_SKIP_AIGATEWAY=1   Do not start the AI Gateway.
+    LANGWATCH_SKIP_AIGATEWAY=1   Do not start the AI Gateway (its hostname then
+                                 resolves to the baseline stack, if one is up).
+    HAVEN_BASELINE=1             Mark this stack as the shared default others fall
+                                 back to for services they don't run themselves.
     START_WORKERS=false          Do not start background workers.
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
