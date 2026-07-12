@@ -608,15 +608,28 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	if err := os.MkdirAll(workerHome, 0o700); err != nil {
 		return nil, fmt.Errorf("mkdir worker home: %w", err)
 	}
-	// Register the home undo right after MkdirAll so a failure inside
-	// setupWorkerHome (which writes config.json with the project API key) still
-	// wipes the partial home.
+	// Register the home undo right after MkdirAll so a failure inside Provision
+	// (which writes config.json with the project API key) still wipes the partial
+	// home.
 	defer func() {
 		if !success {
 			_ = os.RemoveAll(workerHome)
 		}
 	}()
-	if err := setupWorkerHome(workerHome, p.workspaceRoot, creds, uid, p.otelPluginVersion, p.agentsTemplate, p.runner); err != nil {
+	// The coding agent (adapters/opencode) provisions its own home, spawns its own
+	// process, and is driven through the endpoint below — the pool orchestrates
+	// but never speaks opencode's wire protocol. Constructed here so Provision and
+	// Spawn share the one instance the Worker later keeps for the drive methods.
+	agent := opencode.NewAgent(p.readinessTimeout)
+	if err := agent.Provision(opencode.ProvisionInput{
+		Home:              workerHome,
+		WorkspaceRoot:     p.workspaceRoot,
+		Creds:             creds,
+		UID:               uid,
+		OTelPluginVersion: p.otelPluginVersion,
+		AgentsTemplate:    p.agentsTemplate,
+		Runner:            p.runner,
+	}); err != nil {
 		return nil, err
 	}
 
@@ -677,7 +690,6 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		InternalPort: internalPort,
 		BearerToken:  bearerToken,
 	}
-	agent := opencode.NewAgent(p.readinessTimeout)
 
 	// authProxy binds the pool-lifetime context so its serve goroutine logs and
 	// lifetime follow the pool, not a single request.
@@ -696,7 +708,17 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	// alive across turns and only dies on idle/shutdown. Binding to baseCtx
 	// (rather than context.Background, as the flat manager did) means a pool
 	// Shutdown / deadline propagates to the subprocess.
-	cmd, err := spawnOpenCode(p.baseCtx, p.openCodeBinaryPath, conversationID, workerHome, uid, internalPort, creds, openCodePassword, we.ProxyPort, p.runner)
+	cmd, err := agent.Spawn(p.baseCtx, opencode.SpawnInput{
+		BinaryPath:       p.openCodeBinaryPath,
+		ConversationID:   conversationID,
+		Home:             workerHome,
+		UID:              uid,
+		Port:             internalPort,
+		Creds:            creds,
+		OpenCodePassword: openCodePassword,
+		EgressPort:       we.ProxyPort,
+		Runner:           p.runner,
+	})
 	if err != nil {
 		return nil, err
 	}

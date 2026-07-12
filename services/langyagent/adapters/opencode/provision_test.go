@@ -1,4 +1,4 @@
-package workerpool
+package opencode
 
 import (
 	"encoding/json"
@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/app/runner/localunsafe"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -121,13 +120,13 @@ func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
 		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
 
-	pwA, err := opencode.GenerateBearerToken()
+	pwA, err := GenerateBearerToken()
 	if err != nil {
-		t.Fatalf("opencode.GenerateBearerToken: %v", err)
+		t.Fatalf("GenerateBearerToken: %v", err)
 	}
-	pwB, err := opencode.GenerateBearerToken()
+	pwB, err := GenerateBearerToken()
 	if err != nil {
-		t.Fatalf("opencode.GenerateBearerToken: %v", err)
+		t.Fatalf("GenerateBearerToken: %v", err)
 	}
 
 	envA := buildWorkerEnv("conv-a", "/workspace/sessions/conv-a", creds, pwA, 19001)
@@ -231,13 +230,13 @@ func valueOfEnv(env []string, key string) string {
 	return ""
 }
 
-func TestOpenCodeSkillsDir_UnderOpenCodeConfig(t *testing.T) {
+func TestSkillsDir_UnderOpenCodeConfig(t *testing.T) {
 	// opencode only discovers global skills under $HOME/.config/opencode/skills.
 	home := "/home/worker-123"
-	got := openCodeSkillsDir(home)
+	got := skillsDir(home)
 	want := filepath.Join(home, ".config", "opencode", "skills")
 	if got != want {
-		t.Fatalf("openCodeSkillsDir = %q, want %q", got, want)
+		t.Fatalf("skillsDir = %q, want %q", got, want)
 	}
 }
 
@@ -250,7 +249,7 @@ func TestOpenCodeSkillsDir_UnderOpenCodeConfig(t *testing.T) {
 //
 // The skills symlink is asserted alongside it: with MCP gone, skills + CLI ARE
 // the capability surface, so a silently-missing symlink is a total loss of it.
-func TestSetupWorkerHome_WritesCLIOnlyConfig(t *testing.T) {
+func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 	home := t.TempDir()
 	workspace := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
@@ -266,8 +265,17 @@ func TestSetupWorkerHome_WritesCLIOnlyConfig(t *testing.T) {
 
 	// The localUNSAFE runner no-ops the chowns: the test process is unprivileged, so
 	// real chowns would EPERM. The config.json content under test is unaffected.
-	if err := setupWorkerHome(home, workspace, creds, 0, "1.0.0", "# AGENTS\n${LANGWATCH_ENDPOINT}\n", localunsafe.Runner{}); err != nil {
-		t.Fatalf("setupWorkerHome: %v", err)
+	err := NewAgent(0).Provision(ProvisionInput{
+		Home:              home,
+		WorkspaceRoot:     workspace,
+		Creds:             creds,
+		UID:               0,
+		OTelPluginVersion: "1.0.0",
+		AgentsTemplate:    "# AGENTS\n${LANGWATCH_ENDPOINT}\n",
+		Runner:            localunsafe.Runner{},
+	})
+	if err != nil {
+		t.Fatalf("Provision: %v", err)
 	}
 
 	raw, err := os.ReadFile(filepath.Join(home, ".config", "opencode", "config.json"))
@@ -292,7 +300,7 @@ func TestSetupWorkerHome_WritesCLIOnlyConfig(t *testing.T) {
 		t.Errorf("config.json contains the LangWatch API key; it belongs in the worker process env, not the opencode config")
 	}
 
-	target, err := os.Readlink(openCodeSkillsDir(home))
+	target, err := os.Readlink(skillsDir(home))
 	if err != nil {
 		t.Fatalf("skills symlink missing — with MCP gone, skills + CLI are the entire capability surface: %v", err)
 	}
@@ -306,7 +314,7 @@ func TestSkillsSymlink_PointsAtSharedTemplateDir(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(home, ".config", "opencode"), 0o755); err != nil {
 		t.Fatalf("mkdir config: %v", err)
 	}
-	link := openCodeSkillsDir(home)
+	link := skillsDir(home)
 	if err := os.Symlink("/workspace/skills", link); err != nil {
 		t.Fatalf("symlink: %v", err)
 	}
