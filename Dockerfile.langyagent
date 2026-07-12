@@ -247,18 +247,18 @@ RUN langwatch --version
 # opencode config requests the exact same version opencode loads.
 ENV OPENCODE_OTEL_PLUGIN_VERSION=${OPENCODE_OTEL_PLUGIN_VERSION}
 
-# Drop the Go binary in place. The entrypoint dispatches the mono-binary
-# at `service langyagent` so /langyagent is the runtime command name.
+# Drop the Go mono-binary in place; it is the image ENTRYPOINT (below), invoked
+# with the `langyagent` subcommand so it runs the manager as PID 1 DIRECTLY — no
+# shell wrapper. PID 1 is required for the orphan reaper: opencode's children
+# (gh/git/npm) reparent to the manager on a worker kill, and only PID 1 may reap
+# them.
 COPY --from=builder /out/langyagent /usr/local/bin/langyagent
 
-COPY services/langyagent/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# NOTE: AGENTS.md + the skills tree are no longer seeded into /workspace from
-# /opt at pod startup — they are EMBEDDED in the Go binary
-# (services/langyagent/internal/assets, //go:embed) and the manager materializes
-# the skills onto disk itself at boot. The entrypoint no longer does any seeding;
-# it just execs the manager (PID 1, for the orphan reaper).
+# NOTE: there is nothing to seed at startup. AGENTS.md + the skills tree are
+# EMBEDDED in the Go binary (services/langyagent/internal/assets, //go:embed) and
+# the manager materializes the skills onto disk itself at boot. This replaced both
+# the old /opt-into-/workspace seeding AND the exec-only entrypoint.sh that used to
+# wrap the binary — the exec form of ENTRYPOINT makes the binary PID 1 on its own.
 
 # The manager process runs as root so it can chown per-session directories
 # to per-worker UIDs and exec into them with syscall.Credential. See the
@@ -277,5 +277,5 @@ RUN userdel -r ubuntu 2>/dev/null || true && \
 ENV HOME=/root
 WORKDIR /workspace
 EXPOSE 8080
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/usr/local/bin/langyagent", "langyagent"]
+ENTRYPOINT ["/usr/local/bin/langyagent"]
+CMD ["langyagent"]
