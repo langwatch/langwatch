@@ -21,13 +21,6 @@ const (
 	// wall against any pod that can route to it.
 	ErrUnauthorized = herr.Code("unauthorized")
 
-	// ErrBadRequest is the catch-all for a malformed /chat body (unreadable,
-	// invalid JSON, missing required fields).
-	ErrBadRequest = herr.Code("bad_request")
-
-	// ErrPayloadTooLarge signals the /chat body exceeded MaxRequestBodyBytes.
-	ErrPayloadTooLarge = herr.Code("payload_too_large")
-
 	// ErrInvalidConversationID signals a conversationId that is not a safe
 	// path segment (would escape SESSIONS_ROOT).
 	ErrInvalidConversationID = herr.Code("invalid_conversation_id")
@@ -90,8 +83,6 @@ const (
 // once when the router is built (mirrors aigateway's registerErrorStatuses).
 func RegisterStatuses() {
 	herr.RegisterStatus(ErrUnauthorized, http.StatusUnauthorized)
-	herr.RegisterStatus(ErrBadRequest, http.StatusBadRequest)
-	herr.RegisterStatus(ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(ErrInvalidConversationID, http.StatusBadRequest)
 	herr.RegisterStatus(ErrConversationBusy, http.StatusConflict)
 	herr.RegisterStatus(ErrCredentialsRequired, http.StatusPreconditionRequired)

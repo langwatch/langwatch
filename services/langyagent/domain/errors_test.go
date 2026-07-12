@@ -16,8 +16,6 @@ func TestRegisterStatuses_MapsSurfaceCodes(t *testing.T) {
 		want int
 	}{
 		{ErrUnauthorized, http.StatusUnauthorized},
-		{ErrBadRequest, http.StatusBadRequest},
-		{ErrPayloadTooLarge, http.StatusRequestEntityTooLarge},
 		{ErrInvalidConversationID, http.StatusBadRequest},
 		{ErrConversationBusy, http.StatusConflict},
 		{ErrMaxWorkers, http.StatusServiceUnavailable},

@@ -10,6 +10,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
+	httprpc "github.com/langwatch/langwatch/pkg/rpc"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -80,7 +81,7 @@ func chatHandler(application *app.App, maxBodyBytes int64, intent string) http.H
 
 		// decode also struct-validates (required conversationId, prompt, and the
 		// four mandatory credential fields), returning the field-naming herr.
-		req, err := decode[chatRequest](w, r, maxBodyBytes)
+		req, err := httprpc.Decode[chatRequest](w, r, maxBodyBytes)
 		if err != nil {
 			herr.WriteHTTP(w, err)
 			return
