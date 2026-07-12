@@ -31,9 +31,10 @@ type Config struct {
 type PlanOptions struct {
 	ShouldGoWatch      bool // air hot-reload for the Go services instead of `go run`
 	ShouldStartWorkers bool
-	ShouldSkipNLP      bool
-	ShouldSkipGateway  bool
-	ShouldSeed         bool
+	ShouldSkipNLP        bool
+	ShouldSkipGateway    bool
+	ShouldSkipLangyAgent bool
+	ShouldSeed           bool
 	IsStub             bool // verification: echo servers instead of the real apps
 	RepoRoot           string
 }

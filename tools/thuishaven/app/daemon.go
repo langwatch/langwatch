@@ -35,7 +35,15 @@ func (o *Orchestrator) ensureDaemon(worktreeDir string) {
 
 func (o *Orchestrator) daemonAlive() bool {
 	info, ok := o.store.Daemon()
-	return ok && o.sys.ProcessAlive(info.PID)
+	if !ok || !o.sys.ProcessAlive(info.PID) {
+		return false
+	}
+	// PID liveness alone is unreliable: when the daemon dies its PID is recycled
+	// by the OS to an unrelated process, which would leave `ensureDaemon`
+	// believing a daemon is up while the dashboard route points at a closed port
+	// (a 502). Confirm the daemon's own HTTP port is actually accepting
+	// connections before trusting the record.
+	return o.sys.PortInUse(info.Port)
 }
 
 // RunDaemon is the singleton server + monitor. It registers the shared surfaces
@@ -59,10 +67,12 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 	defer o.store.ClearDaemon()
 
 	p := o.cfg.Naming.Project
-	_ = o.proxy.Register(p, "", port)           // langwatch.localhost (dashboard)
-	_ = o.proxy.Register("telemetry", "", port) // telemetry.langwatch.localhost (fan-out)
+	_ = o.proxy.Register(domain.HubService, "", port) // hub.langwatch.localhost (dashboard)
+	_ = o.proxy.Register(p, "", port)                 // langwatch.localhost (legacy alias)
+	_ = o.proxy.Register("telemetry", "", port)       // telemetry.langwatch.localhost (fan-out)
 	o.refreshObservability(ctx)
 	defer func() {
+		o.proxy.Remove(domain.HubService, "")
 		o.proxy.Remove(p, "")
 		o.proxy.Remove("telemetry", "")
 	}()
@@ -70,7 +80,7 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 	scheme, pport := o.proxy.Endpoint()
 	o.log.Info("haven daemon up",
 		zap.Int("port", port),
-		zap.String("dashboard", o.cfg.Naming.URL(p, "", scheme, pport)))
+		zap.String("dashboard", o.cfg.Naming.URL(domain.HubService, "", scheme, pport)))
 	go o.monitorLoop(ctx)
 	return dash.Serve(ctx, port)
 }

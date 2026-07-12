@@ -18,6 +18,11 @@ type Naming struct {
 	TLD     string
 }
 
+// HubService is the routed name for the machine-wide dashboard ("home port"):
+// hub.langwatch.localhost. The bare langwatch.localhost stays registered as a
+// legacy alias.
+const HubService = "hub"
+
 // DefaultNaming is the standard scheme: <service>.<slug>.langwatch.localhost.
 func DefaultNaming(tld string) Naming {
 	if tld == "" {

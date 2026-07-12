@@ -37,8 +37,9 @@ type UpParams struct {
 	WorktreeDir  string
 	LwDir        string
 	Branch       string
-	ExplicitSlug string // from LANGWATCH_SLUG; wins over the derived/cached slug
-	IsBaseline   bool   // this stack is the shared default others fall back to
+	ExplicitSlug     string // from LANGWATCH_SLUG; wins over the derived/cached slug
+	IsBaseline       bool   // this stack is the shared default others fall back to
+	IsLinkedWorktree bool   // a `git worktree add` checkout, not the primary clone
 }
 
 // resolveSlug applies the precedence: explicit > cache > derived (then cached).
@@ -48,6 +49,17 @@ func (o *Orchestrator) resolveSlug(p UpParams) (string, error) {
 			return "", domain.ErrInvalidSlug(p.ExplicitSlug)
 		}
 		return p.ExplicitSlug, nil
+	}
+	// The primary checkout's directory is the repo name itself ("langwatch"),
+	// which would collide with the project label to produce the doubled
+	// app.langwatch.langwatch.localhost. Key its slug on the branch instead — and
+	// deliberately skip the path cache, since the branch (and so the slug) changes
+	// under the same directory. Linked worktrees keep their stable per-directory
+	// slug.
+	if !p.IsLinkedWorktree {
+		if s := domain.SlugFromBranch(p.Branch); s != "" {
+			return s, nil
+		}
 	}
 	if s, ok := o.store.ReadSlugCache(p.WorktreeDir); ok && domain.ValidSlug(s) {
 		return s, nil
@@ -68,17 +80,19 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
-	ports, err := o.sys.FreePorts(5)
+	nSvc := len(domain.PerWorktreeServices)
+	ports, err := o.sys.FreePorts(nSvc + 2)
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
 	scheme, pport := o.proxy.Endpoint()
-	// FreePorts(5): [0..2] the three routed services (app/gateway/nlp), [3] the
-	// API backend that lives behind app's /api, [4] the worker metrics endpoint.
+	// ports[0..nSvc-1] back the routed services (app/gateway/nlp/langyagent, in
+	// PerWorktreeServices order); ports[nSvc] is the API backend behind app's /api,
+	// ports[nSvc+1] the worker metrics endpoint.
 	st := domain.Stack{
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
 		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
-		APIPort: ports[3], WorkerMetricsPort: ports[4], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
+		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
@@ -148,8 +162,8 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 
 // Up is the launcher hook `pnpm dev` runs in portless mode.
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
-	if !o.proxy.Running() {
-		return fmt.Errorf("portless proxy is not running — run `make portless-setup` once to route by hostname")
+	if err := o.proxy.EnsureReady(); err != nil {
+		return fmt.Errorf("could not start the portless proxy automatically (%w) — run `make portless-setup` once to bootstrap it by hand", err)
 	}
 	o.ensureDaemon(p.WorktreeDir)
 	st, cleanup, err := o.provision(ctx, p, opts, true)
@@ -289,8 +303,14 @@ func (o *Orchestrator) ensurePostgres(ctx context.Context, st *domain.Stack) {
 	// No portless route: unlike ClickHouse (HTTP), Postgres speaks its own wire
 	// protocol, so an https://postgres.<slug>... URL through the HTTP proxy would
 	// just 502 — confirmed live (curl returns 502, portless can't speak Postgres
-	// wire protocol). The app already connects straight to loopback via
-	// DATABASE_URL (see OverlayEnv); `haven postgres url` prints the same.
+	// wire protocol). But the hostname still resolves to loopback natively, so we
+	// list it as a real connection target on the shared port (the app connects the
+	// same way via DATABASE_URL; `haven postgres url` prints it).
+	st.Services = append(st.Services, domain.Service{
+		Name: domain.PostgresService, Role: "Postgres (this stack's DB)", Port: port,
+		Hostname: o.cfg.Naming.Hostname(domain.PostgresService, st.Slug),
+		URL:      fmt.Sprintf("%s:%d", o.cfg.Naming.Hostname(domain.PostgresService, st.Slug), port),
+	})
 }
 
 // ensureRedis starts (or reuses) the shared brew-managed Redis and records its
@@ -308,6 +328,14 @@ func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
 		return
 	}
 	st.RedisPort = port
+	// Like Postgres, Redis speaks a raw TCP protocol portless can't proxy, but the
+	// hostname resolves to loopback, so list it as a real connection target on the
+	// shared port. Worktrees are partitioned by RedisDB index, not by server.
+	st.Services = append(st.Services, domain.Service{
+		Name: domain.RedisService, Role: fmt.Sprintf("Redis (this stack's DB %d)", st.RedisDB), Port: port,
+		Hostname: o.cfg.Naming.Hostname(domain.RedisService, st.Slug),
+		URL:      fmt.Sprintf("%s:%d", o.cfg.Naming.Hostname(domain.RedisService, st.Slug), port),
+	})
 }
 
 // Seed reseeds the current stack's database — the "give me a fresh DB" affordance.
@@ -323,6 +351,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return !opts.ShouldSkipGateway
 	case "nlp":
 		return !opts.ShouldSkipNLP
+	case "langyagent":
+		return !opts.ShouldSkipLangyAgent
 	default:
 		return true
 	}
@@ -348,5 +378,5 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 		}
 	}
 	scheme, port := o.proxy.Endpoint()
-	fmt.Printf("    %-10s %s\n\n", "dashboard", o.cfg.Naming.URL(o.cfg.Naming.Project, "", scheme, port))
+	fmt.Printf("    %-10s %s\n\n", "hub", o.cfg.Naming.URL(domain.HubService, "", scheme, port))
 }

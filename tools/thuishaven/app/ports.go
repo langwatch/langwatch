@@ -16,6 +16,11 @@ type Proxy interface {
 	Register(service, slug string, port int) error
 	Remove(service, slug string)
 	Running() bool
+	// EnsureReady boots the proxy if it is not already running and trusts its CA
+	// on first run, so `haven up` self-bootstraps without a prior
+	// `make portless-setup`. Idempotent; the CA trust is guarded so it does not
+	// re-prompt on every launch.
+	EnsureReady() error
 	// Endpoint reports how the proxy is reachable (scheme, port) so URLs are
 	// correct on the default 443 or an unprivileged port.
 	Endpoint() (scheme string, port int)

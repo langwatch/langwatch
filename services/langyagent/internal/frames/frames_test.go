@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/langwatch/langwatch/services/langyagent/frameauth"
+	"github.com/langwatch/langwatch/services/langyagent/internal/frameauth"
 )
 
 // The frame JSON shapes must match the TS langyRelayFrame zod union exactly (the

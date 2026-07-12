@@ -2,6 +2,8 @@ package app
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -55,6 +57,26 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir str
 			Name: "nlp", Dir: opts.RepoRoot, Color: palette[4],
 			Shell: goServiceShell(opts.RepoRoot, "nlpgo", opts.ShouldGoWatch),
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("nlp"))),
+		})
+	}
+	if !opts.ShouldSkipLangyAgent {
+		// langyagent (the cmd/service mono-binary) takes its listen port from PORT,
+		// not SERVER_ADDR (see services/langyagent/config.go) — PORT always wins. Its
+		// sessions/workspace roots default to the in-container /workspace, which is
+		// read-only on a dev host; point them at writable per-slug dirs under haven's
+		// home and create them so the manager boots (session spawn still needs an
+		// `opencode` binary on PATH, but the service itself comes up).
+		laRoot := filepath.Join(o.cfg.Home, "langyagent", st.Slug)
+		_ = os.MkdirAll(filepath.Join(laRoot, "sessions"), 0o755)
+		_ = os.MkdirAll(filepath.Join(laRoot, "workspace"), 0o755)
+		out = append(out, Child{
+			Name: "langyagent", Dir: opts.RepoRoot, Color: palette[6],
+			Shell: goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
+			Env: append(append([]string{}, base...),
+				fmt.Sprintf("PORT=%d", port("langyagent")),
+				"SESSIONS_ROOT="+filepath.Join(laRoot, "sessions"),
+				"LANGY_WORKSPACE_ROOT="+filepath.Join(laRoot, "workspace"),
+			),
 		})
 	}
 	if opts.ShouldStartWorkers {
