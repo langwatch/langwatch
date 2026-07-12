@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/app/runner/localunsafe"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -129,8 +130,8 @@ func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
 		t.Fatalf("GenerateBearerToken: %v", err)
 	}
 
-	envA := buildWorkerEnv("conv-a", "/workspace/sessions/conv-a", creds, pwA, 19001)
-	envB := buildWorkerEnv("conv-b", "/workspace/sessions/conv-b", creds, pwB, 19002)
+	envA := buildWorkerEnv("conv-a", "/workspace/sessions/conv-a", creds, pwA, 19001, nil)
+	envB := buildWorkerEnv("conv-b", "/workspace/sessions/conv-b", creds, pwB, 19002, nil)
 
 	if got := valueOfEnv(envA, "OPENCODE_SERVER_PASSWORD"); got != pwA {
 		t.Fatalf("worker A env OPENCODE_SERVER_PASSWORD = %q, want %q", got, pwA)
@@ -143,17 +144,17 @@ func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
 	}
 }
 
-// buildWorkerEnv must inject the per-worker credentials + OTel wiring and, when
-// present, the GitHub token; and must NOT inject GH_TOKEN when the credential
-// bundle carries no GitHub token.
-func TestBuildWorkerEnv_InjectsCredentialsAndConditionalGithub(t *testing.T) {
+// buildWorkerEnv must inject the per-worker credentials + OTel wiring. GitHub env
+// is NOT its job anymore — that is a Capability's Contribute() (see
+// adapters/github + TestBuildWorkerEnv_AppendsCapabilityEnv).
+func TestBuildWorkerEnv_InjectsCredentials(t *testing.T) {
 	creds := domain.Credentials{
 		LangwatchAPIKey:   "lw-key",
 		LLMVirtualKey:     "vk-secret",
 		GatewayBaseURL:    "https://gateway.internal/v1",
 		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
-	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0)
+	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0, nil)
 
 	wants := map[string]string{
 		"OPENAI_BASE_URL":        "https://gateway.internal/v1",
@@ -169,17 +170,31 @@ func TestBuildWorkerEnv_InjectsCredentialsAndConditionalGithub(t *testing.T) {
 		}
 	}
 	if valueOfEnv(env, "GH_TOKEN") != "" {
-		t.Errorf("GH_TOKEN must be absent when no GitHub token is provided")
+		t.Errorf("buildWorkerEnv must not inject GH_TOKEN itself — that is a capability's Contribute()")
 	}
+}
 
-	creds.GithubToken = "ghp_real"
-	creds.GithubLogin = "alice"
-	withGH := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0)
-	if got := valueOfEnv(withGH, "GH_TOKEN"); got != "ghp_real" {
-		t.Errorf("GH_TOKEN = %q, want ghp_real", got)
+// fakeCap is a stand-in app.Capability that contributes arbitrary env, so the
+// buildWorkerEnv test can prove it folds capabilities in without depending on any
+// concrete one (GitHub is tested in adapters/github).
+type fakeCap struct{ env []string }
+
+func (fakeCap) Name() string           { return "fake" }
+func (c fakeCap) Contribute() []string { return c.env }
+
+// buildWorkerEnv folds each capability's Contribute() into the worker env, without
+// knowing what any capability is.
+func TestBuildWorkerEnv_AppendsCapabilityEnv(t *testing.T) {
+	creds := domain.Credentials{
+		LangwatchAPIKey:   "lw-key",
+		LLMVirtualKey:     "vk",
+		GatewayBaseURL:    "https://gateway.internal/v1",
+		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
-	if got := valueOfEnv(withGH, "GITHUB_LOGIN"); got != "alice" {
-		t.Errorf("GITHUB_LOGIN = %q, want alice", got)
+	caps := []app.Capability{fakeCap{env: []string{"CAP_A=1", "CAP_B=2"}}}
+	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0, caps)
+	if valueOfEnv(env, "CAP_A") != "1" || valueOfEnv(env, "CAP_B") != "2" {
+		t.Errorf("capability env not folded into the worker env: %v", env)
 	}
 }
 
@@ -196,7 +211,7 @@ func TestBuildWorkerEnv_InjectsEgressProxy(t *testing.T) {
 		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
 
-	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 19555)
+	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 19555, nil)
 	wantProxy := "http://127.0.0.1:19555"
 	for _, key := range []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"} {
 		if got := valueOfEnv(env, key); got != wantProxy {
@@ -214,7 +229,7 @@ func TestBuildWorkerEnv_InjectsEgressProxy(t *testing.T) {
 	}
 
 	// No egress port ⇒ no proxy env at all.
-	direct := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0)
+	direct := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0, nil)
 	if got := valueOfEnv(direct, "HTTPS_PROXY"); got != "" {
 		t.Errorf("HTTPS_PROXY must be absent when no egress port is set, got %q", got)
 	}
