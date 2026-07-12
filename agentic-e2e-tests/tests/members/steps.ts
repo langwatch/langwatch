@@ -79,25 +79,16 @@ export async function whenIClickCreateInvites(page: Page) {
  * Shows when no email provider is configured after admin invite.
  */
 export async function whenICloseInviteLinkDialog(page: Page) {
-  const inviteLinkHeading = page.getByRole("heading", {
-    name: "Invite Link",
-  });
-  let isVisible = false;
-  try {
-    await expect(inviteLinkHeading).toBeVisible({ timeout: 3000 });
-    isVisible = true;
-  } catch {
-    isVisible = false;
-  }
-
-  if (isVisible) {
-    // Close the dialog
-    await page
-      .locator('[role="dialog"]')
-      .last()
-      .getByRole("button", { name: /close/i })
-      .click();
-    await expect(inviteLinkHeading).not.toBeVisible({ timeout: 3000 });
+  // The invite-link dialog appears when no email provider is configured. Match
+  // it by role+name (a single element) rather than by heading: the title
+  // renders two nested "Invite Link" headings (Dialog.Title > Heading), so a
+  // heading locator is a strict-mode multiple match that throws. Closing it is
+  // required — while open, the modal makes the underlying Invites table inert,
+  // so the "Invited" row is not visible to later assertions.
+  const dialog = page.getByRole("dialog", { name: "Invite Link" });
+  if (await dialog.isVisible().catch(() => false)) {
+    await dialog.getByRole("button", { name: /close/i }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
   }
 }
 
