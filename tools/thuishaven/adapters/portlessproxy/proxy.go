@@ -4,11 +4,13 @@
 package portlessproxy
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -38,11 +40,98 @@ func (p *Proxy) argv() []string {
 	return []string{"npx", "--yes", "portless"}
 }
 
+// Installed reports whether a real portless binary is resolvable — the first
+// three argv() branches (PORTLESS_BIN, project-local, on PATH) — as opposed to
+// the `npx --yes portless` fallback, which would re-download on every call. This
+// is the signal `haven setup` uses to decide whether to ask the user to install
+// portless first.
+func (p *Proxy) Installed() bool {
+	if os.Getenv("PORTLESS_BIN") != "" {
+		return true
+	}
+	local := filepath.Join(p.lwDir, "node_modules", ".bin", "portless")
+	if _, err := os.Stat(local); err == nil {
+		return true
+	}
+	_, err := exec.LookPath("portless")
+	return err == nil
+}
+
 func (p *Proxy) run(args ...string) error {
 	argv := append(p.argv(), args...)
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Env = append(os.Environ(), "PORTLESS_TLD="+p.naming.TLD)
 	return cmd.Run()
+}
+
+// runVerbose runs a portless subcommand with output inherited, so bootstrap
+// steps (proxy start, trust) surface progress and any keychain prompt inline.
+func (p *Proxy) runVerbose(args ...string) error {
+	argv := append(p.argv(), args...)
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Env = append(os.Environ(), "PORTLESS_TLD="+p.naming.TLD)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	return cmd.Run()
+}
+
+// EnsureReady boots the proxy and trusts its CA so `haven up` self-bootstraps.
+// Starting is idempotent (a running proxy is left alone); trust is guarded by a
+// marker in the state dir so it runs at most once per machine and never
+// re-prompts for the keychain on subsequent launches.
+func (p *Proxy) EnsureReady() error {
+	if !p.Running() {
+		// User-level `proxy start` needs no sudo and is enough to route this dev
+		// session (it prints "already running" and exits 0 if a proxy — e.g. the
+		// root launchd service — already holds the port). The persistent root
+		// service stays opt-in via `haven setup`, which needs sudo and so
+		// must not be triggered from a possibly-non-interactive `pnpm dev`.
+		if err := p.runVerbose("proxy", "start"); err != nil {
+			return fmt.Errorf("could not start the portless proxy: %w", err)
+		}
+		if !p.waitRunning(5 * time.Second) {
+			return fmt.Errorf("portless proxy did not come up in time")
+		}
+	}
+	p.ensureTrusted()
+	return nil
+}
+
+// waitRunning polls until the proxy daemon reports alive or the deadline passes.
+func (p *Proxy) waitRunning(d time.Duration) bool {
+	deadline := time.Now().Add(d)
+	for {
+		if p.Running() {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// ensureTrusted installs the portless CA into the system trust store once.
+// Best-effort: a declined keychain prompt leaves HTTPS untrusted (browser
+// warnings) but must not fail `up`. The marker is written only on success, so a
+// failed attempt retries next launch rather than being silently skipped.
+func (p *Proxy) ensureTrusted() {
+	dir := p.stateDir()
+	// portless writes `ca.trusted` once its CA is in the system store; our own
+	// `.haven-trusted` records a haven-driven trust. Either means the (possibly
+	// sudo/keychain-prompting) `trust` step is already done — skip it.
+	if fileExists(filepath.Join(dir, "ca.trusted")) || fileExists(filepath.Join(dir, ".haven-trusted")) {
+		return
+	}
+	if err := p.runVerbose("trust"); err != nil {
+		return
+	}
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, ".haven-trusted"), []byte("ok\n"), 0o644)
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // Register points a hostname at a loopback port (idempotent via --force).
@@ -77,7 +166,7 @@ func (p *Proxy) Running() bool {
 	if err != nil {
 		return false
 	}
-	return proc.Signal(sig0) == nil
+	return aliveFromSignalErr(proc.Signal(sig0))
 }
 
 // Endpoint reports how the proxy is reachable, reading portless's own state and

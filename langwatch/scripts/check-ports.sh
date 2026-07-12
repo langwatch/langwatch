@@ -49,11 +49,18 @@ else
   PORTS_TO_CHECK+=("$PORT")          ; PORT_LABELS+=("api server")
 fi
 
-# In-process mode (WORKERS_IN_PROCESS=1) runs the workers inside the app and
-# serves their metrics via the app's /metrics — no separate worker-metrics
-# listener, so don't reserve that port.
+# In-process mode runs the workers inside the app and serves their metrics via
+# the app's /metrics — no separate worker-metrics listener, so don't reserve
+# that port. Mirror start.sh / start.ts exactly: the in-process gate only
+# applies when NODE_ENV is development AND WORKERS_IN_PROCESS is true/1;
+# otherwise reserve the port whenever START_WORKERS enables workers.
+IN_PROCESS_WORKERS=false
+if [ "$NODE_ENV_VAL" = "development" ] &&
+   { [ "$WORKERS_IN_PROCESS" = "true" ] || [ "$WORKERS_IN_PROCESS" = "1" ]; }; then
+  IN_PROCESS_WORKERS=true
+fi
 if { [ "$START_WORKERS_VAL" = "true" ] || [ "$START_WORKERS_VAL" = "1" ]; } &&
-   [ "$WORKERS_IN_PROCESS" != "true" ] && [ "$WORKERS_IN_PROCESS" != "1" ]; then
+   [ "$IN_PROCESS_WORKERS" != "true" ]; then
   PORTS_TO_CHECK+=("$WORKER_METRICS_PORT") ; PORT_LABELS+=("worker metrics")
 fi
 

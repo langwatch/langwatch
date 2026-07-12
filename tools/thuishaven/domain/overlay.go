@@ -12,6 +12,12 @@ import (
 // project key, matched by exact lookup on Project.apiKey.
 const DefaultLocalAPIKey = "sk-lw-local-development-key"
 
+// DefaultLangyInternalSecret is the stable local shared secret the control plane
+// presents to the langyagent manager (and the manager requires). Fixed and
+// well-known so both sides always match locally with no .env setup — the same
+// "always the same locally" contract as DefaultLocalAPIKey.
+const DefaultLangyInternalSecret = "langy-local-development-secret"
+
 // svc looks a service up by name; a zero value is fine for the string formatting
 // below when a stack is partial.
 func (s Stack) svc(name string) Service {
@@ -30,7 +36,7 @@ func (s Stack) svc(name string) Service {
 // Stack (which already holds every URL/port) keeps this the single source of
 // truth with no file round-trip.
 func (s Stack) OverlayEnv() []string {
-	app, gw, nlp := s.svc("app"), s.svc("gateway"), s.svc("nlp")
+	app, gw, nlp, langy := s.svc("app"), s.svc("gateway"), s.svc("nlp"), s.svc("langyagent")
 	// The API is same-origin with the app: the browser (and any agent) uses one
 	// URL, app.<slug>.../api, which Vite proxies to the API backend on loopback.
 	// Server-to-server callers (Vite's /api proxy, the Go gateway's control-plane
@@ -74,6 +80,19 @@ func (s Stack) OverlayEnv() []string {
 		// as admin@haven.localhost gets a normal user, not a platform admin.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
+	// langyagent (the OpenCode manager): the control plane dials it at its loopback
+	// port with the shared internal secret both sides require. Isolation (gVisor +
+	// iptables egress control) is a production concern the local host can't provide,
+	// so haven disables it here — the "unsafe dev" mode the manager exposes for
+	// exactly this. Emitted whenever the service has a port (local or a baseline
+	// fallback).
+	if langy.Port != 0 {
+		env = append(env,
+			fmt.Sprintf("OPENCODE_AGENT_URL=http://127.0.0.1:%d", langy.Port),
+			"LANGY_INTERNAL_SECRET="+DefaultLangyInternalSecret,
+			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true",
+		)
+	}
 	// haven manages one shared ClickHouse container; this stack gets its own
 	// database on it. The app connects straight to loopback (HTTP, no proxy) at
 	// the per-slug database, so migration counts are always this worktree's own.

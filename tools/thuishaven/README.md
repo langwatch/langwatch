@@ -38,13 +38,16 @@ Shared, machine-wide (one daemon serves all worktrees):
 ## One-time setup
 
 ```bash
-make portless-setup      # installs the portless proxy (443, trusted CA) + builds haven
+make haven setup         # verifies/installs the portless proxy (443, trusted CA)
+make haven install       # optional: go install so plain `haven ...` works everywhere
 ```
 
-Then, in any worktree:
+Then, in any worktree (hostname routing is opt-in — `pnpm dev` uses the plain
+`PORT` scheme):
 
 ```bash
-pnpm dev                 # == haven up: registers hostnames, starts + supervises the stack
+pnpm dev:haven           # == haven up: registers hostnames, starts + supervises the stack
+pnpm dev:single:haven    # …with the workers hosted in-process (one Node process)
 ```
 
 Open <https://langwatch.localhost> to see every stack across your worktrees.
@@ -52,8 +55,9 @@ Open <https://langwatch.localhost> to see every stack across your worktrees.
 ## Commands
 
 ```
+haven setup      one-time bootstrap — verify/install portless, trust its CA
 haven            live TUI of all stacks (a terminal version of the dashboard)
-haven up         what `pnpm dev` runs — resolve slug, register, supervise
+haven up         what `pnpm dev:haven` runs — resolve slug, register, supervise
 haven list       every stack: slug, branch, worktree, hostnames (--json too)
 haven doctor     proxy / daemon / observability / stack health
 haven seed       reseed this stack's database

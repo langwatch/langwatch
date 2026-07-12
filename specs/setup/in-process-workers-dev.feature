@@ -10,15 +10,20 @@ Feature: In-process workers for local development
   # deployments (charts/langwatch/templates/{app,workers}) and never honours
   # the opt-in flag.
   #
-  # The topology is selected by the WORKERS_IN_PROCESS env flag, read in three
-  # places:
+  # The topology is selected by the WORKERS_IN_PROCESS env flag, read in four
+  # places (all gated on NODE_ENV=development):
   #   - scripts/start.sh        — skips the standalone `workers` concurrently
   #                               lane and lets start:app inherit the flag
   #   - scripts/check-ports.sh  — doesn't reserve the worker-metrics port
-  #                               (no separate metrics listener in this mode)
+  #                               (no separate metrics listener in this mode),
+  #                               only when NODE_ENV=development too
   #   - src/start.ts            — boots the App with the "all" role and calls
   #                               startWorkers({ shouldStartMetricsServer: false })
   #                               after the server is listening
+  #   - tools/thuishaven (haven) — the hostname-routing launcher (`pnpm dev:haven`)
+  #                               drops its separate `workers` child and passes
+  #                               WORKERS_IN_PROCESS=1 to the app child instead
+  #                               (PlanOptions.ShouldRunWorkersInProcess)
   #
   # The "all" role runs the same worker-side wiring as "worker" via
   # `roleRunsWorkers(role)` (src/server/app-layer/config.ts): the outbox
@@ -51,6 +56,14 @@ Feature: In-process workers for local development
     When I run "pnpm dev" (or "pnpm dev:single")
     Then start.sh does not add a separate "workers" lane
     And the app boots with the "all" role
+    And the background worker stack starts inside the app process after it is listening
+
+  @unimplemented
+  Scenario: WORKERS_IN_PROCESS=1 hosts workers in-process on the haven launcher too
+    Given NODE_ENV is "development" and WORKERS_IN_PROCESS is "1"
+    When I run "pnpm dev:single:haven"
+    Then haven does not add a separate "workers" child
+    And haven passes WORKERS_IN_PROCESS=1 to the app child
     And the background worker stack starts inside the app process after it is listening
 
   @integration

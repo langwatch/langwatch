@@ -38,8 +38,11 @@ USAGE
     haven <command> [flags]
 
 COMMANDS
+    setup         One-time machine bootstrap: check portless is installed (and
+                  tell you how to install it if not), start the proxy, trust its
+                  CA. Idempotent — safe to re-run. (Run it via make haven setup.)
     up            Resolve this worktree's slug, allocate ports, register the
-                  hostnames, start + supervise the stack. (What pnpm dev runs.)
+                  hostnames, start + supervise the stack. (What pnpm dev:haven runs.)
     watch         Live TUI of every running stack + service health (bare 'haven'
                   in a terminal does the same). --agent gives a plain snapshot.
     down          Tear this worktree's routes + registry entry down, and drop this
@@ -90,6 +93,10 @@ ENVIRONMENT
                                  = 6 GiB) or over 10 minutes wall-clock — a
                                  runaway tsgo shouldn't sit on a slot forever.
     START_WORKERS=false          Do not start background workers.
+    WORKERS_IN_PROCESS=1         Host the worker stack inside the app process
+                                 instead of a separate "workers" lane — one Node
+                                 process, less RAM (dev-only; what pnpm
+                                 dev:single:haven sets).
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
     LANGWATCH_HAVEN_CH=0         Do not manage ClickHouse (use .env CLICKHOUSE_URL).
@@ -125,8 +132,10 @@ ENVIRONMENT
                                  — zero token waste when an AI agent drives haven.
 
 EXAMPLES
-    pnpm dev                     # up, through haven, in this worktree
+    haven setup                  # one-time: install/verify portless, trust the CA
+    pnpm dev:haven               # up, through haven, in this worktree
+    pnpm dev:single:haven        # …with workers hosted in-process (one Node proc)
     haven list --json            # machine-readable inventory of every stack
     haven doctor                 # is everything wired up?
-    LANGWATCH_GO_WATCH=1 pnpm dev # air hot-reload for gateway + nlp
+    LANGWATCH_GO_WATCH=1 pnpm dev:haven # air hot-reload for gateway + nlp
 `

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // Watch is the TUI: a live, auto-refreshing terminal dashboard of every running
@@ -55,7 +57,7 @@ func (o *Orchestrator) renderWatch() {
 	}
 	scheme, port := o.proxy.Endpoint()
 	b.WriteString(fmt.Sprintf("  \x1b[2mdashboard\x1b[0m %s   \x1b[2mobservability\x1b[0m %s\n",
-		o.cfg.Naming.URL(o.cfg.Naming.Project, "", scheme, port),
+		o.cfg.Naming.URL(domain.HubService, "", scheme, port),
 		o.cfg.Naming.URL("observability", "", scheme, port)))
 	fmt.Print(b.String())
 }
