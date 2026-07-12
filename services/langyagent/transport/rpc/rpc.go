@@ -8,6 +8,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/github"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -76,12 +77,13 @@ func (rpc *RPC) HandleProbe(ctx context.Context, req *probeRequest) (*probeRespo
 		return nil, herr.New(ctx, domain.ErrInvalidConversationID, herr.M{"message": "invalid conversationId"})
 	}
 
-	// Build the signature through the SAME function Acquire uses, so the probe can
-	// never answer a question subtly different from the one that matters.
-	sig := domain.SignatureOf(domain.Credentials{
-		Model:           req.Model,
-		GithubToken:     githubTokenSentinel(req.HasGithubAuth),
-		EgressAllowlist: req.EgressAllowlist,
-	})
+	// Build the signature through the SAME functions the spawn path uses
+	// (app.SignatureKeys → domain.SignatureOf), so the probe can never answer a
+	// question subtly different from the one that matters. The capability set is
+	// reconstructed from the probe's booleans — github.New with a presence sentinel,
+	// never a real token — because a capability's SignatureKey encodes presence, not
+	// the secret.
+	caps := []app.Capability{github.New(githubTokenSentinel(req.HasGithubAuth), "")}
+	sig := domain.SignatureOf(req.Model, req.EgressAllowlist, app.SignatureKeys(caps))
 	return &probeResponse{Alive: rpc.app.HasLiveWorker(req.ConversationID, sig)}, nil
 }

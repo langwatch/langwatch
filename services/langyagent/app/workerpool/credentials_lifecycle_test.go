@@ -10,8 +10,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
+
+// sigOf computes a worker credential signature exactly as the production Acquire
+// path does — capabilitiesFor → app.SignatureKeys → domain.SignatureOf — so tests
+// exercise the real composition rather than a hand-spelled copy that could drift.
+func sigOf(creds domain.Credentials) domain.CredentialSignature {
+	return domain.SignatureOf(creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)))
+}
 
 type recordingRevoker struct {
 	mu    sync.Mutex
@@ -166,7 +174,7 @@ func TestHasLiveWorker_MatchesOnCapabilitySignature(t *testing.T) {
 		LangwatchAPIKey: "k", Model: "openai/gpt-5-mini",
 		EgressAllowlist: []string{"example.com"},
 	}
-	sig := domain.SignatureOf(creds)
+	sig := sigOf(creds)
 
 	p.mu.Lock()
 	p.workers["conv-4"] = &Worker{conversationID: "conv-4", credSig: sig}
@@ -175,7 +183,7 @@ func TestHasLiveWorker_MatchesOnCapabilitySignature(t *testing.T) {
 	assert.True(t, p.HasLiveWorker("conv-4", sig),
 		"a live worker with matching capabilities means no key need be minted")
 
-	otherModel := domain.SignatureOf(domain.Credentials{
+	otherModel := sigOf(domain.Credentials{
 		LangwatchAPIKey: "k", Model: "anthropic/claude-haiku-4-5",
 		EgressAllowlist: []string{"example.com"},
 	})
@@ -194,6 +202,6 @@ func TestSignatureOf_IgnoresTheSessionKey(t *testing.T) {
 	rotated.LangwatchAPIKey = "key-two"
 	rotated.LangwatchAPIKeyID = "id-two"
 
-	assert.Equal(t, domain.SignatureOf(base), domain.SignatureOf(rotated),
+	assert.Equal(t, sigOf(base), sigOf(rotated),
 		"a different session key must not look like a capability change")
 }

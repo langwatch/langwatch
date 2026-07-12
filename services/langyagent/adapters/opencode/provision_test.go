@@ -181,6 +181,7 @@ type fakeCap struct{ env []string }
 
 func (fakeCap) Name() string           { return "fake" }
 func (c fakeCap) Contribute() []string { return c.env }
+func (fakeCap) SignatureKey() string   { return "fake" }
 
 // buildWorkerEnv folds each capability's Contribute() into the worker env, without
 // knowing what any capability is.

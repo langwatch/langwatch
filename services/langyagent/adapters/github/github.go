@@ -41,3 +41,16 @@ func (c Capability) Contribute() []string {
 		"GITHUB_LOGIN=" + c.login,
 	}
 }
+
+// SignatureKey folds GitHub presence into the worker credential signature: a
+// worker that booted with a token keeps GH_TOKEN in its env and can still open
+// PRs, so it must not be reused for a turn that carries no GitHub access (and vice
+// versa). Presence only — never the token value — so it is identical whether
+// computed from a real token (spawn) or the probe's boolean. In lockstep with
+// Contribute: non-empty exactly when Contribute is non-nil.
+func (c Capability) SignatureKey() string {
+	if c.token == "" {
+		return ""
+	}
+	return "github"
+}

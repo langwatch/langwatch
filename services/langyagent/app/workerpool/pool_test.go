@@ -274,7 +274,7 @@ func TestPool_Acquire_ReusesWorkerWithMatchingSignature(t *testing.T) {
 		Model: "openai/gpt-5-mini", LangwatchAPIKey: "k", LLMVirtualKey: "vk",
 		GatewayBaseURL: "g", LangwatchEndpoint: "e",
 	}
-	existing := &Worker{conversationID: "c", credSig: domain.SignatureOf(creds)}
+	existing := &Worker{conversationID: "c", credSig: sigOf(creds)}
 	p.workers["c"] = existing
 
 	got, err := p.Acquire(context.Background(), "c", creds)

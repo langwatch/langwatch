@@ -27,11 +27,11 @@ type probeResponse struct {
 	Alive bool `json:"alive"`
 }
 
-// githubTokenSentinel turns the boolean the probe carries back into the shape
-// SignatureOf reads (`GithubToken != ""`). The value is never used as a
-// credential — it exists only so the signature is computed by the one function
-// that owns that logic, rather than by a second copy of the rule that could drift
-// from it.
+// githubTokenSentinel turns the boolean the probe carries into a present/absent
+// token so the GitHub capability (github.New) reconstructs to the same ACTIVE /
+// inert state a real turn would — and thus the same signature key. The value is
+// never used as a credential: only its presence matters, which is exactly why the
+// probe can compute the signature without ever seeing the real token.
 func githubTokenSentinel(hasGithubAuth bool) string {
 	if hasGithubAuth {
 		return "present"

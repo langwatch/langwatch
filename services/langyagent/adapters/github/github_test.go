@@ -39,3 +39,20 @@ func TestCapability_Name(t *testing.T) {
 		t.Errorf("Name = %q, want github", New("t", "l").Name())
 	}
 }
+
+// SignatureKey encodes GitHub PRESENCE (not the token), and must be in lockstep
+// with Contribute: active exactly when Contribute is non-nil, and independent of
+// the token value + login label (so key rotation / a login change never recycles
+// the worker).
+func TestCapability_SignatureKey(t *testing.T) {
+	if got := New("ghp_real", "alice").SignatureKey(); got != "github" {
+		t.Errorf("SignatureKey with a token = %q, want github", got)
+	}
+	if got := New("", "alice").SignatureKey(); got != "" {
+		t.Errorf("SignatureKey without a token = %q, want empty", got)
+	}
+	// Presence-only: a different token or login yields the SAME key.
+	if New("ghp_one", "alice").SignatureKey() != New("ghp_two", "bob").SignatureKey() {
+		t.Errorf("SignatureKey must not depend on the token value or login")
+	}
+}
