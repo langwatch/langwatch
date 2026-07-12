@@ -6,10 +6,11 @@
 //
 // The manager previously emitted zero OTel. This package is the load-bearing
 // seam ADR-047 calls out: PR4's egress monitoring hangs off the same tracer
-// and meter. The global TracerProvider is installed by pkg/otelsetup, so spans
-// export today. The metric instruments are created against the global Meter —
-// a no-op MeterProvider until one is wired — so every call site exists and
-// lights up the moment a MeterProvider is installed, with no restructuring.
+// and meter. pkg/otelsetup installs BOTH the global TracerProvider and (on the
+// single-tenant primary path) the global MeterProvider, so spans AND these
+// metric instruments export whenever OTEL_OTLP_ENDPOINT is configured. If no
+// endpoint is set the global providers are the SDK no-ops and every call site is
+// a safe no-op — the wiring is identical, nothing is exported.
 package telemetry
 
 import (
