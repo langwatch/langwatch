@@ -38,6 +38,13 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       // never from the model's prose. It replaced the `[langy:connect-github]`
       // sentinel — see server/services/langy/execution/githubCommand.ts.
       "langy_github_not_connected",
+      // Turn-START rejections from the control plane (LangyTurnService), reaching
+      // the browser as coded TRPCErrors from the create/continue mutations.
+      "langy_model_not_configured",
+      "langy_model_not_allowed",
+      "langy_egress_misconfigured",
+      "langy_insufficient_scope",
+      "langy_turn_in_progress",
     ]);
   });
 
@@ -123,6 +130,30 @@ describe("explainLangyError", () => {
 
       expect(presentation.title).toBe("Langy lost its place");
       expect(presentation.action?.kind).toBe("retry");
+    });
+  });
+
+  describe("given the project has no model configured for Langy", () => {
+    it("offers the configure-model action instead of a dead retry", () => {
+      const presentation = explainLangyError(
+        domain({ kind: "langy_model_not_configured", httpStatus: 409 }),
+      );
+
+      expect(presentation.title).toBe("Choose a model for Langy");
+      expect(presentation.action?.kind).toBe("configure-model");
+      expect(presentation.render).toBe("card");
+    });
+  });
+
+  describe("given a turn is already streaming for the conversation", () => {
+    it("tells the user to wait and offers no retry (a retry would 409 again)", () => {
+      const presentation = explainLangyError(
+        domain({ kind: "langy_turn_in_progress", httpStatus: 409 }),
+      );
+
+      expect(presentation.title).toBe("Langy is still replying");
+      expect(presentation.action).toBeUndefined();
+      expect(presentation.render).toBe("card");
     });
   });
 

@@ -76,6 +76,15 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_turn_stalled",
   // NOT a failure — an unmet prerequisite. See the `suppress` case below.
   "langy_github_not_connected",
+  // Turn-START rejections from the control plane (app-layer LangyTurnService,
+  // see server/app-layer/langy/errors.ts). These reach the browser as coded
+  // TRPCErrors from the create/continue mutations — NOT from the worker's turn
+  // classifier — so they need their own copy rather than the generic default.
+  "langy_model_not_configured",
+  "langy_model_not_allowed",
+  "langy_egress_misconfigured",
+  "langy_insufficient_scope",
+  "langy_turn_in_progress",
 ] as const;
 
 function parseReasons(value: unknown): LangySerializedReason[] | undefined {
@@ -291,6 +300,69 @@ export function explainLangyError(
           "Langy needs access to your GitHub account to open pull requests.",
         render: "suppress",
         action: { label: "Connect GitHub", kind: "connect-github" },
+        ...debug,
+      };
+
+    case "langy_model_not_configured":
+      // A prerequisite, not a fault: retrying the same send won't help until a
+      // model is set, so this offers the setup action instead of a retry.
+      return {
+        kind: domain.kind,
+        title: "Choose a model for Langy",
+        description:
+          "Langy needs a model to run. Pick one in your project's model settings, then try again.",
+        render: "card",
+        action: { label: "Configure model", kind: "configure-model" },
+        ...debug,
+      };
+
+    case "langy_model_not_allowed":
+      // The picked override isn't on the project's Langy allowlist. Deterministic
+      // — the identical request fails again — so no retry; the meta.model is
+      // surfaced so the user sees which one was rejected.
+      return {
+        kind: domain.kind,
+        title: "That model isn't available here",
+        description:
+          "The model you picked isn't enabled for this project. Choose one of the configured models and send again.",
+        render: "card",
+        action: { label: "Configure model", kind: "configure-model" },
+        ...debug,
+      };
+
+    case "langy_egress_misconfigured":
+      // Fail-closed network policy: Langy refuses to run rather than leak. Not a
+      // user error and not a retry — an admin has to fix the policy.
+      return {
+        kind: domain.kind,
+        title: "Langy is blocked by a network policy",
+        description:
+          "Langy's outbound network policy for this project is misconfigured, so it can't run safely. Ask a workspace admin to review it.",
+        render: "card",
+        ...debug,
+      };
+
+    case "langy_insufficient_scope":
+      // The caller holds none of Langy's permissions in this project. A
+      // permissions gap an admin resolves — retrying won't change it.
+      return {
+        kind: domain.kind,
+        title: "Langy doesn't have access here",
+        description:
+          "Langy doesn't have the permissions it needs in this project. Ask a workspace admin to grant them.",
+        render: "card",
+        ...debug,
+      };
+
+    case "langy_turn_in_progress":
+      // One turn at a time per conversation. A retry would just 409 again, so
+      // there's no retry action — the answer is to wait for the reply to finish.
+      return {
+        kind: domain.kind,
+        title: "Langy is still replying",
+        description:
+          "There's already a response in progress for this conversation. Wait for it to finish before sending another message.",
+        render: "card",
         ...debug,
       };
 
