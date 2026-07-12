@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/app"
@@ -85,6 +87,7 @@ func (rpc *RPC) HandleWarm(ctx context.Context, req *warmRequest) error {
 	if !domain.IsValidConversationID(req.ConversationID) {
 		return herr.New(ctx, domain.ErrInvalidConversationID, herr.M{"message": "invalid conversationId"})
 	}
+	ctx = clog.With(ctx, zap.String("conversation_id", req.ConversationID))
 
 	creds := req.Credentials
 	// The SAME merge chat does. The model is part of the credential signature, so

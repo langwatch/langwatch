@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
@@ -74,6 +77,11 @@ func chatHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 			return
 		}
 
+		// Stamp the turn's identity onto the context logger so every line the app,
+		// pool, worker, and opencode reader emit for this turn carries it — the
+		// thread to pull when reading logs for one conversation.
+		ctx = clog.With(ctx, turnLogFields(req.ConversationID, req.ProjectID, req.TurnID)...)
+
 		creds := req.Credentials
 		// Thread the user-selected/resolved model (already validated against the
 		// project's allow-list by the control plane) into the worker config so
@@ -99,6 +107,21 @@ func chatHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 			herr.WriteHTTP(w, err)
 		}
 	}
+}
+
+// turnLogFields builds the context-logger fields that identify a turn. Only
+// conversationId is guaranteed present; projectId and turnId are omitted when a
+// caller (an older control plane, or the warm/probe pre-flights) does not send
+// them, so a nil/empty field never clutters the logs.
+func turnLogFields(conversationID, projectID, turnID string) []zap.Field {
+	fields := []zap.Field{zap.String("conversation_id", conversationID)}
+	if projectID != "" {
+		fields = append(fields, zap.String("project_id", projectID))
+	}
+	if turnID != "" {
+		fields = append(fields, zap.String("turn_id", turnID))
+	}
+	return fields
 }
 
 // healthAlias serves the legacy GET /health used by the control-plane preflight

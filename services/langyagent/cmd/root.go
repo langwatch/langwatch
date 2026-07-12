@@ -81,7 +81,6 @@ func Root(ctx context.Context, _ []string) error {
 	}
 
 	application := app.New(
-		app.WithLogger(deps.Logger),
 		app.WithWorkerPool(pool),
 		app.WithTelemetry(deps.Telemetry),
 		// Durable-final poster: same shared secret as the Revoker, no new config.

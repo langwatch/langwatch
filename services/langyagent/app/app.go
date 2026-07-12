@@ -22,7 +22,6 @@ var errStreamConsumerCrashed = errors.New("stream ended unexpectedly")
 // telemetry seam. All fields are injected via Options so tests can swap any
 // dependency.
 type App struct {
-	logger    *zap.Logger
 	pool      WorkerPool
 	telemetry *telemetry.Telemetry
 	finalizer TurnFinalizer
@@ -43,9 +42,6 @@ func New(opts ...Option) *App {
 	return a
 }
 
-// WithLogger injects the logger.
-func WithLogger(l *zap.Logger) Option { return func(a *App) { a.logger = l } }
-
 // WithWorkerPool injects the worker pool.
 func WithWorkerPool(p WorkerPool) Option { return func(a *App) { a.pool = p } }
 
@@ -60,13 +56,6 @@ func WithFinalizer(f TurnFinalizer) Option { return func(a *App) { a.finalizer =
 // Pool returns the configured worker pool (used by serve.go for lifecycle and
 // by the health/status handler).
 func (a *App) Pool() WorkerPool { return a.pool }
-
-func (a *App) log() *zap.Logger {
-	if a.logger == nil {
-		return zap.NewNop()
-	}
-	return a.logger
-}
 
 // ChatRequest is the app-level view of a chat turn. The httpapi adapter builds
 // it after auth + validation.
@@ -161,10 +150,7 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 			a.turnObserved(ctx, start, "at-capacity")
 			return nil
 		}
-		a.log().Error("acquire worker failed",
-			zap.String("conversation", req.ConversationID),
-			zap.Error(err),
-		)
+		clog.Get(ctx).Error("acquire worker failed", zap.Error(err))
 		sink.Begin()
 		sink.ErrorEvent(err.Error())
 		a.turnObserved(ctx, start, "acquire-error")
@@ -231,20 +217,14 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 			a.turnObserved(ctx, start, "session-not-found")
 			return nil
 		}
-		a.log().Error("post message failed",
-			zap.String("conversation", req.ConversationID),
-			zap.Error(err),
-		)
+		clog.Get(ctx).Error("post message failed", zap.Error(err))
 		sink.ErrorEvent(err.Error())
 		a.turnObserved(ctx, start, "post-error")
 		return nil
 	}
 
 	if err := <-errCh; err != nil {
-		a.log().Warn("stream events ended with error",
-			zap.String("conversation", req.ConversationID),
-			zap.Error(err),
-		)
+		clog.Get(ctx).Warn("stream events ended with error", zap.Error(err))
 		sink.ErrorEvent(err.Error())
 		a.turnObserved(ctx, start, "stream-error")
 		return nil
@@ -283,11 +263,7 @@ func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, acc *a
 			Text:           text,
 			ToolCalls:      toolCalls,
 		}); err != nil {
-			a.log().Warn("durable turn finalize failed; liveness reactor is the backstop",
-				zap.String("conversation", req.ConversationID),
-				zap.String("turn", req.TurnID),
-				zap.Error(err),
-			)
+			clog.Get(detached).Warn("durable turn finalize failed; liveness reactor is the backstop", zap.Error(err))
 		}
 	}()
 }

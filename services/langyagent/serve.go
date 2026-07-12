@@ -2,11 +2,13 @@ package langyagent
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/lifecycle"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
@@ -42,6 +44,16 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		// No ReadTimeout / WriteTimeout — /chat streams arbitrarily long ndjson
 		// responses (the worker keeps producing for as long as the LLM keeps
 		// generating). Per-handler cancellation drives the deadline instead.
+
+		// Seed every request context with the service logger (which already carries
+		// service/version/env fields) so clog.Get(ctx) is authoritative from the
+		// first middleware down through the app — the Telemetry middleware then
+		// layers request fields, and the handlers layer conversation/turn ids, all
+		// inherited by every log the turn emits. A detached context.Background keeps
+		// in-flight streams alive across shutdown (lifecycle.ListenServer drains).
+		BaseContext: func(net.Listener) context.Context {
+			return clog.Set(context.Background(), deps.Logger)
+		},
 	}
 
 	g := lifecycle.New(
