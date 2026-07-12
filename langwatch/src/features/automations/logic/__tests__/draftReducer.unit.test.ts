@@ -121,6 +121,18 @@ describe("draftReducer", () => {
       expect(next.source).toBe("trace");
       expect(next.customGraphId).toBeNull();
     });
+    it("clears a leaked alert severity when switching back to trace", () => {
+      // Picking "Alert" seeds a WARNING severity; switching to "Automation"
+      // must drop it — a trace automation has no severity facet to unset it,
+      // so a stray value would render "(WARNING)" in the email and even save.
+      const fromAlert: AutomationDraft = {
+        ...SAMPLE,
+        source: "customGraph",
+        alertType: AlertType.WARNING,
+      };
+      const next = reducer(fromAlert, { type: "SET_SOURCE", value: "trace" });
+      expect(next.alertType).toBeNull();
+    });
   });
 
   describe("cadence confirmation", () => {
@@ -390,17 +402,17 @@ describe("presetLabels", () => {
     expect(presetLabels("customGraph", true).title).toBe("Edit alert");
   });
 
-  it("gives a report report copy — never automation copy (field-5015)", () => {
+  it("gives a report schedule copy — never automation copy (field-5015)", () => {
     const create = presetLabels("report", false);
     expect(create).toMatchObject({
-      title: "New report",
-      saveButton: "Create report",
-      createdToast: "Report created",
-      updatedToast: "Report updated",
-      noun: "report",
+      title: "New schedule",
+      saveButton: "Create schedule",
+      createdToast: "Schedule created",
+      updatedToast: "Schedule updated",
+      noun: "schedule",
     });
     expect(create.saveButton).not.toMatch(/automation/i);
-    expect(presetLabels("report", true).title).toBe("Edit report");
+    expect(presetLabels("report", true).title).toBe("Edit schedule");
   });
 });
 
@@ -572,6 +584,15 @@ describe("report source", () => {
         { type: "SET_SOURCE", value: "report" },
       );
       expect(next.action).toBeNull();
+    });
+    it("clears a leaked alert severity — a report has no severity facet", () => {
+      const fromAlert: AutomationDraft = {
+        ...SAMPLE,
+        source: "customGraph",
+        alertType: AlertType.WARNING,
+      };
+      const next = reducer(fromAlert, { type: "SET_SOURCE", value: "report" });
+      expect(next.alertType).toBeNull();
     });
   });
 

@@ -34,7 +34,7 @@ import { describeCron, isValidCron } from "./reportSchedule";
 
 export type ConditionSource = "trace" | "customGraph" | "report";
 
-/** The content + schedule a scheduled REPORT captures (ADR-042). Mirrors the
+/** The content + schedule a scheduled REPORT captures (ADR-044). Mirrors the
  *  `reportActionParams` the router persists: a source discriminated by kind
  *  plus a cron+timezone schedule. Flat here for simple form binding. */
 export type ReportSourceKind = "traceQuery" | "customGraph" | "dashboard";
@@ -210,11 +210,15 @@ export function reducer(
         // exactly that query (the Subject editor writes it, the router persists
         // it), so clearing it here would silently drop the author's scope and
         // send the newest traces instead of the ones they asked for.
+        // Severity belongs to alerts only — clear a leaked `alertType` so a
+        // report doesn't render (or save) a stray "(WARNING)" the author has
+        // no facet to change.
         return {
           ...state,
           source: "report",
           filters: {},
           customGraphId: null,
+          alertType: null,
           action:
             state.action === "SEND_EMAIL" ||
             state.action === "SEND_SLACK_MESSAGE"
@@ -222,7 +226,9 @@ export function reducer(
               : null,
         };
       }
-      return { ...state, source: "trace", customGraphId: null };
+      // Same for a trace automation: severity is an alert-only facet, so a
+      // value left over from a prior "Alert" pick must not survive the switch.
+      return { ...state, source: "trace", customGraphId: null, alertType: null };
     case "SET_CUSTOM_GRAPH_ID":
       return { ...state, customGraphId: action.value };
     case "SET_FILTERS":
@@ -257,7 +263,7 @@ export function reducer(
   }
 }
 
-/** The Automation / Alert / Report noun set for one preset. */
+/** The Automation / Alert / Schedule noun set for one preset. */
 export interface PresetLabels {
   /** Drawer heading. */
   title: string;
@@ -272,7 +278,7 @@ export interface PresetLabels {
 }
 
 /**
- * The single source of truth for the Automation / Alert / Report nouns,
+ * The single source of truth for the Automation / Alert / Schedule nouns,
  * keyed on the preset (`draft.source`) so every heading, button, and toast
  * stays in step with the chosen type. Replaces the scattered
  * `source === "customGraph" ? … : …` two-way branches that classified a
@@ -294,11 +300,11 @@ export function presetLabels(
       };
     case "report":
       return {
-        title: isEdit ? "Edit report" : "New report",
-        saveButton: isEdit ? "Save report" : "Create report",
-        createdToast: "Report created",
-        updatedToast: "Report updated",
-        noun: "report",
+        title: isEdit ? "Edit schedule" : "New schedule",
+        saveButton: isEdit ? "Save schedule" : "Create schedule",
+        createdToast: "Schedule created",
+        updatedToast: "Schedule updated",
+        noun: "schedule",
       };
     case "trace":
       return {

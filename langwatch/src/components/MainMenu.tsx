@@ -217,7 +217,7 @@ export const MainMenu = React.memo(function MainMenu({
               paddingTop={3}
               paddingBottom={1}
             >
-              {showExpanded ? "Library" : <>&nbsp;</>}
+              {showExpanded ? "Build" : <>&nbsp;</>}
             </Text>
 
             <PageMenuLink
@@ -264,6 +264,17 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/datasets")}
               showLabel={showExpanded}
             />
+
+            {hasPermission("triggers:view") && (
+              <PageMenuLink
+                path={projectRoutes.automations.path}
+                icon={featureIcons.automations.icon}
+                label={projectRoutes.automations.title}
+                project={project}
+                isActive={router.pathname.includes("/automations")}
+                showLabel={showExpanded}
+              />
+            )}
 
             <GovernSection showExpanded={showExpanded} />
 

@@ -98,6 +98,11 @@ export interface ConfigFormCtx<TPreview = unknown> {
   projectId: string;
   organizationId: string | undefined;
   teamSlug: string | undefined;
+  /** The saved automation's id when editing an existing row, undefined for a
+   *  new draft. Lets a provider act against the stored (server-side) secret —
+   *  e.g. the Slack channel picker loads channels from the saved bot token
+   *  without the author having to retype it. */
+  automationId?: string;
   /** Variables advertised to the editor (path / type / description). */
   variables: VariableInfo[];
   /** The example data the preview renders against, shown via ExampleData. */

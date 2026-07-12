@@ -16,7 +16,7 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
 }));
 
 /**
- * Regression coverage for the ADR-042 P1 (scheduler.service.ts:337): a claim
+ * Regression coverage for the ADR-044 P1 (scheduler.service.ts:337): a claim
  * used to advance `nextRunAt` to the NEXT cron slot and stamp `lastSlot` BEFORE
  * the handler ran, so a transient handler failure PERMANENTLY skipped that
  * calendar slot. These tests EXECUTE the real loop against a mock repository and
@@ -153,7 +153,7 @@ afterEach(() => {
   captureException.mockClear();
 });
 
-describe("SchedulerService lease-and-retry (ADR-042 P1)", () => {
+describe("SchedulerService lease-and-retry (ADR-044 P1)", () => {
   describe("given a fresh slot whose handler throws on the first attempt", () => {
     describe("when the loop fires it", () => {
       it("retries the SAME slot: near-future backoff, lastSlot NOT advanced, attempts bumped, error recorded", async () => {

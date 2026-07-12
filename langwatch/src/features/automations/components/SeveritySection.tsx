@@ -3,7 +3,7 @@ import { AlertType } from "@prisma/client";
 import { Select } from "~/components/ui/select";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
-import { FacetSection } from "./FacetSection";
+import { FacetSection, type FacetAccordionProps } from "./FacetSection";
 
 /** Alerts carry a severity; automations and reports don't (ADR-043). */
 const SEVERITY_OPTIONS = [
@@ -11,6 +11,12 @@ const SEVERITY_OPTIONS = [
   { value: AlertType.WARNING, label: "Warning" },
   { value: AlertType.CRITICAL, label: "Critical" },
 ];
+
+const SEVERITY_LABEL: Record<AlertType, string> = {
+  [AlertType.INFO]: "Info",
+  [AlertType.WARNING]: "Warning",
+  [AlertType.CRITICAL]: "Critical",
+};
 
 const SEVERITY_COLLECTION = createListCollection({ items: SEVERITY_OPTIONS });
 
@@ -20,7 +26,11 @@ const SEVERITY_COLLECTION = createListCollection({ items: SEVERITY_OPTIONS });
  * whether to `@channel` by it. Self-gates to `customGraph` so the main pane
  * can drop it in unconditionally.
  */
-export function SeveritySection() {
+export function SeveritySection({
+  accordion,
+}: {
+  accordion?: FacetAccordionProps;
+}) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
 
@@ -30,6 +40,11 @@ export function SeveritySection() {
     <FacetSection
       title="Severity"
       help="How urgent this alert is when it fires. Higher severities stand out in the notification and can page the whole channel."
+      accordion={accordion}
+      complete={draft.alertType !== null}
+      summary={
+        draft.alertType ? SEVERITY_LABEL[draft.alertType] : "Pick a severity"
+      }
     >
       <Select.Root
         collection={SEVERITY_COLLECTION}

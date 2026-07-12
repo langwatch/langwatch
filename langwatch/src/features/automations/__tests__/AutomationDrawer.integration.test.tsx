@@ -196,7 +196,7 @@ function savedRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** A saved scheduled REPORT (ADR-042): the row the Reports table opens this
+/** A saved scheduled REPORT (ADR-044): the row the Reports table opens this
  *  same drawer with — schedule + content source live in `actionParams`, the
  *  trace scope in `filterQuery`. */
 function savedReportRow(overrides: Record<string, unknown> = {}) {

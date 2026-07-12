@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Integration tests for the ADR-042 Phase 1 scheduler primitive against REAL
+ * Integration tests for the ADR-044 Phase 1 scheduler primitive against REAL
  * Postgres (`ScheduledJob`) — NO Redis. These prove the correctness core the
  * ADR flags as riskiest — a slot fires exactly once across two concurrent
  * "pods", the loop reacts promptly to a freshly-inserted job, and a throwing

@@ -7,7 +7,7 @@ export interface TriggerSummary {
   projectId: string;
   name: string;
   action: TriggerAction;
-  /** ADR-042 automation kind. Load-bearing at dispatch: a REPORT fires on its
+  /** ADR-044 automation kind. Load-bearing at dispatch: a REPORT fires on its
    *  calendar schedule only, so it must never be treated as a trace automation.
    *  A report persists `filters: {}` and no `customGraphId`, which is exactly
    *  the shape of a match-everything trace trigger — the kind is the ONLY thing

@@ -1,7 +1,7 @@
 Feature: Seeing what your automations are doing
   As someone who has set up automations, alerts, and reports
-  I want to see what runs on a schedule, what reacts to events, and what has already happened
-  So that I can trust the things I set up are still working — without opening each one
+  I want to see what runs on a schedule, what reacts to events, and what already happened
+  So that I can trust they still work — without opening each one
 
   Background:
     Given an automation fires when something matches

@@ -207,11 +207,6 @@ export default function SettingsLayout({
             <MenuLink href="/settings/annotation-scores">
               Annotation Scores
             </MenuLink>
-            {!isLiteMember && project?.slug && (
-              <MenuLink href={`/${project.slug}/automations`}>
-                Alerts &amp; Automations
-              </MenuLink>
-            )}
             {!isLiteMember && (
               <MenuLink href="/settings/topic-clustering">
                 Topic Clustering

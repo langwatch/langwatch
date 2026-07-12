@@ -244,7 +244,7 @@ export const TRACE_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
 
 
 /**
- * ADR-042: default templates for a SCHEDULED REPORT. Reads as "here is your
+ * ADR-044: default templates for a SCHEDULED REPORT. Reads as "here is your
  * {source} for {period}" — `report.sourceLabel`, `report.scheduleLabel`,
  * `viewUrl`, plus the report's data: `traces` for a trace-query report,
  * `charts` for a graph or dashboard one. Rendered through the same Liquid

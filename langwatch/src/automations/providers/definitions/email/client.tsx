@@ -20,7 +20,6 @@ import {
 import { defaultsForSourceKind } from "~/shared/templating/defaults";
 import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
 import { api } from "~/utils/api";
-import { InlineCadenceSelect } from "../../components/InlineCadenceSelect";
 import { TestFireButton } from "../../components/TestFireButton";
 import type {
   ConfigFormProps,
@@ -154,8 +153,6 @@ function EmailConfigForm({
     onChange({ ...slice, members: slice.members.filter((m) => m !== email) });
   };
 
-  const isGraphAlert = ctx.sourceKind === "graphAlert";
-  const isReport = ctx.sourceKind === "report";
   // Each source kind dispatches with its own defaults — a report sends the
   // report subject and body, an alert the alert ones. The editor must seed the
   // SAME set: an author who opens the wording editor and types one character
@@ -189,15 +186,6 @@ function EmailConfigForm({
 
   return (
     <VStack align="stretch" gap={4}>
-      {/* Alerts always deliver immediately (cadence is pinned server-side) and
-          reports run on their own schedule — so the digest-cadence switch only
-          makes sense for trace automations. */}
-      {!isGraphAlert && !isReport ? (
-        <InlineCadenceSelect
-          value={ctx.notificationCadence}
-          onChange={ctx.setNotificationCadence}
-        />
-      ) : null}
       <Field.Root>
         <Field.Label>Recipients</Field.Label>
         <VStack align="stretch" gap={1}>

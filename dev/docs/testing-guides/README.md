@@ -2,19 +2,19 @@
 
 Five stacked PRs move custom-graph alerts, threshold triggers, and
 analytics reads off the K8s cron + `trace_summaries` re-scans and onto
-an event-sourced, transactional-outbox path. Each PR in the stack has a
-matching guide below for human QA + on-call to click through, verify
-behaviour, and know which flag flips old vs new flow.
+an event-sourced, transactional-outbox path. Each PR has a matching
+guide below for human QA + on-call to verify behaviour and know which
+flag flips old vs new flow.
 
-Guides are written for someone doing the QA — real button labels, real
-menu paths, real URLs. If something doesn't match what's in front of
-you, the guide is wrong; open a ticket, don't fix silently in prod.
+Guides use real button labels, menu paths, and URLs. If something
+doesn't match what's in front of you, the guide is wrong — open a
+ticket, don't fix silently in prod.
 
 ## Stack order
 
-The PRs are stacked in this order. Each one assumes the previous ones
-have landed; regressions frequently cross PR boundaries, so run the
-guides in order on any pre-prod verification pass.
+The PRs are stacked in this order; each assumes the previous ones have
+landed. Regressions frequently cross PR boundaries, so run the guides
+in order on any pre-prod verification pass.
 
 | # | PR | Branch | Ships |
 |---|----|--------|-------|
@@ -22,13 +22,12 @@ guides in order on any pre-prod verification pass.
 | 2 | [#5012](./pr-5012-trace-analytics-foundation.md) | `pr/03-trace-analytics-foundation` | `trace_analytics` slim + `trace_analytics_rollup` ClickHouse tables (ADR-034 Phases 0-3.5). App-layer read routing behind `release_event_sourced_analytics_read`. Optional tripwire behind `release_event_sourced_analytics_read_tripwire`. |
 | 3 | [#5013](./pr-5013-heartbeat-graph-triggers.md) | `pr/04-heartbeat-graph-triggers` | ADR-039 outbox heartbeat primitive + ADR-034 Phase 5 graph triggers via outbox reactor + heartbeat absence-resolve. Flipped per project by `release_es_graph_triggers_firing`; cron coexists for un-flagged projects. |
 | 4 | [#5014](./pr-5014-eval-write-side-aggregates.md) | `pr/05-eval-and-write-side-aggregates` | ADR-034 Phase 6 (`evaluation_analytics` slim + rollup + reactor). Phase 7 (sim/exp/suite aggregates) was pulled back in the 2026-07-07 stack review — only the evaluation pair shipped. The **same** `release_event_sourced_analytics_read` flag from PR2 now covers eval-source metrics too. `release_es_graph_triggers_firing` now also gates eval graph triggers. |
-| 5 | [#5015](./pr-5015-graph-alerts-ui-templates.md) | `pr/06-graph-alerts-ui-templates` | ADR-034 Phases 5.1 / 5.2 / 8 / 8.1: graph-threshold alerts inside the automations drawer, dashboard "Add alert" button repointed to the same drawer, graph alerts dispatched through Liquid templates. Also carries ADR-042 scheduled reports + the `ScheduledJob` scheduler, ADR-043's facet-shaped drawer and trace-query subjects, ADR-040/041 Block Kit templates + Slack bot-token delivery, and the outbox payload slimming. **Ships five Postgres migrations** (`ScheduledJob` table; `TriggerKind` enum + NOT NULL column with a backfill; `Trigger.filterQuery`; `TriggerSent.openIncidentKey` unique; `ScheduledJob` retry columns). No new flag — depends on `release_es_graph_triggers_firing` from PR3 being ON to see the new dispatch path fire. |
+| 5 | [#5015](./pr-5015-graph-alerts-ui-templates.md) | `pr/06-graph-alerts-ui-templates` | ADR-034 Phases 5.1 / 5.2 / 8 / 8.1: graph-threshold alerts inside the automations drawer, dashboard "Add alert" button repointed to the same drawer, graph alerts dispatched through Liquid templates. Also carries ADR-044 scheduled reports + the `ScheduledJob` scheduler, ADR-043's facet-shaped drawer and trace-query subjects, ADR-040/041 Block Kit templates + Slack bot-token delivery, and the outbox payload slimming. **Ships one consolidated Postgres migration** (`20260712000000_reports_scheduler_and_trigger_facets`: `ScheduledJob` table incl. retry columns; `TriggerKind` enum + backfilled NOT NULL column; `Trigger.filterQuery`; `TriggerSent.openIncidentKey` unique). No new flag — depends on `release_es_graph_triggers_firing` from PR3 being ON to see the new dispatch path fire. |
 
 ## Flag summary
 
-Read the guide for each PR for the full behaviour and rollback plan.
-Registered in `langwatch/src/server/featureFlag/registry.ts`; verified
-strings only, no invented flags.
+Read each PR's guide for full behaviour and rollback. Registered in
+`langwatch/src/server/featureFlag/registry.ts`; verified strings only.
 
 | Flag | Default | Owns | Introduced by |
 |------|---------|------|---------------|
@@ -45,14 +44,14 @@ FEATURE_FLAG_FORCE_ENABLE=release_es_graph_triggers_firing pnpm dev
 
 ## Common regression traps across the stack
 
-Repeated below in each guide with local specifics; listed once here so
-you know to watch for them everywhere:
+Repeated in each guide with local specifics; listed once here so you
+watch for them everywhere:
 
 - **Outbox runtime wiring.** `presets.ts` builds the outbox after
   `new EventSourcing(...)` and one-shot `attachOutbox()`s it in. If a
-  worker starts and no outbox is attached, every settle / cadence /
+  worker starts with no outbox attached, every settle / cadence /
   graphEval enqueue silently fails closed. Watch worker boot logs for
-  `outbox runtime attached` and the corresponding warn if it's missing.
+  `outbox runtime attached`.
 - **Filter payload type.** `filters` on the `Trigger` row must be a JSON
   object (`{}`), not the string `"{}"`. The graph-alert builder is the
   single source of truth; both create + update paths route through it.
@@ -63,8 +62,7 @@ you know to watch for them everywhere:
   `IF(_retention_days > 0, …, '2106-01-01')` form. If a rollup / slim
   table's TTL clause references a bare `INTERVAL _retention_days DAY`,
   rows for indefinite-retention projects (`_retention_days = 0`) get
-  reaped on the next merge — hard regression, catch it in the DDL before
-  the first insert.
+  reaped on the next merge — catch it in the DDL before the first insert.
 
 ## Local dev prep
 

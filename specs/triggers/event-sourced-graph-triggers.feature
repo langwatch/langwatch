@@ -1,8 +1,7 @@
 Feature: Event-sourced custom-graph threshold alerts
   As an operator running custom-graph threshold alerts
-  I want them to fire in near real time, resolve on their own,
-  and not double-fire while I'm rolling out the new path
-  So that I get timely, trustworthy alerts during and after the migration.
+  I want them to fire in near real time, resolve on their own, and not double-fire during rollout
+  So that alerts stay timely and trustworthy during and after the migration.
 
   Background:
     Given a project owns active custom-graph triggers
@@ -99,13 +98,12 @@ Feature: Event-sourced custom-graph threshold alerts
 
   Rule: eval-metric graph triggers fire on the same event-sourced path
 
-    The Phase 6 extension wires eval-metric custom-graph triggers
-    (`evaluations.evaluation_score`, `evaluations.evaluation_pass_rate`,
-    `evaluations.evaluation_runs`) onto the same real-time path and the
-    same heartbeat, source-aware so the recency check queries
-    `evaluation_analytics` instead of `trace_analytics`. The
+    Eval-metric custom-graph triggers (`evaluations.evaluation_score`,
+    `evaluations.evaluation_pass_rate`, `evaluations.evaluation_runs`) run on
+    the same real-time path and heartbeat, source-aware so the recency check
+    queries `evaluation_analytics` instead of `trace_analytics`. The
     `release_es_graph_triggers_firing` flag is shared with the trace path —
-    operators do not toggle a second flag.
+    no second toggle.
 
     Scenario: flag off, eval-metric threshold breaches via cron
       Given the project is on the legacy path

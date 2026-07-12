@@ -2,13 +2,17 @@ import {
   Box,
   Button,
   Code,
+  Combobox,
   createListCollection,
   Field,
   HStack,
   Input,
   List,
-  NativeSelect,
+  Portal,
+  Spinner,
   Text,
+  useFilter,
+  useListCollection,
   VStack,
 } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
@@ -29,7 +33,6 @@ import {
 import { defaultsForSourceKind } from "~/shared/templating/defaults";
 import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
 import { api } from "~/utils/api";
-import { InlineCadenceSelect } from "../../components/InlineCadenceSelect";
 import { TestFireButton } from "../../components/TestFireButton";
 import type {
   ConfigFormProps,
@@ -199,8 +202,12 @@ const DELIVERY_ITEMS: { value: SlackDeliveryMethod; label: string }[] = [
 /**
  * Slack app manifest an author pastes into "Create app → From a manifest" to
  * skip manual scope setup. One app serves the whole workspace (not per
- * automation), so the name is generic. It grants `chat:write` (post messages)
- * plus `channels:read`/`groups:read` so the channel picker works out of the box.
+ * automation), so the name is generic. It grants:
+ *   - `chat:write` — post messages to channels the bot is a member of
+ *   - `chat:write.public` — post to ANY public channel without being invited
+ *     first; without it Slack rejects the post with `not_in_channel` until the
+ *     bot is manually `/invite`d, which is the #1 setup snag
+ *   - `channels:read` / `groups:read` — populate the channel picker
  */
 const SLACK_APP_MANIFEST = `display_information:
   name: LangWatch
@@ -208,6 +215,7 @@ oauth_config:
   scopes:
     bot:
       - chat:write
+      - chat:write.public
       - channels:read
       - groups:read`;
 
@@ -240,58 +248,99 @@ function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
 }
 
 /**
- * Channel input with an optional "load from Slack" picker. Manual entry always
- * works; if the app has the `channels:read` scope, the author can load the
- * channel list off the typed token and pick from it. A missing scope degrades
- * to a hint, never an error.
+ * Channel field: a typeable combobox. Manual entry always works (type a name or
+ * paste an ID); once a token is present the channel list is fetched
+ * AUTOMATICALLY and drops in as filterable suggestions. Picking a suggestion
+ * stores the channel ID (what `chat.postMessage` wants), while free typing is
+ * kept verbatim so a custom / not-yet-listed channel still works. A missing
+ * scope degrades to a hint, never a hard error.
  */
 function SlackChannelField({
   projectId,
+  automationId,
   slice,
   onChange,
 }: {
   projectId: string;
+  automationId?: string;
   slice: SlackSlice;
   onChange: (next: SlackSlice) => void;
 }) {
   const list = api.automation.listSlackChannels.useMutation();
-  const canLoad = slice.botToken.trim().length > 0;
-  const channels = list.data?.channels ?? [];
-  const scopeHint =
-    list.data && list.data.error && list.data.error !== "no_token"
-      ? list.data.error === "missing_scope"
-        ? "Add the channels:read scope to your app to pick from a list — you can still type the channel above."
-        : "Couldn't load channels from Slack. Type the channel above."
+  const typedToken = slice.botToken.trim();
+  // Read the STABLE reference react-query hands back — `?? []` would mint a fresh
+  // array every render and turn the "sync the collection" effect below into an
+  // infinite render loop.
+  const channelData = list.data?.channels;
+  const channels = channelData ?? [];
+
+  const fetchChannels = (key: string) => {
+    lastFetched.current = key;
+    list.mutate(
+      { projectId, botToken: typedToken || null, automationId },
+      {
+        onError: (error) =>
+          // eslint-disable-next-line no-console
+          console.error("[slack] listSlackChannels failed", error),
+      },
+    );
+  };
+
+  // Fetch as soon as a usable token exists — a freshly typed one (debounced so
+  // we don't fire mid-type) or the stored token of a saved automation (loaded
+  // server-side by id). No button to click; the list just appears.
+  const fetchKey = typedToken
+    ? /^xoxb-/.test(typedToken)
+      ? `typed:${typedToken}`
+      : null
+    : slice.botTokenAlreadySet || automationId
+      ? "stored"
       : null;
+  const lastFetched = useRef<string | null>(null);
+  useEffect(() => {
+    if (!fetchKey || lastFetched.current === fetchKey) return;
+    const delay = fetchKey.startsWith("typed:") ? 600 : 0;
+    const timer = setTimeout(() => fetchChannels(fetchKey), delay);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchKey]);
+
+  // Filterable collection, refreshed whenever a fetch lands.
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const { contains } = useFilter({ sensitivity: "base" });
+  const { collection, filter, set } = useListCollection<{
+    label: string;
+    value: string;
+  }>({ initialItems: [], filter: contains });
+  useEffect(() => {
+    set(
+      (channelData ?? []).map((c) => ({
+        value: c.id,
+        label: `${c.isPrivate ? "🔒 " : "#"}${c.name}`,
+      })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelData]);
+
+  const canLoad =
+    typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
+  const returnedError =
+    list.data?.error && list.data.error !== "no_token"
+      ? list.data.error
+      : null;
+  const hint = list.isError
+    ? `Couldn't load channels: ${list.error?.message ?? "request failed"}. You can still type the channel above.`
+    : returnedError === "missing_scope"
+      ? "Add the channels:read scope to your app and reinstall it to pick from a list — you can still type the channel above."
+      : returnedError
+        ? "Couldn't load channels from Slack. Check the token, or type the channel above."
+        : null;
 
   return (
     <Field.Root>
-      <Field.Label>Channel</Field.Label>
-      <Input
-        value={slice.channelId}
-        onChange={(e) => onChange({ ...slice, channelId: e.target.value })}
-        placeholder="#alerts or C0123…"
-      />
-      <HStack gap={2} pt={1}>
-        {channels.length > 0 ? (
-          <NativeSelect.Root size="sm" width="auto">
-            <NativeSelect.Field
-              value=""
-              onChange={(e) => {
-                if (e.target.value)
-                  onChange({ ...slice, channelId: e.target.value });
-              }}
-            >
-              <option value="">Pick a channel…</option>
-              {channels.map((c) => (
-                <option key={c.id} value={c.id}>
-                  #{c.name}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        ) : (
+      <HStack justify="space-between" align="center" width="full">
+        <Field.Label>Channel</Field.Label>
+        {canLoad ? (
           <Button
             variant="plain"
             size="xs"
@@ -299,18 +348,73 @@ function SlackChannelField({
             paddingX={0}
             color="fg.muted"
             _hover={{ color: "fg" }}
-            disabled={!canLoad || list.isPending}
-            onClick={() =>
-              list.mutate({ projectId, botToken: slice.botToken.trim() })
-            }
+            disabled={list.isPending}
+            onClick={() => fetchChannels(fetchKey ?? `manual:${Date.now()}`)}
           >
-            {list.isPending ? "Loading…" : "Load channels from Slack"}
+            {list.isPending ? "Loading…" : "Reload"}
           </Button>
-        )}
+        ) : null}
       </HStack>
-      {scopeHint ? (
-        <Text textStyle="xs" color="fg.muted" pt={1}>
-          {scopeHint}
+      <Combobox.Root
+        collection={collection}
+        size="sm"
+        width="full"
+        allowCustomValue
+        openOnClick
+        value={slice.channelId ? [slice.channelId] : []}
+        onValueChange={(details) =>
+          onChange({ ...slice, channelId: details.value[0] ?? "" })
+        }
+        onInputValueChange={(details) => {
+          filter(details.inputValue);
+          // Immediate free entry (paste an ID / type a name). A real pick is
+          // handled by onValueChange so we keep the channel ID, not its label.
+          if (details.reason === "input-change") {
+            onChange({ ...slice, channelId: details.inputValue });
+          }
+        }}
+        onOpenChange={(details) => {
+          if (details.open) filter("");
+        }}
+      >
+        <Combobox.Control>
+          <Combobox.Input
+            placeholder={
+              list.isPending ? "Loading channels…" : "#alerts or C0123…"
+            }
+          />
+          <Combobox.IndicatorGroup>
+            {list.isPending ? <Spinner size="xs" /> : null}
+            <Combobox.Trigger />
+          </Combobox.IndicatorGroup>
+        </Combobox.Control>
+        <Portal>
+          <Combobox.Positioner zIndex="max">
+            <Combobox.Content>
+              <Combobox.Empty>
+                {list.isPending
+                  ? "Loading channels…"
+                  : channels.length === 0
+                    ? "Type a channel name or ID"
+                    : "No match — press Enter to use what you typed"}
+              </Combobox.Empty>
+              {collection.items.map((item) => (
+                <Combobox.Item item={item} key={item.value}>
+                  <Combobox.ItemText>{item.label}</Combobox.ItemText>
+                  <Combobox.ItemIndicator />
+                </Combobox.Item>
+              ))}
+            </Combobox.Content>
+          </Combobox.Positioner>
+        </Portal>
+      </Combobox.Root>
+      {hint ? (
+        <Text
+          textStyle="xs"
+          color={list.isError ? "fg.error" : "fg.muted"}
+          pt={1}
+        >
+          {hint}
         </Text>
       ) : null}
     </Field.Root>
@@ -353,10 +457,6 @@ function SlackConfigForm({
   ctx,
 }: ConfigFormProps<SlackSlice, SlackPreview>) {
   const isBlockKit = slice.templateType === "block_kit";
-  // Graph-alert drafts dispatch with the alert defaults, so the editor
-  // must seed the same template — otherwise the shown template and the
-  // rendered message disagree.
-  const isGraphAlert = ctx.sourceKind === "graphAlert";
   const isReport = ctx.sourceKind === "report";
   // A dashboard report maps straight onto its panels — no layout to pick.
   const autoLayout = isReport && reportSourceIsAutoLayout(ctx.reportSourceKind);
@@ -377,13 +477,15 @@ function SlackConfigForm({
   );
 
   // A returning author who hand-edited the Block Kit source (not a preset,
-  // not the framework default) lands with the code editor already open so
-  // their custom layout is visible; everyone else starts on the gallery.
+  // not the framework default) lands on the Code tab so their custom layout
+  // is visible; everyone else starts on the Template gallery.
   const isCustomBlockKit =
     isBlockKit &&
     !slice.template.usingDefault &&
     !findTemplateOptionBySource(slice.template.value);
-  const [codeOpen, setCodeOpen] = useState(isCustomBlockKit);
+  const [messageMode, setMessageMode] = useState<"template" | "code">(
+    isCustomBlockKit ? "code" : "template",
+  );
 
   // If the cadence or trigger kind switches away from what the picked
   // preset was built for (immediate template on a digest dispatch, trace
@@ -483,6 +585,7 @@ function SlackConfigForm({
           slice={slice}
           onChange={onChange}
           projectId={ctx.projectId}
+          automationId={ctx.automationId}
         />
       ) : (
         <VStack align="stretch" gap={3}>
@@ -517,15 +620,6 @@ function SlackConfigForm({
               : "Add a webhook URL first"
         }
       />
-      {/* Alerts always deliver immediately (cadence is pinned server-side) and
-          reports run on their own cron schedule — so the digest-cadence switch
-          only makes sense for trace automations. */}
-      {!isGraphAlert && !isReport ? (
-        <InlineCadenceSelect
-          value={ctx.notificationCadence}
-          onChange={ctx.setNotificationCadence}
-        />
-      ) : null}
       <FieldHeader
         label="Message"
         usingDefault={slice.template.usingDefault}
@@ -533,51 +627,92 @@ function SlackConfigForm({
         trailing={<VariableInfoIcon variables={variables} />}
       />
       {isBlockKit ? (
-        // Default tier: the guided gallery is the primary surface. The
-        // author picks a ready-made layout and sees a preview; the plain
-        // text and code escape hatches sit below as opt-ins.
+        // Two modes, side by side: a guided gallery (Template) or the raw
+        // Block Kit editor (Code). "Code" is a tab, not a buried disclosure —
+        // plain text is the one remaining escape hatch below.
         <VStack align="stretch" gap={3}>
-          {autoLayout ? (
-            // A dashboard IS its panels — there is no layout to choose, so the
-            // gallery would be a menu of one. It maps straight to the message.
-            <Text textStyle="xs" color="fg.muted">
-              Every panel on the dashboard is sent as its own chart. There's
-              nothing to lay out — you can still edit the message below.
-            </Text>
+          <SegmentedControl
+            size="sm"
+            alignSelf="start"
+            value={messageMode}
+            onValueChange={({ value }) => {
+              if (value) setMessageMode(value as "template" | "code");
+            }}
+            items={[
+              { value: "template", label: "Template" },
+              { value: "code", label: "Code" },
+            ]}
+          />
+          {messageMode === "template" ? (
+            autoLayout ? (
+              // A dashboard IS its panels — there is no layout to choose, so the
+              // gallery would be a menu of one. Switch to Code to edit the copy.
+              <Text textStyle="xs" color="fg.muted">
+                Every panel on the dashboard is sent as its own chart. There's
+                nothing to lay out; switch to Code to edit the message yourself.
+              </Text>
+            ) : (
+              <SlackBlockKitTemplatePicker
+                cadence={ctx.cadenceMode}
+                kind={ctx.sourceKind}
+                reportSource={ctx.reportSourceKind}
+                deliveryMethod={slice.deliveryMethod}
+                hasEvaluationFilter={ctx.hasEvaluationFilter}
+                currentSource={templateValue}
+                onSelect={(option) =>
+                  onChange({
+                    ...slice,
+                    template: { value: option.source, usingDefault: false },
+                  })
+                }
+                onSelectOtherCadence={(option) => {
+                  // Cross-cadence pick: switch the cadence alongside the template
+                  // so the author doesn't have to round-trip via the Cadence
+                  // section. Both land in the same batch, so the cadence-mismatch
+                  // reset effect above sees a consistent pair and leaves it
+                  // alone.
+                  ctx.setNotificationCadence(
+                    option.cadenceFit === "digest" ? "5min_digest" : "immediate",
+                  );
+                  onChange({
+                    ...slice,
+                    template: { value: option.source, usingDefault: false },
+                  });
+                }}
+              />
+            )
           ) : (
-            <SlackBlockKitTemplatePicker
-              cadence={ctx.cadenceMode}
-              kind={ctx.sourceKind}
-              reportSource={ctx.reportSourceKind}
-              deliveryMethod={slice.deliveryMethod}
-              hasEvaluationFilter={ctx.hasEvaluationFilter}
-              currentSource={templateValue}
-              onSelect={(option) =>
-                onChange({
-                  ...slice,
-                  template: { value: option.source, usingDefault: false },
-                })
-              }
-              onSelectOtherCadence={(option) => {
-                // Cross-cadence pick: switch the cadence alongside the template
-                // so the author doesn't have to round-trip via the Cadence
-                // section. Both land in the same batch, so the cadence-mismatch
-                // reset effect above sees a consistent pair and leaves it
-                // alone.
-                ctx.setNotificationCadence(
-                  option.cadenceFit === "digest" ? "5min_digest" : "immediate",
-                );
-                onChange({
-                  ...slice,
-                  template: { value: option.source, usingDefault: false },
-                });
-              }}
-            />
+            // The raw Block Kit editor. This is the only place "Block Kit" and
+            // Liquid braces are exposed. The `liquid-json` Monaco language
+            // tokenizes the JSON and its embedded Liquid, and the Block Kit
+            // schema drives in-editor markers.
+            <VStack align="stretch" gap={2}>
+              <Text textStyle="xs" color="fg.muted">
+                Write the layout yourself in Block Kit. Values in braces fill in
+                from your trace or alert when the message sends.
+              </Text>
+              <Box data-testid="slack-code-editor">
+                <LiquidEditor
+                  variables={variables}
+                  height="320px"
+                  language={LIQUID_JSON_LANGUAGE_ID}
+                  value={templateValue}
+                  onChange={(value) =>
+                    onChange({
+                      ...slice,
+                      template: { value, usingDefault: false },
+                    })
+                  }
+                  jsonSchema={SLACK_BLOCK_KIT_JSON_SCHEMA}
+                  jsonSchemaShadowUri="file:///automation/slack-block-kit-shadow.json"
+                />
+              </Box>
+            </VStack>
           )}
           {slackPreview ? (
             <CompactSlackPreview payload={slackPreview.payload} />
           ) : null}
-          {/* Escape hatch 1: write the message yourself as plain text. */}
+          {/* Escape hatch: write the message yourself as plain text. */}
           <Button
             variant="plain"
             size="xs"
@@ -589,34 +724,6 @@ function SlackConfigForm({
           >
             Write the message as plain text instead
           </Button>
-          {/* Escape hatch 2: the raw Block Kit editor. This is the only
-              place "Block Kit" and Liquid braces are exposed — everything
-              above stays no-code. The `liquid-json` Monaco language tokenizes
-              the JSON and its embedded Liquid, and the Block Kit schema drives
-              in-editor markers. */}
-          <TemplateDisclosure
-            triggerLabel="Edit as code"
-            hint="Write the layout yourself in Block Kit. Values in braces fill in from your trace or alert when the message sends."
-            open={codeOpen}
-            onToggle={() => setCodeOpen((prev) => !prev)}
-          >
-            <Box data-testid="slack-code-editor">
-              <LiquidEditor
-                variables={variables}
-                height="320px"
-                language={LIQUID_JSON_LANGUAGE_ID}
-                value={templateValue}
-                onChange={(value) =>
-                  onChange({
-                    ...slice,
-                    template: { value, usingDefault: false },
-                  })
-                }
-                jsonSchema={SLACK_BLOCK_KIT_JSON_SCHEMA}
-                jsonSchemaShadowUri="file:///automation/slack-block-kit-shadow.json"
-              />
-            </Box>
-          </TemplateDisclosure>
         </VStack>
       ) : (
         // "Edit text" tier: a plain text Slack message, no Block Kit JSON.
@@ -669,10 +776,12 @@ function SlackBotFields({
   slice,
   onChange,
   projectId,
+  automationId,
 }: {
   slice: SlackSlice;
   onChange: (next: SlackSlice) => void;
   projectId: string;
+  automationId?: string;
 }) {
   const tokenRef = useRef<HTMLInputElement>(null);
   const [stepsOpen, setStepsOpen] = useState(false);
@@ -785,6 +894,7 @@ function SlackBotFields({
       </Field.Root>
       <SlackChannelField
         projectId={projectId}
+        automationId={automationId}
         slice={slice}
         onChange={onChange}
       />

@@ -4,7 +4,7 @@ import { Cron } from "croner";
 import { z } from "zod";
 
 /**
- * Builder for the `Trigger` row representing a scheduled REPORT (ADR-042). A
+ * Builder for the `Trigger` row representing a scheduled REPORT (ADR-044). A
  * report is the schedule-triggered automation kind: on a calendar schedule it
  * renders a content SOURCE into the notify channels. The source is orthogonal
  * to the schedule — a report can render a whole dashboard, a single custom

@@ -18,8 +18,10 @@ import { listSlackChannels } from "~/server/triggers/slackWebApi";
 import {
   InvalidEmailRecipientError,
   MissingAnnotatorError,
+  NotificationDeliveryError,
   ProjectNotFoundError,
 } from "~/server/app-layer/triggers/errors";
+import { isDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import {
   decryptSlackBotToken,
   persistSlackActionParams,
@@ -184,11 +186,20 @@ function httpStatusToTRPCCode(httpStatus: number): TRPCErrorCode {
  */
 function toTemplateTRPCError(err: unknown): TRPCError {
   if (err instanceof TRPCError) return err;
-  if (err instanceof DomainError) {
+  // A provider rejection (Slack not_in_channel, dead webhook, bad token) arrives
+  // as a DispatchError with an already-actionable message — lift it onto the
+  // typed DomainError channel so the UI shows a clean 4xx, not a generic 500.
+  const domainError =
+    err instanceof DomainError
+      ? err
+      : isDispatchError(err)
+        ? new NotificationDeliveryError(err.message)
+        : null;
+  if (domainError) {
     return new TRPCError({
-      code: httpStatusToTRPCCode(err.httpStatus),
-      message: err.message,
-      cause: err,
+      code: httpStatusToTRPCCode(domainError.httpStatus),
+      message: domainError.message,
+      cause: domainError,
     });
   }
   return new TRPCError({
@@ -1117,7 +1128,7 @@ export const automationRouter = createTRPCRouter({
       }
 
       if (isReport && input.report) {
-        // Wire the report onto the calendar scheduler (ADR-042): its trigger
+        // Wire the report onto the calendar scheduler (ADR-044): its trigger
         // id is the scheduler targetId; publishWake nudges every pod's loop.
         await getApp().triggers.syncReportSchedule({
           projectId: input.projectId,

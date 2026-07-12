@@ -1,27 +1,26 @@
-import { Box, Code, HStack, Text, Textarea } from "@chakra-ui/react";
+import { Box, Textarea } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSuggestionState } from "~/features/traces-v2/components/SearchBar/getSuggestionState";
+import { SuggestionDropdown } from "~/features/traces-v2/components/SearchBar/SuggestionDropdown";
+import { SyntaxHelpDrawerHost } from "~/features/traces-v2/components/SearchBar/SyntaxHelpDrawer";
 import {
-  getFieldSuggestions,
-  getValueSuggestions,
-} from "~/features/traces-v2/components/SearchBar/suggestionItems";
-
-/** One dropdown row: `value` lands in the query, `label`/`hint` render. */
-interface Row {
-  value: string;
-  label: string;
-  hint?: string;
-  isPrefix?: boolean;
-}
+  buildSuggestionUI,
+  CLOSED_SUGGESTION,
+  highlightedRow,
+  navigateSuggestion,
+  type SuggestionRow,
+} from "~/features/traces-v2/components/SearchBar/suggestionUI";
 
 /**
  * A controlled trace-filter query input with field/value autocomplete.
  *
- * Reuses the traces-view suggestion engine verbatim (`getSuggestionState` +
- * `getFieldSuggestions` / `getValueSuggestions`), so the fields, values, and
- * ranking match the search bar exactly — but stays fully controlled off a
- * `value`/`onChange` pair instead of the traces-view's global filter store, so
- * editing here never touches the live traces view.
+ * Reuses the traces-view suggestion engine AND its dropdown verbatim
+ * (`getSuggestionState` + `buildSuggestionUI` + `SuggestionDropdown`), so the
+ * fields, values, grouping, icons, and ranking match the search bar exactly —
+ * but stays fully controlled off a `value`/`onChange` pair instead of the
+ * traces-view's global filter store, so editing here never touches the live
+ * traces view. The syntax-docs drawer the dropdown footer opens is mounted
+ * locally so that affordance works here too.
  */
 export function QueryFilterInput({
   value,
@@ -35,42 +34,34 @@ export function QueryFilterInput({
   const ref = useRef<HTMLTextAreaElement>(null);
   const [cursor, setCursor] = useState(0);
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   const state = useMemo(
     () => getSuggestionState(value, cursor),
     [value, cursor],
   );
 
-  const rows: Row[] = useMemo(() => {
-    if (!state.open) return [];
-    if (state.mode === "field") {
-      return getFieldSuggestions(state.query).map((i) => ({
-        value: i.value,
-        label: i.label,
-        hint: i.field,
-        isPrefix: i.isPrefix,
-      }));
-    }
-    return getValueSuggestions(state.field, state.query).map((v) => ({
-      value: v,
-      label: v,
-    }));
-  }, [state]);
+  const ui = useMemo(
+    () =>
+      open
+        ? buildSuggestionUI({ state, previousSelected: selectedIndex })
+        : CLOSED_SUGGESTION,
+    [open, state, selectedIndex],
+  );
 
   // Keep the highlighted row in range as the candidate list changes.
   useEffect(() => {
-    setHighlight((h) => (h >= rows.length ? 0 : h));
-  }, [rows.length]);
+    setSelectedIndex((h) => (h >= ui.items.length ? 0 : h));
+  }, [ui.items.length]);
 
-  const showDropdown = open && rows.length > 0;
+  const showDropdown = open && ui.state.open && ui.items.length > 0;
 
   const syncCursor = () => {
     const el = ref.current;
     if (el) setCursor(el.selectionStart ?? 0);
   };
 
-  const accept = (row: Row) => {
+  const accept = (row: SuggestionRow) => {
     if (!state.open) return;
     // Fields append `:` (ready for a value) unless they're a dynamic prefix
     // that still needs a key; accepted values get a trailing space.
@@ -96,17 +87,22 @@ export function QueryFilterInput({
     });
   };
 
+  const acceptByValue = (rowValue: string) => {
+    const row = ui.items.find((r) => r.value === rowValue);
+    if (row) accept(row);
+  };
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (!showDropdown) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlight((h) => (h + 1) % rows.length);
+      setSelectedIndex(navigateSuggestion({ ui, direction: "down" }).selectedIndex);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlight((h) => (h - 1 + rows.length) % rows.length);
+      setSelectedIndex(navigateSuggestion({ ui, direction: "up" }).selectedIndex);
     } else if (e.key === "Enter" || e.key === "Tab") {
       e.preventDefault();
-      const row = rows[highlight];
+      const row = highlightedRow(ui);
       if (row) accept(row);
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -140,50 +136,9 @@ export function QueryFilterInput({
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
       {showDropdown ? (
-        <Box
-          position="absolute"
-          top="100%"
-          left={0}
-          right={0}
-          marginTop={1}
-          zIndex="dropdown"
-          maxHeight="240px"
-          overflowY="auto"
-          bg="bg.panel"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          boxShadow="md"
-          paddingY={1}
-        >
-          {rows.map((row, i) => (
-            <HStack
-              key={`${row.value}-${i}`}
-              gap={2}
-              paddingX={3}
-              paddingY={1.5}
-              cursor="pointer"
-              bg={i === highlight ? "bg.emphasized" : undefined}
-              _hover={{ bg: "bg.emphasized" }}
-              onMouseEnter={() => setHighlight(i)}
-              // mousedown (not click) so it fires before the textarea blur.
-              onMouseDown={(e) => {
-                e.preventDefault();
-                accept(row);
-              }}
-            >
-              <Text textStyle="sm" flex={1} minWidth={0} truncate>
-                {row.label}
-              </Text>
-              {row.hint && row.hint !== row.label ? (
-                <Code size="sm" color="fg.muted" flexShrink={0}>
-                  {row.hint}
-                </Code>
-              ) : null}
-            </HStack>
-          ))}
-        </Box>
+        <SuggestionDropdown ui={ui} onSelect={acceptByValue} />
       ) : null}
+      <SyntaxHelpDrawerHost />
     </Box>
   );
 }

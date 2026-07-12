@@ -1,7 +1,7 @@
 import type { SchedulerHandler } from "./scheduler.types";
 
 /**
- * ADR-042 §4 "Consumer registration": maps `targetType → handler`, the
+ * ADR-044 §4 "Consumer registration": maps `targetType → handler`, the
  * calendar analog of the outbox heartbeat registry
  * (`heartbeat.registry.ts`). A report registers
  * `"reportTrigger" → renderAndDispatchReport`; adding a second scheduled

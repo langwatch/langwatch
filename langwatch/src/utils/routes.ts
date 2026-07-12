@@ -118,6 +118,10 @@ export const projectRoutes = {
     path: "/[project]/triggers",
     title: "Triggers",
   },
+  automations: {
+    path: "/[project]/automations",
+    title: "Automations",
+  },
   prompts: {
     path: "/[project]/prompts",
     title: "Prompts",

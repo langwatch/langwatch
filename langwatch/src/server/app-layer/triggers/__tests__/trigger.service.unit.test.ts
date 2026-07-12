@@ -122,7 +122,7 @@ describe("TriggerService", () => {
     });
 
     // A scheduled report persists `filters: {}` and no `customGraphId` — the
-    // exact shape of a match-everything trace automation. Before ADR-042's
+    // exact shape of a match-everything trace automation. Before ADR-044's
     // `triggerKind` reached this read, every weekly report was a candidate
     // trace trigger, so the notify reactor enqueued a settle (and the settle
     // dispatcher waved it through, its filter guard being a no-op on empty

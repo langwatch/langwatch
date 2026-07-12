@@ -1,7 +1,7 @@
 import { Cron } from "croner";
 
 /**
- * ADR-042 §4 "Representation & nextRunAt computation": compute the next fire
+ * ADR-044 §4 "Representation & nextRunAt computation": compute the next fire
  * from a cron expression evaluated in its IANA timezone, strictly after
  * `after`. Cron + timezone (not a relative window) is what makes "09:00 their
  * Monday" a wall-clock instant that tracks DST automatically — a spring-forward

@@ -18,7 +18,7 @@ export interface OpsScheduledJob {
 }
 
 /**
- * Read-only ops surface over the calendar scheduler (ADR-042). Exposes the
+ * Read-only ops surface over the calendar scheduler (ADR-044). Exposes the
  * durable `ScheduledJob` rows to the ops dashboard so an operator can see what
  * is scheduled, when it next fires, and when it last fired — never a firing
  * path. Cross-tenant by design (one scheduler serves every project); the read

@@ -1,9 +1,22 @@
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { TriggerAction } from "@prisma/client";
+import { Settings2 } from "lucide-react";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import type { ClientEntry } from "~/automations/providers/types";
 import type { ConditionSource } from "../logic/draftReducer";
-import { FacetSection } from "./FacetSection";
+import { useAutomationStore } from "../state/automationStore";
+import {
+  useConfigComplete,
+  useConfigurationSummary,
+} from "../state/selectors";
+import { FacetSection, type FacetAccordionProps } from "./FacetSection";
 
 /** The active channel card is tinted with the preset's list-page accent. */
 const ACCENT_FOR_SOURCE: Record<ConditionSource, string> = {
@@ -24,11 +37,16 @@ export function DeliveryPicker({
   value,
   onChange,
   source,
+  accordion,
 }: {
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
   source: ConditionSource;
+  accordion?: FacetAccordionProps;
 }) {
+  const setSection = useAutomationStore((s) => s.setSection);
+  const configComplete = useConfigComplete();
+  const configSummary = useConfigurationSummary();
   const entries = Object.values(CLIENT_PROVIDERS);
   const notify = entries.filter((e) => e.shared.category === "notify");
   const action = entries.filter((e) => e.shared.category === "action");
@@ -36,19 +54,29 @@ export function DeliveryPicker({
   const notifyOnly = isAlertKind || source === "report";
   const accent = ACCENT_FOR_SOURCE[source];
 
+  // Picking a channel drops the author straight into its setup — no separate,
+  // easy-to-miss "Setup" row to hunt for further down the page.
+  const pick = (next: TriggerAction) => {
+    onChange(next);
+    setSection("configuration");
+  };
+
   return (
     <FacetSection
       title="Delivery"
       help="Where the notification goes and what it sends. Notify channels post to Slack, email, or a webhook; actions add matching traces to a dataset or annotation queue."
+      accordion={accordion}
+      complete={configComplete}
+      summary={value ? configSummary : "Choose where it goes"}
     >
       <VStack align="stretch" gap={3}>
         {notify.length > 0 ? (
           <DeliveryGroup
             label="Notify"
-            description="Tell someone — Slack, email, webhook."
+            description="Tell someone: Slack, email, webhook."
             entries={notify}
             value={value}
-            onChange={onChange}
+            onChange={pick}
             isAlertKind={isAlertKind}
             accent={accent}
           />
@@ -59,10 +87,33 @@ export function DeliveryPicker({
             description="Do something to the matched trace."
             entries={action}
             value={value}
-            onChange={onChange}
+            onChange={pick}
             isAlertKind={isAlertKind}
             accent={accent}
           />
+        ) : null}
+        {value ? (
+          <HStack
+            justify="space-between"
+            gap={3}
+            padding={2.5}
+            borderRadius="md"
+            borderWidth="1px"
+            borderColor={configComplete ? "green.solid" : "border"}
+            colorPalette="green"
+          >
+            <Text textStyle="xs" color="fg.muted" lineClamp={1} minWidth="0">
+              {configComplete ? configSummary : "Finish the setup to save."}
+            </Text>
+            <Button
+              size="xs"
+              variant="outline"
+              flexShrink={0}
+              onClick={() => setSection("configuration")}
+            >
+              <Settings2 size={13} /> Edit setup
+            </Button>
+          </HStack>
         ) : null}
       </VStack>
     </FacetSection>

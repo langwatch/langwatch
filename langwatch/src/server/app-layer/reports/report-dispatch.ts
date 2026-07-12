@@ -154,7 +154,7 @@ function scheduleLabel(cron: string, timezone: string): string {
 }
 
 /**
- * ADR-042 Phase 3c: the scheduler's report handler. When a report's
+ * ADR-044 Phase 3c: the scheduler's report handler. When a report's
  * `ScheduledJob` comes due, load the trigger, fetch the data its source
  * promises (matching traces, or the series behind each chart panel), and
  * dispatch via the SAME notify pipeline alerts use (`renderTriggerEmail` /

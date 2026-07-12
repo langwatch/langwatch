@@ -705,7 +705,7 @@ export function initializeDefaultApp(options?: {
   }
   outboxHeartbeatScheduler?.start();
 
-  // ADR-042 Phase 1: the generic calendar scheduler. No cron infra. A
+  // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
   // worker-only in-process loop that sleeps until the soonest due
   // `ScheduledJob`, atomically claims each due row (a conditional nextRunAt
   // update — the DB-level exactly-once guarantee), and fires it into a handler
@@ -730,7 +730,7 @@ export function initializeDefaultApp(options?: {
       : undefined;
   scheduler?.start();
 
-  // ADR-042 Phase 3c: register the report handler so a due report ScheduledJob
+  // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
   // alerts). The scheduler registry is a process singleton.
   if (config.processRole === "worker") {

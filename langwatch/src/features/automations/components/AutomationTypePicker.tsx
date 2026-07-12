@@ -4,7 +4,7 @@ import { Calendar, TrendingUp, Zap } from "lucide-react";
 import type { ConditionSource } from "../logic/draftReducer";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
-import { FacetSection } from "./FacetSection";
+import { FacetSection, type FacetAccordionProps } from "./FacetSection";
 import { SourceCard } from "./SourceCard";
 
 /** The three presets, in ADR-043 order, each with its list-page accent. */
@@ -37,11 +37,11 @@ const TYPES: {
   },
   {
     source: "report",
-    title: "Report",
-    description: "Send a dashboard, graph, or trace table on a schedule.",
+    title: "Schedule",
+    description: "Send a dashboard, graph, or trace table.",
     accent: "purple",
     icon: <Calendar size={16} />,
-    lockedTooltip: "Create a new automation to send a scheduled report.",
+    lockedTooltip: "Create a new automation to send something on a schedule.",
   },
 ];
 
@@ -55,10 +55,12 @@ const TYPES: {
  */
 export function AutomationTypePicker({
   sourceLocked = false,
+  accordion,
 }: {
   /** The preset can't change (editing a saved alert, or opened from a
    *  specific chart). The unpicked cards render visibly inert. */
   sourceLocked?: boolean;
+  accordion?: FacetAccordionProps;
 }) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
@@ -71,10 +73,16 @@ export function AutomationTypePicker({
     }
   };
 
+  const activeTitle = TYPES.find((t) => t.source === draft.source)?.title ?? "";
+
   return (
     <FacetSection
       title="Type"
-      help="Automations act on each matching trace, alerts watch a metric for a threshold breach, and reports send something on a schedule. The type fixes what you fill out below."
+      help="Automations act on each matching trace, alerts watch a metric for a threshold breach, and schedules send something on a recurring schedule. The type fixes what you fill out below."
+      accordion={accordion}
+      // A type is always chosen, so the check reads as "you've decided this".
+      complete
+      summary={activeTitle}
     >
       <HStack gap={2} align="stretch">
         {TYPES.map((t) => {

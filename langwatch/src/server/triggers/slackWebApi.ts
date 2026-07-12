@@ -32,6 +32,33 @@ interface SlackApiResponse {
 }
 
 /**
+ * Turn a raw Slack `chat.postMessage` error code into a message that tells the
+ * author what to actually do. The bare codes (`not_in_channel`,
+ * `channel_not_found`) are the top setup snags and read as opaque in a toast —
+ * a bot posting to a public channel it hasn't joined needs either an invite or
+ * the `chat:write.public` scope, and a bad channel value needs the picker.
+ */
+function explainSlackPostError(code: string): string {
+  switch (code) {
+    case "not_in_channel":
+      return "the bot isn't in that channel. Invite it with `/invite @LangWatch` in the channel, or reinstall the Slack app with the `chat:write.public` scope so it can post to any public channel";
+    case "channel_not_found":
+      return "that channel doesn't exist or the bot can't see it. Pick it from the channel list, or paste the channel ID (e.g. C0123ABCD) instead of the name";
+    case "is_archived":
+      return "that channel is archived — pick an active channel";
+    case "invalid_auth":
+    case "not_authed":
+    case "token_revoked":
+    case "account_inactive":
+      return "the bot token is invalid or was revoked. Paste a fresh Bot User OAuth token (starts with `xoxb-`)";
+    case "missing_scope":
+      return "the Slack app is missing a required scope. Reinstall it with the `chat:write` (and `chat:write.public`) scopes";
+    default:
+      return `Slack rejected the message: ${code}`;
+  }
+}
+
+/**
  * Post a message through the Slack Web API (`chat.postMessage`) with a bot
  * token — the delivery surface that renders the newer Block Kit blocks (charts,
  * tables, alerts) that incoming webhooks reject.
@@ -93,7 +120,7 @@ export async function postSlackChatMessage({
     ? ` (${body.response_metadata.messages.join("; ")})`
     : "";
   throw new DispatchError({
-    message: `${label}: Slack rejected the message: ${code}${detail}`,
+    message: `${label}: ${explainSlackPostError(code)}${detail}`,
     retryable: RETRYABLE_SLACK_ERRORS.has(code),
   });
 }
@@ -128,19 +155,14 @@ const MAX_CHANNEL_PAGES = 10;
 const CHANNEL_LIST_MAX_RESPONSE_BYTES = 1024 * 1024;
 
 /**
- * List the channels a bot token can see (`conversations.list`) so the config
- * form can offer a channel picker. Requires the `channels:read` (and
- * `groups:read` for private) scope on the app — WITHOUT it Slack returns
- * `missing_scope`, which is surfaced (not thrown) so the UI degrades to manual
- * channel entry rather than erroring.
- *
- * Slack pages this endpoint by cursor, so a real workspace needs the full walk:
- * one page is only ever a prefix of the channel list. A failure part-way through
- * returns the channels gathered so far ALONGSIDE the error, so the picker offers
- * what it has instead of collapsing to nothing.
+ * One cursor-paged `conversations.list` walk for a specific `types` set. Slack
+ * pages by cursor, so a real workspace needs the full walk — one page is only
+ * ever a prefix. A failure part-way through returns the channels gathered so
+ * far ALONGSIDE the error, so a caller can still offer what it has.
  */
-export async function listSlackChannels(
+async function listChannelsForTypes(
   token: string,
+  types: string,
 ): Promise<{ channels: SlackChannel[]; error: string | null }> {
   const collected: SlackChannel[] = [];
   const done = (error: string | null) => ({
@@ -152,7 +174,7 @@ export async function listSlackChannels(
 
   for (let page = 0; page < MAX_CHANNEL_PAGES; page++) {
     const params = new URLSearchParams({
-      types: "public_channel,private_channel",
+      types,
       exclude_archived: "true",
       limit: String(CHANNEL_PAGE_SIZE),
     });
@@ -201,4 +223,27 @@ export async function listSlackChannels(
     "Slack conversations.list page cap reached; returning a partial channel list",
   );
   return done(null);
+}
+
+/**
+ * List the channels a bot token can see (`conversations.list`) so the config
+ * form can offer a channel picker.
+ *
+ * Slack rejects the WHOLE request with `missing_scope` if ANY requested type
+ * lacks its scope — so asking for `private_channel` (needs `groups:read`) fails
+ * outright for an app that only has `channels:read`, taking the public channels
+ * down with it. We degrade instead: try public+private, and on `missing_scope`
+ * retry public-only. An app with just `channels:read` then still gets its public
+ * channels; only an app missing `channels:read` too ends up with `missing_scope`.
+ */
+export async function listSlackChannels(
+  token: string,
+): Promise<{ channels: SlackChannel[]; error: string | null }> {
+  const withPrivate = await listChannelsForTypes(
+    token,
+    "public_channel,private_channel",
+  );
+  if (withPrivate.error !== "missing_scope") return withPrivate;
+  // Missing `groups:read` (private) — fall back to public channels only.
+  return listChannelsForTypes(token, "public_channel");
 }

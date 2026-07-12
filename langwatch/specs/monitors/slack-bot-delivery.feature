@@ -1,6 +1,6 @@
 Feature: Slack delivery via a bot connection (Web API)
   As a team wiring Slack notifications
-  I want to deliver via a Slack app (bot token) instead of only an incoming webhook
+  I want to deliver via a Slack app (bot token), not only an incoming webhook
   So that the richer Block Kit blocks (charts, tables, alerts) actually render
 
   Background:

@@ -17,7 +17,7 @@ const toPgTimestampUtc = (d: Date): string =>
   d.toISOString().slice(0, 23).replace("T", " ");
 
 /**
- * Prisma-backed `ScheduledJob` repository (ADR-042 §4). The durable Postgres
+ * Prisma-backed `ScheduledJob` repository (ADR-044 §4). The durable Postgres
  * row is the source of truth; the service layer (SchedulerService) depends on
  * the `ScheduledJobRepository` interface, never on Prisma directly.
  *
@@ -81,7 +81,7 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     expectedNextRunAt: Date;
     leaseUntil: Date;
   }): Promise<boolean> {
-    // The correctness core (ADR-042 §4): a CONDITIONAL update guarded on the
+    // The correctness core (ADR-044 §4): a CONDITIONAL update guarded on the
     // exact `nextRunAt` we read during the due-scan. N workers racing the same
     // due row all issue this UPDATE; Postgres row-locks serialise them, the
     // first moves `nextRunAt` so every other WHERE no longer matches (0 rows

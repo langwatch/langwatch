@@ -3003,7 +3003,7 @@ model LangyConversation {
 // firing its registered handler. That conditional claim is the SOLE
 // exactly-once mechanism: exactly one of N racing workers wins each slot, so
 // every worker can run the loop and share firing load (no leader-lock). See
-// src/server/app-layer/scheduler/ and dev/docs/adr/042-scheduled-reports-automation-kind.md.
+// src/server/app-layer/scheduler/ and dev/docs/adr/044-scheduled-reports-automation-kind.md.
 model ScheduledJob {
   id         String    @id @default(nanoid())
   projectId  String // multitenancy + per-tenant fairness

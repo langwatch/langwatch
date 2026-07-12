@@ -11,7 +11,7 @@ import type {
 } from "./scheduler.types";
 
 /**
- * Best-effort cross-pod wake (ADR-042, user decision 2026-07-10). Postgres is
+ * Best-effort cross-pod wake (ADR-044, user decision 2026-07-10). Postgres is
  * the sole correctness/locking layer; Redis pub/sub is a pure optimization so a
  * job created on one pod fires on every pod's loop *now* instead of within one
  * poll backstop. Fire-and-forget: a dropped publish or a down Redis costs only
@@ -23,7 +23,7 @@ const WAKE_CHANNEL = "scheduler:wake";
  * Safety-net backstop for the intelligent sleep: even when the next job is far
  * away, the loop re-polls at least this often so a job created on another pod
  * (which this loop's in-process `wake()` can't reach) is still picked up within
- * one backstop. ADR-042 §4: "60 s granularity is ample for calendar reports."
+ * one backstop. ADR-044 §4: "60 s granularity is ample for calendar reports."
  */
 const DEFAULT_MAX_SLEEP_MS = 60_000;
 
@@ -61,7 +61,7 @@ const LEASE_MS = 10 * 60_000;
 const MAX_ATTEMPTS = 5;
 
 /** Base + cap for the bounded exponential retry backoff (see `backoffMs`). */
-const BACKOFF_BASE_MS = 60_000; // 1 min — matches the ADR-042 60s calendar granularity
+const BACKOFF_BASE_MS = 60_000; // 1 min — matches the ADR-044 60s calendar granularity
 const BACKOFF_CAP_MS = 30 * 60_000; // 30 min — an upper bound if MAX_ATTEMPTS grows
 
 export interface SchedulerServiceDeps {
@@ -82,7 +82,7 @@ export interface SchedulerServiceDeps {
 }
 
 /**
- * ADR-042 §4 — the in-process calendar scheduler loop. POSTGRES-ONLY: no
+ * ADR-044 §4 — the in-process calendar scheduler loop. POSTGRES-ONLY: no
  * Redis, no cron infrastructure. A long-lived, worker-only loop that sleeps
  * until the soonest due job (intelligent sleep, backstopped by `maxSleepMs`),
  * scans due rows, atomically LEASES each (conditional `nextRunAt` update), runs
@@ -298,7 +298,7 @@ export class SchedulerService {
 
     // 2. Every worker scans + claims — no leader gate. The per-row conditional
     //    claim (below) is the exactly-once guarantee, so concurrent workers
-    //    simply share the firing load (ADR-042 §4).
+    //    simply share the firing load (ADR-044 §4).
     await this.fireDueJobs();
   }
 
@@ -417,7 +417,7 @@ export class SchedulerService {
     // Report delivery is therefore AT-LEAST-ONCE: a crash AFTER the handler's
     // provider send but BEFORE this settle re-leases the slot on lease expiry
     // and re-fires it, so a duplicate report can go out. That is an accepted
-    // ADR-042 tradeoff — vastly better than the previous silent zero-delivery —
+    // ADR-044 tradeoff — vastly better than the previous silent zero-delivery —
     // and a distributed dedup ledger is deliberately OUT OF SCOPE here.
     try {
       await handler({
@@ -443,7 +443,7 @@ export class SchedulerService {
   }
 
   /**
-   * Retry policy for a thrown handler (ADR-042 "fire into a retrying path").
+   * Retry policy for a thrown handler (ADR-044 "fire into a retrying path").
    * Under the cap the SAME slot is retried after a bounded backoff (`lastSlot`
    * left untouched, so it is not counted delivered). At the cap the slot is
    * abandoned to the next cron instant so the schedule can't wedge — loud +

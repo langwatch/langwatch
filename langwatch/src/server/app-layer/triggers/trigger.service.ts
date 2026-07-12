@@ -49,7 +49,7 @@ export class TriggerService {
    * Active TRACE automations for a project: the ones the trace/evaluation
    * pipelines fire per ingested trace.
    *
-   * REPORTs are excluded (ADR-042). A report persists `filters: {}` and no
+   * REPORTs are excluded (ADR-044). A report persists `filters: {}` and no
    * `customGraphId` — byte-identical to a match-everything trace automation —
    * so without the kind check every scheduled report would ALSO fire once per
    * ingested trace: the notify reactor enqueues a settle for any NOTIFY trigger
@@ -123,7 +123,7 @@ export class TriggerService {
   }
 
   /**
-   * Sync a scheduled report's calendar entry (ADR-042): create/refresh the
+   * Sync a scheduled report's calendar entry (ADR-044): create/refresh the
    * `ScheduledJob` for this report trigger and best-effort wake every pod's
    * scheduler loop so it picks up the (possibly sooner) next run now. The
    * report trigger id IS the scheduler `targetId`. No-op if the scheduler

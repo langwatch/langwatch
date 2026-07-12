@@ -2,18 +2,18 @@
 
 - Status: Proposed
 - Date: 2026-07-10
-- Builds on: ADR-037 (operator surfaces), ADR-040 (webhook channel), ADR-041 (Block Kit templates), ADR-042 (scheduled reports)
+- Builds on: ADR-037 (operator surfaces), ADR-040 (webhook channel), ADR-041 (Block Kit templates), ADR-044 (scheduled reports)
 
 ## Context
 
 The automation surface grew three "kinds" — **Automation** (act on each matching
 trace), **Alert** (fire when a metric crosses a threshold), and **Report** (send
-something on a schedule). They were bolted on one at a time, so the config and
-the list UI conflate concerns: a single "Conditions" cell mixes *what the thing
-is about* with *what makes it run*; the Reports table led with a useless
-"Schedule → see Ops" column; the drawer's sections don't map cleanly onto "what
-lives where," and it can still say "New report" when the source is trace data.
-Users can't tell the pieces apart because the pieces aren't apart.
+on a schedule) — bolted on one at a time, so the config and list UI conflate
+concerns: a "Conditions" cell mixes *what the thing is about* with *what makes it
+run*; the Reports table led with a useless "Schedule → see Ops" column; the
+drawer's sections don't map onto "what lives where," and it can still say "New
+report" over trace data. Users can't tell the pieces apart because the pieces
+aren't apart.
 
 ## Decision
 
@@ -32,29 +32,28 @@ and hide the rest**.
 
 ### Consequences for the list UI
 
-- Each column is **one facet, one purpose**. No column mixes subject with timing.
+- Each column is **one facet, one purpose** — no column mixes subject with timing.
 - **Subject leads, cadence follows.** "Watches *error rate*" / "Sends the
   *analytics dashboard*" is the scannable identity; the schedule is secondary
-  detail, not the headline. (Directly fixes "when should really be what.")
+  detail. (Directly fixes "when should really be what.")
 - The three sections share the **same facet vocabulary** (Name · Subject ·
   Cadence · Delivery · runtime), so moving between them reads as "same shape,
   different preset," not three unrelated tables.
 
 ### Consequences for the drawer
 
-The authoring form's sections map 1:1 onto the facets, in this order: **Name →
-Type → Subject → Cadence → Severity (alerts) → Delivery**. Picking Type first
-fixes which later facets are shown, and the title/labels follow the chosen type
-(no more "New report" over a trace source). This is the home for the guided
-"templates → text → custom Block Kit" progressive disclosure (ADR-041), which
-lives inside **Delivery**.
+The authoring form's sections map 1:1 onto the facets, in order: **Name → Type →
+Subject → Cadence → Severity (alerts) → Delivery**. Picking Type first fixes which
+later facets show, and title/labels follow the chosen type (no more "New report"
+over a trace source). This is the home for the guided "templates → text → custom
+Block Kit" progressive disclosure (ADR-041), which lives inside **Delivery**.
 
 ### Cadence is the growth point
 
 "Cadence" deliberately owns *all* timing — threshold re-notify intervals, digest
-bundling windows, trace debounce, and report schedules — so future timing
-controls (instant + debounce, quiet hours, per-severity throttling) land in one
-named facet instead of being scattered across "conditions" and "schedule."
+windows, trace debounce, report schedules — so future timing controls (instant +
+debounce, quiet hours, per-severity throttling) land in one named facet instead of
+being scattered across "conditions" and "schedule."
 
 ## Rollout
 

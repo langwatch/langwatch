@@ -1,4 +1,5 @@
 import {
+  Box,
   Field,
   HStack,
   Input,
@@ -7,28 +8,48 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { CADENCE_LABELS } from "~/automations/cadences";
 import {
   GRAPH_ALERT_TIME_PERIODS,
   type GraphAlertOperator,
   type GraphAlertTimePeriod,
 } from "~/server/app-layer/triggers/graph-alert.builder";
 import {
+  type AutomationDraft,
+  cadenceIsSet,
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "../logic/draftReducer";
+import { describeCron } from "../logic/reportSchedule";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { CadenceField } from "./CadenceField";
-import { FacetSection } from "./FacetSection";
+import { FacetSection, type FacetAccordionProps } from "./FacetSection";
 import { ReportScheduleField } from "./ReportScheduleField";
 import { TraceDebounceField } from "./TraceDebounceField";
+
+/** One-line preview shown when the Cadence facet is collapsed. */
+function cadenceSummary(draft: AutomationDraft): string {
+  if (draft.source === "customGraph") {
+    const { operator, threshold, timePeriod } = draft.graphAlert;
+    if (!Number.isFinite(threshold)) return "Set a threshold";
+    return `${OPERATOR_LABELS[operator]} ${threshold} over ${TIME_PERIOD_LABELS[timePeriod]}`;
+  }
+  if (draft.source === "report") {
+    return cadenceIsSet(draft)
+      ? describeCron(draft.report.cron, draft.report.timezone)
+      : "Set a schedule";
+  }
+  const settle = Math.round(draft.traceDebounceMs / 1000);
+  return `${CADENCE_LABELS[draft.notificationCadence]}, ${settle}s settle`;
+}
 
 const CADENCE_HELP = {
   trace:
     "How often notifications go out — one per matching trace, or batched into a digest — plus how long to wait for late spans before evaluating.",
   customGraph:
     "What makes the alert fire: the watched metric crosses this threshold over the chosen window.",
-  report: "When the report is sent, as a cron schedule in the timezone you pick.",
+  report: "When it's sent, as a recurring schedule in the timezone you pick.",
 } as const;
 
 /**
@@ -37,20 +58,36 @@ const CADENCE_HELP = {
  * alert's threshold rule, a report's schedule. Reads and writes the draft
  * through the store.
  */
-export function CadenceSection({ isEdit = false }: { isEdit?: boolean }) {
+export function CadenceSection({
+  isEdit = false,
+  accordion,
+}: {
+  isEdit?: boolean;
+  accordion?: FacetAccordionProps;
+}) {
   const draft = useDraft();
 
   return (
-    <FacetSection title="Cadence" help={CADENCE_HELP[draft.source]}>
+    <FacetSection
+      title="Cadence"
+      help={CADENCE_HELP[draft.source]}
+      accordion={accordion}
+      complete={cadenceIsSet(draft)}
+      summary={cadenceSummary(draft)}
+    >
       {draft.source === "customGraph" ? (
         <GraphCadence />
       ) : draft.source === "report" ? (
         <ReportCadence isEdit={isEdit} />
       ) : (
-        <VStack align="stretch" gap={5}>
-          <CadenceField />
-          <TraceDebounceField />
-        </VStack>
+        <HStack align="start" gap={4}>
+          <Box flex="1" minWidth="0">
+            <CadenceField />
+          </Box>
+          <Box flex="1" minWidth="0">
+            <TraceDebounceField />
+          </Box>
+        </HStack>
       )}
     </FacetSection>
   );

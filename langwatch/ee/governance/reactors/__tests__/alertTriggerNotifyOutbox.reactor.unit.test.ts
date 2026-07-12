@@ -276,7 +276,7 @@ describe("alertTriggerNotifyOutbox reactor", () => {
   });
 
   /**
-   * ADR-042 regression. A scheduled report is persisted as a Trigger row with
+   * ADR-044 regression. A scheduled report is persisted as a Trigger row with
    * `triggerKind: REPORT`, `filters: {}` and no `customGraphId` — structurally
    * identical to a match-everything trace automation with a NOTIFY action. This
    * reactor enqueues a settle for exactly that shape, and the settle dispatcher

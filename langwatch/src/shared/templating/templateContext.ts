@@ -557,7 +557,7 @@ export interface ReportChart {
 }
 
 /**
- * Template-variable contract for a SCHEDULED REPORT (ADR-042). A report is
+ * Template-variable contract for a SCHEDULED REPORT (ADR-044). A report is
  * schedule-triggered — it reads as "here is your {source} for {period}",
  * distinct from both the trace-iteration shape and the alert-threshold shape.
  *
@@ -747,7 +747,7 @@ export function buildExampleReportTemplateContext({
   });
 }
 
-/** Pure builder for the report template context (ADR-042). */
+/** Pure builder for the report template context (ADR-044). */
 export function buildReportTemplateContext({
   trigger,
   report,

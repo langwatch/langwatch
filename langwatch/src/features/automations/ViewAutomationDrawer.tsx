@@ -9,8 +9,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { TriggerKind } from "@prisma/client";
 import { differenceInMinutes, differenceInSeconds } from "date-fns";
-import { TrendingUp } from "react-feather";
+import { Calendar, TrendingUp } from "react-feather";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Drawer } from "~/components/ui/drawer";
@@ -61,6 +62,7 @@ export function ViewAutomationDrawer({
 
   const trigger = triggerQuery.data;
   const isGraphAlert = !!trigger?.customGraphId;
+  const isSchedule = trigger?.triggerKind === TriggerKind.REPORT;
   const actionParams = (trigger?.actionParams ?? {}) as TriggerActionParams;
 
   // Resolve the watched graph's JSON so the stored series key renders as its
@@ -164,13 +166,19 @@ export function ViewAutomationDrawer({
               <Skeleton height="24px" width="200px" />
             ) : (
               <Heading size="md">
-                {trigger?.name ?? (isGraphAlert ? "Alert" : "Automation")}
+                {trigger?.name ??
+                  (isGraphAlert ? "Alert" : isSchedule ? "Schedule" : "Automation")}
               </Heading>
             )}
             {isGraphAlert ? (
               <Badge colorPalette="purple" gap={1}>
                 <TrendingUp size={12} />
                 Alert
+              </Badge>
+            ) : isSchedule ? (
+              <Badge colorPalette="purple" gap={1}>
+                <Calendar size={12} />
+                Schedule
               </Badge>
             ) : trigger ? (
               <Badge colorPalette="gray">Automation</Badge>

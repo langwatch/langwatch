@@ -1,5 +1,5 @@
 /**
- * ADR-042 Phase 1 — the generic calendar-scheduling primitive's shared types.
+ * ADR-044 Phase 1 — the generic calendar-scheduling primitive's shared types.
  *
  * The scheduler is deliberately consumer-agnostic: it owns durable cron
  * entries (`ScheduledJob` rows) and firing; it knows nothing about reports,
@@ -47,7 +47,7 @@ export interface ScheduledJobRecord {
 
 /**
  * The tiny-trigger a due job hands its handler — an identity, never a
- * payload (ADR-042 §4 "tiny-trigger discipline"). `slot` is the calendar
+ * payload (ADR-044 §4 "tiny-trigger discipline"). `slot` is the calendar
  * instant being fired (the value of `nextRunAt` when the row came due).
  */
 export interface ScheduledJobFire {
@@ -98,7 +98,7 @@ export interface ScheduledJobRepository {
    * re-fired). The service advances the calendar only via `settleClaim` after a
    * delivered fire. This DB-level lease is the SOLE exactly-once mechanism (no
    * Redis leader-lock), which is what lets multiple workers scan and fire
-   * concurrently to share load (ADR-042 §4 "No double-firing"). `projectId` is
+   * concurrently to share load (ADR-044 §4 "No double-firing"). `projectId` is
    * included purely to satisfy the multitenancy guard; it is always the row's
    * own project, so it does not weaken the claim.
    */

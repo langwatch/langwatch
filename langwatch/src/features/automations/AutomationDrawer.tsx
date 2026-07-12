@@ -1,6 +1,6 @@
 import { Box, Button, Heading, HStack, Spacer, Text } from "@chakra-ui/react";
 import { AlertType, TriggerKind, type TriggerAction } from "@prisma/client";
-import { Mail } from "lucide-react";
+import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
@@ -109,7 +109,7 @@ function subjectTodo(draft: AutomationDraft): string {
     case "customGraph":
       return "pick a graph and series to watch";
     case "report":
-      return "choose what the report sends";
+      return "choose what to send";
     case "trace":
       return "choose which traces to act on";
   }
@@ -824,6 +824,9 @@ export function AutomationDrawer({
       projectId,
       organizationId: organization?.id,
       teamSlug: team?.slug,
+      // Lets a provider (Slack channel picker) act on the stored secret of the
+      // automation being edited without the author retyping it.
+      automationId,
       // Each source renders against its OWN context — autocomplete, hover, and
       // the unknown-variable check all follow the matching list, so a report
       // never offers `match.trace.*` variables that would render empty.
@@ -860,6 +863,7 @@ export function AutomationDrawer({
       projectId,
       organization?.id,
       team?.slug,
+      automationId,
       previewContext,
       isGraphAlert,
       isReport,
@@ -908,17 +912,39 @@ export function AutomationDrawer({
           </Drawer.Header>
           <Drawer.Body>
             {source === "email-link" ? <EmailLinkLandingBanner /> : null}
-            <MainSectionList
-              onTestFire={onTestFire}
-              testFireLoading={testFire.isLoading}
-              isEdit={!!automationId}
-              sourceLocked={sourceLocked}
-              prefilledGraphId={prefilledGraphId}
-            />
+            {/* The form was visually heavy — every control at its default size.
+                Rather than thread a smaller `size` through dozens of controls
+                across every section (and drift over time), scale the whole form
+                surface down here. Contained to the drawer body, so the
+                header/footer and the rest of the app are untouched. */}
+            <Box css={{ zoom: 0.9 }}>
+              <MainSectionList
+                isEdit={!!automationId}
+                sourceLocked={sourceLocked}
+                prefilledGraphId={prefilledGraphId}
+              />
+            </Box>
           </Drawer.Body>
           <Drawer.Footer>
             <HStack width="full">
               <Spacer />
+              {/* Send test sits next to Save (ADR-043 feedback): once a notify
+                  channel is set up, fire the real message before committing. */}
+              {channel ? (
+                <Tooltip
+                  content="Finish the delivery setup to send a test."
+                  disabled={configComplete}
+                >
+                  <Button
+                    variant="outline"
+                    onClick={onTestFire}
+                    loading={testFire.isLoading}
+                    disabled={!configComplete}
+                  >
+                    <Send size={14} /> Send test
+                  </Button>
+                </Tooltip>
+              ) : null}
               <Tooltip
                 content={saveDisabledReason({
                   draft,

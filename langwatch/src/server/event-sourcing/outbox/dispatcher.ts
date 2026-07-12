@@ -510,7 +510,7 @@ async function handleCadenceBatch(
   }
 
   // Content is read HERE, not carried on the payload. The payload is an
-  // identity (ADR-042's tiny-trigger discipline): a copy of the trace's input
+  // identity (ADR-044's tiny-trigger discipline): a copy of the trace's input
   // and output on it would be customer text sitting in Redis and — via the
   // audit projection — at rest in Postgres, duplicated from ClickHouse and
   // outliving the trace it came from. The dispatcher already re-fetches the

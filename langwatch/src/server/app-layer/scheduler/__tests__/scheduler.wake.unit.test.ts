@@ -8,7 +8,7 @@ import type { ScheduledJobRepository } from "../scheduler.types";
 const logger = createLogger("test:scheduler-wake");
 
 /**
- * The best-effort Redis cross-pod wake (ADR-042 user decision): Postgres is the
+ * The best-effort Redis cross-pod wake (ADR-044 user decision): Postgres is the
  * sole correctness layer, so these tests only assert the pub/sub WIRING —
  * producers publish, a running loop subscribes and re-scans on a signal, and
  * teardown disconnects. The exactly-once guarantee is proven separately against

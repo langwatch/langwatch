@@ -1,6 +1,6 @@
 Feature: What a scheduled report actually sends
   As a team subscribing to a scheduled report
-  I want the report to carry the data it promises — the matching traces, the graph, the dashboard
+  I want the report to carry the data it promises — matching traces, the graph, the dashboard
   So that the message is worth reading on its own, without following a link
 
   Background:
@@ -47,15 +47,15 @@ Feature: What a scheduled report actually sends
       Then no message layout is offered to choose from
       And the dashboard's panels map straight to the message
 
-    Scenario: A custom-graph report is offered chart layouts
-      Given the author is configuring a custom-graph report
-      Then the layouts offered all render a chart
-      And no table-of-traces layout is offered
+    Scenario Outline: A report is offered only layouts that fit its source
+      Given the author is configuring a <source> report
+      Then the layouts offered all render <fits>
+      And no <excluded> layout is offered
 
-    Scenario: A trace-query report is offered table layouts
-      Given the author is configuring a trace-query report
-      Then the layouts offered all render the matching traces
-      And no chart layout is offered
+      Examples:
+        | source       | fits                | excluded        |
+        | custom-graph | a chart             | table-of-traces |
+        | trace-query  | the matching traces | chart           |
 
     Scenario: Changing the report's source moves the author to a layout that fits
       Given the author picked a chart layout for a custom-graph report

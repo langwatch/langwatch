@@ -42,7 +42,7 @@ import {
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { useDrawer } from "~/hooks/useDrawer";
-import SettingsLayout from "../../components/SettingsLayout";
+import { DashboardLayout } from "../../components/DashboardLayout";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Switch } from "../../components/ui/switch";
@@ -422,14 +422,14 @@ function Automations() {
   const isLoading = triggers.isLoading;
 
   return (
-    <SettingsLayout>
-      <Container maxWidth="1280px" padding={4}>
+    <DashboardLayout>
+      <Container maxWidth="1280px" padding={6}>
         <VStack align="stretch" gap={10}>
           <VStack align="start" gap={1}>
             <Heading>Alerts &amp; Automations</Heading>
             <Text textStyle="sm" color="fg.muted">
-              Alerts watch a metric, reports go out on a schedule, and
-              automations act on traces as they arrive.
+              Alerts watch a metric, schedules go out on a recurring cadence,
+              and automations act on traces as they arrive.
             </Text>
           </VStack>
 
@@ -559,7 +559,7 @@ function Automations() {
                 )}
               </VStack>
 
-              {/* Reports — send something on a recurring schedule */}
+              {/* Schedules — send something on a recurring schedule */}
               <VStack
                 align="stretch"
                 gap={4}
@@ -568,19 +568,19 @@ function Automations() {
                 <SectionHeader
                   icon={<Calendar size={18} />}
                   accent="purple"
-                  title="Reports"
+                  title="Schedules"
                   count={reports.length}
                   summary="Send a dashboard, a graph, or a table of traces on a recurring schedule."
-                  details="A report bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
-                  addLabel="New report"
+                  details="A schedule bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
+                  addLabel="New schedule"
                   onAdd={() =>
                     openDrawer("automation", { initialSource: "report" })
                   }
                 />
                 {reports.length === 0 ? (
                   <EmptyHint>
-                    No scheduled reports yet — create one for a recurring Slack
-                    or email digest.
+                    No schedules yet. Create one for a recurring Slack or email
+                    digest.
                   </EmptyHint>
                 ) : (
                   <TableShell>
@@ -595,13 +595,13 @@ function Automations() {
                           <Table.ColumnHeader whiteSpace="nowrap">
                             <MetricHeader
                               label="Next run"
-                              help="When this report next goes out, straight from the scheduler. A paused report has no next run."
+                              help="When this next goes out, straight from the scheduler. A paused schedule has no next run."
                             />
                           </Table.ColumnHeader>
                           <Table.ColumnHeader whiteSpace="nowrap">
                             <MetricHeader
                               label="Last run"
-                              help="The last time this report was sent."
+                              help="The last time this was sent."
                             />
                           </Table.ColumnHeader>
                           <Table.ColumnHeader>Delivery</Table.ColumnHeader>
@@ -788,7 +788,7 @@ function Automations() {
           )}
         </VStack>
       </Container>
-    </SettingsLayout>
+    </DashboardLayout>
   );
 }
 
@@ -796,5 +796,5 @@ function Automations() {
  *  facet). The stored series key resolves to its display name from the graph
  *  JSON; falls back to the raw key, or "Graph deleted" when the graph is gone. */
 export default withPermissionGuard("triggers:view", {
-  layoutComponent: SettingsLayout,
+  layoutComponent: DashboardLayout,
 })(Automations);

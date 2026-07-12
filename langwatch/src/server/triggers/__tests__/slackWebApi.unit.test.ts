@@ -247,10 +247,38 @@ describe("listSlackChannels", () => {
   });
 
   describe("when the scope is missing", () => {
-    it("surfaces the error instead of throwing (UI degrades to manual)", async () => {
+    it("surfaces the error only when even public-only is refused", async () => {
+      // Both the public+private attempt and the public-only retry are refused —
+      // the app is missing channels:read entirely.
       respond(200, { ok: false, error: "missing_scope" });
       const result = await listSlackChannels("xoxb-test");
       expect(result).toEqual({ channels: [], error: "missing_scope" });
+    });
+
+    it("falls back to public channels when only groups:read is missing", async () => {
+      // First (public+private) is refused for lack of groups:read; the retry
+      // asks for public channels only, which channels:read alone can serve.
+      mockedSend
+        .mockResolvedValueOnce({
+          status: 200,
+          body: JSON.stringify({ ok: false, error: "missing_scope" }),
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          body: JSON.stringify({
+            ok: true,
+            channels: [{ id: "C1", name: "alerts", is_private: false }],
+          }),
+        });
+
+      const result = await listSlackChannels("xoxb-test");
+
+      expect(result.error).toBeNull();
+      expect(result.channels.map((c) => c.id)).toEqual(["C1"]);
+      expect(bodyParams(0).get("types")).toBe(
+        "public_channel,private_channel",
+      );
+      expect(bodyParams(1).get("types")).toBe("public_channel");
     });
   });
 
