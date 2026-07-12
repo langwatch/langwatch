@@ -158,6 +158,7 @@ function BarViz({ result, height }: { result: StubResult; height: number }) {
           tick={AXIS_TICK}
           axisLine={false}
           tickLine={false}
+          interval={0}
         />
         <Tooltip
           cursor={{ fill: "color-mix(in srgb, currentColor 6%, transparent)" }}
@@ -220,6 +221,8 @@ function StatViz({ result, height }: { result: StubResult; height: number }) {
   const up = total.deltaPct >= 0;
   const spark = total.spark.map((v, i) => ({ i, v }));
   const unit = aggUnit(primaryAgg);
+  // formatAggValue already embeds $ and ms/s; only tokens need a trailing unit.
+  const showUnit = unit === "tok" || unit === "tok/s";
 
   return (
     <VStack align="stretch" justify="center" height={`${height}px`} gap={1} paddingX={2}>
@@ -227,7 +230,7 @@ function StatViz({ result, height }: { result: StubResult; height: number }) {
         <Text fontSize="4xl" fontWeight="700" lineHeight="1" fontVariantNumeric="tabular-nums">
           {formatAggValue(primaryAgg, total.value)}
         </Text>
-        {unit ? (
+        {showUnit ? (
           <Text fontSize="md" color="fg.muted">
             {unit}
           </Text>

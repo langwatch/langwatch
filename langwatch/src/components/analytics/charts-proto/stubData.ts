@@ -184,9 +184,10 @@ const deriveValue = (
     case "sum":
       return mean * volume;
     default: {
+      // Derived deterministically from the shared per-column mean so quantiles
+      // over the same metric stay monotonic (p50 ≤ p90 ≤ p95 ≤ p99).
       const shape = AGG_SHAPE[agg.op] ?? 1;
-      // small deterministic wobble so aggregations aren't perfectly proportional
-      return mean * shape * (0.92 + rng() * 0.16);
+      return mean * shape;
     }
   }
 };
@@ -261,16 +262,24 @@ export const runStubQuery = (spec: WidgetSpec, win: StubWindow): StubResult => {
       (120 + rng() * 5200) * popularity * windowScale * filterScale,
     );
 
+    // One stable mean per (group, metric column) so every aggregation over the
+    // same column is internally consistent (min ≤ p50 ≤ avg ≤ p95 ≤ max, etc.).
+    const columnMeans: Partial<Record<MetricColumn, number>> = {};
+    const meanForColumn = (column: MetricColumn): number => {
+      if (columnMeans[column] === undefined) {
+        const r = mulberry32(hashString(queryKey + "|mean|" + key + "|" + column));
+        columnMeans[column] = METRIC_PROFILE[column].typical * (0.6 + r() * 0.95);
+      }
+      return columnMeans[column]!;
+    };
+
     const values: Record<string, number> = {};
     spec.aggregations.forEach((agg, i) => {
       const alias = aggAlias(agg, i);
       if (agg.op === "count" || agg.op === "cardinality") {
         values[alias] = deriveValue(agg, 0, volume, rng);
       } else if (agg.column) {
-        const profile = METRIC_PROFILE[agg.column];
-        const meanFactor = 0.6 + rng() * 0.95;
-        const mean = profile.typical * meanFactor;
-        values[alias] = deriveValue(agg, mean, volume, rng);
+        values[alias] = deriveValue(agg, meanForColumn(agg.column), volume, rng);
       } else {
         values[alias] = deriveValue(agg, 0, volume, rng);
       }
