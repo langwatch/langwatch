@@ -5,7 +5,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
 
   # ADR-048. Two streams run per turn:
   #   - Stream A (durable, the truth): the ADR-044/046 path — the Redis token
-  #     buffer bridged to useChat, the event-sourced turn_finalized final answer,
+  #     buffer bridged to useChat, the event-sourced agent_responded final answer,
   #     the langy_conversation_updated broadcast, ephemeral status/progress. It
   #     survives refresh (the buffered tail is the resume state). UNCHANGED.
   #   - Stream B (speed, ephemeral): raw opencode text-delta tokens, minimally

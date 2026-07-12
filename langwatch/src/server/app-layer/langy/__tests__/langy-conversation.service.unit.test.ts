@@ -33,12 +33,13 @@ function makeCommands(
   overrides?: Partial<LangyConversationCommands>,
 ): LangyConversationCommands {
   return {
-    sendMessage: vi.fn(async () => {}),
-    startAgentTurn: vi.fn(async () => {}),
-    recordToolCallStarted: vi.fn(async () => {}),
-    recordToolCallCompleted: vi.fn(async () => {}),
-    failAgentTurn: vi.fn(async () => {}),
-    reconcileAgentTurn: vi.fn(async () => {}),
+    continueConversation: vi.fn(async () => {}),
+    createAgentResponse: vi.fn(async () => {}),
+    initiateToolCall: vi.fn(async () => {}),
+    succeedToolCall: vi.fn(async () => {}),
+    failToolCall: vi.fn(async () => {}),
+    failAgentResponse: vi.fn(async () => {}),
+    recordAgentResponse: vi.fn(async () => {}),
     archiveConversation: vi.fn(async () => {}),
     updateConversationMetadata: vi.fn(async () => {}),
     recordTurnHandoff: vi.fn(async () => {}),
@@ -278,11 +279,11 @@ describe("LangyConversationService", () => {
   });
 
   describe("when recordUserMessage is called", () => {
-    it("dispatches one SendMessage command carrying the owner and parts", async () => {
-      const sendMessage = vi.fn(async () => {});
+    it("dispatches one ContinueConversation command carrying the owner and parts", async () => {
+      const continueConversation = vi.fn(async () => {});
       const svc = new LangyConversationService(
         makeRepo(),
-        makeCommands({ sendMessage }),
+        makeCommands({ continueConversation }),
       );
       await svc.recordUserMessage({
         projectId: "p1",
@@ -291,8 +292,8 @@ describe("LangyConversationService", () => {
         parts: [{ type: "text", text: "hi" }],
         title: "hi",
       });
-      expect(sendMessage).toHaveBeenCalledTimes(1);
-      expect(sendMessage).toHaveBeenCalledWith(
+      expect(continueConversation).toHaveBeenCalledTimes(1);
+      expect(continueConversation).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId: "p1",
           conversationId: "c1",
@@ -380,11 +381,11 @@ describe("LangyConversationService", () => {
 
   describe("ingestAgentTurnResult (the durable HTTP-final path)", () => {
     describe("when the agent posts a completed turn", () => {
-      it("dispatches reconcileAgentTurn carrying the turnId and assembled parts", async () => {
-        const reconcileAgentTurn = vi.fn(async () => {});
+      it("dispatches recordAgentResponse carrying the turnId and assembled parts", async () => {
+        const recordAgentResponse = vi.fn(async () => {});
         const svc = new LangyConversationService(
           makeRepo(),
-          makeCommands({ reconcileAgentTurn }),
+          makeCommands({ recordAgentResponse }),
         );
 
         await svc.ingestAgentTurnResult({
@@ -396,8 +397,8 @@ describe("LangyConversationService", () => {
           toolCalls: [{ id: "t1", name: "search", output: "hit" }],
         });
 
-        expect(reconcileAgentTurn).toHaveBeenCalledTimes(1);
-        const arg = reconcileAgentTurn.mock.calls[0]![0] as {
+        expect(recordAgentResponse).toHaveBeenCalledTimes(1);
+        const arg = recordAgentResponse.mock.calls[0]![0] as {
           tenantId: string;
           conversationId: string;
           turnId: string;
@@ -426,11 +427,11 @@ describe("LangyConversationService", () => {
     });
 
     describe("when the agent posts a failed turn", () => {
-      it("dispatches failAgentTurn with a serialized domain error, never raw prose", async () => {
-        const failAgentTurn = vi.fn(async () => {});
+      it("dispatches failAgentResponse with a serialized domain error, never raw prose", async () => {
+        const failAgentResponse = vi.fn(async () => {});
         const svc = new LangyConversationService(
           makeRepo(),
-          makeCommands({ failAgentTurn }),
+          makeCommands({ failAgentResponse }),
         );
 
         await svc.ingestAgentTurnResult({
@@ -441,8 +442,8 @@ describe("LangyConversationService", () => {
           errorCode: "session-not-found",
         });
 
-        expect(failAgentTurn).toHaveBeenCalledTimes(1);
-        const arg = failAgentTurn.mock.calls[0]![0] as {
+        expect(failAgentResponse).toHaveBeenCalledTimes(1);
+        const arg = failAgentResponse.mock.calls[0]![0] as {
           turnId: string;
           error: string;
         };

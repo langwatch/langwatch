@@ -4,10 +4,10 @@ import {
 } from "../../../projections/abstractMapProjection";
 import type { AppendStore } from "../../../projections/mapProjection.types";
 import {
-  type LangyMessageSentEvent,
-  type LangyTurnFinalizedEvent,
-  LangyMessageSentEventSchema,
-  LangyTurnFinalizedEventSchema,
+  type LangyAgentRespondedEvent,
+  type LangyConversationContinuedEvent,
+  LangyAgentRespondedEventSchema,
+  LangyConversationContinuedEventSchema,
 } from "../schemas/events";
 
 /**
@@ -30,14 +30,15 @@ export interface ClickHouseLangyMessageRecord {
 }
 
 const messageEvents = [
-  LangyMessageSentEventSchema,
-  LangyTurnFinalizedEventSchema,
+  LangyConversationContinuedEventSchema,
+  LangyAgentRespondedEventSchema,
 ] as const;
 
 /**
  * Map projection: turns durable message-bearing events into per-message rows in
- * `langy_messages`. `message_sent` records the user's message; `turn_finalized`
- * records the assistant's final answer (the source of truth for the turn).
+ * `langy_messages`. `conversation_continued` records the user's message;
+ * `agent_responded` records the assistant's final answer (the source of truth
+ * for the response).
  *
  * Streamed tokens and ephemeral heartbeats never reach this projection — only
  * these two durable events do — so the message table never floods.
@@ -67,8 +68,8 @@ export class LangyMessageStorageMapProjection
     this.store = deps.store;
   }
 
-  mapLangyConversationMessageSent(
-    event: LangyMessageSentEvent,
+  mapLangyConversationConversationContinued(
+    event: LangyConversationContinuedEvent,
   ): ClickHouseLangyMessageRecord {
     return {
       TenantId: event.tenantId,
@@ -81,8 +82,8 @@ export class LangyMessageStorageMapProjection
     };
   }
 
-  mapLangyConversationTurnFinalized(
-    event: LangyTurnFinalizedEvent,
+  mapLangyConversationAgentResponded(
+    event: LangyAgentRespondedEvent,
   ): ClickHouseLangyMessageRecord {
     return {
       TenantId: event.tenantId,

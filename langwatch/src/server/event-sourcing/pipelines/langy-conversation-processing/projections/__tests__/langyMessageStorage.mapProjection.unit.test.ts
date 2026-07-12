@@ -7,8 +7,8 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "../../schemas/constants";
 import type {
-  LangyMessageSentEvent,
-  LangyTurnFinalizedEvent,
+  LangyAgentRespondedEvent,
+  LangyConversationContinuedEvent,
 } from "../../schemas/events";
 import {
   type ClickHouseLangyMessageRecord,
@@ -18,7 +18,7 @@ import { createLangyMessageAppendStore } from "../langyMessageStorage.store";
 
 const TENANT = createTenantId("project-1");
 
-function messageSentEvent(): LangyMessageSentEvent {
+function messageSentEvent(): LangyConversationContinuedEvent {
   return {
     id: "e1",
     aggregateId: "conv-1",
@@ -26,8 +26,8 @@ function messageSentEvent(): LangyMessageSentEvent {
     tenantId: TENANT,
     createdAt: 1000,
     occurredAt: 1000,
-    type: LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_SENT,
-    version: LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_SENT,
+    type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_CONTINUED,
+    version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_CONTINUED,
     data: {
       conversationId: "conv-1",
       userId: "alice",
@@ -35,10 +35,10 @@ function messageSentEvent(): LangyMessageSentEvent {
       role: "user",
       parts: [{ type: "text", text: "hello" }],
     },
-  } as unknown as LangyMessageSentEvent;
+  } as unknown as LangyConversationContinuedEvent;
 }
 
-function turnFinalizedEvent(): LangyTurnFinalizedEvent {
+function turnFinalizedEvent(): LangyAgentRespondedEvent {
   return {
     id: "e2",
     aggregateId: "conv-1",
@@ -46,8 +46,8 @@ function turnFinalizedEvent(): LangyTurnFinalizedEvent {
     tenantId: TENANT,
     createdAt: 2000,
     occurredAt: 2000,
-    type: LANGY_CONVERSATION_EVENT_TYPES.TURN_FINALIZED,
-    version: LANGY_CONVERSATION_EVENT_VERSIONS.TURN_FINALIZED,
+    type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+    version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
     data: {
       conversationId: "conv-1",
       turnId: "turn-1",
@@ -56,7 +56,7 @@ function turnFinalizedEvent(): LangyTurnFinalizedEvent {
       parts: [{ type: "text", text: "the answer" }],
       outcome: "completed",
     },
-  } as unknown as LangyTurnFinalizedEvent;
+  } as unknown as LangyAgentRespondedEvent;
 }
 
 const noopStore = { append: async () => {} };

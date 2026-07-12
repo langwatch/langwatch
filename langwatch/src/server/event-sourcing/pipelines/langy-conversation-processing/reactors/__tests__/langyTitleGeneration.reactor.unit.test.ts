@@ -27,8 +27,8 @@ function finalized(
     tenantId: TENANT,
     createdAt: 1,
     occurredAt: 1,
-    type: LANGY_CONVERSATION_EVENT_TYPES.TURN_FINALIZED,
-    version: LANGY_CONVERSATION_EVENT_VERSIONS.TURN_FINALIZED,
+    type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+    version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
     data: {
       conversationId: CONVERSATION,
       turnId: "t1",
@@ -48,8 +48,8 @@ function messageSent(): LangyConversationProcessingEvent {
     tenantId: TENANT,
     createdAt: 1,
     occurredAt: 1,
-    type: LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_SENT,
-    version: LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_SENT,
+    type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_CONTINUED,
+    version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_CONTINUED,
     data: { conversationId: CONVERSATION, userId: "alice", messageId: "m1", role: "user", parts: [] },
   } as unknown as LangyConversationProcessingEvent;
 }

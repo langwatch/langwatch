@@ -27,10 +27,11 @@ import { LANGY_EPHEMERAL_SIGNAL_TYPES } from "./schemas/constants";
  * ## Liveness / orphan detection (PR3)
  *
  * The durable fold says a turn is in flight (`CurrentTurnId` set by
- * `agent_turn_started`, cleared by `turn_finalized`). The RECENCY of ephemeral
- * heartbeats in Redis says whether the worker is still alive. "CurrentTurnId
- * set but no ephemeral signal for N seconds" → orphaned turn → dispatch the
- * durable `ReconcileAgentTurn`. Liveness therefore lives entirely off the fold.
+ * `agent_response_started`, cleared by `agent_responded`). The RECENCY of
+ * ephemeral heartbeats in Redis says whether the worker is still alive.
+ * "CurrentTurnId set but no ephemeral signal for N seconds" → orphaned turn →
+ * dispatch the durable `FailAgentResponse`. Liveness therefore lives entirely
+ * off the fold.
  *
  * PR2 ships only this contract + a no-op default; PR3 implements the Redis
  * transport and wires the worker + the live consumer.

@@ -1,7 +1,7 @@
 /**
  * spawnAgent reactor (ADR-044 part 1).
  *
- * Fires on `agent_turn_started` and submits the turn to the in-process
+ * Fires on `agent_response_started` and submits the turn to the in-process
  * `LangyWorkerPool`, which calls the Go langyagent manager. A direct analog of
  * `createScenarioExecutionReactor`: fire-and-forget (does NOT await the turn, so
  * the GroupQueue keeps draining later events for the same aggregate), pool
@@ -25,7 +25,7 @@ import type {
 import { LANGY_CONVERSATION_STATUS } from "../schemas/constants";
 import type { LangyConversationStateData } from "../projections/langyConversationState.foldProjection";
 import type { LangyConversationProcessingEvent } from "../schemas/events";
-import { isLangyAgentTurnStartedEvent } from "../schemas/typeGuards";
+import { isLangyAgentResponseStartedEvent } from "../schemas/typeGuards";
 
 const logger = createLogger("langwatch:langy:spawn-agent-reactor");
 
@@ -56,7 +56,7 @@ export function createSpawnAgentReactor(deps: {
       event: LangyConversationProcessingEvent,
       context: ReactorContext<LangyConversationStateData>,
     ): Promise<void> {
-      if (!isLangyAgentTurnStartedEvent(event)) return;
+      if (!isLangyAgentResponseStartedEvent(event)) return;
 
       // Never re-spawn from a replay — recovery is the liveness sweep's job, not
       // the event log's (ADR-030 / ADR-044 part 2). The handoff is single-use

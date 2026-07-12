@@ -47,8 +47,8 @@ const messageSent = (
   occurredAt: number,
 ): LangyConversationProcessingEvent =>
   event(
-    "MESSAGE_SENT",
-    LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_SENT,
+    "CONVERSATION_CONTINUED",
+    LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_CONTINUED,
     { userId: "alice", messageId: "m1", role: "user", parts: [], ...data },
     occurredAt,
   );
@@ -99,8 +99,8 @@ describe("LangyConversationStateFoldProjection", () => {
     const started = fold.apply(
       fold.apply(fold.init(), messageSent({}, 1000)),
       event(
-        "AGENT_TURN_STARTED",
-        LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_STARTED,
+        "AGENT_RESPONSE_STARTED",
+        LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_STARTED,
         { turnId: "turn-1" },
         1500,
       ),
@@ -116,8 +116,8 @@ describe("LangyConversationStateFoldProjection", () => {
         const state = fold.apply(
           started,
           event(
-            "TURN_FINALIZED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.TURN_FINALIZED,
+            "AGENT_RESPONDED",
+            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
             {
               turnId: "turn-1",
               messageId: "a1",
@@ -141,8 +141,8 @@ describe("LangyConversationStateFoldProjection", () => {
         const state = fold.apply(
           started,
           event(
-            "TURN_FINALIZED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.TURN_FINALIZED,
+            "AGENT_RESPONDED",
+            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
             {
               turnId: "turn-1",
               messageId: "a1",
@@ -316,8 +316,8 @@ describe("LangyConversationStateFoldProjection", () => {
       const state = fold.apply(
         base,
         event(
-          "TOOL_CALL_STARTED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_STARTED,
+          "TOOL_CALL_INITIATED",
+          LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_INITIATED,
           { turnId: "turn-1", toolCallId: "tc-1", toolName: "search_traces" },
           1200,
         ),
@@ -333,8 +333,8 @@ describe("LangyConversationStateFoldProjection", () => {
     const started = fold.apply(
       fold.apply(fold.init(), messageSent({}, 1000)),
       event(
-        "AGENT_TURN_STARTED",
-        LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_STARTED,
+        "AGENT_RESPONSE_STARTED",
+        LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_STARTED,
         { turnId: "turn-1" },
         1500,
       ),

@@ -5,14 +5,15 @@ import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   ArchiveConversationCommand,
   ConsumeTurnHandoffCommand,
-  FailAgentTurnCommand,
+  ContinueConversationCommand,
+  CreateAgentResponseCommand,
+  FailAgentResponseCommand,
+  FailToolCallCommand,
   GenerateConversationTitleCommand,
-  RecordToolCallCompletedCommand,
-  RecordToolCallStartedCommand,
+  InitiateToolCallCommand,
+  RecordAgentResponseCommand,
   RecordTurnHandoffCommand,
-  ReconcileAgentTurnCommand,
-  SendMessageCommand,
-  StartAgentTurnCommand,
+  SucceedToolCallCommand,
   UpdateConversationMetadataCommand,
 } from "./commands";
 import {
@@ -29,8 +30,8 @@ export interface LangyConversationProcessingPipelineDeps {
   langyConversationStateFoldStore: FoldProjectionStore<LangyConversationStateData>;
   langyMessageAppendStore: AppendStore<ClickHouseLangyMessageRecord>;
   /**
-   * PR3 (ADR-044): reacts to `agent_turn_started` and dispatches the turn to
-   * the `LangyWorkerPool`. Optional so the PR2 shape (no reactor) still builds.
+   * PR3 (ADR-044): reacts to `agent_response_started` and dispatches the turn
+   * to the `LangyWorkerPool`. Optional so the PR2 shape (no reactor) still builds.
    */
   spawnAgentReactor?: ReactorDefinition<
     LangyConversationProcessingEvent,
@@ -54,7 +55,7 @@ export interface LangyConversationProcessingPipelineDeps {
     LangyConversationStateData
   >;
   /**
-   * Optional cheap-model title regeneration reactor. Fires on `turn_finalized`
+   * Optional cheap-model title regeneration reactor. Fires on `agent_responded`
    * and dispatches `GenerateConversationTitle` when the throttle allows.
    * Optional so a no-model / test wiring omits it cleanly.
    */
@@ -76,18 +77,18 @@ export interface LangyConversationProcessingPipelineDeps {
  *   sharing). Stored in the langy_conversations ClickHouse table.
  *
  * Map Projection: langyMessageStorage
- * - Per-message rows for `message_sent` (user) and `turn_finalized`
+ * - Per-message rows for `conversation_continued` (user) and `agent_responded`
  *   (assistant), stored in the existing langy_messages table.
  *
- * Commands (PR2 write surface):
- * - sendMessage: user turn -> message_sent
- * - startAgentTurn: agent turn begins -> agent_turn_started
- * - reconcileAgentTurn: streamed answer completes -> turn_finalized
+ * Commands (write surface):
+ * - continueConversation: user turn -> conversation_continued
+ * - createAgentResponse: agent response begins -> agent_response_started
+ * - recordAgentResponse: streamed answer completes -> agent_responded
  * - archiveConversation: soft-delete -> conversation_archived
  * - updateConversationMetadata: rename/share -> conversation_metadata_updated
  *
- * The turn-lifecycle events (tool_call_*, agent_turn_failed) are defined with
- * fold handlers dispatched by the streaming worker during a turn.
+ * The response-lifecycle events (tool_call_*, agent_response_failed) are defined
+ * with fold handlers dispatched by the agent during a response.
  *
  * Status/progress are EPHEMERAL signals (ADR-046): NOT commands and NOT durable
  * events — they are published to a Redis buffer via LangyEphemeralPublisher
@@ -145,12 +146,13 @@ export function createLangyConversationProcessingPipeline(
   }
 
   return builder
-    .withCommand("sendMessage", SendMessageCommand)
-    .withCommand("startAgentTurn", StartAgentTurnCommand)
-    .withCommand("recordToolCallStarted", RecordToolCallStartedCommand)
-    .withCommand("recordToolCallCompleted", RecordToolCallCompletedCommand)
-    .withCommand("failAgentTurn", FailAgentTurnCommand)
-    .withCommand("reconcileAgentTurn", ReconcileAgentTurnCommand)
+    .withCommand("continueConversation", ContinueConversationCommand)
+    .withCommand("createAgentResponse", CreateAgentResponseCommand)
+    .withCommand("initiateToolCall", InitiateToolCallCommand)
+    .withCommand("succeedToolCall", SucceedToolCallCommand)
+    .withCommand("failToolCall", FailToolCallCommand)
+    .withCommand("failAgentResponse", FailAgentResponseCommand)
+    .withCommand("recordAgentResponse", RecordAgentResponseCommand)
     .withCommand("archiveConversation", ArchiveConversationCommand)
     .withCommand("updateConversationMetadata", UpdateConversationMetadataCommand)
     .withCommand("recordTurnHandoff", RecordTurnHandoffCommand)

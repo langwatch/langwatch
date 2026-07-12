@@ -13,12 +13,13 @@
  * fold / map projections. Format: "lw.langy_conversation.<action>".
  */
 export const LANGY_CONVERSATION_EVENT_TYPES = {
-  MESSAGE_SENT: "lw.langy_conversation.message_sent",
-  AGENT_TURN_STARTED: "lw.langy_conversation.agent_turn_started",
-  TOOL_CALL_STARTED: "lw.langy_conversation.tool_call_started",
-  TOOL_CALL_COMPLETED: "lw.langy_conversation.tool_call_completed",
-  AGENT_TURN_FAILED: "lw.langy_conversation.agent_turn_failed",
-  TURN_FINALIZED: "lw.langy_conversation.turn_finalized",
+  CONVERSATION_CONTINUED: "lw.langy_conversation.conversation_continued",
+  AGENT_RESPONSE_STARTED: "lw.langy_conversation.agent_response_started",
+  TOOL_CALL_INITIATED: "lw.langy_conversation.tool_call_initiated",
+  TOOL_CALL_SUCCEEDED: "lw.langy_conversation.tool_call_succeeded",
+  TOOL_CALL_FAILED: "lw.langy_conversation.tool_call_failed",
+  AGENT_RESPONSE_FAILED: "lw.langy_conversation.agent_response_failed",
+  AGENT_RESPONDED: "lw.langy_conversation.agent_responded",
   ARCHIVED: "lw.langy_conversation.conversation_archived",
   // Beyond the prescribed vocabulary — preserves the PATCH rename/share route.
   // See ADR-046 open question 1.
@@ -36,12 +37,13 @@ export const LANGY_CONVERSATION_EVENT_TYPES = {
 } as const;
 
 export const LANGY_CONVERSATION_PROCESSING_EVENT_TYPES = [
-  LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_SENT,
-  LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_STARTED,
-  LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_STARTED,
-  LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_COMPLETED,
-  LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_FAILED,
-  LANGY_CONVERSATION_EVENT_TYPES.TURN_FINALIZED,
+  LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_CONTINUED,
+  LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_STARTED,
+  LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED,
+  LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED,
+  LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED,
+  LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
+  LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
   LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED,
   LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED,
   LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
@@ -76,15 +78,17 @@ export const LANGY_EPHEMERAL_SIGNAL_TYPES = {
  * Format: "lw.langy_conversation.<action>".
  */
 export const LANGY_CONVERSATION_COMMAND_TYPES = {
-  SEND_MESSAGE: "lw.langy_conversation.send_message",
-  START_AGENT_TURN: "lw.langy_conversation.start_agent_turn",
-  // PR3 turn-lifecycle write surface. The durable milestones the streaming
-  // worker records during a turn (ADR-044): a meaningful result the agent
-  // produces is a durable event; transient progress ticks stay ephemeral.
-  RECORD_TOOL_CALL_STARTED: "lw.langy_conversation.record_tool_call_started",
-  RECORD_TOOL_CALL_COMPLETED: "lw.langy_conversation.record_tool_call_completed",
-  FAIL_AGENT_TURN: "lw.langy_conversation.fail_agent_turn",
-  RECONCILE_AGENT_TURN: "lw.langy_conversation.reconcile_agent_turn",
+  CONTINUE_CONVERSATION: "lw.langy_conversation.continue_conversation",
+  CREATE_AGENT_RESPONSE: "lw.langy_conversation.create_agent_response",
+  // Turn-lifecycle write surface. The durable milestones the agent records
+  // during a response (ADR-044): a meaningful result the agent produces is a
+  // durable event; transient progress ticks stay ephemeral. A tool call is
+  // initiated, then reaches exactly one terminal — succeeded or failed.
+  INITIATE_TOOL_CALL: "lw.langy_conversation.initiate_tool_call",
+  SUCCEED_TOOL_CALL: "lw.langy_conversation.succeed_tool_call",
+  FAIL_TOOL_CALL: "lw.langy_conversation.fail_tool_call",
+  FAIL_AGENT_RESPONSE: "lw.langy_conversation.fail_agent_response",
+  RECORD_AGENT_RESPONSE: "lw.langy_conversation.record_agent_response",
   ARCHIVE: "lw.langy_conversation.archive_conversation",
   UPDATE_METADATA: "lw.langy_conversation.update_metadata",
   // ADR-048 shutdown-handoff write surface.
@@ -95,12 +99,13 @@ export const LANGY_CONVERSATION_COMMAND_TYPES = {
 } as const;
 
 export const LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES = [
-  LANGY_CONVERSATION_COMMAND_TYPES.SEND_MESSAGE,
-  LANGY_CONVERSATION_COMMAND_TYPES.START_AGENT_TURN,
-  LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TOOL_CALL_STARTED,
-  LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TOOL_CALL_COMPLETED,
-  LANGY_CONVERSATION_COMMAND_TYPES.FAIL_AGENT_TURN,
-  LANGY_CONVERSATION_COMMAND_TYPES.RECONCILE_AGENT_TURN,
+  LANGY_CONVERSATION_COMMAND_TYPES.CONTINUE_CONVERSATION,
+  LANGY_CONVERSATION_COMMAND_TYPES.CREATE_AGENT_RESPONSE,
+  LANGY_CONVERSATION_COMMAND_TYPES.INITIATE_TOOL_CALL,
+  LANGY_CONVERSATION_COMMAND_TYPES.SUCCEED_TOOL_CALL,
+  LANGY_CONVERSATION_COMMAND_TYPES.FAIL_TOOL_CALL,
+  LANGY_CONVERSATION_COMMAND_TYPES.FAIL_AGENT_RESPONSE,
+  LANGY_CONVERSATION_COMMAND_TYPES.RECORD_AGENT_RESPONSE,
   LANGY_CONVERSATION_COMMAND_TYPES.ARCHIVE,
   LANGY_CONVERSATION_COMMAND_TYPES.UPDATE_METADATA,
   LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TURN_HANDOFF,
@@ -164,7 +169,7 @@ export const LANGY_TITLE_GENERATION = {
   REGENERATE_EVERY_N_TURNS: 3,
   /**
    * Reactor dedup window (ms): collapses repeat regenerations for the same
-   * conversation, and also dedups a redelivered `turn_finalized`. Acts as the
+   * conversation, and also dedups a redelivered `agent_responded`. Acts as the
    * time-based cooldown alongside the every-N-turns count gate.
    */
   COOLDOWN_MS: 60_000,
@@ -174,12 +179,13 @@ export const LANGY_TITLE_GENERATION = {
  * Event schema versions using calendar versioning (YYYY-MM-DD).
  */
 export const LANGY_CONVERSATION_EVENT_VERSIONS = {
-  MESSAGE_SENT: "2026-07-10",
-  AGENT_TURN_STARTED: "2026-07-10",
-  TOOL_CALL_STARTED: "2026-07-10",
-  TOOL_CALL_COMPLETED: "2026-07-10",
-  AGENT_TURN_FAILED: "2026-07-10",
-  TURN_FINALIZED: "2026-07-10",
+  CONVERSATION_CONTINUED: "2026-07-10",
+  AGENT_RESPONSE_STARTED: "2026-07-10",
+  TOOL_CALL_INITIATED: "2026-07-10",
+  TOOL_CALL_SUCCEEDED: "2026-07-10",
+  TOOL_CALL_FAILED: "2026-07-12",
+  AGENT_RESPONSE_FAILED: "2026-07-10",
+  AGENT_RESPONDED: "2026-07-10",
   ARCHIVED: "2026-07-10",
   METADATA_UPDATED: "2026-07-10",
   CONVERSATION_HANDOFF_PENDING: "2026-07-11",
