@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
-	"github.com/langwatch/langwatch/services/langyagent/telemetry"
+	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
 )
 
 // errStreamConsumerCrashed unblocks the handler when the SSE stream goroutine

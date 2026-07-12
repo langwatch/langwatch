@@ -12,7 +12,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
-	"github.com/langwatch/langwatch/services/langyagent/telemetry"
+	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
 )
 
 // newTestPool wires a Pool without touching the filesystem-bound construction

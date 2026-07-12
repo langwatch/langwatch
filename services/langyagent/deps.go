@@ -12,8 +12,8 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
+	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
 	"github.com/langwatch/langwatch/services/langyagent/langytracebridge"
-	"github.com/langwatch/langwatch/services/langyagent/telemetry"
 )
 
 // Deps holds the manager's infrastructure adapters. Mirrors nlpgo/aigateway.
