@@ -10,6 +10,7 @@ import {
 import { Check, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useModelSelectionOptions } from "~/components/ModelSelector";
+import { useLangyPopoverThemeClass } from "../hooks/useLangyPopoverThemeClass";
 import {
   type modelProviderIcons,
   ProviderIconGlyph,
@@ -67,6 +68,8 @@ export function LangyModelPill({
     modelOption?.label || model.split("/").slice(1).join("/") || "Choose model";
 
   const [query, setQuery] = useState("");
+  // Match the flipped tone the Split effect slides behind the popover.
+  const popoverThemeClass = useLangyPopoverThemeClass();
 
   const allItems = useMemo<ModelItem[]>(
     () =>
@@ -215,6 +218,7 @@ export function LangyModelPill({
       <Portal>
         <Combobox.Positioner>
           <Combobox.Content
+            className={popoverThemeClass}
             minWidth="240px"
             maxHeight="340px"
             overflowY="auto"

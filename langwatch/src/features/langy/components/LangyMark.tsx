@@ -89,6 +89,7 @@ export function LangyMark({
   const width = (size * MARK_VIEWBOX_WIDTH) / MARK_VIEWBOX_HEIGHT;
   return (
     <svg
+      className="langy-mark"
       width={width}
       height={size}
       viewBox={`0 0 ${MARK_VIEWBOX_WIDTH} ${MARK_VIEWBOX_HEIGHT}`}

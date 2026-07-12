@@ -94,6 +94,15 @@ export interface LangyAppliedOutcome {
  */
 export type LangyPanelMode = "floating" | "sidebar";
 
+/**
+ * Which decorative treatment the FLOATING panel wears — an interim design-
+ * comparison switch (see LangyWave). `fold` is the two-tone brand fold with a
+ * cursor-reactive seam; `split` is a black↔white invert split across that same
+ * moving seam; `plain` is no effect, just the themed surface. Only floating
+ * mode shows an effect; sidebar is always plain. User-picked, persisted.
+ */
+export type LangyPanelEffect = "fold" | "split" | "plain";
+
 interface LangyState {
   // Panel visibility
   isOpen: boolean;
@@ -104,6 +113,10 @@ interface LangyState {
   // Layout mode (Floating / Sidebar) — user-picked, persisted
   panelMode: LangyPanelMode;
   setPanelMode: (mode: LangyPanelMode) => void;
+
+  // Floating-panel decorative treatment (Fold / Split / Plain) — persisted
+  panelEffect: LangyPanelEffect;
+  setPanelEffect: (effect: LangyPanelEffect) => void;
 
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
@@ -230,6 +243,9 @@ export const useLangyStore = create<LangyState>()(
 
       panelMode: "floating",
       setPanelMode: (panelMode) => set({ panelMode }),
+
+      panelEffect: "plain",
+      setPanelEffect: (panelEffect) => set({ panelEffect }),
 
       activeConversationId: null,
       historyLoadConversationId: null,
@@ -373,6 +389,7 @@ export const useLangyStore = create<LangyState>()(
       partialize: (state) => ({
         devMode: state.devMode,
         panelMode: state.panelMode,
+        panelEffect: state.panelEffect,
       }),
     },
   ),

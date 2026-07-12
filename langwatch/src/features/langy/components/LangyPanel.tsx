@@ -15,11 +15,14 @@ import {
   Braces,
   Check,
   ChevronDown,
+  Columns2,
   LayoutGrid,
   type LucideIcon,
   MoreHorizontal,
   PanelRight,
+  Square,
   SquarePen,
+  Waves,
   X,
 } from "lucide-react";
 import {
@@ -49,6 +52,7 @@ import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 import { Composer } from "./Composer";
 import { LangyCardGallery } from "./LangyCardGallery";
 import { EmptyState } from "./EmptyState";
+import { LangyWave } from "./LangyWave";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import { LangyFoundryMenu } from "./LangyFoundryMenu";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
@@ -59,6 +63,7 @@ import {
 } from "./MessageContent";
 import { RecentChatsMenu } from "./RecentChatsMenu";
 import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
+import { useLangyPopoverThemeClass } from "../hooks/useLangyPopoverThemeClass";
 import { useLangyConversationList } from "../data/useLangyConversationList";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyMessages } from "../data/useLangyMessages";
@@ -70,7 +75,11 @@ import {
 } from "../logic/langyChatTransport";
 import { useLangyStickToBottom } from "../hooks/useLangyStickToBottom";
 import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
-import { type LangyPanelMode, useLangyStore } from "../stores/langyStore";
+import {
+  type LangyPanelEffect,
+  type LangyPanelMode,
+  useLangyStore,
+} from "../stores/langyStore";
 import { Menu } from "~/components/ui/menu";
 import { useLangyPageContext } from "../hooks/useLangyPageContext";
 import { findSkill } from "~/shared/langy/langySkills";
@@ -83,7 +92,7 @@ import { findSkill } from "~/shared/langy/langySkills";
 import type {
   LangyResourceContext,
   LangySkillContext,
-} from "~/server/services/langy/langyTurnContext.schema";
+} from "~/server/app-layer/langy/langyTurnContext.schema";
 import { LangyError } from "./LangyError";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyThinkingLine } from "./LangyThinkingLine";
@@ -345,7 +354,11 @@ function LangyPanel({
   );
   const panelMode = useLangyStore((s) => s.panelMode);
   const floating = panelMode === "floating";
+  const panelEffect = useLangyStore((s) => s.panelEffect);
   const reduceMotion = useReducedMotion();
+  // The panel's own DOM node. The floating "fold" wave (<LangyWave>) tracks
+  // the cursor against it and reads its size; nothing else needs it.
+  const panelRef = useRef<HTMLDivElement>(null);
   const [devMode] = useLangyDevMode();
   const cardGalleryOpen = useLangyStore((s) => s.cardGalleryOpen);
 
@@ -525,17 +538,14 @@ function LangyPanel({
   } = useChat({
     transport,
     onError: (error) => {
+      // Global-handled errors (license / lite-member) are owned by their own
+      // handler — leave them to it.
       if (isHandledByGlobalHandler(error)) return;
-      // A structured domain error renders as an inline <LangyError> card (see
-      // turnError below); don't also toast it — one calm surface only.
-      if (readLangyStreamError(error.message)) return;
-      toaster.create({
-        title: "Langy error",
-        description: error.message,
-        type: "error",
-        duration: 5000,
-        meta: { closable: true },
-      });
+      // Every live turn failure is already surfaced inline — as the recovering
+      // line, the GitHub connect card, or a <LangyError> card (see turnError and
+      // the render branch below), which falls back to a generic card even for a
+      // non-structured error. A toast would double the same failure on a second
+      // surface, so we never raise one here: one calm surface only.
     },
   });
 
@@ -920,7 +930,10 @@ function LangyPanel({
 
   return (
     <MotionBox
-      className="langy-root"
+      ref={panelRef}
+      className={`langy-root${
+        panelEffect === "split" ? " langy-effect-split" : ""
+      }`}
       position="fixed"
       width={`${PANEL_WIDTH}px`}
       zIndex={1500}
@@ -963,6 +976,9 @@ function LangyPanel({
             right: `${PANEL_INSET}px`,
             bottom: `${PANEL_INSET}px`,
             height: "auto",
+            // Own isolated group, so the Split effect's difference-blend
+            // inverts only the panel — never the page behind the glass.
+            isolation: "isolate",
             minHeight: "min(640px, calc(80vh - 12px))",
             maxHeight: "calc(80vh - 12px)",
             // Floating reads as glass: a touch translucent over a blur of the
@@ -975,8 +991,12 @@ function LangyPanel({
             boxShadow:
               "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10), 0 32px 64px rgba(20,20,23,0.10)",
             _dark: {
+              // The stacked drop shadows give depth from OUTSIDE; the inset
+              // hairline gives the top edge a lit rim from INSIDE, so the panel
+              // reads as a raised object catching light rather than a flat cut-
+              // out. white/12 — one notch above the border's white/10.
               boxShadow:
-                "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), 0 32px 64px rgba(0,0,0,0.5)",
+                "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
             },
           }
         : {
@@ -987,7 +1007,12 @@ function LangyPanel({
             borderTopLeftRadius: `${DOCK_RADIUS}px`,
             borderBottomLeftRadius: `${DOCK_RADIUS}px`,
             boxShadow: "-16px 0 40px rgba(20,20,23,0.10)",
-            _dark: { boxShadow: "-18px 0 48px rgba(0,0,0,0.5)" },
+            // Same lit top rim as the floating card — the docked panel's top
+            // edge otherwise dissolves into the page chrome on dark.
+            _dark: {
+              boxShadow:
+                "-18px 0 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
+            },
           })}
     >
       {/* Texture, under the content (which stacks at zIndex 1) and inert to the
@@ -995,6 +1020,20 @@ function LangyPanel({
           site's signal grid on ink. CSS does the switch — see langyTheme.css. */}
       <Box className="langy-grain" aria-hidden />
       <Box className="langy-signal-grid" aria-hidden />
+      {/* A whisper of the brand rising from the top of the panel, so the ink
+          ground has depth and a hint of identity instead of reading flat. Dark
+          only, always on, single-digit alpha — see `.langy-panel-glow` in
+          langyTheme.css. */}
+      <Box className="langy-panel-glow" aria-hidden />
+      {/* The floating "fold": a living rope splitting the panel into two faint
+          brand tones, swaying and leaning toward the cursor. Floating mode
+          only, and only while open — see LangyWave. */}
+      <LangyWave
+        containerRef={panelRef}
+        active={floating && isOpen && panelEffect !== "plain"}
+        variant={panelEffect === "split" ? "split" : "fold"}
+        reduceMotion={reduceMotion}
+      />
       {/* Fills whatever height the panel resolved to (min 440px floating, full
           viewport docked). Header and composer are flexShrink=0; the message
           list between them takes the slack — so the composer is ALWAYS the
@@ -1483,12 +1522,28 @@ const HeaderTitleTrigger = forwardRef<
 function LangyOverflowMenu() {
   const panelMode = useLangyStore((s) => s.panelMode);
   const setPanelMode = useLangyStore((s) => s.setPanelMode);
+  const panelEffect = useLangyStore((s) => s.panelEffect);
+  const setPanelEffect = useLangyStore((s) => s.setPanelEffect);
+  // Over the Split invert, this menu sits on the flipped tone — theme it
+  // to match (light over white, dark over black). Undefined otherwise.
+  const popoverThemeClass = useLangyPopoverThemeClass();
   const [devMode, setDevMode] = useLangyDevMode();
   const cardGalleryOpen = useLangyStore((s) => s.cardGalleryOpen);
   const toggleCardGallery = useLangyStore((s) => s.toggleCardGallery);
   const layouts: { mode: LangyPanelMode; label: string; icon: LucideIcon }[] = [
     { mode: "floating", label: "Floating", icon: AppWindow },
     { mode: "sidebar", label: "Sidebar", icon: PanelRight },
+  ];
+  // Interim design-comparison switch for the floating panel's look — see
+  // LangyWave. Only bites in floating mode (sidebar is always plain).
+  const effects: {
+    effect: LangyPanelEffect;
+    label: string;
+    icon: LucideIcon;
+  }[] = [
+    { effect: "fold", label: "Fold", icon: Waves },
+    { effect: "split", label: "Split", icon: Columns2 },
+    { effect: "plain", label: "Plain", icon: Square },
   ];
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }}>
@@ -1515,7 +1570,7 @@ function LangyOverflowMenu() {
           </Menu.Trigger>
         </TriggerAnchor>
       </Tooltip>
-      <Menu.Content minWidth="200px">
+      <Menu.Content minWidth="200px" className={popoverThemeClass}>
         {layouts.map(({ mode, label, icon: Icon }) => (
           <Menu.Item key={mode} value={mode} onClick={() => setPanelMode(mode)}>
             <HStack gap={2.5} width="full">
@@ -1531,6 +1586,29 @@ function LangyOverflowMenu() {
             </HStack>
           </Menu.Item>
         ))}
+        <Menu.Separator />
+        <Menu.ItemGroup title="Panel effect (floating)">
+          {effects.map(({ effect, label, icon: Icon }) => (
+            <Menu.Item
+              key={effect}
+              value={`effect-${effect}`}
+              onClick={() => setPanelEffect(effect)}
+            >
+              <HStack gap={2.5} width="full">
+                <Icon size={14} />
+                <Text textStyle="sm" flex={1}>
+                  {label}
+                </Text>
+                {panelEffect === effect ? (
+                  <Box color="orange.fg">
+                    <Check size={13} />
+                  </Box>
+                ) : null}
+              </HStack>
+            </Menu.Item>
+          ))}
+        </Menu.ItemGroup>
+        <Menu.Separator />
         <Menu.Item value="dev-mode" onClick={() => setDevMode(!devMode)}>
           <HStack gap={2.5} width="full">
             <Braces size={14} />

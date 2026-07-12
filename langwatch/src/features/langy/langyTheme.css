@@ -254,6 +254,44 @@
   background-size: 180% 180%;
 }
 
+/* ── Panel surface glow (dark only) ─────────────────────────
+   The ink ground on its own reads flat — a near-black rectangle behind a
+   white/10 hairline. The site's dark sections never sit flat: they carry the
+   WarpAccent mesh so the ground has a faint colour rising through it. This is
+   the same idea, static and dialled to a whisper: a soft brand glow that
+   climbs from the top of the panel — right where the mark and heading sit — so
+   the surface has depth and a hint of the identity without a moving wash.
+
+   Orange → purple, the mark's own two stops, so the glow reads as Langy rather
+   than a generic tint; plus a 3%-white top-lift so the upper third is a touch
+   brighter than the floor. Every stop is single-digit alpha — there when you
+   look for it, gone when you don't. Light mode keeps its clean paper (the user
+   likes it), so this is ink-only. It sits BEHIND the content (which stacks at
+   z-index 1) and is inert to the pointer. */
+.langy-panel-glow {
+  display: none;
+}
+.dark .langy-root .langy-panel-glow,
+:root.dark .langy-root .langy-panel-glow {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(
+      130% 46% at 50% -10%,
+      rgba(255, 179, 128, 0.09) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      100% 42% at 100% -2%,
+      rgba(168, 85, 247, 0.07) 0%,
+      transparent 60%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 24%);
+}
+
 /* ── Motion ───────────────────────────────────────────────────────────────
    `mesh-drift` slides an oversized gradient across a surface so a fill breathes
    instead of sitting flat. `border-sheen` walks a highlight along a frame or a
@@ -293,4 +331,128 @@
     background-size: 100% 100%;
     opacity: 0.28;
   }
+}
+
+/* ── Floating "fold" wave (floating mode only) ─────────────────────────────
+   A vertical rope splits the FLOATING panel into two faint brand tones with a
+   luminous seam along the divide. The physics — the sway (wind) and the cursor
+   push — live in LangyWave.tsx, which restrokes the seam and re-clips the warm
+   layer every frame. Everything here is inert to the pointer and sits BEHIND
+   the content (z-index 0; the content column is z-index 1).
+
+   The tones reuse the SAME brand RGBs as `.langy-wash` (blue 91,141,239 →
+   orange 201,123,58 → rust 184,82,64), so the fold reads as Langy rather than a
+   generic tint. Deliberately low alpha: the message text sits straight over it
+   and must stay readable. This is a first pass — expect to tune the stops. */
+.langy-wave {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* Fold sits BEHIND the content (z-index 0); Split sits ABOVE it (z-index 2) so
+   its difference-blend can invert the content on one side of the rope. */
+.langy-wave--fold {
+  z-index: 0;
+}
+/* Split must blend with the PANEL CONTENT, so its inverting layer has to live
+   in the panel's OWN stacking context — not nested in a positioned wrapper,
+   which would confine the difference-blend to the wrapper and paint a flat
+   white rectangle over the content instead of inverting it. `display:
+   contents` dissolves the wrapper so its children anchor straight to the
+   panel's stacking context (the panel sets `isolation: isolate`, keeping the
+   inversion inside the glass). */
+.langy-wave--split {
+  display: contents;
+}
+.langy-wave-base,
+.langy-wave-light {
+  position: absolute;
+  inset: 0;
+}
+/* Cool (blue) — strongest at the left edge, gone by the centre. This is what
+   shows on the left, where the warm layer is clipped away. */
+.langy-wave-base {
+  background-image: linear-gradient(
+    100deg,
+    rgba(91, 141, 239, 0.12) 0%,
+    rgba(91, 141, 239, 0.05) 38%,
+    transparent 60%
+  );
+}
+/* Warm (orange → rust) — strongest just right of centre, where the seam rides,
+   fading to the right edge. The rAF loop clips this to the right of the rope,
+   so only the seam-hugging warm band ever paints. */
+.langy-wave-light {
+  will-change: clip-path;
+  background-image: linear-gradient(
+    100deg,
+    transparent 32%,
+    rgba(201, 123, 58, 0.16) 52%,
+    rgba(184, 82, 64, 0.08) 72%,
+    transparent 100%
+  );
+}
+.langy-wave-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* No viewBox: user units are CSS px, matching the path coordinates. Overflow
+     visible so the seam's glow isn't clipped by the svg box (the panel's own
+     overflow:hidden still contains it). */
+  overflow: visible;
+  pointer-events: none;
+}
+/* The seam: a soft luminous edge catching light, with a darker drop to its left
+   so it reads as a raised fold rather than a drawn line. This is the light-panel
+   default; the dark panel gets a brighter, warmer rim below. */
+.langy-wave-seam {
+  fill: none;
+  stroke: rgba(120, 105, 150, 0.22);
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 5px rgba(255, 232, 205, 0.5)) drop-shadow(
+      -6px 0 14px rgba(40, 28, 60, 0.14)
+    );
+}
+.dark .langy-root .langy-wave-seam,
+:root.dark .langy-root .langy-wave-seam {
+  stroke: rgba(255, 255, 255, 0.32);
+  filter: drop-shadow(0 0 6px rgba(255, 224, 190, 0.42)) drop-shadow(
+      -8px 0 18px rgba(0, 0, 0, 0.35)
+    );
+}
+
+/* ── Split variant: black↔white invert across the seam ─────────────────────
+   One inverting layer, clipped to the right of the rope. White + `difference`
+   is an exact colour inversion of everything below it in the panel's isolated
+   group (the panel sets `isolation: isolate` in floating mode, so the inversion
+   never reaches the page behind the glass). The result: the panel flips
+   black↔white across the moving seam — the "one white, one black" look — with
+   no second render of the live content tree. Swap `difference` for a softer
+   filter later if the raw inversion is too stark; this is a first pass. */
+.langy-wave-split {
+  position: absolute;
+  inset: 0;
+  /* Above the content (z-index 1) so `difference` inverts it. The wrapper is
+     display:contents, so pointer-events + z-index must live here, not on it. */
+  z-index: 2;
+  pointer-events: none;
+  will-change: clip-path;
+  background: #fff;
+  mix-blend-mode: difference;
+}
+/* The seam rides above the inverted layer and the content. */
+.langy-wave--split .langy-wave-svg {
+  z-index: 2;
+}
+
+/* ── Split variant: keep the brand mark legible across the invert ───────────
+   The LangWatch mark is painted in the brand gradient, which the difference-
+   blend flips to green on the inverted side. Under the Split effect only, drop
+   the mark to the theme foreground colour: the blend then renders it as a clean
+   dark mark on the light side, and it stays the fg tone on the dark side. A
+   single element can't be gradient on one side and dark on the other, so the
+   split trades the gradient for a monochrome mark. */
+.langy-effect-split .langy-mark path {
+  fill: currentColor;
 }
