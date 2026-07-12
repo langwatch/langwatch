@@ -1,3 +1,5 @@
+import { useLangyStore } from "../stores/langyStore";
+
 export interface LangyTurnMetric {
   /** Value to roll to; the statcard rolls it up from 0 on first paint. */
   value: number;
@@ -30,22 +32,26 @@ export interface LangyTurnSignals {
 /**
  * Single consumer point for the live turn's granular streaming signals.
  *
- * `status_reported`, `progress_reported` and metric events are classified
- * ephemeral by the backend (ADR-046): they never hit the event_log and are
- * routed through a TTL'd Redis buffer transport that lands in PR3, along with
- * the resume-after-refresh token-tail replay. Until that transport is wired,
- * this hook returns no live status/progress/metrics (the shimmer
- * LangyThinkingLine covers the gap) and `isCatchingUp: false`. Keeping the seam
- * here means the panel, StreamingStatusLine and StreamingStatCard consume a
- * stable shape now and light up when PR3 lands — no UI change required at that
- * point.
+ * `status_reported` / `progress_reported` are classified ephemeral by the
+ * backend (ADR-046): they never hit the event_log. They ride the durable token
+ * buffer (as `status` / `progress` entries), which the `langy.onTurnStream`
+ * subscription relays; the custom `ChatTransport` peels them off the stream —
+ * they are not message parts — and writes them to the store, which this hook
+ * reads. So `StreamingStatusLine` lights up with no component change.
+ *
+ * `metrics`/`segment` are not yet emitted by the agent (the milestone entry
+ * carries no numeric rollup), so they stay null — the status line renders on
+ * status/progress alone. `isCatchingUp` is likewise unused now (the buffer's
+ * tail replay is instant over the subscription).
  */
 export function useLangyTurnSignals(
   _conversationId: string | null,
 ): LangyTurnSignals {
+  const status = useLangyStore((s) => s.turnStatus);
+  const progress = useLangyStore((s) => s.turnProgress);
   return {
-    status: null,
-    progress: null,
+    status,
+    progress,
     metrics: null,
     segment: null,
     isCatchingUp: false,

@@ -41,10 +41,6 @@ import {
   createLangyTokenBuffer,
   LangyTokenBuffer,
 } from "../streaming/langyTokenBuffer";
-import {
-  LangyFastTokenPublisher,
-  LANGY_FAST_TOKEN_TYPE,
-} from "../streaming/langyFastStream";
 import { createLangyTurnHandoffStore } from "../streaming/langyTurnHandoff";
 import {
   LangyCliEnvelopeService,
@@ -131,12 +127,6 @@ export interface RunTurnDeps {
   conversations: LangyConversationService;
   ephemeral: LangyEphemeralPublisher;
   buffer: LangyTokenBuffer;
-  /**
-   * Stream B (ADR-048): raw opencode tokens are fanned onto an ephemeral
-   * per-turn Redis pub/sub channel for the fast-path SSE. Fire-and-forget —
-   * a failed publish degrades Stream B to durable-only and never fails the turn.
-   */
-  fastPublisher: LangyFastTokenPublisher;
   agentUrl: string;
   internalSecret: string;
   fetchImpl?: typeof fetch;
@@ -162,7 +152,6 @@ function parseAgentLine(line: string): {
   delta?: string;
   error?: string;
   handoff?: string;
-  fastToken?: string;
   tool?: LangyToolFrame;
   progress?: boolean;
 } | null {
@@ -184,11 +173,10 @@ function parseAgentLine(line: string): {
       output?: string;
       isError?: boolean;
     };
-    if (event.type === LANGY_FAST_TOKEN_TYPE) {
-      return typeof event.text === "string" && event.text
-        ? { fastToken: event.text }
-        : null;
-    }
+    // `langy.token` fast frames are dropped now that the fast pub/sub lane is
+    // gone: the SAME token text arrives on the `message.part.delta` frame below,
+    // which drives the durable token buffer that `onTurnStream` relays. (An
+    // unmatched type falls through to `return null`.)
     // A "still working" heartbeat frame the agent emits on a timer so a long,
     // silent tool call never stalls the stream. Ephemeral: it carries nothing to
     // persist — the reader just refreshes the turn's liveness key on it.
@@ -646,14 +634,6 @@ export async function runTurn(
     const handleLine = async (line: string) => {
       const parsed = parseAgentLine(line);
       if (!parsed) return;
-      if (parsed.fastToken) {
-        // Stream B: raw token straight onto the ephemeral fast channel. Never
-        // awaited into the durable critical path and never allowed to throw.
-        void deps.fastPublisher
-          .publishToken({ conversationId, turnId, text: parsed.fastToken })
-          .catch(() => undefined);
-        return;
-      }
       if (parsed.progress) {
         // A heartbeat frame: refresh the turn's liveness key so a long silent
         // tool call keeps the per-turn reconcile reactor from failing a live
@@ -815,11 +795,6 @@ export async function runTurn(
       outcome: "completed",
     });
     await deps.buffer.markEnd({ conversationId, turnId });
-    // Close Stream B's fast channel so any attached SSE ends promptly and hands
-    // off to the reconciled final answer (Stream A). Best-effort — ephemeral.
-    await deps.fastPublisher
-      .publishEnd({ conversationId, turnId })
-      .catch(() => undefined);
 
     // GitHub-PR permit reconcile + audit — moved here from the old synchronous
     // route's stream executor `finally` (ADR-044). The reserve happened on the
@@ -859,11 +834,6 @@ export async function runTurn(
         error: serializeLangyTurnError(error),
       })
       .catch(() => {});
-    // End Stream B too so the fast SSE stops waiting and the browser settles on
-    // the durable error state (Stream A).
-    await deps.fastPublisher
-      .publishEnd({ conversationId, turnId })
-      .catch(() => undefined);
     // A failed turn opened no PR — return the reserved permit so a read-only /
     // failed chat doesn't burn the user's daily slot.
     await releasePermitIfReserved({ job, log: turnLogger, context: "failure" });
@@ -943,14 +913,10 @@ function createRunTurnDeps(): RunTurnDeps | null {
   // connection directly.
   const buffer = createLangyTokenBuffer({ redis: connection });
   const ephemeral = new RedisLangyEphemeralPublisher(buffer);
-  // Stream B publisher rides the shared connection — publish is a plain
-  // fire-and-forget command (no blocking reads), so no dedicated connection.
-  const fastPublisher = new LangyFastTokenPublisher(connection);
   return {
     conversations: getApp().langy.conversations,
     ephemeral,
     buffer,
-    fastPublisher,
     agentUrl,
     internalSecret,
   };

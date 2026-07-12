@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import { type UIMessage } from "ai";
 import {
   AppWindow,
   ArrowDown,
@@ -64,7 +64,10 @@ import { useLangyConversationCommands } from "../data/useLangyConversationComman
 import { useLangyMessages } from "../data/useLangyMessages";
 import type { LangyMessageDto } from "../data/langy.dtos";
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
-import { useLangyFastStream } from "../hooks/useLangyFastStream";
+import {
+  createLangyChatTransport,
+  type LangyTurnRequestContext,
+} from "../logic/langyChatTransport";
 import { useLangyStickToBottom } from "../hooks/useLangyStickToBottom";
 import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
 import { type LangyPanelMode, useLangyStore } from "../stores/langyStore";
@@ -315,8 +318,6 @@ function LangyPanel({
   const selectConversation = useLangyStore((s) => s.selectConversation);
   const startNewConversation = useLangyStore((s) => s.startNewConversation);
   const consumeHistoryLoad = useLangyStore((s) => s.consumeHistoryLoad);
-  const activeTurnId = useLangyStore((s) => s.activeTurnId);
-  const optimisticStreamText = useLangyStore((s) => s.optimisticText);
   const appliedOutcomes = useLangyStore((s) => s.appliedOutcomes);
   const discardedProposalIds = useLangyStore((s) => s.discardedProposalIds);
   const applyingProposalIds = useLangyStore((s) => s.applyingProposalIds);
@@ -399,31 +400,44 @@ function LangyPanel({
   const { scrollRef, contentRef, endRef, isPinned, canScroll, jumpToLatest } =
     useLangyStickToBottom();
 
-  // The chat transport (memoised once) writes conversation-adoption + the
-  // Stream-B turn id straight into the store via getState(), so it never needs
-  // recreating and no ref plumbing is required.
+  // The turn's request inputs, read at SEND time from a ref the render keeps
+  // fresh (populated below, once the chips are resolved). The transport owns
+  // these — which is what makes `regenerate()` (no per-send body) carry the
+  // projectId + context, killing the old "Try again" 400.
+  const turnContextRef = useRef<LangyTurnRequestContext | null>(null);
+
+  // The custom transport (memoised once): POSTs the turn to /langy/chat, then
+  // bridges the `langy.onTurnStream` tRPC subscription into the UIMessageChunk
+  // stream useChat consumes. Conversation/turn adoption + status/progress
+  // signals are pushed straight into the store (getState), so no ref plumbing.
   const transport = useMemo(
     () =>
-      new DefaultChatTransport({
-        api: "/api/langy/chat",
-        fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
-          const response = await fetch(input, init);
-          // Adopt the conversation the server created / reused so the NEXT send
-          // stays in it instead of forking a fresh one (and a fresh worker,
-          // keyed by conversation id).
-          const conversationId = response.headers.get(
-            "x-langy-conversation-id",
-          );
-          if (conversationId) {
-            useLangyStore.getState().adoptConversation(conversationId);
+      createLangyChatTransport({
+        getContext: () => {
+          const ctx = turnContextRef.current;
+          if (!ctx) throw new Error("Langy turn context not ready");
+          return ctx;
+        },
+        onIds: ({ conversationId, turnId }) => {
+          const store = useLangyStore.getState();
+          store.adoptConversation(conversationId);
+          store.setActiveTurnId(turnId);
+          // A fresh turn — clear the previous turn's status line.
+          store.resetTurnSignals();
+        },
+        onSignal: (signal) => {
+          const store = useLangyStore.getState();
+          if (signal.type === "status") store.setTurnStatus(signal.status);
+          else if (signal.type === "progress" && signal.progress !== undefined) {
+            store.setTurnProgress(signal.progress);
           }
-          // Capture the turn id for the Stream B fast-path (ADR-048), available
-          // as soon as the headers arrive — before body streaming — so we
-          // subscribe during spawn latency and miss no visible tokens.
-          const turnId = response.headers.get("x-langy-turn-id");
-          if (turnId) useLangyStore.getState().setActiveTurnId(turnId);
-          return response;
-        }) as typeof fetch,
+          // milestone entries carry no numeric rollup and have no consumer yet.
+        },
+        onTurnSettled: () => {
+          // The turn ended: drop the live status line. The streamed message
+          // stands as the view; the durable fold is canonical on reload.
+          useLangyStore.getState().resetTurnSignals();
+        },
       }),
     [],
   );
@@ -621,19 +635,44 @@ function LangyPanel({
   // survive a dev-mode toggle-off (the store clears it too; belt and braces).
   const showCardGallery = devMode && cardGalleryOpen;
 
-  // Stream B optimistic tokens for the in-flight turn (ADR-048). The hook
-  // writes them into the store; enabled only while a turn is streaming.
-  useLangyFastStream({
-    projectId,
-    conversationId: activeConversationId,
-    turnId: activeTurnId,
-    enabled: isBusy,
-  });
-
   // Page context (task #14): the experiment / trace / dataset / project the
   // user is viewing, surfaced as removable composer chips and forwarded with
   // the turn.
   const { chips: contextChips, addableChips } = useLangyPageContext();
+
+  // Keep the transport's request context fresh every render; it is read at send
+  // time (including on regenerate, which carries no per-send body). This is the
+  // ONE definition of the turn's wire shape, mirroring the chat route's body.
+  turnContextRef.current = {
+    projectId: projectId ?? "",
+    conversationId: activeConversationId,
+    ...(modelOverride ? { modelOverride } : {}),
+    ...(contextChips.length > 0
+      ? {
+          pageContext: contextChips.map(
+            (chip): LangyResourceContext => ({
+              kind: chip.kind,
+              ref: chip.ref,
+              label: chip.label,
+            }),
+          ),
+        }
+      : {}),
+    ...(skillChips.length > 0
+      ? {
+          skills: skillChips.map((skill): LangySkillContext => {
+            const target = contextChips.find(
+              (chip) => chip.id === skill.targetChipId,
+            );
+            return {
+              id: skill.id,
+              label: skill.label,
+              ...(target ? { on: target.label } : {}),
+            };
+          }),
+        }
+      : {}),
+  };
 
   const send = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
@@ -641,57 +680,10 @@ function LangyPanel({
     // per-question, so the previous turn's spent attempts don't eat this one's.
     recovery.reset();
     try {
-      await sendMessage(
-        { role: "user", parts: [{ type: "text", text }] },
-        {
-          body: {
-            projectId,
-            // Stay in the active conversation; null/absent means "start a new
-            // one" and the transport adopts the id the server returns.
-            ...(activeConversationId
-              ? { conversationId: activeConversationId }
-              : {}),
-            ...(modelOverride ? { modelOverride } : {}),
-            // What the user is looking at, so the agent can resolve "this
-            // experiment / trace" without an explicit id.
-            // The turn's attached context, built to `langyTurnContextSchema` —
-            // the ONE definition of this wire shape, which the chat route
-            // spreads into its body schema. Typing the payload against the
-            // schema is what stops the two ends drifting apart again: the last
-            // time they did, `safeParse` silently dropped `pageContext` on every
-            // single turn and nobody found out for weeks.
-            ...(contextChips.length > 0
-              ? {
-                  pageContext: contextChips.map(
-                    (chip): LangyResourceContext => ({
-                      kind: chip.kind,
-                      ref: chip.ref,
-                      label: chip.label,
-                    }),
-                  ),
-                }
-              : {}),
-            ...(skillChips.length > 0
-              ? {
-                  skills: skillChips.map((skill): LangySkillContext => {
-                    // Resolve the association at SEND time, against the chips
-                    // actually present. A skill bound to a chip the user has
-                    // since removed sends unbound rather than pointing at a
-                    // resource that is no longer part of the turn.
-                    const target = contextChips.find(
-                      (chip) => chip.id === skill.targetChipId,
-                    );
-                    return {
-                      id: skill.id,
-                      label: skill.label,
-                      ...(target ? { on: target.label } : {}),
-                    };
-                  }),
-                }
-              : {}),
-          },
-        },
-      );
+      // No per-send body: the custom transport sources projectId + conversation
+      // + model + page-context + skills from `turnContextRef` (getContext) at
+      // send time, so both a fresh send AND regenerate() carry the full context.
+      await sendMessage({ role: "user", parts: [{ type: "text", text }] });
       // Clear AFTER success so a failed send leaves the typed text — and the
       // skills the user chose — in place to retry with.
       setDraft("");
@@ -1131,13 +1123,6 @@ function LangyPanel({
                         index === messages.length - 1 &&
                         message.role === "assistant"
                       }
-                      optimisticText={
-                        isBusy &&
-                        index === messages.length - 1 &&
-                        message.role === "assistant"
-                          ? optimisticStreamText
-                          : undefined
-                      }
                       // Only ever on a turn that COMPLETED. We were asking
                       // "How did Langy do?" above a timeout card — rating an
                       // answer that never arrived. The failure IS the feedback;
@@ -1170,10 +1155,7 @@ function LangyPanel({
                         segment={turnSignals.segment}
                       />
                     ) : (
-                      <LangyThinkingLine
-                        messages={messages}
-                        optimisticText={optimisticStreamText}
-                      />
+                      <LangyThinkingLine messages={messages} />
                     )
                   ) : null}
                   {/* Recovering beats failing. While the policy has a retry

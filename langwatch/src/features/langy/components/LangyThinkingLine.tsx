@@ -41,13 +41,7 @@ const THINKING_VERB_DWELL_MS = 3_600;
 /** Coarse: the line only changes at 12s / 35s / 75s, so a 1s tick is plenty. */
 const ELAPSED_TICK_MS = 1_000;
 
-export function LangyThinkingLine({
-  messages,
-  optimisticText,
-}: {
-  messages: UIMessage[];
-  optimisticText?: string;
-}) {
+export function LangyThinkingLine({ messages }: { messages: UIMessage[] }) {
   const reduceMotion = useReducedMotion();
 
   // Time since this line appeared, which is when the turn went in flight (the
@@ -67,7 +61,6 @@ export function LangyThinkingLine({
       typeof langyThinkingLine
     >[0]["messages"],
     elapsedMs,
-    ...(optimisticText !== undefined ? { optimisticText } : {}),
   });
 
   // Whimsy ONLY where the truth signal permits it — i.e. the model is genuinely

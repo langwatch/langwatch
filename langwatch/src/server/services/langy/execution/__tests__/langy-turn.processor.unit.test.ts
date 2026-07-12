@@ -95,13 +95,6 @@ function job(overrides?: Partial<LangyTurnJobData>): LangyTurnJobData {
   } as LangyTurnJobData;
 }
 
-function makeFastPublisher() {
-  return {
-    publishToken: vi.fn(async () => {}),
-    publishEnd: vi.fn(async () => {}),
-  };
-}
-
 function deps(overrides: Partial<RunTurnDeps>): RunTurnDeps {
   return {
     conversations:
@@ -110,8 +103,6 @@ function deps(overrides: Partial<RunTurnDeps>): RunTurnDeps {
       publish: vi.fn(async () => {}),
     } as unknown as RunTurnDeps["ephemeral"],
     buffer: makeBuffer() as unknown as RunTurnDeps["buffer"],
-    fastPublisher:
-      makeFastPublisher() as unknown as RunTurnDeps["fastPublisher"],
     agentUrl: "http://manager",
     internalSecret: "secret",
     // The server's recovery backoff is real seconds in production; a test must

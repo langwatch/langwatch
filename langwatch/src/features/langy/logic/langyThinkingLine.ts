@@ -107,13 +107,10 @@ function hasTokens(message: ThinkingMessage | undefined): boolean {
 export function langyThinkingLine({
   messages,
   elapsedMs,
-  optimisticText,
 }: {
   messages: ThinkingMessage[];
   /** Time since the turn was sent. */
   elapsedMs: number;
-  /** Stream B's raw tokens, which lead the durable text (ADR-048). */
-  optimisticText?: string;
 }): LangyThinkingLine {
   const last = [...messages].reverse().find((m) => m.role === "assistant");
 
@@ -135,7 +132,7 @@ export function langyThinkingLine({
 
   // 2. TOKENS ARE ARRIVING. The model really is generating, so a whimsical verb
   //    here claims nothing that isn't happening — it IS thinking.
-  if (hasTokens(last) || !!optimisticText?.trim()) {
+  if (hasTokens(last)) {
     return { text: "Writing…", tone: "working", allowWhimsy: true };
   }
 

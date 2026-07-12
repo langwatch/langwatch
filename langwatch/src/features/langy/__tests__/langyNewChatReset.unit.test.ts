@@ -21,7 +21,8 @@ function dirtyTheStore() {
   store.selectConversation("conv-old");
   store.setDraft("half a question I never sent");
   store.setActiveTurnId("turn-old");
-  store.setOptimisticText("tokens from the abandoned turn");
+  store.setTurnStatus("searching the abandoned turn");
+  store.setTurnProgress(0.5);
   store.markProposalApplying("prop-1");
   store.markProposalApplied("prop-2", {});
   store.discardProposal("prop-3");
@@ -54,13 +55,15 @@ describe("startNewConversation", () => {
       expect(state.historyLoadConversationId).toBeNull();
     });
 
-    it("drops the abandoned turn — no stale id, no stale optimistic tokens", () => {
-      // A late chunk from the turn we walked away from must have nothing to
-      // paint into: the fast-stream subscription is keyed on `activeTurnId`.
+    it("drops the abandoned turn — no stale id, no stale live signals", () => {
+      // A late signal from the turn we walked away from must have nothing to
+      // paint: the onTurnStream subscription is keyed on the turn, and the live
+      // status/progress reset with the conversation.
       useLangyStore.getState().startNewConversation();
       const state = useLangyStore.getState();
       expect(state.activeTurnId).toBeNull();
-      expect(state.optimisticText).toBe("");
+      expect(state.turnStatus).toBeNull();
+      expect(state.turnProgress).toBeNull();
     });
 
     it("resets the proposal lifecycle", () => {

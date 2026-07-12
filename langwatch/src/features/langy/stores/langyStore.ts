@@ -173,12 +173,20 @@ interface LangyState {
   dismissedFeedbackMessageIds: Set<string>;
   dismissFeedback: (messageId: string) => void;
 
-  // Stream B (raw-token fast path, ADR-048)
+  // The in-flight turn + its live status/progress signals. The ChatTransport
+  // adopts the turn id and pushes signals off the `langy.onTurnStream`
+  // subscription; `useLangyTurnSignals` reads them into `StreamingStatusLine`.
+  // Conversation-scoped (reset on switch / new turn), never persisted.
   activeTurnId: string | null;
   setActiveTurnId: (id: string | null) => void;
-  /** Accumulated optimistic answer text for the in-flight turn. */
-  optimisticText: string;
-  setOptimisticText: (text: string) => void;
+  /** Latest coarse status line for the turn (e.g. "Searching traces…"). */
+  turnStatus: string | null;
+  /** Latest progress fraction/percentage for the turn (0..1 or 0..100). */
+  turnProgress: number | null;
+  setTurnStatus: (status: string | null) => void;
+  setTurnProgress: (progress: number | null) => void;
+  /** Clear the live signals — called when a new turn starts. */
+  resetTurnSignals: () => void;
 
   // Developer mode (persisted per browser)
   devMode: boolean;
@@ -208,7 +216,8 @@ const emptyConversationState = () => ({
   applyingProposalIds: new Set<string>(),
   dismissedFeedbackMessageIds: new Set<string>(),
   activeTurnId: null as string | null,
-  optimisticText: "",
+  turnStatus: null as string | null,
+  turnProgress: null as number | null,
 });
 
 export const useLangyStore = create<LangyState>()(
@@ -330,8 +339,11 @@ export const useLangyStore = create<LangyState>()(
 
       activeTurnId: null,
       setActiveTurnId: (activeTurnId) => set({ activeTurnId }),
-      optimisticText: "",
-      setOptimisticText: (optimisticText) => set({ optimisticText }),
+      turnStatus: null,
+      turnProgress: null,
+      setTurnStatus: (turnStatus) => set({ turnStatus }),
+      setTurnProgress: (turnProgress) => set({ turnProgress }),
+      resetTurnSignals: () => set({ turnStatus: null, turnProgress: null }),
 
       devMode: false,
       // Leaving dev mode takes the gallery with it — otherwise a user who
