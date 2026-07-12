@@ -21,6 +21,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/app"
+	"github.com/langwatch/langwatch/services/langyagent/app/runner/sandboxed"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/telemetry"
 )
@@ -41,12 +42,12 @@ type Options struct {
 	WorkspaceRoot      string
 	OpenCodeBinaryPath string
 	OTelPluginVersion  string
-	// DisableUIDIsolation turns off the ADR-033 per-worker UID sandbox (no chown,
-	// no setuid Credential) so opencode can spawn as the manager's own user on a
-	// non-root dev box. Sourced from Config.UnsafeDevDisableIsolation, which
-	// LoadConfig refuses to set outside local-like environments. NEVER true in
-	// production.
-	DisableUIDIsolation bool
+	// Runner is the isolation substrate for worker subprocesses — the ADR-033
+	// secure-vs-local seam (app/runner/sandboxed vs app/runner/localunsafe),
+	// chosen once at the composition root. nil defaults to the sandboxed (secure)
+	// runner, so a mis-wire fails closed rather than silently running without
+	// per-worker UID isolation.
+	Runner app.Runner
 	// Telemetry and Egress are injected; nil falls back to a working default
 	// (no-op instruments / pass-through guard) so tests and partial wiring boot.
 	Telemetry *telemetry.Telemetry
@@ -84,15 +85,15 @@ type CredentialRevoker interface {
 //
 // It satisfies app.WorkerPool.
 type Pool struct {
-	maxWorkers          int
-	workerIdle          time.Duration
-	readinessTimeout    time.Duration
-	reaperInterval      time.Duration
-	sessionsRoot        string
-	workspaceRoot       string
-	openCodeBinaryPath  string
-	otelPluginVersion   string
-	disableUIDIsolation bool
+	maxWorkers         int
+	workerIdle         time.Duration
+	readinessTimeout   time.Duration
+	reaperInterval     time.Duration
+	sessionsRoot       string
+	workspaceRoot      string
+	openCodeBinaryPath string
+	otelPluginVersion  string
+	runner             app.Runner
 	// agentsTemplate is the shared /workspace/AGENTS.md read ONCE at New; each
 	// spawn only does the per-worker ${LANGWATCH_ENDPOINT} ReplaceAll and never a
 	// disk read. Empty if the file was unreadable at startup — a spawn then fails
@@ -161,27 +162,33 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 	if guard == nil {
 		guard = egress.NewPassThrough()
 	}
+	// nil Runner fails CLOSED to the secure substrate: a mis-wire runs sandboxed
+	// (per-worker setuid + chown), never accidentally without isolation.
+	runner := opts.Runner
+	if runner == nil {
+		runner = sandboxed.New()
+	}
 	baseCtx, baseCancel := context.WithCancel(ctx)
 	return &Pool{
-		maxWorkers:          opts.MaxWorkers,
-		workerIdle:          opts.WorkerIdle,
-		readinessTimeout:    opts.ReadinessTimeout,
-		reaperInterval:      opts.ReaperInterval,
-		sessionsRoot:        opts.SessionsRoot,
-		workspaceRoot:       opts.WorkspaceRoot,
-		openCodeBinaryPath:  opts.OpenCodeBinaryPath,
-		otelPluginVersion:   opts.OTelPluginVersion,
-		disableUIDIsolation: opts.DisableUIDIsolation,
-		agentsTemplate:      agentsTemplate,
-		telemetry:           tel,
-		egress:              guard,
-		revoker:             opts.Revoker,
-		baseCtx:             baseCtx,
-		baseCancel:          baseCancel,
-		workers:             make(map[string]*Worker),
-		spawnLocks:          make(map[string]chan struct{}),
-		uidToConv:           make(map[uint32]string),
-		stopCh:              make(chan struct{}),
+		maxWorkers:         opts.MaxWorkers,
+		workerIdle:         opts.WorkerIdle,
+		readinessTimeout:   opts.ReadinessTimeout,
+		reaperInterval:     opts.ReaperInterval,
+		sessionsRoot:       opts.SessionsRoot,
+		workspaceRoot:      opts.WorkspaceRoot,
+		openCodeBinaryPath: opts.OpenCodeBinaryPath,
+		otelPluginVersion:  opts.OTelPluginVersion,
+		runner:             runner,
+		agentsTemplate:     agentsTemplate,
+		telemetry:          tel,
+		egress:             guard,
+		revoker:            opts.Revoker,
+		baseCtx:            baseCtx,
+		baseCancel:         baseCancel,
+		workers:            make(map[string]*Worker),
+		spawnLocks:         make(map[string]chan struct{}),
+		uidToConv:          make(map[uint32]string),
+		stopCh:             make(chan struct{}),
 	}, nil
 }
 
@@ -608,7 +615,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 			_ = os.RemoveAll(workerHome)
 		}
 	}()
-	if err := setupWorkerHome(workerHome, p.workspaceRoot, creds, uid, p.otelPluginVersion, p.agentsTemplate, p.disableUIDIsolation); err != nil {
+	if err := setupWorkerHome(workerHome, p.workspaceRoot, creds, uid, p.otelPluginVersion, p.agentsTemplate, p.runner); err != nil {
 		return nil, err
 	}
 
@@ -688,7 +695,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	// alive across turns and only dies on idle/shutdown. Binding to baseCtx
 	// (rather than context.Background, as the flat manager did) means a pool
 	// Shutdown / deadline propagates to the subprocess.
-	cmd, err := spawnOpenCode(p.baseCtx, p.openCodeBinaryPath, conversationID, workerHome, uid, internalPort, creds, openCodePassword, we.ProxyPort, p.disableUIDIsolation)
+	cmd, err := spawnOpenCode(p.baseCtx, p.openCodeBinaryPath, conversationID, workerHome, uid, internalPort, creds, openCodePassword, we.ProxyPort, p.runner)
 	if err != nil {
 		return nil, err
 	}
