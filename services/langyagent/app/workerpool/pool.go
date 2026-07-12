@@ -19,6 +19,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/telemetry"
@@ -616,20 +617,20 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	//     handlers always dial this one (worker.port).
 	//   - internalPort: opencode's actual TCP listen, fronted by the proxy.
 	//     Never exposed to callers; the proxy is the only consumer.
-	externalPort, err := GetFreePort()
+	externalPort, err := opencode.GetFreePort()
 	if err != nil {
 		return nil, err
 	}
 	// Any free port works: sibling isolation is enforced by opencode's own
 	// per-worker password (ADR-033 Fix A′), not by pinning the internal listen
-	// into an iptables-locked range. GetFreePort closes its listener before
+	// into an iptables-locked range. opencode.GetFreePort closes its listener before
 	// returning, so two independent calls can (rarely) hand back the SAME
 	// ephemeral port — which would make the proxy bind externalPort first and
 	// opencode then fail to listen, burning the whole readiness timeout. Re-roll
 	// until the internal port differs from the external one.
 	var internalPort int
 	for attempt := 0; attempt < 8; attempt++ {
-		internalPort, err = GetFreePort()
+		internalPort, err = opencode.GetFreePort()
 		if err != nil {
 			return nil, err
 		}
@@ -641,7 +642,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		return nil, fmt.Errorf("could not allocate a distinct internal port (kept colliding with external port %d)", externalPort)
 	}
 
-	bearerToken, err := GenerateBearerToken()
+	bearerToken, err := opencode.GenerateBearerToken()
 	if err != nil {
 		return nil, err
 	}
@@ -652,14 +653,14 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	// internal port (authProxy <-> opencode). Reusing one secret for both would
 	// mean any caller holding the external bearer token could also derive the
 	// internal credential.
-	openCodePassword, err := GenerateBearerToken()
+	openCodePassword, err := opencode.GenerateBearerToken()
 	if err != nil {
 		return nil, err
 	}
 
 	// authProxy binds the pool-lifetime context so its serve goroutine logs and
 	// lifetime follow the pool, not a single request.
-	proxy, err := StartAuthProxy(p.baseCtx, externalPort, internalPort, bearerToken, openCodePassword)
+	proxy, err := opencode.StartAuthProxy(p.baseCtx, externalPort, internalPort, bearerToken, openCodePassword)
 	if err != nil {
 		return nil, fmt.Errorf("start authproxy: %w", err)
 	}
@@ -693,13 +694,13 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	readyStart := time.Now()
 	readinessCtx, cancel := context.WithTimeout(ctx, p.readinessTimeout)
 	defer cancel()
-	if err := WaitForReadiness(readinessCtx, externalPort, internalPort, bearerToken, p.readinessTimeout); err != nil {
+	if err := opencode.WaitForReadiness(readinessCtx, externalPort, internalPort, bearerToken, p.readinessTimeout); err != nil {
 		p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), false)
 		return nil, err
 	}
 	p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), true)
 
-	sessionID, err := CreateSession(ctx, externalPort, bearerToken)
+	sessionID, err := opencode.CreateSession(ctx, externalPort, bearerToken)
 	if err != nil {
 		return nil, err
 	}
@@ -761,7 +762,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 //  3. UID release is convId-guarded inside releaseUIDLocked.
 func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 	var tombstone string
-	var proxyToShutdown *AuthProxy
+	var proxyToShutdown *opencode.AuthProxy
 	shouldWipe := false
 	deletedOwnEntry := false
 	var egressToClose egress.WorkerEgress

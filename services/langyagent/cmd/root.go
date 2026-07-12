@@ -9,8 +9,8 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	langyagent "github.com/langwatch/langwatch/services/langyagent"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/controlplane"
-	"github.com/langwatch/langwatch/services/langyagent/app/workerpool"
 	"github.com/langwatch/langwatch/services/langyagent/app"
+	"github.com/langwatch/langwatch/services/langyagent/app/workerpool"
 )
 
 // Root is the service entrypoint called by cmd/service. Errors returned here
