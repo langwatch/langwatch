@@ -243,14 +243,43 @@ func validCHIdentifier(s string) bool {
 	return true
 }
 
-func TestOverlayEmitsStableAPIKey(t *testing.T) {
+func TestOverlayEmitsHavenSeedLangwatchAPIKey(t *testing.T) {
 	st := Stack{Slug: "portless", APIPort: 1, Services: []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}}}
-	if valueOf(st.OverlayEnv(), "LANGWATCH_API_KEY") != "" {
-		t.Fatalf("no key set → LANGWATCH_API_KEY must be absent")
+	if valueOf(st.OverlayEnv(), "HAVEN_SEED_LANGWATCH_API_KEY") != "" {
+		t.Fatalf("no key set → HAVEN_SEED_LANGWATCH_API_KEY must be absent")
 	}
 	st.LocalAPIKey = DefaultLocalAPIKey
-	if got := valueOf(st.OverlayEnv(), "LANGWATCH_API_KEY"); got != DefaultLocalAPIKey {
-		t.Errorf("LANGWATCH_API_KEY = %q, want the stable default %q", got, DefaultLocalAPIKey)
+	if got := valueOf(st.OverlayEnv(), "HAVEN_SEED_LANGWATCH_API_KEY"); got != DefaultLocalAPIKey {
+		t.Errorf("HAVEN_SEED_LANGWATCH_API_KEY = %q, want the stable default %q", got, DefaultLocalAPIKey)
+	}
+}
+
+// TestOverlayNeverEmitsLangwatchApiKey is the watertight guard: haven must NEVER put
+// LANGWATCH_API_KEY (the langwatch SDK's own key contract) into a platform child's env.
+// A platform process that saw it would self-instrument into its own trace ingest — a
+// feedback loop. haven carries the stable local credential under HAVEN_SEED_LANGWATCH_API_KEY
+// instead, and the TS + Go platform entry points panic if LANGWATCH_API_KEY is ever set.
+// (LANGWATCH_ENDPOINT is a benign address and is intentionally still emitted — only the
+// key triggers self-referencing.) If this test fails, that guarantee is broken.
+func TestOverlayNeverEmitsLangwatchApiKey(t *testing.T) {
+	// Fully-populated stack with the local API key set — the case that used to emit it.
+	st := Stack{
+		Slug: "portless", APIPort: 1, RedisDB: 3, WorkerMetricsPort: 2,
+		LocalAPIKey: DefaultLocalAPIKey,
+		Services:    []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}, {Name: "langyagent"}},
+	}
+	if hasKey(st.OverlayEnv(), "LANGWATCH_API_KEY") {
+		t.Fatalf("overlay emitted LANGWATCH_API_KEY — a platform must never receive the " +
+			"langwatch SDK key contract (it self-references its own ingest). Use " +
+			"HAVEN_SEED_LANGWATCH_API_KEY instead.")
+	}
+	// The renamed key MUST be present so client callers still authenticate, and the
+	// benign endpoint stays exactly as it was.
+	if !hasKey(st.OverlayEnv(), "HAVEN_SEED_LANGWATCH_API_KEY") {
+		t.Errorf("overlay must emit HAVEN_SEED_LANGWATCH_API_KEY (the stable local credential)")
+	}
+	if !hasKey(st.OverlayEnv(), "LANGWATCH_ENDPOINT") {
+		t.Errorf("overlay must still emit LANGWATCH_ENDPOINT (a benign address, unchanged)")
 	}
 }
 
