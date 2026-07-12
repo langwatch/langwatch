@@ -67,7 +67,7 @@ const validBody = `{"conversationId":"c1","prompt":"hi","credentials":{"langwatc
 
 func postChat(t *testing.T, router http.Handler, auth, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/chat", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/worker/create", strings.NewReader(body))
 	if auth != "" {
 		req.Header.Set("Authorization", auth)
 	}
@@ -224,11 +224,11 @@ func TestChat_HappyPathStreamsNdjson(t *testing.T) {
 
 func TestChat_WrongMethodIs405(t *testing.T) {
 	router := newTestRouter(&stubPool{worker: &stubWorker{claimOK: true}})
-	req := httptest.NewRequest(http.MethodGet, "/chat", nil)
+	req := httptest.NewRequest(http.MethodGet, "/worker/create", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
-		t.Errorf("GET /chat status = %d, want 405", rec.Code)
+		t.Errorf("GET /worker/create status = %d, want 405", rec.Code)
 	}
 }
 

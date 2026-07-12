@@ -118,10 +118,14 @@ func New() *Telemetry {
 	return t
 }
 
-// StartTurn opens the per-turn span. Callers defer span.End().
-func (t *Telemetry) StartTurn(ctx context.Context, conversationID string) (context.Context, trace.Span) {
+// StartTurn opens the per-turn span. Callers defer span.End(). intent is the
+// caller's create/revive/continue worker-turn label.
+func (t *Telemetry) StartTurn(ctx context.Context, conversationID, intent string) (context.Context, trace.Span) {
 	return t.tracer.Start(ctx, "langy.turn",
-		trace.WithAttributes(attribute.String("langy.conversation_id", conversationID)),
+		trace.WithAttributes(
+			attribute.String("langy.conversation_id", conversationID),
+			attribute.String("langy.worker_intent", intent),
+		),
 	)
 }
 
@@ -132,9 +136,12 @@ func (t *Telemetry) StartSpawn(ctx context.Context, conversationID string) (cont
 	)
 }
 
-// TurnObserved records a completed turn's duration + outcome.
-func (t *Telemetry) TurnObserved(ctx context.Context, seconds float64, outcome string) {
-	t.turnDuration.Record(ctx, seconds, metric.WithAttributes(attribute.String("outcome", outcome)))
+// TurnObserved records a completed turn's duration, outcome, and intent.
+func (t *Telemetry) TurnObserved(ctx context.Context, seconds float64, outcome, intent string) {
+	t.turnDuration.Record(ctx, seconds, metric.WithAttributes(
+		attribute.String("outcome", outcome),
+		attribute.String("langy.worker_intent", intent),
+	))
 }
 
 // AtCapacity records a rejected-at-capacity request.
