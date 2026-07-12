@@ -156,11 +156,19 @@ Two ways, both wired by `make observability-connect`:
    ```
 
    **Filter to your own worktree.** Every stack tags its telemetry
-   `langwatch.worktree=<slug>` (Loki label `langwatch_worktree`), so when several
-   worktrees share the one collector you isolate yours by adding the label:
+   `langwatch.worktree=<slug>`, which lands in Loki as the structured-metadata
+   field `langwatch_worktree` (NOT an indexed stream label). So when several
+   worktrees share the one collector, isolate yours with a pipe filter, not a
+   stream selector:
 
    ```bash
-   gcx logs query '{service_name="langwatch-backend", langwatch_worktree="<slug>"}' --since 15m
+   gcx logs query '{service_name="langwatch-backend"} | langwatch_worktree="<slug>"' --since 15m
+   ```
+
+   In Tempo the same tag is `resource.langwatch.worktree` in TraceQL:
+
+   ```bash
+   gcx traces query '{ resource.langwatch.worktree = "<slug>" }' --since 15m
    ```
 
 2. **Grafana skills** — the `grafana-lgtm` / `grafana-core` / `grafana-datasources`
