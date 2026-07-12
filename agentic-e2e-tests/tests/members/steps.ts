@@ -48,7 +48,10 @@ export async function whenIClickAddMembers(page: Page) {
  * Fill the email input field in the Add Members dialog.
  */
 export async function whenIFillEmailWith(page: Page, email: string) {
-  await page.getByPlaceholder("Enter email address").last().fill(email);
+  // The Add-members dialog uses a single comma/space-separated email input whose
+  // placeholder is an example list ("alice@example.com, bob@example.com") — see
+  // langwatch/src/components/AddMembersForm.tsx. Match it by a stable substring.
+  await page.getByPlaceholder(/alice@example\.com/i).last().fill(email);
 }
 
 /**
@@ -245,11 +248,13 @@ export async function seedWaitingApprovalInvite({
             {
               email: email.toLowerCase(),
               role: "MEMBER",
+              // Omit customRoleId entirely: the createInviteRequest schema types
+              // it as z.string().optional() (organization.ts), so a literal null
+              // fails validation with "Expected string, received null".
               teams: [
                 {
                   teamId,
                   role: "MEMBER",
-                  customRoleId: null,
                 },
               ],
             },
