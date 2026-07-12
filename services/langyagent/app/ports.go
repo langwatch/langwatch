@@ -1,7 +1,7 @@
 // Package app is the langyagent application layer. It orchestrates a chat
 // turn — acquire a worker, run the turn, map failures — through the consumer
 // interfaces declared here, so it stays testable without a real worker pool or
-// a real HTTP response. Driven adapters (adapters/workerpool) implement these
+// a real HTTP response. Driven adapters (app/workerpool) implement these
 // ports; the driving adapter (adapters/httpapi) provides the ChatSink.
 package app
 
@@ -14,7 +14,7 @@ import (
 )
 
 // WorkerPool is the driven port the app uses to get a worker for a
-// conversation. Implemented by adapters/workerpool.Pool.
+// conversation. Implemented by app/workerpool.Pool.
 type WorkerPool interface {
 	// Acquire returns the worker for conversationID, spawning one if needed. A
 	// herr(domain.ErrMaxWorkers) is returned at capacity. A herr with
