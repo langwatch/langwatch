@@ -180,6 +180,16 @@ var commands = map[string]command{
 		}
 		return d.orch.Up(ctx, d.params, d.opts)
 	},
+	"pr": func(ctx context.Context, d deps, rest []string) error {
+		return app.TryPR(ctx, app.TryPRParams{
+			Ref:          firstNonFlag(rest),
+			RepoRoot:     d.worktree,
+			WorktreeBase: prWorktreeBase(d.worktree),
+			NoInstall:    hasFlag(rest, "--no-install"),
+			Force:        hasFlag(rest, "--force"),
+			DryRun:       hasFlag(rest, "--dry-run"),
+		}, runHavenUpIn)
+	},
 	"setup":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Setup(ctx) },
 	"watch":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Watch(ctx) },
 	"daemon": func(ctx context.Context, d deps, _ []string) error { return d.orch.RunDaemon(ctx, d.dash) },
@@ -343,6 +353,56 @@ func gitIsLinkedWorktree(dir string) bool {
 		return p
 	}
 	return abs(string(gitDir)) != abs(string(commonDir))
+}
+
+// runHavenUpIn re-invokes haven's own `up` with cwd set to a PR worktree, so the
+// whole provision/supervise pipeline runs there (haven derives everything from
+// cwd). Foreground: it blocks supervising the stack until the user stops it,
+// inheriting stdio so the stack banner + logs stream through.
+func runHavenUpIn(ctx context.Context, dir string) error {
+	argv := selfArgv(dir, "up")
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
+}
+
+// prWorktreeBase is where `haven pr` puts new PR worktrees: HAVEN_WORKTREE_DIR if
+// set, else the sibling `worktrees/` dir next to the main checkout (matching the
+// existing layout, e.g. .../langwatch/worktrees).
+func prWorktreeBase(dir string) string {
+	if v := os.Getenv("HAVEN_WORKTREE_DIR"); v != "" {
+		return v
+	}
+	return filepath.Join(filepath.Dir(gitMainWorktree(dir)), "worktrees")
+}
+
+// gitMainWorktree returns the repo's primary checkout (the first entry of `git
+// worktree list`), which is the anchor the sibling worktrees/ dir hangs off —
+// stable no matter which linked worktree haven pr was invoked from.
+func gitMainWorktree(dir string) string {
+	out, err := exec.Command("git", "-C", dir, "worktree", "list", "--porcelain").Output()
+	if err != nil {
+		return gitTopLevel(dir)
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		if rest, ok := strings.CutPrefix(line, "worktree "); ok {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return gitTopLevel(dir)
+}
+
+// firstNonFlag returns the first positional arg (the PR ref), skipping -flags.
+func firstNonFlag(args []string) string {
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			return a
+		}
+	}
+	return ""
 }
 
 func stripFlag(args []string, flag string) ([]string, bool) {
