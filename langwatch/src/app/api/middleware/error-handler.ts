@@ -3,9 +3,13 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { DomainError } from "~/server/app-layer/domain-error";
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
+import { grafanaConfigFromEnv, grafanaLinksForTrace } from "~/utils/grafanaLinks";
 
 import { HttpError, NotFoundError } from "../shared/errors";
 import { errorSchema } from "../shared/schemas";
+
+const INVALID_TRACE_ID = "0".repeat(32);
+const INVALID_SPAN_ID = "0".repeat(16);
 
 /**
  * Error handling middleware that catches errors and formats responses.
@@ -29,8 +33,32 @@ export const handleError = async (
   // Note: Logging is handled by the logger middleware, not here, to avoid double logging
   const { statusCode, response } = determineErrorResponse(error);
 
-  return c.json(response, statusCode);
+  return c.json(withTraceInfo(response, c), statusCode);
 };
+
+/**
+ * Attach the request's trace/span ids and — when a Grafana is configured —
+ * clickable Grafana links to the error body, so anyone can jump from the network
+ * inspector straight to the failing trace/logs. The ids come from the tracer
+ * middleware (c.get("traceId"/"spanId")).
+ *
+ * Included in production too: Grafana is access-controlled (behind AWS auth, not
+ * public), so the URL leaks nothing to a caller who can't reach it, and the
+ * trace/span ids are opaque correlation handles.
+ */
+function withTraceInfo(response: object, c: Context): object {
+  const traceId = liveId(c.get("traceId") as string | undefined, INVALID_TRACE_ID);
+  const spanId = liveId(c.get("spanId") as string | undefined, INVALID_SPAN_ID);
+  if (!traceId && !spanId) return response;
+
+  const links = grafanaLinksForTrace(traceId, grafanaConfigFromEnv());
+  return { ...response, trace: { traceId, spanId, ...(links ?? {}) } };
+}
+
+// An all-zero id is OpenTelemetry's "no valid span" sentinel — treat it as absent.
+function liveId(id: string | undefined, zero: string): string | undefined {
+  return id && id !== zero ? id : undefined;
+}
 
 function determineErrorResponse(
   error: Error & {
