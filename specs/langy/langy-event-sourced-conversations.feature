@@ -97,6 +97,27 @@ Feature: Langy conversations are an event-sourced projection
     And the conversation status reflects the failure
 
   # ============================================================================
+  # The turn as its own render document (a second projection)
+  # ============================================================================
+
+  # The conversation's event stream is folded two ways: the conversation spine
+  # (one document per conversation) and the turn document (one per turn). Both
+  # are projections of the SAME aggregate — the turn fold keys per turn.
+
+  Scenario: A turn folds into one render document keyed per turn
+    Given an agent response that initiated two tool calls and then answered
+    When I read the turn document for that turn
+    Then it carries the turn's status, the whole answer, and both tool calls
+    And each tool call shows whether it succeeded or failed
+    And it is keyed by conversation and turn, distinct from the conversation spine
+
+  Scenario: Two turns of one conversation fold into two separate documents
+    Given a conversation I own with two completed turns
+    When I read that conversation's turn documents
+    Then each turn is its own document
+    And neither turn's tool calls or answer bleed into the other
+
+  # ============================================================================
   # Reading conversations (projections)
   # ============================================================================
 

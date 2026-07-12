@@ -95,8 +95,10 @@ import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processin
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import { createLangyConversationUpdateBroadcastReactor } from "./pipelines/langy-conversation-processing/reactors/langyConversationUpdateBroadcast.reactor";
 import type { LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
+import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
 import type { ClickHouseLangyMessageRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageStorage.mapProjection";
 import type { LangyConversationStateRepository } from "./pipelines/langy-conversation-processing/repositories/langyConversationState.repository";
+import type { LangyConversationTurnStateRepository } from "./pipelines/langy-conversation-processing/repositories/langyConversationTurnState.repository";
 import { LANGY_CONVERSATION_PROJECTION_VERSIONS } from "./pipelines/langy-conversation-processing/schemas/constants";
 import type { SpawnAgentReactorHandle } from "./pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
 import { createSpawnAgentReactor } from "./pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
@@ -216,6 +218,8 @@ export interface PipelineRepositories {
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
   /** ADR-046: Langy conversation spine fold (replaces the Postgres spine). */
   langyConversationState: LangyConversationStateRepository;
+  /** Langy per-turn render-document fold (langy_conversation_turns). */
+  langyConversationTurnState: LangyConversationTurnStateRepository;
   /** ADR-046: Langy per-message append sink (existing langy_messages table). */
   langyMessageStorage: AppendStore<ClickHouseLangyMessageRecord>;
 }
@@ -352,6 +356,15 @@ export class PipelineRegistry {
         "langy_conversations",
       );
 
+    const langyConversationTurnFoldStore =
+      this.cached<LangyConversationTurnData>(
+        new RepositoryFoldStore<LangyConversationTurnData>(
+          this.deps.repositories.langyConversationTurnState,
+          LANGY_CONVERSATION_PROJECTION_VERSIONS.CONVERSATION_TURN,
+        ),
+        "langy_conversation_turns",
+      );
+
     const handoffStore = createLangyTurnHandoffStore({
       redis: this.deps.redis,
     });
@@ -402,6 +415,7 @@ export class PipelineRegistry {
     const pipeline = this.deps.eventSourcing.register(
       createLangyConversationProcessingPipeline({
         langyConversationStateFoldStore,
+        langyConversationTurnFoldStore,
         langyMessageAppendStore: this.deps.repositories.langyMessageStorage,
         spawnAgentReactor: spawnAgentHandle.reactor,
         reconcileAgentTurnReactor,

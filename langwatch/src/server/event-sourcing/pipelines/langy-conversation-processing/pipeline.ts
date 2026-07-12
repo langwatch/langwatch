@@ -24,10 +24,20 @@ import {
   type LangyConversationStateData,
   LangyConversationStateFoldProjection,
 } from "./projections/langyConversationState.foldProjection";
+import {
+  type LangyConversationTurnData,
+  LangyConversationTurnFoldProjection,
+} from "./projections/langyConversationTurn.foldProjection";
 import type { LangyConversationProcessingEvent } from "./schemas/events";
 
 export interface LangyConversationProcessingPipelineDeps {
   langyConversationStateFoldStore: FoldProjectionStore<LangyConversationStateData>;
+  /**
+   * Per-turn render document (langyConversationTurn): a second fold over the same
+   * stream, keyed by `${conversationId}:${turnId}`. Folds one turn into its final
+   * state (status, answer parts, tool-call lifecycle) for one-read rendering.
+   */
+  langyConversationTurnFoldStore: FoldProjectionStore<LangyConversationTurnData>;
   langyMessageAppendStore: AppendStore<ClickHouseLangyMessageRecord>;
   /**
    * PR3 (ADR-044): reacts to `agent_response_started` and dispatches the turn
@@ -76,6 +86,12 @@ export interface LangyConversationProcessingPipelineDeps {
  * - Conversation-level spine (owner, title, status, counts, timestamps,
  *   sharing). Stored in the langy_conversations ClickHouse table.
  *
+ * Fold Projection: langyConversationTurn
+ * - Per-turn render document — a SECOND fold over the same stream, keyed by
+ *   `${conversationId}:${turnId}` (the fold's custom key). Folds one turn into
+ *   its final state (status, answer parts, tool-call lifecycle). Stored in the
+ *   langy_conversation_turns ClickHouse table.
+ *
  * Map Projection: langyMessageStorage
  * - Per-message rows for `conversation_continued` (user) and `agent_responded`
  *   (assistant), stored in the existing langy_messages table.
@@ -104,6 +120,12 @@ export function createLangyConversationProcessingPipeline(
       "langyConversationState",
       new LangyConversationStateFoldProjection({
         store: deps.langyConversationStateFoldStore,
+      }),
+    )
+    .withFoldProjection(
+      "langyConversationTurn",
+      new LangyConversationTurnFoldProjection({
+        store: deps.langyConversationTurnFoldStore,
       }),
     )
     .withMapProjection(
