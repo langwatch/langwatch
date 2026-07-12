@@ -16,6 +16,7 @@ import type {
   LangyAgentRespondedEvent,
   LangyConversationArchivedEvent,
   LangyConversationContinuedEvent,
+  LangyConversationStartedEvent,
   LangyConversationHandoffConsumedEvent,
   LangyConversationHandoffPendingEvent,
   LangyConversationMetadataUpdatedEvent,
@@ -30,6 +31,7 @@ import {
   LangyAgentRespondedEventSchema,
   LangyConversationArchivedEventSchema,
   LangyConversationContinuedEventSchema,
+  LangyConversationStartedEventSchema,
   LangyConversationHandoffConsumedEventSchema,
   LangyConversationHandoffPendingEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
@@ -97,6 +99,7 @@ export interface LangyConversationState
 }
 
 const langyConversationEvents = [
+  LangyConversationStartedEventSchema,
   LangyConversationContinuedEventSchema,
   LangyAgentResponseStartedEventSchema,
   LangyToolCallInitiatedEventSchema,
@@ -174,6 +177,30 @@ export class LangyConversationStateFoldProjection
     return state.ArchivedAt != null
       ? LANGY_CONVERSATION_STATUS.ARCHIVED
       : proposed;
+  }
+
+  handleLangyConversationConversationStarted(
+    event: LangyConversationStartedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    const initialTitle =
+      event.data.title && event.data.title.length > 0 ? event.data.title : null;
+    // First writer wins for owner/title; an explicit creation seeds them before
+    // any message, but never demotes an existing title source.
+    const title = state.Title ?? initialTitle;
+    const titleSource =
+      state.Title == null && initialTitle != null
+        ? LANGY_TITLE_SOURCE.DERIVED
+        : state.TitleSource;
+    return {
+      ...state,
+      ConversationId: state.ConversationId || event.data.conversationId,
+      UserId: state.UserId || event.data.userId,
+      Title: title,
+      TitleSource: titleSource,
+      Status: this.nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE),
+      LastActivityAt: state.LastActivityAt ?? event.occurredAt,
+    };
   }
 
   handleLangyConversationConversationContinued(

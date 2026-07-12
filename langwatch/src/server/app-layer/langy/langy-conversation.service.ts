@@ -10,6 +10,7 @@ import type {
   LangyAgentResponseStartedEventData,
   LangyConversationArchivedEventData,
   LangyConversationContinuedEventData,
+  LangyConversationStartedEventData,
   LangyConversationHandoffConsumedEventData,
   LangyConversationHandoffPendingEventData,
   LangyConversationMetadataUpdatedEventData,
@@ -279,6 +280,7 @@ export class LangyConversationReadRepository {
 type Dispatch<T> = (data: T & CommandEnvelope) => Promise<void>;
 
 export interface LangyConversationCommands {
+  createConversation: Dispatch<LangyConversationStartedEventData>;
   continueConversation: Dispatch<LangyConversationContinuedEventData>;
   createAgentResponse: Dispatch<LangyAgentResponseStartedEventData>;
   initiateToolCall: Dispatch<LangyToolCallInitiatedEventData>;
@@ -468,6 +470,34 @@ export class LangyConversationService {
   }
 
   /**
+   * Explicitly create a conversation: emits `conversation_started`, seeding the
+   * owner (first-writer-wins) and an optional title before any message. Mints a
+   * fresh conversationId when none is supplied. Idempotent on the conversation
+   * (the command keys on `${tenantId}:${conversationId}:created`), so a retried
+   * create collapses to one event.
+   */
+  async createConversation({
+    projectId,
+    userId,
+    conversationId = newConversationId(),
+    title,
+  }: {
+    projectId: string;
+    userId: string;
+    conversationId?: string;
+    title?: string | null;
+  }): Promise<{ id: string }> {
+    await this.commands.createConversation({
+      tenantId: projectId,
+      occurredAt: Date.now(),
+      conversationId,
+      userId,
+      title: title ?? null,
+    });
+    return { id: conversationId };
+  }
+
+  /**
    * Record the user's message. Replaces the old persistMessage(user) +
    * bumpActivity dual write: one command emits one `conversation_continued`
    * event that feeds both the conversation fold (count/activity/owner/title) and
@@ -513,16 +543,20 @@ export class LangyConversationService {
     projectId,
     conversationId,
     turnId = crypto.randomUUID(),
+    questionParts,
   }: {
     projectId: string;
     conversationId: string;
     turnId?: string;
+    /** The user's question that opened the turn — folded into the turn document. */
+    questionParts?: LangyMessagePart[];
   }): Promise<{ turnId: string }> {
     await this.commands.createAgentResponse({
       tenantId: projectId,
       occurredAt: Date.now(),
       conversationId,
       turnId,
+      ...(questionParts !== undefined ? { questionParts } : {}),
     });
     return { turnId };
   }

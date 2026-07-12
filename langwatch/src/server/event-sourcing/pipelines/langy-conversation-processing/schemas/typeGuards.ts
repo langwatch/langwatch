@@ -5,6 +5,7 @@ import type {
   LangyAgentRespondedEvent,
   LangyConversationArchivedEvent,
   LangyConversationContinuedEvent,
+  LangyConversationStartedEvent,
   LangyConversationMetadataUpdatedEvent,
   LangyConversationProcessingEvent,
   LangyConversationHandoffPendingEvent,
@@ -14,6 +15,12 @@ import type {
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
 } from "./events";
+
+export function isLangyConversationStartedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyConversationStartedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED;
+}
 
 export function isLangyConversationContinuedEvent(
   event: LangyConversationProcessingEvent,

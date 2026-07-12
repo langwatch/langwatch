@@ -6,6 +6,7 @@ export {
   ConsumeTurnHandoffCommand,
   ContinueConversationCommand,
   CreateAgentResponseCommand,
+  CreateConversationCommand,
   FailAgentResponseCommand,
   FailToolCallCommand,
   GenerateConversationTitleCommand,

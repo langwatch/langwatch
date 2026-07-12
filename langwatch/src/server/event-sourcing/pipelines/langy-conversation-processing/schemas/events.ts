@@ -7,9 +7,38 @@ import {
 import { langyMessagePartSchema, langyMessageRoleSchema } from "./shared";
 
 /**
+ * ConversationStarted — an explicit conversation-creation event. Sets the owner
+ * (first-writer-wins) and, optionally, an initial title, BEFORE any message.
+ * Distinct from `conversation_continued` (which also lazily creates on the fold
+ * for robustness): a `create → then message` flow emits this first, so an empty
+ * conversation can exist. Feeds the conversation spine fold only — no message
+ * row, no turn document (it is not turn-scoped).
+ */
+export const langyConversationStartedEventDataSchema = z.object({
+  conversationId: z.string(),
+  /** Owner of the conversation. Set once (first-writer-wins). */
+  userId: z.string(),
+  /** Optional initial title (else derived from the first message). */
+  title: z.string().nullable().optional(),
+});
+export type LangyConversationStartedEventData = z.infer<
+  typeof langyConversationStartedEventDataSchema
+>;
+
+export const LangyConversationStartedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED),
+  data: langyConversationStartedEventDataSchema,
+});
+export type LangyConversationStartedEvent = z.infer<
+  typeof LangyConversationStartedEventSchema
+>;
+
+/**
  * ConversationContinued — a user (or system) message was added to the
  * conversation. Feeds both the fold (owner, title, activity, count) and the map
  * projection (the langy_messages row). `parts` is opaque to the pipeline.
+ *
  */
 export const langyConversationContinuedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -37,10 +66,16 @@ export type LangyConversationContinuedEvent = z.infer<
 /**
  * AgentResponseStarted — the assistant began working on the user's latest
  * message.
+ *
+ * `questionParts` carries the user's question that opened this turn, so the
+ * per-turn document (langyConversationTurn) is self-contained — question AND
+ * answer in one render doc — without a join back to langy_messages. Optional:
+ * a response started without a captured question still records.
  */
 export const langyAgentResponseStartedEventDataSchema = z.object({
   conversationId: z.string(),
   turnId: z.string(),
+  questionParts: z.array(langyMessagePartSchema).optional(),
 });
 export type LangyAgentResponseStartedEventData = z.infer<
   typeof langyAgentResponseStartedEventDataSchema
@@ -344,6 +379,7 @@ export type LangyConversationTitleGeneratedEvent = z.infer<
  * Union of all langy-conversation-processing event types.
  */
 export type LangyConversationProcessingEvent =
+  | LangyConversationStartedEvent
   | LangyConversationContinuedEvent
   | LangyAgentResponseStartedEvent
   | LangyToolCallInitiatedEvent
@@ -358,6 +394,7 @@ export type LangyConversationProcessingEvent =
   | LangyConversationTitleGeneratedEvent;
 
 export {
+  isLangyConversationStartedEvent,
   isLangyConversationContinuedEvent,
   isLangyAgentResponseStartedEvent,
   isLangyToolCallInitiatedEvent,
