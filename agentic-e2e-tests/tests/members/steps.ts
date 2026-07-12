@@ -301,21 +301,43 @@ export async function activateEnterpriseLicense(page: Page): Promise<void> {
 }
 
 /**
- * Remove the org's license, restoring FREE_PLAN. Called after each members test
- * so the shared org does not leak an ENTERPRISE plan into other suites (e.g.
- * settings/plans-comparison asserts the Free plan is current).
+ * Remove the org's license, restoring the plan to FREE_PLAN so the shared org
+ * does not leak an ENTERPRISE cap into other suites (e.g.
+ * settings/plans-comparison asserts the Free plan is current). Mirrors
+ * activateEnterpriseLicense's error handling: under sequential execution a
+ * SILENT failure here would strand the shared singleton org on ENTERPRISE for
+ * the rest of the run and surface as a far-removed flake, so we throw at the
+ * point of cause.
+ *
+ * NOTE: activation also create-if-absent provisions org-level retention-policy
+ * rows (provisionMissingRetentionPolicies); removeLicense does not revert those.
+ * Harmless today (no e2e spec asserts retention state) — it's the plan/cap that
+ * is scoped, not every activation side effect.
  */
 export async function removeEnterpriseLicense(page: Page): Promise<void> {
   const { organizationId } = await getOrgAndTeamIds(page);
-  await page.request.post("/api/trpc/license.remove?batch=1", {
+  const response = await page.request.post("/api/trpc/license.remove?batch=1", {
     data: { "0": { json: { organizationId } } },
   });
+  const result = await response.json().catch(() => null);
+  if (!response.ok() || result?.["0"]?.error) {
+    throw new Error(
+      `license.remove failed: ${response.status()} ${JSON.stringify(
+        result,
+      ).slice(0, 500)}`,
+    );
+  }
 }
 
 /**
  * Registers per-test hooks that activate an ENTERPRISE license before each test
  * and remove it after — scoping the raised member cap to the members suite so
  * the shared test org returns to FREE_PLAN for every other suite.
+ *
+ * SAFE ONLY under sequential execution (playwright.config.ts:
+ * fullyParallel:false, workers:1). The test org is a shared singleton, so with
+ * parallel workers a concurrent test could observe it mid-ENTERPRISE-window;
+ * raising CI parallelism would require moving this to an isolated per-test org.
  */
 export function withEnterpriseLicense(): void {
   test.beforeEach(async ({ page }) => {
