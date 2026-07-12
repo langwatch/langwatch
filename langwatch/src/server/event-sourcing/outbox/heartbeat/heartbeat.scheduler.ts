@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import type { Cluster, Redis } from "ioredis";
-import type { ProcessRole } from "~/server/app-layer/config";
+import { type ProcessRole, roleRunsWorkers } from "~/server/app-layer/config";
 import type { Logger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { OutboxEnqueueRequest } from "../outboxReactor.types";
@@ -107,7 +107,7 @@ export class OutboxHeartbeatScheduler {
    * no-op.
    */
   start(): void {
-    if (this.processRole !== "worker") {
+    if (!roleRunsWorkers(this.processRole)) {
       this.logger.debug(
         { processRole: this.processRole },
         "OutboxHeartbeatScheduler.start: non-worker role, skipping",

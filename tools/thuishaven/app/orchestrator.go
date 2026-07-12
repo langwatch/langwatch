@@ -37,8 +37,9 @@ type UpParams struct {
 	WorktreeDir  string
 	LwDir        string
 	Branch       string
-	ExplicitSlug string // from LANGWATCH_SLUG; wins over the derived/cached slug
-	IsBaseline   bool   // this stack is the shared default others fall back to
+	ExplicitSlug     string // from LANGWATCH_SLUG; wins over the derived/cached slug
+	IsBaseline       bool   // this stack is the shared default others fall back to
+	IsLinkedWorktree bool   // a `git worktree add` checkout, not the primary clone
 }
 
 // resolveSlug applies the precedence: explicit > cache > derived (then cached).
@@ -48,6 +49,22 @@ func (o *Orchestrator) resolveSlug(p UpParams) (string, error) {
 			return "", domain.ErrInvalidSlug(p.ExplicitSlug)
 		}
 		return p.ExplicitSlug, nil
+	}
+	// The primary checkout's directory is the repo name itself ("langwatch"),
+	// which would collide with the project label to produce the doubled
+	// app.langwatch.langwatch.localhost. Key its slug on the branch instead — and
+	// deliberately skip the path cache, since the branch (and so the slug) changes
+	// under the same directory. Linked worktrees keep their stable per-directory
+	// slug.
+	if !p.IsLinkedWorktree {
+		// Use the branch slug unless another worktree already owns it (a linked
+		// worktree whose directory name derives the same slug). Reusing it there
+		// would clobber their registry entry, so fall through to DeriveSlug, which
+		// disambiguates. Our own prior stack (same worktree dir) is not a conflict —
+		// re-running `up` on the same branch must keep the same slug.
+		if s := domain.SlugFromBranch(p.Branch); s != "" && !o.slugOwnedByOther(s, p.WorktreeDir) {
+			return s, nil
+		}
 	}
 	if s, ok := o.store.ReadSlugCache(p.WorktreeDir); ok && domain.ValidSlug(s) {
 		return s, nil
@@ -68,17 +85,19 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
-	ports, err := o.sys.FreePorts(5)
+	nSvc := len(domain.PerWorktreeServices)
+	ports, err := o.sys.FreePorts(nSvc + 2)
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
 	scheme, pport := o.proxy.Endpoint()
-	// FreePorts(5): [0..2] the three routed services (app/gateway/nlp), [3] the
-	// API backend that lives behind app's /api, [4] the worker metrics endpoint.
+	// ports[0..nSvc-1] back the routed services (app/gateway/nlp/langyagent, in
+	// PerWorktreeServices order); ports[nSvc] is the API backend behind app's /api,
+	// ports[nSvc+1] the worker metrics endpoint.
 	st := domain.Stack{
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
 		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
-		APIPort: ports[3], WorkerMetricsPort: ports[4], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
+		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
@@ -86,12 +105,17 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 			Hostname: o.cfg.Naming.Hostname(r.Name, slug),
 			URL:      o.cfg.Naming.URL(r.Name, slug, scheme, pport),
 		}
-		// A service this worktree opts out of (gateway/nlp) still gets a hostname —
-		// it resolves to the shared baseline stack's copy, so every URL is always
-		// defined. The app is always local.
+		// A service this worktree opts out of (gateway/nlp/langyagent) resolves to a
+		// live baseline stack's copy when one exists, so its URL stays defined. With
+		// no baseline to fall back to it is genuinely unavailable: drop the
+		// preallocated port so it is neither routed (dead 502) nor emitted into the
+		// overlay (e.g. an OPENCODE_AGENT_URL/LANGY_INTERNAL_SECRET for a dead
+		// socket). The app is always local.
 		if !runsLocally(r.Name, opts) {
 			if bp, ok := o.baselinePort(r.Name); ok {
 				svc.Port, svc.IsFallback = bp, true
+			} else {
+				svc.Port = 0
 			}
 		}
 		st.Services = append(st.Services, svc)
@@ -146,10 +170,33 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 	}
 }
 
-// Up is the launcher hook `pnpm dev` runs in portless mode.
+// Setup is the one-time machine bootstrap `haven setup` runs: it verifies
+// portless is installed (pointing the user at how to install it if not), then
+// starts the proxy and trusts its CA. Idempotent — safe to re-run.
+func (o *Orchestrator) Setup(ctx context.Context) error {
+	if !o.proxy.Installed() {
+		fmt.Println("portless is not installed — haven routes worktree hostnames through it.")
+		fmt.Println()
+		fmt.Println("Install it, then re-run `haven setup`:")
+		fmt.Println("  npm install -g portless                 # recommended")
+		fmt.Println("  brew install portless                   # if you have a portless tap")
+		return fmt.Errorf("portless not found — install it and re-run `haven setup`")
+	}
+	if err := o.proxy.EnsureReady(); err != nil {
+		return fmt.Errorf("portless proxy setup failed: %w", err)
+	}
+	scheme, port := o.proxy.Endpoint()
+	fmt.Println("thuishaven ready.")
+	fmt.Printf("  proxy:     %s://…langwatch.localhost (port %d)\n", scheme, port)
+	fmt.Println("  next:      `pnpm dev:haven` (or `make haven up`) in any worktree")
+	fmt.Println("  dashboard: https://langwatch.localhost")
+	return nil
+}
+
+// Up is the launcher hook `pnpm dev:haven` runs in portless mode.
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
-	if !o.proxy.Running() {
-		return fmt.Errorf("portless proxy is not running — run `make portless-setup` once to route by hostname")
+	if err := o.proxy.EnsureReady(); err != nil {
+		return fmt.Errorf("could not start the portless proxy automatically (%w) — run `haven setup` once to bootstrap it by hand", err)
 	}
 	o.ensureDaemon(p.WorktreeDir)
 	st, cleanup, err := o.provision(ctx, p, opts, true)
@@ -289,8 +336,14 @@ func (o *Orchestrator) ensurePostgres(ctx context.Context, st *domain.Stack) {
 	// No portless route: unlike ClickHouse (HTTP), Postgres speaks its own wire
 	// protocol, so an https://postgres.<slug>... URL through the HTTP proxy would
 	// just 502 — confirmed live (curl returns 502, portless can't speak Postgres
-	// wire protocol). The app already connects straight to loopback via
-	// DATABASE_URL (see OverlayEnv); `haven postgres url` prints the same.
+	// wire protocol). But the hostname still resolves to loopback natively, so we
+	// list it as a real connection target on the shared port (the app connects the
+	// same way via DATABASE_URL; `haven postgres url` prints it).
+	st.Services = append(st.Services, domain.Service{
+		Name: domain.PostgresService, Role: "Postgres (this stack's DB)", Port: port,
+		Hostname: o.cfg.Naming.Hostname(domain.PostgresService, st.Slug),
+		URL:      fmt.Sprintf("%s:%d", o.cfg.Naming.Hostname(domain.PostgresService, st.Slug), port),
+	})
 }
 
 // ensureRedis starts (or reuses) the shared brew-managed Redis and records its
@@ -308,6 +361,14 @@ func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
 		return
 	}
 	st.RedisPort = port
+	// Like Postgres, Redis speaks a raw TCP protocol portless can't proxy, but the
+	// hostname resolves to loopback, so list it as a real connection target on the
+	// shared port. Worktrees are partitioned by RedisDB index, not by server.
+	st.Services = append(st.Services, domain.Service{
+		Name: domain.RedisService, Role: fmt.Sprintf("Redis (this stack's DB %d)", st.RedisDB), Port: port,
+		Hostname: o.cfg.Naming.Hostname(domain.RedisService, st.Slug),
+		URL:      fmt.Sprintf("%s:%d", o.cfg.Naming.Hostname(domain.RedisService, st.Slug), port),
+	})
 }
 
 // Seed reseeds the current stack's database — the "give me a fresh DB" affordance.
@@ -323,9 +384,22 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return !opts.ShouldSkipGateway
 	case "nlp":
 		return !opts.ShouldSkipNLP
+	case "langyagent":
+		return !opts.ShouldSkipLangyAgent
 	default:
 		return true
 	}
+}
+
+// slugOwnedByOther reports whether a registered stack from a different worktree
+// already holds this slug — reusing it would overwrite their registry entry.
+func (o *Orchestrator) slugOwnedByOther(slug, worktreeDir string) bool {
+	for _, st := range o.store.Stacks() {
+		if st.Slug == slug && st.WorktreeDir != worktreeDir {
+			return true
+		}
+	}
+	return false
 }
 
 // baselinePort routes an opted-out service's hostname to a live baseline stack.
@@ -348,5 +422,5 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 		}
 	}
 	scheme, port := o.proxy.Endpoint()
-	fmt.Printf("    %-10s %s\n\n", "dashboard", o.cfg.Naming.URL(o.cfg.Naming.Project, "", scheme, port))
+	fmt.Printf("    %-10s %s\n\n", "hub", o.cfg.Naming.URL(domain.HubService, "", scheme, port))
 }

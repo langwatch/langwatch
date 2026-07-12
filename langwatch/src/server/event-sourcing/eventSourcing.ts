@@ -3,7 +3,7 @@ import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
-import type { ProcessRole } from "~/server/app-layer/config";
+import { type ProcessRole, roleRunsWorkers } from "~/server/app-layer/config";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/queues/makeQueueName";
@@ -625,7 +625,7 @@ export class EventSourcing {
     const effectiveRedis = this._redis;
     if (effectiveRedis) {
       this._globalQueue = new GroupQueueProcessor(definition, effectiveRedis, {
-        consumerEnabled: this._processRole === "worker",
+        consumerEnabled: roleRunsWorkers(this._processRole),
         objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
         resolveStorageDestination: resolveProjectStorageDestination,
       });

@@ -20,7 +20,7 @@ func (o *Orchestrator) List(asJSON bool) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(map[string]any{
 			"stacks":        stacks,
-			"dashboard":     shared(o.cfg.Naming.Project),
+			"dashboard":     shared(domain.HubService),
 			"observability": shared("observability"),
 			"telemetry":     shared("telemetry"),
 		})
@@ -35,7 +35,7 @@ func (o *Orchestrator) List(asJSON bool) error {
 			fmt.Printf("    %-8s %s\n", svc.Name, svc.URL)
 		}
 	}
-	fmt.Printf("\ndashboard %s\n", shared(o.cfg.Naming.Project))
+	fmt.Printf("\ndashboard %s\n", shared(domain.HubService))
 	return nil
 }
 

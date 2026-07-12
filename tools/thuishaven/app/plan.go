@@ -2,6 +2,8 @@ package app
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -38,10 +40,17 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir str
 		Shell: "pnpm run dev:vite",
 		Env:   append(append([]string{}, base...), "NODE_ENV=development"),
 	})
+	// In-process worker mode: the app process (start:app -> start.ts) hosts the
+	// worker stack itself when WORKERS_IN_PROCESS=1, so there is no separate
+	// `workers` lane below — one Node process instead of two, saving its RAM.
+	apiEnv := append(append([]string{}, base...), "NODE_ENV=development")
+	if opts.ShouldRunWorkersInProcess {
+		apiEnv = append(apiEnv, "WORKERS_IN_PROCESS=1")
+	}
 	out = append(out, Child{
 		Name: "api", Dir: lwDir, Color: palette[3],
 		Shell: "pnpm run start:app",
-		Env:   append(append([]string{}, base...), "NODE_ENV=development"),
+		Env:   apiEnv,
 	})
 	if !opts.ShouldSkipGateway {
 		out = append(out, Child{
@@ -57,7 +66,27 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir str
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("nlp"))),
 		})
 	}
-	if opts.ShouldStartWorkers {
+	if !opts.ShouldSkipLangyAgent {
+		// langyagent (the cmd/service mono-binary) takes its listen port from PORT,
+		// not SERVER_ADDR (see services/langyagent/config.go) — PORT always wins. Its
+		// sessions/workspace roots default to the in-container /workspace, which is
+		// read-only on a dev host; point them at writable per-slug dirs under haven's
+		// home and create them so the manager boots (session spawn still needs an
+		// `opencode` binary on PATH, but the service itself comes up).
+		laRoot := filepath.Join(o.cfg.Home, "langyagent", st.Slug)
+		_ = os.MkdirAll(filepath.Join(laRoot, "sessions"), 0o755)
+		_ = os.MkdirAll(filepath.Join(laRoot, "workspace"), 0o755)
+		out = append(out, Child{
+			Name: "langyagent", Dir: opts.RepoRoot, Color: palette[6],
+			Shell: goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
+			Env: append(append([]string{}, base...),
+				fmt.Sprintf("PORT=%d", port("langyagent")),
+				"SESSIONS_ROOT="+filepath.Join(laRoot, "sessions"),
+				"LANGY_WORKSPACE_ROOT="+filepath.Join(laRoot, "workspace"),
+			),
+		})
+	}
+	if opts.ShouldStartWorkers && !opts.ShouldRunWorkersInProcess {
 		out = append(out, Child{
 			Name: "workers", Dir: lwDir, Color: palette[5],
 			Shell: "pnpm run start:workers",

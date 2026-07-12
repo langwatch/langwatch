@@ -1,6 +1,9 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { ProcessRole } from "~/server/app-layer/config";
+import {
+  type ProcessRole,
+  roleSatisfiesRunIn,
+} from "~/server/app-layer/config";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   incrementEsFoldProjectionTotal,
@@ -1344,8 +1347,10 @@ export class ProjectionRouter<
 
   /** Returns true if the reactor's runIn filter excludes the current processRole. */
   private isReactorExcluded(reactor: ReactorDefinition<EventType>): boolean {
-    if (!reactor.options?.runIn || !this.processRole) return false;
-    return !reactor.options.runIn.includes(this.processRole);
+    return !roleSatisfiesRunIn({
+      runIn: reactor.options?.runIn,
+      processRole: this.processRole,
+    });
   }
 
   private async resolveRetention(
