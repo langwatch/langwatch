@@ -39,18 +39,26 @@ export interface LangyChatTransportDeps {
   onTurnSettled?: () => void;
 }
 
-/** The turn-start response `POST /api/langy/chat` now returns (ids only, no stream). */
+/** The turn-start response the create/continue mutations return (ids, no stream). */
 interface StartTurnResponse {
   conversationId: string;
   turnId: string;
 }
 
 /**
- * A custom AI-SDK `ChatTransport` for Langy. `sendMessages` POSTs the turn to
- * the (still-Hono) `/langy/chat` endpoint — which returns only `{conversationId,
- * turnId}` now — then bridges the `langy.onTurnStream` tRPC subscription into the
- * `ReadableStream<UIMessageChunk>` `useChat` expects. Same chunk contract the
- * old `attachTurnStream` produced, so every parts renderer is unchanged.
+ * A custom AI-SDK `ChatTransport` for Langy. `sendMessages` starts the turn via
+ * the `langy.createConversation` / `langy.continueConversation` tRPC mutations —
+ * which return only `{conversationId, turnId}` — then bridges the
+ * `langy.onTurnStream` tRPC subscription into the `ReadableStream<UIMessageChunk>`
+ * `useChat` expects. Same chunk contract the old `attachTurnStream` produced, so
+ * every parts renderer is unchanged.
+ *
+ * Create vs continue is one operation split by whether we already hold a
+ * conversation id: no id yet ⇒ `createConversation` (mints the id + emits the
+ * semantically-first `conversation_started`); an id ⇒ `continueConversation`.
+ *
+ * A rejected mutation throws its typed domain error to `useChat().error`, which
+ * `readLangyTrpcError`/`explainLangyError` render as a proper card.
  *
  * Status/progress/milestone entries are NOT emitted as message parts (nothing
  * consumes `data-langy-*`); they go to `onSignal` and light up the status line
@@ -63,32 +71,28 @@ export function createLangyChatTransport(
   return {
     async sendMessages(options) {
       const ctx = deps.getContext();
-      const response = await fetch("/api/langy/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: options.messages,
-          trigger: options.trigger,
-          projectId: ctx.projectId,
-          ...(ctx.conversationId
-            ? { conversationId: ctx.conversationId }
-            : {}),
-          ...(ctx.modelOverride ? { modelOverride: ctx.modelOverride } : {}),
-          ...(ctx.pageContext?.length ? { pageContext: ctx.pageContext } : {}),
-          ...(ctx.skills?.length ? { skills: ctx.skills } : {}),
-        }),
-        signal: options.abortSignal,
-      });
+      const turnInput = {
+        messages: options.messages,
+        ...(options.trigger ? { trigger: options.trigger } : {}),
+        projectId: ctx.projectId,
+        ...(ctx.modelOverride ? { modelOverride: ctx.modelOverride } : {}),
+        ...(ctx.pageContext?.length ? { pageContext: ctx.pageContext } : {}),
+        ...(ctx.skills?.length ? { skills: ctx.skills } : {}),
+      };
 
-      if (!response.ok) {
-        // Carry the server's typed domain error to useChat().error, which
-        // readLangyTrpcError/explainLangyError render as a proper card.
-        const text = await response.text().catch(() => "");
-        throw new Error(text || `Langy request failed (${response.status})`);
-      }
-
-      const { conversationId, turnId } =
-        (await response.json()) as StartTurnResponse;
+      // The vanilla client's proxy inference collapses on this router (see
+      // api.tsx / the onTurnStream call below), so invoke the mutation by dotted
+      // path and cast — the same escape hatch the subscription path uses.
+      const mutate = trpcClient.mutation as (
+        path: string,
+        input: unknown,
+      ) => Promise<StartTurnResponse>;
+      const { conversationId, turnId } = ctx.conversationId
+        ? await mutate("langy.continueConversation", {
+            ...turnInput,
+            conversationId: ctx.conversationId,
+          })
+        : await mutate("langy.createConversation", turnInput);
       deps.onIds({ conversationId, turnId });
 
       return subscribeTurnStream({

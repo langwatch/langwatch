@@ -1,13 +1,22 @@
 /**
  * Hono routes for the Langy assistant.
  *
- * Only surface left: `POST /api/langy/chat` — the turn-START endpoint. It now
- * does ONLY Phase 1 (session auth, demo gate, project-permission gate, rate
- * limit, body validation) and then delegates the whole turn-start orchestration
- * to `getApp().langy.turns` (LangyTurnService), mapping the DomainErrors it
- * throws to HTTP. It no longer streams: the browser subscribes to the
- * `langy.onTurnStream` tRPC subscription for the live turn, and
- * reads/lists/deletes go through the `api.langy.*` tRPC router.
+ * DEPRECATED (LANGY_REWORK_PLAN.md S2 increment D): `POST /api/langy/chat` is no
+ * longer called by the browser. Turn-start now flows through the tRPC mutations
+ * `langy.createConversation` / `langy.continueConversation` (see
+ * `api/routers/langy.ts`), which carry the SAME Phase-1 gate — session auth
+ * (protectedProcedure), `evaluations:view` + demo refusal (`langyReadProcedure`)
+ * and the per-user rate limit (`langyTurnProcedure`) — and delegate to the same
+ * `getApp().langy.turns.startConversationTurn`, with DomainErrors mapped to coded
+ * TRPCErrors by the shared `domainErrorMiddleware`. This route is kept only as a
+ * belt-and-suspenders fallback pending its removal in the S3/S4 cleanup; nothing
+ * in the product depends on it. Do not add new callers.
+ *
+ * The route still does ONLY Phase 1 (session auth, demo gate, project-permission
+ * gate, rate limit, body validation) and delegates to `getApp().langy.turns`
+ * (LangyTurnService), mapping DomainErrors to HTTP. It does not stream: the
+ * browser subscribes to the `langy.onTurnStream` tRPC subscription for the live
+ * turn, and reads/lists/deletes go through the `api.langy.*` tRPC router.
  *
  * Access: LangWatch staff always have Langy. For everyone else it is gated by
  * `release_langy_enabled` (see the middleware below). Staff bypass the flag.

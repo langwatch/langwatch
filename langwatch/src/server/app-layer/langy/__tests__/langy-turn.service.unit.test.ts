@@ -17,6 +17,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}): {
   deps: LangyTurnServiceDeps;
   mocks: {
     recordUserMessage: ReturnType<typeof vi.fn>;
+    createConversation: ReturnType<typeof vi.fn>;
     startTurn: ReturnType<typeof vi.fn>;
     probe: ReturnType<typeof vi.fn>;
     mintSessionKey: ReturnType<typeof vi.fn>;
@@ -27,6 +28,9 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}): {
   };
 } {
   const recordUserMessage = vi.fn(async () => ({ messageId: "m1" }));
+  const createConversation = vi.fn(async ({ conversationId }: { conversationId: string }) => ({
+    id: conversationId,
+  }));
   const startTurn = vi.fn(async ({ turnId }: { turnId: string }) => ({ turnId }));
   const probe = vi.fn(async () => false);
   const mintSessionKey = vi.fn(async () => ({ token: "t", apiKeyId: "k" }));
@@ -45,6 +49,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}): {
     findByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
     getPendingHandoff: vi.fn(async () => null),
     startTurn,
+    createConversation,
     consumeHandoff: vi.fn(async () => {}),
   };
   const credentials = {
@@ -71,6 +76,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}): {
     deps,
     mocks: {
       recordUserMessage,
+      createConversation,
       startTurn,
       probe,
       mintSessionKey,
@@ -135,6 +141,34 @@ describe("LangyTurnService.startConversationTurn", () => {
       const svc = LangyTurnService.create(deps);
       await svc.startConversationTurn(input());
       expect(order).toEqual(["message", "turn"]);
+    });
+  });
+
+  describe("given a new conversation (create)", () => {
+    it("emits conversation_started (the semantically-first marker) then dispatches the turn", async () => {
+      const svc = LangyTurnService.create(deps);
+      await svc.startConversationTurn(input({ isNewConversation: true }));
+      expect(mocks.createConversation).toHaveBeenCalledTimes(1);
+      expect(mocks.createConversation).toHaveBeenCalledWith(
+        expect.objectContaining({ conversationId: "conv-1" }),
+      );
+      expect(mocks.startTurn).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not block the turn when the conversation_started marker fails", async () => {
+      mocks.createConversation.mockRejectedValue(new Error("marker write failed"));
+      const svc = LangyTurnService.create(deps);
+      const result = await svc.startConversationTurn(input({ isNewConversation: true }));
+      expect(result.turnId).toEqual(expect.any(String));
+      expect(mocks.startTurn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a continued conversation (default)", () => {
+    it("does not emit conversation_started", async () => {
+      const svc = LangyTurnService.create(deps);
+      await svc.startConversationTurn(input());
+      expect(mocks.createConversation).not.toHaveBeenCalled();
     });
   });
 

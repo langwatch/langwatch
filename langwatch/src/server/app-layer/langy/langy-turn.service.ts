@@ -71,6 +71,14 @@ export interface StartConversationTurnInput {
   modelOverride?: string;
   /** A regenerate re-drives the last turn against the message already on record. */
   isRetry: boolean;
+  /**
+   * The turn that opens a NEW conversation. Create and Continue are the same
+   * operation; create is just *semantically first* — it additionally emits
+   * `conversation_started` (owner/title, first-writer-wins) before the message.
+   * Best-effort: the owner is also seeded by the message event, so a failed
+   * marker never blocks the turn. Idempotent (keyed per conversation).
+   */
+  isNewConversation?: boolean;
   /** Composer context chips (page context + skills), rendered into the system block. */
   turnContext: LangyTurnContext;
 }
@@ -120,6 +128,7 @@ export class LangyTurnService {
       messages,
       modelOverride,
       isRetry,
+      isNewConversation,
       turnContext,
     } = input;
     const userId = session.user.id;
@@ -174,6 +183,27 @@ export class LangyTurnService {
     const conversation = conversationResult.value;
 
     const lastUserMessage = messages[messages.length - 1];
+
+    // Create is Continue + a semantically-first `conversation_started`. Emitted
+    // best-effort and off the critical path: the owner/title are ALSO seeded by
+    // the message event (first-writer-wins), so a failed or slow marker must
+    // never block or fail the turn. Idempotent per conversation, so a retried
+    // create collapses to one event.
+    if (isNewConversation) {
+      conversationService
+        .createConversation({
+          projectId,
+          userId,
+          conversationId: conversation.id,
+          title: extractTextFromParts(messages[0]?.parts).slice(0, 80) || null,
+        })
+        .catch((error) =>
+          logger.warn(
+            { error, conversationId: conversation.id },
+            "failed to emit langy conversation_started — the message event still seeds the owner",
+          ),
+        );
+    }
 
     if (model.status === "rejected") {
       logger.warn(
