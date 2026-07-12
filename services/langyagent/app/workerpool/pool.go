@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -546,20 +545,6 @@ func (p *Pool) spawn(ctx context.Context, conversationID string, creds domain.Cr
 func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds domain.Credentials, sig domain.CredentialSignature) (*Worker, error) {
 	log := clog.Get(ctx)
 	workerHome := filepath.Join(p.sessionsRoot, conversationID)
-	// Defense in depth: even with IsValidConversationID at the edge, assert the
-	// resolved path stays under SESSIONS_ROOT before we mkdir/spawn into it. A
-	// symlink could otherwise escape.
-	resolvedRoot, err := filepath.Abs(p.sessionsRoot)
-	if err != nil {
-		return nil, fmt.Errorf("resolve sessions root: %w", err)
-	}
-	resolvedHome, err := filepath.Abs(workerHome)
-	if err != nil {
-		return nil, fmt.Errorf("resolve worker home: %w", err)
-	}
-	if !strings.HasPrefix(resolvedHome, resolvedRoot+string(filepath.Separator)) {
-		return nil, herr.New(ctx, domain.ErrInvalidConversationID, herr.M{"message": "invalid conversationId"})
-	}
 
 	// Stacked rollback: each acquired resource registers a deferred undo guarded
 	// by `success`. On ANY early return OR panic before success is set, the undos
@@ -610,9 +595,21 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		}
 	}()
 
-	if err := os.MkdirAll(workerHome, 0o700); err != nil {
-		return nil, fmt.Errorf("mkdir worker home: %w", err)
+	// Create the worker home THROUGH an os.Root anchored at SESSIONS_ROOT. Unlike a
+	// lexical filepath.Abs + HasPrefix check (which does NOT resolve symlinks), the
+	// root refuses any component that escapes it — traversal OR a planted symlink —
+	// at the syscall level, so this is both the creation and the real containment
+	// guard. conversationID is already charset-validated at the edge, so a failure
+	// here is operational or hostile, not a bad id: fail the spawn closed.
+	root, err := os.OpenRoot(p.sessionsRoot)
+	if err != nil {
+		return nil, fmt.Errorf("open sessions root: %w", err)
 	}
+	if err := root.MkdirAll(conversationID, 0o700); err != nil {
+		root.Close()
+		return nil, herr.New(ctx, domain.ErrWorkerSpawn, herr.M{"message": "the assistant worker could not be started, please try again"})
+	}
+	root.Close()
 	// Register the home undo right after MkdirAll so a failure inside Provision
 	// (which writes config.json with the project API key) still wipes the partial
 	// home.
