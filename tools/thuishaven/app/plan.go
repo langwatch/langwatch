@@ -97,7 +97,11 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir str
 	}
 	if opts.ShouldStartWorkers && !opts.ShouldRunWorkersInProcess {
 		out = append(out, Child{
-			Name: "workers", Dir: lwDir, Color: palette[5],
+			// green, not red: workers are a healthy background lane, and a red
+			// prefix reads as an error even on ordinary info logs. Red (palette[5])
+			// is reserved for genuine failures, so no lane label uses it —
+			// TestNoLaneIsRed pins that.
+			Name: "workers", Dir: lwDir, Color: palette[0],
 			Shell: "pnpm -s run start:workers",
 			Env:   append(nodeEnv(), "START_WORKERS=true"),
 		})
