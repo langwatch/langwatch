@@ -32,7 +32,7 @@ that outlives your terminal. Complementary, not competing.
 haven pr <number | github-url> [-p] [-c] [--keep] [--no-install]
 
 Resolve a GitHub PR to a git worktree, wire its env, and bring the stack up on a
-hostname. Redis is ALWAYS a private, per-PR instance (see haven-private-redis).
+hostname. Redis is ALWAYS a private, per-PR instance (see haven-private-redis-plan.md).
 Postgres and ClickHouse default to the shared managed servers (a fresh per-PR
 database on each); -p / -c upgrade those to fully isolated per-PR instances.
 
@@ -101,7 +101,7 @@ one brew server (`:323-350`), Redis partitioned only by `REDIS_DB_INDEX`
 
 - **Private Redis (always).** The 16-slot DB-index scheme isn't real isolation
   (two PRs can hash to the same index; a FLUSHALL nukes both). This is the shared
-  prerequisite — see the companion **haven-private-redis** plan. `overlay.go`
+  prerequisite — see `haven-private-redis-plan.md`. `overlay.go`
   already emits `REDIS_URL=redis://127.0.0.1:<port>`, so a private port + DB 0
   needs no overlay change beyond the value.
 - **Private Postgres (`-p`)** / **Private ClickHouse (`-c`)**: new adapters
@@ -156,7 +156,7 @@ dirty** (`Hygiene.Dirty`, `hygiene.go:54-60`) — never delete uncommitted work.
 
 ## Cross-links
 
-- Depends on **haven-private-redis** (Redis is always private here).
+- Depends on `haven-private-redis-plan.md` (Redis is always private here).
 - Extend `dev/docs/adr/004-docker-dev-environment.md` (worktree isolation,
   stateful volumes, in-process workers amendments).
 - Reference `dev/docs/boxd-makefile.md` (local-vs-cloud complementarity) and
