@@ -87,6 +87,14 @@ export interface LangyConversationStateData {
    */
   PendingHandoffToken: string | null;
   PendingHandoffTurnId: string | null;
+  /**
+   * The per-conversation `runToken` (LANGY_WORKER_REDESIGN_PLAN §0a): the HMAC
+   * key for authenticating the worker's stream frames. Set once from
+   * `conversation_started` (first-writer-wins) and never surfaced to the client —
+   * this column is read ONLY by the server-side worker-provisioning path
+   * (`findRunToken`), never by the list/detail reads or the turn render fold.
+   */
+  RunToken: string | null;
   ArchivedAt: number | null;
   CreatedAt: number;
   UpdatedAt: number;
@@ -162,6 +170,7 @@ export class LangyConversationStateFoldProjection
       LastError: null,
       PendingHandoffToken: null,
       PendingHandoffTurnId: null,
+      RunToken: null,
       ArchivedAt: null,
     };
   }
@@ -200,6 +209,9 @@ export class LangyConversationStateFoldProjection
       TitleSource: titleSource,
       Status: this.nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE),
       LastActivityAt: state.LastActivityAt ?? event.occurredAt,
+      // First-writer-wins: the runToken is minted once at creation and never
+      // rotated, so an already-set value survives a (retried) started event.
+      RunToken: state.RunToken ?? event.data.runToken ?? null,
     };
   }
 
