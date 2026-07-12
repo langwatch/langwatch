@@ -3,8 +3,9 @@
  *
  * A no-license self-hosted deployment resolves to FREE_PLAN (maxMembers=1), so
  * the org owner alone is at the cap and inviting anyone 403s. Activating this
- * license (see auth.setup.ts) raises the org to ENTERPRISE (maxMembers=100) so
- * the invitation flows can be exercised.
+ * license (see members/steps.ts `withEnterpriseLicense()`, which activates it
+ * before each members test and removes it after) raises the org to ENTERPRISE
+ * (maxMembers=100) so the invitation flows can be exercised.
  *
  * This is the pre-signed `ENTERPRISE_LICENSE_KEY` fixture from
  * `langwatch/ee/licensing/__tests__/fixtures/testLicenses.ts`, signed with the
