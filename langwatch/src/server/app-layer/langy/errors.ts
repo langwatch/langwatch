@@ -51,3 +51,75 @@ export class LangyConversationNotOwnedError extends DomainError {
     this.name = "LangyConversationNotOwnedError";
   }
 }
+
+/** No model is configured for the project's Langy (HTTP 409). */
+export class LangyModelNotConfiguredError extends DomainError {
+  declare readonly kind: "langy_model_not_configured";
+  constructor() {
+    super(
+      "langy_model_not_configured",
+      "No model configured for this project.",
+      { httpStatus: 409 },
+    );
+    this.name = "LangyModelNotConfiguredError";
+  }
+}
+
+/** A `modelOverride` not on the project's Langy VK allowlist (HTTP 400). */
+export class LangyModelNotAllowedError extends DomainError {
+  declare readonly kind: "langy_model_not_allowed";
+  constructor(public readonly model: string) {
+    super(
+      "langy_model_not_allowed",
+      `Model "${model}" is not allowed for this project's Langy. Pick from the configured models.`,
+      { meta: { model }, httpStatus: 400 },
+    );
+    this.name = "LangyModelNotAllowedError";
+  }
+}
+
+/** The project's Langy egress allow-list is misconfigured; fail closed (HTTP 409). */
+export class LangyEgressMisconfiguredError extends DomainError {
+  declare readonly kind: "langy_egress_misconfigured";
+  constructor() {
+    super(
+      "langy_egress_misconfigured",
+      "Langy egress policy is misconfigured for this project.",
+      { httpStatus: 409 },
+    );
+    this.name = "LangyEgressMisconfiguredError";
+  }
+}
+
+/** The caller holds none of Langy's permissions in this project (HTTP 409). */
+export class LangyInsufficientScopeError extends DomainError {
+  declare readonly kind: "langy_insufficient_scope";
+  constructor(message: string) {
+    super("langy_insufficient_scope", message, { httpStatus: 409 });
+    this.name = "LangyInsufficientScopeError";
+  }
+}
+
+/** A turn is already in flight for the conversation — one at a time (HTTP 409). */
+export class LangyTurnInProgressError extends DomainError {
+  declare readonly kind: "langy_turn_in_progress";
+  constructor() {
+    super(
+      "langy_turn_in_progress",
+      "A response is already in progress for this conversation.",
+      { httpStatus: 409 },
+    );
+    this.name = "LangyTurnInProgressError";
+  }
+}
+
+/** The agent/transport is temporarily unavailable (HTTP 503). */
+export class LangyAgentUnavailableError extends DomainError {
+  declare readonly kind: "langy_agent_unavailable";
+  constructor(
+    message = "Agent is temporarily unavailable. Please try again shortly.",
+  ) {
+    super("langy_agent_unavailable", message, { httpStatus: 503 });
+    this.name = "LangyAgentUnavailableError";
+  }
+}

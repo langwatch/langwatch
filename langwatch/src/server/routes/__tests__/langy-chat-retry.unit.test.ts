@@ -22,6 +22,7 @@
  * connect card's re-drive after the user connects their account.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LangyTurnService } from "~/server/app-layer/langy/langy-turn.service";
 
 const getServerAuthSession = vi.fn();
 const hasProjectPermission = vi.fn();
@@ -96,21 +97,54 @@ vi.mock("~/server/services/langy/LangyCredentialService", () => ({
 vi.mock("~/server/app-layer/langy/langy-conversation.service", () => ({
   LangyConversationNotOwnedError: class extends Error {},
 }));
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({
-    langy: {
-      conversations: {
-        ensureConversation: (...args: unknown[]) => ensureConversation(...args),
-        recordUserMessage: (...args: unknown[]) => recordUserMessage(...args),
-        startTurn: (...args: unknown[]) => startTurn(...args),
-        getById: (...args: unknown[]) => getById(...args),
-        findByIdVisible: (...args: unknown[]) => findByIdVisible(...args),
-        getPendingHandoff: (...args: unknown[]) => getPendingHandoff(...args),
+vi.mock("~/server/app-layer/app", () => {
+  const conversations = {
+    ensureConversation: (...args: unknown[]) => ensureConversation(...args),
+    recordUserMessage: (...args: unknown[]) => recordUserMessage(...args),
+    startTurn: (...args: unknown[]) => startTurn(...args),
+    getById: (...args: unknown[]) => getById(...args),
+    findByIdVisible: (...args: unknown[]) => findByIdVisible(...args),
+    getPendingHandoff: (...args: unknown[]) => getPendingHandoff(...args),
+    consumeHandoff: (...args: unknown[]) => Promise.resolve(),
+  } as never;
+  // The turn-start orchestration lives in LangyTurnService (S2 C). Wire a REAL
+  // service to the same mocked collaborators so the route → service → stash flow
+  // these tests assert on is exercised end to end. The worker port is a stub that
+  // always misses (probe → false), so the mint path runs, matching the pre-lift
+  // behaviour these tests were written against.
+  return {
+    getApp: () => ({
+      langy: {
+        conversations,
+        turns: LangyTurnService.create({
+          conversations,
+          credentials: {
+            getOrProvision: (...args: unknown[]) => getOrProvision(...args),
+            getModelsAllowed: (...args: unknown[]) => getModelsAllowed(...args),
+            getEgressAllowlist: (...args: unknown[]) => getEgressAllowlist(...args),
+          } as never,
+          resolveModel: (...args: unknown[]) => getVercelAIModel(...args),
+          worker: { probe: async () => false, warm: async () => undefined },
+          reservePermit: (...args: unknown[]) =>
+            reserveLangyGithubPrPermit(...args),
+          releasePermit: (...args: unknown[]) =>
+            releaseLangyGithubPrPermit(...args),
+          perDayPrCap: 20,
+          mintSessionKey: (...args: unknown[]) =>
+            (mintLangySessionApiKey as unknown as (...a: unknown[]) => Promise<{
+              token: string;
+              apiKeyId: string;
+            }>)(...args),
+          accessStore: { grant: async () => undefined } as never,
+          handoffStore: {
+            stash: (handoff: { system?: string }) => stash(handoff),
+          } as never,
+        }),
+        messages: {},
       },
-      messages: {},
-    },
-  }),
-}));
+    }),
+  };
+});
 // Redis: the route needs a connection to stash the spawn handoff and attach the
 // stream. A minimal duck-type is enough — the turn itself runs on the worker.
 vi.mock("~/server/redis", () => ({
