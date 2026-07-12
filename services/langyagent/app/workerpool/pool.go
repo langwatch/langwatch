@@ -658,6 +658,19 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		return nil, err
 	}
 
+	// The endpoint the sandbox exposes for this worker's coding-agent process:
+	// the authproxy-fronted external port callers dial, opencode's own internal
+	// control port (checked directly by the readiness probe, never exposed), and
+	// the per-worker bearer. agent (adapters/opencode) drives readiness, session,
+	// and every turn through it — the pool never speaks the agent's wire protocol.
+	endpoint := app.Endpoint{
+		BaseURL:      "http://127.0.0.1:" + strconv.Itoa(externalPort),
+		ExternalPort: externalPort,
+		InternalPort: internalPort,
+		BearerToken:  bearerToken,
+	}
+	agent := opencode.NewAgent(p.readinessTimeout)
+
 	// authProxy binds the pool-lifetime context so its serve goroutine logs and
 	// lifetime follow the pool, not a single request.
 	proxy, err := opencode.StartAuthProxy(p.baseCtx, externalPort, internalPort, bearerToken, openCodePassword)
@@ -694,13 +707,13 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	readyStart := time.Now()
 	readinessCtx, cancel := context.WithTimeout(ctx, p.readinessTimeout)
 	defer cancel()
-	if err := opencode.WaitForReadiness(readinessCtx, externalPort, internalPort, bearerToken, p.readinessTimeout); err != nil {
+	if err := agent.WaitReady(readinessCtx, endpoint); err != nil {
 		p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), false)
 		return nil, err
 	}
 	p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), true)
 
-	sessionID, err := opencode.CreateSession(ctx, externalPort, bearerToken)
+	sessionID, err := agent.OpenSession(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -729,10 +742,8 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 
 	return &Worker{
 		conversationID:    conversationID,
-		port:              externalPort,
-		internalPort:      internalPort,
-		bearerToken:       bearerToken,
-		baseURL:           "http://127.0.0.1:" + strconv.Itoa(externalPort),
+		agent:             agent,
+		endpoint:          endpoint,
 		authProxy:         proxy,
 		egress:            we,
 		openCodeSessionID: sessionID,

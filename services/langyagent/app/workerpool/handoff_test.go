@@ -8,6 +8,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
+	"github.com/langwatch/langwatch/services/langyagent/app"
 )
 
 // newHandoffWorker builds a Worker pointing at a test opencode control server,
@@ -16,8 +19,8 @@ import (
 func newHandoffWorker(conversationID, sessionID, baseURL string) *Worker {
 	w := &Worker{
 		conversationID:    conversationID,
-		baseURL:           baseURL,
-		bearerToken:       "b",
+		agent:             opencode.NewAgent(time.Second),
+		endpoint:          app.Endpoint{BaseURL: baseURL, BearerToken: "b"},
 		openCodeSessionID: sessionID,
 	}
 	w.Claim() // mark in-flight
