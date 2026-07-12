@@ -10,6 +10,7 @@ import {
   langyAgentResponseStartedEventDataSchema,
   langyConversationArchivedEventDataSchema,
   langyConversationContinuedEventDataSchema,
+  langyConversationStartedEventDataSchema,
   langyConversationHandoffConsumedEventDataSchema,
   langyConversationHandoffPendingEventDataSchema,
   langyConversationMetadataUpdatedEventDataSchema,
@@ -24,6 +25,20 @@ import {
  * event mapping (via defineCommand). Aggregate = `langy_conversation`,
  * aggregateId = conversationId, TenantId = projectId.
  */
+
+/** CreateConversation → conversation_started (explicit creation). */
+export const CreateConversationCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.CREATE_CONVERSATION,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+  aggregateType: "langy_conversation",
+  schema: langyConversationStartedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:created`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+  }),
+});
 
 /** ContinueConversation → conversation_continued (the user turn). */
 export const ContinueConversationCommand = defineCommand({

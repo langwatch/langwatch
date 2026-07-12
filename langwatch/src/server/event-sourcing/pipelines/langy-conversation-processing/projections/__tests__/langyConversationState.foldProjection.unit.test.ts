@@ -55,6 +55,44 @@ const messageSent = (
 
 describe("LangyConversationStateFoldProjection", () => {
   describe("given a fresh conversation", () => {
+    describe("when it is explicitly created", () => {
+      it("seeds owner and title, active status, and no message yet", () => {
+        const state = fold.apply(
+          fold.init(),
+          event(
+            "CONVERSATION_STARTED",
+            LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+            { userId: "alice", title: "seeded" },
+            1000,
+          ),
+        );
+
+        expect(state.ConversationId).toBe(CONVERSATION);
+        expect(state.UserId).toBe("alice");
+        expect(state.Title).toBe("seeded");
+        expect(state.Status).toBe(LANGY_CONVERSATION_STATUS.ACTIVE);
+        expect(state.MessageCount).toBe(0);
+      });
+
+      it("keeps the original owner when a later message arrives from another user", () => {
+        const created = fold.apply(
+          fold.init(),
+          event(
+            "CONVERSATION_STARTED",
+            LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+            { userId: "alice" },
+            1000,
+          ),
+        );
+        const state = fold.apply(
+          created,
+          messageSent({ userId: "mallory", title: "hijack" }, 2000),
+        );
+        expect(state.UserId).toBe("alice");
+        expect(state.MessageCount).toBe(1);
+      });
+    });
+
     describe("when the first message is sent", () => {
       it("sets the owner, title, active status, and a message count of 1", () => {
         const state = fold.apply(

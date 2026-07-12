@@ -184,10 +184,14 @@ export class LangyConversationTurnFoldProjection
     event: LangyAgentResponseStartedEvent,
     state: LangyConversationTurnData,
   ): LangyConversationTurnData {
+    const question = event.data.questionParts;
     return {
       ...this.withIdentity(event, state),
       Status: LANGY_CONVERSATION_TURN_STATUS.RUNNING,
       StartedAt: state.StartedAt ?? event.occurredAt,
+      // The question rides the start event so the turn doc is self-contained.
+      QuestionParts:
+        question && question.length > 0 ? question : state.QuestionParts,
     };
   }
 

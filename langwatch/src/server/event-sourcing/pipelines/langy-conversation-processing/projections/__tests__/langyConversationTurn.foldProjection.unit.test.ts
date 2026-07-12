@@ -90,6 +90,21 @@ describe("LangyConversationTurnFoldProjection", () => {
       expect(state.StartedAt).toBe(1000);
       expect(state.ToolCalls).toEqual([]);
     });
+
+    it("folds the question parts into the turn document when carried", () => {
+      const state = fold.apply(
+        fold.init(),
+        event(
+          "AGENT_RESPONSE_STARTED",
+          LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_STARTED,
+          { questionParts: [{ type: "text", text: "why failing?" }] },
+          1000,
+        ),
+      );
+      expect(state.QuestionParts).toEqual([
+        { type: "text", text: "why failing?" },
+      ]);
+    });
   });
 
   describe("given a tool call runs during the turn", () => {

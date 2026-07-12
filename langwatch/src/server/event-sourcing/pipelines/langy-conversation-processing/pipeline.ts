@@ -7,6 +7,7 @@ import {
   ConsumeTurnHandoffCommand,
   ContinueConversationCommand,
   CreateAgentResponseCommand,
+  CreateConversationCommand,
   FailAgentResponseCommand,
   FailToolCallCommand,
   GenerateConversationTitleCommand,
@@ -97,6 +98,7 @@ export interface LangyConversationProcessingPipelineDeps {
  *   (assistant), stored in the existing langy_messages table.
  *
  * Commands (write surface):
+ * - createConversation: explicit creation -> conversation_started
  * - continueConversation: user turn -> conversation_continued
  * - createAgentResponse: agent response begins -> agent_response_started
  * - recordAgentResponse: streamed answer completes -> agent_responded
@@ -168,6 +170,7 @@ export function createLangyConversationProcessingPipeline(
   }
 
   return builder
+    .withCommand("createConversation", CreateConversationCommand)
     .withCommand("continueConversation", ContinueConversationCommand)
     .withCommand("createAgentResponse", CreateAgentResponseCommand)
     .withCommand("initiateToolCall", InitiateToolCallCommand)

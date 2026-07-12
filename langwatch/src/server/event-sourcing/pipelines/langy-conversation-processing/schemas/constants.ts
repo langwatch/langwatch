@@ -13,6 +13,7 @@
  * fold / map projections. Format: "lw.langy_conversation.<action>".
  */
 export const LANGY_CONVERSATION_EVENT_TYPES = {
+  CONVERSATION_STARTED: "lw.langy_conversation.conversation_started",
   CONVERSATION_CONTINUED: "lw.langy_conversation.conversation_continued",
   AGENT_RESPONSE_STARTED: "lw.langy_conversation.agent_response_started",
   TOOL_CALL_INITIATED: "lw.langy_conversation.tool_call_initiated",
@@ -37,6 +38,7 @@ export const LANGY_CONVERSATION_EVENT_TYPES = {
 } as const;
 
 export const LANGY_CONVERSATION_PROCESSING_EVENT_TYPES = [
+  LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED,
   LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_CONTINUED,
   LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_STARTED,
   LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED,
@@ -78,6 +80,7 @@ export const LANGY_EPHEMERAL_SIGNAL_TYPES = {
  * Format: "lw.langy_conversation.<action>".
  */
 export const LANGY_CONVERSATION_COMMAND_TYPES = {
+  CREATE_CONVERSATION: "lw.langy_conversation.create_conversation",
   CONTINUE_CONVERSATION: "lw.langy_conversation.continue_conversation",
   CREATE_AGENT_RESPONSE: "lw.langy_conversation.create_agent_response",
   // Turn-lifecycle write surface. The durable milestones the agent records
@@ -99,6 +102,7 @@ export const LANGY_CONVERSATION_COMMAND_TYPES = {
 } as const;
 
 export const LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES = [
+  LANGY_CONVERSATION_COMMAND_TYPES.CREATE_CONVERSATION,
   LANGY_CONVERSATION_COMMAND_TYPES.CONTINUE_CONVERSATION,
   LANGY_CONVERSATION_COMMAND_TYPES.CREATE_AGENT_RESPONSE,
   LANGY_CONVERSATION_COMMAND_TYPES.INITIATE_TOOL_CALL,
@@ -208,6 +212,7 @@ export const LANGY_TITLE_GENERATION = {
  * Event schema versions using calendar versioning (YYYY-MM-DD).
  */
 export const LANGY_CONVERSATION_EVENT_VERSIONS = {
+  CONVERSATION_STARTED: "2026-07-12",
   CONVERSATION_CONTINUED: "2026-07-10",
   AGENT_RESPONSE_STARTED: "2026-07-10",
   TOOL_CALL_INITIATED: "2026-07-10",
