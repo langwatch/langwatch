@@ -67,6 +67,10 @@ func Root(ctx context.Context, _ []string) error {
 		app.WithLogger(deps.Logger),
 		app.WithWorkerPool(pool),
 		app.WithTelemetry(deps.Telemetry),
+		// Durable-final poster: same shared secret as the Revoker, no new config.
+		// The independent completion path back to langy-internal, retried and
+		// idempotent on turnId.
+		app.WithFinalizer(controlplane.NewFinalizer(cfg.InternalSecret, 0)),
 	)
 
 	return langyagent.Serve(ctx, application, deps, cfg)

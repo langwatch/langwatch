@@ -33,6 +33,7 @@ import {
   type GithubPrLink,
 } from "~/server/services/langy/githubPrLinks";
 import type { LangyConversationService } from "~/server/app-layer/langy/langy-conversation.service";
+import { buildFinalAssistantParts } from "~/server/app-layer/langy/langy-final-parts";
 import { LANGY_LIVENESS } from "../streaming/langy.streaming.constants";
 import { RedisLangyEphemeralPublisher } from "../streaming/langyEphemeralPublisher";
 import type { LangyEphemeralPublisher } from "~/server/event-sourcing/pipelines/langy-conversation-processing/ephemeral";
@@ -163,6 +164,7 @@ function parseAgentLine(line: string): {
   handoff?: string;
   fastToken?: string;
   tool?: LangyToolFrame;
+  progress?: boolean;
 } | null {
   if (!line.trim()) return null;
   try {
@@ -186,6 +188,12 @@ function parseAgentLine(line: string): {
       return typeof event.text === "string" && event.text
         ? { fastToken: event.text }
         : null;
+    }
+    // A "still working" heartbeat frame the agent emits on a timer so a long,
+    // silent tool call never stalls the stream. Ephemeral: it carries nothing to
+    // persist — the reader just refreshes the turn's liveness key on it.
+    if (event.type === "langy.progress") {
+      return { progress: true };
     }
     // A tool-call lifecycle frame (ADR-044/tool events). Forwarded ALONGSIDE the
     // text/token frames, so the durable answer path is unchanged.
@@ -565,6 +573,11 @@ export async function runTurn(
       },
       body: JSON.stringify({
         conversationId,
+        // turnId + projectId ride the payload so the agent can echo them on its
+        // durable final POST to langy-internal (the idempotency key + the tenant
+        // the ingest dispatches the finalize command against).
+        turnId,
+        projectId,
         prompt,
         system,
         credentials,
@@ -638,6 +651,15 @@ export async function runTurn(
         // awaited into the durable critical path and never allowed to throw.
         void deps.fastPublisher
           .publishToken({ conversationId, turnId, text: parsed.fastToken })
+          .catch(() => undefined);
+        return;
+      }
+      if (parsed.progress) {
+        // A heartbeat frame: refresh the turn's liveness key so a long silent
+        // tool call keeps the per-turn reconcile reactor from failing a live
+        // turn. Ephemeral and best-effort — never awaited into the critical path.
+        void deps.buffer
+          .heartbeat({ conversationId, turnId })
           .catch(() => undefined);
         return;
       }
@@ -779,21 +801,17 @@ export async function runTurn(
     // client replays the tool cards in order, then the prose (event-driven
     // recovery). The part shape matches the AI-SDK tool part the live stream
     // emits, so the SAME renderer draws them live and on reload.
-    const answer = fullText;
-    const toolParts = [...toolCalls.values()].map((call) => ({
-      type: `tool-${call.name}`,
-      toolCallId: call.id,
-      state: call.isError ? "output-error" : "output-available",
-      ...(call.input !== undefined ? { input: call.input } : {}),
-      ...(call.isError
-        ? { errorText: call.output ?? "Tool call failed" }
-        : { output: call.output ?? "" }),
-    }));
     await deps.conversations.finalizeTurn({
       projectId,
       conversationId,
       turnId,
-      parts: [...toolParts, { type: "text", text: answer, role: "assistant" }],
+      // Shared with the durable HTTP-final ingest (langy-internal) so whichever
+      // path finalizes first produces identical parts and the turnId-idempotent
+      // dedupe is content-safe.
+      parts: buildFinalAssistantParts({
+        text: fullText,
+        toolCalls: [...toolCalls.values()],
+      }),
       outcome: "completed",
     });
     await deps.buffer.markEnd({ conversationId, turnId });

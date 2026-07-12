@@ -52,6 +52,7 @@ import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as langyApp } from "./routes/langy";
+import { app as langyInternalApp } from "./routes/langy-internal";
 import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
@@ -145,6 +146,7 @@ export function createApiRouter() {
   api.route("/", otelApp);
   api.route("/", playgroundApp);
   api.route("/", langyApp);
+  api.route("/", langyInternalApp);
   api.route("/", githubLangyApp);
   api.route("/", scenarioGenerateApp);
   api.route("/", scimApp);
