@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
@@ -119,13 +120,13 @@ func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
 		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
 
-	pwA, err := GenerateBearerToken()
+	pwA, err := opencode.GenerateBearerToken()
 	if err != nil {
-		t.Fatalf("GenerateBearerToken: %v", err)
+		t.Fatalf("opencode.GenerateBearerToken: %v", err)
 	}
-	pwB, err := GenerateBearerToken()
+	pwB, err := opencode.GenerateBearerToken()
 	if err != nil {
-		t.Fatalf("GenerateBearerToken: %v", err)
+		t.Fatalf("opencode.GenerateBearerToken: %v", err)
 	}
 
 	envA := buildWorkerEnv("conv-a", "/workspace/sessions/conv-a", creds, pwA, 19001)
