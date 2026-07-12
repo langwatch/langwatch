@@ -346,8 +346,9 @@ func (p *Pool) countInFlight(workers []*Worker) int {
 // This is the pre-flight the control plane uses to decide whether it needs to
 // mint a session key at all. It answers exactly the question Acquire would ask
 // and nothing more — in particular the signature is computable WITHOUT a key
-// (SignatureOf reads only model / GitHub-presence / egress allow-list), which is
-// what makes "probe, then mint only if spawning" possible in the first place.
+// (it reads only model / active capability keys / egress allow-list, all
+// presence-based), which is what makes "probe, then mint only if spawning"
+// possible in the first place.
 //
 // Deliberately advisory: the worker can die immediately after we answer true.
 // The control plane does not have to get this right, because Acquire refuses a
@@ -396,8 +397,18 @@ func (p *Pool) revokeKeyOf(w *Worker, reason string) {
 	}()
 }
 
+// capabilitiesFor assembles the turn's capability set from its credentials — the
+// ONE place the pool enumerates it, used for BOTH the worker env (each
+// Contribute) and the credential signature (app.SignatureKeys), so the two can
+// never drift. GitHub is the only capability today; it is inert when the turn
+// carried no token. (The probe path builds the equivalent set from its boolean —
+// see transport/rpc; both compute the same signature via app.SignatureKeys.)
+func capabilitiesFor(creds domain.Credentials) []app.Capability {
+	return []app.Capability{github.New(creds.GithubToken, creds.GithubLogin)}
+}
+
 func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
-	wantedSig := domain.SignatureOf(creds)
+	wantedSig := domain.SignatureOf(creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)))
 
 	p.mu.Lock()
 	if w, ok := p.workers[conversationID]; ok {
@@ -720,9 +731,9 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		OpenCodePassword: openCodePassword,
 		EgressPort:       we.ProxyPort,
 		Runner:           p.runner,
-		// The turn's capabilities fold their own env into the worker. GitHub is the
-		// only one today (its Contribute() is inert when the turn carried no token).
-		Capabilities: []app.Capability{github.New(creds.GithubToken, creds.GithubLogin)},
+		// The turn's capabilities fold their own env into the worker — the SAME set
+		// that produced this worker's credential signature (see capabilitiesFor).
+		Capabilities: capabilitiesFor(creds),
 	})
 	if err != nil {
 		return nil, err

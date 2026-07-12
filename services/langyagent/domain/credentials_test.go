@@ -32,30 +32,28 @@ func TestIsValidConversationID(t *testing.T) {
 	}
 }
 
-func TestSignatureOf_DetectsModelAndGithubChanges(t *testing.T) {
-	base := Credentials{Model: "openai/gpt-5-mini"}
-	sigBase := SignatureOf(base)
+func TestSignatureOf_DetectsModelAndCapabilityChanges(t *testing.T) {
+	sigBase := SignatureOf("openai/gpt-5-mini", nil, nil)
 
-	// Same model + no GH → same signature.
-	if SignatureOf(Credentials{Model: "openai/gpt-5-mini"}) != sigBase {
-		t.Errorf("identical credentials should produce identical signatures")
+	// Same inputs → same signature.
+	if SignatureOf("openai/gpt-5-mini", nil, nil) != sigBase {
+		t.Errorf("identical inputs should produce identical signatures")
 	}
-	// Model swap → different signature (worker must be recycled so the new
-	// model is honored).
-	if SignatureOf(Credentials{Model: "anthropic/claude-opus"}) == sigBase {
+	// Model swap → different signature (worker must be recycled so the new model
+	// is honored).
+	if SignatureOf("anthropic/claude-opus", nil, nil) == sigBase {
 		t.Errorf("model change must alter the signature")
 	}
-	// GH token added → different signature (or worker keeps a stale token across
-	// a PR-cap-denied turn).
-	if SignatureOf(Credentials{Model: "openai/gpt-5-mini", GithubToken: "tok"}) == sigBase {
-		t.Errorf("adding a GH token must alter the signature")
+	// A capability becoming active → different signature (else a worker keeps a
+	// stale capability's secret across a turn that no longer grants it). Capability
+	// presence (not the secret, not a display label like GitHub login) is what folds
+	// in — that mapping lives in each capability's SignatureKey, tested there.
+	if SignatureOf("openai/gpt-5-mini", nil, []string{"github"}) == sigBase {
+		t.Errorf("adding an active capability must alter the signature")
 	}
-	// GH login alone is a label, not a capability — login changes without a
-	// token must NOT force a recycle. Assert explicitly so a future edit can't
-	// silently widen the signature.
-	withLogin := Credentials{Model: "openai/gpt-5-mini", GithubLogin: "alice"}
-	if SignatureOf(withLogin) != sigBase {
-		t.Errorf("GithubLogin alone must NOT alter the signature")
+	// The capability fingerprint is canonical — key order is irrelevant.
+	if SignatureOf("m", nil, []string{"a", "b"}) != SignatureOf("m", nil, []string{"b", "a"}) {
+		t.Errorf("capability key order must not affect the signature")
 	}
 }
 
@@ -63,22 +61,22 @@ func TestSignatureOf_DetectsModelAndGithubChanges(t *testing.T) {
 // live worker never runs a stale egress policy; a semantically-equal list must
 // NOT, or a benign re-save would needlessly kill the conversation's worker.
 func TestSignatureOf_EgressAllowlistChangeRecyclesWorker(t *testing.T) {
-	a := SignatureOf(Credentials{EgressAllowlist: []string{"a.example.com"}})
-	b := SignatureOf(Credentials{EgressAllowlist: []string{"b.example.com"}})
+	a := SignatureOf("", []string{"a.example.com"}, nil)
+	b := SignatureOf("", []string{"b.example.com"}, nil)
 	if a == b {
 		t.Fatalf("changing the allow-list must change the signature (a=%+v b=%+v)", a, b)
 	}
 
 	// Reordering / case / trailing dot are the SAME policy — must NOT recycle.
-	x := SignatureOf(Credentials{EgressAllowlist: []string{"a.example.com", "B.example.com"}})
-	y := SignatureOf(Credentials{EgressAllowlist: []string{"b.example.com.", "a.example.com"}})
+	x := SignatureOf("", []string{"a.example.com", "B.example.com"}, nil)
+	y := SignatureOf("", []string{"b.example.com.", "a.example.com"}, nil)
 	if x != y {
 		t.Fatalf("semantically-equal lists must share a signature (x=%+v y=%+v)", x, y)
 	}
 
 	// Setting a list where there was none is a change.
-	none := SignatureOf(Credentials{})
-	some := SignatureOf(Credentials{EgressAllowlist: []string{"a.example.com"}})
+	none := SignatureOf("", nil, nil)
+	some := SignatureOf("", []string{"a.example.com"}, nil)
 	if none == some {
 		t.Fatalf("adding an allow-list must change the signature")
 	}
@@ -88,10 +86,10 @@ func TestSignatureOf_EgressAllowlistChangeRecyclesWorker(t *testing.T) {
 // port/path/userinfo, or a "../../" traversal) into the egress fingerprint — it
 // is dropped, so the signature is computed as if the junk were absent.
 func TestSignatureOf_EgressAllowlistDropsMalformedEntries(t *testing.T) {
-	none := SignatureOf(Credentials{})
+	none := SignatureOf("", nil, nil)
 
 	// A list of only junk fingerprints identically to no list at all.
-	junkOnly := SignatureOf(Credentials{EgressAllowlist: []string{
+	junkOnly := SignatureOf("", []string{
 		"../../etc/passwd",
 		"https://evil.example.com/steal",
 		"evil.example.com/steal",
@@ -100,21 +98,21 @@ func TestSignatureOf_EgressAllowlistDropsMalformedEntries(t *testing.T) {
 		"has space.example",
 		"under_score.example",
 		"..",
-	}})
+	}, nil)
 	if junkOnly != none {
 		t.Fatalf("malformed-only allow-list must fingerprint as unset (got %+v want %+v)", junkOnly, none)
 	}
 
 	// A junk entry beside a valid one contributes nothing — same fingerprint as
 	// the valid one alone.
-	withJunk := SignatureOf(Credentials{EgressAllowlist: []string{"../../etc", "registry.npmjs.org"}})
-	clean := SignatureOf(Credentials{EgressAllowlist: []string{"registry.npmjs.org"}})
+	withJunk := SignatureOf("", []string{"../../etc", "registry.npmjs.org"}, nil)
+	clean := SignatureOf("", []string{"registry.npmjs.org"}, nil)
 	if withJunk != clean {
 		t.Fatalf("a dropped junk entry must not change the fingerprint (got %+v want %+v)", withJunk, clean)
 	}
 
 	// A legitimate wildcard pattern survives validation.
-	wild := SignatureOf(Credentials{EgressAllowlist: []string{"*.internal.acme.com"}})
+	wild := SignatureOf("", []string{"*.internal.acme.com"}, nil)
 	if wild == none {
 		t.Fatalf("a valid wildcard pattern must be kept in the fingerprint")
 	}

@@ -83,8 +83,15 @@ func (c Credentials) Spawnable() bool {
 //
 // The signature is compared on every reuse; mismatch → kill + respawn.
 type CredentialSignature struct {
-	Model         string
-	HasGithubAuth bool
+	Model string
+	// Capabilities is a canonical fingerprint (sorted + newline-joined) of the
+	// worker's ACTIVE capability keys (app.Capability.SignatureKey — GitHub is the
+	// only one today). A capability added or removed since spawn changes this and
+	// forces a respawn: a worker keeps a capability's secret in its subprocess env,
+	// so reusing it for a turn without that capability would leak access, and one
+	// with it would run crippled. A string (not a slice) keeps CredentialSignature
+	// comparable with ==. The keys encode presence, never the secret.
+	Capabilities string
 	// EgressAllowlist is a canonical fingerprint (sorted + newline-joined) of
 	// the project's egress allow-list (ADR-043). Folding it in means a policy
 	// change (the customer edits the list) recycles the worker on its next turn
@@ -94,15 +101,30 @@ type CredentialSignature struct {
 	EgressAllowlist string
 }
 
-// SignatureOf derives the comparable signature from a credentials payload.
-// GithubLogin is deliberately excluded — it is a display label, not a
-// capability, so a login change without a token must NOT force a recycle.
-func SignatureOf(creds Credentials) CredentialSignature {
+// SignatureOf derives the comparable signature from the parts that must match for
+// a worker to be reused: the model, the egress allow-list, and the active
+// capability keys (built by app.SignatureKeys from the capability set). Both the
+// spawn path and the read-only probe path build the signature through here, so the
+// canonicalisation lives in ONE place and the two can never compute subtly
+// different signatures. capabilityKeys carries only capability PRESENCE, never a
+// secret, which is why the probe can supply it from a boolean.
+func SignatureOf(model string, egressAllowlist, capabilityKeys []string) CredentialSignature {
 	return CredentialSignature{
-		Model:           creds.Model,
-		HasGithubAuth:   creds.GithubToken != "",
-		EgressAllowlist: canonicalEgressAllowlist(creds.EgressAllowlist),
+		Model:           model,
+		Capabilities:    canonicalStrings(capabilityKeys),
+		EgressAllowlist: canonicalEgressAllowlist(egressAllowlist),
 	}
+}
+
+// canonicalStrings sorts + newline-joins a key list into an order-independent,
+// ==-comparable fingerprint. Empty in → empty string.
+func canonicalStrings(keys []string) string {
+	if len(keys) == 0 {
+		return ""
+	}
+	sorted := append([]string(nil), keys...)
+	sort.Strings(sorted)
+	return strings.Join(sorted, "\n")
 }
 
 // hostPatternPattern validates a normalised egress allow-list entry: an
