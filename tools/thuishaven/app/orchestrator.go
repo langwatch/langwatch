@@ -57,7 +57,12 @@ func (o *Orchestrator) resolveSlug(p UpParams) (string, error) {
 	// under the same directory. Linked worktrees keep their stable per-directory
 	// slug.
 	if !p.IsLinkedWorktree {
-		if s := domain.SlugFromBranch(p.Branch); s != "" {
+		// Use the branch slug unless another worktree already owns it (a linked
+		// worktree whose directory name derives the same slug). Reusing it there
+		// would clobber their registry entry, so fall through to DeriveSlug, which
+		// disambiguates. Our own prior stack (same worktree dir) is not a conflict —
+		// re-running `up` on the same branch must keep the same slug.
+		if s := domain.SlugFromBranch(p.Branch); s != "" && !o.slugOwnedByOther(s, p.WorktreeDir) {
 			return s, nil
 		}
 	}
@@ -100,12 +105,17 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 			Hostname: o.cfg.Naming.Hostname(r.Name, slug),
 			URL:      o.cfg.Naming.URL(r.Name, slug, scheme, pport),
 		}
-		// A service this worktree opts out of (gateway/nlp) still gets a hostname —
-		// it resolves to the shared baseline stack's copy, so every URL is always
-		// defined. The app is always local.
+		// A service this worktree opts out of (gateway/nlp/langyagent) resolves to a
+		// live baseline stack's copy when one exists, so its URL stays defined. With
+		// no baseline to fall back to it is genuinely unavailable: drop the
+		// preallocated port so it is neither routed (dead 502) nor emitted into the
+		// overlay (e.g. an OPENCODE_AGENT_URL/LANGY_INTERNAL_SECRET for a dead
+		// socket). The app is always local.
 		if !runsLocally(r.Name, opts) {
 			if bp, ok := o.baselinePort(r.Name); ok {
 				svc.Port, svc.IsFallback = bp, true
+			} else {
+				svc.Port = 0
 			}
 		}
 		st.Services = append(st.Services, svc)
@@ -379,6 +389,17 @@ func runsLocally(name string, opts PlanOptions) bool {
 	default:
 		return true
 	}
+}
+
+// slugOwnedByOther reports whether a registered stack from a different worktree
+// already holds this slug — reusing it would overwrite their registry entry.
+func (o *Orchestrator) slugOwnedByOther(slug, worktreeDir string) bool {
+	for _, st := range o.store.Stacks() {
+		if st.Slug == slug && st.WorktreeDir != worktreeDir {
+			return true
+		}
+	}
+	return false
 }
 
 // baselinePort routes an opted-out service's hostname to a live baseline stack.

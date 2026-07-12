@@ -26,35 +26,50 @@ func New(naming domain.Naming, lwDir string) *Proxy {
 	return &Proxy{naming: naming, lwDir: lwDir}
 }
 
-func (p *Proxy) argv() []string {
-	if bin := os.Getenv("PORTLESS_BIN"); bin != "" {
-		return []string{bin}
+// resolveBinary returns a real, runnable portless binary and true, or "" and
+// false when only the `npx --yes portless` fallback is available. It is the
+// single source of truth for both argv() and Installed(), so the two can never
+// disagree about whether portless is installed. PORTLESS_BIN and the
+// project-local candidate must point at an executable file to count — a stale or
+// misconfigured path falls through rather than being trusted.
+func (p *Proxy) resolveBinary() (string, bool) {
+	if bin := os.Getenv("PORTLESS_BIN"); bin != "" && isExecutableFile(bin) {
+		return bin, true
 	}
 	local := filepath.Join(p.lwDir, "node_modules", ".bin", "portless")
-	if _, err := os.Stat(local); err == nil {
-		return []string{local}
+	if isExecutableFile(local) {
+		return local, true
 	}
 	if onPath, err := exec.LookPath("portless"); err == nil {
-		return []string{onPath}
+		return onPath, true
+	}
+	return "", false
+}
+
+func (p *Proxy) argv() []string {
+	if bin, ok := p.resolveBinary(); ok {
+		return []string{bin}
 	}
 	return []string{"npx", "--yes", "portless"}
 }
 
-// Installed reports whether a real portless binary is resolvable — the first
-// three argv() branches (PORTLESS_BIN, project-local, on PATH) — as opposed to
-// the `npx --yes portless` fallback, which would re-download on every call. This
-// is the signal `haven setup` uses to decide whether to ask the user to install
-// portless first.
+// Installed reports whether a real portless binary is resolvable (PORTLESS_BIN,
+// project-local, or on PATH) as opposed to the `npx --yes portless` fallback,
+// which would re-download on every call. This is the signal `haven setup` uses
+// to decide whether to ask the user to install portless first.
 func (p *Proxy) Installed() bool {
-	if os.Getenv("PORTLESS_BIN") != "" {
-		return true
+	_, ok := p.resolveBinary()
+	return ok
+}
+
+// isExecutableFile reports whether path is a regular file with an executable bit
+// set — a candidate we can actually run, not a directory or a dangling path.
+func isExecutableFile(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return false
 	}
-	local := filepath.Join(p.lwDir, "node_modules", ".bin", "portless")
-	if _, err := os.Stat(local); err == nil {
-		return true
-	}
-	_, err := exec.LookPath("portless")
-	return err == nil
+	return info.Mode().Perm()&0o111 != 0
 }
 
 func (p *Proxy) run(args ...string) error {

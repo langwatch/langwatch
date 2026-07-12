@@ -21,8 +21,9 @@ If no feature file exists for your task, create one before writing code.
 
 ### Local dev by hostname — thuishaven / portless (recommended)
 
-Stop juggling ports. `pnpm dev` routes through **`haven`** (the Go orchestrator in
-`tools/thuishaven`, binary `cmd/haven`), which gives every worktree's services a
+Stop juggling ports. Opt in with `pnpm dev:haven` and traffic routes through
+**`haven`** (the Go orchestrator in `tools/thuishaven`, binary `cmd/haven`), which
+gives every worktree's services a
 stable hostname via the [portless](https://github.com/vercel-labs/portless) proxy —
 `app|gateway|nlp.<slug>.langwatch.localhost`, where `<slug>` is the worktree's own
 directory name, sanitised (a checkout at `.../worktrees/portless` is the `portless`

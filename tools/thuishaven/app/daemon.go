@@ -60,9 +60,26 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 	}
 	port := ports[0]
 	info := DaemonInfo{PID: o.sys.Getpid(), Port: port, URL: fmt.Sprintf("http://127.0.0.1:%d", port)}
-	// Save readiness FIRST so `up` finds us immediately, then wire up routes.
-	if err := o.store.SaveDaemon(info); err != nil {
-		return err
+	// Atomically claim the singleton slot BEFORE wiring routes — this both makes
+	// `up` find us immediately and closes the startup race where two `up`s slip
+	// past the daemonAlive() check above (which needs the port listening) and each
+	// spawn a daemon. O_EXCL lets exactly one racer win. If we lose to a live owner
+	// we defer to it; a record left by a crashed daemon (dead PID) is cleared and
+	// the claim retried. ProcessAlive is the right liveness test here, not the
+	// port: the winner has just written its own PID and may not be listening yet.
+	for {
+		claimed, err := o.store.ClaimDaemon(info)
+		if err != nil {
+			return err
+		}
+		if claimed {
+			break
+		}
+		if owner, ok := o.store.Daemon(); ok && o.sys.ProcessAlive(owner.PID) {
+			fmt.Println("haven daemon already running")
+			return nil
+		}
+		o.store.ClearDaemon() // stale record from a crashed daemon — drop and retry
 	}
 	defer o.store.ClearDaemon()
 

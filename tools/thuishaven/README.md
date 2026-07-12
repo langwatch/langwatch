@@ -54,7 +54,7 @@ Open <https://langwatch.localhost> to see every stack across your worktrees.
 
 ## Commands
 
-```
+```text
 haven setup      one-time bootstrap — verify/install portless, trust its CA
 haven            live TUI of all stacks (a terminal version of the dashboard)
 haven up         what `pnpm dev:haven` runs — resolve slug, register, supervise

@@ -43,7 +43,10 @@ type Store interface {
 	WriteHMRGate(lwDir string, expiryUnixMs int64) error
 	ReadHMRGate(lwDir string) (int64, bool)
 	ClearHMRGate(lwDir string)
-	SaveDaemon(DaemonInfo) error
+	// ClaimDaemon atomically records this process as the singleton daemon, but
+	// only if no record exists yet (O_EXCL). It returns false without overwriting
+	// when one already does, so two daemons racing to start can never both win.
+	ClaimDaemon(DaemonInfo) (bool, error)
 	Daemon() (DaemonInfo, bool)
 	ClearDaemon()
 }
