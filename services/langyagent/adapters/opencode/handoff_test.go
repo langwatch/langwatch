@@ -1,15 +1,19 @@
 package opencode
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 )
 
 // ADR-048: `handoff` must be a terminal event type so StreamSession
@@ -118,10 +122,11 @@ func TestPostMessage_OmitsResumeTokenWhenEmpty(t *testing.T) {
 	}
 }
 
-// The in-flight turn's event tail must terminate on a `handoff` frame and
-// forward it to the sink, so the control plane can persist the token off the
-// still-open /chat response (ADR-048).
-func TestStreamSessionEvents_HandoffFrameTerminatesAndForwards(t *testing.T) {
+// The in-flight turn's event tail must terminate on a `handoff` frame, emit a
+// terminal frames.Handoff carrying the opaque resume token (so the relay can
+// persist it), and signal ErrTurnHandedOff so app.Chat skips its own terminal
+// frame but still finalizes (ADR-048).
+func TestStreamSession_HandoffFrameTerminatesAndEmits(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fl, ok := w.(http.Flusher)
 		if !ok {
@@ -134,32 +139,40 @@ func TestStreamSessionEvents_HandoffFrameTerminatesAndForwards(t *testing.T) {
 		fl.Flush()
 		io.WriteString(w, "data: {\"type\":\"handoff\",\"sessionID\":\"sess-1\",\"token\":\"opaque-resume\"}\n\n")
 		fl.Flush()
-		// Hold the connection open; StreamSession must return on the
-		// terminal handoff frame without waiting for us to close.
+		// Hold the connection open; StreamSession must return on the terminal
+		// handoff frame without waiting for us to close.
 		time.Sleep(500 * time.Millisecond)
 	}))
 	defer srv.Close()
 
-	var out bytes.Buffer
+	var mu sync.Mutex
+	var emitted []string
 	done := make(chan error, 1)
 	go func() {
-		done <- StreamSession(context.Background(), srv.URL, "b", "sess-1", &out, func() {})
+		done <- StreamSession(context.Background(), srv.URL, "b", "sess-1", func(f frames.Frame) error {
+			mu.Lock()
+			emitted = append(emitted, f.JSON())
+			mu.Unlock()
+			return nil
+		})
 	}()
 
 	select {
 	case err := <-done:
-		if err != nil {
-			t.Fatalf("StreamSession returned error: %v", err)
+		if !errors.Is(err, domain.ErrTurnHandedOff) {
+			t.Fatalf("StreamSession must signal ErrTurnHandedOff on a handoff terminal, got %v", err)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatalf("StreamSession did not return on the terminal handoff frame")
 	}
 
-	got := out.String()
-	if !strings.Contains(got, "\"type\":\"handoff\"") || !strings.Contains(got, "opaque-resume") {
-		t.Errorf("sink missing forwarded handoff frame; got: %q", got)
+	mu.Lock()
+	joined := strings.Join(emitted, "")
+	mu.Unlock()
+	if !strings.Contains(joined, `"type":"handoff"`) || !strings.Contains(joined, "opaque-resume") {
+		t.Errorf("missing emitted handoff frame; got: %q", joined)
 	}
-	if !strings.Contains(got, "partial") {
-		t.Errorf("sink missing the pre-handoff delta; got: %q", got)
+	if !strings.Contains(joined, "partial") {
+		t.Errorf("missing the pre-handoff delta; got: %q", joined)
 	}
 }

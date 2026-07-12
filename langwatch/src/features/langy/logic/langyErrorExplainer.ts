@@ -66,7 +66,7 @@ export interface LangyDomainError extends DomainErrorShape {
 export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_conversation_not_found",
   "langy_conversation_not_owned",
-  // Turn-execution failures (see server/services/langy/execution/langy-turn-errors.ts).
+  // Turn-execution failures (see server/app-layer/langy/execution/langy-turn-errors.ts).
   "langy_agent_unavailable",
   "langy_agent_at_capacity",
   "langy_agent_session_lost",

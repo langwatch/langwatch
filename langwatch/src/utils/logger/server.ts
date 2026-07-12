@@ -49,7 +49,15 @@ function getSharedTransport(): DestinationStream | null {
     return null;
   }
 
-  const otelLogsEnabled = process.env.PINO_OTEL_ENABLED === "true";
+  // The pino → OTel log transport (pino-opentelemetry-transport) runs in the
+  // same worker thread as the pretty console and, in this Node/pino build,
+  // silences that whole worker — so with it on, the local console shows nothing.
+  // Restrict it to production, where the console is raw JSON on its own stream
+  // and there's a real collector. Traces are unaffected (they go via the OTel
+  // SDK, not pino). Locally you read the pretty console; prod still ships logs.
+  const otelLogsEnabled =
+    process.env.PINO_OTEL_ENABLED === "true" &&
+    process.env.NODE_ENV === "production";
   // Unified log-level env vars, shared with the Go services (pkg/clog) so one
   // set in langwatch/.env configures both. PINO_* kept as fallback for compat.
   const consoleLevel =
@@ -139,7 +147,17 @@ function buildConsoleTransport(
   if (isDevMode) {
     return {
       target: "pino-pretty",
-      options: { colorize: true, minimumLevel: level },
+      // Tuned to sit close to the Go services' pkg/clog output: a kitchen clock
+      // (`2:00PM`) and one line per record, without the pid/hostname noise.
+      // Kept to plain string options so the whole thing serializes into the
+      // pino-pretty worker thread — no functions, no custom stream.
+      options: {
+        colorize: true,
+        translateTime: "SYS:h:MMTT",
+        ignore: "pid,hostname",
+        singleLine: true,
+        minimumLevel: level,
+      },
       level,
     };
   }

@@ -8,6 +8,297 @@ as steps land.
 
 ---
 
+## STATE CONFIRMED (2026-07-12) — one keystone blocks everything: worker self-drive
+
+Verified end-to-end this session (Go build/vet green; TS typecheck clean except the
+3 known pre-existing errors; three independent code maps of Go worker / TS control
+plane / GitHub flow). **The Go structural rework is DONE. The self-drive is NOT wired.
+The two halves do not meet yet.** Concretely:
+
+- **Go signed-frame stack is BUILT but DORMANT.** `internal/frames` (signed union:
+  delta/status/progress/heartbeat/card/tool/final/error, each `.Sign()`) and
+  `internal/frameauth` (HMAC signer + `MintRunToken`) are cross-language-pinned by
+  `specs/langy/langy-frame-auth.vectors.json` — and have **zero live callers**. No
+  runToken is ever minted, injected into the manager, or used to sign a live frame.
+- **Worker still answers a turn IN-BAND.** `/worker/{create,revive,continue}` →
+  `transport/rpc/handlers.go` `chatHandler` → streams **unsigned hand-rolled `langy.*`
+  NDJSON** on the HTTP response body (`adapters/opencode/opencode.go`). **Two
+  unreconciled frame vocabularies** (live unsigned `langy.*` vs dormant signed
+  `internal/frames`). `internal/turnfold` parses the live `langy.*`, not the signed union.
+- **No Go→relay push.** The only outbound POSTs from the worker are the **Finalizer**
+  (`/api/internal/langy/turn/{turnId}/result`, durable FINAL only) and the **Revoker**.
+  Nothing POSTs to `/api/internal/langy/relay/frames`.
+- **TS relay is BUILT + MOUNTED but UNFED.** `routes/langy-relay.ts` (POST /relay/frames,
+  internal-secret) → `services/langy/streaming/langyTurnRelay.ts` (HMAC-verify → dedup →
+  write token buffer + heartbeat). No producer drives it.
+- **The LIVE path is still the interim executor.** `spawnAgent.reactor` →
+  `LangyWorkerPool.submit` → `runTurn` (`services/langy/execution/langy-turn.processor.ts`,
+  1014 LOC) holds the worker response open, reads NDJSON in-band, and is the **sole
+  writer** of the Redis token buffer (G1) and the `langy:hb` liveness key (G2). The
+  GitHub PR flow is inlined here (G4). Booted from `workers/startWorkers.ts`.
+- `reconcileAgentTurn.reactor` **not renamed**. Interim `services/langy/langyGithub*`
+  modules are **dead** (self-tests only). tRPC create/continue/onTurnStream +
+  `LangyTurnService` + turn fold + runToken column (mig 00051) are all in place.
+
+### The remaining plan, sequenced (each milestone gates the next)
+
+**M1 — SELF-DRIVE keystone (Go + TS). Unblocks all of S3. Build/typecheck-verifiable
+here; runtime-gated for the real stream.**
+1. *Go runToken lifecycle*: TS passes the per-conversation `runToken` (already server-only
+   in CH, `service.getRunToken`) to the manager on the create/continue call; the **manager**
+   holds it for the turn and is the SOLE signer (opencode never sees it — see
+   `app/agent.go` docstring). Assemble `frameauth.Identity{projectId,userId,conversationId,
+   turnId}` on the live path.
+2. *Go unify + sign + push*: replace the hand-rolled `langy.*` emission in
+   `adapters/opencode/opencode.go` with the `internal/frames` signed union; add a
+   controlplane adapter (sibling to Finalizer) that PUSHES each signed `OutputFrame`
+   — including first-class `heartbeat` — out-of-band to `POST /relay/frames`. Worker holds
+   ONE push connection per turn (LB pins → in-order). `/worker/create` returns an ack; the
+   in-band response stream is retired (hard-cut — settled §12). Fold `turnfold` onto the
+   signed union (collapses M2 of the review). Panic-guard the push + heartbeat goroutines (H2).
+3. *TS relay becomes the live writer*: once Go pushes, `LangyTurnRelay` writes buffer (G1) +
+   refreshes liveness from frame freshness (G2). Retire `langy:hb` as a separately-owned key
+   (heartbeat = newest stream entry).
+4. *TS rewire dispatch*: `spawnAgent.reactor` dispatches the turn to the worker directly
+   (POST /worker/create|continue with runToken+prompt+creds, **not** holding the response);
+   drop `LangyWorkerPool`/`setPool` late-binding.
+
+**Self-retry recovery reactor (SETTLED with Alex — the point of event-sourcing the turn).**
+The `reconcileAgentTurn` reactor (renamed `agentTurnLiveness` in M2) must SELF-RETRY a stalled
+turn, NOT terminalize it on first lapse. Mechanism, fully event-sourced: the per-turn liveness
+timer fires on a lapsed heartbeat ⇒ emit a durable retry event that increments a `RetryCount` on
+the conversation fold and re-arms the timer with a LONGER delay (backoff); a retry reactor
+re-drives the turn (re-dispatch, same turnId — safe via the Go `ClaimTurn(turnId)` idempotency,
+review "F") and pushes an EPHEMERAL "retrying…" frame to the frontend (buffer/broadcast, never a
+durable event). **3 attempts total**: the first two stalls back off + re-drive + emit "retrying";
+the **3rd stall gives up** → `failAgentResponse`. Re-drive re-derives the turn inputs from the
+event log (durable question in `conversation_continued`/turn-fold `QuestionParts`; session key +
+system re-minted) — the single-use handoff is already consumed. Requires Go `ClaimTurn(turnId)` +
+a bounded recently-completed set (review "F") so a merely-slow worker never double-runs. Only
+re-drive on a genuinely-dead worker (heartbeat lapsed), never on any error.
+
+**STRUCTURE directive (Alex): nothing under `src/server/services/langy/`.** It all moves to
+`src/server/app-layer/langy/` (worker port, streaming/relay/buffer/handoff/frame-auth, credential
+service, github). Fold the moves into M2/M3/M4 cleanup, keeping routes→service→repository
+discipline. New code goes straight into `app-layer/langy/`.
+
+**DISPATCH SITES — SETTLED with Alex (do NOT add a pre-command dispatch).** Three agent
+contacts per turn, all sharing the `turnId` so Go `ClaimTurn` collapses them to one run:
+(1) **warm** BEFORE the command (safe — Acquire only, never Claim/PostMessage, so it cannot
+orphan a turn); (2) the **spawnAgent reactor** dispatch AFTER `agent_response_started` is durably
+committed (fire-and-forget OK here — the durable event guarantees the retry backstop exists);
+(3) the **self-retry reactor** re-drive. **NO optimistic pre-command inline dispatch** — Alex's
+reason: a dispatch before the command is durable has no guaranteed retry, so a lost command
+orphans a running agent. Warm hides the cold-start latency instead.
+
+**runToken race FIXED (this session).** The self-drive dispatch needs the runToken, which
+`getRunToken` reads off the ClickHouse fold (seconds of projection lag) → a brand-new
+conversation's first-turn dispatch would find `null`. Fix: the runToken now rides the **Redis
+handoff** — the turn service mints it (new, instant) or reads it (continue, folded into the
+parallel Phase-3 reads) and stashes it before the command dispatches; `spawnAgent.reactor` reads
+`handoff.runToken` (dropped `getRunToken` dep + the null-skip; registry simplified).
+`createConversation` now takes the runToken from the caller. Typecheck clean; turn-service (12) +
+relay (15) tests green.
+
+**M2b SELF-RETRY — DONE (this session, typecheck-clean; runtime-gated).** Landed SIMPLER than the
+locked design below (Alex steered it): **no dedicated retry event, no fold column, no Redis
+counter** — the retry IS the GroupQueue re-firing a reactor that throws. Reactors never fire on
+replay/refold, so a throw + a time-based give-up are both safe.
+- **The "intentional retry" signal:** `app-layer/langy/langy-turn-retry.error.ts` `LangyTurnDispatchRetry`
+  — a plain (non-CRITICAL) Error, so `isRetryableJobError` classifies it RETRYABLE and the queue
+  re-stages with exponential backoff up to `JOB_RETRY_CONFIG.maxAttempts`. NO event emitted (replay-safe).
+- **spawnAgent reactor:** on a non-accepted dispatch → THROW `LangyTurnDispatchRetry` (was: log +
+  give up). Reads the handoff via `read` (peek) not `take`, so the re-fire re-reads inputs. Turn-id
+  idempotent (Go ClaimTurn), so a re-fire racing a now-live worker is a benign no-op.
+- **reconcileAgentTurn → agentTurnLiveness (renamed + rewritten):** on a stalled turn (heartbeat
+  lapsed) it re-drives — read handoff → `worker.dispatch` → ephemeral "Reconnecting…" (`appendStatus`)
+  → THROW to re-check via the queue. Give-up is TIME-based: `Date.now() - foldState.LastActivityAt >
+  MAX_STALL_MS` (3× heartbeat grace) → `failAgentResponse`. No counter (refold-safe: reactors are
+  live-only). Deps gained `worker` + `handoffStore.read`; wired in pipeline.ts + pipelineRegistry
+  (`agentTurnLivenessReactor`), old file deleted, comments/refs updated.
+- **Handoff `read` (peek):** `LangyTurnHandoffStore.read` added (no delete); spawnAgent + liveness both
+  use it so a re-drive reuses the same inputs (300s TTL covers the retry window).
+- **G6 428-remint still deferred:** a persistent 428 just exhausts the retries for now.
+
+--- superseded design note (kept for context) ---
+**Key constraint found:**
+`CreateAgentResponseCommand` is idempotency-keyed `…:turn-start:${turnId}`, so re-emitting
+`agent_response_started` to re-drive is a NO-OP (deduped). So the retry needs a DEDICATED event:
+- **New event `agent_turn_retry_scheduled`** {conversationId, turnId, attempt} — event type +
+  version constant + zod schema + typeguard + `ScheduleAgentTurnRetryCommand` + `.withCommand`
+  registration. Fold handler = bump `LastActivityAt` only (NO new column ⇒ NO CH migration; the
+  `attempt` rides the event, read from the TRIGGERING event when the delayed timer fires).
+- **Rename** `reconcileAgentTurn.reactor` → `agentTurnLiveness.reactor`. Arm on
+  `agent_response_started` + `tool_call_*` + `agent_turn_retry_scheduled`. On fire, if heartbeat
+  lapsed: `attemptsSoFar = triggering event is retry_scheduled ? event.data.attempt : 0`; if
+  `< MAX(2)` → emit `scheduleAgentTurnRetry(attempt=attemptsSoFar+1)` (RE-ARMS the timer, backoff
+  via a per-attempt delay if the reactor `delay` can be a fn, else fixed), push an EPHEMERAL
+  "retrying…" status frame (`buffer.appendStatus`), and DIRECTLY re-dispatch (`worker.dispatch`,
+  reading the handoff); else → `failAgentResponse` (give up). A `tool_call_*` re-arm means progress
+  ⇒ attempt resets to 0 (healthy). Reactor deps gain: `worker` (dispatch), `handoffStore` (read),
+  `buffer` (appendStatus + liveness), `conversations` (scheduleRetry + failTurn).
+- **Handoff peek, not take:** add `LangyTurnHandoffStore.read` (no delete); change `spawnAgent`
+  from `take`→`read` so retries reuse the same inputs (TTL 300s covers 3 attempts ~90s). Replay is
+  already guarded, so single-use-delete is unnecessary.
+- **Credential edge (G6, deferred):** a re-dispatch to a worker whose key was revoked on death
+  gets 428; full fix re-mints (`mintLangySessionApiKeyForUser` by userId, re-stash handoff). Until
+  then the retry recovers slow-worker (ClaimTurn dedup) + recently-dead-worker-with-valid-key.
+
+**M2 EXECUTION LOG (this session):**
+- **M2a DONE (Go `ClaimTurn` idempotency, review F)** — `app.Worker.Claim() bool` →
+  `ClaimTurn(turnID) ClaimOutcome` (Granted/AlreadyHandled/Busy). Worker tracks `currentTurnID`
+  + a bounded (64) FIFO recently-completed set; same in-flight turnId or recently-completed →
+  benign no-op (StartTurn returns a no-op runner → 202), different turn → busy (409), empty turnId
+  degrades to the boolean guard. Makes the self-retry re-drive safe (a slow worker never
+  double-runs). `claim_turn_test.go` + updated pool/app/transport tests; full module green.
+- **M2b DONE** — self-retry (throw-to-retry via the GroupQueue; see the M2b section above).
+- **M2c DONE** — deleted the dead interim executor: `langy-turn.processor` (runTurn), `langy-worker-pool`,
+  `langy-turn-recovery`, `langy-turn-reconciler` + 6 tests (incl. the two github-flow tests that drove
+  runTurn). All were a dead cluster (spawnAgent dispatches directly now). Cleared the
+  `langy-turn.processor.ts:818` pre-existing type error. G4 (GitHub PR flow) was already dead in the
+  self-drive model — its re-home is a fresh #24 feature, not a preservation. `langy-turn-errors`,
+  `langy-final-parts`, `githubCommand`, `githubPrDetails` kept (used / #24 targets).
+- **M2d DONE** — moved ALL of `src/server/services/langy/*` → `src/server/app-layer/langy/*` (27 source
+  + tests, `git mv` renames so history is preserved; `streaming/` + `execution/` subdirs kept). Rewrote
+  every import `services/langy` → `app-layer/langy` across `.ts` + `.tsx`. `services/langy` is gone.
+  Typecheck clean (only the pre-existing `langy.ts:546 opts.signal`); 37 moved tests pass.
+- **M2 COMPLETE.**
+
+**M3 (S4) — DONE this session (scoped honestly; two items are actually #24).**
+- **M3a DONE — deleted the vestigial `ProjectSecret langy_api_key_secret`.** Removed `provisionLangyApiKey`
+  + `getLangyApiKeyToken` (dead) + `LANGY_API_KEY_NAME`/`LANGY_API_KEY_SECRET_NAME` from
+  `app-layer/langy/langyApiKey.ts` (kept `LANGY_CANDIDATE_PERMISSIONS` — the session key uses it),
+  dropped the unused imports, and removed the eager `provisionLangyApiKey` call in `project.ts`
+  (project.create). The per-turn per-user session key (`mintLangySessionApiKey`) fully supersedes it.
+  Typecheck-clean (only pre-existing `langy.ts:546`).
+- **M3c DONE (already delivered in M1) — progressive per-call tool rendering (G3).** Verified end to
+  end: Go `framesFor` emits ToolStart/ToolEnd PER CALL as opencode events land (not batched); the relay
+  writes each as a live buffer card (`appendTool`) + a durable event (`recordToolCall*`); the UI renders
+  via `LangyStreamCard`/`LangyToolActivity`. The `card`-frame → `appendMilestone` → `LangyStreamCard`
+  plumbing for special cards is wired. (Special-card CONTENT — the enrichment card, the PR card — is a
+  follow-up feature: the PR card is #24; the enrichment card is a Langy-MCP-result feature. The pipe is ready.)
+- **M3b DEFERRED to #24 — permit-release reconcile.** It requires detecting whether a turn opened a PR
+  (`reserve` INCR is the count; `release` DECR only when NO PR). That PR detection/accounting IS the
+  GitHub PR flow (G4 / #24). Current behavior (reserve, never release) is SAFE (cap never bypassed) but
+  over-restrictive (a GitHub-connected user's non-PR turns still burn slots); #24 fixes it with the flow.
+
+**Net: M1 + M2 + M3 landed this session (M3b/M3-cards fold into #24). Next = the paused M4 (#24 GitHub rewrite).**
+
+**GITHUB DEFERRED OUT OF THIS PR (Alex) — gated OFF, NOT deleted.** All GitHub code stays in the tree
+(re-adding it later would be painful/error-prone). One guard,
+`app-layer/langy/langyGithub.enabled.ts` `LANGY_GITHUB_ENABLED = false` (TODO #24), makes it inert:
+- **`LangyCredentialService`** — the GitHub token mint (`getAccessToken`) is wrapped in
+  `if (LANGY_GITHUB_ENABLED)`, so no token is ever resolved into a turn's credentials ⇒ the Go
+  capability seam is inert (no token ⇒ no GitHub access).
+- **`langy-turn.service`** — the PR permit is reserved only when `credentials.githubToken` exists
+  (no token ⇒ no PR ⇒ no permit). So with GitHub off nothing reserves ⇒ the M3b permit-RELEASE
+  concern is moot for this PR (nothing to release), and non-GitHub turns no longer over-reserve.
+- Frontend connect card (`LangyGitHubConnectCard`) is already inert (its trigger
+  `langy_github_not_connected` was produced by the deleted `runTurn`); no persistent connect button.
+- Kept: `langyGithub*` modules, `githubCommand`, `githubPrDetails`, the OAuth connect route + app-layer
+  credential service, the permit functions. #24 flips `LANGY_GITHUB_ENABLED = true` + re-homes the PR flow.
+- RESIDUAL (minor, optional Go follow-up): the worker still ships the `github` skill, so an agent MAY
+  attempt `gh` and fail gracefully (no token). Removing the skill when GitHub is off is a Go-side nicety,
+  not needed for correctness.
+
+**M2 — S3 deletions + rename (TS; gated on M1 landing + runtime-confirmed).**
+- Delete `runTurn`/`langy-turn.processor.ts`, `langy-worker-pool.ts`, `langy-turn-recovery.ts`,
+  `langy-turn-reconciler.ts` (+ tests); clean `startWorkers.ts`.
+- Re-home the pieces that lived in `runTurn`: **G4** GitHub PR flow → its own service (also #24),
+  **G5** server recovery (keep or drop = product call), **G6** 428 re-mint → relay acquire path,
+  **G7** control-plane-worker drain-terminalization → deliberate answer.
+- Rename `reconcileAgentTurn.reactor` → `agentTurnLiveness.reactor` (mechanical; job-dedup
+  namespace caveat at the deploy boundary).
+
+**M3 — S4 progressive rendering + cleanup (TS).** Per-call durable tool events as frames land
+(G3, relay-side); distinct special cards (enrichment/PR/trace-download/preview) in order;
+permit-release reactor on terminal; delete the vestigial `ProjectSecret langy_api_key_secret`.
+
+**M4 — #24 GitHub flow rewrite (TS, last).** Inject Redis/crypto/clock/locker into
+`LangyGithubCredentialsService` (drop module-level `connection`/`encrypt`); split
+org-membership (`isOrganizationMember`/`findFirstAdminUserId`) off the creds repo; delete the
+dead interim `langyGithub*` modules; domain errors + zod on the OAuth callback + credential
+shape; move the PR turn-flow off `runTurn`. Go: close the `GH_USER_ID` gap (SKILL.md:36 wants
+it; `adapters/github` doesn't inject it).
+
+**Go polish (mostly done; residual):** H2 panic guards on the remaining bare goroutines fold
+into M1.2; L1 `Credentials.Complete()` dead-code delete; L2 `extractHandoffToken`→`_test.go`;
+scrub the stale TS-coupled comments in `opencode.go`/`config.go` (land with M1/M2).
+
+### M1 EXECUTION LOG (this session) — DONE, build+test+typecheck green (runtime still gated)
+
+- **M1.2 DONE (Go cutover)** — the worker self-drives. opencode `StreamSession` emits typed
+  `internal/frames` via an `emit` callback (delta/tool/heartbeat), verbatim Stream-A dropped;
+  `ChatSink` is `Emit(frames.Frame)`; a `frameSink` tees into `turnfold` + pushes via the new
+  `app.FrameRelay`/`FrameStream` port (impl `controlplane.RelayClient`). `app.Chat`→`StartTurn`
+  (sync Acquire+Claim → 202/409/503/428) + detached `driveTurn` (opens relay, streams, emits
+  final/error, keeps Finalizer backstop). ADR-048 handoff → `frames.Handoff` + `domain.ErrTurnHandedOff`
+  (finalize-on-handoff preserved). Heartbeat/panic-guarded. `/worker/*` returns 202. Full module
+  build/vet/gofmt/test green; all opencode/app/transport/turnfold/frames tests rewritten to frames.
+- **M1.3 DONE (TS relay)** — `LangyTurnRelay` handles every Go frame incl. the new `handoff`
+  (schema + `recordTurnHandoff` → conversation_handoff_pending; NOT a failure). It is the live
+  buffer+liveness writer once Go pushes. 15 relay tests green. (langy:hb retirement deferred to M2.)
+- **M1.4 DONE (TS dispatch)** — `spawnAgent.reactor` dispatches via new `LangyWorkerPort.dispatch()`
+  (POST /worker/{intent} + runToken+userId, reads status only, body cancelled — output goes to the
+  relay), carrying the runToken from `conversations.getRunToken`. `LangyWorkerPool`/`setPool` dropped;
+  `bootLangyTurnProcessor` (old pool + runTurn + interval sweep) removed from startWorkers. 428 re-mint
+  (G6) deferred to M2; non-accepted dispatch left to the self-retry reactor. Typecheck clean (only the
+  3 known pre-existing errors remain, one in the runTurn deletion target).
+
+### M1.x (superseded) — earlier partial log
+
+- **M1.1 — turn-request contract.** `chatRequest` (transport/rpc/handlers.go) + `app.ChatRequest`
+  now carry `runToken` + `userId` (additive/optional; an older control plane omits them). Threaded
+  transport→app. The TS side does not SEND them yet — that rides M1.4's dispatch rewire.
+- **M1.2a — Go→relay push transport (tested).** New `adapters/controlplane/relay.go`:
+  `RelayClient.Open(ctx, endpoint, runToken, frameauth.Identity) → *RelayStream`; `RelayStream.Emit(frames.Frame)`
+  SIGNS (frameauth, fresh nonce) → one ndjson line over a pipe body to `POST /api/internal/langy/relay/frames`
+  (Bearer `LANGY_INTERNAL_SECRET`, no client Timeout — streaming, ctx-cancelled); `Close()` EOFs the body,
+  waits the relay tally, reports non-2xx. `ErrRelayDisabled` = no secret/endpoint/runToken ⇒ caller falls back,
+  never a turn failure. `relay_test.go` stands up a fake relay that runs `frameauth.Verify` on every line —
+  proves the client signs correctly + streams IN ORDER; covers non-2xx + disabled + emit-after-close.
+
+### M1 CUTOVER — remaining, precise (the security-sensitive, runtime-gated core)
+
+This is the wiring step (the branch's pattern: build pieces first, wire last). NOT build-verifiable
+in halves — a `StreamSession` signature change ripples through the port, so land it as ONE slice with
+its tests updated. **Cannot be runtime-verified without Redis + the live agent** — build + `go test` +
+tsgo is the bar here; the real stream is proven only with `all-local` + the worker up.
+
+- **Behavioral decision (settled here): `/worker/{create,continue}` keeps a SYNCHRONOUS Acquire+Claim**
+  so the busy-guard still returns 409 to the dispatcher pre-stream (today's `worker.Claim()==false` →
+  `ErrConversationBusy`). Only the OUTPUT path goes async: after Claim, the turn streams to the relay in a
+  detached, panic-guarded goroutine and the handler returns `202` immediately. So it is "fire-and-forget
+  output", not "fire-and-forget dispatch" — the 409 semantics the TS caller relies on survive.
+- **Go — flip the sink to frames+push (adapters/opencode/opencode.go + app):**
+  1. `StreamSession` stops writing raw ndjson to an `io.Writer`; it emits typed `internal/frames` values via
+     an `emit func(frames.Frame) error` callback. Map: text delta → `frames.Delta`; tool start/end (the
+     `toolCallTracker`) → `frames.ToolStart`/`ToolEnd`; the `progressInterval` ticker → `frames.Heartbeat`
+     (first-class, replaces `langy.progress`). DROP the verbatim opencode Stream-A line (the relay only speaks
+     the union; the durable final is built from the typed frames). Panic-guard the heartbeat + emit goroutines
+     (review H2). Delete the hand-rolled `langyTokenFrame`/`langyToolFrame`/`langyProgressFrame` structs (kills
+     the two-vocabularies drift, review M2/M3).
+  2. `app.ChatSink` (app/ports.go) becomes a typed frame sink: `Emit(frames.Frame) error` + terminal helpers,
+     NOT an `io.Writer`. The accumulator (`internal/turnfold`) folds the SAME typed frames into the durable
+     final (it already borrows `frames.ToolCall`) — one decode path.
+  3. `app.Chat`: after Claim, open a `RelayStream` (new `app.FrameRelay` port impl'd by `controlplane.RelayClient`,
+     injected via `WithFrameRelay`; built from `req.identity()` = `{ProjectID,UserID,ConversationID,TurnID}` + `req.RunToken`).
+     Stream frames into it; on terminal emit `frames.Final`/`frames.Error`; `Close()`. KEEP `finalizeCompletedTurn`
+     (the Finalizer stays the durable-final backstop — `ingestAgentTurnResult` is turnId-idempotent, so relay-final +
+     Finalizer collapse to one event). If `RunToken`=="" → `ErrRelayDisabled` → skip the push (older control plane).
+  4. `transport/rpc/handlers.go`: `/worker/*` handler returns `202` after the synchronous Claim; the detached
+     turn drives the relay push. Rename the vestigial `chatHandler`/`chatRequest`/"/chat" comments (M3).
+  5. `cmd/root.go` + `deps.go`: construct `controlplane.NewRelayClient(internalSecret)`, inject via `app.WithFrameRelay`.
+- **TS — M1.3 (relay is the live writer):** already built; once Go pushes, `LangyTurnRelay` writes the buffer (G1)
+  + refreshes liveness from frame freshness (G2). Retire `langy:hb` as a separately-owned key (heartbeat = newest
+  stream entry). Verify `onTurnStream` still tails correctly.
+- **TS — M1.4 (rewire dispatch, drop pool):** `spawnAgent.reactor` POSTs `/worker/create|continue` directly with
+  the dispatch body INCLUDING `runToken` (from `service.getRunToken`) + `userId`, and does NOT hold the response
+  (fire-and-forget output; treats 202 as accepted, 409 as busy). Drop `LangyWorkerPool`/`setPool` late-binding.
+  `runTurn` stops being the live driver here (its DELETION is M2, once runtime-confirmed).
+
+---
+
 ## Where things stand
 
 | Commit | What |

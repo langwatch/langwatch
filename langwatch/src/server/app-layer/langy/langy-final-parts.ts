@@ -22,7 +22,7 @@ export interface LangyFinalToolCall {
  * and on reload.
  *
  * This is the single source of truth for final-part shape, shared by the
- * backend relay (`langy-turn.processor`) and the durable HTTP-final ingest
+ * backend relay (`LangyTurnRelay`) and the durable HTTP-final ingest
  * (`langy-internal` → `ingestAgentTurnResult`). Whichever path finalizes a turn
  * first therefore produces identical parts, so the turnId-idempotent dedupe at
  * the event store collapses the two without any content divergence.

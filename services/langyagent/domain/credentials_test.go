@@ -118,26 +118,3 @@ func TestSignatureOf_EgressAllowlistDropsMalformedEntries(t *testing.T) {
 	}
 }
 
-func TestCredentials_Complete(t *testing.T) {
-	full := Credentials{
-		LangwatchAPIKey:   "k",
-		LLMVirtualKey:     "vk",
-		GatewayBaseURL:    "https://gw",
-		LangwatchEndpoint: "https://app",
-	}
-	if !full.Complete() {
-		t.Fatalf("fully-populated credentials should be Complete")
-	}
-	missing := []Credentials{
-		{LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e"},
-		{LangwatchAPIKey: "k", GatewayBaseURL: "g", LangwatchEndpoint: "e"},
-		{LangwatchAPIKey: "k", LLMVirtualKey: "vk", LangwatchEndpoint: "e"},
-		{LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g"},
-		{},
-	}
-	for i, c := range missing {
-		if c.Complete() {
-			t.Errorf("case %d: credentials missing a required field should not be Complete", i)
-		}
-	}
-}

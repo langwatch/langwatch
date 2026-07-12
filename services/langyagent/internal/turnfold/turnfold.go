@@ -1,12 +1,12 @@
-// Package turnfold folds a turn's outbound ndjson frame stream into the durable
-// final — the assistant text and the tool calls — so the app can POST a
-// self-sufficient final independently of the best-effort relay the same bytes
-// streamed through. It is the read counterpart to internal/frames (the producer):
-// it parses the compact langy.token / langy.tool frames back out of the stream.
+// Package turnfold folds a turn's outbound frame stream into the durable final —
+// the assistant text and the tool calls — so the app can POST a self-sufficient
+// final independently of the best-effort relay the same frames streamed through.
+// It is the read counterpart to internal/frames (the producer): it folds the
+// SAME typed frames.Frame values (delta / tool) the manager signs and pushes, so
+// there is one frame vocabulary end to end.
 package turnfold
 
 import (
-	"bytes"
 	"encoding/json"
 	"strings"
 
@@ -29,13 +29,8 @@ func New() *Accumulator {
 	return &Accumulator{tools: map[string]*frames.ToolCall{}}
 }
 
-// marker prefilters the stream: only langy.token / langy.tool frames carry final
-// content, so a line without it (the bulk — verbatim opencode events) is skipped
-// before paying for a full JSON unmarshal.
-var marker = []byte("langy.t")
-
-// frame is the union of the langy.token / langy.tool wire shapes Observe reads;
-// every other field on the line is ignored.
+// frame is the union of the delta / tool wire shapes Observe reads; every other
+// field on the frame is ignored.
 type frame struct {
 	Type    string          `json:"type"`
 	Text    string          `json:"text"`
@@ -46,22 +41,19 @@ type frame struct {
 	IsError *bool           `json:"isError"`
 }
 
-// Observe folds one ndjson line into the final. Best-effort: an unrecognised or
-// malformed line is ignored (these are the same frames the control plane already
-// classifies). A langy.token appends its text; a langy.tool upserts the call. A
-// heartbeat / progress frame carries neither and contributes nothing.
-func (a *Accumulator) Observe(line []byte) {
-	if !bytes.Contains(line, marker) {
-		return
-	}
+// Observe folds one output frame into the final. Best-effort: an unrecognised or
+// malformed frame is ignored. A `delta` appends its text; a `tool` upserts the
+// call. Ephemeral frames (status / progress / heartbeat / card) and the terminal
+// frames (final / error / handoff) carry no accumulation content and are skipped.
+func (a *Accumulator) Observe(fr frames.Frame) {
 	var f frame
-	if json.Unmarshal(line, &f) != nil {
+	if json.Unmarshal([]byte(fr.JSON()), &f) != nil {
 		return
 	}
 	switch f.Type {
-	case "langy.token":
+	case "delta":
 		a.text.WriteString(f.Text)
-	case "langy.tool":
+	case "tool":
 		a.upsertTool(f)
 	}
 }

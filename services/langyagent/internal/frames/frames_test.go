@@ -57,15 +57,16 @@ func TestFrameShapes(t *testing.T) {
 	}
 }
 
-func TestToolEnd_ErrorCarriesFlagAndOutput(t *testing.T) {
-	m := asMap(t, mk(ToolEnd("tc-1", "bash", true, "boom", 12)))
+func TestToolEnd_CarriesFlagInputAndOutput(t *testing.T) {
+	m := asMap(t, mk(ToolEnd("tc-1", "bash", json.RawMessage(`{"command":"false"}`), true, "boom", 12)))
 	if m["type"] != "tool" || m["phase"] != "end" || m["isError"] != true || m["output"] != "boom" {
 		t.Fatalf("unexpected tool-end shape: %v", m)
 	}
-	// A successful tool end omits isError entirely (treated as not-error).
-	ok := asMap(t, mk(ToolEnd("tc-2", "bash", false, "done", 0)))
-	if _, present := ok["isError"]; present {
-		t.Fatalf("successful tool end must omit isError: %v", ok)
+	// isError is ALWAYS present on an end — false is meaningful (succeeded vs
+	// failed), unlike the start where it is absent.
+	ok := asMap(t, mk(ToolEnd("tc-2", "bash", nil, false, "done", 0)))
+	if v, present := ok["isError"]; !present || v != false {
+		t.Fatalf("successful tool end must carry isError=false, got %v", ok)
 	}
 }
 

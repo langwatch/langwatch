@@ -60,7 +60,7 @@ async function makeState(
   }> = {},
 ) {
   const { signGithubOauthState } = await import(
-    "~/server/services/langy/githubOauthState"
+    "~/server/app-layer/langy/githubOauthState"
   );
   return signGithubOauthState(
     {

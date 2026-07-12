@@ -40,10 +40,11 @@ func (a *Agent) Post(ctx context.Context, ep app.Endpoint, sessionID string, tur
 	return PostMessage(ctx, ep.BaseURL, ep.BearerToken, sessionID, turn.System, turn.Prompt, turn.ResumeToken)
 }
 
-// Stream forwards the session's events into sink until a terminal event or ctx
-// cancellation. sink is an io.Writer (raw ndjson) plus Flush.
+// Stream maps the session's opencode events onto typed frames and emits them into
+// sink until a terminal event or ctx cancellation. The manager is the sole author
+// of these frames; sink signs + pushes them to the control-plane relay.
 func (a *Agent) Stream(ctx context.Context, ep app.Endpoint, sessionID string, sink app.ChatSink) error {
-	return StreamSession(ctx, ep.BaseURL, ep.BearerToken, sessionID, sink, sink.Flush)
+	return StreamSession(ctx, ep.BaseURL, ep.BearerToken, sessionID, sink.Emit)
 }
 
 // NotifyShutdownImminent (ADR-048) posts the session-scoped shutdown notice.

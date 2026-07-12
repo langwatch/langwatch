@@ -2,11 +2,11 @@ import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import type { Unsubscribable } from "@trpc/server/observable";
 
 import { trpcClient } from "~/utils/api";
-import type { LangyStreamEntry } from "~/server/services/langy/streaming/langyTokenBuffer";
+import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type {
   LangyResourceContext,
   LangySkillContext,
-} from "~/server/services/langy/langyTurnContext.schema";
+} from "~/server/app-layer/langy/langyTurnContext.schema";
 
 /**
  * The per-turn request inputs the transport owns. Sourcing them HERE (from the
@@ -83,10 +83,24 @@ export function createLangyChatTransport(
       // The vanilla client's proxy inference collapses on this router (see
       // api.tsx / the onTurnStream call below), so invoke the mutation by dotted
       // path and cast — the same escape hatch the subscription path uses.
-      const mutate = trpcClient.mutation as (
+      //
+      // The call MUST stay attached to `trpcClient`. `TRPCUntypedClient.mutation`
+      // runs `this.requestAsPromise(...)`, so a detached `const mutate =
+      // trpcClient.mutation` drops `this` and throws "Cannot read properties of
+      // undefined (reading 'requestAsPromise')" synchronously — before any
+      // request leaves the browser. The arrow keeps the property access inline
+      // (like the api.tsx sibling and the onTurnStream call below), so `this` is
+      // bound to the client.
+      const mutate = (
         path: string,
         input: unknown,
-      ) => Promise<StartTurnResponse>;
+      ): Promise<StartTurnResponse> =>
+        (
+          trpcClient.mutation as (
+            path: string,
+            input: unknown,
+          ) => Promise<StartTurnResponse>
+        )(path, input);
       const { conversationId, turnId } = ctx.conversationId
         ? await mutate("langy.continueConversation", {
             ...turnInput,

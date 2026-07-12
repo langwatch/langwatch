@@ -22,7 +22,7 @@ import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { ValidationError } from "~/server/app-layer/domain-error";
 import { prisma } from "~/server/db";
-import { revokeLangySessionApiKey } from "~/server/services/langy/langyApiKey";
+import { revokeLangySessionApiKey } from "~/server/app-layer/langy/langyApiKey";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:langy-internal");

@@ -6,7 +6,7 @@ import { KNOWN_LANGY_ERROR_KINDS } from "./langyErrorExplainer";
  * Recovery happens on the SERVER first. The turn processor already knows the
  * turn failed and why, so for the failures it can fix by simply trying again it
  * does exactly that, in process, on the same turn — the browser never learns a
- * thing (see `server/services/langy/execution/langy-turn-recovery.ts`). That is
+ * thing (see `server/app-layer/langy/execution/langy-turn-recovery.ts`). That is
  * strictly better than bouncing a failure to the browser and asking IT to drive
  * a retry: nothing is re-posted, no permit is re-reserved, the open stream just
  * keeps streaming.

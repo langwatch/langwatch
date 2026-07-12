@@ -11,7 +11,7 @@ import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { scheduleTopicClustering } from "~/server/topicClustering/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
-import { reapExpiredLangySessionApiKeys } from "~/server/services/langy/langyApiKey";
+import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {

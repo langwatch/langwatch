@@ -20,7 +20,7 @@
  * Any failure — generator unwired, model unavailable, empty title — is a no-op
  * and never affects the turn.
  *
- * Modeled on `reconcileAgentTurn.reactor.ts` / `spawnAgent.reactor.ts`.
+ * Modeled on `agentTurnLiveness.reactor.ts` / `spawnAgent.reactor.ts`.
  *
  * @see specs/langy/langy-conversation-title.feature
  */

@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -40,6 +41,16 @@ type chatRequest struct {
 	// final so the ingest can dispatch the finalize command. Not required for the
 	// same rollout reason as TurnID.
 	ProjectID string `json:"projectId,omitempty"`
+	// RunToken is the per-conversation secret (frameauth) the manager SIGNS every
+	// pushed output frame with. Minted server-only at conversation_started,
+	// injected here at dispatch, and NEVER echoed back on the wire — the HMAC
+	// proves possession without re-transmitting it. Absent ⇒ an older control
+	// plane; the manager cannot sign frames and skips the relay push.
+	RunToken string `json:"runToken,omitempty"`
+	// UserID scopes the signed frame identity to the human the conversation
+	// belongs to (Langy is a per-user private surface, not just project-scoped).
+	// Part of the frameauth identity tuple; omitted by an older control plane.
+	UserID string `json:"userId,omitempty"`
 }
 
 // warmRequest is /chat's body minus the turn: no prompt, no system, no resume
@@ -70,10 +81,18 @@ const (
 	workerIntentContinue = "continue"
 )
 
+// maxTurnDuration bounds a detached turn so a wedged opencode stream (one that
+// never sends a terminal event) cannot leak the drive goroutine forever. It is a
+// generous ceiling well above any realistic turn — the turn normally ends on its
+// terminal frame long before this fires.
+const maxTurnDuration = 30 * time.Minute
+
 // chatHandler is the per-request worker dispatcher. Transport-only: it reads the
-// body (capped at maxBodyBytes), validates inputs, and delegates the turn to the
-// app. The app owns worker acquisition, streaming, and outcome mapping; the
-// request context drives client-disconnect cancellation. intent is the route's
+// body (capped at maxBodyBytes), validates inputs, and runs the SYNCHRONOUS half
+// of the turn (StartTurn: acquire + claim) so pre-stream outcomes come back as
+// HTTP statuses. On success it returns 202 and drives the turn on a detached,
+// panic-guarded goroutine — the turn's output flows out-of-band as signed frames
+// to the relay, so the client is not held open for it. intent is the route's
 // worker-turn label (one of workerIntent*), recorded on the turn's logs + metrics.
 func chatHandler(application *app.App, maxBodyBytes int64, intent string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -108,8 +127,7 @@ func chatHandler(application *app.App, maxBodyBytes int64, intent string) http.H
 			creds.Model = mo
 		}
 
-		sink := newNDJSONSink(w)
-		if err := application.Chat(ctx, app.ChatRequest{
+		run, err := application.StartTurn(ctx, app.ChatRequest{
 			ConversationID: req.ConversationID,
 			Prompt:         req.Prompt,
 			System:         req.System,
@@ -117,13 +135,26 @@ func chatHandler(application *app.App, maxBodyBytes int64, intent string) http.H
 			ResumeToken:    req.ResumeToken,
 			TurnID:         req.TurnID,
 			ProjectID:      req.ProjectID,
+			RunToken:       req.RunToken,
+			UserID:         req.UserID,
 			Intent:         intent,
-		}, sink); err != nil {
-			// Pre-stream failures only (e.g. conversation-busy → 409). Once the
-			// stream has begun, the app writes error events into the sink and
-			// returns nil.
+		})
+		if err != nil {
+			// Pre-stream outcome: conversation-busy → 409, at-capacity → 503,
+			// credentials-required → 428, invalid conversationId → 400.
 			herr.WriteHTTP(w, err)
+			return
 		}
+
+		// Accepted: the worker is claimed. Detach the drive from the request (the
+		// 202 ends it) with a panic guard, bounded by maxTurnDuration so a wedged
+		// stream cannot leak the goroutine.
+		w.WriteHeader(http.StatusAccepted)
+		clog.Go(ctx, "langy-turn", func() {
+			turnCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), maxTurnDuration)
+			defer cancel()
+			run(turnCtx)
+		})
 	}
 }
 

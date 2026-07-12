@@ -11,15 +11,17 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/services/langyagent/app"
+	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 )
 
-// sinkStub is a minimal app.ChatSink capturing forwarded bytes, for the Stream
+// sinkStub is a minimal app.ChatSink capturing the frames Stream emits, for the
 // delegation test.
-type sinkStub struct{ strings.Builder }
+type sinkStub struct{ emitted []string }
 
-func (s *sinkStub) Begin()                {}
-func (s *sinkStub) ErrorEvent(msg string) {}
-func (s *sinkStub) Flush()                {}
+func (s *sinkStub) Emit(f frames.Frame) error {
+	s.emitted = append(s.emitted, f.JSON())
+	return nil
+}
 
 // endpointFor derives an app.Endpoint whose external port matches the test
 // server's real listener, so port-keyed calls (OpenSession, WaitReady) hit it.
@@ -95,12 +97,14 @@ func TestAgent_Post_UsesBaseURLAndCarriesTurn(t *testing.T) {
 	}
 }
 
-// Agent.Stream must forward the session's events into the ChatSink.
-func TestAgent_Stream_ForwardsSessionEventsToSink(t *testing.T) {
+// Agent.Stream must map the session's events onto frames and emit them into the
+// ChatSink; the terminal event ends the stream (and emits no frame of its own).
+func TestAgent_Stream_EmitsSessionFramesToSink(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fl := w.(http.Flusher)
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("data: {\"type\":\"message.part.delta\",\"properties\":{\"sessionID\":\"sess-1\",\"field\":\"text\",\"delta\":\"hi\"}}\n\n"))
 		_, _ = w.Write([]byte("data: {\"type\":\"message.done\",\"sessionID\":\"sess-1\"}\n\n"))
 		fl.Flush()
 	}))
@@ -111,7 +115,8 @@ func TestAgent_Stream_ForwardsSessionEventsToSink(t *testing.T) {
 	if err := NewAgent(time.Second).Stream(context.Background(), ep, "sess-1", &sink); err != nil {
 		t.Fatalf("Stream: %v", err)
 	}
-	if !strings.Contains(sink.String(), "\"type\":\"message.done\"") {
-		t.Errorf("sink missing forwarded terminal event; got %q", sink.String())
+	joined := strings.Join(sink.emitted, "")
+	if !strings.Contains(joined, `"type":"delta"`) || !strings.Contains(joined, `"text":"hi"`) {
+		t.Errorf("sink missing the forwarded delta frame; got %v", sink.emitted)
 	}
 }

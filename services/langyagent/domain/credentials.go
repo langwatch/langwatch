@@ -50,14 +50,6 @@ type Credentials struct {
 	EgressAllowlist []string `json:"egressAllowlist,omitempty"`
 }
 
-// Complete reports whether the mandatory credential fields are present. The
-// per-worker LangWatch key, the LLM virtual key, and both base URLs are
-// required to spawn a functional worker.
-func (c Credentials) Complete() bool {
-	return c.LangwatchAPIKey != "" && c.LLMVirtualKey != "" &&
-		c.GatewayBaseURL != "" && c.LangwatchEndpoint != ""
-}
-
 // Spawnable reports whether these credentials can boot a NEW worker — i.e. a
 // LangWatch key actually came with them.
 //

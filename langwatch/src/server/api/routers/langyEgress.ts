@@ -9,7 +9,7 @@
  *
  * The enforcement path is the credentials envelope + the agent's egress
  * adapter (see LangyCredentialService.getEgressAllowlist and
- * services/langyagent/adapters/egress/adapter.go). This router is only how a
+ * app-layer/langyagent/adapters/egress/adapter.go). This router is only how a
  * customer reads and sets the value; a change takes effect on the
  * conversation's next turn (the worker recycles when its egress signature
  * changes).
@@ -21,7 +21,7 @@ import { auditLog } from "~/server/auditLog";
 import {
   langyEgressAllowlistSchema,
   LangyCredentialService,
-} from "~/server/services/langy/LangyCredentialService";
+} from "~/server/app-layer/langy/LangyCredentialService";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const langyEgressRouter = createTRPCRouter({

@@ -42,7 +42,7 @@ describe("given the Langy skill catalogue", () => {
       // list one skill out of fourteen).
       expect(skillSourceDirs(dockerfile)).toEqual([
         "skills/_compiled/native",
-        "services/langyagent/skills",
+        "app-layer/langyagent/skills",
       ]);
     });
   });

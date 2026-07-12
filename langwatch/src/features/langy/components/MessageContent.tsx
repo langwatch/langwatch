@@ -5,7 +5,7 @@ import type React from "react";
 import { Markdown } from "~/components/Markdown";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
-import { githubProgressFromToolParts } from "~/server/services/langy/execution/githubCommand";
+import { githubProgressFromToolParts } from "~/server/app-layer/langy/execution/githubCommand";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
 import {

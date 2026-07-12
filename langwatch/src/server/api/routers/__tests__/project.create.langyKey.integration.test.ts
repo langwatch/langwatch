@@ -33,7 +33,7 @@ import {
 import {
   LANGY_API_KEY_NAME,
   provisionLangyApiKey,
-} from "~/server/services/langy/langyApiKey";
+} from "~/server/app-layer/langy/langyApiKey";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";

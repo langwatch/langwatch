@@ -11,6 +11,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
+	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
 )
@@ -236,20 +237,21 @@ func TestPool_OnWorkerExit_InflightSpawnSuppressesWipe(t *testing.T) {
 	}
 }
 
-func TestWorker_Claim_SerialisesConcurrentTurns(t *testing.T) {
-	// Two simultaneous /chat for the same conversation would both subscribe to
-	// the worker's /event stream and each terminate on the other's terminal
-	// event. Claim returns false for the second caller so the app can 409 it.
+func TestWorker_ClaimTurn_SerialisesConcurrentTurns(t *testing.T) {
+	// Two simultaneous turns for the same conversation would both subscribe to the
+	// worker's /event stream and each terminate on the other's terminal event.
+	// ClaimTurn grants the first and busies a DIFFERENT second so the app can 409
+	// it. (turnId idempotency itself is covered in claim_turn_test.go.)
 	w := &Worker{}
-	if !w.Claim() {
-		t.Fatalf("first claim on a fresh worker should succeed")
+	if w.ClaimTurn("t1") != app.ClaimGranted {
+		t.Fatalf("first claim on a fresh worker should be granted")
 	}
-	if w.Claim() {
-		t.Fatalf("second claim while still in-flight should fail")
+	if w.ClaimTurn("t2") != app.ClaimBusy {
+		t.Fatalf("a different turn while still in-flight should be busy")
 	}
 	w.Release()
-	if !w.Claim() {
-		t.Fatalf("after release a fresh claim should succeed")
+	if w.ClaimTurn("t3") != app.ClaimGranted {
+		t.Fatalf("after release a fresh claim should be granted")
 	}
 }
 

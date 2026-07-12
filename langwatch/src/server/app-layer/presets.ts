@@ -70,17 +70,17 @@ import {
 } from "../event-sourcing/pipelines/langy-conversation-processing/repositories";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import { LangyTurnService } from "./langy/langy-turn.service";
-import { LangyCredentialService } from "~/server/services/langy/LangyCredentialService";
-import { createLangyWorkerPort } from "~/server/services/langy/langyWorker";
+import { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
+import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { mintLangySessionApiKey } from "~/server/services/langy/langyApiKey";
+import { mintLangySessionApiKey } from "~/server/app-layer/langy/langyApiKey";
 import {
   LANGY_GITHUB_PRS_PER_DAY,
   releaseLangyGithubPrPermit,
   reserveLangyGithubPrPermit,
 } from "~/server/middleware/rate-limit-langy-github-prs";
-import { createLangyTurnAccessStore } from "~/server/services/langy/streaming/langyTurnAccess";
-import { createLangyTurnHandoffStore } from "~/server/services/langy/streaming/langyTurnHandoff";
+import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { connection } from "~/server/redis";
 import { LangyGithubCredentialsService } from "./langy/langy-github-credentials.service";
 import { LangyMessageService } from "./langy/langy-message.service";
@@ -1315,9 +1315,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           handle: async () => {
             /* noop */
           },
-        },
-        setPool: () => {
-          /* noop */
         },
       },
       langyTitleGenerationHandle: {

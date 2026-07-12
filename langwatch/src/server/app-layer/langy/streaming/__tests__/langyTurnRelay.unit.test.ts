@@ -40,6 +40,7 @@ function fakeConversations(runToken: string | null = RUN_TOKEN) {
     recordToolCallStarted: vi.fn(async () => {}),
     recordToolCallCompleted: vi.fn(async () => {}),
     ingestAgentTurnResult: vi.fn(async () => {}),
+    recordTurnHandoff: vi.fn(async () => {}),
   } satisfies LangyRelayConversations;
 }
 
@@ -174,6 +175,26 @@ describe("LangyTurnRelay", () => {
       expect(conversations.ingestAgentTurnResult).toHaveBeenCalledWith(
         expect.objectContaining({ status: "failed", errorCode: "at-capacity" }),
       );
+    });
+
+    it("ends the stream and persists the resume token on a handoff (ADR-048)", async () => {
+      const { relay, buffer, conversations } = makeRelay();
+      const out = await relay.handle(
+        frame({ type: "handoff", resumeToken: "opaque-resume" }),
+      );
+      expect(out).toEqual({ status: "terminal" });
+      expect(buffer.markEnd).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+      // A handoff is NOT a failure — it persists the token, never ingests a result.
+      expect(conversations.recordTurnHandoff).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        conversationId: "conv-1",
+        turnId: "turn-1",
+        token: "opaque-resume",
+      });
+      expect(conversations.ingestAgentTurnResult).not.toHaveBeenCalled();
     });
   });
 

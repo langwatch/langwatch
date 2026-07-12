@@ -48,6 +48,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}): {
     recordUserMessage,
     findByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
     getPendingHandoff: vi.fn(async () => null),
+    getRunToken: vi.fn(async () => "rt-existing"),
     startTurn,
     createConversation,
     consumeHandoff: vi.fn(async () => {}),
@@ -62,7 +63,11 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}): {
     conversations: conversations as unknown as LangyTurnServiceDeps["conversations"],
     credentials: credentials as unknown as LangyTurnServiceDeps["credentials"],
     resolveModel: vi.fn(async () => ({})),
-    worker: { probe, warm: vi.fn(async () => {}) },
+    worker: {
+      probe,
+      warm: vi.fn(async () => {}),
+      dispatch: vi.fn(async () => "accepted" as const),
+    },
     reservePermit,
     releasePermit,
     perDayPrCap: 5,
@@ -115,6 +120,11 @@ describe("LangyTurnService.startConversationTurn", () => {
       expect(result.turnId).toEqual(expect.any(String));
       expect(mocks.grant).toHaveBeenCalledTimes(1);
       expect(mocks.stash).toHaveBeenCalledTimes(1);
+      // The runToken rides the handoff (not a fold read) so the dispatch has it
+      // without racing the ClickHouse projection.
+      expect(mocks.stash).toHaveBeenCalledWith(
+        expect.objectContaining({ runToken: expect.any(String) }),
+      );
       expect(mocks.startTurn).toHaveBeenCalledTimes(1);
     });
 

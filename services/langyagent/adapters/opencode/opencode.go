@@ -19,6 +19,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 )
 
 // terminalEventTypes are the SSE event types that close the per-turn stream:
@@ -428,32 +429,11 @@ func ExtractHandoffToken(event map[string]any) (string, bool) {
 	return "", true
 }
 
-// langyTokenFrame is the compact Stream B fast-path frame (ADR-048). It rides
-// the SAME /chat ndjson stream as the full events (Stream A), multiplexed by
-// `type`. The control plane's runTurn peels these off to the ephemeral fast
-// pub/sub channel and ignores them on the durable path (parseAgentLine only
-// matches text/message.part.delta/error, so an unknown `type` is dropped there).
-type langyTokenFrame struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
-// langyTokenType is the discriminator the control plane matches on to route a
-// frame to Stream B. Kept as a single source of truth for the wire contract.
-const langyTokenType = "langy.token"
-
-// langyProgressFrame is a periodic "still working" heartbeat, multiplexed on the
-// same /chat ndjson stream. It carries no content: its only job is to keep the
-// stream producing during a long, silent tool call so the control-plane relay
-// keeps refreshing the turn's liveness key (the scan loop below blocks on
-// upstream bytes, so it cannot self-tick through silence). The relay treats it
-// as ephemeral — it refreshes liveness and drops it, never event-sourcing it.
-type langyProgressFrame struct {
-	Type string `json:"type"`
-}
-
-// langyProgressType is the discriminator for the heartbeat frame.
-const langyProgressType = "langy.progress"
+// The manager maps each opencode event onto a typed internal/frames value —
+// frames.Delta for a token, frames.ToolStart/ToolEnd for the tool lifecycle,
+// frames.Heartbeat for the keep-alive — which app.Chat SIGNS and pushes to the
+// control-plane relay. There is ONE frame vocabulary now (the frames union); the
+// old hand-rolled langy.token/langy.tool/langy.progress structs are gone.
 
 // progressInterval is how often the heartbeat frame is emitted. Comfortably
 // below the control plane's HEARTBEAT_GRACE (30s) so a live-but-quiet turn is
@@ -462,8 +442,8 @@ const progressInterval = 5 * time.Second
 
 // textDeltaFromEvent extracts the raw token text from an already-decoded
 // opencode event, or reports ok=false when the event is not a text delta. It
-// mirrors the control plane's parseAgentLine (langy-turn.processor.ts) exactly
-// so both ends agree on which opencode shapes are "a token": the current
+// decides which opencode shapes count as "a token" (fed to frames.Delta): the
+// current
 // `message.part.delta` (properties.field=="text", properties.delta) and the
 // legacy `type=="text"` (part.text). Reads the typed sseEvent so Stream B rides
 // the SAME single decode as session routing — no per-event map alloc (ADR-044
@@ -482,38 +462,10 @@ func textDeltaFromEvent(ev *sseEvent) (string, bool) {
 	return "", false
 }
 
-// langyToolFrame is the compact tool-lifecycle frame. Like langyTokenFrame it
-// rides the SAME /chat ndjson stream as the full events, multiplexed by `type`,
-// so the control plane can event-source the call (tool_call_initiated /
-// tool_call_succeeded / tool_call_failed) and stream a mapped UI card without re-deriving the
-// lifecycle from raw opencode parts.
-//
-// Optionality is carried by pointers/omitempty so the wire shape is exact:
-// a `start` frame is {type,id,name,phase[,title][,input]} and an `end` frame is
-// {type,id,name,phase[,input],output,isError} — `isError` is ALWAYS present on an
-// end (false is meaningful there), and always absent on a start.
-//
-// BOTH phases carry the input, so either event identifies the call on its own.
-type langyToolFrame struct {
-	Type    string          `json:"type"`
-	ID      string          `json:"id"`
-	Name    string          `json:"name"`
-	Phase   string          `json:"phase"`
-	Title   string          `json:"title,omitempty"`
-	Input   json.RawMessage `json:"input,omitempty"`
-	Output  *string         `json:"output,omitempty"`
-	IsError *bool           `json:"isError,omitempty"`
-}
-
-// langyToolType is the discriminator the control plane matches on to route a
-// frame to the tool-card mapper. Single source of truth for the wire contract,
-// mirroring langyTokenType.
-const langyToolType = "langy.tool"
-
-const (
-	toolPhaseStart = "start"
-	toolPhaseEnd   = "end"
-)
+// The tool lifecycle is emitted as frames.ToolStart / frames.ToolEnd (the frames
+// union `tool` frame), so the control plane can event-source the call
+// (tool_call_initiated / tool_call_succeeded / tool_call_failed) and stream a
+// mapped UI card without re-deriving the lifecycle from raw opencode parts.
 
 // opencode's `part.type` for a tool call, and the `state.status` values a tool
 // part transitions through. `completed` and `error` are the settle transitions.
@@ -664,16 +616,12 @@ func toolStateOpensCard(part *ssePart) bool {
 }
 
 // toolStartFrame opens the card: the tool's identity plus, when opencode has
-// surfaced them, the human title and the args it was called with.
-func toolStartFrame(id string, part *ssePart) langyToolFrame {
-	return langyToolFrame{
-		Type:  langyToolType,
-		ID:    id,
-		Name:  part.Tool,
-		Phase: toolPhaseStart,
-		Title: part.State.Title,
-		Input: rawToolValue(part.State.Input),
-	}
+// surfaced them, the human title and the args it was called with. Marshals to the
+// frames union `tool` start frame; a marshal failure (never realistically) drops
+// the frame, best-effort like the rest of the lifecycle.
+func toolStartFrame(id string, part *ssePart) (frames.Frame, bool) {
+	f, err := frames.ToolStart(id, part.Tool, part.State.Title, "", rawToolValue(part.State.Input))
+	return f, err == nil
 }
 
 // toolEndFrame closes the card with the settled result. On an error settle the
@@ -687,7 +635,7 @@ func toolStartFrame(id string, part *ssePart) langyToolFrame {
 // It also means a call whose start went out before its arguments materialised is
 // still correctly identified when it settles, rather than being permanently
 // anonymous because of the transition it happened to open on.
-func toolEndFrame(id string, part *ssePart, isError bool) langyToolFrame {
+func toolEndFrame(id string, part *ssePart, isError bool) (frames.Frame, bool) {
 	output := toolTextFromRaw(part.State.Output)
 	if isError {
 		if msg := toolTextFromRaw(part.State.Error); msg != "" {
@@ -695,15 +643,11 @@ func toolEndFrame(id string, part *ssePart, isError bool) langyToolFrame {
 		}
 	}
 	output = truncateToolOutput(output)
-	return langyToolFrame{
-		Type:    langyToolType,
-		ID:      id,
-		Name:    part.Tool,
-		Phase:   toolPhaseEnd,
-		Input:   rawToolValue(part.State.Input),
-		Output:  &output,
-		IsError: &isError,
-	}
+	// durationMs is not surfaced by opencode's part stream; the durable milestone
+	// carries none (0 ⇒ omitted). isError routes succeeded vs failed on the relay.
+	// The input rides the end too, so the settle event is self-describing.
+	f, err := frames.ToolEnd(id, part.Tool, rawToolValue(part.State.Input), isError, output, 0)
+	return f, err == nil
 }
 
 // toolCallTracker de-dupes the tool lifecycle across the re-sent part updates
@@ -724,15 +668,15 @@ func newToolCallTracker() *toolCallTracker {
 	}
 }
 
-// framesFor maps one decoded opencode event onto the langy.tool frames it should
-// produce: nothing for a non-tool event, a `start` the first time the call
+// framesFor maps one decoded opencode event onto the frames-union tool frames it
+// should produce: nothing for a non-tool event, a `start` the first time the call
 // exposes its name + input, and an `end` on the settle transition. A tool whose
 // only surfaced transition is the settle one (a fast tool that never showed a
 // `running`) still gets its `start` emitted first, so the consumer is never
 // asked to close a card it was never told to open. Pure apart from the tracker's
 // own bookkeeping — no I/O — so it is trivially unit-testable, mirroring
 // textDeltaFromEvent.
-func (t *toolCallTracker) framesFor(ev *sseEvent) []langyToolFrame {
+func (t *toolCallTracker) framesFor(ev *sseEvent) []frames.Frame {
 	part, ok := toolPartFromEvent(ev)
 	if !ok {
 		return nil
@@ -746,45 +690,41 @@ func (t *toolCallTracker) framesFor(ev *sseEvent) []langyToolFrame {
 		return nil
 	}
 
-	var frames []langyToolFrame
+	var out []frames.Frame
 	if _, seen := t.started[id]; !seen {
 		t.started[id] = struct{}{}
-		frames = append(frames, toolStartFrame(id, part))
+		if f, ok := toolStartFrame(id, part); ok {
+			out = append(out, f)
+		}
 	}
 	if !settled {
-		return frames
+		return out
 	}
 	if _, seen := t.ended[id]; !seen {
 		t.ended[id] = struct{}{}
-		frames = append(frames, toolEndFrame(id, part, isError))
+		if f, ok := toolEndFrame(id, part, isError); ok {
+			out = append(out, f)
+		}
 	}
-	return frames
+	return out
 }
 
-// StreamSession tails /event from the worker and forwards every event
-// belonging to sessionID as one ndjson line to w. Returns when a terminal event
-// lands or the context is cancelled. The fetch carries the same ctx so a client
-// disconnect aborts the upstream socket immediately — opencode would otherwise
-// hold it open until it had something to send. baseURL is the worker's
-// precomputed "http://127.0.0.1:<port>".
+// StreamSession tails /event from the worker and maps every event belonging to
+// sessionID onto typed internal/frames values, handing each to emit. Returns when
+// a terminal event lands or the context is cancelled — nil on a clean completion,
+// domain.ErrTurnHandedOff on an ADR-048 handoff, an error for an opencode `error`
+// event or a transport failure. The fetch carries the same ctx so a cancel aborts
+// the upstream socket immediately — opencode would otherwise hold it open until it
+// had something to send. baseURL is the worker's "http://127.0.0.1:<port>".
 //
-// Performance: it reads with scanner.Bytes() (no per-line string alloc), routes
-// via the typed sseEvent, and writes each forwarded event through ONE reused
-// scratch buffer — so a whole turn allocates a single write buffer instead of
-// one per event.
-//
-// Stream B (ADR-048): when a forwarded event is a text delta, a compact
-// {"type":"langy.token","text":...} frame is written and flushed FIRST — ahead
-// of the heavy full-event line — so the raw-token fast-path is never queued
-// behind Stream A's payload. That is the only new work per delta (one typed
-// field read + one small write); terminal detection + session routing untouched.
-//
-// Tool lifecycle: when a forwarded event carries an opencode tool part, compact
-// {"type":"langy.tool",...} start/end frames are written the same way, so the
-// control plane can event-source the call and stream a mapped UI card instead of
-// re-deriving the lifecycle from raw parts. Best-effort and additive — the raw
-// event is still forwarded verbatim, and a tool frame never fails the turn.
-func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, w io.Writer, flush func()) error {
+// It reads with scanner.Bytes() (no per-line string alloc) and routes via the
+// typed sseEvent. The manager is the SOLE author of the frames the control plane
+// sees: a text delta becomes frames.Delta, the tool lifecycle frames.ToolStart/
+// ToolEnd, the keep-alive frames.Heartbeat. The verbatim opencode line is NOT
+// forwarded — the relay speaks only the frames union; app.Chat assembles the
+// durable final from the emitted frames. emit is serialised by a single mutex so
+// the concurrent heartbeat ticker never interleaves with the scan loop.
+func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, emit func(frames.Frame) error) error {
 	url := baseURL + "/event"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -804,33 +744,31 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 		return fmt.Errorf("event stream failed: %d", resp.StatusCode)
 	}
 
-	// All writes to w go through writeLine so the concurrent heartbeat ticker
-	// below can never interleave bytes with the scan loop mid-line. Returns false
-	// on a write error (client disconnect) so callers stop promptly.
-	var writeMu sync.Mutex
-	writeLine := func(b []byte) bool {
-		writeMu.Lock()
-		defer writeMu.Unlock()
-		if _, err := w.Write(b); err != nil {
-			return false
-		}
-		if flush != nil {
-			flush()
-		}
-		return true
+	// All emits go through emitFrame so the concurrent heartbeat ticker can never
+	// interleave with the scan loop: the relay push is ONE ordered stream, so a
+	// single mutex serialises frame writes exactly like the old in-band writeMu (and
+	// keeps the durable-final accumulator, fed inside emit, free of a data race).
+	// Returns false on an emit error (the relay push broke) so callers stop.
+	var emitMu sync.Mutex
+	emitFrame := func(f frames.Frame) bool {
+		emitMu.Lock()
+		defer emitMu.Unlock()
+		return emit(f) == nil
 	}
 
-	// Heartbeat: emit a langy.progress frame every progressInterval so the relay
-	// keeps refreshing the turn's liveness key even through a long, silent tool
-	// call — the scan loop blocks on upstream bytes and cannot self-tick through
-	// silence. Best-effort; a write error just stops the ticker (the loop detects
-	// the same disconnect). We wait for the goroutine to exit before returning so
-	// no heartbeat write races the handler teardown.
+	// Heartbeat: emit a frames.Heartbeat every progressInterval so the relay keeps
+	// the turn's liveness fresh (freshness = alive) through a long, silent tool call
+	// — the scan loop blocks on upstream bytes and cannot self-tick through silence.
+	// Best-effort; an emit error just stops the ticker (the loop detects the same
+	// break). We wait for the goroutine to exit before returning so no heartbeat
+	// races teardown. Panic-guarded (review H2): a marshal panic in this hot loop
+	// must never take down the single-replica manager.
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer clog.HandlePanic(ctx, false)
 		ticker := time.NewTicker(progressInterval)
 		defer ticker.Stop()
 		for {
@@ -840,11 +778,11 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				frame, mErr := json.Marshal(langyProgressFrame{Type: langyProgressType})
+				hb, mErr := frames.Heartbeat()
 				if mErr != nil {
 					continue
 				}
-				if !writeLine(append(frame, '\n')) {
+				if !emitFrame(hb) {
 					return
 				}
 			}
@@ -858,7 +796,6 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	dataPrefix := []byte("data:")
-	var out []byte // reused across the whole stream: one alloc/turn, not one/event
 	var ev sseEvent
 	tools := newToolCallTracker() // per-turn de-dupe of the tool start/end frames
 	for scanner.Scan() {
@@ -879,40 +816,44 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 		if !eventBelongsToSession(&ev, sessionID) {
 			continue
 		}
-		// Stream B fast-path: emit the raw token frame FIRST so time-to-first
-		// token isn't gated on the heavy full-event line behind it. Best-effort —
-		// a write error here means the client is gone, which the full-event write
-		// below detects and returns on.
+		// Token fast-path: emit the delta frame so time-to-first-token is not gated
+		// behind the tool frames below.
 		if delta, ok := textDeltaFromEvent(&ev); ok {
-			if frame, mErr := json.Marshal(langyTokenFrame{Type: langyTokenType, Text: delta}); mErr == nil {
-				if !writeLine(append(frame, '\n')) {
-					return nil // client disconnect.
+			if f, mErr := frames.Delta(delta); mErr == nil {
+				if !emitFrame(f) {
+					return nil // relay push broke.
 				}
 			}
 		}
-		// Tool lifecycle: emit the compact start/end frames ahead of the heavy
-		// full-event line so the card opens as promptly as the tokens flow.
-		// Best-effort — a marshal failure drops the frame and the turn keeps
-		// streaming; forwarding must never fail a turn.
+		// Tool lifecycle: start/end frames as the call opens and settles.
 		for _, tf := range tools.framesFor(&ev) {
-			frame, mErr := json.Marshal(tf)
-			if mErr != nil {
-				continue
-			}
-			if !writeLine(append(frame, '\n')) {
-				return nil // client disconnect.
+			if !emitFrame(tf) {
+				return nil
 			}
 		}
-		// Forward the payload VERBATIM, newline-terminated. payload aliases the
-		// scanner buffer (valid only until the next Scan); appending into out
-		// copies it out before Write.
-		out = append(out[:0], payload...)
-		out = append(out, '\n')
-		if !writeLine(out) {
-			return nil // client disconnect — opencode keeps producing, but we're done.
-		}
+		// Terminal handling. The verbatim opencode event is NOT forwarded any more
+		// (the relay speaks only the frames union); the durable final is assembled by
+		// app.Chat from the emitted frames. Three terminal outcomes are distinguished:
+		//   - handoff (ADR-048): map the opaque resume token onto a terminal
+		//     frames.Handoff the relay persists, then signal ErrTurnHandedOff so the
+		//     app skips its own terminal frame but still posts the durable final;
+		//   - error: return the agent's message so the app emits a frames.Error;
+		//   - anything else: normal completion (nil ⇒ app emits frames.Final).
 		if _, terminal := terminalEventTypes[ev.Type]; terminal {
-			return nil
+			switch ev.Type {
+			case "handoff":
+				var m map[string]any
+				_ = json.Unmarshal(payload, &m)
+				token, _ := ExtractHandoffToken(m)
+				if f, mErr := frames.Handoff(token); mErr == nil {
+					_ = emitFrame(f)
+				}
+				return domain.ErrTurnHandedOff
+			case "error":
+				return fmt.Errorf("agent reported an error: %s", agentErrorMessage(payload))
+			default:
+				return nil
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -922,6 +863,30 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 		return err
 	}
 	return nil
+}
+
+// agentErrorMessage best-effort extracts a human message from an opencode `error`
+// event, tolerating the bare `error`/`message` field and a nested `properties.*`,
+// mirroring the shape-tolerance in eventBelongsToSession / ExtractHandoffToken.
+func agentErrorMessage(payload []byte) string {
+	var m map[string]any
+	if json.Unmarshal(payload, &m) == nil {
+		if s, _ := m["error"].(string); s != "" {
+			return s
+		}
+		if s, _ := m["message"].(string); s != "" {
+			return s
+		}
+		if props, _ := m["properties"].(map[string]any); props != nil {
+			if s, _ := props["error"].(string); s != "" {
+				return s
+			}
+			if s, _ := props["message"].(string); s != "" {
+				return s
+			}
+		}
+	}
+	return "the agent hit an error"
 }
 
 // eventBelongsToSession extracts the session id from any of the shapes OpenCode

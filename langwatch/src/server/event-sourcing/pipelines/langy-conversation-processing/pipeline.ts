@@ -49,10 +49,11 @@ export interface LangyConversationProcessingPipelineDeps {
     LangyConversationStateData
   >;
   /**
-   * PR3 (ADR-044): a delayed per-turn timer that reconciles a stalled turn to a
-   * terminal state when its heartbeat lapses. Optional for the same reason.
+   * ADR-044: a delayed per-turn timer that SELF-RETRIES a stalled turn (re-drive +
+   * throw-to-retry via the queue) and fails it only after the retry window lapses.
+   * Optional for the same reason.
    */
-  reconcileAgentTurnReactor?: ReactorDefinition<
+  agentTurnLivenessReactor?: ReactorDefinition<
     LangyConversationProcessingEvent,
     LangyConversationStateData
   >;
@@ -144,11 +145,11 @@ export function createLangyConversationProcessingPipeline(
       deps.spawnAgentReactor,
     );
   }
-  if (deps.reconcileAgentTurnReactor) {
+  if (deps.agentTurnLivenessReactor) {
     builder = builder.withReactor(
       "langyConversationState",
-      "reconcileAgentTurn",
-      deps.reconcileAgentTurnReactor,
+      "agentTurnLiveness",
+      deps.agentTurnLivenessReactor,
     );
   }
   // Freshness broadcast: bound to the conversation-state fold so it fires

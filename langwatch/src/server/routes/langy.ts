@@ -31,7 +31,7 @@ import { featureFlagService } from "~/server/featureFlag";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { getLangWatchTracer } from "langwatch";
 import { DomainError } from "~/server/app-layer/domain-error";
-import { langyTurnContextSchema } from "~/server/services/langy/langyTurnContext.schema";
+import { langyTurnContextSchema } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim } from "./types";

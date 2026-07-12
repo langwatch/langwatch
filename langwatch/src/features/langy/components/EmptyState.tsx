@@ -50,7 +50,7 @@ const SUGGESTIONS: { icon: SuggestionIcon; label: string; prompt: string }[] = [
     //
     // The wording carries the whole loop — investigate, then ship the fix as a
     // PR — because that IS the loop the agent runs (see
-    // services/langyagent/skills/github/SKILL.md: clone → branch → edit →
+    // app-layer/langyagent/skills/github/SKILL.md: clone → branch → edit →
     // commit → push → `gh pr create`). It stops there, and so does this copy.
     // Opening an ISSUE and VALIDATING a fix are NOT capabilities today — there
     // is no `gh issue create` anywhere in the skill, `githubPrLinks` extracts
@@ -71,10 +71,19 @@ export function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
       gap={0}
       height="full"
       justify="center"
-      paddingX={5}
+      // One centred measure for the whole empty state — the hero and the
+      // suggestion list share these bounds, so nothing sits in its own width
+      // (the subtitle used to be capped at 260px while the list ran the full
+      // ~428px). 360px is ~0.77 of the 468px panel: tight enough that the
+      // centred text isn't marooned in air, wide enough that the long GitHub
+      // row never wraps — true-golden 0.618 (≈289px) would clip it.
+      maxWidth="360px"
+      marginX="auto"
+      width="full"
+      paddingX={3}
       paddingY={8}
     >
-      <VStack gap={0} align="center" marginBottom={7}>
+      <VStack gap={0} align="center" marginBottom="34px">
         {/* The LangWatch mark, in the brand gradient — and the ONLY place it
             appears inside the panel (the launcher is the other). Bare, no tile:
             the orange chip that used to box it in was old-brand chrome, a
@@ -84,12 +93,15 @@ export function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
         <LangyMark size={44} />
         <Text
           fontFamily="var(--langy-font-serif)"
-          fontSize="2xl"
+          // 27px ≈ the 44px mark ÷ φ, so mark and heading lock into the golden
+          // ratio; the 21px above it is the next Fibonacci step over the 8px
+          // that follows — the block's rhythm is 21 · 8 · 34.
+          fontSize="27px"
           fontWeight="500"
           letterSpacing="-0.02em"
           color="fg"
           textAlign="center"
-          marginTop={4}
+          marginTop="21px"
         >
           How can I help?
         </Text>
@@ -98,7 +110,11 @@ export function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
           color="fg.muted"
           lineHeight="1.5"
           textAlign="center"
-          maxWidth="260px"
+          // `balance` evens the two lines instead of orphaning "of these." on a
+          // row of its own; the cap keeps the measure from running the full
+          // column so it stays a tight caption under the hero.
+          textWrap="balance"
+          maxWidth="300px"
           marginTop={2}
         >
           Ask in plain language — or start with one of these.
@@ -137,8 +153,8 @@ function SuggestionRow({
       gap={3}
       width="full"
       textAlign="left"
-      paddingX={2.5}
-      paddingY={2.5}
+      paddingX="10px"
+      paddingY="13px"
       borderRadius="10px"
       background="transparent"
       color="fg"

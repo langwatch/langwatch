@@ -12,7 +12,7 @@ import {
  * what time it is.
  *
  * Most failures never get here — the turn processor recovers them in process,
- * on the same stream (see `server/services/langy/execution/langy-turn-recovery.ts`).
+ * on the same stream (see `server/app-layer/langy/execution/langy-turn-recovery.ts`).
  * What reaches this hook is the two failures the server provably cannot fix
  * from inside itself: a draining pod (`langy_worker_restarting`) and a turn that
  * burned the whole attach budget (`langy_turn_timeout`).

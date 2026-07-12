@@ -12,11 +12,11 @@ import Module from "module";
 // reaches the running process (and Langy can't reach the gateway from inside
 // the OpenCode pod). NODE_ENV / PORT / similar process-level vars stay
 // shell-only because .env shouldn't carry them.
-dotenv.config({ override: true });
+dotenv.config({ override: true, quiet: true });
 // Portless (haven) overlay: loaded LAST with override so the resolved hostname
 // URLs + ports win over anything pinned in .env. In non-portless runs the file
 // is absent and this is a no-op. See tools/thuishaven + ADR-048.
-dotenv.config({ path: ".env.portless", override: true });
+dotenv.config({ path: ".env.portless", override: true, quiet: true });
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
 if (process.env.NODE_ENV === "production") {

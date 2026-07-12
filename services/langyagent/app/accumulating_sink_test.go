@@ -1,56 +1,52 @@
 package app
 
 import (
-	"bytes"
+	"encoding/json"
 	"testing"
+
+	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 )
 
-// captureSink is a ChatSink that records everything written to it, so the test
-// can assert the decorator forwards frames unchanged while accumulating them.
-type captureSink struct {
-	buf     bytes.Buffer
-	begun   bool
-	flushed bool
+// captureStream records frames pushed to the relay, so the test can assert the
+// frameSink both pushes each frame in order AND accumulates the durable final.
+type captureStream struct {
+	emitted []frames.Frame
+	closed  bool
 }
 
-func (s *captureSink) Begin()              { s.begun = true }
-func (s *captureSink) ErrorEvent(_ string) {}
-func (s *captureSink) Flush()              { s.flushed = true }
-func (s *captureSink) Write(p []byte) (int, error) {
-	return s.buf.Write(p)
+func (s *captureStream) Emit(f frames.Frame) error { s.emitted = append(s.emitted, f); return nil }
+func (s *captureStream) Close() error              { s.closed = true; return nil }
+
+// okf unwraps a frames.* constructor's (Frame, error) so it spreads as one arg.
+func okf(f frames.Frame, err error) frames.Frame {
+	if err != nil {
+		panic(err)
+	}
+	return f
 }
 
-func TestAccumulatingSink_ForwardsAndAccumulates(t *testing.T) {
-	inner := &captureSink{}
-	acc := newAccumulatingSink(inner)
+func TestFrameSink_PushesAndAccumulates(t *testing.T) {
+	stream := &captureStream{}
+	sink := newFrameSink(stream)
 
-	// Embedded ChatSink methods pass through untouched.
-	acc.Begin()
-	acc.Flush()
-	if !inner.begun || !inner.flushed {
-		t.Errorf("Begin/Flush not forwarded to inner sink")
+	in := []frames.Frame{
+		okf(frames.Delta("hi")),
+		okf(frames.ToolStart("a", "search", "", "", json.RawMessage(`{"q":"x"}`))),
+		okf(frames.ToolEnd("a", "search", nil, false, "found", 0)),
 	}
-
-	lines := []string{
-		`{"type":"langy.token","text":"hi"}`,
-		`{"type":"message.part.delta","properties":{"field":"text","delta":"hi"}}`,
-		`{"type":"langy.tool","id":"a","name":"search","phase":"end","output":"found","isError":false}`,
-	}
-	for _, l := range lines {
-		if _, err := acc.Write([]byte(l + "\n")); err != nil {
-			t.Fatalf("write: %v", err)
+	for _, f := range in {
+		if err := sink.Emit(f); err != nil {
+			t.Fatalf("emit: %v", err)
 		}
 	}
 
-	// Every line is forwarded verbatim to the inner sink.
-	for _, l := range lines {
-		if !bytes.Contains(inner.buf.Bytes(), []byte(l)) {
-			t.Errorf("inner sink missing forwarded line %q", l)
-		}
+	// Every frame is pushed to the relay stream, in order.
+	if len(stream.emitted) != len(in) {
+		t.Fatalf("pushed %d frames, want %d", len(stream.emitted), len(in))
 	}
 
 	// result() maps the accumulated frame-shaped tool call to FinalToolCall.
-	text, tools := acc.result()
+	text, tools := sink.result()
 	if text != "hi" {
 		t.Errorf("text = %q, want hi", text)
 	}
@@ -59,5 +55,17 @@ func TestAccumulatingSink_ForwardsAndAccumulates(t *testing.T) {
 	}
 	if tools[0].Output == nil || *tools[0].Output != "found" {
 		t.Errorf("tool output = %v, want found", tools[0].Output)
+	}
+}
+
+// A nil stream (relay disabled for this turn) must not panic — the durable final
+// is still accumulated so the Finalizer backstop can post it.
+func TestFrameSink_NilStreamStillAccumulates(t *testing.T) {
+	sink := newFrameSink(nil)
+	if err := sink.Emit(okf(frames.Delta("hi"))); err != nil {
+		t.Fatalf("emit: %v", err)
+	}
+	if text, _ := sink.result(); text != "hi" {
+		t.Errorf("text = %q, want hi", text)
 	}
 }

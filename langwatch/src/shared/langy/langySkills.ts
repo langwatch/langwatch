@@ -9,7 +9,7 @@ import GENERATED_SKILLS from "./langySkills.generated.json";
  * reason. It once advertised 13 tools that did not exist: the agent believed the
  * list, tried to call them, and the cost was days. The fix — compute the list,
  * never write it — was right. But the computation was then pointed at
- * `services/langyagent/skills/`, which holds exactly one skill (`github`), while
+ * `app-layer/langyagent/skills/`, which holds exactly one skill (`github`), while
  * the image ships FOURTEEN. So the palette under-offered by 13 real capabilities.
  *
  * A hand-written catalogue over-promises. A catalogue derived from the wrong
@@ -21,7 +21,7 @@ import GENERATED_SKILLS from "./langySkills.generated.json";
  *   1. AGENT SKILLS — `langySkills.generated.json`, produced by
  *      `scripts/generate-langy-skills.ts` from the skill directories named in
  *      `Dockerfile.langyagent`'s COPY set (`skills/_compiled/native/` +
- *      `services/langyagent/skills/`) — i.e. from the image itself. Each entry's
+ *      `app-layer/langyagent/skills/`) — i.e. from the image itself. Each entry's
  *      words are its own `SKILL.md` front-matter, the same source behind the
  *      public skill directory, so a skill cannot describe itself as something it
  *      is not. `__tests__/langySkills.unit.test.ts` re-derives from disk and fails

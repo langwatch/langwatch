@@ -102,11 +102,12 @@ import type { LangyConversationTurnStateRepository } from "./pipelines/langy-con
 import { LANGY_CONVERSATION_PROJECTION_VERSIONS } from "./pipelines/langy-conversation-processing/schemas/constants";
 import type { SpawnAgentReactorHandle } from "./pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
 import { createSpawnAgentReactor } from "./pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
-import { createReconcileAgentTurnReactor } from "./pipelines/langy-conversation-processing/reactors/reconcileAgentTurn.reactor";
+import { createAgentTurnLivenessReactor } from "./pipelines/langy-conversation-processing/reactors/agentTurnLiveness.reactor";
 import type { LangyTitleGenerationReactorHandle } from "./pipelines/langy-conversation-processing/reactors/langyTitleGeneration.reactor";
 import { createLangyTitleGenerationReactor } from "./pipelines/langy-conversation-processing/reactors/langyTitleGeneration.reactor";
-import { createLangyTokenBuffer } from "../services/langy/streaming/langyTokenBuffer";
-import { createLangyTurnHandoffStore } from "../services/langy/streaming/langyTurnHandoff";
+import { createLangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
+import { createLangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
+import { createLangyWorkerPort } from "../app-layer/langy/langyWorker";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -325,7 +326,7 @@ export class PipelineRegistry {
       billing: mapCommands(billingPipeline.commands),
       /** Late-bind the execution pool for scenario execution reactor. */
       scenarioExecutionHandle,
-      /** Late-bind the worker pool for the langy spawnAgent reactor (ADR-044). */
+      /** The langy spawnAgent reactor (self-driving dispatch — no pool to bind). */
       spawnAgentHandle,
       /** Late-bind the model-backed title generator for the langy title reactor. */
       langyTitleGenerationHandle,
@@ -340,8 +341,8 @@ export class PipelineRegistry {
    *
    * PR3 adds two reactors: `spawnAgent` (reacts to `agent_response_started`,
    * dispatches the turn to the worker pool — pool late-bound via the returned
-   * handle) and `reconcileAgentTurn` (a delayed per-turn liveness timer that
-   * terminalizes a stalled turn). The reconcile reactor needs to dispatch
+   * handle) and `agentTurnLiveness` (a delayed per-turn timer that self-retries a
+   * stalled turn, then fails it). The liveness reactor needs to dispatch
    * `failAgentResponse`, a command of THIS pipeline, so that dispatcher is
    * resolved via a Deferred after the pipeline is built (the scenario
    * `computeRunMetrics` self-reference pattern).
@@ -369,9 +370,20 @@ export class PipelineRegistry {
       redis: this.deps.redis,
     });
     const buffer = createLangyTokenBuffer({ redis: this.deps.redis });
-    const spawnAgentHandle = createSpawnAgentReactor({ handoffStore });
+    // The manager dispatch port: spawnAgent POSTs the turn to the Go worker over
+    // the internal secret; the worker Claims synchronously then drives the turn
+    // detached, pushing signed frames to the relay. The runToken rides the handoff
+    // (stashed by the turn service), so no fold read is needed here.
+    const langyWorkerPort = createLangyWorkerPort({
+      agentUrl: process.env.OPENCODE_AGENT_URL ?? "",
+      internalSecret: process.env.LANGY_INTERNAL_SECRET ?? "",
+    });
+    const spawnAgentHandle = createSpawnAgentReactor({
+      handoffStore,
+      worker: langyWorkerPort,
+    });
 
-    // Deferred: the reconcile reactor dispatches failAgentResponse, a command of
+    // Deferred: the liveness reactor dispatches failAgentResponse, a command of
     // the pipeline being built here. Resolve it once the pipeline exists.
     const failTurn = new Deferred<
       (args: {
@@ -381,9 +393,13 @@ export class PipelineRegistry {
         error: string;
       }) => Promise<void>
     >("langyFailTurn");
-    const reconcileAgentTurnReactor = createReconcileAgentTurnReactor({
+    const agentTurnLivenessReactor = createAgentTurnLivenessReactor({
       buffer,
       conversations: { failTurn: (args) => failTurn.fn(args) },
+      // Re-drive a stalled turn: same dispatch port + handoff the spawn reactor
+      // uses (read, not take — the handoff must survive a re-drive).
+      worker: langyWorkerPort,
+      handoffStore,
     });
 
     // Freshness signal: broadcast a per-conversation SSE signal on every fold
@@ -418,7 +434,7 @@ export class PipelineRegistry {
         langyConversationTurnFoldStore,
         langyMessageAppendStore: this.deps.repositories.langyMessageStorage,
         spawnAgentReactor: spawnAgentHandle.reactor,
-        reconcileAgentTurnReactor,
+        agentTurnLivenessReactor,
         langyConversationUpdateBroadcastReactor,
         langyTitleGenerationReactor: langyTitleGenerationHandle.reactor,
       }),

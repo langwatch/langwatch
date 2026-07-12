@@ -91,6 +91,12 @@ export interface LangyRelayConversations {
     toolCalls?: { id: string; name: string; input?: unknown; output?: string; isError?: boolean }[];
     errorCode?: string;
   }): Promise<void>;
+  recordTurnHandoff(a: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    token: string;
+  }): Promise<void>;
 }
 
 export interface LangyTurnRelayDeps {
@@ -256,6 +262,21 @@ export class LangyTurnRelay {
           status: "failed",
           ...(frame.code !== undefined ? { errorCode: frame.code } : {}),
         });
+        return { status: "terminal" };
+
+      case "handoff":
+        // ADR-048: the worker checkpointed on shutdown. End the live stream and
+        // persist the opaque resume token so the next turn resumes from it. The
+        // turn is NOT failed — it will be re-driven on a fresh worker.
+        await this.deps.buffer.markEnd(at);
+        if (frame.resumeToken !== undefined && frame.resumeToken !== "") {
+          await this.deps.conversations.recordTurnHandoff({
+            projectId,
+            conversationId,
+            turnId,
+            token: frame.resumeToken,
+          });
+        }
         return { status: "terminal" };
     }
   }

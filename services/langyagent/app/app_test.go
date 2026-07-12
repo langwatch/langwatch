@@ -1,16 +1,15 @@
 package app
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
-	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 )
 
 // --- fakes ---
@@ -43,20 +42,26 @@ type fakeWorker struct {
 	postErr          error
 	gotResumeToken   string
 	streamErr        error
-	streamWrites     bool // write one event on the stream (happy path)
+	streamWrites     bool // emit one delta frame on the stream (happy path)
 	blockUntilCancel bool // wait for ctx cancellation before returning (post-error path)
 }
 
-func (w *fakeWorker) Claim() bool { w.claimed++; return w.claimOK }
-func (w *fakeWorker) Release()    { w.released++ }
-func (w *fakeWorker) Touch()      {}
+func (w *fakeWorker) ClaimTurn(string) ClaimOutcome {
+	w.claimed++
+	if w.claimOK {
+		return ClaimGranted
+	}
+	return ClaimBusy
+}
+func (w *fakeWorker) Release() { w.released++ }
+func (w *fakeWorker) Touch()   {}
 func (w *fakeWorker) PostMessage(_ context.Context, _, _, resumeToken string) error {
 	w.gotResumeToken = resumeToken
 	return w.postErr
 }
 func (w *fakeWorker) StreamEvents(ctx context.Context, sink ChatSink) error {
 	if w.streamWrites {
-		_, _ = sink.Write([]byte("{\"type\":\"message.part.delta\"}\n"))
+		_ = sink.Emit(okf(frames.Delta("hello")))
 	}
 	if w.blockUntilCancel {
 		<-ctx.Done()
@@ -64,140 +69,151 @@ func (w *fakeWorker) StreamEvents(ctx context.Context, sink ChatSink) error {
 	return w.streamErr
 }
 
-type fakeSink struct {
-	mu     sync.Mutex
-	begun  bool
-	events []string
-	buf    bytes.Buffer
+// fakeRelay hands out one captureStream per turn so a test can inspect the frames
+// the turn pushed to the relay.
+type fakeRelay struct{ stream *captureStream }
+
+func (r *fakeRelay) Open(context.Context, string, string, string, string, string, string) (FrameStream, error) {
+	r.stream = &captureStream{}
+	return r.stream, nil
 }
 
-func (s *fakeSink) Begin() { s.mu.Lock(); s.begun = true; s.mu.Unlock() }
-func (s *fakeSink) Write(p []byte) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.buf.Write(p)
-}
-func (s *fakeSink) ErrorEvent(msg string) {
-	s.mu.Lock()
-	s.events = append(s.events, msg)
-	s.mu.Unlock()
-}
-func (s *fakeSink) Flush() {}
-
-func (s *fakeSink) snapshot() (bool, []string, string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.begun, append([]string(nil), s.events...), s.buf.String()
+// frameTypes lists the `type` discriminant of each pushed frame, in order.
+func frameTypes(fs []frames.Frame) []string {
+	out := make([]string, 0, len(fs))
+	for _, f := range fs {
+		var p struct {
+			Type string `json:"type"`
+		}
+		_ = json.Unmarshal([]byte(f.JSON()), &p)
+		out = append(out, p.Type)
+	}
+	return out
 }
 
-func newApp(pool WorkerPool) *App {
-	return New(WithWorkerPool(pool))
+func has(types []string, want string) bool {
+	for _, t := range types {
+		if t == want {
+			return true
+		}
+	}
+	return false
+}
+
+func newTestApp(pool WorkerPool, relay FrameRelay) *App {
+	return New(WithWorkerPool(pool), WithFrameRelay(relay))
 }
 
 func req() ChatRequest {
-	return ChatRequest{ConversationID: "c1", Prompt: "hi", Credentials: domain.Credentials{
+	return ChatRequest{ConversationID: "c1", Prompt: "hi", RunToken: "rt-secret", Credentials: domain.Credentials{
 		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
 	}}
 }
 
-func TestApp_Chat_AtCapacityEmitsErrorEventAnd200(t *testing.T) {
+// runTurn drives StartTurn's returned runner to completion synchronously (the
+// transport runs it detached; the test does it in-line to observe the outcome).
+func runTurn(t *testing.T, a *App, r ChatRequest) {
+	t.Helper()
+	run, err := a.StartTurn(context.Background(), r)
+	if err != nil {
+		t.Fatalf("StartTurn: %v", err)
+	}
+	run(context.Background())
+}
+
+func TestApp_StartTurn_AtCapacityReturnsMaxWorkers(t *testing.T) {
 	pool := &fakePool{acquireErr: herr.New(context.Background(), domain.ErrMaxWorkers, nil)}
-	sink := &fakeSink{}
-	if err := newApp(pool).Chat(context.Background(), req(), sink); err != nil {
-		t.Fatalf("at-capacity must not return an error to the caller, got %v", err)
-	}
-	begun, events, _ := sink.snapshot()
-	if !begun {
-		t.Errorf("at-capacity should begin the stream (200)")
-	}
-	if len(events) != 1 || events[0] != "at-capacity" {
-		t.Errorf("expected a single at-capacity error event, got %v", events)
+	_, err := newTestApp(pool, &fakeRelay{}).StartTurn(context.Background(), req())
+	if err == nil || !herr.IsCode(err, domain.ErrMaxWorkers) {
+		t.Fatalf("at capacity must return herr(ErrMaxWorkers) (transport → 503), got %v", err)
 	}
 }
 
-func TestApp_Chat_ConversationBusyReturns409WithoutBeginningStream(t *testing.T) {
+func TestApp_StartTurn_ConversationBusyReturns409(t *testing.T) {
 	worker := &fakeWorker{claimOK: false}
-	pool := &fakePool{worker: worker}
-	sink := &fakeSink{}
-	err := newApp(pool).Chat(context.Background(), req(), sink)
+	_, err := newTestApp(&fakePool{worker: worker}, &fakeRelay{}).StartTurn(context.Background(), req())
 	if err == nil || !herr.IsCode(err, domain.ErrConversationBusy) {
-		t.Fatalf("expected herr(ErrConversationBusy), got %v", err)
+		t.Fatalf("a busy conversation must return herr(ErrConversationBusy), got %v", err)
 	}
-	begun, _, _ := sink.snapshot()
-	if begun {
-		t.Errorf("a busy conversation must NOT begin the 200 stream (the transport writes a 409)")
+	if worker.claimed != 1 {
+		t.Errorf("StartTurn must attempt the claim exactly once, got %d", worker.claimed)
 	}
 }
 
-func TestApp_Chat_SessionVanishedRecyclesWorkerAndReportsEvent(t *testing.T) {
+func TestApp_Turn_SessionVanishedRecyclesWorkerAndEmitsError(t *testing.T) {
 	worker := &fakeWorker{
 		claimOK:          true,
 		postErr:          herr.New(context.Background(), domain.ErrSessionNotFound, nil),
 		blockUntilCancel: true,
 	}
 	pool := &fakePool{worker: worker}
-	sink := &fakeSink{}
-	if err := newApp(pool).Chat(context.Background(), req(), sink); err != nil {
-		t.Fatalf("session-not-found is surfaced as an event, not a returned error; got %v", err)
-	}
+	relay := &fakeRelay{}
+	runTurn(t, newTestApp(pool, relay), req())
+
 	if len(pool.killed) != 1 || pool.killed[0] != "c1" {
 		t.Errorf("expected the vanished-session worker to be recycled, killed=%v", pool.killed)
 	}
-	_, events, _ := sink.snapshot()
-	if len(events) != 1 || events[0] != "session-not-found" {
-		t.Errorf("expected a session-not-found event, got %v", events)
+	if !has(frameTypes(relay.stream.emitted), "error") {
+		t.Errorf("session-not-found must push a terminal error frame, got %v", frameTypes(relay.stream.emitted))
 	}
 	if worker.released != 1 {
 		t.Errorf("worker must be released exactly once, got %d", worker.released)
 	}
 }
 
-func TestApp_Chat_PostErrorSurfacedAsEvent(t *testing.T) {
-	worker := &fakeWorker{
-		claimOK:          true,
-		postErr:          errors.New("boom-post"),
-		blockUntilCancel: true,
+func TestApp_Turn_PostErrorEmitsErrorFrame(t *testing.T) {
+	worker := &fakeWorker{claimOK: true, postErr: errors.New("boom-post"), blockUntilCancel: true}
+	relay := &fakeRelay{}
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
+
+	if !has(frameTypes(relay.stream.emitted), "error") {
+		t.Errorf("a post error must push a terminal error frame, got %v", frameTypes(relay.stream.emitted))
 	}
-	pool := &fakePool{worker: worker}
-	sink := &fakeSink{}
-	if err := newApp(pool).Chat(context.Background(), req(), sink); err != nil {
-		t.Fatalf("post error is surfaced as an event, got returned err %v", err)
-	}
-	_, events, _ := sink.snapshot()
-	if len(events) != 1 || events[0] != "boom-post" {
-		t.Errorf("expected the post error surfaced as an event, got %v", events)
+	if worker.released != 1 {
+		t.Errorf("worker must be released exactly once, got %d", worker.released)
 	}
 }
 
-func TestApp_Chat_StreamErrorSurfacedAsEvent(t *testing.T) {
+func TestApp_Turn_StreamErrorEmitsErrorFrame(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamErr: errors.New("boom-stream")}
-	pool := &fakePool{worker: worker}
-	sink := &fakeSink{}
-	if err := newApp(pool).Chat(context.Background(), req(), sink); err != nil {
-		t.Fatalf("stream error is surfaced as an event, got returned err %v", err)
+	relay := &fakeRelay{}
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
+
+	// The stream error's message rides the error frame; assert both the type and
+	// that the message reached the wire.
+	var sawErr bool
+	for _, f := range relay.stream.emitted {
+		var e struct {
+			Type  string `json:"type"`
+			Error string `json:"error"`
+		}
+		_ = json.Unmarshal([]byte(f.JSON()), &e)
+		if e.Type == "error" && e.Error == "boom-stream" {
+			sawErr = true
+		}
 	}
-	_, events, _ := sink.snapshot()
-	if len(events) != 1 || events[0] != "boom-stream" {
-		t.Errorf("expected the stream error surfaced as an event, got %v", events)
+	if !sawErr {
+		t.Errorf("stream error must push an error frame carrying its message, got %v", frameTypes(relay.stream.emitted))
 	}
 }
 
-func TestApp_Chat_HappyPathStreamsAndReleases(t *testing.T) {
+func TestApp_Turn_HappyPathEmitsDeltaThenFinalAndReleases(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true}
-	pool := &fakePool{worker: worker}
-	sink := &fakeSink{}
-	if err := newApp(pool).Chat(context.Background(), req(), sink); err != nil {
-		t.Fatalf("happy path should not error, got %v", err)
+	relay := &fakeRelay{}
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
+
+	types := frameTypes(relay.stream.emitted)
+	if !has(types, "delta") {
+		t.Errorf("the streamed delta must reach the relay, got %v", types)
 	}
-	begun, events, body := sink.snapshot()
-	if !begun {
-		t.Errorf("happy path must begin the 200 stream")
+	if !has(types, "final") {
+		t.Errorf("a completed turn must push a terminal final frame, got %v", types)
 	}
-	if len(events) != 0 {
-		t.Errorf("happy path must emit no error events, got %v", events)
+	if has(types, "error") {
+		t.Errorf("the happy path must push no error frame, got %v", types)
 	}
-	if !strings.Contains(body, "message.part.delta") {
-		t.Errorf("expected the streamed event to reach the sink, body=%q", body)
+	if !relay.stream.closed {
+		t.Errorf("the relay stream must be closed at turn end")
 	}
 	if worker.claimed != 1 || worker.released != 1 {
 		t.Errorf("worker must be claimed and released exactly once, got claimed=%d released=%d", worker.claimed, worker.released)

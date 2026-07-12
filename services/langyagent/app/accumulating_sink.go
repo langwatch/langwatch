@@ -1,31 +1,40 @@
 package app
 
-import "github.com/langwatch/langwatch/services/langyagent/internal/turnfold"
+import (
+	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
+	"github.com/langwatch/langwatch/services/langyagent/internal/turnfold"
+)
 
-// accumulatingSink is a ChatSink that tees the turn's frame stream into a
-// turnfold.Accumulator as it forwards it, so the app can assemble a durable final
-// (text + tool calls) to POST independently of the relay — without changing the
-// Worker/StreamEvents contract. The embedded ChatSink carries Begin/ErrorEvent/
-// Flush through unchanged; only Write is intercepted, to observe each line before
-// forwarding it.
-type accumulatingSink struct {
-	ChatSink
-	acc *turnfold.Accumulator
+// frameSink is the app's ChatSink for a self-driven turn: every frame the coding
+// agent produces is (1) folded into a turnfold.Accumulator so the app can post a
+// self-sufficient durable final, and (2) pushed to the control-plane relay via the
+// per-turn FrameStream. The stream may be nil (relay disabled — an older control
+// plane with no runToken, or a missing endpoint): the turn still runs and
+// finalizes, it just has no live edge.
+type frameSink struct {
+	stream FrameStream
+	acc    *turnfold.Accumulator
 }
 
-func newAccumulatingSink(inner ChatSink) *accumulatingSink {
-	return &accumulatingSink{ChatSink: inner, acc: turnfold.New()}
+func newFrameSink(stream FrameStream) *frameSink {
+	return &frameSink{stream: stream, acc: turnfold.New()}
 }
 
-func (s *accumulatingSink) Write(p []byte) (int, error) {
-	s.acc.Observe(p)
-	return s.ChatSink.Write(p)
+// Emit folds the frame into the durable-final accumulator and pushes it to the
+// relay. A push error is returned (StreamSession stops on it), but the accumulate
+// always happens first so the durable final is complete regardless of the push.
+func (s *frameSink) Emit(f frames.Frame) error {
+	s.acc.Observe(f)
+	if s.stream == nil {
+		return nil
+	}
+	return s.stream.Emit(f)
 }
 
 // result snapshots the accumulated final, mapping the frame-shaped tool calls
 // turnfold returns to the durable-final shape the control-plane ingest expects
 // (FinalToolCall). Called once, after the stream has returned.
-func (s *accumulatingSink) result() (text string, toolCalls []FinalToolCall) {
+func (s *frameSink) result() (text string, toolCalls []FinalToolCall) {
 	text, tools := s.acc.Result()
 	toolCalls = make([]FinalToolCall, 0, len(tools))
 	for _, t := range tools {

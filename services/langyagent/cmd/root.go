@@ -87,6 +87,10 @@ func Root(ctx context.Context, _ []string) error {
 		// The independent completion path back to langy-internal, retried and
 		// idempotent on turnId.
 		app.WithFinalizer(controlplane.NewFinalizer(cfg.InternalSecret, 0)),
+		// Relay push: the live edge. The manager SIGNS each output frame with the
+		// turn's runToken and streams it to the control-plane relay — same shared
+		// secret, no new config. Disabled per-turn when no runToken rides the turn.
+		app.WithFrameRelay(controlplane.NewRelayClient(cfg.InternalSecret)),
 	)
 
 	return langyagent.Serve(ctx, application, deps, cfg)

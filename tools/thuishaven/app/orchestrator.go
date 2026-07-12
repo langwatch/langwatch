@@ -34,9 +34,9 @@ func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch Cl
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).
 type UpParams struct {
-	WorktreeDir  string
-	LwDir        string
-	Branch       string
+	WorktreeDir      string
+	LwDir            string
+	Branch           string
 	ExplicitSlug     string // from LANGWATCH_SLUG; wins over the derived/cached slug
 	IsBaseline       bool   // this stack is the shared default others fall back to
 	IsLinkedWorktree bool   // a `git worktree add` checkout, not the primary clone
@@ -205,20 +205,23 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	}
 	defer cleanup()
 
-	env := st.OverlayEnv()
+	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
+	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
+	// banner. Keeps the codegen/prepare/seed lanes as quiet as the services.
+	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
 	// Codegen (prisma/zod/sdk-versions/mcp) then migrations — both finish before
 	// the services boot. Owned here so `pnpm dev` is simply `haven up`.
-	if err := o.sup.RunOnce(ctx, "codegen", p.LwDir, "pnpm run start:prepare:files", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "codegen", p.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 	}
-	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm run start:prepare:db", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
 		o.log.Warn("db prepare failed (continuing)", zap.Error(err))
 	}
 	// Always seed. The seed is idempotent (a no-op once the stable local project +
 	// API key exist), so every `up` guarantees the same migrations AND the same
 	// seeded credential are in place — a freshly-provisioned DB is immediately
 	// usable with the well-known LANGWATCH_API_KEY, no manual sign-up.
-	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm -s run prisma:seed", env); err != nil {
 		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
 	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir))
@@ -373,7 +376,7 @@ func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
 
 // Seed reseeds the current stack's database — the "give me a fresh DB" affordance.
 func (o *Orchestrator) Seed(ctx context.Context, p UpParams) error {
-	return o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", nil)
+	return o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm -s run prisma:seed", []string{"DOTENV_CONFIG_QUIET=true"})
 }
 
 // runsLocally reports whether this worktree runs the service itself (vs falling

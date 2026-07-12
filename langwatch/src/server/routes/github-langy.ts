@@ -13,7 +13,7 @@
  *
  * The route is just HTTP plumbing — sign/verify state, validate query params,
  * shape responses. Everything else (DB writes, GitHub HTTP, popup HTML) lives
- * in services/langy/* siblings.
+ * in app-layer/langy/* siblings.
  *
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
@@ -31,13 +31,13 @@ import { featureFlagService } from "~/server/featureFlag";
 import {
   popupErrorHtml,
   popupResponseHtml,
-} from "~/server/services/langy/githubOauthPopupHtml";
+} from "~/server/app-layer/langy/githubOauthPopupHtml";
 import {
   type GithubOauthStatePayload,
   STATE_TTL_MS,
   signGithubOauthState,
   verifyGithubOauthState,
-} from "~/server/services/langy/githubOauthState";
+} from "~/server/app-layer/langy/githubOauthState";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { createLogger } from "~/utils/logger/server";
 

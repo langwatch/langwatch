@@ -15,18 +15,25 @@ import (
 	httprpc "github.com/langwatch/langwatch/pkg/rpc"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 )
 
 // --- stubs implementing the app ports ---
 
 type stubWorker struct{ claimOK bool }
 
-func (w *stubWorker) Claim() bool                                               { return w.claimOK }
+func (w *stubWorker) ClaimTurn(string) app.ClaimOutcome {
+	if w.claimOK {
+		return app.ClaimGranted
+	}
+	return app.ClaimBusy
+}
 func (w *stubWorker) Release()                                                  {}
 func (w *stubWorker) Touch()                                                    {}
 func (w *stubWorker) PostMessage(context.Context, string, string, string) error { return nil }
 func (w *stubWorker) StreamEvents(_ context.Context, sink app.ChatSink) error {
-	_, _ = sink.Write([]byte("{\"type\":\"message.part.delta\"}\n"))
+	f, _ := frames.Delta("hi")
+	_ = sink.Emit(f)
 	return nil
 }
 
@@ -197,29 +204,28 @@ func TestChat_ConversationBusyReturns409(t *testing.T) {
 	}
 }
 
-func TestChat_AtCapacityStreams200WithErrorEvent(t *testing.T) {
+// At capacity is now a synchronous HTTP status (503), not a 200 stream event —
+// there is no in-band response to carry an error event; the dispatcher decides.
+func TestChat_AtCapacityReturns503(t *testing.T) {
 	pool := &stubPool{acquireErr: herr.New(context.Background(), domain.ErrMaxWorkers, nil)}
 	router := newTestRouter(pool)
 	rec := postChat(t, router, "Bearer "+internalSecret, validBody)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (at-capacity is a stream event, not an HTTP error)", rec.Code)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 (at capacity)", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "at-capacity") {
-		t.Errorf("body should carry the at-capacity error event, got %q", rec.Body.String())
-	}
-	if ct := rec.Header().Get("Content-Type"); ct != "application/x-ndjson" {
-		t.Errorf("Content-Type = %q, want application/x-ndjson", ct)
+	if got := errorType(t, rec.Body.String()); got != string(domain.ErrMaxWorkers) {
+		t.Errorf("error.type = %q, want max_workers_reached", got)
 	}
 }
 
-func TestChat_HappyPathStreamsNdjson(t *testing.T) {
+// The happy path Claims the worker synchronously and returns 202; the turn's
+// output then flows out-of-band as signed frames to the relay, not on the
+// response body.
+func TestChat_HappyPathReturns202(t *testing.T) {
 	router := newTestRouter(&stubPool{worker: &stubWorker{claimOK: true}})
 	rec := postChat(t, router, "Bearer "+internalSecret, validBody)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
-	}
-	if !strings.Contains(rec.Body.String(), "message.part.delta") {
-		t.Errorf("body should carry the streamed opencode event, got %q", rec.Body.String())
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", rec.Code)
 	}
 }
 

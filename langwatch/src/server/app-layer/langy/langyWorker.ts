@@ -20,6 +20,29 @@ const tracer = getLangWatchTracer("langwatch.langy.chat");
 /** The warm is fire-and-forget; don't let it hold a socket open. */
 const AGENT_WARM_TIMEOUT_MS = 3_000;
 /**
+ * The dispatch POST returns only the pre-stream STATUS (202 accepted / 409 busy /
+ * 428 credentials / 503 at-capacity) — the turn's output flows out-of-band to the
+ * relay, not on this response. The manager does a synchronous Acquire+Claim before
+ * answering (so the busy-409 is real), which can cold-spawn opencode, so the budget
+ * must cover a cold start with margin. Not a per-token deadline — it closes the
+ * moment the status lands.
+ */
+const AGENT_DISPATCH_TIMEOUT_MS = 60_000;
+
+/**
+ * The pre-stream outcome of a turn dispatch. `accepted` (202) means the worker is
+ * driving the turn and pushing frames to the relay. `busy` (409) means another
+ * turn holds the conversation's single-stream session. `credentialsRequired` (428)
+ * means the worker died after the route's probe and must re-mint (G6). `unavailable`
+ * covers 503/at-capacity, transport failures, and any other non-2xx — the liveness
+ * reactor is the backstop.
+ */
+export type LangyDispatchOutcome =
+  | "accepted"
+  | "busy"
+  | "credentialsRequired"
+  | "unavailable";
+/**
  * The probe sits in front of EVERY message, so it gets a tight budget. It exists
  * to save a ~70ms mint; spending longer than that waiting for the answer would
  * make it a pessimisation. On timeout we fail open and mint, exactly as before.
@@ -50,6 +73,28 @@ export interface LangyWorkerPort {
     credentials: unknown;
     modelOverride?: string;
   }): Promise<void>;
+
+  /**
+   * Dispatch a turn to the manager (`POST /worker/{intent}`) and return its
+   * pre-stream STATUS only. The manager Claims the worker synchronously (so a busy
+   * conversation returns 409 here) and then drives the turn detached, pushing
+   * signed frames to the relay — the response body is NOT the turn output and is
+   * cancelled immediately. `runToken` is the per-conversation frameauth secret the
+   * manager signs those frames with; `userId` scopes their identity.
+   */
+  dispatch(args: {
+    intent: "create" | "revive" | "continue";
+    conversationId: string;
+    turnId: string;
+    projectId: string;
+    userId: string;
+    runToken: string;
+    prompt: string;
+    system: string;
+    credentials: unknown;
+    modelOverride?: string;
+    resumeToken?: string;
+  }): Promise<LangyDispatchOutcome>;
 }
 
 /**
@@ -126,6 +171,75 @@ export function createLangyWorkerPort(config: {
               { error, conversationId },
               "langy worker warm failed — cold-starting",
             );
+          }
+        },
+      );
+    },
+
+    async dispatch({
+      intent,
+      conversationId,
+      turnId,
+      projectId,
+      userId,
+      runToken,
+      prompt,
+      system,
+      credentials,
+      modelOverride,
+      resumeToken,
+    }) {
+      return tracer.withActiveSpan(
+        "langy.chat.dispatch_turn",
+        {
+          attributes: {
+            "langy.conversation.id": conversationId,
+            "langy.turn.id": turnId,
+            "langy.worker.intent": intent,
+          },
+        },
+        async (): Promise<LangyDispatchOutcome> => {
+          try {
+            const headers: Record<string, string> = {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${internalSecret}`,
+            };
+            propagation.inject(context.active(), headers);
+
+            const response = await fetch(`${agentUrl}/worker/${intent}`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                conversationId,
+                // turnId + projectId ride the payload so the manager can echo them
+                // on its durable final; runToken + userId let it sign the frames it
+                // pushes to the relay.
+                turnId,
+                projectId,
+                userId,
+                runToken,
+                prompt,
+                system,
+                credentials,
+                ...(modelOverride ? { modelOverride } : {}),
+                // ADR-048: resume from a prior turn's checkpoint if one is pending.
+                ...(resumeToken ? { resumeToken } : {}),
+              }),
+              signal: AbortSignal.timeout(AGENT_DISPATCH_TIMEOUT_MS),
+            });
+            // Fire-and-forget output: the worker streams the turn to the relay, not
+            // on this response — read the status, drop the body.
+            void response.body?.cancel();
+            if (response.status === 202 || response.ok) return "accepted";
+            if (response.status === 409) return "busy";
+            if (response.status === 428) return "credentialsRequired";
+            return "unavailable";
+          } catch (error) {
+            logger.warn(
+              { error, conversationId, turnId },
+              "langy worker dispatch failed — leaving the turn to the liveness reactor",
+            );
+            return "unavailable";
           }
         },
       );

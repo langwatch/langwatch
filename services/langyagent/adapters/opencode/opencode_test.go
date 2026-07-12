@@ -1,7 +1,6 @@
 package opencode
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,9 +10,12 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 )
 
 func portOf(t *testing.T, serverURL string) int {
@@ -212,10 +214,40 @@ func TestSSEDecode_TerminalTypeDetected(t *testing.T) {
 	}
 }
 
-// StreamSession must forward OUR session's events verbatim as ndjson,
-// filter a sibling session's events (the isolation guarantee on the read side),
-// and stop at the terminal event.
-func TestStreamSessionEvents_ForwardsOwnSessionAndFiltersSibling(t *testing.T) {
+// collectFrames runs StreamSession against srv and returns the JSON payloads of
+// the frames it emitted (in order), so a test asserts the frames union the manager
+// produces rather than a verbatim ndjson dump.
+func collectFrames(t *testing.T, srvURL, session string) []string {
+	t.Helper()
+	var mu sync.Mutex
+	var got []string
+	err := StreamSession(context.Background(), srvURL, "bearer", session, func(f frames.Frame) error {
+		mu.Lock()
+		got = append(got, f.JSON())
+		mu.Unlock()
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("StreamSession: %v", err)
+	}
+	return got
+}
+
+func frameType(t *testing.T, line string) string {
+	t.Helper()
+	var p struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal([]byte(line), &p); err != nil {
+		t.Fatalf("frame not valid json %q: %v", line, err)
+	}
+	return p.Type
+}
+
+// StreamSession must emit OUR session's frames (a delta), filter a sibling
+// session's events (the read-side isolation guarantee), and stop at the terminal
+// event WITHOUT itself emitting a terminal frame (app.Chat emits the final).
+func TestStreamSession_EmitsOwnSessionFramesAndFiltersSibling(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/event" {
 			w.WriteHeader(http.StatusNotFound)
@@ -228,29 +260,32 @@ func TestStreamSessionEvents_ForwardsOwnSessionAndFiltersSibling(t *testing.T) {
 				fl.Flush()
 			}
 		}
-		emit(`{"type":"message.part.delta","sessionID":"mine","text":"hello"}`)
-		emit(`{"type":"message.part.delta","sessionID":"sibling","text":"leak?"}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","field":"text","delta":"hello"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"sibling","field":"text","delta":"leak?"}}`)
 		emit(`{"type":"message.completed","sessionID":"mine"}`)
 	}))
 	defer srv.Close()
 
-	var buf bytes.Buffer
-	if err := StreamSession(context.Background(), srv.URL, "bearer", "mine", &buf, nil); err != nil {
-		t.Fatalf("StreamSession: %v", err)
+	got := collectFrames(t, srv.URL, "mine")
+
+	var deltas []string
+	for _, line := range got {
+		if strings.Contains(line, "leak") {
+			t.Errorf("a sibling session's event must NOT be emitted, got %q", line)
+		}
+		switch frameType(t, line) {
+		case "delta":
+			var d struct {
+				Text string `json:"text"`
+			}
+			_ = json.Unmarshal([]byte(line), &d)
+			deltas = append(deltas, d.Text)
+		case "final", "error":
+			t.Errorf("StreamSession must not emit a terminal frame on normal completion, got %q", line)
+		}
 	}
-	out := buf.String()
-	if !strings.Contains(out, `"sessionID":"mine"`) || !strings.Contains(out, "hello") {
-		t.Errorf("our session's event should be forwarded verbatim, got %q", out)
-	}
-	if strings.Contains(out, "sibling") || strings.Contains(out, "leak?") {
-		t.Errorf("a sibling session's event must NOT be forwarded, got %q", out)
-	}
-	if !strings.Contains(out, "message.completed") {
-		t.Errorf("terminal event should be forwarded, got %q", out)
-	}
-	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	if len(lines) != 2 {
-		t.Errorf("expected exactly 2 ndjson lines (our delta + terminal), got %d: %q", len(lines), out)
+	if len(deltas) != 1 || deltas[0] != "hello" {
+		t.Errorf("expected exactly one delta %q, got %v", "hello", deltas)
 	}
 }
 
@@ -323,7 +358,7 @@ func TestRequireOpenCodeAuthEnforced_FailsWhenControlEndpointReachableEvenIfRoot
 	}
 }
 
-// toolFrame is the consumer's view of a langy.tool ndjson line — decoded exactly
+// toolFrame is the consumer's view of a tool ndjson frame — decoded exactly
 // as the control plane would. Pointers on the optional fields so a test can tell
 // "absent" from "present and false/empty", which is the whole point of the
 // start/end wire contract.
@@ -357,13 +392,9 @@ func emitFrames(t *testing.T, tracker *toolCallTracker, payload string) []toolFr
 	t.Helper()
 	var out []toolFrame
 	for _, f := range tracker.framesFor(decodeSSE(t, payload)) {
-		raw, err := json.Marshal(f)
-		if err != nil {
-			t.Fatalf("marshal frame: %v", err)
-		}
 		var decoded toolFrame
-		if err := json.Unmarshal(raw, &decoded); err != nil {
-			t.Fatalf("decode frame %s: %v", raw, err)
+		if err := json.Unmarshal([]byte(f.JSON()), &decoded); err != nil {
+			t.Fatalf("decode frame %s: %v", f.JSON(), err)
 		}
 		out = append(out, decoded)
 	}
@@ -386,8 +417,8 @@ func TestToolCallTracker_RunningPartEmitsStartFrame(t *testing.T) {
 		`{"status":"running","title":"Searching traces","input":{"query":"errors"}}`))
 
 	f := onlyFrame(t, frames)
-	if f.Type != langyToolType || f.Phase != toolPhaseStart {
-		t.Errorf("expected a langy.tool start frame, got type=%q phase=%q", f.Type, f.Phase)
+	if f.Type != "tool" || f.Phase != "start" {
+		t.Errorf("expected a tool start frame, got type=%q phase=%q", f.Type, f.Phase)
 	}
 	if f.ID != "call_1" || f.Name != "search_traces" {
 		t.Errorf("id/name = %q/%q, want call_1/search_traces", f.ID, f.Name)
@@ -429,7 +460,7 @@ func TestToolCallTracker_RunningWithEmptyInputWaitsForTheRealArgs(t *testing.T) 
 	f := onlyFrame(t, emitFrames(t, tracker, toolEvent("s1", "call_1", "bash",
 		`{"status":"running","input":{"command":"langwatch trace search"}}`)))
 
-	if f.Phase != toolPhaseStart {
+	if f.Phase != "start" {
 		t.Fatalf("phase = %q, want the start we deferred", f.Phase)
 	}
 	if string(f.Input) != `{"command":"langwatch trace search"}` {
@@ -453,7 +484,7 @@ func TestToolCallTracker_GenuinelyEmptyInputStillSettles(t *testing.T) {
 	if len(frames) != 2 {
 		t.Fatalf("a withheld start must be emitted at settle, want start+end, got %+v", frames)
 	}
-	if frames[0].Phase != toolPhaseStart || frames[1].Phase != toolPhaseEnd {
+	if frames[0].Phase != "start" || frames[1].Phase != "end" {
 		t.Errorf("want start then end, got %q then %q", frames[0].Phase, frames[1].Phase)
 	}
 }
@@ -470,7 +501,7 @@ func TestToolCallTracker_EndFrameCarriesTheInput(t *testing.T) {
 		`{"status":"completed","input":{"command":"langwatch trace search"},"output":"3 traces"}`))
 
 	end := frames[len(frames)-1]
-	if end.Phase != toolPhaseEnd {
+	if end.Phase != "end" {
 		t.Fatalf("phase = %q, want end", end.Phase)
 	}
 	if string(end.Input) != `{"command":"langwatch trace search"}` {
@@ -497,7 +528,7 @@ func TestToolCallTracker_CompletedPartEmitsEndFrameWithoutError(t *testing.T) {
 		`{"status":"completed","input":{"query":"errors"},"output":"3 traces found","time":{"start":1,"end":2}}`))
 
 	f := onlyFrame(t, frames)
-	if f.Phase != toolPhaseEnd {
+	if f.Phase != "end" {
 		t.Fatalf("phase = %q, want end", f.Phase)
 	}
 	if f.ID != "call_1" {
@@ -523,7 +554,7 @@ func TestToolCallTracker_ErrorPartEmitsEndFrameWithErrorMessage(t *testing.T) {
 		`{"status":"error","input":{"command":"false"},"error":"exit status 1"}`))
 
 	f := onlyFrame(t, frames)
-	if f.Phase != toolPhaseEnd {
+	if f.Phase != "end" {
 		t.Fatalf("phase = %q, want end", f.Phase)
 	}
 	if f.IsError == nil || !*f.IsError {
@@ -554,7 +585,7 @@ func TestToolCallTracker_DeDupesResentParts(t *testing.T) {
 	if len(all) != 2 {
 		t.Fatalf("expected exactly 2 frames (one start, one end) across re-sent parts, got %d: %+v", len(all), all)
 	}
-	if all[0].Phase != toolPhaseStart || all[1].Phase != toolPhaseEnd {
+	if all[0].Phase != "start" || all[1].Phase != "end" {
 		t.Errorf("expected start then end, got %q then %q", all[0].Phase, all[1].Phase)
 	}
 	if all[0].ID != all[1].ID {
@@ -572,7 +603,7 @@ func TestToolCallTracker_SettleWithoutRunningStillEmitsStartFirst(t *testing.T) 
 	if len(frames) != 2 {
 		t.Fatalf("expected a synthesized start + the end, got %d: %+v", len(frames), frames)
 	}
-	if frames[0].Phase != toolPhaseStart || frames[1].Phase != toolPhaseEnd {
+	if frames[0].Phase != "start" || frames[1].Phase != "end" {
 		t.Fatalf("expected start then end, got %q then %q", frames[0].Phase, frames[1].Phase)
 	}
 	if string(frames[0].Input) != `{"pattern":"*.go"}` {
@@ -644,11 +675,10 @@ func TestTextDeltaFromEvent_ToolPartIsNotAToken(t *testing.T) {
 	}
 }
 
-// The end-to-end forwarding contract: tool frames are ADDITIVE. The raw opencode
-// events still go out verbatim, the langy.token fast-path still fires for text
-// deltas, and the tool lifecycle rides alongside as compact start/end frames —
-// all session-filtered, so a sibling's tool call never leaks.
-func TestStreamSessionEvents_ForwardsToolFramesAlongsideTextDeltas(t *testing.T) {
+// The tool lifecycle rides alongside the text deltas as compact start/end frames,
+// all session-filtered so a sibling's tool call never leaks. The verbatim opencode
+// events are NO LONGER emitted — the relay speaks only the frames union.
+func TestStreamSession_EmitsToolFramesAlongsideDeltas(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/event" {
 			w.WriteHeader(http.StatusNotFound)
@@ -670,57 +700,35 @@ func TestStreamSessionEvents_ForwardsToolFramesAlongsideTextDeltas(t *testing.T)
 	}))
 	defer srv.Close()
 
-	var buf bytes.Buffer
-	if err := StreamSession(context.Background(), srv.URL, "bearer", "mine", &buf, nil); err != nil {
-		t.Fatalf("StreamSession: %v", err)
-	}
-	out := buf.String()
+	got := collectFrames(t, srv.URL, "mine")
 
-	if strings.Contains(out, "sibling") || strings.Contains(out, "leak") {
-		t.Errorf("a sibling session's tool call must NOT be forwarded, got %q", out)
-	}
-
+	var deltas int
 	var toolFrames []toolFrame
-	var tokens, rawEvents int
-	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
-		var probe struct {
-			Type string `json:"type"`
+	for _, line := range got {
+		if strings.Contains(line, "leak") {
+			t.Errorf("a sibling session's tool call must NOT be emitted, got %q", line)
 		}
-		if err := json.Unmarshal([]byte(line), &probe); err != nil {
-			t.Fatalf("every forwarded line must be valid json, %q: %v", line, err)
-		}
-		switch probe.Type {
-		case langyToolType:
+		switch frameType(t, line) {
+		case "delta":
+			deltas++
+		case "tool":
 			var f toolFrame
 			if err := json.Unmarshal([]byte(line), &f); err != nil {
 				t.Fatalf("decode tool frame %q: %v", line, err)
 			}
 			toolFrames = append(toolFrames, f)
-		case langyTokenType:
-			tokens++
-		default:
-			rawEvents++
 		}
 	}
 
-	// Stream B is untouched: the text delta still produces exactly one token frame.
-	if tokens != 1 {
-		t.Errorf("expected exactly 1 langy.token frame for the single text delta, got %d", tokens)
-	}
-	if !strings.Contains(out, `{"type":"langy.token","text":"Found"}`) {
-		t.Errorf("the text delta's token frame must be forwarded unchanged, got %q", out)
-	}
-	// Stream A is untouched: all 5 of our raw events still go out verbatim
-	// (pending, running, delta, completed, terminal) — the sibling's is filtered.
-	if rawEvents != 5 {
-		t.Errorf("expected 5 raw session events forwarded verbatim, got %d", rawEvents)
+	if deltas != 1 {
+		t.Errorf("expected exactly 1 delta frame for the single text delta, got %d", deltas)
 	}
 
 	if len(toolFrames) != 2 {
 		t.Fatalf("expected exactly one start + one end tool frame, got %d: %+v", len(toolFrames), toolFrames)
 	}
 	start, end := toolFrames[0], toolFrames[1]
-	if start.Phase != toolPhaseStart || end.Phase != toolPhaseEnd {
+	if start.Phase != "start" || end.Phase != "end" {
 		t.Fatalf("expected start then end, got %q then %q", start.Phase, end.Phase)
 	}
 	if start.ID != "call_1" || end.ID != "call_1" {

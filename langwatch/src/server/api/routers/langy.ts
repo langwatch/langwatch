@@ -13,15 +13,15 @@ import { connection } from "~/server/redis";
 import {
   createLangyTokenBuffer,
   type LangyStreamEntry,
-} from "~/server/services/langy/streaming/langyTokenBuffer";
-import { createLangyTurnAccessStore } from "~/server/services/langy/streaming/langyTurnAccess";
-import { AGENT_CHAT_TIMEOUT_MS } from "~/server/services/langy/execution/langy-turn-errors";
+} from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+import { AGENT_CHAT_TIMEOUT_MS } from "~/server/app-layer/langy/execution/langy-turn-errors";
 import type { Session } from "~/server/auth";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import {
   langyTurnContextSchema,
   type LangyTurnContext,
-} from "~/server/services/langy/langyTurnContext.schema";
+} from "~/server/app-layer/langy/langyTurnContext.schema";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { checkProjectPermission, isDemoProjectId } from "../rbac";
 import {

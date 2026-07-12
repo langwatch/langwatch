@@ -100,6 +100,7 @@ import { StreamingStatusLine } from "./StreamingStatusLine";
 import {
   explainLangyError,
   readLangyStreamError,
+  readLangyTrpcError,
 } from "../logic/langyErrorExplainer";
 import {
   turnHadSideEffects,
@@ -819,13 +820,24 @@ function LangyPanel({
     turnSignals.progress !== null ||
     (turnSignals.metrics?.length ?? 0) > 0;
   const turnError = useMemo(() => {
-    // The LIVE failure, off the stream.
+    // The LIVE failure. Two roads reach `error`, and BOTH must be classified:
+    //  - a turn-START rejection from the create/continue MUTATION carries the
+    //    domain error on `error.data.domainError` → readLangyTrpcError;
+    //  - a mid-turn failure off the STREAM carries it as a JSON message →
+    //    readLangyStreamError.
+    // Reading only the stream shape (as this once did) collapsed EVERY mutation
+    // rejection — model-not-configured, egress-misconfigured, insufficient-scope,
+    // even a raw infra throw — into the generic "unknown" card, hiding the real
+    // (and often actionable) error the server actually returned. The unknown
+    // fallback now also carries the raw message so a genuinely-unhandled error
+    // stays legible in the dev-mode debug drawer instead of being a black box.
     if (error) {
-      const domain = readLangyStreamError(error.message) ?? {
-        kind: "unknown",
-        meta: {},
-        httpStatus: 500,
-      };
+      const domain = readLangyTrpcError(error) ??
+        readLangyStreamError(error.message) ?? {
+          kind: "unknown",
+          meta: error.message ? { error: error.message } : {},
+          httpStatus: 500,
+        };
       return explainLangyError(domain);
     }
     // The DURABLE failure, off the conversation fold. A turn error lived only in

@@ -23,7 +23,7 @@ func newHandoffWorker(conversationID, sessionID, baseURL string) *Worker {
 		endpoint:          app.Endpoint{BaseURL: baseURL, BearerToken: "b"},
 		openCodeSessionID: sessionID,
 	}
-	w.Claim() // mark in-flight
+	w.ClaimTurn("") // mark in-flight
 	return w
 }
 

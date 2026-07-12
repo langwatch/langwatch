@@ -1,6 +1,7 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { createLogger } from "~/utils/logger/server";
+import { ClickHouseLogger } from "./clickhouseLogger";
 import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:client");
@@ -66,6 +67,7 @@ function getClickHouseClient(): ClickHouseClient | null {
         enabled: true,
         idle_socket_ttl: 1500,
       },
+      log: { LoggerClass: ClickHouseLogger },
     });
 
     clickHouseClient = wrapWithDefaultSettings(

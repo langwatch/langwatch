@@ -27,6 +27,17 @@ export interface LangyTurnHandoff {
   modelOverride?: string;
   credentials: LangyCredentials;
   /**
+   * The per-conversation runToken (LANGY_WORKER_REDESIGN_PLAN §0a) the manager
+   * signs its relay frames with. Carried HERE — not read from the ClickHouse fold
+   * via getRunToken — because the fold lags seconds behind conversation_started,
+   * so a brand-new conversation's first-turn dispatch would otherwise find none.
+   * The service mints it (new) or reads it (continue) and stashes it before the
+   * command dispatches, so the spawn reactor reads it straight from the handoff it
+   * already takes. Empty only for a legacy conversation with no runToken (the
+   * dispatch then runs with no live edge; the durable final still lands).
+   */
+  runToken: string;
+  /**
    * Whether the route reserved a GitHub-PR permit for this turn. The worker
    * reconciles/releases it on completion (ADR-044): release-only-if-reserved
    * preserves the erosion-via-blip cap-bypass fix from the old synchronous
@@ -89,6 +100,30 @@ export class LangyTurnHandoffStore {
     const raw = await this.redis.get(key);
     if (raw == null) return null;
     await this.redis.del(key);
+    try {
+      return JSON.parse(raw) as LangyTurnHandoff;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Read WITHOUT consuming (peek). Used by the dispatch reactors, which must be
+   * able to RE-read the same inputs on a retry: a reactor that throws is re-fired
+   * by the queue, and the self-retry liveness reactor re-drives a stalled turn —
+   * both need the handoff to survive. It ages out on its own TTL (300s, well past
+   * the ~3-attempt retry window); replay is guarded in the reactor, so single-use
+   * deletion is unnecessary. Returns null when it never existed or aged out.
+   */
+  async read({
+    conversationId,
+    turnId,
+  }: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyTurnHandoff | null> {
+    const raw = await this.redis.get(handoffKey(conversationId, turnId));
+    if (raw == null) return null;
     try {
       return JSON.parse(raw) as LangyTurnHandoff;
     } catch {

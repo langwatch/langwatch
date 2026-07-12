@@ -69,11 +69,26 @@ type Worker struct {
 	// lastSeen drives the idle reaper.
 	lastSeen time.Time
 	// inFlight serialises turns on the same conversation. Two simultaneous
-	// /chat requests for one conversationID would otherwise both subscribe to
+	// /worker requests for one conversationID would otherwise both subscribe to
 	// the same /event stream and each terminate on the other's terminal event,
-	// splicing replies. Claim/Release wrap it.
+	// splicing replies. ClaimTurn/Release wrap it.
 	inFlight bool
+	// currentTurnID is the turnId currently in flight (empty when idle, or when an
+	// older control plane sent none). It makes ClaimTurn turnId-idempotent: a
+	// re-dispatch of the SAME turn is a benign no-op, not a second run.
+	currentTurnID string
+	// handled + handledRing are a bounded FIFO set of recently-completed turnIds,
+	// so a re-dispatch that arrives AFTER a turn finished (the self-retry racing a
+	// just-completed worker) is also a benign no-op. Capacity-bounded: a worker
+	// serves many turns over its life and must not grow this without limit.
+	handled     map[string]struct{}
+	handledRing [recentTurnsCap]string
+	handledNext int
 }
+
+// recentTurnsCap bounds the per-worker recently-completed turnId set. Comfortably
+// larger than any plausible in-flight-plus-retry window for one conversation.
+const recentTurnsCap = 64
 
 // compile-time proof Worker satisfies the app port.
 var _ app.Worker = (*Worker)(nil)
@@ -92,25 +107,57 @@ func (w *Worker) idleSince() time.Duration {
 	return time.Since(w.lastSeen)
 }
 
-// Claim is true if the worker was idle and now belongs to the caller — the
-// caller MUST call Release() when its turn is done (success or error). False
-// means another turn is already running; the orchestrator converts that into a
-// conversation-busy error (409).
-func (w *Worker) Claim() bool {
+// ClaimTurn takes turnId-idempotent ownership for one turn — the caller MUST call
+// Release() when the turn is done (success or error) after a granted claim. See
+// app.ClaimOutcome: the SAME turnId in flight or recently completed is a benign
+// no-op (the self-retry re-drive of a merely-slow worker), a DIFFERENT turn is
+// busy. An empty turnId degrades to the boolean in-flight guard.
+func (w *Worker) ClaimTurn(turnID string) app.ClaimOutcome {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.inFlight {
-		return false
+		if turnID != "" && w.currentTurnID == turnID {
+			return app.ClaimAlreadyHandled
+		}
+		return app.ClaimBusy
+	}
+	if turnID != "" {
+		if _, done := w.handled[turnID]; done {
+			return app.ClaimAlreadyHandled
+		}
 	}
 	w.inFlight = true
-	return true
+	w.currentTurnID = turnID
+	return app.ClaimGranted
 }
 
-// Release marks the worker idle again.
+// Release marks the worker idle again and records the turn as recently-handled so
+// a re-dispatch arriving after completion is a benign no-op.
 func (w *Worker) Release() {
 	w.mu.Lock()
+	if w.currentTurnID != "" {
+		w.rememberHandled(w.currentTurnID)
+	}
 	w.inFlight = false
+	w.currentTurnID = ""
 	w.mu.Unlock()
+}
+
+// rememberHandled records a completed turnId in the bounded FIFO set. Caller holds
+// w.mu.
+func (w *Worker) rememberHandled(turnID string) {
+	if w.handled == nil {
+		w.handled = make(map[string]struct{}, recentTurnsCap)
+	}
+	if _, ok := w.handled[turnID]; ok {
+		return
+	}
+	if old := w.handledRing[w.handledNext]; old != "" {
+		delete(w.handled, old)
+	}
+	w.handledRing[w.handledNext] = turnID
+	w.handledNext = (w.handledNext + 1) % recentTurnsCap
+	w.handled[turnID] = struct{}{}
 }
 
 // PostMessage queues a turn on the worker's opencode session. resumeToken

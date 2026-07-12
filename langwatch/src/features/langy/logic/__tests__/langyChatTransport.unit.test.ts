@@ -18,13 +18,24 @@ const subscription = vi.fn<
   (path: string, input: unknown, opts: unknown) => Unsubscribable
 >(() => ({ unsubscribe: vi.fn() }));
 
+// The mock mirrors tRPC's real `TRPCUntypedClient`, whose `mutation`/`subscription`
+// run `this.requestAsPromise(...)` internally (see @trpc/client dist). Modelling
+// that `this` dependency is load-bearing: a transport that DETACHES the method
+// (`const m = trpcClient.mutation; m(...)`) loses `this` and throws
+// "Cannot read properties of undefined (reading 'requestAsPromise')" — the exact
+// crash that shipped. A bare `vi.fn()` (no `this`) would silently hide it, which
+// is how it slipped through before. Each method touches `this.requestAsPromise`
+// the way the real client does, then delegates to the spy for assertions.
 vi.mock("~/utils/api", () => ({
   trpcClient: {
-    get mutation() {
-      return mutation;
+    requestAsPromise: true,
+    mutation(path: string, input: unknown) {
+      void (this as { requestAsPromise: unknown }).requestAsPromise;
+      return mutation(path, input);
     },
-    get subscription() {
-      return subscription;
+    subscription(path: string, input: unknown, opts: unknown) {
+      void (this as { requestAsPromise: unknown }).requestAsPromise;
+      return subscription(path, input, opts);
     },
   },
 }));
@@ -120,6 +131,28 @@ describe("createLangyChatTransport", () => {
       await expect(transport.sendMessages(options())).rejects.toThrow("boom");
       expect(onIds).not.toHaveBeenCalled();
       expect(subscription).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the tRPC client method depends on its `this` binding", () => {
+    it("keeps the mutation call attached to trpcClient so a send never throws the detached-`this` TypeError", async () => {
+      // Regression: the transport shipped `const mutate = trpcClient.mutation`,
+      // which drops `this`. The first send then threw synchronously with
+      // "Cannot read properties of undefined (reading 'requestAsPromise')" —
+      // before any request left the browser (no network, generic error card).
+      // Reverting the transport to a detached reference makes this (and every
+      // other send test) throw against the `this`-faithful mock above.
+      const { transport, onIds } = makeTransport({ conversationId: null });
+
+      // Must RESOLVE. A detached call rejects with the TypeError instead.
+      await expect(transport.sendMessages(options())).resolves.toBeDefined();
+      expect(mutation).toHaveBeenCalledTimes(1);
+      expect(onIds).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+      // And it got far enough to open the live stream.
+      expect(subscription).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -29,12 +29,12 @@ import {
 import {
   langyAgentErrorFromFrame,
   serializeLangyTurnError,
-} from "~/server/services/langy/execution/langy-turn-errors";
+} from "~/server/app-layer/langy/execution/langy-turn-errors";
 import {
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "./errors";
-import { mintRunToken } from "~/server/services/langy/streaming/langyFrameAuth";
+import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
 
 /** List-item shape the sidebar renders. Named for the domain, not the column. */
 export type ConversationListItem = {
@@ -514,11 +514,21 @@ export class LangyConversationService {
     userId,
     conversationId = newConversationId(),
     title,
+    runToken,
   }: {
     projectId: string;
     userId: string;
     conversationId?: string;
     title?: string | null;
+    /**
+     * The per-conversation runToken (LANGY_WORKER_REDESIGN_PLAN §0a). The caller
+     * mints it (or reuses one) and passes it so it can ALSO stash it in the turn
+     * handoff — the dispatch reads it from there, not from the ClickHouse fold,
+     * which lags seconds behind and would leave a first-turn dispatch with none.
+     * Defaults to a fresh mint when omitted. Idempotent + first-writer-wins on the
+     * fold, so a retried create collapses to one token.
+     */
+    runToken?: string;
   }): Promise<{ id: string }> {
     await this.commands.createConversation({
       tenantId: projectId,
@@ -526,12 +536,7 @@ export class LangyConversationService {
       conversationId,
       userId,
       title: title ?? null,
-      // Mint the per-conversation runToken here, at creation, exactly once
-      // (LANGY_WORKER_REDESIGN_PLAN §0a). The started event is idempotent on
-      // `${tenant}:${conversation}:created`, and the fold is first-writer-wins, so
-      // a retried create collapses to one token. Injected into the worker at
-      // spawn; never surfaced to the client.
-      runToken: mintRunToken(),
+      runToken: runToken ?? mintRunToken(),
     });
     return { id: conversationId };
   }

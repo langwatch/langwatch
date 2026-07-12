@@ -15,7 +15,7 @@
  * where it belongs.
  *
  * @see src/features/langy/logic/langyErrorExplainer.ts (the copy for each kind)
- * @see services/langyagent/app/app.go (the error frames the manager emits)
+ * @see app-layer/langyagent/app/app.go (the error frames the manager emits)
  */
 
 import { trace } from "@opentelemetry/api";

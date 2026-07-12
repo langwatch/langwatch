@@ -968,7 +968,7 @@ describe("Metadata Mapping - resource attributes", () => {
   });
 
   it("maps the Langy worker's resource attributes end to end", async () => {
-    // Exactly what services/langyagent/adapters/workerpool/worker.go sets via
+    // Exactly what app-layer/langyagent/adapters/workerpool/worker.go sets via
     // OPENCODE_RESOURCE_ATTRIBUTES for a conversation.
     const request = createOtelTraceWithResourceAttributes([
       { key: "tag.tags", value: { stringValue: "langy" } },

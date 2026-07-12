@@ -21,13 +21,14 @@
 import type { Session } from "~/server/auth";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
-import { LangySessionKeyScopeError } from "~/server/services/langy/langyApiKey";
-import type { LangyCredentialService } from "~/server/services/langy/LangyCredentialService";
-import type { LangyWorkerPort } from "~/server/services/langy/langyWorker";
-import type { LangyTurnAccessStore } from "~/server/services/langy/streaming/langyTurnAccess";
-import type { LangyTurnHandoffStore } from "~/server/services/langy/streaming/langyTurnHandoff";
-import { renderLangyTurnContext } from "~/server/services/langy/langyTurnContext.schema";
-import type { LangyTurnContext } from "~/server/services/langy/langyTurnContext.schema";
+import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
+import type { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
+import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
+import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
+import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import {
   LangyAgentUnavailableError,
@@ -184,6 +185,13 @@ export class LangyTurnService {
 
     const lastUserMessage = messages[messages.length - 1];
 
+    // The per-conversation runToken the manager signs its relay frames with. Mint
+    // it for a NEW conversation (instant, no fold-projection lag); a CONTINUE reads
+    // the existing one in Phase 3. Threaded into BOTH conversation_started (durable)
+    // AND the turn handoff (what the dispatch actually reads), so a first-turn
+    // dispatch never races the ClickHouse fold. See langyTurnHandoff.runToken.
+    const mintedRunToken = isNewConversation ? mintRunToken() : null;
+
     // Create is Continue + a semantically-first `conversation_started`. Emitted
     // best-effort and off the critical path: the owner/title are ALSO seeded by
     // the message event (first-writer-wins), so a failed or slow marker must
@@ -196,6 +204,7 @@ export class LangyTurnService {
           userId,
           conversationId: conversation.id,
           title: extractTextFromParts(messages[0]?.parts).slice(0, 80) || null,
+          ...(mintedRunToken ? { runToken: mintedRunToken } : {}),
         })
         .catch((error) =>
           logger.warn(
@@ -234,20 +243,37 @@ export class LangyTurnService {
     const questionParts = lastUserMessage?.parts ?? [];
 
     // ── PHASE 3: THE CONVERSATION-SCOPED READS ──────────────────────────────
-    const [currentResult, handoffResult] = await Promise.allSettled([
-      // findByIdVisible, not getById: absence is a real answer here — a
-      // not-yet-projected conversation cannot have a turn running, so "not
-      // there" means "not busy".
-      conversationService.findByIdVisible({
-        id: conversation.id,
-        projectId,
-        userId,
-      }),
-      conversationService.getPendingHandoff({
-        projectId,
-        conversationId: conversation.id,
-      }),
-    ]);
+    // In parallel — the busy-guard read, the pending-handoff read, and (for a
+    // CONTINUE) the existing runToken. A new conversation minted its runToken
+    // above, so its getRunToken is a wasted-but-harmless null; keeping the batch
+    // uniform stays parallel rather than branching a serial read into the path.
+    const [currentResult, handoffResult, runTokenResult] =
+      await Promise.allSettled([
+        // findByIdVisible, not getById: absence is a real answer here — a
+        // not-yet-projected conversation cannot have a turn running, so "not
+        // there" means "not busy".
+        conversationService.findByIdVisible({
+          id: conversation.id,
+          projectId,
+          userId,
+        }),
+        conversationService.getPendingHandoff({
+          projectId,
+          conversationId: conversation.id,
+        }),
+        mintedRunToken
+          ? Promise.resolve(mintedRunToken)
+          : conversationService.getRunToken({
+              projectId,
+              conversationId: conversation.id,
+            }),
+      ]);
+
+    // The runToken the dispatch signs frames with: the fresh mint (new) or the
+    // existing one (continue). Empty only for a legacy conversation with none —
+    // the turn still runs, just with no live edge (durable final backstop).
+    const runToken =
+      runTokenResult.status === "fulfilled" ? (runTokenResult.value ?? "") : "";
 
     if (credentialsResult.status === "rejected") {
       // LangyCredentialResolutionError is a DomainError (409); anything else is
@@ -320,7 +346,14 @@ export class LangyTurnService {
     // RELEASE only on an early exit that never starts a turn, and only when
     // reserved (a Redis-down reserve returns reserved:false; DECRing that walks
     // the shared counter negative).
-    const permit = await this.deps.reservePermit({ userId });
+    //
+    // Only reserve when the turn actually carries a GitHub token — no token means
+    // no PR is possible, so there is nothing to cap. With GitHub gated off (TODO
+    // #24) no token is ever resolved, so this never reserves (and the M3b
+    // permit-RELEASE reactor lands with #24 alongside the PR flow).
+    const permit = credentials.githubToken
+      ? await this.deps.reservePermit({ userId })
+      : { reserved: false, allowed: true, resetAt: 0 };
     const releaseReservedPermit = async () => {
       if (!permit.reserved) return;
       try {
@@ -416,6 +449,7 @@ export class LangyTurnService {
       system,
       ...(modelOverride ? { modelOverride } : {}),
       credentials,
+      runToken,
       permitReserved: permit.reserved,
       ...(pendingHandoff ? { resumeToken: pendingHandoff.token } : {}),
     });
@@ -442,6 +476,36 @@ export class LangyTurnService {
       logger.error({ error }, "failed to dispatch langy CreateAgentResponse");
       throw new LangyAgentUnavailableError("Agent request failed");
     }
+
+    // ── OPTIMISTIC DISPATCH (latency) ────────────────────────────────────────
+    // The command above just committed `agent_response_started`, so the spawnAgent
+    // reactor WILL fire as the durable backstop — the retry guarantee exists NOW.
+    // So, from THIS process (without waiting for the event to cross to the worker
+    // process where the reactor runs), fire-and-forget the dispatch so the agent
+    // starts immediately. Both carry the SAME turnId, so the manager's ClaimTurn
+    // collapses them to exactly one run (the reactor's dispatch becomes a benign
+    // 202). Fire-and-forget: the turn-start response must not wait on it, and
+    // worker.dispatch never throws (it maps failures to an outcome). We do NOT do
+    // this before the command — a dispatch with no committed event could orphan a
+    // running agent with nothing to reconcile it.
+    const intent = pendingHandoff
+      ? "revive"
+      : credentials.langwatchApiKey
+        ? "create"
+        : "continue";
+    void worker.dispatch({
+      intent,
+      conversationId: conversation.id,
+      turnId,
+      projectId,
+      userId,
+      runToken,
+      prompt: userText,
+      system,
+      credentials,
+      ...(modelOverride ? { modelOverride } : {}),
+      ...(pendingHandoff ? { resumeToken: pendingHandoff.token } : {}),
+    });
 
     // ADR-048: the resume token is threaded to the new worker — clear it so it is
     // consumed exactly once. Best-effort (idempotent).

@@ -10,6 +10,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
 )
 
@@ -22,9 +23,10 @@ var errStreamConsumerCrashed = errors.New("stream ended unexpectedly")
 // telemetry seam. All fields are injected via Options so tests can swap any
 // dependency.
 type App struct {
-	pool      WorkerPool
-	telemetry *telemetry.Telemetry
-	finalizer TurnFinalizer
+	pool       WorkerPool
+	telemetry  *telemetry.Telemetry
+	finalizer  TurnFinalizer
+	frameRelay FrameRelay
 }
 
 // finalizeTimeout bounds the durable final POST (across its internal retries).
@@ -53,6 +55,11 @@ func WithTelemetry(t *telemetry.Telemetry) Option { return func(a *App) { a.tele
 // HTTP-final and relies on the relay + liveness reactor alone.
 func WithFinalizer(f TurnFinalizer) Option { return func(a *App) { a.finalizer = f } }
 
+// WithFrameRelay injects the control-plane relay push client. Optional: when
+// absent (tests, or a deployment with no internal secret) the turn runs with no
+// live edge (no signed frames pushed) and relies on the durable final alone.
+func WithFrameRelay(r FrameRelay) Option { return func(a *App) { a.frameRelay = r } }
+
 // Pool returns the configured worker pool (used by serve.go for lifecycle and
 // by the health/status handler).
 func (a *App) Pool() WorkerPool { return a.pool }
@@ -76,6 +83,13 @@ type ChatRequest struct {
 	// ProjectID is the tenant the turn belongs to. Required by the ingest to
 	// dispatch the finalize command; carried here so the agent can echo it back.
 	ProjectID string
+	// RunToken is the per-conversation frameauth secret the manager SIGNS every
+	// pushed output frame with (never re-transmitted). Empty ⇒ no relay push
+	// (older control plane); the app falls back to the in-band path.
+	RunToken string
+	// UserID scopes the signed frame identity to the conversation's owner. Part of
+	// the frameauth identity tuple.
+	UserID string
 	// Intent is the caller's worker-turn label (create/revive/continue), a
 	// semantic hint the transport derives from the route. Recorded on the turn
 	// span + duration metric so per-intent behaviour is visible; it does NOT change
@@ -128,72 +142,73 @@ func (a *App) HasLiveWorker(conversationID string, sig domain.CredentialSignatur
 	return a.pool.HasLiveWorker(conversationID, sig)
 }
 
-// Chat runs one chat turn: acquire the worker, claim it, post the prompt, and
-// stream the reply into sink. It mirrors the flat handler's control flow
-// exactly — the only behavioural change is that operational telemetry is
-// emitted around it.
+// StartTurn runs the SYNCHRONOUS half of a self-driven turn — acquire the worker
+// and Claim it — and returns a detached runner for the streaming half. The split
+// preserves the pre-stream outcomes the dispatcher relies on, now as HTTP statuses
+// (there is no in-band stream to carry an error event any more):
 //
-// Outcome mapping (unchanged from the flat handler):
-//   - at capacity           → 200 stream carrying an "at-capacity" error event
-//   - other acquire failure → 200 stream carrying the error as an error event
-//   - conversation busy      → herr(ErrConversationBusy) returned to the caller
-//     (transport writes a 409) — no stream is begun
-//   - session vanished       → "session-not-found" error event; worker recycled
-//   - stream/post error      → the error surfaced as an error event
-//   - success                → the opencode ndjson event stream
-func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
-	ctx, span := a.startTurn(ctx, req.ConversationID, req.Intent)
-	defer span()
-	start := time.Now()
-
+//	at capacity          → herr(ErrMaxWorkers)          (transport → 503)
+//	keyless spawn needed → herr(ErrCredentialsRequired) (transport → 428)
+//	conversation busy    → herr(ErrConversationBusy)    (transport → 409)
+//	success              → nil + a runner the transport runs detached after 202
+//
+// The worker is Claimed before this returns, so the 409 busy-guard still fires
+// synchronously; the returned runner owns Release. The transport runs it on a
+// detached, panic-guarded goroutine — the client is not held open for the turn,
+// whose output flows out-of-band as signed frames to the relay.
+func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Context), error) {
 	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.Credentials)
 	if err != nil {
 		if errors.Is(err, domain.ErrMaxWorkers) {
 			a.atCapacity(ctx)
-			sink.Begin()
-			sink.ErrorEvent("at-capacity")
-			a.turnObserved(ctx, start, "at-capacity", req.Intent)
-			return nil
+			return nil, herr.NewLight(ctx, domain.ErrMaxWorkers, nil)
 		}
 		clog.Get(ctx).Error("acquire worker failed", zap.Error(err))
-		sink.Begin()
-		sink.ErrorEvent(err.Error())
-		a.turnObserved(ctx, start, "acquire-error", req.Intent)
-		return nil
+		return nil, err // already a herr from the pool (e.g. ErrCredentialsRequired)
 	}
-
-	// Per-conversation in-flight guard. The worker's OpenCode session is
-	// single-stream — two concurrent turns subscribing to /event from the same
-	// worker would each receive the other's deltas and could terminate on the
-	// other's terminal event, splicing replies. Return conversation-busy on
-	// overlap (transport → 409); the control plane shows a "still answering —
-	// wait" notice. This must happen BEFORE Begin() commits the 200.
-	if !worker.Claim() {
-		a.turnObserved(ctx, start, "busy", req.Intent)
+	// Per-conversation in-flight guard, turnId-idempotent (review "F"). The
+	// worker's OpenCode session is single-stream — two concurrent DIFFERENT turns
+	// would splice replies (busy → 409). But a redundant dispatch of the SAME
+	// turnId — exactly what the self-retry re-drive of a merely-slow worker
+	// produces — must be a benign no-op, never a second run.
+	switch worker.ClaimTurn(req.TurnID) {
+	case ClaimAlreadyHandled:
+		// Nothing claimed, nothing to drive; the transport answers 202 so the
+		// re-driving reactor treats it as accepted, not a failure.
+		return func(context.Context) {}, nil
+	case ClaimBusy:
 		// Expected hot-path control-flow outcome — no stack capture needed.
-		return herr.NewLight(ctx, domain.ErrConversationBusy, nil)
+		return nil, herr.NewLight(ctx, domain.ErrConversationBusy, nil)
 	}
-	defer worker.Release()
 	worker.Touch()
+	return func(runCtx context.Context) { a.driveTurn(runCtx, req, worker) }, nil
+}
 
-	sink.Begin()
+// driveTurn is the detached streaming half: open the relay push, post the prompt,
+// stream the agent's frames into it, emit the terminal frame, and post the durable
+// final. It owns the worker's Release and returns no value — every outcome is a
+// pushed frame and/or the durable final, never a value to a caller.
+func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
+	defer worker.Release()
+	ctx, span := a.startTurn(ctx, req.ConversationID, req.Intent)
+	defer span()
+	start := time.Now()
 
-	// Wrap the sink so the token/tool frames the worker streams are also
-	// accumulated here, letting the app post a self-sufficient durable final
-	// (the independent completion path) without changing the Worker contract.
-	acc := newAccumulatingSink(sink)
+	// The per-turn relay push. Disabled (no runToken/endpoint/secret) ⇒ nil stream:
+	// the turn still runs + finalizes, it just has no live edge.
+	stream := a.openRelay(ctx, req)
+	if stream != nil {
+		defer func() { _ = stream.Close() }()
+	}
+	sink := newFrameSink(stream)
 
-	// Inner ctx whose lifetime this turn owns: the SSE consumer is bound to it
-	// so a PostMessage failure can cancel the consumer immediately rather than
-	// wait for the outer request ctx to time out.
+	// Inner ctx the SSE consumer is bound to, so a PostMessage failure can cancel it
+	// immediately rather than wait for the outer ctx.
 	streamCtx, cancelStream := context.WithCancel(ctx)
 	defer cancelStream()
 
-	// Kick the SSE consumer first so we don't lose the first delta if opencode
-	// is fast to start producing. The goroutine is panic-guarded: a panic in
-	// StreamEvents is recovered + logged (via HandlePanic) AND a sentinel is
-	// pushed into errCh so the handler below never hangs on <-errCh — one crashed
-	// turn can't wedge the request or the manager.
+	// Kick the consumer first so we don't lose the first delta. Panic-guarded: a
+	// crash is recovered + a sentinel pushed so the flow below never hangs on errCh.
 	errCh := make(chan error, 1)
 	go func() {
 		streamed := false
@@ -203,59 +218,102 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 			}
 		}()
 		defer clog.HandlePanic(streamCtx, false)
-		err := worker.StreamEvents(streamCtx, acc)
+		err := worker.StreamEvents(streamCtx, sink)
 		streamed = true
 		errCh <- err
 	}()
 
 	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.ResumeToken); err != nil {
-		// Cancel the SSE consumer, then DRAIN it (<-errCh) BEFORE writing any error
-		// event. StreamEvents writes to the same http.ResponseWriter as the sink;
-		// waiting for it to return first avoids a concurrent write on the ndjson
-		// stream. Worker stays claimed until the deferred Release — keep that
-		// window small.
 		cancelStream()
 		<-errCh // the stream consumer has now fully returned.
 		if errors.Is(err, domain.ErrSessionNotFound) {
 			a.pool.KillSessionVanished(req.ConversationID)
-			sink.ErrorEvent("session-not-found")
+			emitError(ctx, sink, "the session ended — please retry", "session_not_found")
 			a.turnObserved(ctx, start, "session-not-found", req.Intent)
-			return nil
+			return
 		}
 		clog.Get(ctx).Error("post message failed", zap.Error(err))
-		sink.ErrorEvent(err.Error())
+		emitError(ctx, sink, "the agent could not start the turn", "post_error")
 		a.turnObserved(ctx, start, "post-error", req.Intent)
-		return nil
+		return
 	}
 
-	if err := <-errCh; err != nil {
-		clog.Get(ctx).Warn("stream events ended with error", zap.Error(err))
-		sink.ErrorEvent(err.Error())
+	streamErr := <-errCh
+	switch {
+	case errors.Is(streamErr, domain.ErrTurnHandedOff):
+		// ADR-048: the resume-token frame was already pushed; skip our terminal
+		// frame, but post the durable final exactly as the in-band path did.
+		a.finalizeCompletedTurn(ctx, req, sink)
+		a.turnObserved(ctx, start, "handoff", req.Intent)
+	case streamErr != nil:
+		clog.Get(ctx).Warn("stream events ended with error", zap.Error(streamErr))
+		emitError(ctx, sink, streamErr.Error(), "agent_error")
 		a.turnObserved(ctx, start, "stream-error", req.Intent)
+	default:
+		emitFinal(ctx, sink)
+		// Durable final: post the completed answer to langy-internal independently
+		// of the relay's terminal frame — the path that survives the relay dropping.
+		// The turnId-idempotent ingest collapses the duplicate.
+		a.finalizeCompletedTurn(ctx, req, sink)
+		a.turnObserved(ctx, start, "ok", req.Intent)
+	}
+}
+
+// openRelay opens the per-turn relay push, returning nil when the relay is
+// unconfigured or disabled for this turn (no runToken) — never an error the turn
+// should fail on. A real open failure is logged; the turn proceeds without a live
+// edge and the durable final still lands.
+func (a *App) openRelay(ctx context.Context, req ChatRequest) FrameStream {
+	if a.frameRelay == nil {
 		return nil
 	}
+	stream, err := a.frameRelay.Open(ctx, req.Credentials.LangwatchEndpoint, req.RunToken,
+		req.ProjectID, req.UserID, req.ConversationID, req.TurnID)
+	if err != nil {
+		if !errors.Is(err, ErrRelayDisabled) {
+			clog.Get(ctx).Warn("relay push open failed; turn runs without a live edge", zap.Error(err))
+		}
+		return nil
+	}
+	return stream
+}
 
-	// Durable final: post the completed turn's answer straight to the control
-	// plane's langy-internal ingest, independently of the relay it just streamed
-	// through. This is the path that survives the relay dropping mid- or
-	// post-stream — a completed turn reaches the event log either way, and the
-	// turnId-idempotent ingest collapses the duplicate.
-	a.finalizeCompletedTurn(ctx, req, acc)
+// emitFinal builds the durable final from the accumulator and pushes it as the
+// terminal frames.Final (the relay marks the buffer end + records the answer).
+func emitFinal(ctx context.Context, sink *frameSink) {
+	text, tools := sink.result()
+	tc := make([]frames.ToolCall, 0, len(tools))
+	for _, t := range tools {
+		tc = append(tc, frames.ToolCall{ID: t.ID, Name: t.Name, Input: t.Input, Output: t.Output, IsError: t.IsError})
+	}
+	f, err := frames.Final(text, tc)
+	if err != nil {
+		clog.Get(ctx).Warn("build final frame failed", zap.Error(err))
+		return
+	}
+	_ = sink.Emit(f)
+}
 
-	a.turnObserved(ctx, start, "ok", req.Intent)
-	return nil
+// emitError pushes a terminal frames.Error (the relay marks the buffer errored +
+// records a failed turn).
+func emitError(ctx context.Context, sink *frameSink, message, code string) {
+	f, err := frames.Error(message, code)
+	if err != nil {
+		clog.Get(ctx).Warn("build error frame failed", zap.Error(err))
+		return
+	}
+	_ = sink.Emit(f)
 }
 
 // finalizeCompletedTurn posts the accumulated final for a successful turn. It is
-// detached from the request ctx (a client disconnect must not cancel the durable
-// write) and fire-and-forget with a panic guard, mirroring the revoke path: a
-// dropped final is recoverable via the ingest's idempotency and the liveness
-// reactor backstop, so it must never block or fail the turn.
-func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, acc *accumulatingSink) {
+// detached from the request ctx and fire-and-forget with a panic guard: a dropped
+// final is recoverable via the ingest's idempotency and the liveness reactor
+// backstop, so it must never block or fail the turn.
+func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, sink *frameSink) {
 	if a.finalizer == nil || req.TurnID == "" {
 		return
 	}
-	text, toolCalls := acc.result()
+	text, toolCalls := sink.result()
 	detached := context.WithoutCancel(ctx)
 	go func() {
 		defer clog.HandlePanic(detached, false)

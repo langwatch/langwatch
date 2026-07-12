@@ -94,6 +94,16 @@ export const langyRelayFrameSchema = z.discriminatedUnion("type", [
     error: z.string(),
     code: z.string().optional(),
   }),
+  /**
+   * Terminal handoff (ADR-048): the worker checkpointed the in-flight turn on a
+   * shutdown-imminent notice and hands back an opaque resume token the control
+   * plane persists, so the NEXT turn resumes from it. Ends the live stream; the
+   * token is durable, never rendered.
+   */
+  z.object({
+    type: z.literal("handoff"),
+    resumeToken: z.string().optional(),
+  }),
 ]);
 export type LangyRelayFrame = z.infer<typeof langyRelayFrameSchema>;
 export type LangyRelayToolCall = z.infer<typeof langyRelayToolCallSchema>;

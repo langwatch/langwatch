@@ -10,10 +10,18 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 )
+
+// ErrRelayDisabled is returned by FrameRelay.Open when the relay push cannot run
+// for a turn — no internal secret, no endpoint, or no runToken (an older control
+// plane that mints none). The app treats it as "no live edge for this turn",
+// never a turn failure.
+var ErrRelayDisabled = errors.New("langyagent: relay push disabled (missing secret, endpoint, or runToken)")
 
 // WorkerPool is the driven port the app uses to get a worker for a
 // conversation. Implemented by app/workerpool.Pool.
@@ -49,13 +57,33 @@ type WorkerPool interface {
 	Shutdown()
 }
 
+// ClaimOutcome is the result of Worker.ClaimTurn — a turnId-idempotent claim.
+type ClaimOutcome int
+
+const (
+	// ClaimGranted: the worker is now driving THIS turn (a fresh claim).
+	ClaimGranted ClaimOutcome = iota
+	// ClaimAlreadyHandled: this exact turnId is already in flight on this worker,
+	// OR was recently completed on it — a redundant dispatch, which is exactly what
+	// the self-retry re-drive of a merely-slow worker produces. A BENIGN no-op: the
+	// caller answers 2xx and drives nothing, so the turn never double-runs.
+	ClaimAlreadyHandled
+	// ClaimBusy: a DIFFERENT turn holds the worker's single-stream session (the
+	// orchestrator returns conversation-busy → 409).
+	ClaimBusy
+)
+
 // Worker is one acquired conversation worker. A turn Claims it, PostMessages the
 // prompt, StreamEvents the reply, then Releases it.
 type Worker interface {
-	// Claim takes exclusive ownership of the worker for one turn. False means a
-	// turn is already in flight (the orchestrator returns conversation-busy).
-	Claim() bool
-	// Release returns the worker to idle. Always paired with a successful Claim.
+	// ClaimTurn takes exclusive, turnId-idempotent ownership for one turn. It is
+	// the safety the self-retry needs (review "F"): a redundant dispatch of the
+	// SAME turnId (a re-drive of a worker whose heartbeat merely lapsed) is a benign
+	// no-op, never a second run; a different turn overlapping is busy. An empty
+	// turnId (older control plane) degrades to the boolean in-flight guard.
+	ClaimTurn(turnID string) ClaimOutcome
+	// Release returns the worker to idle and records the turn as recently-handled.
+	// Always paired with a granted ClaimTurn.
 	Release()
 	// Touch resets the idle timer.
 	Touch()
@@ -103,18 +131,31 @@ type TurnFinalizer interface {
 	Finalize(ctx context.Context, endpoint, turnID string, result TurnResult) error
 }
 
-// ChatSink is the streaming transport the app writes a turn's ndjson events
-// into. The httpapi adapter implements it over an http.ResponseWriter. It is an
-// io.Writer (raw ndjson lines) plus turn-level helpers.
+// ChatSink is the typed frame sink the app streams a turn's output frames into.
+// In self-drive (LANGY_WORKER_REDESIGN §0/§0b) the app no longer holds an
+// http.ResponseWriter open: the coding agent's output is mapped to typed
+// internal/frames values, and the sink SIGNS each and pushes it to the
+// control-plane relay (adapters/controlplane.RelayStream) — while the app also
+// tees the same frames into the durable-final accumulator.
 type ChatSink interface {
-	// Begin commits the 200 status + ndjson response headers. Idempotent.
-	Begin()
-	// Write emits raw ndjson bytes (one line, newline included). Returns an
-	// error on client disconnect so the stream stops promptly.
-	Write(p []byte) (int, error)
-	// ErrorEvent emits a {"type":"error","error":msg} ndjson line and flushes,
-	// matching the wire shape the control-plane stream consumer expects.
-	ErrorEvent(msg string)
-	// Flush pushes buffered bytes to the client.
-	Flush()
+	// Emit signs + pushes one output frame (best-effort at the call site — a
+	// dropped ephemeral frame must never fail the turn). It also feeds the
+	// durable-final accumulator.
+	Emit(f frames.Frame) error
+}
+
+// FrameRelay opens ONE authenticated push connection per turn to the control-plane
+// relay (POST /api/internal/langy/relay/frames). Implemented by
+// adapters/controlplane.RelayClient; the app owns the turn drive and streams into
+// it. A herr-free ErrRelayDisabled (no secret/endpoint/runToken) means "no live
+// edge for this turn" — the durable final (Finalizer) still lands.
+type FrameRelay interface {
+	Open(ctx context.Context, endpoint, runToken, projectID, userID, conversationID, turnID string) (FrameStream, error)
+}
+
+// FrameStream is one turn's push connection. Emit signs+pushes a frame in order;
+// Close ends the stream and reports the relay's outcome.
+type FrameStream interface {
+	Emit(f frames.Frame) error
+	Close() error
 }

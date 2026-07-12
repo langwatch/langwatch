@@ -8,7 +8,7 @@ import {
 
 /**
  * The kind list is the contract between the worker's turn classifier
- * (`server/services/langy/execution/langy-turn-errors.ts`) and the copy the
+ * (`server/app-layer/langy/execution/langy-turn-errors.ts`) and the copy the
  * browser renders. Pinning it here means adding a backend kind without copy —
  * or renaming one — fails loudly instead of silently landing in the generic
  * default.
@@ -36,7 +36,7 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       "langy_turn_stalled",
       // Raised from the TOOL STREAM (the agent reached for `gh` with no token),
       // never from the model's prose. It replaced the `[langy:connect-github]`
-      // sentinel — see server/services/langy/execution/githubCommand.ts.
+      // sentinel — see server/app-layer/langy/execution/githubCommand.ts.
       "langy_github_not_connected",
       // Turn-START rejections from the control plane (LangyTurnService), reaching
       // the browser as coded TRPCErrors from the create/continue mutations.

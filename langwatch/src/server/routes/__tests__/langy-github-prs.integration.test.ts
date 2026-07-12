@@ -18,7 +18,7 @@
  *     drain, the chat-route service-boundary mocks)
  *
  * BOUNDARY NOTES (read by the reviewer):
- *   - Scenarios 4 & 7 describe the worker process (services/langyagent/
+ *   - Scenarios 4 & 7 describe the worker process (app-layer/langyagent/
  *     server.js) wiping its home dir and the idle reaper deleting the clone.
  *     server.js is plain Node, not a module this TS suite can import, so we
  *     assert the contract the *control plane* owns: the TS layer never
@@ -46,7 +46,7 @@ process.env.GITHUB_LANGY_CLIENT_SECRET = "test-client-secret";
 process.env.OPENCODE_AGENT_URL = "http://agent.test";
 process.env.LANGY_INTERNAL_SECRET = "internal-secret";
 
-import { extractGithubPrLinks } from "../../services/langy/githubPrLinks";
+import { extractGithubPrLinks } from "../../app-layer/langy/githubPrLinks";
 import { GithubOAuthHttpClient } from "~/server/app-layer/clients/github/github-oauth.http.client";
 import { LangyGithubCredentialsService } from "~/server/app-layer/langy/langy-github-credentials.service";
 import { PrismaLangyUserGithubCredentialsRepository } from "~/server/app-layer/langy/repositories/langy-user-github-credentials.prisma.repository";
@@ -77,7 +77,7 @@ function makeGithubCredsOver(prismaLike: unknown): LangyGithubCredentialsService
  * out of the model's prose; they are read from the TOOL STREAM (the agent runs
  * `git push`, so we know it pushed) and, for an opened PR, from the stdout of the
  * `gh pr create` that created it. Their coverage moved to
- * `services/langy/execution/__tests__/langy-github-progress.unit.test.ts`,
+ * `app-layer/langy/execution/__tests__/langy-github-progress.unit.test.ts`,
  * which exercises the real path — including the invariant these protected: a PR
  * merely MENTIONED in a reply must never burn the daily cap or forge an audit row.
  */
@@ -137,7 +137,7 @@ async function makeState(
   }> = {},
 ) {
   const { signGithubOauthState } = await import(
-    "~/server/services/langy/githubOauthState"
+    "~/server/app-layer/langy/githubOauthState"
   );
   return signGithubOauthState(
     {
@@ -340,7 +340,7 @@ vi.mock("~/server/app-layer/clients/tokenizer/tiktoken.client", () => ({
     }
   },
 }));
-vi.mock("~/server/services/langy/LangyCredentialService", () => ({
+vi.mock("~/server/app-layer/langy/LangyCredentialService", () => ({
   LangyCredentialResolutionError: class extends Error {},
   LangyCredentialService: {
     create: () => ({
@@ -795,7 +795,7 @@ describe("Feature: revoking the Langy GitHub connection", () => {
         // genuinely cannot mint.
         findUnique.mockResolvedValue(null);
         const { getGithubTokenForUser } = await import(
-          "~/server/services/langy/langyGithubToken"
+          "~/server/app-layer/langy/langyGithubToken"
         );
         // Cache was cleared, so the mint falls through to the (now-missing)
         // row read and returns null.
@@ -821,7 +821,7 @@ vi.mock("~/server/redis", () => ({
 // ===========================================================================
 // SCENARIOS 4 & 7 — token never persists / lives only until the reaper.
 //
-// The worker-side filesystem wipe (services/langyagent/server.js) is plain
+// The worker-side filesystem wipe (app-layer/langyagent/server.js) is plain
 // Node and not importable here; it is covered where it lives. The CONTRACT
 // the TS control plane owns and that backs both scenarios:
 //   - the ONLY thing kept at rest is the ENCRYPTED refresh token; the access
@@ -891,7 +891,7 @@ describe("Feature: Langy GitHub tokens never persist at rest", () => {
         vi.stubGlobal("fetch", fetchMock);
 
         const { getGithubTokenForUser } = await import(
-          "~/server/services/langy/langyGithubToken"
+          "~/server/app-layer/langy/langyGithubToken"
         );
         const minted = await getGithubTokenForUser({
           prisma: prisma as never,
@@ -945,7 +945,7 @@ describe("Feature: Langy GitHub tokens never persist at rest", () => {
       /** @scenario "Live workers may keep a token until the idle reaper runs" */
       it("clears the cached token on disconnect so no new session can mint, leaving any live worker's in-memory copy untouched", async () => {
         const { clearGithubTokenCache, getGithubTokenForUser } = await import(
-          "~/server/services/langy/langyGithubToken"
+          "~/server/app-layer/langy/langyGithubToken"
         );
 
         // A live worker minted earlier — the token sits in the Redis cache.

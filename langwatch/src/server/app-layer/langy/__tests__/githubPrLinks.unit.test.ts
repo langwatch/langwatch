@@ -93,5 +93,5 @@ describe("extractGithubPrLinks", () => {
  * "summarize PR #4751" must never burn the cap or forge an audit row — now holds
  * STRUCTURALLY (a PR merely mentioned in prose was never a command's output), and
  * is exercised end-to-end in
- * `services/langy/execution/__tests__/langy-github-progress.unit.test.ts`.
+ * `app-layer/langy/execution/__tests__/langy-github-progress.unit.test.ts`.
  */

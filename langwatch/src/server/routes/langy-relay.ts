@@ -18,9 +18,9 @@
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { connection } from "~/server/redis";
-import { createLangyFrameDedup } from "~/server/services/langy/streaming/langyFrameDedup";
-import { createLangyTokenBuffer } from "~/server/services/langy/streaming/langyTokenBuffer";
-import { LangyTurnRelay } from "~/server/services/langy/streaming/langyTurnRelay";
+import { createLangyFrameDedup } from "~/server/app-layer/langy/streaming/langyFrameDedup";
+import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { LangyTurnRelay } from "~/server/app-layer/langy/streaming/langyTurnRelay";
 import { createLogger } from "~/utils/logger/server";
 import { verifyLangyInternalSecret } from "./langy-internal";
 

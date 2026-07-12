@@ -122,13 +122,13 @@ func ToolStart(id, name, title, command string, input json.RawMessage) (Frame, e
 	})
 }
 
-// ToolEnd reports a tool the agent finished. isError routes the durable
-// milestone to tool_call_failed (with output as the error text) vs succeeded.
-func ToolEnd(id, name string, isError bool, output string, durationMs int64) (Frame, error) {
-	f := toolFrame{Type: "tool", ID: id, Name: name, Phase: "end", Output: output}
-	if isError {
-		f.IsError = &isError
-	}
+// ToolEnd reports a tool the agent finished. isError routes the durable milestone
+// to tool_call_failed (with output as the error text) vs succeeded, and is ALWAYS
+// present on an end frame — false is meaningful there. The input rides the end too,
+// so one event answers both "what ran?" and "how did it end?" for the card, the
+// durable log, and anyone debugging a turn after the fact.
+func ToolEnd(id, name string, input json.RawMessage, isError bool, output string, durationMs int64) (Frame, error) {
+	f := toolFrame{Type: "tool", ID: id, Name: name, Phase: "end", Input: input, Output: output, IsError: &isError}
 	if durationMs > 0 {
 		f.DurationMs = &durationMs
 	}
@@ -166,4 +166,17 @@ type errorFrame struct {
 // Error is terminal failure — a vetted error code, never raw prose.
 func Error(message, code string) (Frame, error) {
 	return marshal(errorFrame{Type: "error", Error: message, Code: code})
+}
+
+type handoffFrame struct {
+	Type        string `json:"type"`
+	ResumeToken string `json:"resumeToken,omitempty"`
+}
+
+// Handoff is terminal (ADR-048): the worker checkpointed the in-flight turn on a
+// shutdown-imminent notice and hands back an opaque resume token the control plane
+// persists, so the NEXT turn resumes from it. The token is opaque here — authored
+// and consumed by opencode, only persisted by the relay.
+func Handoff(resumeToken string) (Frame, error) {
+	return marshal(handoffFrame{Type: "handoff", ResumeToken: resumeToken})
 }

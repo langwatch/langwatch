@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import type { Session } from "~/server/auth";
 import { getApp } from "~/server/app-layer";
+import { LANGY_GITHUB_ENABLED } from "./langyGithub.enabled";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
 import { ProjectRepository } from "~/server/projects/project.repository";
@@ -24,7 +25,7 @@ const githubLogger = createLogger("langwatch:langy:credentials:github");
  * fails closed (throws) rather than silently disabling enforcement — the same
  * posture `getModelsAllowed` takes on a malformed VK config. Kept in sync with
  * the Go matcher (`hostMatchesAny` in
- * services/langyagent/adapters/egress/policy.go).
+ * app-layer/langyagent/adapters/egress/policy.go).
  */
 const egressHostPatternSchema = z
   .string()
@@ -244,29 +245,33 @@ export class LangyCredentialService {
 
     // Best-effort GitHub token mint. Never blocks chat — when absent the
     // worker's github.md skill tells the user to connect, instead of erroring.
+    // GATED OFF (TODO #24): while GitHub is disabled we never resolve a token, so
+    // the worker's capability seam is inert (no token ⇒ no GitHub access).
     let githubToken: string | undefined;
     let githubLogin: string | undefined;
-    try {
-      const gh = await getApp().langy.githubCredentials.getAccessToken({
-        userId: actorUserId,
-        organizationId: project.organizationId,
-      });
-      if (gh) {
-        githubToken = gh.token;
-        githubLogin = gh.githubLogin;
+    if (LANGY_GITHUB_ENABLED) {
+      try {
+        const gh = await getApp().langy.githubCredentials.getAccessToken({
+          userId: actorUserId,
+          organizationId: project.organizationId,
+        });
+        if (gh) {
+          githubToken = gh.token;
+          githubLogin = gh.githubLogin;
+        }
+      } catch (error) {
+        githubLogger.warn(
+          { error, projectId, userId: actorUserId },
+          "github token mint failed; chat continues without it",
+        );
+        captureException(toError(error), {
+          extra: {
+            projectId,
+            context:
+              "getGithubTokenForUser:LangyCredentialService.getOrProvision",
+          },
+        });
       }
-    } catch (error) {
-      githubLogger.warn(
-        { error, projectId, userId: actorUserId },
-        "github token mint failed; chat continues without it",
-      );
-      captureException(toError(error), {
-        extra: {
-          projectId,
-          context:
-            "getGithubTokenForUser:LangyCredentialService.getOrProvision",
-        },
-      });
     }
 
     return {

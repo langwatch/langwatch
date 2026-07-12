@@ -79,12 +79,12 @@ vi.mock("~/server/middleware/rate-limit-langy-github-prs", () => ({
 vi.mock("~/server/modelProviders/utils", () => ({
   getVercelAIModel: (...args: unknown[]) => getVercelAIModel(...args),
 }));
-vi.mock("~/server/services/langy/langyApiKey", () => ({
+vi.mock("~/server/app-layer/langy/langyApiKey", () => ({
   LangySessionKeyScopeError: class extends Error {},
   mintLangySessionApiKey: (...args: unknown[]) =>
     (mintLangySessionApiKey as unknown as (...a: unknown[]) => unknown)(...args),
 }));
-vi.mock("~/server/services/langy/LangyCredentialService", () => ({
+vi.mock("~/server/app-layer/langy/LangyCredentialService", () => ({
   LangyCredentialResolutionError: class extends Error {},
   LangyCredentialService: {
     create: () => ({
@@ -155,15 +155,15 @@ vi.mock("~/server/redis", () => ({
     xrange: async () => [],
   },
 }));
-vi.mock("~/server/services/langy/streaming/langyTurnAccess", () => ({
+vi.mock("~/server/app-layer/langy/streaming/langyTurnAccess", () => ({
   createLangyTurnAccessStore: () => ({ grant: async () => undefined }),
 }));
-vi.mock("~/server/services/langy/streaming/langyTurnHandoff", () => ({
+vi.mock("~/server/app-layer/langy/streaming/langyTurnHandoff", () => ({
   createLangyTurnHandoffStore: () => ({
     stash: (handoff: { system?: string }) => stash(handoff),
   }),
 }));
-vi.mock("~/server/services/langy/streaming/langyTokenBuffer", () => ({
+vi.mock("~/server/app-layer/langy/streaming/langyTokenBuffer", () => ({
   createLangyTokenBuffer: () => ({
     // The turn has not produced anything yet; the attach reads an empty tail and
     // then follows. Return a terminal `end` so the response closes immediately.
