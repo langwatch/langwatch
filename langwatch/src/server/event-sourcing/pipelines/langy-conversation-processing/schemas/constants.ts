@@ -150,6 +150,35 @@ export type LangyTitleSource =
   (typeof LANGY_TITLE_SOURCE)[keyof typeof LANGY_TITLE_SOURCE];
 
 /**
+ * Lifecycle status of a single turn, held on the langyConversationTurn fold —
+ * the per-turn render document. `pending` = the turn document exists but the
+ * agent has not started (init default); `running` = the agent is working;
+ * `completed`/`failed` = terminal. A turn reaches exactly one terminal.
+ */
+export const LANGY_CONVERSATION_TURN_STATUS = {
+  PENDING: "pending",
+  RUNNING: "running",
+  COMPLETED: "completed",
+  FAILED: "failed",
+} as const;
+
+export type LangyConversationTurnStatus =
+  (typeof LANGY_CONVERSATION_TURN_STATUS)[keyof typeof LANGY_CONVERSATION_TURN_STATUS];
+
+/**
+ * Status of one tool call inside a turn's `ToolCalls` list. Initiated, then
+ * exactly one terminal (succeeded/failed) — mirrors the durable tool-call events.
+ */
+export const LANGY_TURN_TOOL_CALL_STATUS = {
+  INITIATED: "initiated",
+  SUCCEEDED: "succeeded",
+  FAILED: "failed",
+} as const;
+
+export type LangyTurnToolCallStatus =
+  (typeof LANGY_TURN_TOOL_CALL_STATUS)[keyof typeof LANGY_TURN_TOOL_CALL_STATUS];
+
+/**
  * Throttle + shape policy for auto title regeneration (the
  * langyTitleGeneration reactor). Regenerate once after the first finalized
  * turn (while the title is still a derived placeholder), then only every N
@@ -198,4 +227,5 @@ export const LANGY_CONVERSATION_EVENT_VERSIONS = {
  */
 export const LANGY_CONVERSATION_PROJECTION_VERSIONS = {
   CONVERSATION_STATE: "2026-07-10",
+  CONVERSATION_TURN: "2026-07-12",
 } as const;

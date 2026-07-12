@@ -65,6 +65,8 @@ import { createLangyMessageAppendStore } from "../event-sourcing/pipelines/langy
 import {
   LangyConversationStateRepositoryClickHouse,
   LangyConversationStateRepositoryMemory,
+  LangyConversationTurnStateRepositoryClickHouse,
+  LangyConversationTurnStateRepositoryMemory,
 } from "../event-sourcing/pipelines/langy-conversation-processing/repositories";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import { LangyGithubCredentialsService } from "./langy/langy-github-credentials.service";
@@ -591,6 +593,9 @@ export function initializeDefaultApp(options?: {
     langyConversationState: clickhouseEnabled
       ? new LangyConversationStateRepositoryClickHouse(resolveClickHouseClient)
       : new LangyConversationStateRepositoryMemory(),
+    langyConversationTurnState: clickhouseEnabled
+      ? new LangyConversationTurnStateRepositoryClickHouse(resolveClickHouseClient)
+      : new LangyConversationTurnStateRepositoryMemory(),
     langyMessageStorage: createLangyMessageAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
