@@ -12,8 +12,9 @@ import (
 )
 
 // StartOrphanReaper drains zombies for any process re-parented to the manager.
-// The manager is PID 1 inside the langyagent pod (entrypoint.sh uses `exec
-// "$@"`), and only PID 1 may reap orphans whose parent died.
+// The manager is PID 1 inside the langyagent pod (the binary is the image
+// ENTRYPOINT, exec form — no shell wrapper), and only PID 1 may reap orphans
+// whose parent died.
 //
 // Why this matters: opencode forks children (`gh`, `git`, `npm`) that inherit
 // the worker pgroup (Setpgid: true). When the manager kills the worker via
