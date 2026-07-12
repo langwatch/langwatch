@@ -15,7 +15,7 @@ import (
 // frames that reach the control plane. The agent never holds the runToken and
 // never talks to the relay directly — "the agent goes through us".
 //
-// Process provisioning + spawn are the runner's concern (app/runner) and fold
+// Process provisioning + spawn are the runner's concern (the app.Runner seam) and fold
 // into this port at the runner seam; today it covers readiness, session, and the
 // per-turn drive — the stable half the worker uses after the sandbox is up.
 type CodingAgent interface {

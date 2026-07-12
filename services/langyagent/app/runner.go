@@ -12,7 +12,7 @@ import "syscall"
 // manager can neither setuid nor chown — sibling isolation is GONE there, which
 // is acceptable ONLY on a single-tenant dev box.
 //
-// Implemented by app/runner/sandboxed and app/runner/localunsafe. The three
+// Implemented by adapters/runner/sandboxed and adapters/runner/localunsafe. The three
 // methods are precisely the operations that used to branch on the bool.
 type Runner interface {
 	// Chown gives a provisioned file to the worker's per-conversation UID so a

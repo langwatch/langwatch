@@ -21,8 +21,8 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/github"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/sandboxed"
 	"github.com/langwatch/langwatch/services/langyagent/app"
-	"github.com/langwatch/langwatch/services/langyagent/app/runner/sandboxed"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/assets"
 	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
@@ -45,7 +45,7 @@ type Options struct {
 	OpenCodeBinaryPath string
 	OTelPluginVersion  string
 	// Runner is the isolation substrate for worker subprocesses — the ADR-033
-	// secure-vs-local seam (app/runner/sandboxed vs app/runner/localunsafe),
+	// secure-vs-local seam (adapters/runner/sandboxed vs adapters/runner/localunsafe),
 	// chosen once at the composition root. nil defaults to the sandboxed (secure)
 	// runner, so a mis-wire fails closed rather than silently running without
 	// per-worker UID isolation.
