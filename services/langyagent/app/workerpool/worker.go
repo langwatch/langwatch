@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -231,41 +230,21 @@ func openCodeSkillsDir(workerHome string) string {
 	return filepath.Join(workerHome, ".config", "opencode", "skills")
 }
 
-// maybeChown chowns path to uid unless per-worker UID isolation is disabled, in
-// which case it is a no-op (returns nil). Isolation is only ever disabled in
-// local dev (LANGY_UNSAFE_DEV_DISABLE_ISOLATION; LoadConfig refuses it in
-// production), where the manager is unprivileged and os.Chown would fail EPERM.
-func maybeChown(path string, uid uint32, disableIsolation bool) error {
-	if disableIsolation {
-		return nil
-	}
-	return os.Chown(path, int(uid), int(uid))
-}
-
-// maybeLchown is maybeChown for symlinks (chowns the link itself, not its
-// target). No-op when isolation is disabled.
-func maybeLchown(path string, uid uint32, disableIsolation bool) error {
-	if disableIsolation {
-		return nil
-	}
-	return os.Lchown(path, int(uid), int(uid))
-}
-
 // setupWorkerHome creates a per-worker home dir with its own opencode config, a
 // substituted AGENTS.md, and a symlink to the shared skills/ under workspaceRoot.
-// Every file is chown'd to the per-conversation UID and chmod'd 0700/0600 BEFORE
-// any credential material lands, so a sibling worker (running as a different UID)
-// can never open(2) this worker's files even with knowledge of the path.
-// Requires CAP_CHOWN + CAP_DAC_OVERRIDE.
+// Every file is chown'd (via the runner) to the per-conversation UID and chmod'd
+// 0700/0600 BEFORE any credential material lands, so a sibling worker (running as
+// a different UID) can never open(2) this worker's files even with knowledge of
+// the path. The sandboxed runner requires CAP_CHOWN + CAP_DAC_OVERRIDE.
 //
-// When disableIsolation is set (LANGY_UNSAFE_DEV_DISABLE_ISOLATION, local dev
-// only — LoadConfig refuses it in production) the chowns are skipped so the
-// unprivileged manager can create these files as its own user; the chmods stay
-// (chmod on files you own needs no privilege). Sibling isolation is gone in that
-// mode — acceptable ONLY on a single-tenant dev box.
-func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials, uid uint32, otelPluginVersion, agentsTemplate string, disableIsolation bool) error {
+// The runner is the isolation seam: the sandboxed runner performs the chowns; the
+// localUNSAFE runner no-ops them so the unprivileged dev manager can create these
+// files as its own user (the chmods stay in both — chmod on files you own needs
+// no privilege). Sibling isolation is gone under the local runner — acceptable
+// ONLY on a single-tenant dev box.
+func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials, uid uint32, otelPluginVersion, agentsTemplate string, runner app.Runner) error {
 	// Lock down the worker's home BEFORE writing anything sensitive.
-	if err := maybeChown(workerHome, uid, disableIsolation); err != nil {
+	if err := runner.Chown(workerHome, uid); err != nil {
 		return fmt.Errorf("chown home: %w", err)
 	}
 	if err := os.Chmod(workerHome, 0o700); err != nil {
@@ -280,7 +259,7 @@ func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials,
 	if err := os.MkdirAll(tmpDir, 0o700); err != nil {
 		return fmt.Errorf("mkdir tmp: %w", err)
 	}
-	if err := maybeChown(tmpDir, uid, disableIsolation); err != nil {
+	if err := runner.Chown(tmpDir, uid); err != nil {
 		return fmt.Errorf("chown tmp: %w", err)
 	}
 
@@ -295,7 +274,7 @@ func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials,
 		filepath.Join(workerHome, ".config"),
 		configDir,
 	} {
-		if err := maybeChown(dir, uid, disableIsolation); err != nil {
+		if err := runner.Chown(dir, uid); err != nil {
 			return fmt.Errorf("chown %s: %w", dir, err)
 		}
 		if err := os.Chmod(dir, 0o700); err != nil {
@@ -338,7 +317,7 @@ func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials,
 	// WriteFile keeps ownership at the writing process (root). Explicit chown is
 	// what makes "only the worker UID" literal — without it, the manager (root)
 	// could still read the plaintext API key.
-	if err := maybeChown(configPath, uid, disableIsolation); err != nil {
+	if err := runner.Chown(configPath, uid); err != nil {
 		return fmt.Errorf("chown config: %w", err)
 	}
 
@@ -355,7 +334,7 @@ func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials,
 	if err := os.WriteFile(agentsPath, []byte(rendered), 0o600); err != nil {
 		return fmt.Errorf("write AGENTS.md: %w", err)
 	}
-	if err := maybeChown(agentsPath, uid, disableIsolation); err != nil {
+	if err := runner.Chown(agentsPath, uid); err != nil {
 		return fmt.Errorf("chown AGENTS.md: %w", err)
 	}
 
@@ -371,7 +350,7 @@ func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials,
 	}
 	// lchown the symlink itself; target permissions are what actually gate reads
 	// but lchowning prevents another UID from tampering with the link.
-	_ = maybeLchown(skillsLink, uid, disableIsolation)
+	_ = runner.Lchown(skillsLink, uid)
 
 	return nil
 }
@@ -478,47 +457,18 @@ func hostFromURL(raw string) string {
 	return u.Hostname()
 }
 
-// workerSysProcAttr builds the SysProcAttr for the opencode subprocess. Normally
-// it drops the child into the per-conversation UID via a setuid Credential (with
-// an explicit empty supplementary-group set) so a sibling worker's files are
-// unreachable at the kernel level. When disableIsolation is set (local dev only —
-// LoadConfig refuses it in production), it omits the Credential so opencode runs
-// as the manager's own (unprivileged) user, since a non-root manager cannot
-// setuid. Setpgid is kept in BOTH modes so opencode + its shelled children share
-// one process group the manager can signal as a unit on shutdown.
-func workerSysProcAttr(uid uint32, disableIsolation bool) *syscall.SysProcAttr {
-	if disableIsolation {
-		return &syscall.SysProcAttr{Setpgid: true}
-	}
-	return &syscall.SysProcAttr{
-		Credential: &syscall.Credential{
-			Uid: uid,
-			Gid: uid,
-			// Explicit empty Groups forces setgroups([]) on exec — without this,
-			// the child inherits root's supplementary groups (the manager runs
-			// as root). Combined with the unique per-conv UID, the worker now
-			// belongs to exactly one identity at the kernel level, no shared
-			// group footing from the manager process.
-			Groups: []uint32{},
-		},
-		// Setpgid puts opencode in its own process group so a SIGTERM to the
-		// manager doesn't tear down the worker before we've gracefully reaped
-		// it; we send the explicit signal during shutdown.
-		Setpgid: true,
-	}
-}
-
-// spawnOpenCode starts the opencode subprocess with the per-worker env and
-// drops into the per-conversation UID before exec (unless disableIsolation is
-// set — local dev only, see workerSysProcAttr). Combined with mode 0700 on
-// workerHome and mode 0600 on config.json, the UID handoff makes a sibling
-// worker's files unreachable to this process at the kernel level — open(2)
-// returns EACCES regardless of how the path is constructed.
+// spawnOpenCode starts the opencode subprocess with the per-worker env and drops
+// into the per-conversation UID before exec via the runner's SysProcAttr (the
+// sandboxed runner setuids into the UID; the localUNSAFE runner runs as the
+// manager's own user). Combined with mode 0700 on workerHome and mode 0600 on
+// config.json, the UID handoff makes a sibling worker's files unreachable to this
+// process at the kernel level — open(2) returns EACCES regardless of how the path
+// is constructed.
 //
-// ctx is the POOL-LIFETIME context (not a single request's): the worker
-// outlives the turn that spawned it and only dies on idle/shutdown, but binding
-// to the pool context (rather than context.Background as the flat version did)
-// means a pool Shutdown / deadline still propagates to the subprocess.
+// ctx is the POOL-LIFETIME context (not a single request's): the worker outlives
+// the turn that spawned it and only dies on idle/shutdown, but binding to the pool
+// context (rather than context.Background as the flat version did) means a pool
+// Shutdown / deadline still propagates to the subprocess.
 func spawnOpenCode(
 	ctx context.Context,
 	openCodeBinaryPath string,
@@ -528,7 +478,7 @@ func spawnOpenCode(
 	creds domain.Credentials,
 	openCodePassword string,
 	egressPort int,
-	disableIsolation bool,
+	runner app.Runner,
 ) (*exec.Cmd, error) {
 	cmd := exec.CommandContext(ctx, openCodeBinaryPath,
 		"serve", "--port", strconv.Itoa(port), "--hostname", "127.0.0.1",
@@ -545,7 +495,7 @@ func spawnOpenCode(
 	// would re-leak everything OTel already structures.
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
-	cmd.SysProcAttr = workerSysProcAttr(uid, disableIsolation)
+	cmd.SysProcAttr = runner.SysProcAttr(uid)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start opencode: %w", err)
 	}
