@@ -52,6 +52,22 @@ jobs:
       NEXTAUTH_SECRET: "test-secret-for-e2e-testing"
       NEXTAUTH_URL: "http://localhost:5570"
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
+      # Trust the in-repo TEST license keypair so auth.setup.ts can activate a
+      # test ENTERPRISE license and exercise member-invitation flows above the
+      # free-tier maxMembers=1 cap. Public key only (safe to commit) — matches
+      # TEST_PUBLIC_KEY in langwatch/ee/licensing/__tests__/fixtures/testKeys.ts.
+      # Must be on the app process env before `pnpm start` boots — constants.ts
+      # resolves PUBLIC_KEY from this var once at module load. gitleaks:allow
+      LANGWATCH_LICENSE_PUBLIC_KEY: |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApmJ61eRR1wxrapjipSmN
+        IqYMJPmbonA1d6XV51kdnVs/MdNrrdoWIal6TDt2lHvbAbrEalqR7h+vQzBBZ4St
+        ZPqBzTIHQwu3Wjlj7Fj7IeVUiJnRg60W+u9DmYXUeFBlZFMHxV3nNVqedwDcFpV/
+        IrAMmSe3QeTqBztcDMBxu5luA4DMU5Hi6kp4qcHDoCCiEH4a6ZZkPdNC+xpFdW41
+        75BwdKBKnyOZrUvyPaKrxInra7z+9YQKiggRciQvCNxc76Ef4DLGkTIf36Cvm7XL
+        m0gqlJm89dYcRBaDVGFTnb98BM7SrAIg117yjuuw5o/RmSlKq9/Klkz0QsXYF9Zj
+        iQIDAQAB
+        -----END PUBLIC KEY-----
       # AI Gateway data-plane secrets (shared by control plane + Go gateway).
       # The gateway validates these as required; without them `make service
       # svc=aigateway` crash-loops. Test-only values, 32+ chars.

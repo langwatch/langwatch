@@ -2,6 +2,8 @@ import { test as setup, expect } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 
+import { E2E_ENTERPRISE_LICENSE_KEY } from "./license.fixture";
+
 const AUTH_DIR = path.join(__dirname, "..", ".auth");
 const AUTH_FILE = path.join(AUTH_DIR, "user.json");
 
@@ -127,6 +129,50 @@ setup("authenticate", async ({ page, request }) => {
   } else {
     console.log("Org/project already exists, skipping setup.");
   }
+
+  // Step 3b: Activate a test ENTERPRISE license for the org so the
+  // member-invitation specs can invite past the free-tier maxMembers=1 cap.
+  // A no-license self-hosted deployment resolves to FREE_PLAN (maxMembers=1),
+  // so the owner alone is already at the cap and createInviteRequest 403s. The
+  // app trusts this test-signed license because e2e-ci sets
+  // LANGWATCH_LICENSE_PUBLIC_KEY to the matching TEST_PUBLIC_KEY;
+  // getActivePlan re-reads the license from Postgres on every call, so
+  // activating here (before the specs run) takes effect with no app restart.
+  console.log("Activating test enterprise license...");
+  const licenseOrgsResponse = await page.request.get(
+    "/api/trpc/organization.getAll?batch=1&input=" +
+      encodeURIComponent(JSON.stringify({ "0": { json: {} } })),
+  );
+  const licenseOrgsData = await licenseOrgsResponse.json().catch(() => null);
+  const licenseOrgs: Array<{ id: string }> =
+    licenseOrgsData?.["0"]?.result?.data?.json ?? [];
+  const organizationId = licenseOrgs[0]?.id;
+  if (!organizationId) {
+    throw new Error(
+      `Cannot activate license: no organization found (${JSON.stringify(
+        licenseOrgsData,
+      ).slice(0, 300)})`,
+    );
+  }
+  const licenseResponse = await page.request.post(
+    "/api/trpc/license.upload?batch=1",
+    {
+      data: {
+        "0": {
+          json: { organizationId, licenseKey: E2E_ENTERPRISE_LICENSE_KEY },
+        },
+      },
+    },
+  );
+  const licenseResult = await licenseResponse.json().catch(() => null);
+  if (!licenseResponse.ok() || licenseResult?.["0"]?.error) {
+    throw new Error(
+      `license.upload failed: ${licenseResponse.status()} ${JSON.stringify(
+        licenseResult,
+      ).slice(0, 500)}`,
+    );
+  }
+  console.log("Enterprise license activated (maxMembers=100).");
 
   // Step 4: Confirm the authenticated shell on a settings page. We use
   // /settings rather than the app root because root redirects to the

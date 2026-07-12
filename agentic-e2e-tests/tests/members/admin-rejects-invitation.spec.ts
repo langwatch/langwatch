@@ -17,13 +17,11 @@ import {
  * Scenario: Admin rejects an invitation request (lines 36-42)
  */
 test.describe("Invitation Approval - Admin Rejects Request", () => {
-  // fixme(#1811): the member-invitation flow needs an org plan with maxMembers>=2,
-  // but free-tier self-hosted CI has no license, so the plan resolves to FREE_PLAN
-  // (maxMembers=1) — the org owner alone is already at the cap and
-  // createInviteRequest 403s "maximum number of team members" (verified via
-  // licenseEnforcement.checkLimit: current=1, max=1). Re-enable once the CI test
-  // org is provisioned a license/subscription that raises the member cap.
-  test.fixme();
+  // Member-invitation requires an org plan with maxMembers>=2. auth.setup.ts
+  // activates a test ENTERPRISE license (maxMembers=100) for the org so these
+  // run in self-hosted CI, where a no-license org otherwise resolves to
+  // FREE_PLAN (maxMembers=1) and createInviteRequest 403s. See
+  // tests/license.fixture.ts. (#1811)
   /**
    * Scenario: Admin rejects an invitation request
    * Source: update-pending-invitation.feature lines 36-42
