@@ -15,7 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/langwatch/langwatch/services/langyagent/frameauth"
+	"github.com/langwatch/langwatch/services/langyagent/internal/frameauth"
 )
 
 // Frame is a JSON-marshalled output frame, ready to be signed. Construct one via

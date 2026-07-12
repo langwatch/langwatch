@@ -48,9 +48,9 @@ type vectorsFile struct {
 
 func loadVectors(t *testing.T) vectorsFile {
 	t.Helper()
-	// The package dir is services/langyagent/frameauth; the shared vector file
-	// lives at repo-root specs/langy — three levels up.
-	path := filepath.Join("..", "..", "..", "specs", "langy", "langy-frame-auth.vectors.json")
+	// The package dir is services/langyagent/internal/frameauth; the shared vector
+	// file lives at repo-root specs/langy — four levels up.
+	path := filepath.Join("..", "..", "..", "..", "specs", "langy", "langy-frame-auth.vectors.json")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read vectors: %v", err)
