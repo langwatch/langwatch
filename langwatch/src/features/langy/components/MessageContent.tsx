@@ -15,7 +15,6 @@ import {
 import { LangyFeedback } from "./LangyFeedback";
 import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
 import { StreamingText } from "./StreamingText";
-import { reconcileOptimisticText } from "../logic/langyOptimisticText";
 
 export interface LangyProposal {
   langyProposal: true;
@@ -46,7 +45,6 @@ export function MessageContent({
   onApply,
   onDiscard,
   isStreaming = false,
-  optimisticText,
   conversationId,
   showFeedback = false,
 }: {
@@ -62,11 +60,6 @@ export function MessageContent({
   onDiscard: (proposalId: string) => void;
   /** True for the in-flight assistant turn — streams tokens with blur reveal. */
   isStreaming?: boolean;
-  /**
-   * Stream B optimistic text for the in-flight turn (ADR-048). Reconciled
-   * against the durable text below and only used while streaming.
-   */
-  optimisticText?: string;
   /** Active conversation id, so feedback can attach to it. */
   conversationId?: string | null;
   /** Show the thumbs feedback affordance under a completed assistant reply. */
@@ -111,13 +104,11 @@ export function MessageContent({
     : parseLangyFeedbackDirective(rawText);
   const text = feedbackDirective.cleanedText;
 
-  // Stream B optimistic lead (ADR-048): during the live turn the fast per-token
-  // text leads while it is a clean superset of the durable text; otherwise the
-  // durable text. Reconciled once here so the "has content" guard and the render
-  // agree — the optimistic lead shows even before the first durable batch lands.
-  const displayText = isStreaming
-    ? reconcileOptimisticText(text, optimisticText)
-    : text;
+  // The live turn's tokens now arrive as `text-delta` chunks through the
+  // onTurnStream subscription, so useChat's `message.parts` already carry the
+  // streamed text — no separate optimistic buffer to reconcile. StreamingText
+  // still gives the blur-reveal while `isStreaming`.
+  const displayText = text;
 
   const proposals = extractProposals(message);
   // The PR cards, read off the message's TOOL PARTS — not scraped from the

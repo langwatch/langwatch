@@ -117,10 +117,6 @@ function deps(overrides: Partial<RunTurnDeps>): RunTurnDeps {
     conversations: makeConversations() as unknown as RunTurnDeps["conversations"],
     ephemeral: makeEphemeral() as unknown as RunTurnDeps["ephemeral"],
     buffer: makeBuffer() as unknown as RunTurnDeps["buffer"],
-    fastPublisher: {
-      publishToken: vi.fn(async () => {}),
-      publishEnd: vi.fn(async () => {}),
-    } as unknown as RunTurnDeps["fastPublisher"],
     agentUrl: "http://manager",
     internalSecret: "secret",
     sleepImpl: async () => {},
