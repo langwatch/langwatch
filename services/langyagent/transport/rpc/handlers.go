@@ -7,18 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
-	"go.uber.org/zap"
-
-	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
-
-// validate is the shared struct validator for the /chat body. It is safe for
-// concurrent use and caches struct reflection, so it is built once.
-var validate = validator.New()
 
 // chatRequest is the body shape /chat accepts. The control plane (Hono langy.ts
 // route) is the only legitimate caller and is responsible for authn/authz of
@@ -45,43 +37,6 @@ type chatRequest struct {
 	// final so the ingest can dispatch the finalize command. Not required for the
 	// same rollout reason as TurnID.
 	ProjectID string `json:"projectId,omitempty"`
-}
-
-// validateChatRequest checks the decoded body against its `validate` tags. On
-// failure it returns a herr(ErrBadRequest) that NAMES the offending fields for
-// internal diagnostics (logged + carried in Meta) while the user-facing message
-// stays generic — the raw validator error is never surfaced to the caller.
-func validateChatRequest(ctx context.Context, req chatRequest) error {
-	err := validate.Struct(req)
-	if err == nil {
-		return nil
-	}
-	ve, ok := err.(validator.ValidationErrors)
-	if !ok {
-		// Non-field validator failure (misconfigured tag). Keep the detail in a
-		// logged reason; the client still gets a generic message.
-		return herr.New(ctx, domain.ErrBadRequest, herr.M{"message": "the request body was invalid"}, err)
-	}
-	fields := make([]string, 0, len(ve))
-	for _, fe := range ve {
-		fields = append(fields, validationFieldPath(fe))
-	}
-	clog.Get(ctx).Warn("chat request validation failed", zap.Strings("fields", fields))
-	return herr.New(ctx, domain.ErrBadRequest, herr.M{
-		"message": "the request was missing or contained invalid required fields",
-		"fields":  fields,
-	})
-}
-
-// validationFieldPath renders a validator field error as its struct path with
-// the root type stripped (e.g. "Credentials.LangwatchAPIKey"), naming exactly
-// which part of the /chat schema failed.
-func validationFieldPath(fe validator.FieldError) string {
-	ns := fe.StructNamespace()
-	if i := strings.IndexByte(ns, '.'); i >= 0 {
-		return ns[i+1:]
-	}
-	return ns
 }
 
 // warmRequest is /chat's body minus the turn: no prompt, no system, no resume
@@ -154,15 +109,10 @@ func chatHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
+		// decode also struct-validates (required conversationId, prompt, and the
+		// four mandatory credential fields), returning the field-naming herr.
 		req, err := decode[chatRequest](w, r, maxBodyBytes)
 		if err != nil {
-			herr.WriteHTTP(w, err)
-			return
-		}
-		// Structural validation (required conversationId, prompt, and the four
-		// mandatory credential fields) in one pass — the herr names the offending
-		// field for diagnostics with a generic user message.
-		if err := validateChatRequest(ctx, req); err != nil {
 			herr.WriteHTTP(w, err)
 			return
 		}
