@@ -62,14 +62,6 @@ type Config struct {
 	SessionsRoot       string `env:"SESSIONS_ROOT" validate:"required"`
 	OTelPluginVersion  string `env:"OPENCODE_OTEL_PLUGIN_VERSION" validate:"required"`
 
-	// Self-observability (ADR-044 part 4). When set, the manager tees its own
-	// spans to a static INTERNAL LangWatch project so the team can observe how
-	// Langy behaves in the wild. Unset (the default, and self-hosted) means NO
-	// tee — behaviour is exactly today's single export. Message content is
-	// stripped from the internal tee (behavioural shape only, no customer text).
-	LangyInternalOTLPEndpoint string `env:"LANGY_INTERNAL_OTLP_ENDPOINT"`
-	LangyInternalOTLPHeaders  string `env:"LANGY_INTERNAL_OTLP_HEADERS"`
-
 	// ShutdownHandoffDeadlineMS (ADR-048) is the wall-clock budget the manager
 	// gives each live worker to checkpoint on SIGTERM before the process-group
 	// kill. The `deadline` posted to a worker is now + this. MUST leave room for

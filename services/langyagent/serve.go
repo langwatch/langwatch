@@ -50,9 +50,6 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 	)
 	g.Add(
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
-		// Flush + stop the self-observability tee before OTel tears down (ADR-044
-		// part 4). No-op when the internal tee is disabled.
-		lifecycle.Closer("langy-internal-tee", deps.InternalTeeShutdown),
 		// The PID-1 orphan reaper: opencode's children (gh/git/npm) reparent to
 		// the manager on worker kill; only PID 1 may reap them. Fire-and-forget,
 		// stops when the group context cancels.
@@ -72,11 +69,11 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		// telemetry BEFORE the worker drain so a grace period later cut short by
 		// SIGKILL still ships what we already have. Registered BEFORE the handoff
 		// Closer below so it stops AFTER it (reverse-order). ForceFlushGlobal
-		// flushes the tracer provider, the internal tee, and the meter provider;
-		// the full Shutdown of "otel"/"langy-internal-tee" (registered first) still
-		// runs LAST. HONEST LIMIT: SIGKILL / OOM are uncatchable — this narrows the
-		// loss window, it is not a zero-loss guarantee. Bounded so a dead collector
-		// can't eat the grace budget out from under the worker drain.
+		// flushes the tracer provider and the meter provider; the full Shutdown of
+		// "otel" (registered first) still runs LAST. HONEST LIMIT: SIGKILL / OOM are
+		// uncatchable — this narrows the loss window, it is not a zero-loss
+		// guarantee. Bounded so a dead collector can't eat the grace budget out from
+		// under the worker drain.
 		lifecycle.Closer("otel-early-flush", func(ctx context.Context) error {
 			flushCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 			defer cancel()
