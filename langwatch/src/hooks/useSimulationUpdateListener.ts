@@ -108,7 +108,7 @@ export function useSimulationUpdateListener({
     };
   }, []);
 
-  useSSESubscription<
+  const subscription = useSSESubscription<
     { event: string; timestamp: number },
     { projectId: string }
   >(
@@ -172,4 +172,12 @@ export function useSimulationUpdateListener({
       },
     },
   );
+
+  // Callers use the connection state to disable fallback polling while the
+  // event stream is healthy — SSE is the primary freshness signal, polling
+  // exists only for disconnected sessions.
+  return {
+    connectionState: subscription.connectionState,
+    isConnected: subscription.isConnected,
+  } as const;
 }

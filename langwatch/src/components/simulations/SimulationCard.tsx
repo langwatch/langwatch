@@ -23,25 +23,10 @@ export interface SimulationCardProps {
 }
 
 
-function SimulationCardHeader({
-  title,
-  status,
-}: {
-  title: string;
-  status?: ScenarioRunStatus;
-}) {
-  const isComplete = status
-    ? SCENARIO_RUN_STATUS_CONFIG[status].isComplete
-    : false;
-
+function SimulationCardHeader({ title }: { title: string }) {
   return (
     <Box py={2} px={3} w="100%" position="relative" zIndex={2}>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color={isComplete ? "white" : "fg"}
-        lineClamp={2}
-      >
+      <Text fontSize="xs" fontWeight="semibold" color="fg" lineClamp={2}>
         {title}
       </Text>
     </Box>
@@ -214,14 +199,14 @@ function SimulationStatusBadge({ status }: { status: ScenarioRunStatus }) {
         px={3}
         py={1}
         borderRadius="full"
-        bg={`color-mix(in srgb, var(--chakra-colors-${config.colorPalette}-subtle) 80%, transparent)`}
-        boxShadow="0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)"
-        border="1px solid"
-        borderColor={`color-mix(in srgb, var(--chakra-colors-${config.colorPalette}-muted) 50%, transparent)`}
-        color={config.fgColor}
+        bg={`${config.colorPalette}.subtle/85`}
+        boxShadow="xs"
+        borderWidth="1px"
+        borderColor={`${config.colorPalette}.muted/50`}
+        color={`${config.colorPalette}.fg`}
       >
         {isRunning || isPending ? (
-          <Spinner size="xs" color={config.fgColor} />
+          <Spinner size="xs" color="currentColor" />
         ) : (
           <Icon size={12} color="currentColor" />
         )}
@@ -259,14 +244,17 @@ export function SimulationCard({
   return (
     <Card.Root
       height="100%"
-      border="1px solid rgba(255,255,255,0.12)"
+      borderWidth="1px"
+      borderColor="border.muted"
       borderRadius="xl"
       position="relative"
       bg="bg.panel"
+      boxShadow="sm"
+      transition="border-color 0.15s ease, box-shadow 0.15s ease"
+      _hover={{ borderColor: "border.emphasized", boxShadow: "md" }}
       css={{
         overflow: "hidden !important",
         contain: "content",
-        boxShadow: "sm",
         "&:hover .simulation-card-content": {
           opacity: 1,
         },
@@ -287,10 +275,10 @@ export function SimulationCard({
       }}
     >
       <VStack height="100%" gap={0}>
-        {!isLoading && <SimulationCardHeader title={title} status={status} />}
+        {!isLoading && <SimulationCardHeader title={title} />}
         <Box
           className="simulation-card-content"
-          opacity={shouldDim ? 0.45 : 1}
+          opacity={shouldDim ? 0.8 : 1}
           transition="opacity 0.3s ease"
           height="100%"
           width="100%"
