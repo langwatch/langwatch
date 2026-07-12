@@ -126,6 +126,18 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		domain.DefaultObservabilityLimits(ram, cpus),
 	)
 
+	// The console floor haven imposes while the observability stack is up: default
+	// warn, because the full info/debug stream is in Grafana and the terminal only
+	// needs what wants a human. LW_OBS_CONSOLE_LEVEL overrides it; "off"/"none"/""
+	// opts out and leaves the console to .env.
+	obsConsoleLevel := "warn"
+	if v, ok := os.LookupEnv("LW_OBS_CONSOLE_LEVEL"); ok {
+		obsConsoleLevel = v
+	}
+	if obsConsoleLevel == "off" || obsConsoleLevel == "none" {
+		obsConsoleLevel = ""
+	}
+
 	cfg := app.Config{
 		Naming:                   naming,
 		Home:                     havenHome(),
@@ -139,9 +151,10 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		ShouldManageRedis:        os.Getenv("LANGWATCH_HAVEN_REDIS") != "0",
 		// Observability shares CH's colima VM, so it defaults ON now — the VM is
 		// already paying for itself. LANGWATCH_HAVEN_OBS=0 opts out.
-		ShouldStartObservability: os.Getenv("LANGWATCH_HAVEN_OBS") != "0",
-		LocalAPIKey:              envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
-		RepoRoot:                 worktree,
+		ShouldStartObservability:  os.Getenv("LANGWATCH_HAVEN_OBS") != "0",
+		LocalAPIKey:               envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
+		RepoRoot:                  worktree,
+		ObservabilityConsoleLevel: obsConsoleLevel,
 	}
 
 	return deps{
@@ -241,15 +254,21 @@ func (d deps) dispatch(ctx context.Context, sub string, rest []string) error {
 
 func optionsFromEnv(repoRoot string) app.PlanOptions {
 	return app.PlanOptions{
-		ShouldGoWatch:             os.Getenv("LANGWATCH_GO_WATCH") == "1",
-		ShouldStartWorkers:        os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
-		ShouldRunWorkersInProcess: os.Getenv("WORKERS_IN_PROCESS") == "1" || os.Getenv("WORKERS_IN_PROCESS") == "true",
-		ShouldSkipNLP:        os.Getenv("LANGWATCH_SKIP_NLP") == "1",
-		ShouldSkipGateway:    os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
-		ShouldSkipLangyAgent: os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1",
-		ShouldSeed:           os.Getenv("LANGWATCH_SEED") == "1",
-		IsStub:             os.Getenv("HAVEN_STUB") == "1",
-		RepoRoot:           repoRoot,
+		ShouldGoWatch:      os.Getenv("LANGWATCH_GO_WATCH") == "1",
+		ShouldStartWorkers: os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
+		// Under haven the worker stack defaults to IN-PROCESS (hosted in the app
+		// process), saving the RAM of a second Node process — the sensible default on
+		// a laptop juggling several worktrees. Workers keep their own logger name
+		// ("langwatch:workers"), so their lines stay identifiable even without a
+		// separate lane. Opt back into a standalone `workers` lane with
+		// WORKERS_IN_PROCESS=0.
+		ShouldRunWorkersInProcess: os.Getenv("WORKERS_IN_PROCESS") != "0" && os.Getenv("WORKERS_IN_PROCESS") != "false",
+		ShouldSkipNLP:             os.Getenv("LANGWATCH_SKIP_NLP") == "1",
+		ShouldSkipGateway:         os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
+		ShouldSkipLangyAgent:      os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1",
+		ShouldSeed:                os.Getenv("LANGWATCH_SEED") == "1",
+		IsStub:                    os.Getenv("HAVEN_STUB") == "1",
+		RepoRoot:                  repoRoot,
 	}
 }
 

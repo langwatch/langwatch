@@ -39,6 +39,17 @@ type Stack struct {
 	// OTel wiring, so a worktree exports its logs/traces/metrics the moment the
 	// stack exists and stays silent when it does not.
 	ObservabilityOTLPPort int `json:"observabilityOtlpPort,omitempty"`
+	// ObservabilityGrafanaPort is the shared Grafana's loopback port while the stack
+	// is up (0 otherwise). It lets OverlayEnv publish GRAFANA_BASE_URL, so the app
+	// can turn a trace/span id into a clickable Grafana deep link — in HTTP error
+	// responses, the Langy "view trace" link, and anywhere else a developer wants to
+	// jump straight to the failing trace.
+	ObservabilityGrafanaPort int `json:"observabilityGrafanaPort,omitempty"`
+	// ObservabilityConsoleLevel, when set, is injected as LOG_CONSOLE_LEVEL while the
+	// stack is up — muting the console to this floor (default "warn") because the
+	// full info/debug stream is in Grafana. Empty is the opt-out: the console is left
+	// to whatever .env says.
+	ObservabilityConsoleLevel string `json:"observabilityConsoleLevel,omitempty"`
 	// LocalAPIKey is the stable, deterministic local dev API key haven seeds and
 	// injects, so every worktree (and every agent) authenticates with the same key.
 	LocalAPIKey string `json:"localApiKey"`
