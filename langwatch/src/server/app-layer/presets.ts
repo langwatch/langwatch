@@ -69,6 +69,19 @@ import {
   LangyConversationTurnStateRepositoryMemory,
 } from "../event-sourcing/pipelines/langy-conversation-processing/repositories";
 import { LangyConversationService } from "./langy/langy-conversation.service";
+import { LangyTurnService } from "./langy/langy-turn.service";
+import { LangyCredentialService } from "~/server/services/langy/LangyCredentialService";
+import { createLangyWorkerPort } from "~/server/services/langy/langyWorker";
+import { getVercelAIModel } from "~/server/modelProviders/utils";
+import { mintLangySessionApiKey } from "~/server/services/langy/langyApiKey";
+import {
+  LANGY_GITHUB_PRS_PER_DAY,
+  releaseLangyGithubPrPermit,
+  reserveLangyGithubPrPermit,
+} from "~/server/middleware/rate-limit-langy-github-prs";
+import { createLangyTurnAccessStore } from "~/server/services/langy/streaming/langyTurnAccess";
+import { createLangyTurnHandoffStore } from "~/server/services/langy/streaming/langyTurnHandoff";
+import { connection } from "~/server/redis";
 import { LangyGithubCredentialsService } from "./langy/langy-github-credentials.service";
 import { LangyMessageService } from "./langy/langy-message.service";
 import { NullLangyUserGithubCredentialsRepository } from "./langy/repositories/langy-user-github-credentials.repository";
@@ -768,6 +781,37 @@ export function initializeDefaultApp(options?: {
     githubAppConfigured,
   );
 
+  // Langy turn-start orchestration (LANGY_REWORK_PLAN.md S2 C): the pipeline the
+  // Hono route used to inline, now an app-layer service with injected ports. The
+  // worker port + turn stores are null when their infra is absent (no agent env /
+  // no Redis); the service raises LangyAgentUnavailableError in that case, exactly
+  // as the route 503'd.
+  const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
+  const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
+  const langyTurns = LangyTurnService.create({
+    conversations: langyConversations,
+    credentials: LangyCredentialService.create(prisma),
+    resolveModel: getVercelAIModel,
+    worker:
+      langyAgentUrl && langyInternalSecret
+        ? createLangyWorkerPort({
+            agentUrl: langyAgentUrl,
+            internalSecret: langyInternalSecret,
+          })
+        : null,
+    reservePermit: reserveLangyGithubPrPermit,
+    releasePermit: releaseLangyGithubPrPermit,
+    perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
+    mintSessionKey: ({ session, projectId, organizationId }) =>
+      mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
+    accessStore: connection
+      ? createLangyTurnAccessStore({ redis: connection })
+      : null,
+    handoffStore: connection
+      ? createLangyTurnHandoffStore({ redis: connection })
+      : null,
+  });
+
   // Late-bind the cheap-model title generator into the langyTitleGeneration
   // reactor (created in the pipeline registry). Kept out of the event-sourcing
   // layer so it stays free of model-provider + app-layer read deps; the reactor
@@ -954,6 +998,7 @@ export function initializeDefaultApp(options?: {
     suiteRuns: { runs: suiteRunService },
     langy: {
       conversations: langyConversations,
+      turns: langyTurns,
       messages: langyMessages,
       githubCredentials: langyGithubCredentials,
     },
@@ -1139,6 +1184,26 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           throw new Error("ClickHouse not available in test app");
         },
       ),
+      turns: LangyTurnService.create({
+        conversations: void 0 as unknown as LangyConversationService,
+        credentials: void 0 as unknown as LangyCredentialService,
+        resolveModel: async () => {
+          throw new Error("no model provider in test app");
+        },
+        worker: null,
+        reservePermit: async () => ({
+          reserved: false,
+          allowed: false,
+          resetAt: 0,
+        }),
+        releasePermit: noop,
+        perDayPrCap: 0,
+        mintSessionKey: async () => {
+          throw new Error("no session-key mint in test app");
+        },
+        accessStore: null,
+        handoffStore: null,
+      }),
       messages: LangyMessageService.create(),
       githubCredentials: new LangyGithubCredentialsService(
         new NullLangyUserGithubCredentialsRepository(),
