@@ -9,15 +9,18 @@
 
 import {
   Box,
+  Button,
+  EmptyState,
   HStack,
-  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
@@ -35,9 +38,11 @@ import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
 } from "./RunHistoryFilters";
+import { RunHistorySkeleton } from "./RunHistorySkeleton";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { useRunHistoryStore } from "./useRunHistoryStore";
+import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 
 type ExternalSetDetailPanelProps = {
   scenarioSetId: string;
@@ -74,10 +79,20 @@ export function ExternalSetDetailPanel({
     : "none";
 
 
+  // Live updates: SSE invalidates getSuiteRunData directly; its connection
+  // state disables the fallback freshness polling below.
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project?.id,
+    debounceMs: 500,
+    filter: { scenarioSetId },
+  });
+
   const {
     data: runDataResult,
     isLoading,
     error,
+    refetch,
   } = api.scenarios.getSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
@@ -88,12 +103,22 @@ export function ExternalSetDetailPanel({
     },
     {
       enabled: !!project,
-      refetchInterval: 5000,
+      // No timer on the heavy query: SSE invalidations and the freshness
+      // probe below drive refetches, so quiet sets never re-download runs.
       trpc: { context: { skipBatch: true } },
     },
   );
 
   const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
+
+  useSuiteRunFreshness({
+    scenarioSetId,
+    startDateMs: period.startDate.getTime(),
+    endDateMs: period.endDate.getTime(),
+    runs: runData ?? [],
+    enabled: !!project,
+    sseConnected,
+  });
 
   // Fetch scenarios for filter options
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -216,6 +241,7 @@ export function ExternalSetDetailPanel({
           paddingY={4}
           bg="bg"
           flexShrink={0}
+          position="relative"
           _after={{
             content: '""',
             position: "absolute",
@@ -245,22 +271,27 @@ export function ExternalSetDetailPanel({
 
       {/* Content — scrollable */}
       <VStack ref={runListRef} align="stretch" gap={0} flex={1} overflow="auto">
-        {isLoading && (
-          <VStack paddingY={8}>
-            <Spinner />
-            <Text fontSize="sm" color="fg.muted">
-              Loading run data...
-            </Text>
-          </VStack>
-        )}
+        {isLoading && <RunHistorySkeleton />}
 
         {error && (
-          <VStack paddingY={8}>
-            <Text color="red.500">Error loading run data</Text>
-            <Text fontSize="sm" color="fg.muted">
-              {error.message}
-            </Text>
-          </VStack>
+          <EmptyState.Root paddingY={12}>
+            <EmptyState.Content>
+              <EmptyState.Indicator color="red.fg">
+                <TriangleAlert size={28} />
+              </EmptyState.Indicator>
+              <EmptyState.Title>Couldn&apos;t load run data</EmptyState.Title>
+              <EmptyState.Description maxWidth="360px" textAlign="center">
+                {error.message}
+              </EmptyState.Description>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void refetch()}
+              >
+                <RefreshCw size={14} /> Try again
+              </Button>
+            </EmptyState.Content>
+          </EmptyState.Root>
         )}
 
         {!isLoading && !error && runData && runData.length > 0 && (
@@ -314,11 +345,17 @@ export function ExternalSetDetailPanel({
         )}
 
         {!isLoading && !error && (!runData || runData.length === 0) && (
-          <VStack paddingY={8}>
-            <Text fontSize="sm" color="fg.muted">
-              No run data found for this set.
-            </Text>
-          </VStack>
+          <EmptyState.Root paddingY={12}>
+            <EmptyState.Content>
+              <EmptyState.Indicator>
+                <FlaskConical size={28} />
+              </EmptyState.Indicator>
+              <EmptyState.Title>No runs yet</EmptyState.Title>
+              <EmptyState.Description>
+                No run data found for this set.
+              </EmptyState.Description>
+            </EmptyState.Content>
+          </EmptyState.Root>
         )}
       </VStack>
     </VStack>
