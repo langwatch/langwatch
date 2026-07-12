@@ -54,6 +54,7 @@ interface ClickHouseLangyConversationRecord {
   LastError: string | null;
   PendingHandoffToken: string | null;
   PendingHandoffTurnId: string | null;
+  RunToken: string | null;
   CreatedAt: number;
   UpdatedAt: number;
   ArchivedAt: number | null;
@@ -79,6 +80,7 @@ interface ClickHouseLangyConversationWriteRecord {
   LastError: string | null;
   PendingHandoffToken: string | null;
   PendingHandoffTurnId: string | null;
+  RunToken: string | null;
   CreatedAt: Date;
   UpdatedAt: Date;
   ArchivedAt: Date | null;
@@ -110,6 +112,7 @@ export class LangyConversationStateRepositoryClickHouse<
       LastError: record.LastError,
       PendingHandoffToken: record.PendingHandoffToken,
       PendingHandoffTurnId: record.PendingHandoffTurnId,
+      RunToken: record.RunToken,
       ArchivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
       CreatedAt: Number(record.CreatedAt),
       UpdatedAt: Number(record.UpdatedAt),
@@ -143,6 +146,7 @@ export class LangyConversationStateRepositoryClickHouse<
       LastError: data.LastError,
       PendingHandoffToken: data.PendingHandoffToken,
       PendingHandoffTurnId: data.PendingHandoffTurnId,
+      RunToken: data.RunToken,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
       UpdatedAt: new Date(data.UpdatedAt),
       ArchivedAt: data.ArchivedAt != null ? new Date(data.ArchivedAt) : null,
@@ -185,6 +189,7 @@ export class LangyConversationStateRepositoryClickHouse<
             t.CurrentTurnId AS CurrentTurnId, t.LastError AS LastError,
             t.PendingHandoffToken AS PendingHandoffToken,
             t.PendingHandoffTurnId AS PendingHandoffTurnId,
+            t.RunToken AS RunToken,
             toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
             if(t.ArchivedAt IS NOT NULL, toUnixTimestamp64Milli(t.ArchivedAt), NULL) AS ArchivedAt,

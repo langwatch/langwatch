@@ -34,6 +34,7 @@ import {
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "./errors";
+import { mintRunToken } from "~/server/services/langy/streaming/langyFrameAuth";
 
 /** List-item shape the sidebar renders. Named for the domain, not the column. */
 export type ConversationListItem = {
@@ -274,6 +275,38 @@ export class LangyConversationReadRepository {
     }
     return { token: row.PendingHandoffToken, turnId: row.PendingHandoffTurnId };
   }
+
+  /**
+   * The per-conversation `runToken` (LANGY_WORKER_REDESIGN_PLAN §0a), or null.
+   * Point lookup on the (TenantId, ConversationId) sort key, latest-version via
+   * argMax — never FINAL. This is the ONLY read that projects RunToken, and it is
+   * server-only (worker provisioning + relay frame verification): the token is
+   * kept out of every client-facing read on purpose, so it can never leak into a
+   * projection the browser sees.
+   */
+  async findRunToken({
+    projectId,
+    conversationId,
+  }: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<string | null> {
+    const client = await this.resolver(projectId);
+    const result = await client.query({
+      query: `
+        SELECT argMax(RunToken, UpdatedAt) AS RunToken
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND ConversationId = {conversationId:String}
+        GROUP BY ConversationId
+        HAVING ${LATEST_ARCHIVED_MS} = 0
+      `,
+      query_params: { tenantId: projectId, conversationId },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<{ RunToken: string | null }>();
+    return rows[0]?.RunToken ? String(rows[0].RunToken) : null;
+  }
 }
 
 /** Command dispatchers injected from the event-sourcing pipeline registry. */
@@ -493,8 +526,31 @@ export class LangyConversationService {
       conversationId,
       userId,
       title: title ?? null,
+      // Mint the per-conversation runToken here, at creation, exactly once
+      // (LANGY_WORKER_REDESIGN_PLAN §0a). The started event is idempotent on
+      // `${tenant}:${conversation}:created`, and the fold is first-writer-wins, so
+      // a retried create collapses to one token. Injected into the worker at
+      // spawn; never surfaced to the client.
+      runToken: mintRunToken(),
     });
     return { id: conversationId };
+  }
+
+  /**
+   * The per-conversation `runToken` (LANGY_WORKER_REDESIGN_PLAN §0a), or null
+   * when the conversation has none (lazily created / predates the field). READ
+   * ONLY server-side: the worker-provisioning path injects it at spawn and the
+   * relay uses it to verify the worker's stream frames. It is deliberately not
+   * part of any client-facing read — the same posture as the handoff token.
+   */
+  async getRunToken({
+    projectId,
+    conversationId,
+  }: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<string | null> {
+    return this.repository.findRunToken({ projectId, conversationId });
   }
 
   /**

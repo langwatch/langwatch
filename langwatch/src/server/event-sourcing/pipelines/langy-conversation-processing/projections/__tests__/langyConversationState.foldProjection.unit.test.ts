@@ -93,6 +93,38 @@ describe("LangyConversationStateFoldProjection", () => {
       });
     });
 
+    describe("when it carries a runToken (§0a)", () => {
+      const started = (runToken: unknown, occurredAt: number) =>
+        event(
+          "CONVERSATION_STARTED",
+          LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+          { userId: "alice", runToken },
+          occurredAt,
+        );
+
+      it("folds the runToken onto the server-only state column", () => {
+        const state = fold.apply(fold.init(), started("rt-secret-abc", 1000));
+        expect(state.RunToken).toBe("rt-secret-abc");
+      });
+
+      it("keeps the original runToken when a retried started event proposes a new one (first-writer-wins, never rotated)", () => {
+        const created = fold.apply(fold.init(), started("rt-original", 1000));
+        const retried = fold.apply(created, started("rt-different", 2000));
+        expect(retried.RunToken).toBe("rt-original");
+      });
+
+      it("survives an unrelated later event so the token isn't lost mid-conversation", () => {
+        const created = fold.apply(fold.init(), started("rt-keep", 1000));
+        const afterMessage = fold.apply(created, messageSent({}, 2000));
+        expect(afterMessage.RunToken).toBe("rt-keep");
+      });
+
+      it("is null for a conversation that was lazily created by a message (no started event)", () => {
+        const state = fold.apply(fold.init(), messageSent({}, 1000));
+        expect(state.RunToken).toBeNull();
+      });
+    });
+
     describe("when the first message is sent", () => {
       it("sets the owner, title, active status, and a message count of 1", () => {
         const state = fold.apply(
