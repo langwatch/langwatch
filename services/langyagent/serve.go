@@ -10,9 +10,9 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/lifecycle"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/langyagent/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/workerpool"
 	"github.com/langwatch/langwatch/services/langyagent/app"
+	"github.com/langwatch/langwatch/services/langyagent/transport/rpc"
 )
 
 // Serve wires the app into HTTP transport and pkg/lifecycle management,
@@ -26,7 +26,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 	)
 
 	info := contexts.MustGetServiceInfo(ctx)
-	handler := httpapi.NewRouter(httpapi.RouterDeps{
+	handler := rpc.NewRouter(rpc.RouterDeps{
 		App:                 application,
 		Logger:              deps.Logger,
 		Health:              deps.Health,

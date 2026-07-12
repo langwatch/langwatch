@@ -1,9 +1,10 @@
-// Package httpapi is the driving adapter (HTTP transport) for the langyagent
-// manager. It does auth + validation only and delegates every turn to the app.
-// The router is stdlib net/http (Go 1.22+ method-and-pattern ServeMux) wrapped
-// with the shared pkg/httpmiddleware chain — no third-party router, per the
-// "prefer standard APIs" steer.
-package httpapi
+// Package rpc is the driving adapter (HTTP transport) for the langyagent
+// manager — the inbound RPC surface. It does auth + validation only and
+// delegates every turn to the app. The router (this file, http.go) is stdlib
+// net/http (Go 1.22+ method-and-pattern ServeMux) wrapped with the shared
+// pkg/httpmiddleware chain — no third-party router, per the "prefer standard
+// APIs" steer. Serve() wires it in.
+package rpc
 
 import (
 	"crypto/subtle"
