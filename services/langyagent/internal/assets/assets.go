@@ -30,45 +30,59 @@ import (
 //go:embed skills
 var embedded embed.FS
 
+// Embedded fs paths (always forward-slashed). These mirror the //go:embed
+// directives above — the directives need string literals, so the consts document
+// them rather than drive them.
+const (
+	agentsFile = "AGENTS.md"
+	skillsRoot = "skills"
+)
+
+// Skill-tree permissions. World-readable + root-owned so every per-conversation
+// worker UID can open(2) a skill for read while none can modify it — the posture
+// the old entrypoint.sh chmod set. Explicit (not umask-derived) so the guarantee
+// holds regardless of the container's umask.
+const (
+	dirPerm  = 0o755
+	filePerm = 0o644
+)
+
 // AgentsTemplate returns the AGENTS.md system-prompt template verbatim. It keeps
 // the literal ${LANGWATCH_ENDPOINT} placeholder — the manager substitutes it
 // per-worker at spawn. Read from the binary, so it never depends on a mounted
 // /workspace.
 func AgentsTemplate() (string, error) {
-	raw, err := embedded.ReadFile("AGENTS.md")
+	raw, err := embedded.ReadFile(agentsFile)
 	if err != nil {
-		return "", fmt.Errorf("assets: read embedded AGENTS.md: %w", err)
+		return "", fmt.Errorf("assets: read embedded %s: %w", agentsFile, err)
 	}
 	return string(raw), nil
 }
 
 // MaterializeSkills writes the embedded skills/ tree to destDir on disk so the
 // per-worker opencode subprocess can discover it (a subprocess cannot read the
-// embedded FS). Files land world-readable + root-owned (dirs 0755, files 0644):
-// every per-conversation worker UID must be able to open(2) them for read, and
-// none may modify them — the same posture the old entrypoint.sh chmod set. Call
-// once at pool startup; setupWorkerHome then symlinks each worker home at destDir.
+// embedded FS). Idempotent — it overwrites, so a restart re-lays the tree cleanly.
+// Call once at pool startup; each worker home then symlinks to destDir.
 func MaterializeSkills(destDir string) error {
-	return fs.WalkDir(embedded, "skills", func(path string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(embedded, skillsRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		// Re-root "skills/..." under destDir (destDir IS the skills dir).
-		rel, err := filepath.Rel("skills", path)
+		// Re-root the embedded "skills/..." path under destDir (destDir IS the
+		// skills dir). WalkDir visits a directory before its entries, so a file's
+		// parent already exists by the time we reach it — no per-file MkdirAll.
+		rel, err := filepath.Rel(skillsRoot, path)
 		if err != nil {
 			return err
 		}
 		target := filepath.Join(destDir, rel)
 		if d.IsDir() {
-			return os.MkdirAll(target, 0o755)
+			return os.MkdirAll(target, dirPerm)
 		}
 		data, err := embedded.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("assets: read embedded %s: %w", path, err)
 		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		return os.WriteFile(target, data, 0o644)
+		return os.WriteFile(target, data, filePerm)
 	})
 }
