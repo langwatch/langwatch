@@ -5,19 +5,20 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import type { CommandEnvelope } from "~/server/event-sourcing/commands/commandEnvelope";
 import type {
-  LangyAgentTurnFailedEventData,
+  LangyAgentResponseFailedEventData,
+  LangyAgentRespondedEventData,
+  LangyAgentResponseStartedEventData,
   LangyConversationArchivedEventData,
+  LangyConversationContinuedEventData,
   LangyConversationHandoffConsumedEventData,
   LangyConversationHandoffPendingEventData,
   LangyConversationMetadataUpdatedEventData,
   LangyConversationTitleGeneratedEventData,
-  LangyAgentTurnStartedEventData,
   LangyMessagePart,
   LangyMessageRole,
-  LangyMessageSentEventData,
-  LangyToolCallCompletedEventData,
-  LangyToolCallStartedEventData,
-  LangyTurnFinalizedEventData,
+  LangyToolCallFailedEventData,
+  LangyToolCallInitiatedEventData,
+  LangyToolCallSucceededEventData,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -47,7 +48,7 @@ export type ConversationListItem = {
 export type ConversationDetail = ConversationListItem & {
   status: string;
   /**
-   * Why the last turn failed, when it did (`agent_turn_failed` sets it on the
+   * Why the last turn failed, when it did (`agent_response_failed` sets it on the
    * fold). DURABLE, unlike the browser's `useChat` error — which is why a refresh
    * after a failed turn used to leave the user's question sitting there with no
    * answer and no explanation at all.
@@ -278,12 +279,13 @@ export class LangyConversationReadRepository {
 type Dispatch<T> = (data: T & CommandEnvelope) => Promise<void>;
 
 export interface LangyConversationCommands {
-  sendMessage: Dispatch<LangyMessageSentEventData>;
-  startAgentTurn: Dispatch<LangyAgentTurnStartedEventData>;
-  recordToolCallStarted: Dispatch<LangyToolCallStartedEventData>;
-  recordToolCallCompleted: Dispatch<LangyToolCallCompletedEventData>;
-  failAgentTurn: Dispatch<LangyAgentTurnFailedEventData>;
-  reconcileAgentTurn: Dispatch<LangyTurnFinalizedEventData>;
+  continueConversation: Dispatch<LangyConversationContinuedEventData>;
+  createAgentResponse: Dispatch<LangyAgentResponseStartedEventData>;
+  initiateToolCall: Dispatch<LangyToolCallInitiatedEventData>;
+  succeedToolCall: Dispatch<LangyToolCallSucceededEventData>;
+  failToolCall: Dispatch<LangyToolCallFailedEventData>;
+  failAgentResponse: Dispatch<LangyAgentResponseFailedEventData>;
+  recordAgentResponse: Dispatch<LangyAgentRespondedEventData>;
   archiveConversation: Dispatch<LangyConversationArchivedEventData>;
   updateConversationMetadata: Dispatch<LangyConversationMetadataUpdatedEventData>;
   recordTurnHandoff: Dispatch<LangyConversationHandoffPendingEventData>;
@@ -434,7 +436,7 @@ export class LangyConversationService {
 
   /**
    * Resolve the conversation id for a chat turn. Does NOT write — the aggregate
-   * is created by the first `sendMessage`. Verifies ownership against the fold;
+   * is created by the first `continueConversation`. Verifies ownership against the fold;
    * a stale/archived/unknown id yields a fresh conversation.
    */
   async ensureConversation({
@@ -467,9 +469,9 @@ export class LangyConversationService {
 
   /**
    * Record the user's message. Replaces the old persistMessage(user) +
-   * bumpActivity dual write: one command emits one `message_sent` event that
-   * feeds both the conversation fold (count/activity/owner/title) and the
-   * message map projection (langy_messages row).
+   * bumpActivity dual write: one command emits one `conversation_continued`
+   * event that feeds both the conversation fold (count/activity/owner/title) and
+   * the message map projection (langy_messages row).
    */
   async recordUserMessage({
     projectId,
@@ -487,7 +489,7 @@ export class LangyConversationService {
     role?: LangyMessageRole;
   }): Promise<{ messageId: string }> {
     const messageId = newMessageId();
-    await this.commands.sendMessage({
+    await this.commands.continueConversation({
       tenantId: projectId,
       occurredAt: Date.now(),
       conversationId,
@@ -503,7 +505,7 @@ export class LangyConversationService {
   /**
    * Mark the start of an agent turn. Returns the turnId to correlate finalize.
    * Accepts an optional turnId so a caller can stash the out-of-band spawn
-   * handoff (ADR-044) under the same id BEFORE the `agent_turn_started` event is
+   * handoff (ADR-044) under the same id BEFORE the `agent_response_started` event is
    * dispatched — closing the race where the spawn reactor fires before the
    * handoff exists.
    */
@@ -516,7 +518,7 @@ export class LangyConversationService {
     conversationId: string;
     turnId?: string;
   }): Promise<{ turnId: string }> {
-    await this.commands.startAgentTurn({
+    await this.commands.createAgentResponse({
       tenantId: projectId,
       occurredAt: Date.now(),
       conversationId,
@@ -547,7 +549,7 @@ export class LangyConversationService {
     command?: string;
     input?: unknown;
   }): Promise<void> {
-    await this.commands.recordToolCallStarted({
+    await this.commands.initiateToolCall({
       tenantId: projectId,
       occurredAt: Date.now(),
       conversationId,
@@ -559,7 +561,13 @@ export class LangyConversationService {
     });
   }
 
-  /** Record a durable turn milestone: a tool the agent finished running. */
+  /**
+   * Record a durable response milestone: a tool the agent finished running.
+   * A tool call reaches exactly one terminal — `isError` routes it to the
+   * `tool_call_failed` event (carrying `errorText`), otherwise to
+   * `tool_call_succeeded`. Both share the `tool-done:<toolCallId>` idempotency
+   * slot, so the first terminal for a call wins.
+   */
   async recordToolCallCompleted({
     projectId,
     conversationId,
@@ -583,25 +591,32 @@ export class LangyConversationService {
     durationMs?: number;
     errorText?: string;
   }): Promise<void> {
-    await this.commands.recordToolCallCompleted({
+    const shared = {
       tenantId: projectId,
       occurredAt: Date.now(),
       conversationId,
       turnId,
       toolCallId,
       toolName,
-      ...(isError !== undefined ? { isError } : {}),
       ...(command !== undefined ? { command } : {}),
       ...(input !== undefined ? { input } : {}),
       ...(durationMs !== undefined ? { durationMs } : {}),
-      ...(errorText !== undefined ? { errorText } : {}),
-    });
+    };
+    if (isError) {
+      await this.commands.failToolCall({
+        ...shared,
+        ...(errorText !== undefined ? { errorText } : {}),
+      });
+    } else {
+      await this.commands.succeedToolCall(shared);
+    }
   }
 
   /**
-   * Terminal failure for a turn that has no answer to carry (stalled/orphaned
-   * turn reconciled, or drained on shutdown). Emits `agent_turn_failed`, which
-   * clears the fold's CurrentTurnId and surfaces the error to the user.
+   * Terminal failure for a response that has no answer to carry (stalled/
+   * orphaned response drained by the liveness sweep, or drained on shutdown).
+   * Emits `agent_response_failed`, which clears the fold's CurrentTurnId and
+   * surfaces the error to the user.
    */
   async failTurn({
     projectId,
@@ -614,7 +629,7 @@ export class LangyConversationService {
     turnId: string;
     error: string;
   }): Promise<void> {
-    await this.commands.failAgentTurn({
+    await this.commands.failAgentResponse({
       tenantId: projectId,
       occurredAt: Date.now(),
       conversationId,
@@ -630,8 +645,8 @@ export class LangyConversationService {
    * stream after the agent finished — the failure mode where a completed turn
    * would otherwise stall until the liveness reactor wrongly fails it.
    *
-   * Idempotent on `turnId`: it dispatches the same `reconcileAgentTurn` /
-   * `failAgentTurn` commands the relay does, whose events carry a
+   * Idempotent on `turnId`: it dispatches the same `recordAgentResponse` /
+   * `failAgentResponse` commands the relay does, whose events carry a
    * `turnId`-scoped idempotencyKey, so a duplicate (the relay already finalized,
    * or the agent's bounded retry re-posted) collapses to one event at the store.
    * Whichever path lands first wins; the other is a no-op.
@@ -741,9 +756,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Finalize an agent turn: `turn_finalized` carries the whole final answer as
-   * the source of truth (streamed tokens were never events). Replaces the old
-   * persistMessage(assistant) write.
+   * Finalize an agent response: `agent_responded` carries the whole final
+   * answer as the source of truth (streamed tokens were never events). Replaces
+   * the old persistMessage(assistant) write.
    */
   async finalizeTurn({
     projectId,
@@ -761,7 +776,7 @@ export class LangyConversationService {
     error?: string | null;
   }): Promise<{ messageId: string }> {
     const messageId = newMessageId();
-    await this.commands.reconcileAgentTurn({
+    await this.commands.recordAgentResponse({
       tenantId: projectId,
       occurredAt: Date.now(),
       conversationId,

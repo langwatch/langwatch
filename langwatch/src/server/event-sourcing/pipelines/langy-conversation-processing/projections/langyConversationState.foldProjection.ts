@@ -11,30 +11,32 @@ import {
   type LangyTitleSource,
 } from "../schemas/constants";
 import type {
-  LangyAgentTurnFailedEvent,
-  LangyAgentTurnStartedEvent,
+  LangyAgentResponseFailedEvent,
+  LangyAgentResponseStartedEvent,
+  LangyAgentRespondedEvent,
   LangyConversationArchivedEvent,
+  LangyConversationContinuedEvent,
   LangyConversationHandoffConsumedEvent,
   LangyConversationHandoffPendingEvent,
   LangyConversationMetadataUpdatedEvent,
   LangyConversationTitleGeneratedEvent,
-  LangyMessageSentEvent,
-  LangyToolCallCompletedEvent,
-  LangyToolCallStartedEvent,
-  LangyTurnFinalizedEvent,
+  LangyToolCallFailedEvent,
+  LangyToolCallInitiatedEvent,
+  LangyToolCallSucceededEvent,
 } from "../schemas/events";
 import {
-  LangyAgentTurnFailedEventSchema,
-  LangyAgentTurnStartedEventSchema,
+  LangyAgentResponseFailedEventSchema,
+  LangyAgentResponseStartedEventSchema,
+  LangyAgentRespondedEventSchema,
   LangyConversationArchivedEventSchema,
+  LangyConversationContinuedEventSchema,
   LangyConversationHandoffConsumedEventSchema,
   LangyConversationHandoffPendingEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
   LangyConversationTitleGeneratedEventSchema,
-  LangyMessageSentEventSchema,
-  LangyToolCallCompletedEventSchema,
-  LangyToolCallStartedEventSchema,
-  LangyTurnFinalizedEventSchema,
+  LangyToolCallFailedEventSchema,
+  LangyToolCallInitiatedEventSchema,
+  LangyToolCallSucceededEventSchema,
 } from "../schemas/events";
 
 /**
@@ -66,7 +68,7 @@ export interface LangyConversationStateData {
   LastActivityAt: number | null;
   /**
    * The turn currently in flight, or null when idle. Set by the durable
-   * `agent_turn_started`, cleared by `turn_finalized` / `agent_turn_*`.
+   * `agent_response_started`, cleared by `agent_responded` / `agent_response_failed`.
    * Turn LIVENESS (is the worker still alive?) is NOT tracked here — it is a
    * purely ephemeral concern that lives in the Redis signal buffer (ADR-046);
    * PR3's orphan detection compares "CurrentTurnId set" against ephemeral
@@ -95,12 +97,13 @@ export interface LangyConversationState
 }
 
 const langyConversationEvents = [
-  LangyMessageSentEventSchema,
-  LangyAgentTurnStartedEventSchema,
-  LangyToolCallStartedEventSchema,
-  LangyToolCallCompletedEventSchema,
-  LangyAgentTurnFailedEventSchema,
-  LangyTurnFinalizedEventSchema,
+  LangyConversationContinuedEventSchema,
+  LangyAgentResponseStartedEventSchema,
+  LangyToolCallInitiatedEventSchema,
+  LangyToolCallSucceededEventSchema,
+  LangyToolCallFailedEventSchema,
+  LangyAgentResponseFailedEventSchema,
+  LangyAgentRespondedEventSchema,
   LangyConversationArchivedEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
   LangyConversationHandoffPendingEventSchema,
@@ -113,7 +116,7 @@ const langyConversationEvents = [
  *
  * - `implements FoldEventHandlers` enforces a handler for every event schema.
  * - Handler names are derived from event type strings (e.g.
- *   `"lw.langy_conversation.message_sent"` -> `handleLangyConversationMessageSent`).
+ *   `"lw.langy_conversation.conversation_continued"` -> `handleLangyConversationConversationContinued`).
  * - `CreatedAt` / `UpdatedAt` / `LastEventOccurredAt` are auto-managed by the base.
  */
 export class LangyConversationStateFoldProjection
@@ -173,8 +176,8 @@ export class LangyConversationStateFoldProjection
       : proposed;
   }
 
-  handleLangyConversationMessageSent(
-    event: LangyMessageSentEvent,
+  handleLangyConversationConversationContinued(
+    event: LangyConversationContinuedEvent,
     state: LangyConversationStateData,
   ): LangyConversationStateData {
     const derivedTitle =
@@ -202,8 +205,8 @@ export class LangyConversationStateFoldProjection
     };
   }
 
-  handleLangyConversationAgentTurnStarted(
-    event: LangyAgentTurnStartedEvent,
+  handleLangyConversationAgentResponseStarted(
+    event: LangyAgentResponseStartedEvent,
     state: LangyConversationStateData,
   ): LangyConversationStateData {
     return {
@@ -216,10 +219,11 @@ export class LangyConversationStateFoldProjection
   }
 
   // Tool calls are DURABLE, meaningful transitions (an audit of what the agent
-  // did during the turn); they bump LastActivityAt. They are NOT liveness
+  // did during the response); they bump LastActivityAt. They are NOT liveness
   // heartbeats — those are ephemeral (status/progress) and never reach the fold.
-  handleLangyConversationToolCallStarted(
-    event: LangyToolCallStartedEvent,
+  // A call is initiated, then reaches exactly one terminal: succeeded or failed.
+  handleLangyConversationToolCallInitiated(
+    event: LangyToolCallInitiatedEvent,
     state: LangyConversationStateData,
   ): LangyConversationStateData {
     return {
@@ -229,8 +233,8 @@ export class LangyConversationStateFoldProjection
     };
   }
 
-  handleLangyConversationToolCallCompleted(
-    event: LangyToolCallCompletedEvent,
+  handleLangyConversationToolCallSucceeded(
+    event: LangyToolCallSucceededEvent,
     state: LangyConversationStateData,
   ): LangyConversationStateData {
     return {
@@ -240,8 +244,19 @@ export class LangyConversationStateFoldProjection
     };
   }
 
-  handleLangyConversationAgentTurnFailed(
-    event: LangyAgentTurnFailedEvent,
+  handleLangyConversationToolCallFailed(
+    event: LangyToolCallFailedEvent,
+    state: LangyConversationStateData,
+  ): LangyConversationStateData {
+    return {
+      ...state,
+      ConversationId: state.ConversationId || event.data.conversationId,
+      LastActivityAt: event.occurredAt,
+    };
+  }
+
+  handleLangyConversationAgentResponseFailed(
+    event: LangyAgentResponseFailedEvent,
     state: LangyConversationStateData,
   ): LangyConversationStateData {
     return {
@@ -254,8 +269,8 @@ export class LangyConversationStateFoldProjection
     };
   }
 
-  handleLangyConversationTurnFinalized(
-    event: LangyTurnFinalizedEvent,
+  handleLangyConversationAgentResponded(
+    event: LangyAgentRespondedEvent,
     state: LangyConversationStateData,
   ): LangyConversationStateData {
     const failed = event.data.outcome === "failed";

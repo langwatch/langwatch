@@ -21,7 +21,7 @@ Feature: Langy conversations are an event-sourced projection
   Scenario: Sending the first message creates the conversation from its events
     Given no Langy conversation exists yet
     When I send the message "why are my traces failing?"
-    Then a "message_sent" event is recorded for a new conversation aggregate
+    Then a "conversation_continued" event is recorded for a new conversation aggregate
     And the conversation fold shows me as the owner
     And the conversation title is derived from the first message
     And the message count is 1
@@ -30,13 +30,13 @@ Feature: Langy conversations are an event-sourced projection
   Scenario: A message and its activity bump are one command, not two writes
     Given I am continuing an existing conversation I own
     When I send a message
-    Then exactly one "SendMessage" command is dispatched
+    Then exactly one "ContinueConversation" command is dispatched
     And the message content and the conversation's activity bump come from the
-      same "message_sent" event
+      same "conversation_continued" event
     And there is no separate spine write that could desync from the message
 
   Scenario: Retrying the same send does not double-count
-    Given a "SendMessage" command with a fixed idempotency key
+    Given a "ContinueConversation" command with a fixed idempotency key
     When the command is dispatched twice for the same message
     Then the conversation message count reflects a single message
     And langy_messages holds a single row for that message id
@@ -45,11 +45,23 @@ Feature: Langy conversations are an event-sourced projection
   # The agent turn and its final answer
   # ============================================================================
 
-  Scenario: Starting an agent turn records the turn on the fold
+  Scenario: Starting an agent response records the turn on the fold
     Given I have sent a message on a conversation I own
-    When the agent turn begins
-    Then an "agent_turn_started" event is recorded
+    When the agent response begins
+    Then an "agent_response_started" event is recorded
     And the conversation status reflects an in-progress turn
+
+  Scenario: A tool call reaches exactly one terminal — succeeded or failed
+    Given the agent has initiated a tool call during a response
+    When the tool call returns successfully
+    Then a "tool_call_succeeded" event is recorded carrying the command and duration
+    And no "tool_call_failed" event is recorded for that call
+
+  Scenario: A failing tool call is a distinct event carrying the error
+    Given the agent has initiated a tool call during a response
+    When the tool call returns an error
+    Then a "tool_call_failed" event is recorded carrying the error text
+    And no "tool_call_succeeded" event is recorded for that call
 
   Scenario: Streamed tokens are not events
     Given an agent turn is streaming its answer token by token
@@ -64,18 +76,24 @@ Feature: Langy conversations are an event-sourced projection
     And none reached the conversation fold or the message rows
     And they left no residue once the turn finished
 
-  Scenario: The finalized turn carries the whole answer as the source of truth
-    Given an agent turn has streamed to completion
-    When the turn is reconciled
-    Then a "turn_finalized" event is recorded carrying the full final answer
+  Scenario: The finalized response carries the whole answer as the source of truth
+    Given an agent response has streamed to completion
+    When the response is recorded
+    Then an "agent_responded" event is recorded carrying the full final answer
     And an assistant message row is stored in langy_messages from that event
     And the conversation message count includes the assistant message
     And the conversation status returns to idle
 
-  Scenario: A failed turn is recorded without an assistant message loss
-    Given an agent turn ended in failure
-    When the turn is reconciled with a failure outcome
-    Then a "turn_finalized" event records the failure
+  Scenario: A failed response is recorded without an assistant message loss
+    Given an agent response ended in failure
+    When the response is recorded with a failure outcome
+    Then an "agent_responded" event records the failure
+    And the conversation status reflects the failure
+
+  Scenario: A stalled response with no answer to carry fails distinctly
+    Given an agent response stalled with no answer to carry
+    When the liveness sweep drains it
+    Then an "agent_response_failed" event is recorded
     And the conversation status reflects the failure
 
   # ============================================================================

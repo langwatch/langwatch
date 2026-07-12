@@ -484,8 +484,8 @@ func textDeltaFromEvent(ev *sseEvent) (string, bool) {
 
 // langyToolFrame is the compact tool-lifecycle frame. Like langyTokenFrame it
 // rides the SAME /chat ndjson stream as the full events, multiplexed by `type`,
-// so the control plane can event-source the call (tool_call_started /
-// tool_call_completed) and stream a mapped UI card without re-deriving the
+// so the control plane can event-source the call (tool_call_initiated /
+// tool_call_succeeded / tool_call_failed) and stream a mapped UI card without re-deriving the
 // lifecycle from raw opencode parts.
 //
 // Optionality is carried by pointers/omitempty so the wire shape is exact:

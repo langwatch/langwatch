@@ -7,11 +7,11 @@ import {
 import { langyMessagePartSchema, langyMessageRoleSchema } from "./shared";
 
 /**
- * MessageSent — a user (or system) message was added to the conversation.
- * Feeds both the fold (owner, title, activity, count) and the map projection
- * (the langy_messages row). `parts` is opaque to the pipeline.
+ * ConversationContinued — a user (or system) message was added to the
+ * conversation. Feeds both the fold (owner, title, activity, count) and the map
+ * projection (the langy_messages row). `parts` is opaque to the pipeline.
  */
-export const langyMessageSentEventDataSchema = z.object({
+export const langyConversationContinuedEventDataSchema = z.object({
   conversationId: z.string(),
   /** Owner of the conversation. Set on the fold from the first message only. */
   userId: z.string(),
@@ -21,40 +21,43 @@ export const langyMessageSentEventDataSchema = z.object({
   /** Derived from the first user message; the fold keeps the first non-empty. */
   title: z.string().nullable().optional(),
 });
-export type LangyMessageSentEventData = z.infer<
-  typeof langyMessageSentEventDataSchema
+export type LangyConversationContinuedEventData = z.infer<
+  typeof langyConversationContinuedEventDataSchema
 >;
 
-export const LangyMessageSentEventSchema = EventSchema.extend({
-  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_SENT),
-  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_SENT),
-  data: langyMessageSentEventDataSchema,
+export const LangyConversationContinuedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_CONTINUED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_CONTINUED),
+  data: langyConversationContinuedEventDataSchema,
 });
-export type LangyMessageSentEvent = z.infer<typeof LangyMessageSentEventSchema>;
+export type LangyConversationContinuedEvent = z.infer<
+  typeof LangyConversationContinuedEventSchema
+>;
 
 /**
- * AgentTurnStarted — the assistant began working on the user's latest message.
+ * AgentResponseStarted — the assistant began working on the user's latest
+ * message.
  */
-export const langyAgentTurnStartedEventDataSchema = z.object({
+export const langyAgentResponseStartedEventDataSchema = z.object({
   conversationId: z.string(),
   turnId: z.string(),
 });
-export type LangyAgentTurnStartedEventData = z.infer<
-  typeof langyAgentTurnStartedEventDataSchema
+export type LangyAgentResponseStartedEventData = z.infer<
+  typeof langyAgentResponseStartedEventDataSchema
 >;
 
-export const LangyAgentTurnStartedEventSchema = EventSchema.extend({
-  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_STARTED),
-  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_STARTED),
-  data: langyAgentTurnStartedEventDataSchema,
+export const LangyAgentResponseStartedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_STARTED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_STARTED),
+  data: langyAgentResponseStartedEventDataSchema,
 });
-export type LangyAgentTurnStartedEvent = z.infer<
-  typeof LangyAgentTurnStartedEventSchema
+export type LangyAgentResponseStartedEvent = z.infer<
+  typeof LangyAgentResponseStartedEventSchema
 >;
 
 /**
- * ToolCallStarted — the agent began a tool call during a turn. Recorded as a
- * meaningful transition (not a token) and treated as liveness.
+ * ToolCallInitiated — the agent began a tool call during a response. Recorded
+ * as a meaningful transition (not a token) and treated as liveness.
  *
  * It carries WHAT THE CALL IS DOING, not merely that one happened. A tool name
  * on its own is close to worthless here: half of Langy's calls are `bash`, and
@@ -68,7 +71,7 @@ export type LangyAgentTurnStartedEvent = z.infer<
  * frame that never surfaced its arguments must still be recordable — an event we
  * refuse to write is strictly worse than one that is missing a field.
  */
-export const langyToolCallStartedEventDataSchema = z.object({
+export const langyToolCallInitiatedEventDataSchema = z.object({
   conversationId: z.string(),
   turnId: z.string(),
   toolCallId: z.string(),
@@ -76,75 +79,106 @@ export const langyToolCallStartedEventDataSchema = z.object({
   command: z.string().optional(),
   input: z.unknown().optional(),
 });
-export type LangyToolCallStartedEventData = z.infer<
-  typeof langyToolCallStartedEventDataSchema
+export type LangyToolCallInitiatedEventData = z.infer<
+  typeof langyToolCallInitiatedEventDataSchema
 >;
 
-export const LangyToolCallStartedEventSchema = EventSchema.extend({
-  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_STARTED),
-  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_STARTED),
-  data: langyToolCallStartedEventDataSchema,
+export const LangyToolCallInitiatedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_INITIATED),
+  data: langyToolCallInitiatedEventDataSchema,
 });
-export type LangyToolCallStartedEvent = z.infer<
-  typeof LangyToolCallStartedEventSchema
+export type LangyToolCallInitiatedEvent = z.infer<
+  typeof LangyToolCallInitiatedEventSchema
 >;
 
 /**
- * ToolCallCompleted — a tool call the agent started has returned.
+ * ToolCallSucceeded — a tool call the agent initiated returned without error.
  *
- * Self-describing, exactly like its `started` twin: it repeats the `command` so
- * that ONE event answers "what ran, and how did it go?" without a join back to
- * the start. Debugging a turn is reading a list of these, and a list that says
- * only `bash → isError: true` sends you hunting for the other half.
+ * Self-describing, exactly like its `initiated` twin: it repeats the `command`
+ * so that ONE event answers "what ran, and how long did it take?" without a join
+ * back to the start. Debugging a response is reading a list of these, and a list
+ * that says only `bash` sends you hunting for the other half.
  *
  * `durationMs` is what turns the log into something you can find a slow call in
  * — the CLI spawn alone has been measured in the hundreds of milliseconds, and
- * you cannot chase that without a number. `errorText` keeps the failure itself,
- * truncated, rather than a bare boolean that tells you a thing broke but not why.
+ * you cannot chase that without a number. A tool call that errored is a distinct
+ * event (`tool_call_failed`), so no `isError` boolean lives here.
  */
-export const langyToolCallCompletedEventDataSchema = z.object({
+export const langyToolCallSucceededEventDataSchema = z.object({
   conversationId: z.string(),
   turnId: z.string(),
   toolCallId: z.string(),
   toolName: z.string(),
-  isError: z.boolean().optional(),
+  command: z.string().optional(),
+  input: z.unknown().optional(),
+  durationMs: z.number().optional(),
+});
+export type LangyToolCallSucceededEventData = z.infer<
+  typeof langyToolCallSucceededEventDataSchema
+>;
+
+export const LangyToolCallSucceededEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_SUCCEEDED),
+  data: langyToolCallSucceededEventDataSchema,
+});
+export type LangyToolCallSucceededEvent = z.infer<
+  typeof LangyToolCallSucceededEventSchema
+>;
+
+/**
+ * ToolCallFailed — a tool call the agent initiated returned an error. The
+ * failing twin of `tool_call_succeeded`: a call reaches exactly one of the two.
+ *
+ * `errorText` keeps the failure itself, truncated, rather than a bare boolean
+ * that tells you a thing broke but not why — the whole reason a failed call is
+ * its own event is that the failure detail is worth first-class carriage.
+ */
+export const langyToolCallFailedEventDataSchema = z.object({
+  conversationId: z.string(),
+  turnId: z.string(),
+  toolCallId: z.string(),
+  toolName: z.string(),
   command: z.string().optional(),
   input: z.unknown().optional(),
   durationMs: z.number().optional(),
   errorText: z.string().optional(),
 });
-export type LangyToolCallCompletedEventData = z.infer<
-  typeof langyToolCallCompletedEventDataSchema
+export type LangyToolCallFailedEventData = z.infer<
+  typeof langyToolCallFailedEventDataSchema
 >;
 
-export const LangyToolCallCompletedEventSchema = EventSchema.extend({
-  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_COMPLETED),
-  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_COMPLETED),
-  data: langyToolCallCompletedEventDataSchema,
+export const LangyToolCallFailedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_FAILED),
+  data: langyToolCallFailedEventDataSchema,
 });
-export type LangyToolCallCompletedEvent = z.infer<
-  typeof LangyToolCallCompletedEventSchema
+export type LangyToolCallFailedEvent = z.infer<
+  typeof LangyToolCallFailedEventSchema
 >;
 
 /**
- * AgentTurnFailed — PR3 seam. The turn's lifecycle failed.
+ * AgentResponseFailed — the response's lifecycle failed with no answer to carry
+ * (a stalled/orphaned response the liveness sweep terminalizes). Distinct from
+ * `agent_responded`, which carries the completed answer.
  */
-export const langyAgentTurnFailedEventDataSchema = z.object({
+export const langyAgentResponseFailedEventDataSchema = z.object({
   conversationId: z.string(),
   turnId: z.string(),
   error: z.string(),
 });
-export type LangyAgentTurnFailedEventData = z.infer<
-  typeof langyAgentTurnFailedEventDataSchema
+export type LangyAgentResponseFailedEventData = z.infer<
+  typeof langyAgentResponseFailedEventDataSchema
 >;
 
-export const LangyAgentTurnFailedEventSchema = EventSchema.extend({
-  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_FAILED),
-  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_FAILED),
-  data: langyAgentTurnFailedEventDataSchema,
+export const LangyAgentResponseFailedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED),
+  data: langyAgentResponseFailedEventDataSchema,
 });
-export type LangyAgentTurnFailedEvent = z.infer<
-  typeof LangyAgentTurnFailedEventSchema
+export type LangyAgentResponseFailedEvent = z.infer<
+  typeof LangyAgentResponseFailedEventSchema
 >;
 
 // NOTE: `status_reported` and `progress_reported` are EPHEMERAL signals, not
@@ -154,12 +188,12 @@ export type LangyAgentTurnFailedEvent = z.infer<
 // schemas are for durable event-sourcing events.
 
 /**
- * TurnFinalized — the whole final answer of an agent turn, the source of truth.
- * Streamed tokens are NOT events; this single event carries the complete
+ * AgentResponded — the whole final answer of an agent response, the source of
+ * truth. Streamed tokens are NOT events; this single event carries the complete
  * assistant message. Feeds the fold (terminal status, count) and the map
  * projection (the assistant langy_messages row).
  */
-export const langyTurnFinalizedEventDataSchema = z.object({
+export const langyAgentRespondedEventDataSchema = z.object({
   conversationId: z.string(),
   turnId: z.string(),
   messageId: z.string(),
@@ -168,17 +202,17 @@ export const langyTurnFinalizedEventDataSchema = z.object({
   outcome: z.enum(["completed", "failed"]).default("completed"),
   error: z.string().nullable().optional(),
 });
-export type LangyTurnFinalizedEventData = z.infer<
-  typeof langyTurnFinalizedEventDataSchema
+export type LangyAgentRespondedEventData = z.infer<
+  typeof langyAgentRespondedEventDataSchema
 >;
 
-export const LangyTurnFinalizedEventSchema = EventSchema.extend({
-  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TURN_FINALIZED),
-  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.TURN_FINALIZED),
-  data: langyTurnFinalizedEventDataSchema,
+export const LangyAgentRespondedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED),
+  data: langyAgentRespondedEventDataSchema,
 });
-export type LangyTurnFinalizedEvent = z.infer<
-  typeof LangyTurnFinalizedEventSchema
+export type LangyAgentRespondedEvent = z.infer<
+  typeof LangyAgentRespondedEventSchema
 >;
 
 /**
@@ -279,7 +313,7 @@ export type LangyConversationHandoffConsumedEvent = z.infer<
 
 /**
  * ConversationTitleGenerated — a cheap-model auto title produced after a
- * finalized turn by the langyTitleGeneration reactor. Updates the fold's
+ * finalized response by the langyTitleGeneration reactor. Updates the fold's
  * `Title` ONLY when `titleSource !== "user"` (a manual rename is sticky), and
  * marks the fold's title source as `auto`. Carries the model that produced it
  * for provenance. No message row and no activity bump — it refines metadata,
@@ -310,12 +344,13 @@ export type LangyConversationTitleGeneratedEvent = z.infer<
  * Union of all langy-conversation-processing event types.
  */
 export type LangyConversationProcessingEvent =
-  | LangyMessageSentEvent
-  | LangyAgentTurnStartedEvent
-  | LangyToolCallStartedEvent
-  | LangyToolCallCompletedEvent
-  | LangyAgentTurnFailedEvent
-  | LangyTurnFinalizedEvent
+  | LangyConversationContinuedEvent
+  | LangyAgentResponseStartedEvent
+  | LangyToolCallInitiatedEvent
+  | LangyToolCallSucceededEvent
+  | LangyToolCallFailedEvent
+  | LangyAgentResponseFailedEvent
+  | LangyAgentRespondedEvent
   | LangyConversationArchivedEvent
   | LangyConversationMetadataUpdatedEvent
   | LangyConversationHandoffPendingEvent
@@ -323,12 +358,13 @@ export type LangyConversationProcessingEvent =
   | LangyConversationTitleGeneratedEvent;
 
 export {
-  isLangyMessageSentEvent,
-  isLangyAgentTurnStartedEvent,
-  isLangyToolCallStartedEvent,
-  isLangyToolCallCompletedEvent,
-  isLangyAgentTurnFailedEvent,
-  isLangyTurnFinalizedEvent,
+  isLangyConversationContinuedEvent,
+  isLangyAgentResponseStartedEvent,
+  isLangyToolCallInitiatedEvent,
+  isLangyToolCallSucceededEvent,
+  isLangyToolCallFailedEvent,
+  isLangyAgentResponseFailedEvent,
+  isLangyAgentRespondedEvent,
   isLangyConversationArchivedEvent,
   isLangyConversationMetadataUpdatedEvent,
   isLangyConversationHandoffPendingEvent,

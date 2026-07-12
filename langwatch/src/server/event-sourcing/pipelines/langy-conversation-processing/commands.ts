@@ -5,17 +5,18 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "./schemas/constants";
 import {
-  langyAgentTurnFailedEventDataSchema,
+  langyAgentResponseFailedEventDataSchema,
+  langyAgentRespondedEventDataSchema,
+  langyAgentResponseStartedEventDataSchema,
   langyConversationArchivedEventDataSchema,
+  langyConversationContinuedEventDataSchema,
   langyConversationHandoffConsumedEventDataSchema,
   langyConversationHandoffPendingEventDataSchema,
   langyConversationMetadataUpdatedEventDataSchema,
   langyConversationTitleGeneratedEventDataSchema,
-  langyAgentTurnStartedEventDataSchema,
-  langyMessageSentEventDataSchema,
-  langyToolCallCompletedEventDataSchema,
-  langyToolCallStartedEventDataSchema,
-  langyTurnFinalizedEventDataSchema,
+  langyToolCallFailedEventDataSchema,
+  langyToolCallInitiatedEventDataSchema,
+  langyToolCallSucceededEventDataSchema,
 } from "./schemas/events";
 
 /**
@@ -24,13 +25,13 @@ import {
  * aggregateId = conversationId, TenantId = projectId.
  */
 
-/** SendMessage → message_sent (the user turn). */
-export const SendMessageCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.SEND_MESSAGE,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_SENT,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_SENT,
+/** ContinueConversation → conversation_continued (the user turn). */
+export const ContinueConversationCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.CONTINUE_CONVERSATION,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_CONTINUED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_CONTINUED,
   aggregateType: "langy_conversation",
-  schema: langyMessageSentEventDataSchema,
+  schema: langyConversationContinuedEventDataSchema,
   aggregateId: (d) => d.conversationId,
   idempotencyKey: (d) =>
     `${d.tenantId}:${d.conversationId}:message:${d.messageId}`,
@@ -41,13 +42,13 @@ export const SendMessageCommand = defineCommand({
   }),
 });
 
-/** StartAgentTurn → agent_turn_started. */
-export const StartAgentTurnCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.START_AGENT_TURN,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_STARTED,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_STARTED,
+/** CreateAgentResponse → agent_response_started. */
+export const CreateAgentResponseCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.CREATE_AGENT_RESPONSE,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_STARTED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_STARTED,
   aggregateType: "langy_conversation",
-  schema: langyAgentTurnStartedEventDataSchema,
+  schema: langyAgentResponseStartedEventDataSchema,
   aggregateId: (d) => d.conversationId,
   idempotencyKey: (d) =>
     `${d.tenantId}:${d.conversationId}:turn-start:${d.turnId}`,
@@ -62,16 +63,16 @@ export const StartAgentTurnCommand = defineCommand({
 // (see ../ephemeral.ts), never dispatched through this pipeline (ADR-046).
 //
 // The commands below ARE durable: a meaningful result the agent produces during
-// a turn (a tool call it ran, an intermediate answer, a hard failure) is worth
-// persisting on the event log, unlike a transient "42% through" progress tick.
+// a response (a tool call it ran, an intermediate answer, a hard failure) is
+// worth persisting on the event log, unlike a transient "42% through" tick.
 
-/** RecordToolCallStarted → tool_call_started (a durable turn milestone). */
-export const RecordToolCallStartedCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TOOL_CALL_STARTED,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_STARTED,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_STARTED,
+/** InitiateToolCall → tool_call_initiated (a durable response milestone). */
+export const InitiateToolCallCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.INITIATE_TOOL_CALL,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_INITIATED,
   aggregateType: "langy_conversation",
-  schema: langyToolCallStartedEventDataSchema,
+  schema: langyToolCallInitiatedEventDataSchema,
   aggregateId: (d) => d.conversationId,
   idempotencyKey: (d) =>
     `${d.tenantId}:${d.conversationId}:tool-start:${d.toolCallId}`,
@@ -82,13 +83,13 @@ export const RecordToolCallStartedCommand = defineCommand({
   }),
 });
 
-/** RecordToolCallCompleted → tool_call_completed (a durable turn milestone). */
-export const RecordToolCallCompletedCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TOOL_CALL_COMPLETED,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_COMPLETED,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_COMPLETED,
+/** SucceedToolCall → tool_call_succeeded (a durable response milestone). */
+export const SucceedToolCallCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.SUCCEED_TOOL_CALL,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_SUCCEEDED,
   aggregateType: "langy_conversation",
-  schema: langyToolCallCompletedEventDataSchema,
+  schema: langyToolCallSucceededEventDataSchema,
   aggregateId: (d) => d.conversationId,
   idempotencyKey: (d) =>
     `${d.tenantId}:${d.conversationId}:tool-done:${d.toolCallId}`,
@@ -100,16 +101,39 @@ export const RecordToolCallCompletedCommand = defineCommand({
 });
 
 /**
- * FailAgentTurn → agent_turn_failed. The terminal a stalled/orphaned turn
- * reaches when there is no answer to carry (reconcile + drain). Distinct from
- * ReconcileAgentTurn/turn_finalized, which carries the completed answer.
+ * FailToolCall → tool_call_failed (a durable response milestone). The failing
+ * terminal of a tool call; a call reaches exactly one of succeed/fail, so the
+ * idempotency key matches SucceedToolCall's `tool-done` slot — the first
+ * terminal for a toolCallId wins and a contradictory second is collapsed.
  */
-export const FailAgentTurnCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.FAIL_AGENT_TURN,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_FAILED,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_FAILED,
+export const FailToolCallCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.FAIL_TOOL_CALL,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_FAILED,
   aggregateType: "langy_conversation",
-  schema: langyAgentTurnFailedEventDataSchema,
+  schema: langyToolCallFailedEventDataSchema,
+  aggregateId: (d) => d.conversationId,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.conversationId}:tool-done:${d.toolCallId}`,
+  spanAttributes: (d) => ({
+    "payload.conversation.id": d.conversationId,
+    "payload.turn.id": d.turnId,
+    "payload.tool.name": d.toolName,
+  }),
+});
+
+/**
+ * FailAgentResponse → agent_response_failed. The terminal a stalled/orphaned
+ * response reaches when there is no answer to carry (the liveness sweep drains
+ * it). Distinct from RecordAgentResponse/agent_responded, which carries the
+ * completed answer.
+ */
+export const FailAgentResponseCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.FAIL_AGENT_RESPONSE,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED,
+  aggregateType: "langy_conversation",
+  schema: langyAgentResponseFailedEventDataSchema,
   aggregateId: (d) => d.conversationId,
   idempotencyKey: (d) =>
     `${d.tenantId}:${d.conversationId}:turn-failed:${d.turnId}`,
@@ -119,13 +143,13 @@ export const FailAgentTurnCommand = defineCommand({
   }),
 });
 
-/** ReconcileAgentTurn → turn_finalized (the whole final answer, source of truth). */
-export const ReconcileAgentTurnCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECONCILE_AGENT_TURN,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.TURN_FINALIZED,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.TURN_FINALIZED,
+/** RecordAgentResponse → agent_responded (the whole final answer, source of truth). */
+export const RecordAgentResponseCommand = defineCommand({
+  commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECORD_AGENT_RESPONSE,
+  eventType: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
   aggregateType: "langy_conversation",
-  schema: langyTurnFinalizedEventDataSchema,
+  schema: langyAgentRespondedEventDataSchema,
   aggregateId: (d) => d.conversationId,
   idempotencyKey: (d) =>
     `${d.tenantId}:${d.conversationId}:turn-final:${d.turnId}`,
@@ -152,7 +176,7 @@ export const ArchiveConversationCommand = defineCommand({
 
 /**
  * GenerateConversationTitle → conversation_title_generated (auto title).
- * Dispatched by the langyTitleGeneration reactor after a finalized turn.
+ * Dispatched by the langyTitleGeneration reactor after a finalized response.
  * Idempotency is keyed on conversationId + occurredAt so a redelivered
  * dispatch collapses; the reactor's own per-conversation dedup window is the
  * primary throttle (see LANGY_TITLE_GENERATION.COOLDOWN_MS).

@@ -334,13 +334,13 @@ export class PipelineRegistry {
    * A fold projection writes the conversation spine to `langy_conversations`; a
    * map projection writes per-message rows to `langy_messages`.
    *
-   * PR3 adds two reactors: `spawnAgent` (reacts to `agent_turn_started`,
+   * PR3 adds two reactors: `spawnAgent` (reacts to `agent_response_started`,
    * dispatches the turn to the worker pool — pool late-bound via the returned
    * handle) and `reconcileAgentTurn` (a delayed per-turn liveness timer that
    * terminalizes a stalled turn). The reconcile reactor needs to dispatch
-   * `failAgentTurn`, a command of THIS pipeline, so that dispatcher is resolved
-   * via a Deferred after the pipeline is built (the scenario `computeRunMetrics`
-   * self-reference pattern).
+   * `failAgentResponse`, a command of THIS pipeline, so that dispatcher is
+   * resolved via a Deferred after the pipeline is built (the scenario
+   * `computeRunMetrics` self-reference pattern).
    */
   private registerLangyConversationPipeline() {
     const langyConversationStateFoldStore =
@@ -358,8 +358,8 @@ export class PipelineRegistry {
     const buffer = createLangyTokenBuffer({ redis: this.deps.redis });
     const spawnAgentHandle = createSpawnAgentReactor({ handoffStore });
 
-    // Deferred: the reconcile reactor dispatches failAgentTurn, a command of the
-    // pipeline being built here. Resolve it once the pipeline exists.
+    // Deferred: the reconcile reactor dispatches failAgentResponse, a command of
+    // the pipeline being built here. Resolve it once the pipeline exists.
     const failTurn = new Deferred<
       (args: {
         projectId: string;
@@ -412,7 +412,7 @@ export class PipelineRegistry {
 
     const langyCommands = mapCommands(pipeline.commands);
     failTurn.resolve((args) =>
-      langyCommands.failAgentTurn({
+      langyCommands.failAgentResponse({
         tenantId: args.projectId,
         occurredAt: Date.now(),
         conversationId: args.conversationId,

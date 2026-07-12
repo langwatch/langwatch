@@ -1,7 +1,7 @@
 /**
  * langyTitleGeneration reactor.
  *
- * Fires on `turn_finalized` and, when the throttle allows, asks a CHEAP model
+ * Fires on `agent_responded` and, when the throttle allows, asks a CHEAP model
  * for a concise conversation title, then dispatches `GenerateConversationTitle`
  * (→ `conversation_title_generated`). The title is a first-class event on the
  * `langy_conversation` aggregate; this reactor is the only producer of the
@@ -37,7 +37,7 @@ import {
 } from "../schemas/constants";
 import type { LangyConversationStateData } from "../projections/langyConversationState.foldProjection";
 import type { LangyConversationProcessingEvent } from "../schemas/events";
-import { isLangyTurnFinalizedEvent } from "../schemas/typeGuards";
+import { isLangyAgentRespondedEvent } from "../schemas/typeGuards";
 
 const logger = createLogger("langwatch:langy:title-generation-reactor");
 
@@ -113,7 +113,7 @@ export function createLangyTitleGenerationReactor(deps: {
 
     shouldReact(event, context) {
       // Only a cleanly finalized turn is a title-worthy checkpoint.
-      if (!isLangyTurnFinalizedEvent(event)) return false;
+      if (!isLangyAgentRespondedEvent(event)) return false;
       if (event.data.outcome !== "completed") return false;
       return shouldRegenerate(context.foldState);
     },

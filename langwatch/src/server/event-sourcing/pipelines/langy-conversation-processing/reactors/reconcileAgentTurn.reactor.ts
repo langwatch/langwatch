@@ -1,8 +1,8 @@
 /**
  * reconcileAgentTurn reactor (ADR-044 part 2).
  *
- * A delayed, per-turn liveness timer. It arms on `agent_turn_started` and
- * re-arms on every durable milestone (`tool_call_started/completed`) — those
+ * A delayed, per-turn liveness timer. It arms on `agent_response_started` and
+ * re-arms on every durable milestone (`tool_call_initiated/succeeded/failed`) — those
  * milestones double as the reconcile timer's re-arm, so a healthy turn that
  * keeps producing milestones keeps pushing the timer out.
  * When it finally fires (grace window past the last milestone) it checks whether
@@ -31,9 +31,10 @@ import {
   serializeLangyTurnError,
 } from "~/server/services/langy/execution/langy-turn-errors";
 import {
-  isLangyAgentTurnStartedEvent,
-  isLangyToolCallCompletedEvent,
-  isLangyToolCallStartedEvent,
+  isLangyAgentResponseStartedEvent,
+  isLangyToolCallFailedEvent,
+  isLangyToolCallInitiatedEvent,
+  isLangyToolCallSucceededEvent,
 } from "../schemas/typeGuards";
 
 const logger = createLogger("langwatch:langy:reconcile-reactor");
@@ -41,9 +42,10 @@ const logger = createLogger("langwatch:langy:reconcile-reactor");
 /** Events that arm / re-arm the per-turn reconcile timer. */
 function isArmingEvent(event: LangyConversationProcessingEvent): boolean {
   return (
-    isLangyAgentTurnStartedEvent(event) ||
-    isLangyToolCallStartedEvent(event) ||
-    isLangyToolCallCompletedEvent(event)
+    isLangyAgentResponseStartedEvent(event) ||
+    isLangyToolCallInitiatedEvent(event) ||
+    isLangyToolCallSucceededEvent(event) ||
+    isLangyToolCallFailedEvent(event)
   );
 }
 
