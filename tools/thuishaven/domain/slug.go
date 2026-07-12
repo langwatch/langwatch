@@ -31,6 +31,19 @@ func DeriveSlug(worktreeDir string, taken map[string]bool) string {
 	return base + "-" + hex.EncodeToString(h[:2])
 }
 
+// SlugFromBranch derives a slug from a git branch name, sanitised the same way
+// as a directory name (feat/langy-rework -> feat-langy-rework). Used for the
+// primary checkout, whose directory name is the repo name itself and would
+// otherwise collide with the project label (app.langwatch.langwatch.localhost).
+// Returns "" for a detached HEAD or an otherwise unusable branch.
+func SlugFromBranch(branch string) string {
+	branch = strings.TrimSpace(branch)
+	if branch == "" || branch == "HEAD" {
+		return ""
+	}
+	return SanitizeSlug(branch)
+}
+
 // SanitizeSlug lowercases name and reduces it to [a-z0-9-] with single dashes and
 // no leading/trailing dash — a valid hostname label and, after the "lw_" prefix
 // with dashes swapped for underscores, a valid ClickHouse identifier.

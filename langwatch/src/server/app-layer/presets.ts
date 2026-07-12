@@ -106,6 +106,7 @@ import {
   type AppConfig,
   createAppConfigFromEnv,
   type ProcessRole,
+  roleRunsWorkers,
 } from "./config";
 import type {
   AppDependencies,
@@ -218,6 +219,17 @@ export function initializeWebApp(): App {
 
 export function initializeWorkerApp(): App {
   return initializeDefaultApp({ processRole: "worker" });
+}
+
+/**
+ * Dev-only single-process mode: the web server also hosts the worker stack
+ * in-process (opt-in via WORKERS_IN_PROCESS=1). Boots the App with the "all"
+ * role so the outbox consumer, drainer, and heartbeat scheduler wire up
+ * exactly as they do on a dedicated worker. Prod never calls this — it runs
+ * web and worker as separate deployments.
+ */
+export function initializeInProcessApp(): App {
+  return initializeDefaultApp({ processRole: "all" });
 }
 
 export function initializeDefaultApp(options?: {
@@ -616,12 +628,14 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
-  // Outbox stack: worker-only consumer loop. The send-side handle is wired
-  // into the EventSourcing runtime below (passed to `new EventSourcing`), so
-  // its `.withOutbox` reactors can enqueue settle payloads. Web processes
-  // don't build this (no settle traffic; no consumer to drain).
+  // Outbox stack: the consumer loop for roles where roleRunsWorkers() is true
+  // ("worker" and the in-process dev "all" role). The send-side handle is
+  // wired into the EventSourcing runtime below (passed to `new
+  // EventSourcing`), so its `.withOutbox` reactors can enqueue settle
+  // payloads. Web processes don't build this (no settle traffic; no consumer
+  // to drain).
   const outbox =
-    config.processRole === "worker"
+    roleRunsWorkers(config.processRole)
       ? buildOutboxRuntime({
           prisma,
           redis: redis ?? null,
@@ -651,9 +665,10 @@ export function initializeDefaultApp(options?: {
     outbox,
   });
 
-  // Heartbeat scheduler (ADR-034 Phase 4): worker-only periodic source of
-  // outbox enqueues for the cases the event-driven outbox path
-  // STRUCTURALLY cannot reach (no-data detection, resolve-when-traffic-stops).
+  // Heartbeat scheduler (ADR-034 Phase 4): for roles where roleRunsWorkers()
+  // is true, a periodic source of outbox enqueues for the cases the
+  // event-driven outbox path STRUCTURALLY cannot reach (no-data detection,
+  // resolve-when-traffic-stops).
   // Registrations live in `outboxHeartbeatRegistry` (process-singleton);
   // the scheduler routes every tick's `decide` result through the same
   // `dispatchOutboxEnqueues` helper `adaptOutboxReactor` uses, so one
@@ -662,7 +677,7 @@ export function initializeDefaultApp(options?: {
   // Redis client are present — the lock is the leader-election primitive
   // so a missing Redis means no scheduler.
   const outboxHeartbeatScheduler =
-    config.processRole === "worker" && outbox && redis
+    roleRunsWorkers(config.processRole) && outbox && redis
       ? new OutboxHeartbeatScheduler({
           registry: outboxHeartbeatRegistry,
           redis,

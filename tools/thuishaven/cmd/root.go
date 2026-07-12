@@ -147,7 +147,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	return deps{
 		orch:     app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, logger),
 		dash:     dashboard.New(store.Stacks, sharedURL),
-		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1"},
+		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree)},
 		opts:     optionsFromEnv(worktree),
 		worktree: worktree,
 		lwDir:    lwDir,
@@ -167,6 +167,7 @@ var commands = map[string]command{
 		}
 		return d.orch.Up(ctx, d.params, d.opts)
 	},
+	"setup":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Setup(ctx) },
 	"watch":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Watch(ctx) },
 	"daemon": func(ctx context.Context, d deps, _ []string) error { return d.orch.RunDaemon(ctx, d.dash) },
 	"down": func(ctx context.Context, d deps, rest []string) error {
@@ -240,11 +241,13 @@ func (d deps) dispatch(ctx context.Context, sub string, rest []string) error {
 
 func optionsFromEnv(repoRoot string) app.PlanOptions {
 	return app.PlanOptions{
-		ShouldGoWatch:      os.Getenv("LANGWATCH_GO_WATCH") == "1",
-		ShouldStartWorkers: os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
-		ShouldSkipNLP:      os.Getenv("LANGWATCH_SKIP_NLP") == "1",
-		ShouldSkipGateway:  os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
-		ShouldSeed:         os.Getenv("LANGWATCH_SEED") == "1",
+		ShouldGoWatch:             os.Getenv("LANGWATCH_GO_WATCH") == "1",
+		ShouldStartWorkers:        os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
+		ShouldRunWorkersInProcess: os.Getenv("WORKERS_IN_PROCESS") == "1" || os.Getenv("WORKERS_IN_PROCESS") == "true",
+		ShouldSkipNLP:        os.Getenv("LANGWATCH_SKIP_NLP") == "1",
+		ShouldSkipGateway:    os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
+		ShouldSkipLangyAgent: os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1",
+		ShouldSeed:           os.Getenv("LANGWATCH_SEED") == "1",
 		IsStub:             os.Getenv("HAVEN_STUB") == "1",
 		RepoRoot:           repoRoot,
 	}
@@ -298,6 +301,29 @@ func gitBranch(dir string) string {
 		return "unknown"
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// gitIsLinkedWorktree reports whether dir is a linked git worktree (created by
+// `git worktree add`) rather than the primary checkout. Git points a linked
+// worktree's --git-dir at .git/worktrees/<name> while --git-common-dir stays the
+// shared .git, so the two diverge only for linked worktrees.
+func gitIsLinkedWorktree(dir string) bool {
+	gitDir, err1 := exec.Command("git", "-C", dir, "rev-parse", "--git-dir").Output()
+	commonDir, err2 := exec.Command("git", "-C", dir, "rev-parse", "--git-common-dir").Output()
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	abs := func(p string) string {
+		p = strings.TrimSpace(p)
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(dir, p)
+		}
+		if c, err := filepath.Abs(p); err == nil {
+			return c
+		}
+		return p
+	}
+	return abs(string(gitDir)) != abs(string(commonDir))
 }
 
 func stripFlag(args []string, flag string) ([]string, bool) {

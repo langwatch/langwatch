@@ -1,8 +1,6 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
-.PHONY: observability observability-down observability-connect observability-logs observability-status
-.PHONY: portless-setup haven haven-install portless-list portless-doctor portless-down
 .PHONY: _dev-up-deprecation-warning
 
 # Surface every target — boxd-* are pulled in via include below.
@@ -22,11 +20,14 @@ help:
 	@echo "    make quickstart-help                non-interactive preset reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo ""
-	@echo "  Local dev by hostname (thuishaven / portless — ADR-048):"
-	@echo "    make portless-setup                 one-time: install portless proxy + build haven"
-	@echo "    make portless-list                  which worktree runs what (all stacks)"
-	@echo "    make portless-doctor                check portless / haven / observability health"
-	@echo "    (then just 'pnpm dev' in any worktree; dashboard at https://langwatch.localhost)"
+	@echo "  Local dev by hostname (thuishaven — ADR-048):"
+	@echo "    make haven setup                    one-time: install/verify portless + trust its CA"
+	@echo "    make haven install                  go install the haven binary (then run 'haven ...' directly)"
+	@echo "    make haven up                       start this worktree's hostname stack (== pnpm dev:haven)"
+	@echo "    make haven list                     which worktree runs what (all stacks)"
+	@echo "    make haven doctor                   check proxy / haven / observability health"
+	@echo "    make haven <cmd>                    any haven subcommand (see 'haven help')"
+	@echo "    (dashboard at https://langwatch.localhost)"
 	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
 	@echo ""
 	@echo "  Local observability (logs/traces/metrics → Grafana for agent debugging):"
@@ -58,6 +59,10 @@ help:
 	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
 
 include boxd.mk
+# dev/haven.mk is included at the BOTTOM of this file: its `make haven <sub>`
+# passthrough neutralises the trailing words (e.g. `down`, `install`) as no-op
+# goals, and for that override to beat the real `down` / `install` recipes it
+# must be evaluated after they are defined. See the include at end of file.
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -120,78 +125,6 @@ service-watch:
 			--build.bin "./tmp/$(svc) $(svc)" \
 			--build.include_ext "go" \
 			--build.exclude_dir "tmp,vendor,node_modules"
-
-# =============================================================================
-# THUISHAVEN — hostname-based local dev via portless (ADR-048)
-# =============================================================================
-# `haven` (built from cmd/haven) gives every worktree's services stable
-# hostnames — app|gateway|nlp.<slug>.langwatch.localhost (API lives at
-# app.<slug>.../api) — so multiple worktrees never fight over ports. `pnpm dev`
-# routes through it automatically once the portless proxy is installed.
-# Dashboard: https://langwatch.localhost
-
-HAVEN_PKG = ./cmd/haven
-HAVEN = $$(command -v haven || echo "go run $(HAVEN_PKG)")
-
-# One-time machine setup: install the portless proxy (persistent), trust its CA,
-# and build the haven binary. `.localhost` resolves to loopback natively, so
-# there is no /etc/hosts or DNS step.
-portless-setup:
-	@command -v portless >/dev/null 2>&1 || npm install -g portless
-	@(portless service install 2>/dev/null || portless proxy start || true) && (portless trust || true)
-	@$(MAKE) haven
-	@echo ""
-	@echo "thuishaven ready. Run 'pnpm dev' in any worktree; open https://langwatch.localhost"
-
-# Build / install the haven orchestrator.
-haven:
-	@go build -o bin/haven $(HAVEN_PKG) && echo "built bin/haven"
-haven-install:
-	@go install $(HAVEN_PKG) && echo "installed haven -> $$(go env GOPATH)/bin/haven"
-
-# Convenience wrappers (use an installed `haven`, else `go run ./cmd/haven`).
-portless-list:
-	@$(HAVEN) list
-portless-doctor:
-	@$(HAVEN) doctor
-portless-down:
-	@$(HAVEN) down
-
-# =============================================================================
-# LOCAL OBSERVABILITY STACK (owned by haven — one capped container on colima)
-# =============================================================================
-# An ephemeral OTLP Collector + Loki + Tempo + Prometheus + Grafana for reading
-# local logs/traces/metrics — including from an agent over the gcx CLI.
-#
-# haven owns the lifecycle (it is not a compose service): it runs the bundle on
-# colima rather than Docker Desktop, so the VM has an explicit ceiling, and it
-# caps the container's memory/CPU/pids/logs and Prometheus's retention. Once the
-# stack is up, every `pnpm dev` stack exports to it automatically, tagged
-# langwatch.worktree=<slug> — no .env surgery. See
-# dev/docs/best_practices/local-observability.md and
-# dev/docs/adr/042-local-observability-stack.md.
-
-# Start the stack (starts colima if needed) and wait until Grafana is healthy.
-observability:
-	@$(HAVEN) observability up
-
-# Mint a Grafana service-account token and configure the gcx CLI with it so
-# an agent can query the stack. Idempotent.
-observability-connect:
-	@bash scripts/observability/connect.sh
-
-# Tail the stack logs.
-observability-logs:
-	@docker logs -f langwatch-otel-lgtm
-
-# Show the stack status (also covered by `make portless-doctor`).
-observability-status:
-	@$(HAVEN) observability status
-
-# Stop ONLY the observability stack (never the rest of the dev stack). The stack
-# keeps no volume, so this discards all collected telemetry by design.
-observability-down:
-	@$(HAVEN) observability down
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`
 # (interactive) or `./scripts/dev.sh <preset>` directly. Preset list:
@@ -333,3 +266,8 @@ sync-all-openapi:
 	pnpm run task generateOpenAPISpec
 	cd typescript-sdk && pnpm run generate:openapi-types
 	cd python-sdk && make generate/api-client
+
+# Included last on purpose (see the note next to `include boxd.mk`): the
+# `make haven <sub>` passthrough must define its no-op goals after the real
+# `down` / `install` targets so its override wins.
+include dev/haven.mk

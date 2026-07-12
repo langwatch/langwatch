@@ -31,9 +31,15 @@ type Config struct {
 type PlanOptions struct {
 	ShouldGoWatch      bool // air hot-reload for the Go services instead of `go run`
 	ShouldStartWorkers bool
-	ShouldSkipNLP      bool
-	ShouldSkipGateway  bool
-	ShouldSeed         bool
+	// ShouldRunWorkersInProcess hosts the worker stack inside the app process
+	// (WORKERS_IN_PROCESS=1) instead of a separate `workers` lane — the dev-only
+	// single-process mode that saves the RAM of a second Node process. Mirrors
+	// scripts/start.sh + start.ts. Dev-only; haven always runs NODE_ENV=development.
+	ShouldRunWorkersInProcess bool
+	ShouldSkipNLP        bool
+	ShouldSkipGateway    bool
+	ShouldSkipLangyAgent bool
+	ShouldSeed           bool
 	IsStub             bool // verification: echo servers instead of the real apps
 	RepoRoot           string
 }
