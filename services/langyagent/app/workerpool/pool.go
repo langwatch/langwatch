@@ -23,7 +23,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/app/runner/sandboxed"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
-	"github.com/langwatch/langwatch/services/langyagent/telemetry"
+	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
 )
 
 // revokeTimeout bounds the revoke call to the control plane. Short on purpose:
