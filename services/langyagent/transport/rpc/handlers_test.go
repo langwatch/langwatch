@@ -12,6 +12,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
+	httprpc "github.com/langwatch/langwatch/pkg/rpc"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -113,11 +114,11 @@ func TestChat_ValidationErrors(t *testing.T) {
 		wantCode int
 		wantType string
 	}{
-		{"invalid json", `{not-json`, http.StatusBadRequest, string(domain.ErrBadRequest)},
-		{"missing conversationId", `{"prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusBadRequest, string(domain.ErrBadRequest)},
-		{"missing prompt", `{"conversationId":"c1","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusBadRequest, string(domain.ErrBadRequest)},
+		{"invalid json", `{not-json`, http.StatusBadRequest, string(httprpc.CodeBadRequest)},
+		{"missing conversationId", `{"prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusBadRequest, string(httprpc.CodeBadRequest)},
+		{"missing prompt", `{"conversationId":"c1","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusBadRequest, string(httprpc.CodeBadRequest)},
 		{"path-escaping conversationId", `{"conversationId":"../etc","prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusBadRequest, string(domain.ErrInvalidConversationID)},
-		{"incomplete credentials", `{"conversationId":"c1","prompt":"hi","credentials":{"langwatchApiKey":"k"}}`, http.StatusBadRequest, string(domain.ErrBadRequest)},
+		{"incomplete credentials", `{"conversationId":"c1","prompt":"hi","credentials":{"langwatchApiKey":"k"}}`, http.StatusBadRequest, string(httprpc.CodeBadRequest)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -165,7 +166,7 @@ func TestChat_ValidationNamesOffendingField(t *testing.T) {
 			if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
 				t.Fatalf("decode envelope: %v (%q)", err, rec.Body.String())
 			}
-			if env.Error.Type != string(domain.ErrBadRequest) {
+			if env.Error.Type != string(httprpc.CodeBadRequest) {
 				t.Errorf("error.type = %q, want bad_request", env.Error.Type)
 			}
 			// The user message must NOT echo the raw field name.

@@ -15,6 +15,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
+	httprpc "github.com/langwatch/langwatch/pkg/rpc"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -38,6 +39,7 @@ type RouterDeps struct {
 // chain (RequestID → Recover → Telemetry → Version).
 func NewRouter(deps RouterDeps) http.Handler {
 	domain.RegisterStatuses()
+	httprpc.RegisterStatuses() // bad_request / payload_too_large from the shared decoder
 
 	mux := http.NewServeMux()
 
@@ -70,11 +72,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 	rpc := NewRPC(deps.App, deps.MaxRequestBodyBytes)
 	mux.Handle("POST /warm", requireInternalSecret(
 		deps.InternalSecret,
-		handleNoContent(rpc.maxBodyBytes, rpc.HandleWarm),
+		httprpc.HandleNoContent(rpc.maxBodyBytes, rpc.HandleWarm),
 	))
 	mux.Handle("POST /worker/probe", requireInternalSecret(
 		deps.InternalSecret,
-		handle(rpc.maxBodyBytes, rpc.HandleProbe),
+		httprpc.Handle(rpc.maxBodyBytes, rpc.HandleProbe),
 	))
 
 	// Middleware chain — applied so RequestID is outermost (mirrors aigateway).
