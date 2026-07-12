@@ -76,3 +76,29 @@ it.
   debugging; the compose file documents how to persist + cap retention if needed.
 - `grafana/otel-lgtm`'s Grafana must be v12+ for `gcx`; if the pinned image ships
   an older Grafana, the raw API still works — only `gcx` needs the bump.
+
+## Amendment: haven owns the stack and auto-wires the split
+
+The stack's lifecycle moved from the `compose.dev.yml` `observability` profile to
+**haven** (`tools/thuishaven`, the `otellgtm` adapter): it defaults on, shares
+ClickHouse's colima VM, and `make haven doctor` reports its health. `make
+observability{,-connect,-down}` still work; they now front haven.
+
+Because haven already knows when the stack is up, it stops making the developer
+hand-tune `.env` and wires the console/Grafana split itself. When the collector
+is running, the overlay (`.env.portless`) additionally carries:
+
+- `LOG_CONSOLE_LEVEL=warn` — the console shows only warnings/errors while
+  `info`/`debug` flow to Loki (`LOG_OTEL_LEVEL=debug`, unchanged). This reverses
+  the original "haven never sets the console level" stance (it overrides `.env`,
+  so it was left alone) — now an explicit, opt-outable choice via
+  `LW_OBS_CONSOLE_LEVEL` (`off`/`none`/empty restores `.env`). The pretty console
+  also drops the business-context fields, keeping only trace/span.
+- `GRAFANA_BASE_URL` (loopback Grafana) — so the app turns a trace id into a
+  clickable Grafana deep link. HTTP error bodies gain a `trace` block (ids +
+  Tempo/Loki links), and the Langy error card renders a "view trace" link. Both
+  are safe in production too (Grafana is access-controlled), where ops sets
+  `GRAFANA_BASE_URL` instead.
+
+See `specs/ops/local-observability-stack.feature` (the "console stays quiet" and
+"error links straight to its trace" scenarios) and ADR-003.
