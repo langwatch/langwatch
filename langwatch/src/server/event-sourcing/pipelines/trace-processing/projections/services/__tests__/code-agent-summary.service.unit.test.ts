@@ -15,6 +15,7 @@ import {
   accumulateCodeAgentSummaryFromLog,
   accumulateCodeAgentSummaryFromSpan,
   CODE_AGENT_ATTRS,
+  deriveCodeAgentSessionTitle,
 } from "../code-agent-summary.service";
 
 function span(name: string, spanAttributes: Record<string, string> = {}) {
@@ -333,5 +334,65 @@ describe("the ORDER things happened", () => {
 
       expect(stepNames(attributes)).toEqual(["Read", "Bash!", "Edit"]);
     });
+  });
+});
+
+describe("deriveCodeAgentSessionTitle", () => {
+  function titleResponseBody(title: string): string {
+    return JSON.stringify({
+      content: [{ type: "text", text: JSON.stringify({ title }) }],
+    });
+  }
+
+  it("unwraps the haiku-generated title from a generate_session_title response", () => {
+    const title = deriveCodeAgentSessionTitle({
+      "event.name": "api_response_body",
+      query_source: "generate_session_title",
+      body: titleResponseBody("Refactor auth flow to use BetterAuth"),
+    });
+
+    expect(title).toBe("Refactor auth flow to use BetterAuth");
+  });
+
+  it("ignores a genuine conversational reply (no query_source stamped)", () => {
+    const title = deriveCodeAgentSessionTitle({
+      "event.name": "api_response_body",
+      body: JSON.stringify({
+        content: [{ type: "text", text: "Sure, I can help with that." }],
+      }),
+    });
+
+    expect(title).toBeNull();
+  });
+
+  it("ignores other utility query sources (prompt_suggestion, quota)", () => {
+    const title = deriveCodeAgentSessionTitle({
+      "event.name": "api_response_body",
+      query_source: "prompt_suggestion",
+      body: titleResponseBody("continue"),
+    });
+
+    expect(title).toBeNull();
+  });
+
+  it("ignores every other event on the claude_code log path", () => {
+    expect(
+      deriveCodeAgentSessionTitle({
+        "event.name": "api_request",
+        query_source: "generate_session_title",
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null for an unparseable or non-title body", () => {
+    const title = deriveCodeAgentSessionTitle({
+      "event.name": "api_response_body",
+      query_source: "generate_session_title",
+      body: JSON.stringify({
+        content: [{ type: "text", text: "not json" }],
+      }),
+    });
+
+    expect(title).toBeNull();
   });
 });

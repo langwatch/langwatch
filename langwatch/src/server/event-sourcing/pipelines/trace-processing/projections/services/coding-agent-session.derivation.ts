@@ -156,6 +156,17 @@ const RATE_LIMIT_STATUS = "429";
 const TRUNCATING_STOP_REASONS = new Set(["max_tokens", "refusal"]);
 
 /**
+ * A cache write costs MORE per token than a read, so a call whose
+ * `cacheCreationTokens` is close to the size of the context the PREVIOUS call
+ * had cached is the session paying twice for the same tokens. Same
+ * thresholds `sessionView/tokenTimeline.ts`'s `findCacheRebuilds` uses
+ * client-side (kept in sync by hand — one reads a single trace's transcript
+ * at render time, this one folds at ingest across a session's traces).
+ */
+const CACHE_REBUILD_RATIO_THRESHOLD = 0.5;
+const CACHE_REBUILD_MIN_TOKENS = 1_000;
+
+/**
  * A rejection the human made deliberately, versus one they made by walking away.
  * Neither is a tool that BROKE — counting them together would report the human's
  * judgement as the agent's failure.
@@ -209,6 +220,10 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     compactions: 0,
     compactionTokensBefore: 0,
     compactionTokensAfter: 0,
+    peakContextTokens: 0,
+    cacheRebuildCount: 0,
+    largestCacheRebuildTokens: 0,
+    previousCallContextTokens: 0,
 
     failedTools: 0,
     errorTypes: {},
@@ -398,6 +413,18 @@ export function applySpanToCodingAgentSession({
     const model = str(attrs.model) ?? str(attrs["gen_ai.request.model"]);
     const requestId = str(attrs.request_id);
 
+    const cacheReadTokens = num(attrs.cache_read_tokens);
+    const cacheCreationTokens = num(attrs.cache_creation_tokens);
+    const contextTokens = cacheReadTokens + cacheCreationTokens;
+    // The first call is never a "rebuild" — there is nothing to reuse yet,
+    // so a cold cache isn't the session's fault. `previousCallContextTokens`
+    // starts at 0, which doubles as that gate.
+    const isRebuild =
+      next.previousCallContextTokens > 0 &&
+      cacheCreationTokens >= CACHE_REBUILD_MIN_TOKENS &&
+      cacheCreationTokens / next.previousCallContextTokens >=
+        CACHE_REBUILD_RATIO_THRESHOLD;
+
     return {
       ...next,
       modelCalls: next.modelCalls + 1,
@@ -409,9 +436,14 @@ export function applySpanToCodingAgentSession({
       attempts: next.attempts + Math.max(1, num(attrs.attempt)),
       inputTokens: next.inputTokens + num(attrs.input_tokens),
       outputTokens: next.outputTokens + num(attrs.output_tokens),
-      cacheReadTokens: next.cacheReadTokens + num(attrs.cache_read_tokens),
-      cacheCreationTokens:
-        next.cacheCreationTokens + num(attrs.cache_creation_tokens),
+      cacheReadTokens: next.cacheReadTokens + cacheReadTokens,
+      cacheCreationTokens: next.cacheCreationTokens + cacheCreationTokens,
+      peakContextTokens: Math.max(next.peakContextTokens, contextTokens),
+      cacheRebuildCount: next.cacheRebuildCount + (isRebuild ? 1 : 0),
+      largestCacheRebuildTokens: isRebuild
+        ? Math.max(next.largestCacheRebuildTokens, cacheCreationTokens)
+        : next.largestCacheRebuildTokens,
+      previousCallContextTokens: contextTokens,
       models: model !== null ? addTo(next.models, model) : next.models,
       // The pointer back to the body that ended the session. Last call wins.
       finalRequestId: requestId ?? next.finalRequestId,

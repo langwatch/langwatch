@@ -261,6 +261,9 @@ export interface CodingAgentSessionRow {
   compactions: number;
   compactionTokensBefore: number;
   compactionTokensAfter: number;
+  peakContextTokens: number;
+  cacheRebuildCount: number;
+  largestCacheRebuildTokens: number;
 
   failedTools: number;
   errorTypes: Record<string, number>;
@@ -359,6 +362,9 @@ export function projectCodingAgentSessionToRow({
     compactions: state.compactions,
     compactionTokensBefore: state.compactionTokensBefore,
     compactionTokensAfter: state.compactionTokensAfter,
+    peakContextTokens: state.peakContextTokens,
+    cacheRebuildCount: state.cacheRebuildCount,
+    largestCacheRebuildTokens: state.largestCacheRebuildTokens,
 
     failedTools: state.failedTools,
     errorTypes: state.errorTypes,

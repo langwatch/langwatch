@@ -43,6 +43,34 @@ export type TranscriptEntry =
       model: string | null;
     }
   | {
+      /**
+       * A model call's own economics, positioned in the sequence at the moment
+       * it happened. Separate from `assistant_message` (the TEXT, from the
+       * logs) because the two come off different signals and only the span
+       * knows the cost. Not meant to be its own line in a rendered transcript —
+       * it exists so a reader scrubbing the session can see tokens/cost
+       * accumulate at the right point without re-deriving it from spans.
+       */
+      kind: "model_call";
+      atMs: number;
+      model: string | null;
+      tokens: number;
+      costUsd: number;
+      durationMs: number | null;
+      spanId: string;
+      /**
+       * The cache split, not just the total — this is what lets a reader spot
+       * WHICH call re-created the cache instead of reading from it. A cache
+       * read bills at a fraction of fresh input; a cache write costs MORE than
+       * it, so a call with a large `cacheCreationTokens` next to a small
+       * `cacheReadTokens` is the session paying twice for the same context.
+       */
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadTokens: number;
+      cacheCreationTokens: number;
+    }
+  | {
       kind: "tool";
       atMs: number;
       name: string;
@@ -126,9 +154,29 @@ export function buildCodingAgentTranscript({
   for (const span of spans) {
     if (isModelCallSpan(span.name)) {
       modelCalls += 1;
-      tokens +=
+      const callTokens =
         (span.metrics?.promptTokens ?? 0) + (span.metrics?.completionTokens ?? 0);
-      costUsd += span.metrics?.cost ?? 0;
+      const callCostUsd = span.metrics?.cost ?? 0;
+      tokens += callTokens;
+      costUsd += callCostUsd;
+      entries.push({
+        kind: "model_call",
+        atMs: span.startTimeMs,
+        model:
+          readString(span.params, "gen_ai.request.model") ??
+          readString(span.params, "model"),
+        tokens: callTokens,
+        costUsd: callCostUsd,
+        durationMs:
+          span.endTimeMs && span.startTimeMs
+            ? span.endTimeMs - span.startTimeMs
+            : null,
+        spanId: span.spanId,
+        inputTokens: readNumber(span.params, "input_tokens") ?? 0,
+        outputTokens: readNumber(span.params, "output_tokens") ?? 0,
+        cacheReadTokens: readNumber(span.params, "cache_read_tokens") ?? 0,
+        cacheCreationTokens: readNumber(span.params, "cache_creation_tokens") ?? 0,
+      });
       continue;
     }
 
@@ -235,14 +283,21 @@ function logToEntry({
       };
     }
 
-    case "compaction":
+    case "compaction": {
+      const pre = readNumber(attrs, "pre_tokens");
+      const post = readNumber(attrs, "post_tokens");
+      const trigger = readString(attrs, "trigger") ?? "auto";
       return {
         kind: "note",
         atMs,
         level: "info",
         event,
-        text: "The conversation was compacted — older detail was summarised away.",
+        text:
+          pre !== null && post !== null
+            ? `Context compacted (${trigger}): ${formatTokenCount(pre)} → ${formatTokenCount(post)} tokens`
+            : `Context compacted (${trigger})`,
       };
+    }
 
     case "permission_mode_changed":
       return {
@@ -340,4 +395,8 @@ function readNumber(
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+function formatTokenCount(n: number): string {
+  return n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
 }

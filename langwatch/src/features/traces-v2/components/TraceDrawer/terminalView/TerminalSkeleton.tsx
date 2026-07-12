@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { TERMINAL_TOKENS } from "./palette";
+import { TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./palette";
 
 /**
  * The Terminal's loading state, which must itself look like a terminal.
@@ -17,8 +17,8 @@ import { TERMINAL_TOKENS } from "./palette";
  */
 
 const CELL = {
-  fontFamily: "mono",
-  fontSize: "12px",
+  fontFamily: TERMINAL_FONT_STACK,
+  fontSize: "13px",
   lineHeight: "1.55",
 } as const;
 
@@ -40,7 +40,7 @@ export function TerminalSkeleton() {
     >
       {/* The prompt is already there — a terminal always has one. */}
       <HStack align="baseline" gap={2}>
-        <Text {...CELL} color="blue.fg" fontWeight="bold" aria-hidden>
+        <Text {...CELL} color={TERMINAL_TOKENS.blue} fontWeight="bold" aria-hidden>
           ❯
         </Text>
         <Cursor />

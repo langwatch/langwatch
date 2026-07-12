@@ -13,13 +13,15 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/codingAgentSession.foldProjection";
+import type { CodingAgentSession } from "~/server/app-layer/traces/coding-agent-session-merge";
+import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { SessionView } from "../SessionView";
 
 /** Straight from ClickHouse. Do not tidy. */
-const REAL_SESSION: CodingAgentSessionRow = {
+const REAL_SESSION: CodingAgentSession = {
   tenantId: "project_1",
   traceId: "1e7dbf01553db533b9709651db7d14b6",
+  traceIds: ["1e7dbf01553db533b9709651db7d14b6"],
   version: "2026-07-11",
   startedAtMs: 1_752_000_000_000,
   agent: "claude-code",
@@ -81,6 +83,9 @@ const REAL_SESSION: CodingAgentSessionRow = {
   compactions: 0,
   compactionTokensBefore: 0,
   compactionTokensAfter: 0,
+  peakContextTokens: 0,
+  cacheRebuildCount: 0,
+  largestCacheRebuildTokens: 0,
   failedTools: 4,
   errorTypes: { "Error:ENOENT": 3, ShellError: 1 },
   apiErrors: 0,
@@ -110,10 +115,13 @@ const REAL_SESSION: CodingAgentSessionRow = {
   truncated: false,
 };
 
-function renderSession(over: Partial<CodingAgentSessionRow> = {}) {
+function renderSession(
+  over: Partial<CodingAgentSession> = {},
+  entries?: TranscriptEntry[],
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SessionView session={{ ...REAL_SESSION, ...over }} />
+      <SessionView session={{ ...REAL_SESSION, ...over }} entries={entries} />
     </ChakraProvider>,
   );
 }
@@ -182,6 +190,128 @@ describe("SessionView", () => {
       renderSession({ truncated: true });
 
       expect(screen.getByText("The reply was cut off")).toBeTruthy();
+    });
+  });
+
+  describe("given a session that spans more than one trace", () => {
+    it("says so, rather than silently showing only the trace that was open", () => {
+      renderSession({
+        traceIds: ["trace-a", "trace-b", "trace-c"],
+      });
+      expect(screen.getByText("spans 3 traces")).toBeTruthy();
+    });
+  });
+
+  describe("given a session that is just the one trace", () => {
+    it("shows no multi-trace note — the common case stays quiet", () => {
+      renderSession();
+      expect(screen.queryByText(/spans \d+ traces/)).toBeNull();
+    });
+  });
+
+  describe("given no transcript entries", () => {
+    it("omits the token timeline rather than showing an empty chart", () => {
+      renderSession();
+      expect(screen.queryByText("Where the tokens went")).toBeNull();
+    });
+  });
+
+  describe("given transcript entries with a cache rebuild", () => {
+    it("shows the timeline and names the prompt that triggered the rebuild", () => {
+      const entries: TranscriptEntry[] = [
+        { kind: "user_prompt", atMs: 500, text: "start over on this", chars: 19 },
+        {
+          kind: "model_call",
+          atMs: 1_000,
+          model: "claude-opus-4-8",
+          tokens: 100_000,
+          costUsd: 5,
+          durationMs: 2_000,
+          spanId: "llm-1",
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 100_000,
+          cacheCreationTokens: 0,
+        },
+        {
+          kind: "model_call",
+          atMs: 2_000,
+          model: "claude-opus-4-8",
+          tokens: 90_000,
+          costUsd: 6,
+          durationMs: 2_000,
+          spanId: "llm-2",
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 90_000,
+        },
+      ];
+
+      renderSession({}, entries);
+
+      expect(screen.getByText("Where the tokens went")).toBeTruthy();
+      expect(screen.getByText(/after "start over on this"/)).toBeTruthy();
+    });
+  });
+
+  describe("given a session with cache-health data", () => {
+    it("shows the peak context, cache miss count, and the biggest single rebuild", () => {
+      renderSession({
+        peakContextTokens: 620_000,
+        cacheRebuildCount: 3,
+        largestCacheRebuildTokens: 60_000,
+      });
+
+      expect(screen.getByText("Cache health")).toBeTruthy();
+      expect(screen.getByText("620k")).toBeTruthy();
+      expect(screen.getByText("3")).toBeTruthy();
+      expect(
+        screen.getByText(
+          /Biggest single rebuild: 60k tokens re-sent instead of being reused from cache\./,
+        ),
+      ).toBeTruthy();
+    });
+
+    it("omits the biggest-rebuild callout when there were no rebuilds", () => {
+      renderSession({ cacheRebuildCount: 0, largestCacheRebuildTokens: 0 });
+
+      expect(screen.queryByText(/Biggest single rebuild/)).toBeNull();
+    });
+  });
+
+  describe("given a session that was never compacted", () => {
+    it("omits the Context noise section rather than showing a zero", () => {
+      renderSession();
+      expect(screen.queryByText("Context noise")).toBeNull();
+    });
+  });
+
+  describe("given a session that was compacted", () => {
+    it("reports how many times and the before/after token counts", () => {
+      renderSession({
+        compactions: 2,
+        compactionTokensBefore: 180_000,
+        compactionTokensAfter: 40_000,
+      });
+
+      expect(screen.getByText("Context noise")).toBeTruthy();
+      expect(screen.getByText("Compacted 2× — 180k → 40k tokens.")).toBeTruthy();
+    });
+  });
+
+  describe("given a session that used a skill", () => {
+    it("lists Skills ahead of MCP servers in what it reached for", () => {
+      renderSession({ skills: ["code-review"] });
+
+      const skillsLabel = screen.getByText("Skills");
+      const mcpLabel = screen.getByText("MCP servers");
+      // DOCUMENT_POSITION_FOLLOWING means skillsLabel comes BEFORE mcpLabel.
+      expect(
+        skillsLabel.compareDocumentPosition(mcpLabel) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(screen.getByText("code-review")).toBeTruthy();
     });
   });
 });

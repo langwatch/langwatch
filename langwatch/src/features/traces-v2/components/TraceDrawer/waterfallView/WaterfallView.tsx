@@ -9,6 +9,7 @@ import type {
   SpanTreeNode,
 } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
+import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import { formatDuration } from "../../../utils/formatters";
@@ -21,6 +22,7 @@ import {
   flattenTree,
   getTimeMarkers,
   getTraceRange,
+  shouldShowTimeline,
 } from "./tree";
 import {
   DEFAULT_TREE_PCT,
@@ -73,6 +75,7 @@ export const WaterfallView = memo(function WaterfallView({
   const { signalsBySpanId, isFetched: signalsFetched } =
     useSpanLangwatchSignals();
   const hasAnySignals = signalsBySpanId.size > 0;
+  const { logsBySpanId } = useSpanLogs();
 
   const isDraggingDivider = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -183,6 +186,24 @@ export const WaterfallView = memo(function WaterfallView({
     const picked = interior.filter((_, i) => i % stride === 0);
     return [timeMarkers[0]!, ...picked, timeMarkers[last]!];
   }, [timeMarkers, timelinePanelWidth]);
+
+  // Below COLLAPSE_TIMELINE_BELOW_PX, drop the timeline/flame-graph panel
+  // entirely and give the span list the full width — a squeezed timeline
+  // (hairline bars, a divider eating space, truncated labels) is less
+  // useful than the list is, at that width. Tracks the DRAWER's width via
+  // the same container the resizable divider already measures against, not
+  // the window's — the drawer can be narrower than the viewport.
+  const [containerWidth, setContainerWidth] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => setContainerWidth(el.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const showTimeline = shouldShowTimeline(containerWidth);
 
   // Horizontal-scroll floor for the tree pane. The virtualizer's rows
   // are absolutely positioned, so their content can't grow the scroll
@@ -407,8 +428,8 @@ export const WaterfallView = memo(function WaterfallView({
       {/* Tree panel */}
       <Flex
         direction="column"
-        width={`${treePct * 100}%`}
-        minWidth={`${MIN_TREE_WIDTH}px`}
+        width={showTimeline ? `${treePct * 100}%` : "100%"}
+        minWidth={showTimeline ? `${MIN_TREE_WIDTH}px` : undefined}
         flexShrink={0}
         height="full"
         overflow="hidden"
@@ -551,6 +572,7 @@ export const WaterfallView = memo(function WaterfallView({
                     rootDuration={rootDuration}
                     isSelected={node.span.spanId === selectedSpanId}
                     isPrompt={promptSpanIds?.has(node.span.spanId) ?? false}
+                    logCount={logsBySpanId.get(node.span.spanId)?.length ?? 0}
                     isPinned={pinnedSet.has(node.span.spanId)}
                     isCollapsed={collapsedIds.has(node.span.spanId)}
                     hasChildren={node.children.length > 0}
@@ -577,185 +599,190 @@ export const WaterfallView = memo(function WaterfallView({
         </Box>
       </Flex>
 
-      {/* Resizable divider */}
-      <Box
-        width="5px"
-        flexShrink={0}
-        cursor="col-resize"
-        position="relative"
-        zIndex={2}
-        onMouseDown={handleDividerStart}
-        _hover={{
-          "& > div": { opacity: 1, bg: "blue.solid" },
-        }}
-      >
-        <Box
-          position="absolute"
-          top={0}
-          bottom={0}
-          left="2px"
-          width="1px"
-          // Light mode: lean on the darker `border.emphasized` token so
-          // the divider doesn't vanish against the white-ish surface.
-          // Dark mode: drop to the regular `border` token (and a lower
-          // opacity) — `border.emphasized` reads brighter than the
-          // panel separators around it, which looked off-key in the
-          // dark theme.
-          bg={{ base: "border.emphasized", _dark: "border" }}
-          opacity={0.5}
-          transition="all 0.15s ease"
-        />
-      </Box>
-
-      {/* Timeline panel */}
-      <Flex
-        ref={timelinePanelRef}
-        direction="column"
-        flex={1}
-        minWidth={0}
-        height="full"
-        overflow="hidden"
-      >
-        {/* Time axis header — time markers share the same right inset as
-            the bars below so labels and bars align vertically. */}
-        <Flex
-          align="center"
-          position="relative"
-          height="24px"
-          flexShrink={0}
-          borderBottomWidth="1px"
-          borderColor="border.subtle"
-          bg="bg.subtle/30"
-        >
-          <Box position="absolute" top={0} bottom={0} left={2} right={4}>
-            {visibleTimeMarkers.map((ms, idx) => {
-              const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
-              const isLast = idx === visibleTimeMarkers.length - 1;
-              const isFirst = idx === 0;
-              return (
-                <Text
-                  key={idx}
-                  textStyle="xs"
-                  color="fg.subtle"
-                  position="absolute"
-                  top="50%"
-                  left={`${pct}%`}
-                  transform={
-                    isLast
-                      ? "translate(-100%, -50%)"
-                      : isFirst
-                        ? "translateY(-50%)"
-                        : "translate(-50%, -50%)"
-                  }
-                  whiteSpace="nowrap"
-                  userSelect="none"
-                  lineHeight={1}
-                >
-                  {formatDuration(ms)}
-                </Text>
-              );
-            })}
+      {/* Resizable divider + timeline panel — dropped entirely below
+          COLLAPSE_TIMELINE_BELOW_PX; nothing to divide or show. */}
+      {showTimeline && (
+        <>
+          <Box
+            width="5px"
+            flexShrink={0}
+            cursor="col-resize"
+            position="relative"
+            zIndex={2}
+            onMouseDown={handleDividerStart}
+            _hover={{
+              "& > div": { opacity: 1, bg: "blue.solid" },
+            }}
+          >
+            <Box
+              position="absolute"
+              top={0}
+              bottom={0}
+              left="2px"
+              width="1px"
+              // Light mode: lean on the darker `border.emphasized` token so
+              // the divider doesn't vanish against the white-ish surface.
+              // Dark mode: drop to the regular `border` token (and a lower
+              // opacity) — `border.emphasized` reads brighter than the
+              // panel separators around it, which looked off-key in the
+              // dark theme.
+              bg={{ base: "border.emphasized", _dark: "border" }}
+              opacity={0.5}
+              transition="all 0.15s ease"
+            />
           </Box>
-        </Flex>
 
-        {/* Timeline rows — driven by the tree's scroll position via transform.
+          <Flex
+            ref={timelinePanelRef}
+            direction="column"
+            flex={1}
+            minWidth={0}
+            height="full"
+            overflow="hidden"
+          >
+            {/* Time axis header — time markers share the same right inset as
+            the bars below so labels and bars align vertically. */}
+            <Flex
+              align="center"
+              position="relative"
+              height="24px"
+              flexShrink={0}
+              borderBottomWidth="1px"
+              borderColor="border.subtle"
+              bg="bg.subtle/30"
+            >
+              <Box position="absolute" top={0} bottom={0} left={2} right={4}>
+                {visibleTimeMarkers.map((ms, idx) => {
+                  const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
+                  const isLast = idx === visibleTimeMarkers.length - 1;
+                  const isFirst = idx === 0;
+                  return (
+                    <Text
+                      key={idx}
+                      textStyle="xs"
+                      color="fg.subtle"
+                      position="absolute"
+                      top="50%"
+                      left={`${pct}%`}
+                      transform={
+                        isLast
+                          ? "translate(-100%, -50%)"
+                          : isFirst
+                            ? "translateY(-50%)"
+                            : "translate(-50%, -50%)"
+                      }
+                      whiteSpace="nowrap"
+                      userSelect="none"
+                      lineHeight={1}
+                    >
+                      {formatDuration(ms)}
+                    </Text>
+                  );
+                })}
+              </Box>
+            </Flex>
+
+            {/* Timeline rows — driven by the tree's scroll position via transform.
             No native scrollbar here; wheel events delegate to the tree.
             Right inset is applied per-bar (in TimelineBar) rather than
             on this container so the row's hover / selection background
             still extends edge-to-edge while only the bars + time
             labels stay clear of the pane edge. */}
-        <Box
-          flex={1}
-          overflow="hidden"
-          position="relative"
-          onWheel={handleTimelineWheel}
-        >
-          <Box
-            ref={timelineContentRef}
-            position="relative"
-            height={`${virtualizer.getTotalSize()}px`}
-            width="full"
-            style={{ willChange: "transform" }}
-          >
-            {/* Vertical grid lines — inset to match the bars and time
-                marker labels so the alignment grid is consistent. */}
             <Box
-              position="absolute"
-              top={0}
-              bottom={0}
-              left={2}
-              right={4}
-              pointerEvents="none"
-              zIndex={0}
+              flex={1}
+              overflow="hidden"
+              position="relative"
+              onWheel={handleTimelineWheel}
             >
-              {visibleTimeMarkers.map((ms, idx) => {
-                const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
-                return (
-                  <Box
-                    key={idx}
-                    position="absolute"
-                    left={`${pct}%`}
-                    top={0}
-                    bottom={0}
-                    width="1px"
-                    bg="border.subtle"
-                    opacity={0.3}
-                  />
-                );
-              })}
-            </Box>
-
-            {virtualizer.getVirtualItems().map((virtualRow) => {
-              const row = flatRows[virtualRow.index]!;
-
-              if (row.kind === "group") {
-                return (
-                  <Box
-                    key={`group-tl-${row.parentSpanId}-${row.name}`}
-                    position="absolute"
-                    top={0}
-                    left={0}
-                    width="full"
-                    height={`${virtualRow.size}px`}
-                    transform={`translateY(${virtualRow.start}px)`}
-                  >
-                    <GroupTimelineBar
-                      group={row}
-                      rootStart={rootStart}
-                      rootDuration={rootDuration}
-                    />
-                  </Box>
-                );
-              }
-              const { node } = row;
-              return (
+              <Box
+                ref={timelineContentRef}
+                position="relative"
+                height={`${virtualizer.getTotalSize()}px`}
+                width="full"
+                style={{ willChange: "transform" }}
+              >
+                {/* Vertical grid lines — inset to match the bars and time
+                marker labels so the alignment grid is consistent. */}
                 <Box
-                  key={node.span.spanId}
                   position="absolute"
                   top={0}
-                  left={0}
-                  width="full"
-                  height={`${virtualRow.size}px`}
-                  transform={`translateY(${virtualRow.start}px)`}
+                  bottom={0}
+                  left={2}
+                  right={4}
+                  pointerEvents="none"
+                  zIndex={0}
                 >
-                  <TimelineBar
-                    span={node.span}
-                    rootStart={rootStart}
-                    rootDuration={rootDuration}
-                    rowHeight={virtualRow.size}
-                    isSelected={node.span.spanId === selectedSpanId}
-                    isDimmed={
-                      selectedSpanId !== null &&
-                      node.span.spanId !== selectedSpanId
-                    }
-                    onSelect={handleSelectSpan}
-                  />
+                  {visibleTimeMarkers.map((ms, idx) => {
+                    const pct =
+                      rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
+                    return (
+                      <Box
+                        key={idx}
+                        position="absolute"
+                        left={`${pct}%`}
+                        top={0}
+                        bottom={0}
+                        width="1px"
+                        bg="border.subtle"
+                        opacity={0.3}
+                      />
+                    );
+                  })}
                 </Box>
-              );
-            })}
-          </Box>
-        </Box>
-      </Flex>
+
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const row = flatRows[virtualRow.index]!;
+
+                  if (row.kind === "group") {
+                    return (
+                      <Box
+                        key={`group-tl-${row.parentSpanId}-${row.name}`}
+                        position="absolute"
+                        top={0}
+                        left={0}
+                        width="full"
+                        height={`${virtualRow.size}px`}
+                        transform={`translateY(${virtualRow.start}px)`}
+                      >
+                        <GroupTimelineBar
+                          group={row}
+                          rootStart={rootStart}
+                          rootDuration={rootDuration}
+                        />
+                      </Box>
+                    );
+                  }
+                  const { node } = row;
+                  return (
+                    <Box
+                      key={node.span.spanId}
+                      position="absolute"
+                      top={0}
+                      left={0}
+                      width="full"
+                      height={`${virtualRow.size}px`}
+                      transform={`translateY(${virtualRow.start}px)`}
+                    >
+                      <TimelineBar
+                        span={node.span}
+                        rootStart={rootStart}
+                        rootDuration={rootDuration}
+                        rowHeight={virtualRow.size}
+                        isSelected={node.span.spanId === selectedSpanId}
+                        isDimmed={
+                          selectedSpanId !== null &&
+                          node.span.spanId !== selectedSpanId
+                        }
+                        onSelect={handleSelectSpan}
+                      />
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
+          </Flex>
+        </>
+      )}
     </Flex>
   );
 });

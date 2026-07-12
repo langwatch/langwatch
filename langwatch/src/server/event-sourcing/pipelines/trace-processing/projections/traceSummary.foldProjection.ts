@@ -39,6 +39,7 @@ import type { NormalizedSpan } from "../schemas/spans";
 import {
   accumulateCodeAgentSummaryFromLog,
   accumulateCodeAgentSummaryFromSpan,
+  deriveCodeAgentSessionTitle,
 } from "./services/code-agent-summary.service";
 import {
   SpanTimingService,
@@ -570,6 +571,16 @@ export class TraceSummaryFoldProjection
       totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + liftedOut;
     }
 
+    // Claude Code's own generated session title beats the raw root-span name
+    // ("claude_code.interaction" reads as an implementation detail, not a
+    // title) — but never a name the USER already set. Mirrors a real rename:
+    // `traceNameFromFallback` clears so a later root span can't stomp it back
+    // to the span name, while `rootMetadataFromFallback` is left untouched so
+    // root bookkeeping can still be claimed/upgraded independently.
+    const sessionTitle = state.traceNameUserOverridden
+      ? null
+      : deriveCodeAgentSessionTitle(event.data.attributes);
+
     return {
       ...state,
       traceId: state.traceId || event.data.traceId,
@@ -582,6 +593,9 @@ export class TraceSummaryFoldProjection
       nonBilledCost,
       totalPromptTokenCount,
       totalCompletionTokenCount,
+      ...(sessionTitle !== null
+        ? { traceName: sessionTitle, traceNameFromFallback: false }
+        : {}),
     };
   }
 

@@ -62,8 +62,6 @@ import { ModelsTooltip } from "../../TraceTable/registry/cells/trace/ModelCell";
 import { Chip } from "../Chip";
 import { splitChipsForOverflow } from "../ChipBar";
 import { ExceptionsContent } from "../ExceptionsContent";
-import { useCodeAgentActivity } from "../../../hooks/useCodeAgentActivity";
-import { InteractionActivity } from "../../InteractionActivity";
 import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
@@ -870,10 +868,6 @@ export const DrawerHeader = memo(function DrawerHeader({
     };
   }, [trace.traceName, trace.name, trace.traceId]);
 
-  // Reads the interaction facts already folded onto the trace, so this costs no
-  // extra query.
-  const codeAgentActivity = useCodeAgentActivity(trace.attributes);
-
   const chipDefs = useTraceHeaderChipDefs(trace, {
     onSelectSpan: selectSpan,
     // `onOpenPromptsTab` is a no-op after the redesign — selecting the
@@ -1259,17 +1253,6 @@ export const DrawerHeader = memo(function DrawerHeader({
           {pinResult.inline}
           {pinResult.overflow}
         </HStack>
-      )}
-
-      {/* What this interaction actually did, in the order it did it. A coding
-          agent's prompt and final reply say almost nothing about the work
-          between them, and that work is usually the reason someone opened the
-          drawer. A sequence, not a chip, so it gets its own row rather than
-          competing for a slot in the pill strip above. */}
-      {codeAgentActivity.hasActivity && (
-        <Box marginX={-4} paddingX={4} paddingBottom={1} overflow="hidden">
-          <InteractionActivity activity={codeAgentActivity} maxInlineSteps={10} />
-        </Box>
       )}
 
       {/* Row 5: Inline mode tabs — Trace / Conversation. Trace ID + relative

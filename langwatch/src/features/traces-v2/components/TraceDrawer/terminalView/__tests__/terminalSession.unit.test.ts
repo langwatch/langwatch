@@ -1,54 +1,60 @@
 import { describe, expect, it } from "vitest";
-import type { ConversationTurn } from "../../transcript";
+import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import {
-  buildTimeline,
+  buildEntryTimeline,
   extractDiffFromToolInput,
   isDiffTool,
-  type TerminalStep,
   toolPrimaryArg,
 } from "../terminalSession";
 
-const emptyTurn: ConversationTurn = {
-  kind: "assistant",
-  blocks: [],
-  toolCalls: [],
-  messages: [],
-};
-
-function step(partial: Partial<TerminalStep>): TerminalStep {
-  return { turn: emptyTurn, ...partial };
+function modelCall(atMs: number, tokens: number, costUsd: number): TranscriptEntry {
+  return {
+    kind: "model_call",
+    atMs,
+    model: null,
+    tokens,
+    costUsd,
+    durationMs: null,
+    spanId: `llm-${atMs}`,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+  };
 }
 
-describe("buildTimeline", () => {
-  describe("given steps with per-step tokens and cost", () => {
-    it("accumulates tokens and cost across the timeline", () => {
-      const timeline = buildTimeline([
-        step({ tokens: 100, costUsd: 0.01 }),
-        step({ tokens: 50, costUsd: 0.02 }),
-        step({ tokens: 25, costUsd: 0.03 }),
+function note(atMs: number): TranscriptEntry {
+  return { kind: "note", atMs, level: "info", event: "x", text: "x" };
+}
+
+describe("buildEntryTimeline", () => {
+  describe("given model_call entries carrying tokens and cost", () => {
+    it("accumulates tokens and cost as they occur in the sequence", () => {
+      const timeline = buildEntryTimeline([
+        modelCall(1000, 100, 0.01),
+        note(1500),
+        modelCall(2000, 50, 0.02),
+        modelCall(3000, 25, 0.03),
       ]);
-      expect(timeline.map((p) => p.cumulativeTokens)).toEqual([100, 150, 175]);
+      expect(timeline.map((p) => p.cumulativeTokens)).toEqual([
+        100, 100, 150, 175,
+      ]);
       expect(timeline.map((p) => p.cumulativeCostUsd)).toEqual([
-        0.01, 0.03, 0.06,
+        0.01, 0.01, 0.03, 0.06,
       ]);
     });
   });
 
-  describe("given steps with timestamps", () => {
-    it("measures elapsed time from the first timestamped step", () => {
-      const timeline = buildTimeline([
-        step({ timestamp: 1000 }),
-        step({ timestamp: 3000 }),
-        step({ timestamp: 8000 }),
-      ]);
+  describe("given entries with timestamps", () => {
+    it("measures elapsed time from the first entry", () => {
+      const timeline = buildEntryTimeline([note(1000), note(3000), note(8000)]);
       expect(timeline.map((p) => p.elapsedMs)).toEqual([0, 2000, 7000]);
     });
   });
 
-  describe("given steps missing metrics", () => {
-    it("treats absent tokens/cost as zero", () => {
-      const timeline = buildTimeline([step({}), step({ tokens: 10 })]);
-      expect(timeline[0]!.cumulativeTokens).toBe(0);
+  describe("given non-model-call entries", () => {
+    it("carries the running totals forward without adding to them", () => {
+      const timeline = buildEntryTimeline([modelCall(1000, 10, 0), note(2000)]);
       expect(timeline[1]!.cumulativeTokens).toBe(10);
     });
   });

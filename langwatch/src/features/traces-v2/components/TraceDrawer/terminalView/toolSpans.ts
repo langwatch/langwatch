@@ -48,22 +48,17 @@ function str(value: unknown): string | null {
 }
 
 /**
- * The tool call's id, as the model issued it. Claude stamps it under the OTel
- * GenAI name as well as its own, so read both rather than betting on one.
+ * Index the trace's tool spans by their OWN span id, so a `tool` entry from
+ * the coding-agent transcript (which carries `spanId` directly, off the SAME
+ * span this reads) can be matched to what actually ran. `tool.execution`
+ * children contribute the failure signal — the outer `tool` span covers
+ * permission + execution, so it can look "ok" while the body failed.
+ *
+ * Keyed by span id rather than `tool_use_id`: the transcript is agent-neutral
+ * and not every agent's tool span carries a model-issued call id, but every
+ * span has an id.
  */
-function toolUseIdOf(span: SpanDetail): string | null {
-  const params = span.params ?? {};
-  return str(params.tool_use_id) ?? str(params["gen_ai.tool.call.id"]);
-}
-
-/**
- * Index the trace's tool spans by the `tool_use_id` the model used to call
- * them, so a `tool_use` block in the transcript can be matched to what actually
- * ran. `tool.execution` children contribute the failure signal — the outer
- * `tool` span spans permission + execution, so it can look "ok" while the body
- * failed.
- */
-export function indexToolSpansByUseId({
+export function indexToolSpansBySpanId({
   spans,
   events,
 }: {
@@ -89,11 +84,9 @@ export function indexToolSpansByUseId({
     }
   }
 
-  const byToolUseId = new Map<string, TerminalToolSpan>();
+  const bySpanId = new Map<string, TerminalToolSpan>();
   for (const span of spans) {
     if (span.name !== TOOL_SPAN) continue;
-    const toolUseId = toolUseIdOf(span);
-    if (toolUseId === null) continue;
 
     const params = span.params ?? {};
     // The event can land on the tool span or on its execution child.
@@ -103,7 +96,7 @@ export function indexToolSpansByUseId({
 
     const resultTokens = Number(params.result_tokens);
 
-    byToolUseId.set(toolUseId, {
+    bySpanId.set(span.spanId, {
       toolName: str(params.tool_name),
       durationMs: span.durationMs,
       isError: span.status === "error" || failedParents.has(span.spanId),
@@ -115,7 +108,7 @@ export function indexToolSpansByUseId({
       diff: str(attrs?.diff),
     });
   }
-  return byToolUseId;
+  return bySpanId;
 }
 
 function childOutput({

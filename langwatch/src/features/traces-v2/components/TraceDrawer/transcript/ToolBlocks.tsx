@@ -236,11 +236,7 @@ export function ToolPairCard({
               tone={isError ? "error" : "default"}
             >
               {resultHasAnsi ? (
-                <TerminalOutput
-                  text={resultBody}
-                  isError={isError}
-                  maxHeight="600px"
-                />
+                <TerminalOutput text={resultBody} isError={isError} />
               ) : (
                 <Box
                   as="pre"

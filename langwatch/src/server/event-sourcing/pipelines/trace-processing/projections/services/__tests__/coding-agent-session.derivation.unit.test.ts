@@ -472,6 +472,105 @@ describe("context pressure", () => {
   });
 });
 
+describe("context health", () => {
+  it("tracks the biggest single call's context, not the cumulative sum across calls", () => {
+    const state = fold([
+      {
+        span: span("claude_code.llm_request", {
+          cache_read_tokens: 5_000,
+          cache_creation_tokens: 1_000,
+        }),
+      },
+      {
+        span: span("claude_code.llm_request", {
+          cache_read_tokens: 60_000,
+          cache_creation_tokens: 2_000,
+        }),
+      },
+      {
+        span: span("claude_code.llm_request", {
+          cache_read_tokens: 10_000,
+          cache_creation_tokens: 500,
+        }),
+      },
+    ]);
+
+    // The middle call's context (60,000 + 2,000) is the peak, even though it
+    // isn't the last call and isn't the biggest cumulative sum.
+    expect(state.peakContextTokens).toBe(62_000);
+  });
+
+  it("does not flag the first call as a rebuild — there is nothing to reuse yet", () => {
+    const state = fold([
+      {
+        span: span("claude_code.llm_request", {
+          cache_read_tokens: 0,
+          cache_creation_tokens: 50_000,
+        }),
+      },
+    ]);
+
+    expect(state.cacheRebuildCount).toBe(0);
+  });
+
+  it("flags a call that re-creates most of the prior call's cached context", () => {
+    const state = fold([
+      // First call establishes a 100,000-token cached context.
+      {
+        span: span("claude_code.llm_request", {
+          cache_read_tokens: 0,
+          cache_creation_tokens: 100_000,
+        }),
+      },
+      // Second call re-creates 60,000 of it instead of reading it from cache
+      // (60,000 / 100,000 = 60% >= the 50% threshold).
+      {
+        span: span("claude_code.llm_request", {
+          cache_read_tokens: 0,
+          cache_creation_tokens: 60_000,
+        }),
+      },
+    ]);
+
+    expect(state.cacheRebuildCount).toBe(1);
+    expect(state.largestCacheRebuildTokens).toBe(60_000);
+  });
+
+  it("does not flag a small cache write that isn't actually a rebuild", () => {
+    const state = fold([
+      {
+        span: span("claude_code.llm_request", {
+          cache_read_tokens: 0,
+          cache_creation_tokens: 100_000,
+        }),
+      },
+      // Only 2% of the prior context, and under the 1,000-token floor either way.
+      {
+        span: span("claude_code.llm_request", {
+          cache_read_tokens: 90_000,
+          cache_creation_tokens: 500,
+        }),
+      },
+    ]);
+
+    expect(state.cacheRebuildCount).toBe(0);
+    expect(state.largestCacheRebuildTokens).toBe(0);
+  });
+
+  it("keeps the single worst rebuild across several, not the last one", () => {
+    const state = fold([
+      { span: span("claude_code.llm_request", { cache_creation_tokens: 100_000 }) },
+      // Rebuild #1: 60% of 100k.
+      { span: span("claude_code.llm_request", { cache_creation_tokens: 60_000 }) },
+      // Rebuild #2: 90% of 60k, but smaller in absolute tokens than #1.
+      { span: span("claude_code.llm_request", { cache_creation_tokens: 54_000 }) },
+    ]);
+
+    expect(state.cacheRebuildCount).toBe(2);
+    expect(state.largestCacheRebuildTokens).toBe(60_000);
+  });
+});
+
 describe("the guardrails", () => {
   it("counts the hooks that actually BLOCKED an action", () => {
     const state = fold([

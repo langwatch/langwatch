@@ -74,6 +74,9 @@ interface ClickHouseWriteRecord {
   Compactions: number;
   CompactionTokensBefore: string;
   CompactionTokensAfter: string;
+  PeakContextTokens: string;
+  CacheRebuildCount: number;
+  LargestCacheRebuildTokens: string;
 
   FailedTools: number;
   ErrorTypes: Record<string, number>;
@@ -172,6 +175,9 @@ function toRecord(
     Compactions: row.compactions,
     CompactionTokensBefore: big(row.compactionTokensBefore),
     CompactionTokensAfter: big(row.compactionTokensAfter),
+    PeakContextTokens: big(row.peakContextTokens),
+    CacheRebuildCount: row.cacheRebuildCount,
+    LargestCacheRebuildTokens: big(row.largestCacheRebuildTokens),
 
     FailedTools: row.failedTools,
     ErrorTypes: row.errorTypes,
@@ -423,6 +429,9 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     compactions: asNumber(record.Compactions),
     compactionTokensBefore: asNumber(record.CompactionTokensBefore),
     compactionTokensAfter: asNumber(record.CompactionTokensAfter),
+    peakContextTokens: asNumber(record.PeakContextTokens),
+    cacheRebuildCount: asNumber(record.CacheRebuildCount),
+    largestCacheRebuildTokens: asNumber(record.LargestCacheRebuildTokens),
 
     failedTools: asNumber(record.FailedTools),
     errorTypes: asNumberMap(record.ErrorTypes),
