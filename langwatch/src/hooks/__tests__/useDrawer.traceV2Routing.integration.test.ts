@@ -10,18 +10,16 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { push, replace, router } = vi.hoisted(() => {
+const { push, router } = vi.hoisted(() => {
   const push = vi.fn();
-  const replace = vi.fn();
   return {
     push,
-    replace,
     router: {
       query: {},
       pathname: "/[project]/experiments",
       asPath: "/test-project/experiments/exp-1",
       push,
-      replace,
+      replace: vi.fn(),
     },
   };
 });

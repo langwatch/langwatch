@@ -12,7 +12,13 @@ export default function TraceDetailsRedirect() {
   const traceId = router.query.trace as string | undefined;
 
   useEffect(() => {
-    if (!projectSlug || !traceId || !router.isReady) return;
+    if (!router.isReady) return;
+    // A ready router with no slug/trace means a malformed or stale link;
+    // send it to 404 rather than leaving a permanently blank page.
+    if (!projectSlug || !traceId) {
+      void router.replace("/404");
+      return;
+    }
 
     void router.replace(
       `/${projectSlug}/traces?drawer.open=traceV2Details&drawer.traceId=${encodeURIComponent(traceId)}`,

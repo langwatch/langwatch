@@ -13,6 +13,7 @@ const baseArgs = {
 
 describe("buildTemplateContext", () => {
   describe("when given trace matches", () => {
+    /** @scenario "Notification links point at the Trace Explorer trace path" */
     it("builds trace URLs and the project URL from the base host", () => {
       const ctx = buildTemplateContext({
         ...baseArgs,
