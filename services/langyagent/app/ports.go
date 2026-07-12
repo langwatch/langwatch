@@ -7,6 +7,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/langwatch/langwatch/services/langyagent/domain"
@@ -63,6 +64,41 @@ type Worker interface {
 	// StreamEvents forwards this session's opencode events into sink until a
 	// terminal event or ctx cancellation.
 	StreamEvents(ctx context.Context, sink ChatSink) error
+}
+
+// FinalToolCall is one tool call a turn ran, in the compact shape the durable
+// final carries. Output doubles as the error text when IsError. Mirrors the
+// control plane's LangyFinalToolCall (langy-final-parts.ts).
+type FinalToolCall struct {
+	ID      string          `json:"id"`
+	Name    string          `json:"name"`
+	Input   json.RawMessage `json:"input,omitempty"`
+	Output  *string         `json:"output,omitempty"`
+	IsError *bool           `json:"isError,omitempty"`
+}
+
+// TurnResult is the durable final the agent posts back to the control plane's
+// langy-internal ingest, independently of the best-effort NDJSON relay. The
+// wire contract for POST /api/internal/langy/turn/{turnId}/result.
+type TurnResult struct {
+	ProjectID      string `json:"projectId"`
+	ConversationID string `json:"conversationId"`
+	// Status is "completed" or "failed". Only "completed" is posted today;
+	// failures are covered by the relay's error dispatch and the liveness reactor.
+	Status    string          `json:"status"`
+	Text      string          `json:"text,omitempty"`
+	ToolCalls []FinalToolCall `json:"toolCalls,omitempty"`
+	ErrorCode string          `json:"errorCode,omitempty"`
+}
+
+// TurnFinalizer is the driven port for delivering a turn's durable final to the
+// control plane. Implemented by adapters/controlplane.Finalizer; nil in tests
+// and in deployments without the internal secret (the app no-ops).
+type TurnFinalizer interface {
+	// Finalize posts result for turnID to the control plane at endpoint (the
+	// LangwatchEndpoint the turn was spawned with). Bounded, idempotent retry
+	// lives in the implementation.
+	Finalize(ctx context.Context, endpoint, turnID string, result TurnResult) error
 }
 
 // ChatSink is the streaming transport the app writes a turn's ndjson events

@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { z } from "zod";
 
 import type { Session } from "~/server/auth";
+import { DomainError } from "~/server/app-layer/domain-error";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { createLogger } from "~/utils/logger/server";
@@ -55,13 +56,16 @@ export function ensureGatewayV1BaseUrl(baseUrl: string): string {
 
 /**
  * Thrown when credential resolution can't complete — missing project,
- * missing provider credential, missing env config. The /chat route turns
- * these into 409s so the user gets a clear actionable error rather than
- * a generic 500.
+ * missing provider credential, missing env config. A `DomainError` (kind
+ * `langy_credential_resolution`, httpStatus 409) so it serialises uniformly
+ * through the shared `onError → handleError` path with a proper status/kind,
+ * and `classifyLangyTurnError` renders it on the chat stream — instead of the
+ * /chat route hand-mapping it to a 409. The message is user-safe by
+ * construction (it is the copy shown to the user); nothing internal is carried.
  */
-export class LangyCredentialResolutionError extends Error {
+export class LangyCredentialResolutionError extends DomainError {
   constructor(message: string) {
-    super(message);
+    super("langy_credential_resolution", message, { httpStatus: 409 });
     this.name = "LangyCredentialResolutionError";
   }
 }

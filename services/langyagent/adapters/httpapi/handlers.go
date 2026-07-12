@@ -40,6 +40,14 @@ type chatRequest struct {
 	// conversation; the manager forwards it verbatim into the worker, never
 	// parsing it. Absent ⇒ a normal cold start.
 	ResumeToken string `json:"resumeToken,omitempty"`
+	// TurnID is the control plane's per-turn idempotency key. The agent echoes it
+	// back on the durable final POST. Not required: an older control plane omits
+	// it, and the agent then skips the durable final (relay + reactor still run).
+	TurnID string `json:"turnId,omitempty"`
+	// ProjectID is the tenant the turn belongs to, echoed back on the durable
+	// final so the ingest can dispatch the finalize command. Not required for the
+	// same rollout reason as TurnID.
+	ProjectID string `json:"projectId,omitempty"`
 }
 
 // validateChatRequest checks the decoded body against its `validate` tags. On
@@ -200,6 +208,8 @@ func chatHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 			System:         req.System,
 			Credentials:    creds,
 			ResumeToken:    req.ResumeToken,
+			TurnID:         req.TurnID,
+			ProjectID:      req.ProjectID,
 		}, sink); err != nil {
 			// Pre-stream failures only (e.g. conversation-busy → 409). Once the
 			// stream has begun, the app writes error events into the sink and

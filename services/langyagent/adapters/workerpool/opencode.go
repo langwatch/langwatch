@@ -442,6 +442,24 @@ type langyTokenFrame struct {
 // frame to Stream B. Kept as a single source of truth for the wire contract.
 const langyTokenType = "langy.token"
 
+// langyProgressFrame is a periodic "still working" heartbeat, multiplexed on the
+// same /chat ndjson stream. It carries no content: its only job is to keep the
+// stream producing during a long, silent tool call so the control-plane relay
+// keeps refreshing the turn's liveness key (the scan loop below blocks on
+// upstream bytes, so it cannot self-tick through silence). The relay treats it
+// as ephemeral — it refreshes liveness and drops it, never event-sourcing it.
+type langyProgressFrame struct {
+	Type string `json:"type"`
+}
+
+// langyProgressType is the discriminator for the heartbeat frame.
+const langyProgressType = "langy.progress"
+
+// progressInterval is how often the heartbeat frame is emitted. Comfortably
+// below the control plane's HEARTBEAT_GRACE (30s) so a live-but-quiet turn is
+// never mistaken for a dead one; matches the relay's heartbeat refresh cadence.
+const progressInterval = 5 * time.Second
+
 // textDeltaFromEvent extracts the raw token text from an already-decoded
 // opencode event, or reports ok=false when the event is not a text delta. It
 // mirrors the control plane's parseAgentLine (langy-turn.processor.ts) exactly
@@ -786,6 +804,57 @@ func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID st
 		return fmt.Errorf("event stream failed: %d", resp.StatusCode)
 	}
 
+	// All writes to w go through writeLine so the concurrent heartbeat ticker
+	// below can never interleave bytes with the scan loop mid-line. Returns false
+	// on a write error (client disconnect) so callers stop promptly.
+	var writeMu sync.Mutex
+	writeLine := func(b []byte) bool {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		if _, err := w.Write(b); err != nil {
+			return false
+		}
+		if flush != nil {
+			flush()
+		}
+		return true
+	}
+
+	// Heartbeat: emit a langy.progress frame every progressInterval so the relay
+	// keeps refreshing the turn's liveness key even through a long, silent tool
+	// call — the scan loop blocks on upstream bytes and cannot self-tick through
+	// silence. Best-effort; a write error just stops the ticker (the loop detects
+	// the same disconnect). We wait for the goroutine to exit before returning so
+	// no heartbeat write races the handler teardown.
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ticker := time.NewTicker(progressInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				frame, mErr := json.Marshal(langyProgressFrame{Type: langyProgressType})
+				if mErr != nil {
+					continue
+				}
+				if !writeLine(append(frame, '\n')) {
+					return
+				}
+			}
+		}
+	}()
+	defer func() {
+		close(stop)
+		wg.Wait()
+	}()
+
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	dataPrefix := []byte("data:")
@@ -816,11 +885,8 @@ func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID st
 		// below detects and returns on.
 		if delta, ok := textDeltaFromEvent(&ev); ok {
 			if frame, mErr := json.Marshal(langyTokenFrame{Type: langyTokenType, Text: delta}); mErr == nil {
-				if _, wErr := w.Write(append(frame, '\n')); wErr != nil {
+				if !writeLine(append(frame, '\n')) {
 					return nil // client disconnect.
-				}
-				if flush != nil {
-					flush()
 				}
 			}
 		}
@@ -833,11 +899,8 @@ func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID st
 			if mErr != nil {
 				continue
 			}
-			if _, wErr := w.Write(append(frame, '\n')); wErr != nil {
+			if !writeLine(append(frame, '\n')) {
 				return nil // client disconnect.
-			}
-			if flush != nil {
-				flush()
 			}
 		}
 		// Forward the payload VERBATIM, newline-terminated. payload aliases the
@@ -845,11 +908,8 @@ func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID st
 		// copies it out before Write.
 		out = append(out[:0], payload...)
 		out = append(out, '\n')
-		if _, err := w.Write(out); err != nil {
+		if !writeLine(out) {
 			return nil // client disconnect — opencode keeps producing, but we're done.
-		}
-		if flush != nil {
-			flush()
 		}
 		if _, terminal := terminalEventTypes[ev.Type]; terminal {
 			return nil

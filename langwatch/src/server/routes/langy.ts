@@ -21,11 +21,9 @@
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { Context } from "hono";
 import { z } from "zod";
-import { timingSafeEqual } from "crypto";
 import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
-  revokeLangySessionApiKey,
 } from "~/server/services/langy/langyApiKey";
 import { env } from "~/env.mjs";
 import { hasProjectPermission, isDemoProjectId } from "~/server/api/rbac";
@@ -1554,86 +1552,5 @@ langyRoute().get("/langy/memory/export", async (c) => {
     conversations: conversationsWithMessages,
   });
 });
-
-/**
- * The agent manager reports that a worker has died, so the session key that died
- * with it can stop being a live credential.
- *
- * REVOKE ONLY. There is deliberately no minting counterpart here. The manager is
- * trusted to *hold* a key it was handed, not to manufacture one: a mint endpoint
- * behind this same secret would let whoever holds it create credentials for any
- * user in any project they can name, which is a trust-boundary change and not
- * something a latency optimisation gets to introduce. Revocation is fail-closed —
- * the worst a compromised manager can do with this is destroy its own access.
- *
- * `revokeLangySessionApiKey` narrows it further still: it refuses any key that is
- * not a Langy session key, so a bad or malicious id cannot take a customer's
- * personal or ingestion keys offline.
- *
- * Idempotent, and "already gone" is a success: the manager races the expiry
- * reaper, and a key the reaper collected first must not look like a failure.
- */
-langyRoute().post("/langy/credentials/revoke", async (c) => {
-  const internalSecret = process.env.LANGY_INTERNAL_SECRET;
-  if (!internalSecret) {
-    logger.error("LANGY_INTERNAL_SECRET is not configured");
-    return c.json({ error: "Not configured" }, { status: 503 });
-  }
-  if (
-    !isLangyInternalCallerAuthorized(
-      c.req.header("authorization"),
-      internalSecret,
-    )
-  ) {
-    return c.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const parsed = revokeCredentialsSchema.safeParse(
-    await c.req.json().catch(() => null),
-  );
-  if (!parsed.success) {
-    return c.json({ error: "Invalid request body" }, { status: 400 });
-  }
-
-  const outcome = await revokeLangySessionApiKey({
-    prisma,
-    apiKeyId: parsed.data.apiKeyId,
-  });
-
-  switch (outcome) {
-    case "revoked":
-    case "already_revoked":
-      return c.json({ outcome }, { status: 200 });
-    case "not_found":
-      // 404, which the manager treats as success — the key is in the state it
-      // asked for. Anything else would make the reaper winning the race look
-      // like a fault.
-      return c.json({ outcome }, { status: 404 });
-    case "refused":
-      // The id resolved to a key that is not ours. Refused, and loud: this should
-      // never happen in normal operation.
-      return c.json({ error: "Not a Langy session key" }, { status: 403 });
-  }
-});
-
-const revokeCredentialsSchema = z.object({
-  apiKeyId: z.string().min(1).max(128),
-});
-
-/**
- * Constant-time bearer check against the shared manager secret. A plain `===`
- * leaks the secret one byte at a time to anything that can time our responses,
- * and this endpoint is reachable from inside the cluster.
- */
-function isLangyInternalCallerAuthorized(
-  authorizationHeader: string | undefined,
-  expected: string,
-): boolean {
-  if (!authorizationHeader?.startsWith("Bearer ")) return false;
-  const presented = Buffer.from(authorizationHeader.slice("Bearer ".length));
-  const expectedBuf = Buffer.from(expected);
-  if (presented.length !== expectedBuf.length) return false;
-  return timingSafeEqual(presented, expectedBuf);
-}
 
 export const app = secured.hono;

@@ -1,12 +1,16 @@
 // Package controlplane holds the manager's OUTBOUND calls back to the LangWatch
-// control plane.
+// control plane, both authenticated with the shared LANGY_INTERNAL_SECRET:
 //
-// There is exactly one, and its narrowness is the point: revoke a session key we
-// were handed. The manager cannot ask for a key to be minted. A revoke-only
-// surface is fail-closed — the worst a compromised manager can do with it is
-// destroy its own access — whereas a mint surface would turn the manager into
-// something that can manufacture credentials for any user it names, which is a
-// trust-boundary change and not something a latency fix gets to introduce.
+//   - Revoker    — revoke a session key we were handed (see below).
+//   - Finalizer  — post a turn's durable final result to the langy-internal
+//     ingest (finalizer.go), the independent completion path.
+//
+// The Revoker's narrowness is the point: revoke a session key we were handed.
+// The manager cannot ask for a key to be minted. A revoke-only surface is
+// fail-closed — the worst a compromised manager can do with it is destroy its
+// own access — whereas a mint surface would turn the manager into something that
+// can manufacture credentials for any user it names, which is a trust-boundary
+// change and not something a latency fix gets to introduce.
 package controlplane
 
 import (

@@ -377,4 +377,81 @@ describe("LangyConversationService", () => {
       });
     });
   });
+
+  describe("ingestAgentTurnResult (the durable HTTP-final path)", () => {
+    describe("when the agent posts a completed turn", () => {
+      it("dispatches reconcileAgentTurn carrying the turnId and assembled parts", async () => {
+        const reconcileAgentTurn = vi.fn(async () => {});
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands({ reconcileAgentTurn }),
+        );
+
+        await svc.ingestAgentTurnResult({
+          projectId: "p1",
+          conversationId: "c1",
+          turnId: "turn-9",
+          status: "completed",
+          text: "the answer",
+          toolCalls: [{ id: "t1", name: "search", output: "hit" }],
+        });
+
+        expect(reconcileAgentTurn).toHaveBeenCalledTimes(1);
+        const arg = reconcileAgentTurn.mock.calls[0]![0] as {
+          tenantId: string;
+          conversationId: string;
+          turnId: string;
+          outcome: string;
+          parts: unknown[];
+        };
+        // turnId rides the command — its event's idempotencyKey is derived from
+        // it, so a duplicate (relay already finalized, or a retried POST) dedupes.
+        expect(arg).toMatchObject({
+          tenantId: "p1",
+          conversationId: "c1",
+          turnId: "turn-9",
+          outcome: "completed",
+        });
+        // Tool card before prose.
+        expect(arg.parts).toEqual([
+          {
+            type: "tool-search",
+            toolCallId: "t1",
+            state: "output-available",
+            output: "hit",
+          },
+          { type: "text", text: "the answer", role: "assistant" },
+        ]);
+      });
+    });
+
+    describe("when the agent posts a failed turn", () => {
+      it("dispatches failAgentTurn with a serialized domain error, never raw prose", async () => {
+        const failAgentTurn = vi.fn(async () => {});
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands({ failAgentTurn }),
+        );
+
+        await svc.ingestAgentTurnResult({
+          projectId: "p1",
+          conversationId: "c1",
+          turnId: "turn-9",
+          status: "failed",
+          errorCode: "session-not-found",
+        });
+
+        expect(failAgentTurn).toHaveBeenCalledTimes(1);
+        const arg = failAgentTurn.mock.calls[0]![0] as {
+          turnId: string;
+          error: string;
+        };
+        expect(arg.turnId).toBe("turn-9");
+        // The stored error is a serialized SerializedDomainError (has a `kind`),
+        // not the raw code — LastError is rendered on history load.
+        const parsed = JSON.parse(arg.error) as { kind?: string };
+        expect(parsed.kind).toBe("langy_agent_session_lost");
+      });
+    });
+  });
 });

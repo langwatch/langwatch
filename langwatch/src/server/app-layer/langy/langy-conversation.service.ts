@@ -21,6 +21,14 @@ import type {
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
+  buildFinalAssistantParts,
+  type LangyFinalToolCall,
+} from "./langy-final-parts";
+import {
+  langyAgentErrorFromFrame,
+  serializeLangyTurnError,
+} from "~/server/services/langy/execution/langy-turn-errors";
+import {
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "./errors";
@@ -612,6 +620,61 @@ export class LangyConversationService {
       conversationId,
       turnId,
       error,
+    });
+  }
+
+  /**
+   * Ingest a turn result the agent posted directly over HTTP (the
+   * `langy-internal` durable path). This is the independent, at-least-once
+   * completion path: it survives the backend relay dropping the agent's NDJSON
+   * stream after the agent finished — the failure mode where a completed turn
+   * would otherwise stall until the liveness reactor wrongly fails it.
+   *
+   * Idempotent on `turnId`: it dispatches the same `reconcileAgentTurn` /
+   * `failAgentTurn` commands the relay does, whose events carry a
+   * `turnId`-scoped idempotencyKey, so a duplicate (the relay already finalized,
+   * or the agent's bounded retry re-posted) collapses to one event at the store.
+   * Whichever path lands first wins; the other is a no-op.
+   *
+   * The agent posts a compact `{ text, toolCalls }` (success) or an error
+   * `code` (failure); part assembly and error classification happen HERE, in one
+   * place, so the durable body is identical to the relay's and never carries raw
+   * agent prose (`LastError` is a vetted domain error, rendered on history load).
+   */
+  async ingestAgentTurnResult({
+    projectId,
+    conversationId,
+    turnId,
+    status,
+    text,
+    toolCalls,
+    errorCode,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    status: "completed" | "failed";
+    text?: string;
+    toolCalls?: LangyFinalToolCall[];
+    errorCode?: string;
+  }): Promise<void> {
+    if (status === "failed") {
+      await this.failTurn({
+        projectId,
+        conversationId,
+        turnId,
+        error: serializeLangyTurnError(
+          langyAgentErrorFromFrame(errorCode ?? "agent error"),
+        ),
+      });
+      return;
+    }
+    await this.finalizeTurn({
+      projectId,
+      conversationId,
+      turnId,
+      parts: buildFinalAssistantParts({ text: text ?? "", toolCalls }),
+      outcome: "completed",
     });
   }
 

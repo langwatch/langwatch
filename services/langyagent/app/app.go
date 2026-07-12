@@ -25,7 +25,11 @@ type App struct {
 	logger    *zap.Logger
 	pool      WorkerPool
 	telemetry *telemetry.Telemetry
+	finalizer TurnFinalizer
 }
+
+// finalizeTimeout bounds the durable final POST (across its internal retries).
+const finalizeTimeout = 15 * time.Second
 
 // Option configures an App.
 type Option func(*App)
@@ -47,6 +51,11 @@ func WithWorkerPool(p WorkerPool) Option { return func(a *App) { a.pool = p } }
 
 // WithTelemetry injects the telemetry instruments.
 func WithTelemetry(t *telemetry.Telemetry) Option { return func(a *App) { a.telemetry = t } }
+
+// WithFinalizer injects the durable turn-result poster. Optional: when absent
+// (tests, or a deployment with no internal secret) the app skips the durable
+// HTTP-final and relies on the relay + liveness reactor alone.
+func WithFinalizer(f TurnFinalizer) Option { return func(a *App) { a.finalizer = f } }
 
 // Pool returns the configured worker pool (used by serve.go for lifecycle and
 // by the health/status handler).
@@ -70,6 +79,14 @@ type ChatRequest struct {
 	// turn that handed off on shutdown. Threaded into PostMessage so opencode
 	// resumes from it; empty on a normal cold start.
 	ResumeToken string
+	// TurnID is the control plane's idempotency key for this turn. It rides the
+	// durable final POST so re-delivery (retry, or a final the relay already
+	// recorded) collapses to one event. Empty ⇒ an older control plane that does
+	// not yet thread it; the app then skips the durable final.
+	TurnID string
+	// ProjectID is the tenant the turn belongs to. Required by the ingest to
+	// dispatch the finalize command; carried here so the agent can echo it back.
+	ProjectID string
 }
 
 // Warm spawns the conversation's worker WITHOUT running a turn.
@@ -170,6 +187,11 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 
 	sink.Begin()
 
+	// Wrap the sink so the token/tool frames the worker streams are also
+	// accumulated here, letting the app post a self-sufficient durable final
+	// (the independent completion path) without changing the Worker contract.
+	acc := newAccumulatingSink(sink)
+
 	// Inner ctx whose lifetime this turn owns: the SSE consumer is bound to it
 	// so a PostMessage failure can cancel the consumer immediately rather than
 	// wait for the outer request ctx to time out.
@@ -190,7 +212,7 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 			}
 		}()
 		defer clog.HandlePanic(streamCtx, false)
-		err := worker.StreamEvents(streamCtx, sink)
+		err := worker.StreamEvents(streamCtx, acc)
 		streamed = true
 		errCh <- err
 	}()
@@ -228,8 +250,46 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 		return nil
 	}
 
+	// Durable final: post the completed turn's answer straight to the control
+	// plane's langy-internal ingest, independently of the relay it just streamed
+	// through. This is the path that survives the relay dropping mid- or
+	// post-stream — a completed turn reaches the event log either way, and the
+	// turnId-idempotent ingest collapses the duplicate.
+	a.finalizeCompletedTurn(ctx, req, acc)
+
 	a.turnObserved(ctx, start, "ok")
 	return nil
+}
+
+// finalizeCompletedTurn posts the accumulated final for a successful turn. It is
+// detached from the request ctx (a client disconnect must not cancel the durable
+// write) and fire-and-forget with a panic guard, mirroring the revoke path: a
+// dropped final is recoverable via the ingest's idempotency and the liveness
+// reactor backstop, so it must never block or fail the turn.
+func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, acc *accumulatingSink) {
+	if a.finalizer == nil || req.TurnID == "" {
+		return
+	}
+	text, toolCalls := acc.result()
+	detached := context.WithoutCancel(ctx)
+	go func() {
+		defer clog.HandlePanic(detached, false)
+		fctx, cancel := context.WithTimeout(detached, finalizeTimeout)
+		defer cancel()
+		if err := a.finalizer.Finalize(fctx, req.Credentials.LangwatchEndpoint, req.TurnID, TurnResult{
+			ProjectID:      req.ProjectID,
+			ConversationID: req.ConversationID,
+			Status:         "completed",
+			Text:           text,
+			ToolCalls:      toolCalls,
+		}); err != nil {
+			a.log().Warn("durable turn finalize failed; liveness reactor is the backstop",
+				zap.String("conversation", req.ConversationID),
+				zap.String("turn", req.TurnID),
+				zap.Error(err),
+			)
+		}
+	}()
 }
 
 // --- telemetry helpers: nil-safe so the app unit-tests without instruments ---
