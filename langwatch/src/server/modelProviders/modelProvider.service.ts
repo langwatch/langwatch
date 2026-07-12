@@ -809,10 +809,11 @@ export class ModelProviderService {
     // Walk the multi-scope access relation: every MP whose scope set
     // intersects the project's (projectId, teamId, organizationId) is
     // returned. When the same provider string appears multiple times
-    // (e.g. an ORG row and a PROJECT override), narrower-scope wins for
-    // the legacy `Record<provider, …>` shape we still return here —
-    // new consumers that need the full list should call
-    // `listAccessibleForProject` directly on the service.
+    // (e.g. an ORG row and a PROJECT override), an enabled row beats a
+    // disabled one, then narrower-scope wins for the legacy
+    // `Record<provider, …>` shape we still return here — new consumers
+    // that need the full list should call `listAccessibleForProject`
+    // directly on the service.
     const savedProviders =
       await this.repository.findAllAccessibleForProject(projectId);
 
