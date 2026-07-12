@@ -321,7 +321,13 @@ export async function collectStorageStats(
         backupStatsCollectionFailing = false;
       }
     } catch (backupError) {
-      if (!backupStatsCollectionFailing) {
+      // system.backup_log only exists once backups are configured, which is a
+      // production concern — locally the table is absent, so this "failure" is
+      // expected noise on every 15s tick. Only production surfaces it (and even
+      // there just once, edge-triggered, until it recovers). Off-prod it stays at
+      // debug, below the console floor, so a dev's terminal never sees it.
+      const isProd = process.env.NODE_ENV === "production";
+      if (isProd && !backupStatsCollectionFailing) {
         logger.warn(
           { error: backupError },
           "Failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
