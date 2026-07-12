@@ -6,30 +6,9 @@
  * Usage: Import and compose these steps in test files to create
  * readable tests that map directly to feature specifications.
  */
-import { Page, expect } from "@playwright/test";
+import { Page, expect, test } from "@playwright/test";
 
-import { getProjectSlug } from "../helpers";
-
-/**
- * Typed shape of a tRPC response from organization.getAll.
- * tRPC wraps results in a nested `result.data` structure,
- * with the actual payload under `result.data.json`.
- */
-interface TrpcOrganizationResponse {
-  result?: {
-    data?:
-      | {
-          json?: Array<{
-            id: string;
-            teams?: Array<{ id: string }>;
-          }>;
-        }
-      | Array<{
-          id: string;
-          teams?: Array<{ id: string }>;
-        }>;
-  };
-}
+import { E2E_ENTERPRISE_LICENSE_KEY } from "../license.fixture";
 
 // =============================================================================
 // Navigation Steps
@@ -40,10 +19,11 @@ interface TrpcOrganizationResponse {
  * Extracts the org slug from the Home link to build the URL.
  */
 export async function givenIAmOnTheMembersPage(page: Page) {
-  const projectSlug = await getProjectSlug(page);
-
-  // Navigate to settings/members using the org context
-  await page.goto(`/${projectSlug}/settings/members`);
+  // Members settings is org-scoped at /settings/members (resolved via the
+  // session's active org), not project-prefixed — every app nav link uses this
+  // exact href (see langwatch/src/routes.tsx). The org context comes from the
+  // authenticated session, not the URL.
+  await page.goto(`/settings/members`);
   await expect(
     page.getByRole("heading", { name: "Organization Members" })
   ).toBeVisible({ timeout: 15000 });
@@ -213,33 +193,32 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
   organizationId: string;
   teamId: string;
 }> {
-  // Confirm the authenticated app loaded before calling the org API.
-  await getProjectSlug(page);
-
-  // Use the settings API to get org data
-  const orgData = await page.evaluate(async () => {
-    const response = await fetch("/api/trpc/organization.getAll");
-    const json = (await response.json()) as TrpcOrganizationResponse;
-    // tRPC wraps the result; data may be {json: [...]} or directly [...]
-    const data = json.result?.data;
-    const orgs = (data && !Array.isArray(data) ? data.json : data) ?? [];
-    if (!Array.isArray(orgs) || orgs.length === 0) {
-      throw new Error("No organizations found");
-    }
-    const org = orgs[0]!;
-    return {
-      organizationId: org.id,
-      teamId: org.teams?.[0]?.id ?? "",
+  // Use page.request (not page.evaluate(fetch(...))): the Playwright request
+  // context resolves this relative URL against baseURL and carries the auth
+  // cookies, whereas an in-page fetch on a blank/unnavigated page throws
+  // "Failed to parse URL". Mirrors getProjectSlug and the batched tRPC shape.
+  const response = await page.request.get(
+    "/api/trpc/organization.getAll?batch=1&input=" +
+      encodeURIComponent(JSON.stringify({ "0": { json: {} } })),
+  );
+  const json = (await response.json().catch(() => null)) as {
+    "0"?: {
+      result?: {
+        data?: {
+          json?: Array<{ id: string; teams?: Array<{ id: string }> }>;
+        };
+      };
     };
-  });
-
-  if (!orgData.organizationId || !orgData.teamId) {
+  } | null;
+  const org = (json?.["0"]?.result?.data?.json ?? [])[0];
+  if (!org?.id || !org.teams?.[0]?.id) {
     throw new Error(
-      `Could not extract org/team IDs: ${JSON.stringify(orgData)}`
+      `Could not extract org/team IDs (status ${response.status()}): ${JSON.stringify(
+        json,
+      ).slice(0, 300)}`,
     );
   }
-
-  return orgData;
+  return { organizationId: org.id, teamId: org.teams[0].id };
 }
 
 /**
@@ -293,4 +272,60 @@ export function generateUniqueEmail(prefix: string): string {
   const timestamp = Date.now();
   const random = Math.floor(Math.random() * 1000);
   return `${prefix}-${timestamp}-${random}@example.com`;
+}
+
+// =============================================================================
+// License Scoping
+// =============================================================================
+
+/**
+ * Activate a test ENTERPRISE license (maxMembers=100) for the current org.
+ *
+ * A no-license self-hosted deployment resolves to FREE_PLAN (maxMembers=1), so
+ * the owner alone is at the cap and createInviteRequest 403s. The app trusts
+ * this test-signed license because e2e-ci sets LANGWATCH_LICENSE_PUBLIC_KEY to
+ * the matching TEST_PUBLIC_KEY; getActivePlan re-reads the org's license from
+ * Postgres on every call, so activation takes effect with no app restart.
+ */
+export async function activateEnterpriseLicense(page: Page): Promise<void> {
+  const { organizationId } = await getOrgAndTeamIds(page);
+  const response = await page.request.post("/api/trpc/license.upload?batch=1", {
+    data: {
+      "0": { json: { organizationId, licenseKey: E2E_ENTERPRISE_LICENSE_KEY } },
+    },
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok() || result?.["0"]?.error) {
+    throw new Error(
+      `license.upload failed: ${response.status()} ${JSON.stringify(
+        result,
+      ).slice(0, 500)}`,
+    );
+  }
+}
+
+/**
+ * Remove the org's license, restoring FREE_PLAN. Called after each members test
+ * so the shared org does not leak an ENTERPRISE plan into other suites (e.g.
+ * settings/plans-comparison asserts the Free plan is current).
+ */
+export async function removeEnterpriseLicense(page: Page): Promise<void> {
+  const { organizationId } = await getOrgAndTeamIds(page);
+  await page.request.post("/api/trpc/license.remove?batch=1", {
+    data: { "0": { json: { organizationId } } },
+  });
+}
+
+/**
+ * Registers per-test hooks that activate an ENTERPRISE license before each test
+ * and remove it after — scoping the raised member cap to the members suite so
+ * the shared test org returns to FREE_PLAN for every other suite.
+ */
+export function withEnterpriseLicense(): void {
+  test.beforeEach(async ({ page }) => {
+    await activateEnterpriseLicense(page);
+  });
+  test.afterEach(async ({ page }) => {
+    await removeEnterpriseLicense(page);
+  });
 }

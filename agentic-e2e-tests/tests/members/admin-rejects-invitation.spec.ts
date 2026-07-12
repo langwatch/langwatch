@@ -8,6 +8,7 @@ import {
   seedWaitingApprovalInvite,
   getOrgAndTeamIds,
   generateUniqueEmail,
+  withEnterpriseLicense,
 } from "./steps";
 
 /**
@@ -17,11 +18,12 @@ import {
  * Scenario: Admin rejects an invitation request (lines 36-42)
  */
 test.describe("Invitation Approval - Admin Rejects Request", () => {
-  // Member-invitation requires an org plan with maxMembers>=2. auth.setup.ts
-  // activates a test ENTERPRISE license (maxMembers=100) for the org so these
-  // run in self-hosted CI, where a no-license org otherwise resolves to
-  // FREE_PLAN (maxMembers=1) and createInviteRequest 403s. See
-  // tests/license.fixture.ts. (#1811)
+  // Member-invitation requires an org plan with maxMembers>=2. A no-license
+  // self-hosted org resolves to FREE_PLAN (maxMembers=1), so createInviteRequest
+  // 403s. withEnterpriseLicense() activates a test ENTERPRISE license
+  // (maxMembers=100) before each test and removes it after, scoping the raised
+  // cap to this suite. See tests/license.fixture.ts. (#1802)
+  withEnterpriseLicense();
   /**
    * Scenario: Admin rejects an invitation request
    * Source: update-pending-invitation.feature lines 36-42
