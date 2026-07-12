@@ -47,6 +47,29 @@ process.env.OPENCODE_AGENT_URL = "http://agent.test";
 process.env.LANGY_INTERNAL_SECRET = "internal-secret";
 
 import { extractGithubPrLinks } from "../../services/langy/githubPrLinks";
+import { GithubOAuthHttpClient } from "~/server/app-layer/clients/github/github-oauth.http.client";
+import { LangyGithubCredentialsService } from "~/server/app-layer/langy/langy-github-credentials.service";
+import { PrismaLangyUserGithubCredentialsRepository } from "~/server/app-layer/langy/repositories/langy-user-github-credentials.prisma.repository";
+import { prisma as mockedDbPrisma } from "~/server/db";
+
+// The GitHub OAuth route + disconnect router now delegate to the app-layer
+// LangyGithubCredentialsService via getApp(). To keep the per-test dependency
+// injection these scenarios rely on, getApp()'s `githubCredentials` reads this
+// mutable holder: scenarios that need to drive real service logic over a bespoke
+// Prisma mock (disconnect) set it; the rest fall back to a default service built
+// over the module-level `~/server/db` mock. Real service + repo + client run;
+// only Prisma/Redis/fetch are mocked.
+const githubCredsHolder = vi.hoisted(() => ({
+  value: null as unknown,
+}));
+
+function makeGithubCredsOver(prismaLike: unknown): LangyGithubCredentialsService {
+  return new LangyGithubCredentialsService(
+    new PrismaLangyUserGithubCredentialsRepository(prismaLike as never),
+    new GithubOAuthHttpClient("test-client-id", "test-client-secret"),
+    true,
+  );
+}
 
 /**
  * NOTE — the `[langy:progress:...]` scenarios that used to live in this file are
@@ -161,6 +184,9 @@ describe("Feature: Langy opens GitHub PRs as the requesting user", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+    // Default to a service over the module-level `~/server/db` mock; scenarios
+    // that need a bespoke Prisma mock (disconnect) override this holder.
+    githubCredsHolder.value = null;
     getServerAuthSession.mockResolvedValue({ user: { id: "u1" } });
     membershipFindUnique.mockResolvedValue({
       userId: "u1",
@@ -343,6 +369,8 @@ vi.mock("~/server/app-layer/app", () => ({
         finalizeTurn: (...args: unknown[]) => finalizeTurn(...args),
       },
       messages: {},
+      githubCredentials:
+        githubCredsHolder.value ?? makeGithubCredsOver(mockedDbPrisma),
     },
   }),
 }));
@@ -728,6 +756,10 @@ describe("Feature: revoking the Langy GitHub connection", () => {
           async () => new Response("{}", { status: 200 }),
         );
         vi.stubGlobal("fetch", fetchMock);
+
+        // The router delegates to getApp().langy.githubCredentials, not
+        // ctx.prisma — drive real service logic over this scenario's Prisma mock.
+        githubCredsHolder.value = makeGithubCredsOver(prisma);
 
         const { langyGithubRouter } = await import(
           "~/server/api/routers/langyGithub"

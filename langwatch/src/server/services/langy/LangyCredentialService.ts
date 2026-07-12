@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { z } from "zod";
 
 import type { Session } from "~/server/auth";
+import { getApp } from "~/server/app-layer";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
 import { ProjectRepository } from "~/server/projects/project.repository";
@@ -11,7 +12,6 @@ import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
 } from "./langyApiKey";
-import { getGithubTokenForUser } from "./langyGithubToken";
 import { provisionLangyVirtualKey } from "./langyVirtualKey";
 
 const logger = createLogger("langwatch:langy:credentials");
@@ -247,8 +247,7 @@ export class LangyCredentialService {
     let githubToken: string | undefined;
     let githubLogin: string | undefined;
     try {
-      const gh = await getGithubTokenForUser({
-        prisma: this.prisma,
+      const gh = await getApp().langy.githubCredentials.getAccessToken({
         userId: actorUserId,
         organizationId: project.organizationId,
       });
