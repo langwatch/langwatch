@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/localunsafe"
 	"github.com/langwatch/langwatch/services/langyagent/app"
-	"github.com/langwatch/langwatch/services/langyagent/app/runner/localunsafe"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
