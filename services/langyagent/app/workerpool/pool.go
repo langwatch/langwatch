@@ -2,6 +2,7 @@ package workerpool
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -447,9 +448,12 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 	// consume a worker slot it was never going to fill.
 	if !creds.Spawnable() {
 		p.mu.Unlock()
-		return nil, herr.New(ctx, domain.ErrCredentialsRequired, herr.M{
-			"message": "a worker must be spawned for this conversation, but no session key was supplied",
-		})
+		// The control plane, not the end user, is the audience: it catches this
+		// code, mints a key, and retries transparently. So the diagnostic rides as
+		// a reason (logged, per the herr contract) rather than in meta.message,
+		// which herr.WriteHTTP would promote into the user-facing envelope.
+		return nil, herr.New(ctx, domain.ErrCredentialsRequired, nil,
+			errors.New("a worker must be spawned for this conversation, but no session key was supplied"))
 	}
 
 	// Atomic capacity reservation. Increment BEFORE releasing the registry lock
