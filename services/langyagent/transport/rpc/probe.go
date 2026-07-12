@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -52,14 +51,9 @@ func probeHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+		req, err := decode[probeRequest](w, r, maxBodyBytes)
 		if err != nil {
-			herr.WriteHTTP(w, herr.New(ctx, domain.ErrPayloadTooLarge, herr.M{"message": "probe body too large"}))
-			return
-		}
-		var req probeRequest
-		if err := json.Unmarshal(body, &req); err != nil {
-			herr.WriteHTTP(w, herr.New(ctx, domain.ErrBadRequest, herr.M{"message": "invalid probe body"}))
+			herr.WriteHTTP(w, err)
 			return
 		}
 		if !domain.IsValidConversationID(req.ConversationID) {
