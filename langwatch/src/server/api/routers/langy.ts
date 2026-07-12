@@ -9,6 +9,13 @@ import type {
 } from "~/server/app-layer/langy/langy-conversation.service";
 import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
 import { trackServerEvent } from "~/server/posthog";
+import { connection } from "~/server/redis";
+import {
+  createLangyTokenBuffer,
+  type LangyStreamEntry,
+} from "~/server/services/langy/streaming/langyTokenBuffer";
+import { createLangyTurnAccessStore } from "~/server/services/langy/streaming/langyTurnAccess";
+import { AGENT_CHAT_TIMEOUT_MS } from "~/server/services/langy/execution/langy-turn-errors";
 import { checkProjectPermission, isDemoProjectId } from "../rbac";
 import {
   langyConversationDetailSchema,
@@ -79,6 +86,40 @@ function toDetailDto(detail: ConversationDetail): LangyConversationDetailDto {
     // fall back to "active" for any unexpected value rather than throwing.
     status: langyConversationStatusSchema.catch("active").parse(detail.status),
   };
+}
+
+/**
+ * May this user watch this turn's live stream? Same gate the deleted Hono
+ * `/stream` route used: the fast path confirms the turn's own actor from the
+ * synchronously-written turn-access record (so a just-started turn doesn't 404
+ * before its fold is projected); otherwise it falls back to the durable
+ * visibility rule (owner or shared). It never widens access.
+ */
+async function canWatchTurn({
+  projectId,
+  conversationId,
+  turnId,
+  userId,
+}: {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  userId: string;
+}): Promise<boolean> {
+  if (connection) {
+    const access = createLangyTurnAccessStore({ redis: connection });
+    if (
+      await access.isTurnActor({ projectId, conversationId, turnId, userId })
+    ) {
+      return true;
+    }
+  }
+  const conv = await getApp().langy.conversations.findByIdVisible({
+    id: conversationId,
+    projectId,
+    userId,
+  });
+  return !!conv;
 }
 
 export const langyRouter = createTRPCRouter({
@@ -312,6 +353,74 @@ export const langyRouter = createTRPCRouter({
         }
       } finally {
         getApp().broadcast.cleanupTenantEmitter(projectId);
+      }
+    }),
+
+  /**
+   * The live turn stream. Yields the durable token-buffer entries for one turn
+   * (delta / tool / status / progress / milestone / end / error) as an ordered
+   * async generator — the tRPC replacement for the deleted Hono `/chat` +
+   * `/stream` UIMessage SSE. Reads the SAME durable buffer `attachTurnStream`
+   * did (tail-then-follow on one Redis Stream), so a (re)connect gets the
+   * buffered prefix then the live edge, gap-free.
+   *
+   * Ephemeral by contract: the buffer is best-effort live delivery; the durable
+   * TRUTH is the fold, loaded by the `messages` query on turn end (the client's
+   * reconcile). This carries only live chunks, never the authoritative snapshot.
+   */
+  onTurnStream: langyReadProcedure
+    .input(z.object({ conversationId: z.string(), turnId: z.string() }))
+    .subscription(async function* (opts): AsyncGenerator<LangyStreamEntry> {
+      const { projectId, conversationId, turnId } = opts.input;
+      const userId = opts.ctx.session.user.id;
+
+      // Same gate the deleted `/stream` route used. Reported as not-found so it
+      // can't be used to probe another user's private conversation.
+      if (
+        !(await canWatchTurn({ projectId, conversationId, turnId, userId }))
+      ) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Turn not found." });
+      }
+      // No Redis ⇒ no live buffer; the client falls back to the fold query.
+      if (!connection) return;
+
+      const blocking = connection.duplicate();
+      const buffer = createLangyTokenBuffer({
+        redis: connection,
+        blockingRedis: blocking,
+      });
+      // Tear down on client disconnect OR the hard per-turn deadline, whichever
+      // comes first — a wedged turn must not hold a blocking connection forever.
+      const signals: AbortSignal[] = [
+        AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
+      ];
+      if (opts.signal) signals.push(opts.signal);
+      const signal = AbortSignal.any(signals);
+
+      try {
+        // Drain the buffered prefix, then tail the live edge from where it ended.
+        const { reads, lastId } = await buffer.readTail({
+          conversationId,
+          turnId,
+        });
+        let terminal = false;
+        for (const { entry } of reads) {
+          yield entry;
+          if (entry.type === "end" || entry.type === "error") terminal = true;
+        }
+        if (!terminal) {
+          for await (const { entry } of buffer.follow({
+            conversationId,
+            turnId,
+            fromId: lastId,
+            signal,
+          })) {
+            yield entry;
+            if (entry.type === "end" || entry.type === "error") break;
+          }
+        }
+      } finally {
+        blocking.disconnect();
       }
     }),
 });
