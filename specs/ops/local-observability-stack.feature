@@ -18,6 +18,17 @@ Feature: Local observability stack for debugging
     And its structured logs appear in Loki
     And its runtime metrics appear in Prometheus
 
+  Scenario: The console stays quiet while the stack is up
+    When the stack is running
+    Then the app's console shows only warnings and errors
+    And its info and debug logs are sent to the collector instead
+    And each console line keeps only its trace and span id, not the full context
+
+  Scenario: An error links straight to its trace
+    When a request fails
+    Then the error response carries the trace and span id
+    And a Grafana link that opens the failing trace, clickable from the network inspector
+
   Scenario: Go services dual-export their own telemetry
     When a Go service produces telemetry
     Then its product traces still reach the LangWatch app

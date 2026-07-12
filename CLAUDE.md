@@ -129,7 +129,7 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
-When debugging locally, `pnpm dev` may tee output to `langwatch/server.log` — check it with `grep` if available.
+When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven doctor` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` label, e.g. `gcx logs query '{service_name="langwatch-backend", langwatch_worktree="<slug>"}' --since 15m` and `gcx traces query '{ .service.name = "langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
 
