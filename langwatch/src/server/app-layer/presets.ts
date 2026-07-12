@@ -67,7 +67,12 @@ import {
   LangyConversationStateRepositoryMemory,
 } from "../event-sourcing/pipelines/langy-conversation-processing/repositories";
 import { LangyConversationService } from "./langy/langy-conversation.service";
+import { LangyGithubCredentialsService } from "./langy/langy-github-credentials.service";
 import { LangyMessageService } from "./langy/langy-message.service";
+import { NullLangyUserGithubCredentialsRepository } from "./langy/repositories/langy-user-github-credentials.repository";
+import { PrismaLangyUserGithubCredentialsRepository } from "./langy/repositories/langy-user-github-credentials.prisma.repository";
+import { GithubOAuthHttpClient } from "./clients/github/github-oauth.http.client";
+import { NullGithubOAuthClient } from "./clients/github/github-oauth.client";
 import { createLangyConversationTitleGenerator } from "./langy/langy-title-generation.service";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import type { SpawnAgentReactorHandle } from "../event-sourcing/pipelines/langy-conversation-processing/reactors/spawnAgent.reactor";
@@ -725,6 +730,24 @@ export function initializeDefaultApp(options?: {
   );
   const langyMessages = LangyMessageService.create();
 
+  // Langy GitHub credentials (issue #4747): per-user connection lifecycle +
+  // short-lived access-token minting. The GitHub App is optional per instance;
+  // when unconfigured we inject a Null OAuth client and mark the service
+  // unconfigured so it short-circuits to "not connected" without touching rows.
+  const githubAppConfigured = Boolean(
+    env.GITHUB_LANGY_CLIENT_ID && env.GITHUB_LANGY_CLIENT_SECRET,
+  );
+  const langyGithubCredentials = new LangyGithubCredentialsService(
+    new PrismaLangyUserGithubCredentialsRepository(prisma),
+    githubAppConfigured
+      ? new GithubOAuthHttpClient(
+          env.GITHUB_LANGY_CLIENT_ID!,
+          env.GITHUB_LANGY_CLIENT_SECRET!,
+        )
+      : new NullGithubOAuthClient(),
+    githubAppConfigured,
+  );
+
   // Late-bind the cheap-model title generator into the langyTitleGeneration
   // reactor (created in the pipeline registry). Kept out of the event-sourcing
   // layer so it stays free of model-provider + app-layer read deps; the reactor
@@ -909,7 +932,11 @@ export function initializeDefaultApp(options?: {
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
-    langy: { conversations: langyConversations, messages: langyMessages },
+    langy: {
+      conversations: langyConversations,
+      messages: langyMessages,
+      githubCredentials: langyGithubCredentials,
+    },
     organizations,
     projects,
     tokenizer,
@@ -1091,6 +1118,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         },
       ),
       messages: LangyMessageService.create(),
+      githubCredentials: new LangyGithubCredentialsService(
+        new NullLangyUserGithubCredentialsRepository(),
+        new NullGithubOAuthClient(),
+        false,
+      ),
     },
     organizations: nullOrganizations,
     projects: nullProjects,

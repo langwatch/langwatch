@@ -24,16 +24,10 @@ import {
   handlerManagedAuth,
   publicEndpoint,
 } from "~/server/api/security";
+import { getApp } from "~/server/app-layer";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
-import {
-  exchangeCode,
-  fetchGithubUser,
-  type GithubTokenResponse,
-  type GithubUser,
-} from "~/server/services/langy/githubOauthClient";
 import {
   popupErrorHtml,
   popupResponseHtml,
@@ -44,16 +38,6 @@ import {
   signGithubOauthState,
   verifyGithubOauthState,
 } from "~/server/services/langy/githubOauthState";
-import {
-  isOrganizationMember,
-  upsertGithubCredential,
-} from "~/server/services/langy/langyGithubConnection";
-import {
-  clearGithubTokenCache,
-  consumeGithubOauthNonce,
-  registerGithubOauthNonce,
-} from "~/server/services/langy/langyGithubToken";
-import { encrypt } from "~/utils/encryption";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { createLogger } from "~/utils/logger/server";
 
@@ -273,8 +257,7 @@ secured
     // violation: the row appears in OTHER-ORG's footprint, and the audit log
     // says "user X connected GitHub in org Y" against an org X is not in.
     if (
-      !(await isOrganizationMember({
-        prisma,
+      !(await getApp().langy.githubCredentials.isOrganizationMember({
         userId: session.user.id,
         organizationId,
       }))
@@ -295,10 +278,11 @@ secured
     // Whether registration succeeded rides in the SIGNED state, so a Redis
     // flap between connect (down — nonce never stored) and callback (up —
     // "missing" looks like a replay) can't 401 a legitimate first use.
-    const nonceRegistered = await registerGithubOauthNonce(
-      nonce,
-      Math.ceil(STATE_TTL_MS / 1000),
-    );
+    const nonceRegistered =
+      await getApp().langy.githubCredentials.registerOauthNonce(
+        nonce,
+        Math.ceil(STATE_TTL_MS / 1000),
+      );
 
     const state = signState({
       userId: session.user.id,
@@ -349,7 +333,8 @@ secured
     // registered (Redis down at /connect — the signed flag says so) or Redis
     // is down now (null), fall through to the signature + session defenses.
     if (state.nonceRegistered) {
-      const nonceConsumed = await consumeGithubOauthNonce(state.nonce);
+      const nonceConsumed =
+        await getApp().langy.githubCredentials.consumeOauthNonce(state.nonce);
       if (nonceConsumed === false) {
         return callbackError(c, state, "State already used", 401);
       }
@@ -359,8 +344,7 @@ secured
     // /connect — defense in depth in case a stale state outlives a
     // membership change between connect and callback.
     if (
-      !(await isOrganizationMember({
-        prisma,
+      !(await getApp().langy.githubCredentials.isOrganizationMember({
         userId: state.userId,
         organizationId: state.organizationId,
       }))
@@ -374,11 +358,18 @@ secured
     // defense in depth against a future signer that forgets to sanitize.
     const returnTo = safeReturnTo(state.returnTo);
 
-    let token: GithubTokenResponse;
-    let user: GithubUser;
+    let githubLogin: string;
     try {
-      token = await exchangeCode(code, redirectUri);
-      user = await fetchGithubUser(token.access_token!);
+      // Exchange the code, resolve the user, and persist the connection
+      // (encrypt refresh token + upsert + clear any stale access-token cache)
+      // in the app-layer service.
+      ({ githubLogin } =
+        await getApp().langy.githubCredentials.completeOAuthConnection({
+          code,
+          redirectUri,
+          userId: state.userId,
+          organizationId: state.organizationId,
+        }));
     } catch (err) {
       logger.warn({ err }, "github callback exchange failed");
       // Real error in the server log; surface a generic message to the
@@ -390,30 +381,12 @@ secured
         : c.redirect(withGithubError(returnTo, publicMsg), 302);
     }
 
-    await upsertGithubCredential({
-      prisma,
-      userId: state.userId,
-      organizationId: state.organizationId,
-      githubLogin: user.login,
-      githubUserId: String(user.id),
-      encryptedRefreshToken: encrypt(token.refresh_token!),
-      scopes: token.scope ?? null,
-    });
-
-    // A reconnect may follow a disconnect that revoked the previous grant;
-    // the mint cache could still hold a token from that dead grant. Clear it
-    // so the next chat mints from the refresh token we just stored.
-    await clearGithubTokenCache({
-      userId: state.userId,
-      organizationId: state.organizationId,
-    });
-
     try {
       await auditLog({
         userId: state.userId,
         organizationId: state.organizationId,
         action: "langy.github.connect",
-        args: { githubLogin: user.login },
+        args: { githubLogin },
       });
     } catch (err) {
       // The credential is ALREADY persisted at this point. An auditLog
@@ -429,7 +402,7 @@ secured
     }
 
     if (state.mode === "popup") {
-      return popupHtml(c, popupResponseHtml(user.login), 200);
+      return popupHtml(c, popupResponseHtml(githubLogin), 200);
     }
     return c.redirect(returnTo, 302);
   });

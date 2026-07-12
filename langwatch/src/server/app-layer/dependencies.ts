@@ -26,6 +26,7 @@ import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
+import type { LangyGithubCredentialsService } from "./langy/langy-github-credentials.service";
 import type { LangyMessageService } from "./langy/langy-message.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
@@ -91,6 +92,7 @@ export interface AppDependencies {
   langy: {
     conversations: LangyConversationService;
     messages: LangyMessageService;
+    githubCredentials: LangyGithubCredentialsService;
   };
   experiments: ExperimentService;
   triggers: TriggerService;
