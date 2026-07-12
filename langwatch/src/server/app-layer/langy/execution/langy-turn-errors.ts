@@ -23,6 +23,7 @@ import {
   DomainError,
   type SerializedDomainError,
 } from "~/server/app-layer/domain-error";
+import { grafanaTraceUrlFromEnv } from "~/utils/grafanaLinks";
 
 /** How long we give the manager to answer one turn before we give up. */
 export const AGENT_CHAT_TIMEOUT_MS = 120_000;
@@ -254,10 +255,17 @@ function isUnreachable(error: unknown): boolean {
  */
 function unhandledShape(): SerializedDomainError {
   const spanContext = trace.getActiveSpan()?.spanContext();
+  // The "view trace" link needs the REAL trace id, not the span id we lead with
+  // for display — so it opens the whole failing trace.
+  const traceUrl = grafanaTraceUrlFromEnv(spanContext?.traceId);
   return {
     kind: "unknown",
     meta: {},
-    telemetry: { traceId: spanContext?.spanId ?? spanContext?.traceId, spanId: spanContext?.spanId },
+    telemetry: {
+      traceId: spanContext?.spanId ?? spanContext?.traceId,
+      spanId: spanContext?.spanId,
+      ...(traceUrl ? { traceUrl } : {}),
+    },
     httpStatus: 500,
     reasons: [],
   };

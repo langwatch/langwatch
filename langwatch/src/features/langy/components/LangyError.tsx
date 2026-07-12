@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Link, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import type {
@@ -88,6 +88,7 @@ export function LangyError({
         meta={presentation.meta}
         reasons={presentation.reasons}
         traceId={presentation.traceId}
+        traceUrl={presentation.traceUrl}
       />
       {presentation.action ? (
         <HStack justify="flex-end">
@@ -122,21 +123,25 @@ export function LangyError({
  *
  * The TRACE ID is the exception and stays. It is not an internal detail; it is
  * the one thing a user can hand to support, and the copy explicitly asks them to
- * ("share the id below with support").
+ * ("share the id below with support"). When a Grafana is configured, we also
+ * offer a "view trace" link straight to it — harmless to everyone else, since
+ * Grafana is access-controlled.
  */
 function ErrorDetails({
   meta,
   reasons,
   traceId,
+  traceUrl,
 }: {
   meta?: Record<string, unknown>;
   reasons?: LangySerializedReason[];
   traceId?: string;
+  traceUrl?: string;
 }) {
   const [devMode] = useLangyDevMode();
   const hasMeta = devMode && meta && Object.keys(meta).length > 0;
   const hasReasons = devMode && reasons && reasons.length > 0;
-  if (!traceId && !hasMeta && !hasReasons) return null;
+  if (!traceId && !traceUrl && !hasMeta && !hasReasons) return null;
 
   return (
     <VStack
@@ -147,10 +152,29 @@ function ErrorDetails({
       borderTopStyle="solid"
       borderTopColor="border.muted"
     >
-      {traceId ? (
-        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
-          id: {traceId}
-        </Text>
+      {traceId || traceUrl ? (
+        <HStack gap={2} justify="space-between" align="center">
+          {traceId ? (
+            <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+              id: {traceId}
+            </Text>
+          ) : (
+            <span />
+          )}
+          {traceUrl ? (
+            <Link
+              href={traceUrl}
+              target="_blank"
+              rel="noreferrer"
+              textStyle="2xs"
+              color="fg.muted"
+              fontWeight="500"
+              whiteSpace="nowrap"
+            >
+              View trace ↗
+            </Link>
+          ) : null}
+        </HStack>
       ) : null}
       {hasMeta ? (
         <VStack align="stretch" gap={0}>

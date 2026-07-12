@@ -167,6 +167,20 @@ describe("explainLangyError", () => {
       expect(presentation.traceId).toBe("abc123");
       expect(presentation.action?.kind).toBe("retry");
     });
+
+    it("carries the Grafana trace link through to the presentation", () => {
+      const presentation = explainLangyError(
+        domain({
+          kind: "unknown",
+          traceId: "abc123",
+          traceUrl: "http://127.0.0.1:3000/explore?panes=x",
+        }),
+      );
+
+      expect(presentation.traceUrl).toBe(
+        "http://127.0.0.1:3000/explore?panes=x",
+      );
+    });
   });
 });
 
@@ -190,6 +204,26 @@ describe("readLangyStreamError", () => {
         traceId: "t-1",
         reasons: undefined,
       });
+    });
+  });
+
+  describe("given telemetry that carries a Grafana trace link", () => {
+    it("parses the trace link off telemetry", () => {
+      const parsed = readLangyStreamError(
+        JSON.stringify({
+          kind: "unknown",
+          meta: {},
+          telemetry: {
+            traceId: "t-1",
+            spanId: "s-1",
+            traceUrl: "http://127.0.0.1:3000/explore",
+          },
+          httpStatus: 500,
+          reasons: [],
+        }),
+      );
+
+      expect(parsed?.traceUrl).toBe("http://127.0.0.1:3000/explore");
     });
   });
 

@@ -45,6 +45,13 @@ export interface LangyErrorPresentation {
   action?: LangyErrorAction;
   /** Present for unknown/unhandled errors so support can correlate. */
   traceId?: string;
+  /**
+   * A Grafana deep link to the failing trace, present when a Grafana is
+   * configured (locally, whenever the observability stack is up). The UI turns
+   * it into a "view trace" link. Safe in production too — Grafana is
+   * access-controlled, so the URL is harmless to a user who can't reach it.
+   */
+  traceUrl?: string;
   /** Renderable domain metadata, surfaced under the message when present. */
   meta?: Record<string, unknown>;
   /** The reason chain, surfaced under the message for debugging when present. */
@@ -54,6 +61,7 @@ export interface LangyErrorPresentation {
 /** Richer than the automations shape: also carries trace id + reason chain. */
 export interface LangyDomainError extends DomainErrorShape {
   traceId?: string;
+  traceUrl?: string;
   reasons?: LangySerializedReason[];
 }
 
@@ -130,7 +138,7 @@ export function readLangyStreamError(
     kind?: unknown;
     meta?: unknown;
     httpStatus?: unknown;
-    telemetry?: { traceId?: unknown };
+    telemetry?: { traceId?: unknown; traceUrl?: unknown };
     reasons?: unknown;
   };
   if (typeof value.kind !== "string") return null;
@@ -145,6 +153,10 @@ export function readLangyStreamError(
       value.telemetry && typeof value.telemetry.traceId === "string"
         ? value.telemetry.traceId
         : undefined,
+    traceUrl:
+      value.telemetry && typeof value.telemetry.traceUrl === "string"
+        ? value.telemetry.traceUrl
+        : undefined,
     reasons: parseReasons(value.reasons),
   };
 }
@@ -156,14 +168,19 @@ export function readLangyTrpcError(err: unknown): LangyDomainError | null {
   const serialized = (
     err as {
       data?: {
-        domainError?: { telemetry?: { traceId?: unknown }; reasons?: unknown };
+        domainError?: {
+          telemetry?: { traceId?: unknown; traceUrl?: unknown };
+          reasons?: unknown;
+        };
       };
     }
   )?.data?.domainError;
   const traceId = serialized?.telemetry?.traceId;
+  const traceUrl = serialized?.telemetry?.traceUrl;
   return {
     ...domain,
     traceId: typeof traceId === "string" ? traceId : undefined,
+    traceUrl: typeof traceUrl === "string" ? traceUrl : undefined,
     reasons: parseReasons(serialized?.reasons),
   };
 }
@@ -375,6 +392,7 @@ export function explainLangyError(
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,
+        traceUrl: domain.traceUrl,
         ...debug,
       };
 
@@ -388,6 +406,7 @@ export function explainLangyError(
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,
+        traceUrl: domain.traceUrl,
         ...debug,
       };
   }
