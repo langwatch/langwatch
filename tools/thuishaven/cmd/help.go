@@ -49,13 +49,14 @@ COMMANDS
                   fetched + reset to the PR's current head, so you always try the
                   latest push. Flags: --dry-run (resolve + print the plan, create
                   nothing), --no-install, --force (a non-open PR), --trusted (run
-                  install lifecycle scripts for a fork — see below). Shares the
+                  install lifecycle scripts for a fork — see below; --allow-scripts
+                  is an alias). Shares the
                   managed Postgres/ClickHouse/Redis for now — per-PR isolation is
                   the follow-up in specs/setup/haven-try-pr-plan.md.
                   TRUST: a fork PR's install runs with --ignore-scripts by default
                   (this repo has a postinstall a fork could weaponise); --trusted
-                  opts back in. Either way 'haven up' runs the PR's own app code,
-                  so only try PRs you'd be willing to run locally.
+                  (or --allow-scripts) opts back in. Either way 'haven up' runs the
+                  PR's own app code, so only try PRs you'd be willing to run locally.
     watch         Live TUI of every running stack + service health (bare 'haven'
                   in a terminal does the same). --agent gives a plain snapshot.
     down          Tear this worktree's routes + registry entry down, and drop this
