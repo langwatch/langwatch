@@ -2,10 +2,7 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -113,13 +110,11 @@ func warmHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+		// A warm is best-effort: a body that can't be read or parsed just means no
+		// warm (202), not a failed request — the turn behind it reports its own
+		// problems.
+		req, err := decode[warmRequest](w, r, maxBodyBytes)
 		if err != nil {
-			w.WriteHeader(http.StatusAccepted)
-			return
-		}
-		var req warmRequest
-		if err := json.Unmarshal(body, &req); err != nil {
 			w.WriteHeader(http.StatusAccepted)
 			return
 		}
@@ -159,23 +154,9 @@ func chatHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+		req, err := decode[chatRequest](w, r, maxBodyBytes)
 		if err != nil {
-			var mbe *http.MaxBytesError
-			if errors.As(err, &mbe) {
-				herr.WriteHTTP(w, herr.New(ctx, domain.ErrPayloadTooLarge, herr.M{"message": "request body too large"}))
-				return
-			}
-			// The raw read error goes in reasons: it's logged by the telemetry
-			// middleware but WriteHTTP replaces non-herr reasons with "unknown"
-			// for the client, so no transport internals leak into the response.
-			herr.WriteHTTP(w, herr.New(ctx, domain.ErrBadRequest, herr.M{"message": "could not read the request body"}, err))
-			return
-		}
-
-		var req chatRequest
-		if err := json.Unmarshal(body, &req); err != nil {
-			herr.WriteHTTP(w, herr.New(ctx, domain.ErrBadRequest, herr.M{"message": "invalid JSON body"}))
+			herr.WriteHTTP(w, err)
 			return
 		}
 		// Structural validation (required conversationId, prompt, and the four
