@@ -45,11 +45,17 @@ COMMANDS
                   hostnames, start + supervise the stack. (What pnpm dev:haven runs.)
     pr <ref>      Try a GitHub PR locally in seconds: clone it into a worktree,
                   install deps, and bring its stack up on a hostname. <ref> is a
-                  PR number or URL (works for fork PRs too). Flags: --dry-run
-                  (resolve + print the plan, create nothing), --no-install,
-                  --force (a non-open PR). Shares the managed Postgres/ClickHouse/
-                  Redis for now — per-PR isolation is the follow-up in
-                  specs/setup/haven-try-pr-plan.md.
+                  PR number or URL (works for fork PRs too). A reused worktree is
+                  fetched + reset to the PR's current head, so you always try the
+                  latest push. Flags: --dry-run (resolve + print the plan, create
+                  nothing), --no-install, --force (a non-open PR), --trusted (run
+                  install lifecycle scripts for a fork — see below). Shares the
+                  managed Postgres/ClickHouse/Redis for now — per-PR isolation is
+                  the follow-up in specs/setup/haven-try-pr-plan.md.
+                  TRUST: a fork PR's install runs with --ignore-scripts by default
+                  (this repo has a postinstall a fork could weaponise); --trusted
+                  opts back in. Either way 'haven up' runs the PR's own app code,
+                  so only try PRs you'd be willing to run locally.
     watch         Live TUI of every running stack + service health (bare 'haven'
                   in a terminal does the same). --agent gives a plain snapshot.
     down          Tear this worktree's routes + registry entry down, and drop this

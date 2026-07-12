@@ -35,9 +35,22 @@ const DEFAULT_TO = "now";
 /**
  * Wrap a single Explore query pane in the `panes`/`schemaVersion=1` URL shape
  * Grafana has used since 10.1 (current through 13.x). The pane key is arbitrary.
+ *
+ * Fails closed: a malformed `GRAFANA_BASE_URL` (a bare host with no scheme, an
+ * empty string, anything `new URL` rejects) returns null rather than throwing.
+ * These builders run on the error path (serialized domain errors, HTTP error
+ * bodies), so a bad env value must never turn a handled error into a second throw.
  */
-function buildExploreUrl(baseUrl: string, pane: Record<string, unknown>): string {
-  const url = new URL("/explore", ensureTrailingSlash(baseUrl));
+function buildExploreUrl(
+  baseUrl: string,
+  pane: Record<string, unknown>,
+): string | null {
+  let url: URL;
+  try {
+    url = new URL("/explore", ensureTrailingSlash(baseUrl));
+  } catch {
+    return null;
+  }
   url.searchParams.set("schemaVersion", "1");
   url.searchParams.set("orgId", "1");
   url.searchParams.set("panes", JSON.stringify({ lw: pane }));
@@ -45,8 +58,8 @@ function buildExploreUrl(baseUrl: string, pane: Record<string, unknown>): string
 }
 
 // new URL("/explore", base) needs the base to be a valid absolute URL; a bare
-// host without a scheme would throw. Callers pass a full URL, but tolerate a
-// trailing slash either way.
+// host without a scheme would throw (caught in buildExploreUrl). Callers pass a
+// full URL, but tolerate a trailing slash either way.
 function ensureTrailingSlash(baseUrl: string): string {
   return baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
 }
@@ -54,11 +67,12 @@ function ensureTrailingSlash(baseUrl: string): string {
 /**
  * A Grafana Explore link that opens the trace with this id in Tempo. A bare
  * trace id is valid TraceQL, so Grafana resolves it straight to the trace view.
+ * Returns null when the base URL is malformed (see buildExploreUrl).
  */
 export function grafanaTraceUrl(
   traceId: string,
   config: GrafanaDeepLinkConfig,
-): string {
+): string | null {
   const uid = config.tempoDatasourceUid ?? DEFAULT_TEMPO_DATASOURCE_UID;
   return buildExploreUrl(config.baseUrl, {
     datasource: uid,
@@ -76,12 +90,13 @@ export function grafanaTraceUrl(
 
 /**
  * A Grafana Explore link that opens the Loki logs carrying this trace id. Useful
- * when the log line, not the span, is what you want to read.
+ * when the log line, not the span, is what you want to read. Returns null when
+ * the base URL is malformed (see buildExploreUrl).
  */
 export function grafanaLogsUrlByTrace(
   traceId: string,
   config: GrafanaDeepLinkConfig,
-): string {
+): string | null {
   const uid = config.lokiDatasourceUid ?? DEFAULT_LOKI_DATASOURCE_UID;
   return buildExploreUrl(config.baseUrl, {
     datasource: uid,
@@ -104,8 +119,8 @@ export function grafanaLogsUrlByTrace(
 /**
  * Both links for an error that carries a trace id — trace-first (the usual
  * "what happened"), logs as the companion. Returns null when there is no base
- * URL configured (no observability stack / no Grafana), so callers can fall back
- * to plain ids without special-casing.
+ * URL configured (no observability stack / no Grafana) or when it is malformed,
+ * so callers can fall back to plain ids without special-casing.
  */
 export function grafanaLinksForTrace(
   traceId: string | undefined,
@@ -113,10 +128,10 @@ export function grafanaLinksForTrace(
 ): { traceUrl: string; logsUrl: string } | null {
   if (!traceId || !config.baseUrl) return null;
   const full: GrafanaDeepLinkConfig = { ...config, baseUrl: config.baseUrl };
-  return {
-    traceUrl: grafanaTraceUrl(traceId, full),
-    logsUrl: grafanaLogsUrlByTrace(traceId, full),
-  };
+  const traceUrl = grafanaTraceUrl(traceId, full);
+  const logsUrl = grafanaLogsUrlByTrace(traceId, full);
+  if (!traceUrl || !logsUrl) return null;
+  return { traceUrl, logsUrl };
 }
 
 /**
@@ -155,5 +170,6 @@ export function grafanaTraceUrlFromEnv(
   if (!traceId) return undefined;
   const { baseUrl, tempoDatasourceUid } = grafanaConfigFromEnv();
   if (!baseUrl) return undefined;
-  return grafanaTraceUrl(traceId, { baseUrl, tempoDatasourceUid });
+  // null (malformed base URL) coalesces to undefined so it stays safe to spread.
+  return grafanaTraceUrl(traceId, { baseUrl, tempoDatasourceUid }) ?? undefined;
 }

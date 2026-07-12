@@ -19,6 +19,7 @@ type TryPRParams struct {
 	NoInstall    bool   // skip `pnpm install`
 	Force        bool   // proceed even if the PR is not open
 	DryRun       bool   // resolve + print the plan, create nothing
+	AllowScripts bool   // run install lifecycle scripts even for a fork PR (--trusted)
 }
 
 // prView is the slice of `gh pr view --json` we read.
@@ -72,11 +73,13 @@ func TryPR(
 	if p.DryRun {
 		action := "create"
 		if isDir(worktree) {
-			action = "reuse"
+			action = "reuse (fetch to head)"
 		}
 		install := "pnpm install, then "
 		if p.NoInstall {
 			install = ""
+		} else if view.IsCrossRepository && !p.AllowScripts {
+			install = "pnpm install --ignore-scripts (fork), then "
 		}
 		fmt.Printf("would %s worktree %s (branch %s) from PR #%d (%s), %shaven up\n",
 			action, worktree, branch, view.Number, view.HeadRefName, install)
@@ -84,7 +87,14 @@ func TryPR(
 	}
 
 	if isDir(worktree) {
-		fmt.Printf("↺ reusing existing worktree %s\n", worktree)
+		// "haven pr" means "try the CURRENT state of the PR", so a reused worktree
+		// must be brought up to the PR's head — otherwise a push-then-retry silently
+		// serves stale code. refreshPRWorktree also fails loudly if the dir is not a
+		// usable git worktree, so isDir alone isn't trusted as the reuse gate.
+		fmt.Printf("↺ reusing existing worktree %s — refreshing to PR head\n", worktree)
+		if err := refreshPRWorktree(ctx, worktree, view.Number); err != nil {
+			return err
+		}
 	} else {
 		fmt.Printf("→ PR #%d (%s) → %s\n", view.Number, view.HeadRefName, worktree)
 		if err := ensurePRWorktree(ctx, p.RepoRoot, view.Number, branch, worktree); err != nil {
@@ -93,14 +103,65 @@ func TryPR(
 	}
 
 	if !p.NoInstall {
-		fmt.Printf("→ pnpm install\n")
-		if err := runStreaming(ctx, worktree, "pnpm", "install"); err != nil {
-			return fmt.Errorf("pnpm install failed in %s: %w", worktree, err)
+		if err := installDeps(ctx, worktree, view, p.AllowScripts); err != nil {
+			return err
 		}
 	}
 
 	fmt.Printf("→ haven up (%s)\n", filepath.Base(worktree))
 	return runUp(ctx, worktree)
+}
+
+// installDeps runs pnpm install in the PR worktree. For a fork (cross-repo) PR it
+// defaults to --ignore-scripts: this repo has a postinstall, and a fork controls
+// package scripts, so a plain install would execute fork-authored code with the
+// developer's local env/credentials the instant they try the PR. --trusted opts
+// back into full lifecycle scripts. (Same-repo PRs are as trusted as the base, so
+// they install normally.) Note: `haven up` still runs the PR's application code —
+// only try PRs you would be willing to run locally.
+func installDeps(ctx context.Context, worktree string, view prView, allowScripts bool) error {
+	args := pnpmInstallArgs(view, allowScripts)
+	if sanitizedInstall(view, allowScripts) {
+		fmt.Printf("⚠ fork PR (%s): installing with --ignore-scripts so its lifecycle scripts don't run.\n",
+			view.HeadRefName)
+		fmt.Printf("  Pass --trusted to allow them. (haven up still runs the PR's app code.)\n")
+	}
+	fmt.Printf("→ pnpm %s\n", strings.Join(args, " "))
+	if err := runStreaming(ctx, worktree, "pnpm", args...); err != nil {
+		return fmt.Errorf("pnpm install failed in %s: %w", worktree, err)
+	}
+	return nil
+}
+
+// sanitizedInstall reports whether a fork PR's install must skip lifecycle
+// scripts: cross-repo (a fork controls package scripts) and not explicitly
+// trusted. Same-repo PRs are as trusted as the base and install normally.
+func sanitizedInstall(view prView, allowScripts bool) bool {
+	return view.IsCrossRepository && !allowScripts
+}
+
+// pnpmInstallArgs is the pnpm argv for a PR install — sanitized (no lifecycle
+// scripts) for an untrusted fork, plain otherwise.
+func pnpmInstallArgs(view prView, allowScripts bool) []string {
+	if sanitizedInstall(view, allowScripts) {
+		return []string{"install", "--ignore-scripts"}
+	}
+	return []string{"install"}
+}
+
+// refreshPRWorktree brings an already-existing PR worktree up to the PR's current
+// head. The PR head branch (haven-pr-N) is checked out here, and git refuses to
+// fetch straight into a checked-out branch, so fetch to FETCH_HEAD and hard-reset
+// onto it — which moves the branch and the working tree to the latest commit.
+func refreshPRWorktree(ctx context.Context, worktree string, number int) error {
+	fetchSpec := fmt.Sprintf("pull/%d/head", number)
+	if err := runStreaming(ctx, worktree, "git", "fetch", "-f", "origin", fetchSpec); err != nil {
+		return fmt.Errorf("git fetch %s (reuse) in %s: %w", fetchSpec, worktree, err)
+	}
+	if err := runStreaming(ctx, worktree, "git", "reset", "--hard", "FETCH_HEAD"); err != nil {
+		return fmt.Errorf("git reset --hard FETCH_HEAD in %s: %w", worktree, err)
+	}
+	return nil
 }
 
 // resolvePR asks gh for the PR's number/state/head. gh accepts a bare number

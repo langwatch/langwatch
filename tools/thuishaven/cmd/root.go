@@ -188,6 +188,7 @@ var commands = map[string]command{
 			NoInstall:    hasFlag(rest, "--no-install"),
 			Force:        hasFlag(rest, "--force"),
 			DryRun:       hasFlag(rest, "--dry-run"),
+			AllowScripts: hasFlag(rest, "--trusted") || hasFlag(rest, "--allow-scripts"),
 		}, runHavenUpIn)
 	},
 	"setup":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Setup(ctx) },
@@ -366,6 +367,11 @@ func runHavenUpIn(ctx context.Context, dir string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
+	// On Ctrl-C (ctx cancel), ask `haven up` to shut down gracefully with SIGTERM
+	// instead of exec's default SIGKILL, so its stack deregistration/cleanup runs.
+	// WaitDelay bounds that grace so a wedged child can't hang the shell forever.
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	cmd.WaitDelay = 10 * time.Second
 	return cmd.Run()
 }
 

@@ -2,6 +2,7 @@ package app
 
 import (
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -35,5 +36,33 @@ func TestPRWorktreePathAndBranchAreDeterministic(t *testing.T) {
 	// Namespaced so it never collides with a real branch called 4913.
 	if got, want := prBranchName(4913), "haven-pr-4913"; got != want {
 		t.Errorf("prBranchName = %q, want %q", got, want)
+	}
+}
+
+func TestPnpmInstallArgs(t *testing.T) {
+	sameRepo := prView{IsCrossRepository: false}
+	fork := prView{IsCrossRepository: true}
+
+	cases := []struct {
+		name         string
+		view         prView
+		allowScripts bool
+		want         []string
+	}{
+		// A fork controls package scripts, and this repo has a postinstall — its
+		// install must not run lifecycle scripts unless explicitly trusted.
+		{"untrusted fork is sanitized", fork, false, []string{"install", "--ignore-scripts"}},
+		{"trusted fork runs scripts", fork, true, []string{"install"}},
+		// Same-repo PRs are as trusted as the base; --trusted is a no-op for them.
+		{"same-repo installs normally", sameRepo, false, []string{"install"}},
+		{"same-repo with --trusted", sameRepo, true, []string{"install"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := pnpmInstallArgs(tc.view, tc.allowScripts); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("pnpmInstallArgs(%+v, %v) = %q, want %q",
+					tc.view, tc.allowScripts, got, tc.want)
+			}
+		})
 	}
 }
