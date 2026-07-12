@@ -39,6 +39,12 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir str
 		Name: "app", Dir: lwDir, Color: palette[1],
 		Shell: "pnpm run dev:vite",
 		Env:   append(append([]string{}, base...), "NODE_ENV=development"),
+		// Hold the web (vite) until the API answers /api/health. The app proxies
+		// /api to the API (start:app), which is a bigger process and boots slower;
+		// a browser that loads the web before the API is up gets stuck in an auth
+		// redirect loop. Gating the lane means the hostname simply isn't served
+		// until the stack can actually handle a request.
+		ReadyProbeURL: fmt.Sprintf("http://127.0.0.1:%d/api/health", st.APIPort),
 	})
 	// In-process worker mode: the app process (start:app -> start.ts) hosts the
 	// worker stack itself when WORKERS_IN_PROCESS=1, so there is no separate
