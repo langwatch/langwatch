@@ -16,6 +16,14 @@ type Proxy interface {
 	Register(service, slug string, port int) error
 	Remove(service, slug string)
 	Running() bool
+	// Installed reports whether a real portless binary is resolvable (a global
+	// install, a project-local one, or PORTLESS_BIN) rather than the on-demand
+	// `npx` fallback — so `haven setup` can tell the user to install it once.
+	Installed() bool
+	// EnsureReady boots the proxy if it is not already running and trusts its CA
+	// on first run, so `haven up` self-bootstraps without a prior `haven setup`.
+	// Idempotent; the CA trust is guarded so it does not re-prompt on every launch.
+	EnsureReady() error
 	// Endpoint reports how the proxy is reachable (scheme, port) so URLs are
 	// correct on the default 443 or an unprivileged port.
 	Endpoint() (scheme string, port int)
@@ -35,7 +43,10 @@ type Store interface {
 	WriteHMRGate(lwDir string, expiryUnixMs int64) error
 	ReadHMRGate(lwDir string) (int64, bool)
 	ClearHMRGate(lwDir string)
-	SaveDaemon(DaemonInfo) error
+	// ClaimDaemon atomically records this process as the singleton daemon, but
+	// only if no record exists yet (O_EXCL). It returns false without overwriting
+	// when one already does, so two daemons racing to start can never both win.
+	ClaimDaemon(DaemonInfo) (bool, error)
 	Daemon() (DaemonInfo, bool)
 	ClearDaemon()
 }

@@ -24,11 +24,21 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("../../copilot-kit/TraceMessage", () => ({
-  TraceMessage: ({ traceId }: { traceId: string }) => (
-    <button data-testid="trace-message" data-trace-id={traceId}>
-      View Trace
-    </button>
+// RunTurnSeparator internally calls useOrganizationTeamProject() and
+// api.traces.getById.useQuery, neither of which is available in this jsdom
+// harness — mock the module so the renderer's grouping contract (one
+// separator per traced turn) is what these tests exercise.
+vi.mock("../RunTurnSeparator", () => ({
+  RunTurnSeparator: ({
+    index,
+    traceId,
+  }: {
+    index: number;
+    traceId: string;
+  }) => (
+    <div data-testid="run-turn-separator" data-trace-id={traceId}>
+      Turn {index}
+    </div>
   ),
 }));
 
@@ -143,14 +153,14 @@ describe("<ScenarioMessageRenderer/>", () => {
     });
   });
 
-  // The AC 3 binding below is partial: TraceMessage owns the click handler
-  // (useTraceDetailsDrawer().openTraceDetailsDrawer), so this jsdom test only
-  // asserts the renderer's responsibility — mounting TraceMessage with the
-  // correct traceId. The drawer-open behavior on click is browser-verified.
+  // The trace binding below is partial: RunTurnSeparator owns the fetch +
+  // click handler (useTraceDetailsDrawer().openTraceDetailsDrawer), so these
+  // jsdom tests only assert the renderer's responsibility — mounting one
+  // separator per traced turn with the correct traceId. The drawer-open
+  // behavior on click is browser-verified.
   describe("when an assistant audio message has a trace id in drawer variant", () => {
-    /** @scenario "Assistant audio turn with a trace id shows the View Trace button in drawer variant" */
-    /** @scenario "Clicking View Trace on an audio turn opens the trace details drawer" */
-    it("renders a View Trace button under the media bubble", () => {
+    /** @scenario "Assistant audio turn with a trace id shows a turn separator in drawer variant" */
+    it("renders a turn separator above the traced turn", () => {
       renderWith([
         {
           id: "msg_audio_trace",
@@ -161,17 +171,17 @@ describe("<ScenarioMessageRenderer/>", () => {
         } as ScenarioMessageSnapshotEvent["messages"][number],
       ]);
 
-      const traceButton = screen.getByTestId("trace-message");
-      expect(traceButton).toBeInTheDocument();
-      expect(traceButton).toHaveAttribute("data-trace-id", "trace_abc123");
+      const separator = screen.getByTestId("run-turn-separator");
+      expect(separator).toBeInTheDocument();
+      expect(separator).toHaveAttribute("data-trace-id", "trace_abc123");
       // Confirms it's the media branch rendering (not a text branch)
       expect(document.querySelector("audio")).not.toBeNull();
     });
   });
 
   describe("when an assistant audio message has no trace id", () => {
-    /** @scenario "Assistant audio turn without a trace id does not show the button" */
-    it("does not render a View Trace button", () => {
+    /** @scenario "Assistant audio turn without a trace id renders no separator" */
+    it("does not render a turn separator", () => {
       renderWith([
         {
           id: "msg_audio_no_trace",
@@ -181,14 +191,14 @@ describe("<ScenarioMessageRenderer/>", () => {
         } as ScenarioMessageSnapshotEvent["messages"][number],
       ]);
 
-      expect(screen.queryByTestId("trace-message")).toBeNull();
+      expect(screen.queryByTestId("run-turn-separator")).toBeNull();
       expect(document.querySelector("audio")).not.toBeNull();
     });
   });
 
   describe("when a user-role audio message has a trace id", () => {
-    /** @scenario "User-role audio turn does not show the View Trace button" */
-    it("does not render a View Trace button", () => {
+    /** @scenario "A traced turn gets one separator regardless of message role" */
+    it("renders a turn separator above the traced user turn", () => {
       renderWith([
         {
           id: "msg_audio_user_trace",
@@ -199,14 +209,15 @@ describe("<ScenarioMessageRenderer/>", () => {
         } as ScenarioMessageSnapshotEvent["messages"][number],
       ]);
 
-      expect(screen.queryByTestId("trace-message")).toBeNull();
+      const separator = screen.getByTestId("run-turn-separator");
+      expect(separator).toHaveAttribute("data-trace-id", "trace_xyz");
       expect(document.querySelector("audio")).not.toBeNull();
     });
   });
 
   describe("when the renderer is mounted in grid variant", () => {
-    /** @scenario "Grid variant suppresses the View Trace button on audio turns" */
-    it("does not render a View Trace button on assistant audio messages", () => {
+    /** @scenario "Grid variant suppresses turn separators on audio turns" */
+    it("does not render a turn separator on assistant audio messages", () => {
       renderWithGrid([
         {
           id: "msg_audio_grid",
@@ -217,13 +228,13 @@ describe("<ScenarioMessageRenderer/>", () => {
         } as ScenarioMessageSnapshotEvent["messages"][number],
       ]);
 
-      expect(screen.queryByTestId("trace-message")).toBeNull();
+      expect(screen.queryByTestId("run-turn-separator")).toBeNull();
     });
   });
 
   describe("when an assistant message has both audio and a sibling text transcript with one trace id", () => {
-    /** @scenario "Transcript-collapse case renders one bubble with one View Trace button" */
-    it("renders exactly one bubble with exactly one View Trace button", () => {
+    /** @scenario "Transcript-collapse case renders one bubble with one turn separator" */
+    it("renders exactly one bubble with exactly one turn separator", () => {
       renderWith([
         {
           id: "msg_audio_transcript",
@@ -235,13 +246,13 @@ describe("<ScenarioMessageRenderer/>", () => {
       ]);
 
       expect(document.querySelectorAll("audio")).toHaveLength(1);
-      expect(screen.getAllByTestId("trace-message")).toHaveLength(1);
+      expect(screen.getAllByTestId("run-turn-separator")).toHaveLength(1);
     });
   });
 
-  describe("when assistant text, tool_call, and tool_result turns have trace ids", () => {
-    /** @scenario "Existing trace-button behavior on text and tool turns is unchanged" */
-    it("renders a View Trace button for each turn unchanged", () => {
+  describe("when assistant text, tool_call, and tool_result turns have distinct trace ids", () => {
+    /** @scenario "Each distinct consecutive trace id group gets its own separator" */
+    it("renders one turn separator per distinct consecutive trace id group", () => {
       renderWith([
         {
           id: "msg_text_turn",
@@ -264,11 +275,11 @@ describe("<ScenarioMessageRenderer/>", () => {
         } as ScenarioMessageSnapshotEvent["messages"][number],
       ]);
 
-      const traceButtons = screen.getAllByTestId("trace-message");
-      expect(traceButtons).toHaveLength(3);
+      const separators = screen.getAllByTestId("run-turn-separator");
+      expect(separators).toHaveLength(3);
 
-      const traceIds = traceButtons.map((btn) =>
-        btn.getAttribute("data-trace-id"),
+      const traceIds = separators.map((separator) =>
+        separator.getAttribute("data-trace-id"),
       );
       expect(traceIds).toContain("trace_text");
       expect(traceIds).toContain("trace_tool_call");
@@ -404,9 +415,9 @@ describe("<ScenarioMessageRenderer/>", () => {
             } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
           ]);
 
-          // Exactly one audio element and one trace button — no duplicate bubble.
+          // Exactly one audio element and one turn separator — no duplicate bubble.
           expect(document.querySelectorAll("audio")).toHaveLength(1);
-          expect(screen.getAllByTestId("trace-message")).toHaveLength(1);
+          expect(screen.getAllByTestId("run-turn-separator")).toHaveLength(1);
 
           // The text renders as the transcript inside the same media wrapper as
           // the <audio> (co-contained), not as a standalone second bubble.

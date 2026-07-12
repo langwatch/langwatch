@@ -47,7 +47,7 @@ make observability-down        # stop it (haven observability down) — discards
 ```
 
 Then open Grafana at http://localhost:3000 (anonymous Admin, or admin/admin), or
-ask your agent to query it. `make portless-doctor` (or `haven doctor`) reports
+ask your agent to query it. `make haven doctor` (or `haven doctor`) reports
 stack health and the image actually running.
 
 ### Tuning the caps

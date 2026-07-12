@@ -122,13 +122,30 @@ func (s *Store) ReadHMRGate(lwDir string) (int64, bool) {
 // ClearHMRGate removes the marker so HMR resumes immediately.
 func (s *Store) ClearHMRGate(lwDir string) { _ = os.Remove(s.hmrGatePath(lwDir)) }
 
-// SaveDaemon / Daemon / ClearDaemon manage the singleton daemon record.
-func (s *Store) SaveDaemon(info app.DaemonInfo) error {
+// ClaimDaemon / Daemon / ClearDaemon manage the singleton daemon record.
+
+// ClaimDaemon writes the daemon record only if none exists yet. The O_EXCL
+// create is atomic across processes, so of two daemons racing to start exactly
+// one claims the slot; the loser gets (false, nil) and an untouched record. A
+// stale record left by a crashed daemon must be cleared (ClearDaemon) before the
+// claim can succeed — ClaimDaemon itself never overwrites.
+func (s *Store) ClaimDaemon(info app.DaemonInfo) (bool, error) {
 	if err := os.MkdirAll(s.home, 0o755); err != nil {
-		return err
+		return false, err
 	}
+	f, err := os.OpenFile(s.daemonPath(), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		if os.IsExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	defer func() { _ = f.Close() }()
 	b, _ := json.MarshalIndent(info, "", "  ")
-	return os.WriteFile(s.daemonPath(), append(b, '\n'), 0o644)
+	if _, err := f.Write(append(b, '\n')); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (s *Store) Daemon() (app.DaemonInfo, bool) {

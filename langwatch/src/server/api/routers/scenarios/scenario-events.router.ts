@@ -155,6 +155,28 @@ export const scenarioEventsRouter = createTRPCRouter({
       });
     }),
 
+  // Cheap freshness probe for the run history views: returns only the latest
+  // UpdatedAt across the project's runs in the window. Clients poll this tiny
+  // response and invalidate getSuiteRunData only when the value advances,
+  // instead of re-downloading run payloads on a timer.
+  getSuiteRunFreshness: protectedProcedure
+    .input(
+      projectSchema
+        .extend({ scenarioSetId: z.string().optional() })
+        .extend(dateRangeFields),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input, ctx }) => {
+      const service = getApp().simulations.runs;
+      const dates = resolveDateRange(input);
+      const lastUpdatedAt = await service.getLastUpdatedAt({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+        ...dates,
+      });
+      return { lastUpdatedAt };
+    }),
+
   // Get all run data for a scenario set (paginated, no BullMQ merge)
   getScenarioSetRunData: protectedProcedure
     .input(
@@ -265,29 +287,6 @@ export const scenarioEventsRouter = createTRPCRouter({
         ...dates,
       });
       return { count };
-    }),
-
-  // Get scenario run data by scenario id
-  getRunDataByScenarioId: protectedProcedure
-    .input(
-      projectSchema.extend({
-        scenarioId: z.string(),
-      }),
-    )
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input, ctx }) => {
-      logger.debug(
-        { projectId: input.projectId, scenarioId: input.scenarioId },
-        "Fetching run data by scenario id",
-      );
-      const service = getApp().simulations.runs;
-      // Point lookup by scenario id — no date window, so a scenario's full run
-      // history stays reachable.
-      const data = await service.getScenarioRunDataByScenarioId({
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-      });
-      return { data };
     }),
 
   // Get pre-aggregated batch history for the sidebar (no full messages)
