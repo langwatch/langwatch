@@ -24,7 +24,7 @@ import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 interface ViewAutomationDrawerProps {
@@ -226,46 +226,10 @@ export function ViewAutomationDrawer({
                     : "This automation has not fired yet."}
                 </Text>
               ) : (
-                <VStack align="stretch" gap={0} width="full">
-                  {recentFiresQuery.data?.map((fire) => {
-                    const firedAt = new Date(fire.createdAt);
-                    const isOpenIncident =
-                      !!fire.customGraphId && !fire.resolvedAt;
-                    return (
-                      <HStack
-                        key={fire.id}
-                        justify="space-between"
-                        paddingY={2}
-                        borderBottomWidth="1px"
-                        borderColor="border"
-                        _last={{ borderBottomWidth: 0 }}
-                      >
-                        <Text textStyle="sm">
-                          fired {formatTimeAgo(firedAt.getTime())}
-                          {fire.resolvedAt
-                            ? ` · resolved after ${formatDurationBetween(
-                                firedAt,
-                                new Date(fire.resolvedAt),
-                              )}`
-                            : ""}
-                        </Text>
-                        {isOpenIncident ? (
-                          <HStack gap={1.5}>
-                            <Box
-                              width="8px"
-                              height="8px"
-                              borderRadius="full"
-                              bg="red.solid"
-                            />
-                            <Text textStyle="sm" color="red.fg">
-                              Still firing
-                            </Text>
-                          </HStack>
-                        ) : null}
-                      </HStack>
-                    );
-                  })}
-                </VStack>
+                <RecentFiresList
+                  fires={recentFiresQuery.data ?? []}
+                  isGraphAlert={isGraphAlert}
+                />
               )}
             </VStack>
           </VStack>
@@ -284,4 +248,100 @@ export function ViewAutomationDrawer({
       </Drawer.Content>
     </Drawer.Root>
   );
+}
+
+type RecentFire = RouterOutputs["automation"]["getRecentFires"][number];
+
+/**
+ * Recent fires as a compact, honest list. The fire ledger is metadata-only
+ * (no trace ids: `triggers:view` is weaker than trace-content permission), so
+ * there is nothing per-trace to link. A busy automation logs many rows that
+ * otherwise read as identical "fired 6 minutes ago" lines, so a burst that
+ * shares a relative-time label collapses into one "Fired 7 times" row. Alerts
+ * stay per-incident because each open/resolve is a distinct event.
+ */
+function RecentFiresList({
+  fires,
+  isGraphAlert,
+}: {
+  fires: RecentFire[];
+  isGraphAlert: boolean;
+}) {
+  const rows = isGraphAlert
+    ? fires.map((fire) => {
+        const firedAt = new Date(fire.createdAt);
+        const open = !fire.resolvedAt;
+        return {
+          key: fire.id,
+          dot: open ? "red.solid" : "green.solid",
+          label: open ? "Firing" : "Resolved",
+          detail: open
+            ? "still firing"
+            : `${formatTimeAgo(firedAt.getTime())} · lasted ${formatDurationBetween(
+                firedAt,
+                new Date(fire.resolvedAt!),
+              )}`,
+          detailColor: open ? "red.fg" : "fg.muted",
+        };
+      })
+    : groupFiresByLabel(fires).map((g) => ({
+        key: g.key,
+        dot: "green.solid",
+        label: g.count === 1 ? "Fired once" : `Fired ${g.count} times`,
+        detail: g.label,
+        detailColor: "fg.muted",
+      }));
+
+  return (
+    <VStack
+      align="stretch"
+      gap={0}
+      width="full"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      overflow="hidden"
+    >
+      {rows.map((row) => (
+        <HStack
+          key={row.key}
+          gap={2.5}
+          paddingX={3}
+          paddingY={2}
+          borderBottomWidth="1px"
+          borderColor="border"
+          _last={{ borderBottomWidth: 0 }}
+        >
+          <Box boxSize={2} borderRadius="full" flexShrink={0} bg={row.dot} />
+          <Text textStyle="sm" flex="1" minWidth="0">
+            {row.label}
+          </Text>
+          <Text
+            textStyle="xs"
+            color={row.detailColor}
+            flexShrink={0}
+            whiteSpace="nowrap"
+          >
+            {row.detail}
+          </Text>
+        </HStack>
+      ))}
+    </VStack>
+  );
+}
+
+/** Collapse consecutive fires that share a relative-time label ("6 minutes
+ *  ago") into one counted row. Input is newest-first, so equal labels are
+ *  always adjacent. */
+function groupFiresByLabel(
+  fires: RecentFire[],
+): { key: string; label: string; count: number }[] {
+  const groups: { key: string; label: string; count: number }[] = [];
+  for (const fire of fires) {
+    const label = formatTimeAgo(new Date(fire.createdAt).getTime()) ?? "";
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.count++;
+    else groups.push({ key: fire.id, label, count: 1 });
+  }
+  return groups;
 }

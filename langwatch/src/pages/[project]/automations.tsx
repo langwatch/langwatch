@@ -2,21 +2,23 @@ import {
   Box,
   Code,
   Button,
-  Container,
   Heading,
   HStack,
+  SimpleGrid,
+  Spacer,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type { Monitor, TriggerAction } from "@prisma/client";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Edit2,
   Eye,
   Filter,
   Calendar,
   MoreVertical,
+  Plus,
   Trash,
   TrendingUp,
   Zap,
@@ -39,9 +41,10 @@ import {
   SectionHeader,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
-import { SegmentedControl } from "~/components/ui/segmented-control";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { useDrawer } from "~/hooks/useDrawer";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
@@ -78,12 +81,6 @@ function Automations() {
     [triggerStats.data],
   );
 
-  // The three lenses the page answers: what runs on a clock, what reacts to
-  // events, and what has already happened.
-  const [lens, setLens] = useState<"triggered" | "scheduled" | "history">(
-    "triggered",
-  );
-
   // A report's cron only DESCRIBES its schedule — the scheduler owns the real
   // instants, so next/last run come from there, not from the trigger row.
   const reportSchedules = api.automation.getReportSchedules.useQuery(
@@ -95,11 +92,11 @@ function Automations() {
     [reportSchedules.data],
   );
 
-  // What every automation in the project has actually been doing. Only fetched
-  // when the reader asks for it — it is the one query the other lenses never need.
+  // What every automation in the project has actually been doing. Now surfaced
+  // inline (no History tab), so it loads with the page.
   const activity = api.automation.getRecentActivity.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && lens === "history" },
+    { enabled: !!project?.id },
   );
 
   // Alerts react to a custom graph's metric; automations react to traces.
@@ -119,12 +116,6 @@ function Automations() {
       ),
     [triggers.data],
   );
-  // Everything that fires in reaction to something, as opposed to on a clock.
-  const triggered = useMemo(
-    () => [...alerts, ...traceAutomations],
-    [alerts, traceAutomations],
-  );
-
   // Only needed to resolve dataset names on ADD_TO_DATASET rows. Gated on
   // the project being loaded (an empty projectId trips the permission
   // middleware with a spurious "no permission" toast) and on the list
@@ -421,53 +412,107 @@ function Automations() {
 
   const isLoading = triggers.isLoading;
 
+  // At-a-glance overview: what's wrong right now, how busy things have been,
+  // and what runs next. Derived from the same queries the tables use.
+  const overview = useMemo(() => {
+    const stats = [...statsByTriggerId.values()];
+    const firingNow = stats.filter((s) => s.currentlyFiring).length;
+    const fired30d = stats.reduce(
+      (sum, s) => sum + (s.recentFireCount ?? 0),
+      0,
+    );
+    const next = (reportSchedules.data ?? [])
+      .filter((s) => s.nextRunAt)
+      .map((s) => ({
+        at: new Date(s.nextRunAt!).getTime(),
+        triggerId: s.triggerId,
+      }))
+      .sort((a, b) => a.at - b.at)[0];
+    const nextName = next
+      ? ((triggers.data ?? []).find((t) => t.id === next.triggerId)?.name ??
+        null)
+      : null;
+    return { firingNow, fired30d, next, nextName };
+  }, [statsByTriggerId, reportSchedules.data, triggers.data]);
+
   return (
     <DashboardLayout>
-      <Container maxWidth="1280px" padding={6}>
-        <VStack align="stretch" gap={10}>
-          <VStack align="start" gap={1}>
-            <Heading>Alerts &amp; Automations</Heading>
-            <Text textStyle="sm" color="fg.muted">
-              Alerts watch a metric, schedules go out on a recurring cadence,
-              and automations act on traces as they arrive.
-            </Text>
-          </VStack>
+      <PageLayout.Header>
+        <PageLayout.Heading>Automations</PageLayout.Heading>
+        <Spacer />
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button colorPalette="orange" size="sm">
+              <Plus size={16} /> New
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item value="automation" onClick={() => openDrawer("automation", {})}>
+              <HStack gap={2}>
+                <Zap size={14} /> Automation
+              </HStack>
+            </Menu.Item>
+            <Menu.Item
+              value="alert"
+              onClick={() =>
+                openDrawer("automation", { initialSource: "customGraph" })
+              }
+            >
+              <HStack gap={2}>
+                <TrendingUp size={14} /> Alert
+              </HStack>
+            </Menu.Item>
+            <Menu.Item
+              value="schedule"
+              onClick={() =>
+                openDrawer("automation", { initialSource: "report" })
+              }
+            >
+              <HStack gap={2}>
+                <Calendar size={14} /> Schedule
+              </HStack>
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+      </PageLayout.Header>
+      <Box paddingX={6} paddingY={6} width="full">
+        <VStack align="stretch" gap={8} width="full">
+          <Text textStyle="sm" color="fg.muted">
+            Alerts watch a metric, schedules go out on a recurring cadence, and
+            automations act on traces as they arrive.
+          </Text>
 
-          <SegmentedControl
-            value={lens}
-            onValueChange={(e) =>
-              setLens(e.value as "triggered" | "scheduled" | "history")
-            }
-            size="sm"
-            alignSelf="start"
-            items={[
-              { value: "triggered", label: `Triggered (${triggered.length})` },
-              { value: "scheduled", label: `Scheduled (${reports.length})` },
-              { value: "history", label: "History" },
-            ]}
-          />
+          <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+            <StatTile
+              label="Firing now"
+              value={overview.firingNow}
+              sub={
+                overview.firingNow > 0
+                  ? "alerts over their threshold"
+                  : "all clear"
+              }
+              alert={overview.firingNow > 0}
+            />
+            <StatTile
+              label="Fired (30 days)"
+              value={overview.fired30d.toLocaleString()}
+              sub="across every automation"
+            />
+            <StatTile
+              label="Next scheduled"
+              value={overview.next ? (formatTimeAgo(overview.next.at) ?? "—") : "—"}
+              sub={overview.nextName ?? "no schedules queued"}
+            />
+          </SimpleGrid>
 
           {isLoading ? (
             <Text textStyle="sm" color="fg.muted">
               Loading...
             </Text>
-          ) : lens === "history" ? (
-            <AutomationsHistory
-              fires={activity.data ?? []}
-              triggers={triggers.data ?? []}
-              isLoading={activity.isLoading}
-              onOpenAutomation={(triggerId) =>
-                openDrawer("viewAutomation", { automationId: triggerId })
-              }
-            />
           ) : (
             <>
               {/* Alerts — fire when a graph's metric crosses a threshold */}
-              <VStack
-                align="stretch"
-                gap={4}
-                display={lens === "triggered" ? "flex" : "none"}
-              >
+              <VStack align="stretch" gap={4}>
                 <SectionHeader
                   icon={<TrendingUp size={18} />}
                   accent="orange"
@@ -560,11 +605,7 @@ function Automations() {
               </VStack>
 
               {/* Schedules — send something on a recurring schedule */}
-              <VStack
-                align="stretch"
-                gap={4}
-                display={lens === "scheduled" ? "flex" : "none"}
-              >
+              <VStack align="stretch" gap={4}>
                 <SectionHeader
                   icon={<Calendar size={18} />}
                   accent="purple"
@@ -670,11 +711,7 @@ function Automations() {
               </VStack>
 
               {/* Automations — act on each incoming trace that matches */}
-              <VStack
-                align="stretch"
-                gap={4}
-                display={lens === "triggered" ? "flex" : "none"}
-              >
+              <VStack align="stretch" gap={4}>
                 <SectionHeader
                   icon={<Zap size={18} />}
                   accent="blue"
@@ -784,17 +821,74 @@ function Automations() {
                   </TableShell>
                 )}
               </VStack>
+
+              {/* Recent activity — always visible, no longer behind a tab */}
+              <VStack align="stretch" gap={3} width="full">
+                <Heading size="sm">Recent activity</Heading>
+                <AutomationsHistory
+                  fires={activity.data ?? []}
+                  triggers={triggers.data ?? []}
+                  isLoading={activity.isLoading}
+                  onOpenAutomation={(triggerId) =>
+                    openDrawer("viewAutomation", { automationId: triggerId })
+                  }
+                />
+              </VStack>
             </>
           )}
         </VStack>
-      </Container>
+      </Box>
     </DashboardLayout>
   );
 }
 
-/** Alert "Watches" cell — the graph + series the alert is about (the subject
- *  facet). The stored series key resolves to its display name from the graph
- *  JSON; falls back to the raw key, or "Graph deleted" when the graph is gone. */
+/** One glance tile in the overview strip: a quiet uppercase label, a big
+ *  number, and a one-line qualifier. Turns red when it's reporting a problem
+ *  (an alert past its threshold). */
+function StatTile({
+  label,
+  value,
+  sub,
+  alert = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub: string;
+  alert?: boolean;
+}) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor={alert ? "red.solid" : "border"}
+      borderRadius="lg"
+      padding={4}
+      bg="bg.panel"
+    >
+      <Text
+        textStyle="2xs"
+        textTransform="uppercase"
+        letterSpacing="0.04em"
+        fontWeight="600"
+        color={alert ? "red.fg" : "fg.muted"}
+      >
+        {label}
+      </Text>
+      <Text
+        fontSize="2xl"
+        fontWeight="semibold"
+        lineHeight="1.2"
+        marginTop={1}
+        color={alert ? "red.fg" : "fg"}
+      >
+        {value}
+      </Text>
+      <Text textStyle="xs" color="fg.muted" marginTop={0.5} lineClamp={1}>
+        {sub}
+      </Text>
+    </Box>
+  );
+}
+
 export default withPermissionGuard("triggers:view", {
   layoutComponent: DashboardLayout,
 })(Automations);

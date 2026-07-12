@@ -257,7 +257,10 @@ export function ReportRunCells({
 }
 
 /** Bordered table frame that scrolls horizontally instead of squishing
- *  columns on narrow viewports. */
+ *  columns on narrow viewports. The `css` block is the one place the three
+ *  automation tables get their shared polish — a quiet uppercase header on a
+ *  tinted strip, generous row height, and a soft hover — so no per-page table
+ *  markup has to repeat it. */
 export function TableShell({ children }: { children: React.ReactNode }) {
   return (
     <Box
@@ -265,8 +268,34 @@ export function TableShell({ children }: { children: React.ReactNode }) {
       borderColor="border"
       borderRadius="lg"
       overflow="hidden"
+      bg="bg.panel"
     >
-      <Box overflowX="auto">{children}</Box>
+      <Box
+        overflowX="auto"
+        css={{
+          "& thead th": {
+            backgroundColor: "var(--chakra-colors-bg-subtle)",
+            fontSize: "11px",
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+            color: "var(--chakra-colors-fg-muted)",
+            whiteSpace: "nowrap",
+            paddingTop: "0.6rem",
+            paddingBottom: "0.6rem",
+            borderBottomColor: "var(--chakra-colors-border)",
+          },
+          "& tbody td": {
+            paddingTop: "0.85rem",
+            paddingBottom: "0.85rem",
+            verticalAlign: "middle",
+            borderColor: "var(--chakra-colors-border-muted)",
+          },
+          "& tbody tr:last-of-type td": { borderBottom: "none" },
+        }}
+      >
+        {children}
+      </Box>
     </Box>
   );
 }
