@@ -18,11 +18,11 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 )
 
-// generateBearerToken returns a random 32-byte token encoded as hex. Used as
+// GenerateBearerToken returns a random 32-byte token encoded as hex. Used as
 // the per-worker shared secret between the manager and its own reverse proxy.
 // 256 bits of entropy makes online brute-force from a sibling worker
 // implausible even if the sibling were given unbounded loopback access.
-func generateBearerToken() (string, error) {
+func GenerateBearerToken() (string, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		return "", fmt.Errorf("generate bearer token: %w", err)
@@ -46,17 +46,17 @@ func generateBearerToken() (string, error) {
 // its own random OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′), and this proxy is
 // the only holder of it: a sibling that connects directly to internalPort has
 // no credential and gets 401 from opencode itself.
-type authProxy struct {
+type AuthProxy struct {
 	server *http.Server
 	listen net.Listener
 }
 
-// startAuthProxy binds 127.0.0.1:externalPort and reverse-proxies authorised
+// StartAuthProxy binds 127.0.0.1:externalPort and reverse-proxies authorised
 // requests to 127.0.0.1:internalPort. The returned proxy is already serving in
 // a goroutine; the caller closes it via shutdown(). The context carries the
 // logger (clog) used by the serve goroutine — the proxy outlives any single
 // request, so callers pass the pool-lifetime context, not a request context.
-func startAuthProxy(ctx context.Context, externalPort, internalPort int, bearerToken, openCodePassword string) (*authProxy, error) {
+func StartAuthProxy(ctx context.Context, externalPort, internalPort int, bearerToken, openCodePassword string) (*AuthProxy, error) {
 	log := clog.Get(ctx)
 	target := &url.URL{
 		Scheme: "http",
@@ -118,13 +118,13 @@ func startAuthProxy(ctx context.Context, externalPort, internalPort int, bearerT
 		}
 	})
 
-	return &authProxy{server: srv, listen: listener}, nil
+	return &AuthProxy{server: srv, listen: listener}, nil
 }
 
 // shutdown stops the proxy goroutine. Best-effort: a 1s deadline is enough for
 // in-flight HTTP turns to drain on a healthy worker; we drop anything longer
 // rather than block a worker recycle.
-func (p *authProxy) shutdown() {
+func (p *AuthProxy) Shutdown() {
 	if p == nil || p.server == nil {
 		return
 	}

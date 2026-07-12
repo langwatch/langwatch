@@ -119,13 +119,13 @@ func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
 		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
 
-	pwA, err := generateBearerToken()
+	pwA, err := GenerateBearerToken()
 	if err != nil {
-		t.Fatalf("generateBearerToken: %v", err)
+		t.Fatalf("GenerateBearerToken: %v", err)
 	}
-	pwB, err := generateBearerToken()
+	pwB, err := GenerateBearerToken()
 	if err != nil {
-		t.Fatalf("generateBearerToken: %v", err)
+		t.Fatalf("GenerateBearerToken: %v", err)
 	}
 
 	envA := buildWorkerEnv("conv-a", "/workspace/sessions/conv-a", creds, pwA, 19001)

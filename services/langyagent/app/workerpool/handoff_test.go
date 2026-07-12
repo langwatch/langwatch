@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// ADR-048: `handoff` must be a terminal event type so streamSessionEvents
+// ADR-048: `handoff` must be a terminal event type so StreamSession
 // forwards the frame and returns cleanly, ending the turn.
 func TestTerminalEventTypes_IncludesHandoff(t *testing.T) {
 	if _, ok := terminalEventTypes["handoff"]; !ok {
@@ -21,7 +21,7 @@ func TestTerminalEventTypes_IncludesHandoff(t *testing.T) {
 	}
 }
 
-// notifyShutdownImminent POSTs the session-scoped shutdown notice with the
+// NotifyShutdownImminent POSTs the session-scoped shutdown notice with the
 // absolute deadline (unix millis) opencode must checkpoint before.
 func TestNotifyShutdownImminent_PostsDeadline(t *testing.T) {
 	var gotPath, gotAuth string
@@ -37,9 +37,9 @@ func TestNotifyShutdownImminent_PostsDeadline(t *testing.T) {
 	defer srv.Close()
 
 	deadline := time.UnixMilli(1_752_000_000_000)
-	err := notifyShutdownImminent(context.Background(), srv.URL, "bearer-abc", "sess-1", deadline)
+	err := NotifyShutdownImminent(context.Background(), srv.URL, "bearer-abc", "sess-1", deadline)
 	if err != nil {
-		t.Fatalf("notifyShutdownImminent: %v", err)
+		t.Fatalf("NotifyShutdownImminent: %v", err)
 	}
 	if gotPath != "/session/sess-1/shutdown_imminent" {
 		t.Errorf("path = %q, want /session/sess-1/shutdown_imminent", gotPath)
@@ -58,24 +58,24 @@ func TestNotifyShutdownImminent_ErrorOnServerFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := notifyShutdownImminent(context.Background(), srv.URL, "b", "sess-1", time.Now()); err == nil {
+	if err := NotifyShutdownImminent(context.Background(), srv.URL, "b", "sess-1", time.Now()); err == nil {
 		t.Fatalf("expected an error when opencode answers 500 to shutdown_imminent")
 	}
 }
 
-// The token in a handoff frame is opaque to the manager; extractHandoffToken
+// The token in a handoff frame is opaque to the manager; ExtractHandoffToken
 // only asserts the frame shape (bare and nested) for bookkeeping/tests.
 func TestExtractHandoffToken(t *testing.T) {
 	bare := map[string]any{"type": "handoff", "token": "opaque-1"}
-	if tok, ok := extractHandoffToken(bare); !ok || tok != "opaque-1" {
+	if tok, ok := ExtractHandoffToken(bare); !ok || tok != "opaque-1" {
 		t.Errorf("bare: got (%q,%v), want (opaque-1,true)", tok, ok)
 	}
 	nested := map[string]any{"type": "handoff", "properties": map[string]any{"token": "opaque-2"}}
-	if tok, ok := extractHandoffToken(nested); !ok || tok != "opaque-2" {
+	if tok, ok := ExtractHandoffToken(nested); !ok || tok != "opaque-2" {
 		t.Errorf("nested: got (%q,%v), want (opaque-2,true)", tok, ok)
 	}
 	notHandoff := map[string]any{"type": "message.done"}
-	if _, ok := extractHandoffToken(notHandoff); ok {
+	if _, ok := ExtractHandoffToken(notHandoff); ok {
 		t.Errorf("a non-handoff event must not report a handoff token")
 	}
 }
@@ -92,9 +92,9 @@ func TestPostMessage_IncludesResumeToken(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := postMessage(context.Background(), srv.URL, "b", "sess-1", "sys", "hi", "resume-token-xyz")
+	err := PostMessage(context.Background(), srv.URL, "b", "sess-1", "sys", "hi", "resume-token-xyz")
 	if err != nil {
-		t.Fatalf("postMessage: %v", err)
+		t.Fatalf("PostMessage: %v", err)
 	}
 	if body.ResumeToken != "resume-token-xyz" {
 		t.Errorf("resumeToken = %q, want resume-token-xyz", body.ResumeToken)
@@ -111,8 +111,8 @@ func TestPostMessage_OmitsResumeTokenWhenEmpty(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := postMessage(context.Background(), srv.URL, "b", "sess-1", "sys", "hi", ""); err != nil {
-		t.Fatalf("postMessage: %v", err)
+	if err := PostMessage(context.Background(), srv.URL, "b", "sess-1", "sys", "hi", ""); err != nil {
+		t.Fatalf("PostMessage: %v", err)
 	}
 	if _, present := raw["resumeToken"]; present {
 		t.Errorf("resumeToken must be omitted on a cold start, got %v", raw["resumeToken"])
@@ -135,7 +135,7 @@ func TestStreamSessionEvents_HandoffFrameTerminatesAndForwards(t *testing.T) {
 		fl.Flush()
 		io.WriteString(w, "data: {\"type\":\"handoff\",\"sessionID\":\"sess-1\",\"token\":\"opaque-resume\"}\n\n")
 		fl.Flush()
-		// Hold the connection open; streamSessionEvents must return on the
+		// Hold the connection open; StreamSession must return on the
 		// terminal handoff frame without waiting for us to close.
 		time.Sleep(500 * time.Millisecond)
 	}))
@@ -144,16 +144,16 @@ func TestStreamSessionEvents_HandoffFrameTerminatesAndForwards(t *testing.T) {
 	var out bytes.Buffer
 	done := make(chan error, 1)
 	go func() {
-		done <- streamSessionEvents(context.Background(), srv.URL, "b", "sess-1", &out, func() {})
+		done <- StreamSession(context.Background(), srv.URL, "b", "sess-1", &out, func() {})
 	}()
 
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Fatalf("streamSessionEvents returned error: %v", err)
+			t.Fatalf("StreamSession returned error: %v", err)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatalf("streamSessionEvents did not return on the terminal handoff frame")
+		t.Fatalf("StreamSession did not return on the terminal handoff frame")
 	}
 
 	got := out.String()
