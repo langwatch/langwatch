@@ -55,11 +55,26 @@ type warmRequest struct {
 // Consumed by RPC.HandleWarm.
 const warmTimeout = 90 * time.Second
 
+// Worker-turn intent labels. The control plane picks one per turn as a semantic
+// hint — the manager runs the SAME turn logic for all three (Acquire reconciles
+// create/reuse/revive internally), and the label is recorded on the turn's logs +
+// metrics so per-intent latency and volume are visible. create = expects a cold
+// spawn (a session key rode along); revive = resume a prior turn's handoff
+// checkpoint (resumeToken present); continue = reuse a live worker (no key, the
+// caller's probe said one was alive). The caller can guess wrong — it is a label,
+// not a command — and the turn still runs correctly.
+const (
+	workerIntentCreate   = "create"
+	workerIntentRevive   = "revive"
+	workerIntentContinue = "continue"
+)
+
 // chatHandler is the per-request worker dispatcher. Transport-only: it reads the
 // body (capped at maxBodyBytes), validates inputs, and delegates the turn to the
 // app. The app owns worker acquisition, streaming, and outcome mapping; the
-// request context drives client-disconnect cancellation.
-func chatHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
+// request context drives client-disconnect cancellation. intent is the route's
+// worker-turn label (one of workerIntent*), recorded on the turn's logs + metrics.
+func chatHandler(application *app.App, maxBodyBytes int64, intent string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -77,10 +92,11 @@ func chatHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 			return
 		}
 
-		// Stamp the turn's identity onto the context logger so every line the app,
-		// pool, worker, and opencode reader emit for this turn carries it — the
-		// thread to pull when reading logs for one conversation.
+		// Stamp the turn's identity + intent onto the context logger so every line
+		// the app, pool, worker, and opencode reader emit for this turn carries it —
+		// the thread to pull when reading logs for one conversation.
 		ctx = clog.With(ctx, turnLogFields(req.ConversationID, req.ProjectID, req.TurnID)...)
+		ctx = clog.With(ctx, zap.String("worker_intent", intent))
 
 		creds := req.Credentials
 		// Thread the user-selected/resolved model (already validated against the
@@ -100,6 +116,7 @@ func chatHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
 			ResumeToken:    req.ResumeToken,
 			TurnID:         req.TurnID,
 			ProjectID:      req.ProjectID,
+			Intent:         intent,
 		}, sink); err != nil {
 			// Pre-stream failures only (e.g. conversation-busy → 409). Once the
 			// stream has begun, the app writes error events into the sink and

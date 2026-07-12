@@ -13,7 +13,7 @@ func TestTelemetry_AllCallSitesSafeWithoutProvider(t *testing.T) {
 	tel := New()
 	ctx := context.Background()
 
-	c, end := tel.StartTurn(ctx, "conv-1")
+	c, end := tel.StartTurn(ctx, "conv-1", "create")
 	_ = c
 	end.End()
 
@@ -21,7 +21,7 @@ func TestTelemetry_AllCallSitesSafeWithoutProvider(t *testing.T) {
 	_ = c2
 	span.End()
 
-	tel.TurnObserved(ctx, (250 * time.Millisecond).Seconds(), "ok")
+	tel.TurnObserved(ctx, (250 * time.Millisecond).Seconds(), "ok", "create")
 	tel.AtCapacity(ctx)
 	tel.WorkerSpawned(ctx, 1.5, true)
 	tel.WorkerSpawned(ctx, 0.2, false)

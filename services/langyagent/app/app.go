@@ -76,6 +76,11 @@ type ChatRequest struct {
 	// ProjectID is the tenant the turn belongs to. Required by the ingest to
 	// dispatch the finalize command; carried here so the agent can echo it back.
 	ProjectID string
+	// Intent is the caller's worker-turn label (create/revive/continue), a
+	// semantic hint the transport derives from the route. Recorded on the turn
+	// span + duration metric so per-intent behaviour is visible; it does NOT change
+	// how the turn runs (Acquire reconciles the real state).
+	Intent string
 }
 
 // Warm spawns the conversation's worker WITHOUT running a turn.
@@ -137,7 +142,7 @@ func (a *App) HasLiveWorker(conversationID string, sig domain.CredentialSignatur
 //   - stream/post error      → the error surfaced as an error event
 //   - success                → the opencode ndjson event stream
 func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
-	ctx, span := a.startTurn(ctx, req.ConversationID)
+	ctx, span := a.startTurn(ctx, req.ConversationID, req.Intent)
 	defer span()
 	start := time.Now()
 
@@ -147,13 +152,13 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 			a.atCapacity(ctx)
 			sink.Begin()
 			sink.ErrorEvent("at-capacity")
-			a.turnObserved(ctx, start, "at-capacity")
+			a.turnObserved(ctx, start, "at-capacity", req.Intent)
 			return nil
 		}
 		clog.Get(ctx).Error("acquire worker failed", zap.Error(err))
 		sink.Begin()
 		sink.ErrorEvent(err.Error())
-		a.turnObserved(ctx, start, "acquire-error")
+		a.turnObserved(ctx, start, "acquire-error", req.Intent)
 		return nil
 	}
 
@@ -164,7 +169,7 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 	// overlap (transport → 409); the control plane shows a "still answering —
 	// wait" notice. This must happen BEFORE Begin() commits the 200.
 	if !worker.Claim() {
-		a.turnObserved(ctx, start, "busy")
+		a.turnObserved(ctx, start, "busy", req.Intent)
 		// Expected hot-path control-flow outcome — no stack capture needed.
 		return herr.NewLight(ctx, domain.ErrConversationBusy, nil)
 	}
@@ -214,19 +219,19 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 		if errors.Is(err, domain.ErrSessionNotFound) {
 			a.pool.KillSessionVanished(req.ConversationID)
 			sink.ErrorEvent("session-not-found")
-			a.turnObserved(ctx, start, "session-not-found")
+			a.turnObserved(ctx, start, "session-not-found", req.Intent)
 			return nil
 		}
 		clog.Get(ctx).Error("post message failed", zap.Error(err))
 		sink.ErrorEvent(err.Error())
-		a.turnObserved(ctx, start, "post-error")
+		a.turnObserved(ctx, start, "post-error", req.Intent)
 		return nil
 	}
 
 	if err := <-errCh; err != nil {
 		clog.Get(ctx).Warn("stream events ended with error", zap.Error(err))
 		sink.ErrorEvent(err.Error())
-		a.turnObserved(ctx, start, "stream-error")
+		a.turnObserved(ctx, start, "stream-error", req.Intent)
 		return nil
 	}
 
@@ -237,7 +242,7 @@ func (a *App) Chat(ctx context.Context, req ChatRequest, sink ChatSink) error {
 	// turnId-idempotent ingest collapses the duplicate.
 	a.finalizeCompletedTurn(ctx, req, acc)
 
-	a.turnObserved(ctx, start, "ok")
+	a.turnObserved(ctx, start, "ok", req.Intent)
 	return nil
 }
 
@@ -270,19 +275,19 @@ func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, acc *a
 
 // --- telemetry helpers: nil-safe so the app unit-tests without instruments ---
 
-func (a *App) startTurn(ctx context.Context, conversationID string) (context.Context, func()) {
+func (a *App) startTurn(ctx context.Context, conversationID, intent string) (context.Context, func()) {
 	if a.telemetry == nil {
 		return ctx, func() {}
 	}
-	ctx, span := a.telemetry.StartTurn(ctx, conversationID)
+	ctx, span := a.telemetry.StartTurn(ctx, conversationID, intent)
 	return ctx, func() { span.End() }
 }
 
-func (a *App) turnObserved(ctx context.Context, start time.Time, outcome string) {
+func (a *App) turnObserved(ctx context.Context, start time.Time, outcome, intent string) {
 	if a.telemetry == nil {
 		return
 	}
-	a.telemetry.TurnObserved(ctx, time.Since(start).Seconds(), outcome)
+	a.telemetry.TurnObserved(ctx, time.Since(start).Seconds(), outcome, intent)
 }
 
 func (a *App) atCapacity(ctx context.Context) {

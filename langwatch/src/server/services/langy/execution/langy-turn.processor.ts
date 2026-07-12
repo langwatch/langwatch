@@ -552,8 +552,20 @@ export async function runTurn(
    * failure. Idempotent to call again ONLY when it produced no output — which
    * `resolveServerRecovery` enforces before it lets us round again.
    */
-  const postTurnToManager = async () =>
-    doFetch(`${deps.agentUrl}/chat`, {
+  const postTurnToManager = async () => {
+    // Intent label the manager records for per-intent logs/metrics; it runs the
+    // SAME turn logic regardless (Acquire reconciles the real worker state), so a
+    // wrong guess still runs correctly. Computed per attempt so the 428-retry
+    // below — which mints a key — flips continue → create on its own. revive: we
+    // are resuming a handoff checkpoint. create: a session key rode along, so the
+    // route decided this is a cold spawn. continue: no key, the route's probe said
+    // a live worker already exists and we are continuing the conversation on it.
+    const intent = resumeToken
+      ? "revive"
+      : credentials.langwatchApiKey
+        ? "create"
+        : "continue";
+    return doFetch(`${deps.agentUrl}/worker/${intent}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -575,6 +587,7 @@ export async function runTurn(
       }),
       signal: AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
     });
+  };
 
   const attemptManagerTurn = async (): Promise<string | null> => {
     let agentResponse = await postTurnToManager();

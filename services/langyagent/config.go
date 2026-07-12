@@ -11,7 +11,10 @@
 //
 // HTTP API:
 //
-//	POST /chat   (Bearer ${LANGY_INTERNAL_SECRET})   → application/x-ndjson stream
+//	POST /worker/{create,revive,continue}  (Bearer ${LANGY_INTERNAL_SECRET})
+//	                                                 → application/x-ndjson turn stream
+//	                                                   (intent labels; same turn logic)
+//	POST /warm  /worker/probe                        → pre-flight (spawn / liveness)
 //	GET  /health                                     → "ok (N/MAX workers)" (legacy alias)
 //	GET  /healthz /readyz /startupz                  → k8s probes (pkg/health)
 //

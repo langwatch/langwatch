@@ -2,7 +2,7 @@
  * Internal Langy control-plane endpoints — the Go agent's OUTBOUND calls back
  * to the app. Mounted at `/api/internal/langy`, protected by the shared bearer
  * secret `LANGY_INTERNAL_SECRET` (the same secret the control plane presents to
- * the agent on `/chat`). Never expose publicly.
+ * the agent on its `/worker/*` turn endpoints). Never expose publicly.
  *
  * This is the durable half of the turn lifecycle (see
  * specs/langy/langy-turn-lifecycle.md): the agent posts its final result here

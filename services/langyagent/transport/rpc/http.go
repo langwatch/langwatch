@@ -50,12 +50,18 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// and the chart probes still call /health.
 	mux.HandleFunc("GET /health", healthAlias(deps.App))
 
-	// Streaming verb: chat returns an arbitrarily long ndjson turn, so it does not
-	// fit the typed request/response RPC and stays a bespoke handler.
-	mux.Handle("POST /chat", requireInternalSecret(
-		deps.InternalSecret,
-		chatHandler(deps.App, deps.MaxRequestBodyBytes),
-	))
+	// Streaming turn verbs. All three run one turn on a (possibly-spawned) worker
+	// through the SAME handler — the manager's Acquire reconciles create/reuse/revive
+	// internally — and differ only in the intent label they record (create/revive/
+	// continue), so per-intent latency and volume are visible in logs + metrics. The
+	// turn streams an arbitrarily long ndjson response, so it does not fit the typed
+	// request/response RPC and stays a bespoke handler.
+	for _, intent := range []string{workerIntentCreate, workerIntentRevive, workerIntentContinue} {
+		mux.Handle("POST /worker/"+intent, requireInternalSecret(
+			deps.InternalSecret,
+			chatHandler(deps.App, deps.MaxRequestBodyBytes, intent),
+		))
+	}
 
 	// Typed RPC verbs (RPC.Handle*): the generic adapters decode+validate the body
 	// and serialize the result. Warm boots the worker ahead of the turn (fire-and-
