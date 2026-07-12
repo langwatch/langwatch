@@ -342,8 +342,9 @@ func setupWorkerHome(workerHome, workspaceRoot string, creds domain.Credentials,
 	// opencode discovers global skills under $HOME/.config/opencode/skills,
 	// where each <name>/SKILL.md is exposed to the model as an invokable skill —
 	// so the link MUST land there, not at $HOME/skills (which opencode never
-	// scans). The shared dir is root-owned and world-readable (see
-	// entrypoint.sh), so workers following the link can READ but not mutate it.
+	// scans). The shared dir is root-owned and world-readable (materialized from
+	// the embedded assets by workerpool.New), so workers following the link can
+	// READ but not mutate it.
 	skillsLink := openCodeSkillsDir(workerHome)
 	if err := os.Symlink(filepath.Join(workspaceRoot, "skills"), skillsLink); err != nil && !errors.Is(err, os.ErrExist) {
 		return fmt.Errorf("symlink skills: %w", err)
