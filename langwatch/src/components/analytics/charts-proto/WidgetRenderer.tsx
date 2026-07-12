@@ -27,12 +27,7 @@ import {
 } from "recharts";
 import { TrendingDown, TrendingUp } from "react-feather";
 import { aggAlias, type WidgetSpec } from "./model";
-import {
-  aggUnit,
-  formatAggValue,
-  formatCompactInt,
-  type StubResult,
-} from "./stubData";
+import { aggUnit, formatAggValue, type StubResult } from "./stubData";
 
 const GRID_STROKE = "color-mix(in srgb, currentColor 12%, transparent)";
 const AXIS_TICK = { fontSize: 11, fill: "currentColor", opacity: 0.55 };
@@ -281,7 +276,12 @@ function ChartTip({
   series,
 }: {
   active?: boolean;
-  payload?: Array<{ value: number; name?: string; color?: string; payload?: any }>;
+  payload?: Array<{
+    value: number;
+    name?: string;
+    color?: string;
+    payload?: { name?: string; color?: string };
+  }>;
   label?: string;
   agg: StubResult["primaryAgg"];
   multi?: boolean;
@@ -336,5 +336,3 @@ function ChartTip({
     </Box>
   );
 }
-
-export { formatCompactInt };
