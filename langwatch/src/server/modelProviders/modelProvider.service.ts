@@ -812,8 +812,8 @@ export class ModelProviderService {
     // (e.g. an ORG row and a PROJECT override), an enabled row beats a
     // disabled one, then narrower-scope wins for the legacy
     // `Record<provider, …>` shape we still return here — new consumers
-    // that need the full list should call `listAccessibleForProject`
-    // directly on the service.
+    // that need the full list should call
+    // `listProjectModelProvidersForFrontend` directly on the service.
     const savedProviders =
       await this.repository.findAllAccessibleForProject(projectId);
 
