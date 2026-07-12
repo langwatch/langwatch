@@ -268,6 +268,109 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
     );
   }
 
+  async getEventsUpToPaged(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    upToEvent: EventType;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }): Promise<readonly EventType[]> {
+    const { aggregateId, context, aggregateType } = request;
+    EventUtils.validateTenantId(
+      context,
+      `${this.constructor.name}.getEventsUpToPaged`,
+    );
+
+    if (this.hasMissingAggregateId(aggregateId)) {
+      this.logWarning(
+        `${this.constructor.name}.getEventsUpToPaged`,
+        { tenantId: context.tenantId, aggregateType },
+        "Skipped event_log read for an empty aggregateId (would scan the whole empty-id key range); returning no events",
+      );
+      return [];
+    }
+
+    const pagedRead = this.repository.getEventRecordsUpToPaged;
+    if (!pagedRead) {
+      throw new Error(
+        `${this.constructor.name}: the event repository does not implement getEventRecordsUpToPaged; a paginated re-fold cannot be served`,
+      );
+    }
+
+    return await this.readEventsUpToPagedFromRepository(pagedRead, request);
+  }
+
+  /**
+   * Instrumented repository call + row-to-event mapping for
+   * {@link getEventsUpToPaged}, split out so the public method only carries
+   * validation and capability-checking.
+   */
+  private async readEventsUpToPagedFromRepository(
+    pagedRead: NonNullable<EventRepository["getEventRecordsUpToPaged"]>,
+    request: {
+      aggregateId: string;
+      context: EventStoreReadContext<EventType>;
+      aggregateType: AggregateType;
+      upToEvent: EventType;
+      after: { timestamp: number; eventId: string } | undefined;
+      limit: number;
+    },
+  ): Promise<readonly EventType[]> {
+    const { aggregateId, context, aggregateType, upToEvent, after, limit } =
+      request;
+    return await this.instrument(
+      `${this.constructor.name}.getEventsUpToPaged`,
+      {
+        "aggregate.id": String(aggregateId),
+        "tenant.id": context.tenantId,
+        "aggregate.type": aggregateType,
+        "up_to.event_id": upToEvent.id,
+        "page.limit": limit,
+      },
+      async () => {
+        try {
+          const records = await pagedRead.call(this.repository, {
+            tenantId: context.tenantId,
+            aggregateType,
+            aggregateId,
+            upToTimestamp: upToEvent.createdAt,
+            upToEventId: upToEvent.id,
+            after,
+            limit,
+          });
+
+          const events = records.map((record) =>
+            recordToEvent<EventType>(record, aggregateId),
+          );
+
+          // Do NOT dedup here: `deduplicateEvents` can drop the raw page's
+          // last row (a retry sharing an idempotencyKey with an earlier row
+          // in the same page), which would both feed a stale cursor to the
+          // caller (re-reading the same range forever) and make a full page
+          // look short, i.e. mistaken for exhaustion, silently truncating the
+          // re-fold. The caller's cross-page `seen` set (idempotencyKey ??
+          // id) reproduces the same dedup effect without touching the raw
+          // page length or its last row.
+          return this.postProcessEvents(events);
+        } catch (error) {
+          this.logError(
+            `${this.constructor.name}.getEventsUpToPaged`,
+            {
+              aggregateId: String(aggregateId),
+              tenantId: context.tenantId,
+              aggregateType,
+              upToEventId: upToEvent.id,
+              limit,
+            },
+            error,
+          );
+          throw error;
+        }
+      },
+    );
+  }
+
   async countEventsBefore(
     aggregateId: string,
     context: EventStoreReadContext<EventType>,

@@ -259,10 +259,10 @@ export class PipelineRegistry {
 
   registerAll() {
     // TODO: Customer.io reactors are implemented but not yet registered.
-    // Counting strategy needs to be finalised (extend R5 daily sync pattern
-    // vs per-event ClickHouse queries) before enabling.
-    // See: customerIoDailyUsageSyncReactor, customerIoTraceSyncReactor,
-    //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
+    // Counting strategy needs to be finalised (per-event ClickHouse queries)
+    // before enabling.
+    // See: customerIoTraceSyncReactor, customerIoEvaluationSyncReactor,
+    //      customerIoSimulationSyncReactor
 
     const traceSummaryStore = this.cached<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),

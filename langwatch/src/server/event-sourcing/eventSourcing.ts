@@ -36,7 +36,6 @@ import type {
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
-import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
 import type {
@@ -45,9 +44,7 @@ import type {
 } from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
-import type { ReactorDefinition } from "./reactors/reactor.types";
 import { EventSourcingPipeline } from "./runtimePipeline";
-import { ConfigurationError } from "./services/errorHandling";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
 import type { EventStore } from "./stores/eventStore.types";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
@@ -142,9 +139,6 @@ export class EventSourcing {
     // Create projection registry and register SaaS-only projections
     this.projectionRegistry = new ProjectionRegistry<Event>();
     if (options.isSaas) {
-      this.projectionRegistry.registerFoldProjection(
-        projectDailySdkUsageProjection,
-      );
       this.projectionRegistry.registerMapProjection(
         orgBillableEventsMeterProjection,
       );
@@ -177,37 +171,6 @@ export class EventSourcing {
    */
   get isOutboxWired(): boolean {
     return !!this._outbox;
-  }
-
-  /**
-   * Register a reactor on a global fold projection.
-   *
-   * Must be called before the projection registry is initialized
-   * (i.e., before the first pipeline is registered).
-   *
-   * Silently skips registration when the fold projection does not exist
-   * (e.g. `projectDailySdkUsage` is only registered in SaaS mode).
-   */
-  registerGlobalFoldReactor(
-    foldName: string,
-    reactor: ReactorDefinition<Event>,
-  ): void {
-    try {
-      this.projectionRegistry.registerReactor(foldName, reactor);
-    } catch (error) {
-      // Only suppress "fold not registered" errors — let wiring bugs (duplicates, etc.) fail fast
-      if (
-        error instanceof ConfigurationError &&
-        error.message.includes("fold not registered")
-      ) {
-        logger.debug(
-          { foldName, reactorName: reactor.name },
-          "Skipping global fold reactor — fold not registered",
-        );
-        return;
-      }
-      throw error;
-    }
   }
 
   get eventStore(): EventStore | undefined {

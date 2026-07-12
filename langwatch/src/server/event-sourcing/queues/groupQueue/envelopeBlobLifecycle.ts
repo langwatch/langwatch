@@ -183,74 +183,90 @@ export class EnvelopeBlobLifecycle {
 
   /**
    * Acquires this staged occupancy's hold on its GQ2 blob (no-op for GQ1,
-   * inline, and legacy values). Fire-and-forget: a missed acquire degrades to
-   * the blob's TTL backstop, never to a premature reclaim.
+   * inline, and legacy values). Awaited by the caller (2026-07-11 fix): this
+   * was previously fire-and-forget, which let a killed worker process drop
+   * the acquire silently — before it ever reached Redis — leaving a
+   * concurrent squash's release free to reclaim a blob this occupancy still
+   * needed. A failed acquire still only warns and degrades to the TTL
+   * backstop; it never throws to the caller.
    */
-  acquire(value: string): void {
+  async acquire(value: string): Promise<void> {
     const hold = readEnvelopeHold(value);
     if (!hold) return;
-    void this.blobHolders
-      .acquire({
+    try {
+      await this.blobHolders.acquire({
         projectId: hold.ref.projectId,
         hash: hold.ref.hash,
         slotId: hold.token,
-      })
-      .catch((err: unknown) => {
-        // Tenant-attributed (never a bare hash, never the bucket): every blob
-        // log line carries the owning projectId so logs can't cross tenants.
-        logger.warn(
-          {
-            projectId: hold.ref.projectId,
-            blobHash: hold.ref.hash,
-            tier: hold.ref.tier,
-            err: redactStorageUrisInText(
-              err instanceof Error ? err.message : String(err),
-            ),
-          },
-          "Blob holder acquire failed; relying on the TTL backstop",
-        );
       });
+    } catch (err) {
+      // Tenant-attributed (never a bare hash, never the bucket): every blob
+      // log line carries the owning projectId so logs can't cross tenants.
+      logger.warn(
+        {
+          projectId: hold.ref.projectId,
+          blobHash: hold.ref.hash,
+          tier: hold.ref.tier,
+          err: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
+        },
+        "Blob holder acquire failed; relying on the TTL backstop",
+      );
+    }
   }
 
   /**
    * Releases holds for retired staged values: a GQ2 value releases its holder —
    * reclaiming the blob when the last hold drops, deleting an s3 object
-   * out-of-band; a legacy GQ1 value deletes its randomUUID blob. Fire-and-forget:
-   * the blob TTL is the correctness backstop, so the hot path never waits.
+   * out-of-band; a legacy GQ1 value deletes its randomUUID blob. Awaited by
+   * the caller (2026-07-11 fix): this was previously fire-and-forget, so a
+   * killed worker process could drop a release before it reached Redis,
+   * leaking the holder (or, combined with a concurrent transfer, racing it).
+   * Each value's release still degrades to a warn + the TTL backstop rather
+   * than throwing — one bad value must not abort the rest of the batch.
    */
-  release({ values, groupId }: { values: string[]; groupId: string }): void {
+  async release({
+    values,
+    groupId,
+  }: {
+    values: string[];
+    groupId: string;
+  }): Promise<void> {
     const expected = this.projectIdFor(groupId);
-    for (const value of values) {
-      // Single parse per value: hold + GQ1 blobId from one splitEnvelope so a
-      // maxBatch=10 coalesced completion doesn't do ~20 redundant Buffer.from +
-      // JSON.parse (2026-06-24 review).
-      const { hold, blobId } = readEnvelopeRetirement(value);
-      if (hold) {
-        // Tenant guard: never release a hold whose ref isn't this group's
-        // tenant. A mis-routed or forged GQ2 value must not reclaim another
-        // tenant's blob on the fail-safe cleanup path (ADR-030 §5).
-        if (hold.ref.projectId !== expected) {
-          logger.warn(
-            {
-              projectId: expected,
-              refProjectId: hold.ref.projectId,
-              blobHash: hold.ref.hash,
-              groupId,
-            },
-            "Skipping blob release for a tenant-mismatched ref",
-          );
-          continue;
-        }
-        void this.blobHolders
-          .release({
-            projectId: hold.ref.projectId,
-            hash: hold.ref.hash,
-            tier: hold.ref.tier,
-            slotId: hold.token,
-          })
-          .then((outcome) => {
+    await Promise.all(
+      values.map(async (value) => {
+        // Single parse per value: hold + GQ1 blobId from one splitEnvelope so a
+        // maxBatch=10 coalesced completion doesn't do ~20 redundant Buffer.from +
+        // JSON.parse (2026-06-24 review).
+        const { hold, blobId } = readEnvelopeRetirement(value);
+        if (hold) {
+          // Tenant guard: never release a hold whose ref isn't this group's
+          // tenant. A mis-routed or forged GQ2 value must not reclaim another
+          // tenant's blob on the fail-safe cleanup path (ADR-030 §5).
+          if (hold.ref.projectId !== expected) {
+            logger.warn(
+              {
+                projectId: expected,
+                refProjectId: hold.ref.projectId,
+                blobHash: hold.ref.hash,
+                groupId,
+              },
+              "Skipping blob release for a tenant-mismatched ref",
+            );
+            return;
+          }
+          try {
+            const outcome = await this.blobHolders.release({
+              projectId: hold.ref.projectId,
+              hash: hold.ref.hash,
+              tier: hold.ref.tier,
+              slotId: hold.token,
+            });
             if (outcome === "reclaim-s3" && this.tieredBlobs) {
-              return this.tieredBlobs.delete(hold.ref).catch((err: unknown) => {
+              try {
+                await this.tieredBlobs.delete(hold.ref);
+              } catch (err) {
                 // S3 reclaim failed — the holder is already gone, so no future
                 // release will retry this object. Warn AND counter so oncall
                 // sees a recurring failure before the bucket-lifecycle
@@ -268,10 +284,9 @@ export class EnvelopeBlobLifecycle {
                   },
                   "S3 blob reclaim failed after holder drop — orphaned until bucket lifecycle sweeps",
                 );
-              });
+              }
             }
-          })
-          .catch((err: unknown) => {
+          } catch (err) {
             logger.warn(
               {
                 projectId: hold.ref.projectId,
@@ -283,12 +298,67 @@ export class EnvelopeBlobLifecycle {
               },
               "Blob holder release/reclaim failed; relying on the TTL backstop",
             );
-          });
-        continue;
-      }
-      if (blobId) {
-        void this.blobs.delete({ id: blobId }).catch(() => undefined);
-      }
+          }
+          return;
+        }
+        if (blobId) {
+          try {
+            await this.blobs.delete({ id: blobId });
+          } catch {
+            // GQ1 blobs have no refcount/backstop beyond their own TTL;
+            // best-effort cleanup only.
+          }
+        }
+      }),
+    );
+  }
+
+  /**
+   * Deletes the s3 object of a blob whose LAST hold was already dropped inside
+   * a stage eval (the dedup-squash hold transfer runs in Lua, which cannot
+   * reach s3 — the eval reports `reclaimS3` and this finishes the job).
+   * Awaited by the caller (2026-07-11 fix), same rationale as {@link release}.
+   * Same failure telemetry as the release path either way.
+   */
+  async reclaimOrphanedS3({
+    value,
+    groupId,
+  }: {
+    value: string;
+    groupId: string;
+  }): Promise<void> {
+    const hold = readEnvelopeHold(value);
+    if (!hold || hold.ref.tier !== "s3" || !this.tieredBlobs) return;
+    // Same guard as release(): never delete an object whose ref isn't this
+    // group's tenant (ADR-030 §5).
+    if (hold.ref.projectId !== this.projectIdFor(groupId)) {
+      logger.warn(
+        {
+          projectId: this.projectIdFor(groupId),
+          refProjectId: hold.ref.projectId,
+          blobHash: hold.ref.hash,
+          groupId,
+        },
+        "Skipping S3 reclaim for a tenant-mismatched ref",
+      );
+      return;
+    }
+    try {
+      await this.tieredBlobs.delete(hold.ref);
+    } catch (err) {
+      gqBlobReclaimS3FailuresTotal.inc({ queue_name: this.queueName });
+      // Tenant-attributed (never a bare hash, never the bucket): every blob
+      // log line carries the owning projectId so logs can't cross tenants.
+      logger.warn(
+        {
+          projectId: hold.ref.projectId,
+          blobHash: hold.ref.hash,
+          err: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
+        },
+        "S3 blob reclaim failed after squash-transfer holder drop — orphaned until bucket lifecycle sweeps",
+      );
     }
   }
 
@@ -298,8 +368,17 @@ export class EnvelopeBlobLifecycle {
    * reclaims the old blob if newly unreferenced — no acquire-then-release gap in
    * which a partial failure could reclaim a live blob (ADR-030 §4). Falls back to
    * ordered acquire+release when either side isn't a GQ2 hold.
+   *
+   * Awaited by the caller (2026-07-11 fix): this was previously fire-and-forget
+   * end to end, so a killed worker process — or simply a subsequent squash on
+   * the same group racing ahead before this one's Redis round trip landed —
+   * could interleave with another transfer/release for the same blob in
+   * whatever order the network happened to deliver them, rather than the
+   * caller's own call order. Awaiting makes each transfer complete (or fail
+   * loudly into its own warn) before the next squash on this group can start
+   * its own.
    */
-  transfer({
+  async transfer({
     newValue,
     oldValue,
     groupId,
@@ -307,7 +386,7 @@ export class EnvelopeBlobLifecycle {
     newValue: string;
     oldValue: string;
     groupId: string;
-  }): void {
+  }): Promise<void> {
     const expected = this.projectIdFor(groupId);
     const newHold = readEnvelopeHold(newValue);
     const oldHold = readEnvelopeHold(oldValue);
@@ -324,7 +403,7 @@ export class EnvelopeBlobLifecycle {
         },
         "Skipping blob acquire for a tenant-mismatched replacement ref",
       );
-      this.release({ values: [oldValue], groupId });
+      await this.release({ values: [oldValue], groupId });
       return;
     }
     // Fall back to ordered acquire+release when either side isn't a GQ2 hold, or
@@ -339,27 +418,25 @@ export class EnvelopeBlobLifecycle {
     // atomic like TRANSFER_LUA — extending the Lua for the mixed-format case
     // is tracked as a follow-up.
     if (!newHold || !oldHold || oldHold.ref.projectId !== expected) {
-      void (async () => {
-        try {
-          await this.acquireAwait(newValue);
-        } catch (err) {
-          logger.warn(
-            {
-              refProjectId: newHold?.ref.projectId,
-              blobHash: newHold?.ref.hash,
-              groupId,
-              err: err instanceof Error ? err.message : String(err),
-            },
-            "transfer fallback: acquire failed; skipping release to keep old blob alive under TTL",
-          );
-          return;
-        }
-        this.release({ values: [oldValue], groupId });
-      })();
+      try {
+        await this.acquireAwait(newValue);
+      } catch (err) {
+        logger.warn(
+          {
+            refProjectId: newHold?.ref.projectId,
+            blobHash: newHold?.ref.hash,
+            groupId,
+            err: err instanceof Error ? err.message : String(err),
+          },
+          "transfer fallback: acquire failed; skipping release to keep old blob alive under TTL",
+        );
+        return;
+      }
+      await this.release({ values: [oldValue], groupId });
       return;
     }
-    void this.blobHolders
-      .transfer({
+    try {
+      const outcome = await this.blobHolders.transfer({
         newProjectId: newHold.ref.projectId,
         newHash: newHold.ref.hash,
         newSlotId: newHold.token,
@@ -367,37 +444,37 @@ export class EnvelopeBlobLifecycle {
         oldHash: oldHold.ref.hash,
         oldTier: oldHold.ref.tier,
         oldSlotId: oldHold.token,
-      })
-      .then((outcome) => {
-        if (outcome === "reclaim-s3" && this.tieredBlobs) {
-          return this.tieredBlobs.delete(oldHold.ref).catch((err: unknown) => {
-            gqBlobReclaimS3FailuresTotal.inc({ queue_name: this.queueName });
-            logger.warn(
-              {
-                projectId: oldHold.ref.projectId,
-                blobHash: oldHold.ref.hash,
-                err: redactStorageUrisInText(
-                  err instanceof Error ? err.message : String(err),
-                ),
-              },
-              "S3 blob reclaim failed after transfer — orphaned until bucket lifecycle sweeps",
-            );
-          });
-        }
-      })
-      .catch((err: unknown) => {
-        logger.warn(
-          {
-            projectId: oldHold.ref.projectId,
-            blobHash: oldHold.ref.hash,
-            tier: oldHold.ref.tier,
-            err: redactStorageUrisInText(
-              err instanceof Error ? err.message : String(err),
-            ),
-          },
-          "Blob holder transfer failed; relying on the TTL backstop",
-        );
       });
+      if (outcome === "reclaim-s3" && this.tieredBlobs) {
+        try {
+          await this.tieredBlobs.delete(oldHold.ref);
+        } catch (err) {
+          gqBlobReclaimS3FailuresTotal.inc({ queue_name: this.queueName });
+          logger.warn(
+            {
+              projectId: oldHold.ref.projectId,
+              blobHash: oldHold.ref.hash,
+              err: redactStorageUrisInText(
+                err instanceof Error ? err.message : String(err),
+              ),
+            },
+            "S3 blob reclaim failed after transfer — orphaned until bucket lifecycle sweeps",
+          );
+        }
+      }
+    } catch (err) {
+      logger.warn(
+        {
+          projectId: oldHold.ref.projectId,
+          blobHash: oldHold.ref.hash,
+          tier: oldHold.ref.tier,
+          err: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
+        },
+        "Blob holder transfer failed; relying on the TTL backstop",
+      );
+    }
   }
 
   /**

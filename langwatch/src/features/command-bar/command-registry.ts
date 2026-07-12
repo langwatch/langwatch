@@ -30,7 +30,6 @@ import {
   ScrollText,
   Settings,
   Shield,
-  Stethoscope,
   Sun,
   Table,
   Tags,
@@ -519,14 +518,6 @@ export const actionCommands: Command[] = [
       "span",
       "anvil",
     ],
-  },
-  {
-    id: "action-sdk-radar",
-    label: "SDK Radar",
-    description: "Check SDK version status",
-    icon: Stethoscope,
-    category: "actions",
-    keywords: ["sdk", "version", "update", "outdated", "radar", "upgrade"],
   },
   {
     id: "action-feature-flags",

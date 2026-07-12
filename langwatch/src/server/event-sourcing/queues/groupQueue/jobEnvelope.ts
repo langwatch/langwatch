@@ -1,25 +1,45 @@
 import { randomUUID } from "node:crypto";
-import { promisify } from "node:util";
-import { gunzip, gzip } from "node:zlib";
 
 import type { Logger } from "pino";
 
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 
 import { MAX_BLOB_BYTES } from "./blobConstants";
+import {
+  compress,
+  compressionMediaType,
+  type CompressionCodec,
+  contentHashSource,
+  decodePayload,
+  decompress,
+  encodePayload,
+} from "./bodyCodec";
 import { gqEnvelopeGQ2DowngradeTotal, gqPayloadTooLargeTotal } from "./metrics";
 import type { BlobRef, TieredBlobStore } from "./tieredBlobStore";
 
-const gzipAsync = promisify(gzip);
-const gunzipAsync = promisify(gunzip);
-
 /**
- * Cap decompression output at the same ceiling encode enforces (ADR-030 §1), so
- * a tampered or corrupt blob (e.g. a tenant zip-bombing their own BYOC object)
- * can't OOM the worker. zlib throws past the limit; decode lets that propagate to
- * the missing-blob fail-safe (complete the slot, recover via replay).
+ * Compression and payload codec are chosen at WRITE time behind flags, but READ
+ * always sniffs the bytes and accepts every format we have ever written. That
+ * asymmetry is the whole rollout story: ship readers that understand zstd and
+ * msgpack with writes still off, let the fleet cycle, then flip the flags.
+ *
+ * Writing first is NOT safe here. `decodeJobEnvelope` throwing a plain Error
+ * (unknown codec, failed parse) does not retry — `GroupQueue` only re-stages on
+ * `TransientBlobStoreError`, so everything else terminates at the non-retryable
+ * fail-safe, which completes the slot and drops the job to replay. An old worker
+ * meeting a new body during a rolling deploy would silently discard it.
  */
-const DECODE_GUNZIP_OPTS = { maxOutputLength: MAX_BLOB_BYTES };
+function zstdWritesEnabled(): boolean {
+  return process.env.GROUP_QUEUE_ZSTD_WRITES_ENABLED === "true";
+}
+
+function msgpackWritesEnabled(): boolean {
+  return process.env.GROUP_QUEUE_MSGPACK_WRITES_ENABLED === "true";
+}
+
+function writeCompression(): CompressionCodec {
+  return zstdWritesEnabled() ? "zstd" : "gzip";
+}
 
 /**
  * Versioned envelope for staged job values: `GQ<v>|<headerLen>|<headerJson><body>`.
@@ -75,9 +95,10 @@ function envelopeWritesEnabled(): boolean {
  * job was squashed by dedup or lost in a crash must eventually expire.
  */
 export interface JobBlobStore {
-  put(params: { id: string; data: Buffer }): Promise<void>;
+  /** `ttlSeconds` overrides the GQ1 default backstop (see {@link RedisJobBlobStore}). */
+  put(params: { id: string; data: Buffer; ttlSeconds?: number }): Promise<void>;
   /** Read the blob AND refresh its backstop TTL. Worker hot path only. */
-  get(params: { id: string }): Promise<Buffer | null>;
+  get(params: { id: string; ttlSeconds?: number }): Promise<Buffer | null>;
   /** Read the blob WITHOUT refreshing its TTL. Non-worker / ops-dashboard inspection path. */
   peek(params: { id: string }): Promise<Buffer | null>;
   delete(params: { id: string }): Promise<void>;
@@ -188,7 +209,13 @@ function finalize(
 
 /**
  * Picks the inline encoding for a body that stays in the envelope: raw JSON, or
- * gzip+base64 when compression actually wins (mutates `header.e` to `"gz"`).
+ * compressed+base64 when compression actually wins (mutates `header.e` to
+ * `"gz"`).
+ *
+ * `"gz"` means "compressed"; the codec itself is sniffed from the magic bytes on
+ * decode rather than named in the header, so a zstd body and a gzip body are
+ * both `"gz"` and a reader never has to trust a header that could disagree with
+ * the bytes it actually got.
  */
 async function inlineBody(
   json: string,
@@ -196,10 +223,12 @@ async function inlineBody(
   header: EnvelopeHeader,
 ): Promise<string> {
   if (jsonBytes > COMPRESSION_THRESHOLD_BYTES) {
-    const compressed = (await gzipAsync(json)).toString("base64");
+    const compressed = (await compress(json, writeCompression())).toString(
+      "base64",
+    );
     // High-entropy payloads (inline base64-ish data) can come out LARGER after
-    // gzip+base64; keep raw JSON unless compression actually wins. `"gz"` costs
-    // one more header byte than `"j"`.
+    // compress+base64; keep raw JSON unless compression actually wins. `"gz"`
+    // costs one more header byte than `"j"`.
     if (Buffer.byteLength(compressed) + 1 < jsonBytes) {
       header.e = "gz";
       return compressed;
@@ -272,19 +301,13 @@ export async function encodeJobEnvelope({
   /** Optional logger for tenant-attributed warn on cap / downgrade. */
   logger?: Logger;
 }): Promise<string> {
-  const json = JSON.stringify(jobData);
   const enabled = writesEnabled ?? envelopeWritesEnabled();
-  if (!enabled) {
-    return json;
-  }
-  const jsonBytes = Buffer.byteLength(json);
-  assertPayloadWithinCap(jsonBytes, { projectId, queueName, logger });
 
   // GQ2: content-addressed, tenant-namespaced, tiered offload. Active only once
   // the composition root supplies a tiered store and the job's tenant. If
   // either is missing we fall back to GQ1 — noisy so a regression in the
   // composition root can't ship a silently-downgraded pipeline.
-  if (tieredBlobs && projectId) {
+  if (enabled && tieredBlobs && projectId) {
     const header = routingHeader(jobData, 2);
     // Lift queue machinery into the header so it doesn't perturb the content
     // hash. Without this, N reactors fanning out the same event produce N
@@ -300,17 +323,28 @@ export async function encodeJobEnvelope({
     if (Object.keys(machinery).length > 0) {
       header.m = machinery;
     }
-    const payloadJson = JSON.stringify(payload);
-    const payloadBytes = Buffer.byteLength(payloadJson);
+
+    // GQ2 never serializes `jobData` as a whole — only the payload. The old
+    // `JSON.stringify(jobData)` above this branch was a second full pass whose
+    // result this path then threw away.
+    const { bytes, codec, json: payloadJson } = encodePayload(payload, {
+      msgpackEnabled: msgpackWritesEnabled(),
+    });
+    const payloadBytes = bytes.length;
+    assertPayloadWithinCap(payloadBytes, { projectId, queueName, logger });
+
     if (payloadBytes > INLINE_CEILING_BYTES) {
+      const compression = writeCompression();
       const ref = await tieredBlobs.put({
         projectId,
-        data: await gzipAsync(payloadJson),
-        // Hash the RAW payload json string directly, not the gzip output — the
-        // dedup key is independent of gzip determinism (zlib version/level;
-        // ADR-030 §1). `contentHash` accepts strings and lets crypto handle the
-        // UTF-8 conversion internally so we don't allocate a full-payload Buffer.
-        hashSource: payloadJson,
+        data: await compress(bytes, compression),
+        // Hash the RAW payload, never the compressed output — the dedup key must
+        // not depend on gzip/zstd determinism (library version/level; ADR-030
+        // §1). The codec is folded in so a JSON-encoded and a msgpack-encoded
+        // copy of the same payload can't collide on one key with different bytes
+        // mid-rollout.
+        hashSource: contentHashSource({ codec, json: payloadJson, bytes }),
+        mediaType: compressionMediaType(compression),
       });
       header.e = ref.tier;
       header.ref = ref;
@@ -320,12 +354,22 @@ export async function encodeJobEnvelope({
       header.h = randomUUID();
       return finalize(ENVELOPE_PREFIX_V2, header, "");
     }
+
+    // Inline bodies are under INLINE_CEILING_BYTES (4KB) and msgpack only
+    // engages above MSGPACK_MIN_BYTES (100KB), so an inline body is always JSON.
     return finalize(
       ENVELOPE_PREFIX_V2,
       header,
-      await inlineBody(payloadJson, payloadBytes, header),
+      await inlineBody(payloadJson ?? bytes.toString("utf-8"), payloadBytes, header),
     );
   }
+
+  const json = JSON.stringify(jobData);
+  if (!enabled) {
+    return json;
+  }
+  const jsonBytes = Buffer.byteLength(json);
+  assertPayloadWithinCap(jsonBytes, { projectId, queueName, logger });
 
   // GQ1 fallback path: reached when the caller opted into writes but didn't
   // supply BOTH a tiered store and a projectId. Loud so a composition-root
@@ -346,7 +390,7 @@ export async function encodeJobEnvelope({
   const header = routingHeader(jobData, 1);
   if (blobs && jsonBytes > BLOB_OFFLOAD_THRESHOLD_BYTES) {
     const id = randomUUID();
-    await blobs.put({ id, data: await gzipAsync(json) });
+    await blobs.put({ id, data: await compress(json, writeCompression()) });
     header.e = "ref";
     header.r = id;
     return finalize(ENVELOPE_PREFIX_V1, header, "");
@@ -404,9 +448,7 @@ export async function decodeJobEnvelope({
         "Job envelope tiered blob is missing (deleted or expired)",
       );
     }
-    const parsedBody = JSON.parse(
-      (await gunzipAsync(data, DECODE_GUNZIP_OPTS)).toString("utf8"),
-    ) as Record<string, unknown>;
+    const parsedBody = decodePayload(await decompress(data));
     return mergeMachinery(parsedBody, header);
   }
 
@@ -429,18 +471,13 @@ export async function decodeJobEnvelope({
         `Job envelope blob ${header.r} is missing (deleted or expired)`,
       );
     }
-    return JSON.parse(
-      (await gunzipAsync(data, DECODE_GUNZIP_OPTS)).toString("utf8"),
-    ) as Record<string, unknown>;
+    return decodePayload(await decompress(data));
   }
 
-  const json =
+  const parsedBody =
     header.e === "gz"
-      ? (
-          await gunzipAsync(Buffer.from(body, "base64"), DECODE_GUNZIP_OPTS)
-        ).toString("utf8")
-      : body;
-  const parsedBody = JSON.parse(json) as Record<string, unknown>;
+      ? decodePayload(await decompress(Buffer.from(body, "base64")))
+      : (JSON.parse(body) as Record<string, unknown>);
   // GQ2 inline lifted machinery into header.m too; GQ1 (v=1) never did.
   return header.v === 2 ? mergeMachinery(parsedBody, header) : parsedBody;
 }

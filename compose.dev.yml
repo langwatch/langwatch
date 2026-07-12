@@ -407,6 +407,12 @@ services:
           memory: 256m
           cpus: "0.25"
 
+  # The local observability stack (grafana/otel-lgtm) is NOT a compose service.
+  # haven owns it: it runs the bundle on colima with explicit memory/CPU/pids/log
+  # and retention caps, and wires every stack to it automatically. Bring it up
+  # with `make observability` (or `haven observability up`).
+  # See dev/docs/adr/042-local-observability-stack.md.
+
 volumes:
   # Stateful — shared across worktrees (#3860 AC#4 / AC#5).
   # Sign-up persists when switching worktrees; ClickHouse traces survive too.

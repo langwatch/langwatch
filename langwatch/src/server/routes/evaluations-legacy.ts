@@ -196,15 +196,18 @@ secured
       }
 
       let body: Record<string, any>;
+      let payloadSize: number;
       try {
-        body = await c.req.json();
+        // Size comes from the wire bytes, not a re-serialisation of the parsed
+        // body — these payloads carry full dataset entries and LLM outputs.
+        const raw = await c.req.text();
+        payloadSize = Buffer.byteLength(raw, "utf8");
+        body = JSON.parse(raw);
       } catch {
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
-      getPayloadSizeHistogram("log_results").observe(
-        JSON.stringify(body).length,
-      );
+      getPayloadSizeHistogram("log_results").observe(payloadSize);
 
       let params: ESBatchEvaluationRESTParams;
       try {

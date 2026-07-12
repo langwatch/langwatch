@@ -265,13 +265,19 @@ secured
       const project = c.get("project");
 
       let body: unknown;
+      let payloadSize: number;
       try {
-        body = await c.req.json();
+        // Take the size from the wire bytes rather than re-serialising the
+        // parsed body: bodies here run to 20MB, and the old
+        // `JSON.stringify(body).length` both cost a full second pass and
+        // reported UTF-16 code units instead of transferred bytes.
+        const raw = await c.req.text();
+        payloadSize = Buffer.byteLength(raw, "utf8");
+        body = JSON.parse(raw);
       } catch {
         return c.json({ message: "Bad request" }, 400);
       }
 
-      const payloadSize = JSON.stringify(body).length;
       const payloadSizeMB = payloadSize / (1024 * 1024);
       getPayloadSizeHistogram("log_steps").observe(payloadSize);
 

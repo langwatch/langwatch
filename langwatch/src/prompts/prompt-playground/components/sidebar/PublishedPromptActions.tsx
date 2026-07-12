@@ -22,7 +22,7 @@ import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/Drag
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { getDisplayHandle } from "./PublishedPromptsList";
+import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 
 interface PublishedPromptActionsProps {
   promptId: string;

@@ -12,8 +12,11 @@ import type { JobBlobStore } from "./jobEnvelope";
  *
  * A staged-but-not-yet-dispatched job (long retry backoff, paused pipeline,
  * delayed schedule) sees NO intervening read between the producer's `put` and
- * the dispatcher's `get`, so the TTL is set to comfortably outlive the longest
- * plausible staged residence (7 days, see {@link GQ1_BLOB_BACKSTOP_TTL_SECONDS}).
+ * the dispatcher's `get`, so the DEFAULT TTL is set to comfortably outlive the
+ * longest plausible staged residence (7 days, see
+ * {@link GQ1_BLOB_BACKSTOP_TTL_SECONDS}). GQ2 callers pass their own shorter
+ * backstop per call: a refcounted blob reclaims eagerly on the last release,
+ * so its TTL only has to cover genuine orphans, not staged residence.
  */
 export class RedisJobBlobStore implements JobBlobStore {
   private readonly redis: IORedis | Cluster;
@@ -30,12 +33,20 @@ export class RedisJobBlobStore implements JobBlobStore {
     this.keyPrefix = redisBlobKeyPrefix(queueName);
   }
 
-  async put({ id, data }: { id: string; data: Buffer }): Promise<void> {
+  async put({
+    id,
+    data,
+    ttlSeconds,
+  }: {
+    id: string;
+    data: Buffer;
+    ttlSeconds?: number;
+  }): Promise<void> {
     await this.redis.set(
       this.keyPrefix + id,
       data,
       "EX",
-      GQ1_BLOB_BACKSTOP_TTL_SECONDS,
+      ttlSeconds ?? GQ1_BLOB_BACKSTOP_TTL_SECONDS,
     );
   }
 
@@ -44,11 +55,17 @@ export class RedisJobBlobStore implements JobBlobStore {
    * {@link peek} for the inspection path that must NOT extend the backstop TTL.
    * A missing key returns null.
    */
-  async get({ id }: { id: string }): Promise<Buffer | null> {
+  async get({
+    id,
+    ttlSeconds,
+  }: {
+    id: string;
+    ttlSeconds?: number;
+  }): Promise<Buffer | null> {
     return await this.redis.getexBuffer(
       this.keyPrefix + id,
       "EX",
-      GQ1_BLOB_BACKSTOP_TTL_SECONDS,
+      ttlSeconds ?? GQ1_BLOB_BACKSTOP_TTL_SECONDS,
     );
   }
 

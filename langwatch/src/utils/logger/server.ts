@@ -50,8 +50,12 @@ function getSharedTransport(): DestinationStream | null {
   }
 
   const otelLogsEnabled = process.env.PINO_OTEL_ENABLED === "true";
-  const consoleLevel = process.env.PINO_CONSOLE_LEVEL ?? "info";
-  const otelLevel = process.env.PINO_OTEL_LEVEL ?? "debug";
+  // Unified log-level env vars, shared with the Go services (pkg/clog) so one
+  // set in langwatch/.env configures both. PINO_* kept as fallback for compat.
+  const consoleLevel =
+    process.env.LOG_CONSOLE_LEVEL ?? process.env.PINO_CONSOLE_LEVEL ?? "info";
+  const otelLevel =
+    process.env.LOG_OTEL_LEVEL ?? process.env.PINO_OTEL_LEVEL ?? "debug";
 
   try {
     sharedTransport = buildTransport({
@@ -74,10 +78,12 @@ function getSharedTransport(): DestinationStream | null {
 /**
  * Creates a server-side logger with context injection and transports.
  *
- * Environment variables:
- * - PINO_CONSOLE_LEVEL: Console log level (default: "info")
- * - PINO_OTEL_ENABLED: Set to "true" to enable OTel log export
- * - PINO_OTEL_LEVEL: OTel export level (default: "debug")
+ * Environment variables (unified with the Go services — see pkg/clog):
+ * - LOG_CONSOLE_LEVEL (fallback PINO_CONSOLE_LEVEL): console level (default "info")
+ * - LOG_OTEL_LEVEL (fallback PINO_OTEL_LEVEL): collector export level (default "debug")
+ * - PINO_OTEL_ENABLED: "true" to export logs to the OTel collector
+ * Split-stream: set LOG_CONSOLE_LEVEL=warn + LOG_OTEL_LEVEL=debug so the console
+ * shows only warnings/errors while info/debug flow to the observability stack.
  */
 export const createLogger = (
   name: string,
