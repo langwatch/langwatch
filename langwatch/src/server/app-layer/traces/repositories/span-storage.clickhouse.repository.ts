@@ -1520,6 +1520,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 AND TraceId = {traceId:String}
                 ${partition.sqlAnd}
                 AND ${dedupInTuple(partition.sqlAndInner)}
+              -- Order before the cap so a runaway trace consistently yields the
+              -- same earliest-starting prefix; an unordered LIMIT would let
+              -- ClickHouse return an arbitrary subset that varies with merges
+              -- and part ordering, making which spans carry signals
+              -- nondeterministic across calls.
+              ORDER BY StartTimeMs ASC
               LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             )
           `,
