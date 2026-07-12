@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -49,56 +48,8 @@ type warmRequest struct {
 	ModelOverride  string             `json:"modelOverride,omitempty"`
 }
 
-// warmHandler boots the conversation's worker ahead of the turn.
-//
-// The control plane calls this the instant it knows a turn is coming, and does
-// not wait for the answer. Spawning opencode is the expensive part of a cold
-// turn; doing it in parallel with the rest of the request (persisting the
-// message, reserving the permit, dispatching the command through the event log)
-// takes it off the critical path entirely.
-//
-// Idempotent by construction: it Acquires, and does not Claim or PostMessage, so
-// it can neither start a turn nor duplicate one. Always 202 — a warm that failed
-// is a warm that didn't help, not a request that failed, and the turn behind it
-// reports its own problems.
-func warmHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		// A warm is best-effort: a body that can't be read or parsed just means no
-		// warm (202), not a failed request — the turn behind it reports its own
-		// problems.
-		req, err := decode[warmRequest](w, r, maxBodyBytes)
-		if err != nil {
-			w.WriteHeader(http.StatusAccepted)
-			return
-		}
-		if !domain.IsValidConversationID(req.ConversationID) {
-			herr.WriteHTTP(w, herr.New(ctx, domain.ErrInvalidConversationID, herr.M{"message": "invalid conversationId"}))
-			return
-		}
-
-		creds := req.Credentials
-		// The SAME merge /chat does. The model is part of the credential
-		// signature, so warming without it would spawn a worker the turn then
-		// discards.
-		if mo := strings.TrimSpace(req.ModelOverride); mo != "" {
-			creds.Model = mo
-		}
-
-		// Detach from the request: the caller does not await this, and we must
-		// not abandon a half-spawned worker when it hangs up.
-		go func() {
-			warmCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), warmTimeout)
-			defer cancel()
-			_ = application.Warm(warmCtx, req.ConversationID, creds)
-		}()
-
-		w.WriteHeader(http.StatusAccepted)
-	}
-}
-
 // warmTimeout bounds a detached spawn so a wedged warm cannot leak a goroutine.
+// Consumed by RPC.HandleWarm.
 const warmTimeout = 90 * time.Second
 
 // chatHandler is the per-request worker dispatcher. Transport-only: it reads the
