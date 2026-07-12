@@ -163,10 +163,13 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       );
 
       expect(result.openai).toBeDefined();
-      expect(result.openai.enabled).toBe(true);
+      // `noUncheckedIndexedAccess` makes `result.openai` possibly
+      // undefined; vitest's toBeDefined() doesn't narrow the type, so
+      // assert non-null on the property accesses below.
+      expect(result.openai!.enabled).toBe(true);
       // The enabled ORGANIZATION row wins; the disabled PROJECT row
       // does not mask it.
-      expect(result.openai.scopeType).toBe("ORGANIZATION");
+      expect(result.openai!.scopeType).toBe("ORGANIZATION");
     });
 
     /**
@@ -203,9 +206,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       );
 
       expect(result.anthropic).toBeDefined();
-      expect(result.anthropic.enabled).toBe(true);
+      expect(result.anthropic!.enabled).toBe(true);
       // Narrower (PROJECT) scope wins when enabled states are equal.
-      expect(result.anthropic.scopeType).toBe("PROJECT");
+      expect(result.anthropic!.scopeType).toBe("PROJECT");
     });
   },
 );
