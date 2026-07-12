@@ -19,6 +19,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/github"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/app/runner/sandboxed"
@@ -718,6 +719,9 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		OpenCodePassword: openCodePassword,
 		EgressPort:       we.ProxyPort,
 		Runner:           p.runner,
+		// The turn's capabilities fold their own env into the worker. GitHub is the
+		// only one today (its Contribute() is inert when the turn carried no token).
+		Capabilities: []app.Capability{github.New(creds.GithubToken, creds.GithubLogin)},
 	})
 	if err != nil {
 		return nil, err

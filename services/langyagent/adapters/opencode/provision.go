@@ -42,6 +42,9 @@ type SpawnInput struct {
 	OpenCodePassword string
 	EgressPort       int
 	Runner           app.Runner
+	// Capabilities (GitHub today, a secrets broker next) each fold their own env
+	// into the worker process — the env assembly never special-cases any one.
+	Capabilities []app.Capability
 }
 
 // Provision creates a per-worker home dir with its own opencode config, a
@@ -184,7 +187,7 @@ func (a *Agent) Spawn(ctx context.Context, in SpawnInput) (*exec.Cmd, error) {
 	cmd := exec.CommandContext(ctx, in.BinaryPath,
 		"serve", "--port", strconv.Itoa(in.Port), "--hostname", "127.0.0.1",
 	)
-	cmd.Env = buildWorkerEnv(in.ConversationID, in.Home, in.Creds, in.OpenCodePassword, in.EgressPort)
+	cmd.Env = buildWorkerEnv(in.ConversationID, in.Home, in.Creds, in.OpenCodePassword, in.EgressPort, in.Capabilities)
 	cmd.Dir = in.Home
 	// Discard opencode's stdout/stderr. opencode emits LLM completions, tool
 	// outputs (env dumps, file contents), and the raw user prompt — all of which
@@ -291,7 +294,7 @@ func filterSensitiveEnv() []string {
 // LLM traffic go direct (they have their own explicit NetworkPolicy egress
 // rules; routing them through the per-worker proxy would add a hop and expose
 // LLM streaming to the throttle).
-func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials, openCodePassword string, egressPort int) []string {
+func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials, openCodePassword string, egressPort int, caps []app.Capability) []string {
 	env := filterSensitiveEnv()
 	env = append(env,
 		"HOME="+workerHome,
@@ -317,11 +320,11 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 		// which is 0400 and UID-gated.
 		"OPENCODE_SERVER_PASSWORD="+openCodePassword,
 	)
-	if creds.GithubToken != "" {
-		env = append(env,
-			"GH_TOKEN="+creds.GithubToken,
-			"GITHUB_LOGIN="+creds.GithubLogin,
-		)
+	// Capabilities (GitHub today) fold their own env in — GH_TOKEN + GITHUB_LOGIN
+	// used to be an inline branch here; it is now the github.Capability's
+	// Contribute(). buildWorkerEnv no longer knows about any specific capability.
+	for _, c := range caps {
+		env = append(env, c.Contribute()...)
 	}
 	if egressPort > 0 {
 		proxyURL := fmt.Sprintf("http://127.0.0.1:%d", egressPort)
