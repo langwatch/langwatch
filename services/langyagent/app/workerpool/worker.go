@@ -46,7 +46,7 @@ type Worker struct {
 	baseURL string
 	// authProxy fronts opencode with bearer-token auth. Shutdown on worker exit
 	// so the externally-advertised port frees up.
-	authProxy *authProxy
+	authProxy *AuthProxy
 	// egress is the per-worker OUTBOUND egress handle (ADR-043) returned by the
 	// egress guard's PrepareWorker: it carries the loopback forward-proxy port
 	// the worker's HTTPS_PROXY points at (0 when the guard runs no proxy) and a
@@ -128,7 +128,7 @@ func (w *Worker) Release() {
 // shutdown; empty on a normal cold start. It is forwarded verbatim to opencode,
 // never parsed by the manager.
 func (w *Worker) PostMessage(ctx context.Context, system, prompt, resumeToken string) error {
-	return postMessage(ctx, w.baseURL, w.bearerToken, w.openCodeSessionID, system, prompt, resumeToken)
+	return PostMessage(ctx, w.baseURL, w.bearerToken, w.openCodeSessionID, system, prompt, resumeToken)
 }
 
 // NotifyShutdownImminent posts a shutdown-imminent notice to this worker's
@@ -136,7 +136,7 @@ func (w *Worker) PostMessage(ctx context.Context, system, prompt, resumeToken st
 // emit a terminal `handoff` frame before the process-group kill. deadline is the
 // absolute instant the worker must checkpoint before.
 func (w *Worker) NotifyShutdownImminent(ctx context.Context, deadline time.Time) error {
-	return notifyShutdownImminent(ctx, w.baseURL, w.bearerToken, w.openCodeSessionID, deadline)
+	return NotifyShutdownImminent(ctx, w.baseURL, w.bearerToken, w.openCodeSessionID, deadline)
 }
 
 // isInFlight reports whether a turn currently owns this worker (Claimed but not
@@ -153,7 +153,7 @@ func (w *Worker) isInFlight() bool {
 // events as ndjson into the sink until a terminal event lands or ctx is
 // cancelled.
 func (w *Worker) StreamEvents(ctx context.Context, sink app.ChatSink) error {
-	return streamSessionEvents(ctx, w.baseURL, w.bearerToken, w.openCodeSessionID, sink, sink.Flush)
+	return StreamSession(ctx, w.baseURL, w.bearerToken, w.openCodeSessionID, sink, sink.Flush)
 }
 
 // sensitiveEnvPattern matches env names that must never reach a worker. The JS

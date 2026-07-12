@@ -616,20 +616,20 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	//     handlers always dial this one (worker.port).
 	//   - internalPort: opencode's actual TCP listen, fronted by the proxy.
 	//     Never exposed to callers; the proxy is the only consumer.
-	externalPort, err := getFreePort()
+	externalPort, err := GetFreePort()
 	if err != nil {
 		return nil, err
 	}
 	// Any free port works: sibling isolation is enforced by opencode's own
 	// per-worker password (ADR-033 Fix A′), not by pinning the internal listen
-	// into an iptables-locked range. getFreePort closes its listener before
+	// into an iptables-locked range. GetFreePort closes its listener before
 	// returning, so two independent calls can (rarely) hand back the SAME
 	// ephemeral port — which would make the proxy bind externalPort first and
 	// opencode then fail to listen, burning the whole readiness timeout. Re-roll
 	// until the internal port differs from the external one.
 	var internalPort int
 	for attempt := 0; attempt < 8; attempt++ {
-		internalPort, err = getFreePort()
+		internalPort, err = GetFreePort()
 		if err != nil {
 			return nil, err
 		}
@@ -641,7 +641,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		return nil, fmt.Errorf("could not allocate a distinct internal port (kept colliding with external port %d)", externalPort)
 	}
 
-	bearerToken, err := generateBearerToken()
+	bearerToken, err := GenerateBearerToken()
 	if err != nil {
 		return nil, err
 	}
@@ -652,20 +652,20 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	// internal port (authProxy <-> opencode). Reusing one secret for both would
 	// mean any caller holding the external bearer token could also derive the
 	// internal credential.
-	openCodePassword, err := generateBearerToken()
+	openCodePassword, err := GenerateBearerToken()
 	if err != nil {
 		return nil, err
 	}
 
 	// authProxy binds the pool-lifetime context so its serve goroutine logs and
 	// lifetime follow the pool, not a single request.
-	proxy, err := startAuthProxy(p.baseCtx, externalPort, internalPort, bearerToken, openCodePassword)
+	proxy, err := StartAuthProxy(p.baseCtx, externalPort, internalPort, bearerToken, openCodePassword)
 	if err != nil {
 		return nil, fmt.Errorf("start authproxy: %w", err)
 	}
 	defer func() {
 		if !success {
-			proxy.shutdown()
+			proxy.Shutdown()
 		}
 	}()
 
@@ -693,13 +693,13 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	readyStart := time.Now()
 	readinessCtx, cancel := context.WithTimeout(ctx, p.readinessTimeout)
 	defer cancel()
-	if err := waitForReadiness(readinessCtx, externalPort, internalPort, bearerToken, p.readinessTimeout); err != nil {
+	if err := WaitForReadiness(readinessCtx, externalPort, internalPort, bearerToken, p.readinessTimeout); err != nil {
 		p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), false)
 		return nil, err
 	}
 	p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), true)
 
-	sessionID, err := createOpenCodeSession(ctx, externalPort, bearerToken)
+	sessionID, err := CreateSession(ctx, externalPort, bearerToken)
 	if err != nil {
 		return nil, err
 	}
@@ -761,7 +761,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 //  3. UID release is convId-guarded inside releaseUIDLocked.
 func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 	var tombstone string
-	var proxyToShutdown *authProxy
+	var proxyToShutdown *AuthProxy
 	shouldWipe := false
 	deletedOwnEntry := false
 	var egressToClose egress.WorkerEgress
@@ -828,7 +828,7 @@ func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
 	if proxyToShutdown != nil {
 		// The authproxy shutdown drains in-flight turns; run it off the lock as a
 		// panic-guarded goroutine so the pool never blocks on it.
-		clog.Go(p.baseCtx, "authproxy-shutdown", proxyToShutdown.shutdown)
+		clog.Go(p.baseCtx, "authproxy-shutdown", proxyToShutdown.Shutdown)
 	}
 	if tombstone != "" {
 		if err := os.RemoveAll(tombstone); err != nil {
@@ -894,7 +894,7 @@ func (p *Pool) kill(conversationID, reason string) {
 	// immediately; otherwise a respawn picking the same port would fail with
 	// EADDRINUSE on the listener bind.
 	if w.authProxy != nil {
-		clog.Go(p.baseCtx, "authproxy-shutdown", w.authProxy.shutdown)
+		clog.Go(p.baseCtx, "authproxy-shutdown", w.authProxy.Shutdown)
 	}
 	// Same for the per-worker egress forward proxy's loopback port. Closed HERE
 	// (synchronously with the kill, before the exit watcher's onWorkerExit runs)

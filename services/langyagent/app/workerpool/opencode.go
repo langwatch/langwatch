@@ -40,10 +40,10 @@ var terminalEventTypes = map[string]struct{}{
 
 // errAuthProbeUnreachable marks a transport-level failure of the auth
 // enforcement probe (opencode's internal listener not up yet, a connection
-// reset). It is retryable — waitForReadiness keeps polling. A definite non-401
+// reset). It is retryable — WaitForReadiness keeps polling. A definite non-401
 // *status* is NOT this error: that's a real security failure and fails closed.
 // Kept as an internal sentinel (not a herr code): it never leaves the pool, it
-// only classifies a retry inside waitForReadiness.
+// only classifies a retry inside WaitForReadiness.
 var errAuthProbeUnreachable = errors.New("opencode-auth-probe-unreachable")
 
 // httpClient is reused across all opencode calls. opencode binds 127.0.0.1 per
@@ -120,11 +120,11 @@ func addBearer(req *http.Request, bearerToken string) {
 	req.Header.Set("Authorization", "Bearer "+bearerToken)
 }
 
-// getFreePort asks the kernel for an ephemeral port and returns it after
+// GetFreePort asks the kernel for an ephemeral port and returns it after
 // closing the listener. There is a brief race window between Close() and
 // opencode binding the port, but it is short enough in practice (and opencode's
 // listen() retries the SO_REUSEADDR socket).
-func getFreePort() (int, error) {
+func GetFreePort() (int, error) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return 0, err
@@ -134,7 +134,7 @@ func getFreePort() (int, error) {
 	return port, nil
 }
 
-// waitForReadiness polls the worker until its opencode is both listening AND
+// WaitForReadiness polls the worker until its opencode is both listening AND
 // enforcing auth. It runs two probes CONCURRENTLY each cycle — both must pass:
 //
 //   - The external probe (probeExternalReady) hits the authProxy root. opencode
@@ -142,7 +142,7 @@ func getFreePort() (int, error) {
 //     listening. Connection refused / transport error is the "not yet" state we
 //     poll through. One exception: 502 from the proxy is authproxy.go's own
 //     rev.ErrorHandler reporting that opencode's listener isn't up yet.
-//     startAuthProxy binds and serves synchronously, but opencode is a separate
+//     StartAuthProxy binds and serves synchronously, but opencode is a separate
 //     process that takes real time to start listening — the proxy answers 502 to
 //     every poll in that window. Treating that as "ready" would race the auth
 //     probe against a backend that isn't there yet (it always loses in
@@ -158,7 +158,7 @@ func getFreePort() (int, error) {
 //
 // The cadence is an adaptive backoff — start tight (opencode is usually ready in
 // tens of ms), grow to a 100ms cap — driven by a single reused timer.
-func waitForReadiness(ctx context.Context, externalPort, internalPort int, bearerToken string, deadline time.Duration) error {
+func WaitForReadiness(ctx context.Context, externalPort, internalPort int, bearerToken string, deadline time.Duration) error {
 	dl := time.Now().Add(deadline)
 	backoff := 10 * time.Millisecond
 	const maxBackoff = 100 * time.Millisecond
@@ -293,9 +293,9 @@ func requireOpenCodeAuthEnforced(ctx context.Context, internalPort int) error {
 	return nil
 }
 
-// createOpenCodeSession posts a fresh session to the worker. Returns the
+// CreateSession posts a fresh session to the worker. Returns the
 // session id we route subsequent prompts to.
-func createOpenCodeSession(ctx context.Context, port int, bearerToken string) (string, error) {
+func CreateSession(ctx context.Context, port int, bearerToken string) (string, error) {
 	body := bytes.NewBufferString(`{"title":"langy"}`)
 	url := fmt.Sprintf("http://127.0.0.1:%d/session", port)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
@@ -328,12 +328,12 @@ func createOpenCodeSession(ctx context.Context, port int, bearerToken string) (s
 	return out.Session.ID, nil
 }
 
-// postMessage queues a turn for the worker. 204/2xx → success. 404 means the
+// PostMessage queues a turn for the worker. 204/2xx → success. 404 means the
 // session vanished (rare; surfaces as domain.ErrSessionNotFound so the
 // orchestrator can recycle the worker). baseURL is the worker's precomputed
 // "http://127.0.0.1:<port>" so no per-turn Sprintf is needed. resumeToken
 // (ADR-048) rides the payload when resuming a prior turn's checkpoint.
-func postMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, userText, resumeToken string) error {
+func PostMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, userText, resumeToken string) error {
 	type part struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
@@ -376,7 +376,7 @@ func postMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, u
 	return nil
 }
 
-// notifyShutdownImminent POSTs a shutdown-imminent notice to the worker's
+// NotifyShutdownImminent POSTs a shutdown-imminent notice to the worker's
 // opencode control API (ADR-048), telling it to checkpoint the in-flight turn
 // and emit a terminal `handoff` frame before the manager kills its process
 // group. `deadline` is the absolute wall-clock instant (unix millis) the worker
@@ -385,7 +385,7 @@ func postMessage(ctx context.Context, baseURL, bearerToken, sessionID, system, u
 // caller, which logs and proceeds with the drain (a worker that cannot be
 // notified simply cold-starts on its next turn, today's behaviour). opencode is
 // expected to answer 2xx/204; a 404 means the session already vanished.
-func notifyShutdownImminent(ctx context.Context, baseURL, bearerToken, sessionID string, deadline time.Time) error {
+func NotifyShutdownImminent(ctx context.Context, baseURL, bearerToken, sessionID string, deadline time.Time) error {
 	body := bytes.NewBufferString(fmt.Sprintf(`{"deadline":%d}`, deadline.UnixMilli()))
 	url := baseURL + "/session/" + sessionID + "/shutdown_imminent"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
@@ -406,14 +406,14 @@ func notifyShutdownImminent(ctx context.Context, baseURL, bearerToken, sessionID
 	return nil
 }
 
-// extractHandoffToken pulls the opaque resume token out of a decoded `handoff`
+// ExtractHandoffToken pulls the opaque resume token out of a decoded `handoff`
 // ndjson frame (ADR-048). The token is opaque to the manager — this exists only
 // so tests (and any future manager-side bookkeeping) can assert the frame shape;
 // the token itself is never interpreted here, only on the control plane (which
 // persists it) and in opencode (which authors and consumes it). Tolerates the
 // bare `token` field and a nested `properties.token`, mirroring the
 // session-id shape-tolerance in eventBelongsToSession.
-func extractHandoffToken(event map[string]any) (string, bool) {
+func ExtractHandoffToken(event map[string]any) (string, bool) {
 	if typ, _ := event["type"].(string); typ != "handoff" {
 		return "", false
 	}
@@ -711,7 +711,7 @@ func toolEndFrame(id string, part *ssePart, isError bool) langyToolFrame {
 // repeat within one), so the same callID lands on the stream many times. The
 // tracker holds the per-turn set of ids it has already opened and closed, which
 // is what guarantees EXACTLY one `start` and one `end` per call. Scoped to a
-// single streamSessionEvents call — one turn, one tracker, no cross-turn leak.
+// single StreamSession call — one turn, one tracker, no cross-turn leak.
 type toolCallTracker struct {
 	started map[string]struct{}
 	ended   map[string]struct{}
@@ -761,7 +761,7 @@ func (t *toolCallTracker) framesFor(ev *sseEvent) []langyToolFrame {
 	return frames
 }
 
-// streamSessionEvents tails /event from the worker and forwards every event
+// StreamSession tails /event from the worker and forwards every event
 // belonging to sessionID as one ndjson line to w. Returns when a terminal event
 // lands or the context is cancelled. The fetch carries the same ctx so a client
 // disconnect aborts the upstream socket immediately — opencode would otherwise
@@ -784,7 +784,7 @@ func (t *toolCallTracker) framesFor(ev *sseEvent) []langyToolFrame {
 // control plane can event-source the call and stream a mapped UI card instead of
 // re-deriving the lifecycle from raw parts. Best-effort and additive — the raw
 // event is still forwarded verbatim, and a tool frame never fails the turn.
-func streamSessionEvents(ctx context.Context, baseURL, bearerToken, sessionID string, w io.Writer, flush func()) error {
+func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, w io.Writer, flush func()) error {
 	url := baseURL + "/event"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

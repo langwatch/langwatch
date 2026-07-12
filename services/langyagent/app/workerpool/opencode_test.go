@@ -53,7 +53,7 @@ func TestRequireOpenCodeAuthEnforced_FailsWhenBackendIsUnauthenticated(t *testin
 	}
 }
 
-// waitForReadiness must fail closed if the proxy chain is up but the underlying
+// WaitForReadiness must fail closed if the proxy chain is up but the underlying
 // opencode doesn't actually require auth — booting the worker in that state
 // would mean any sibling can reach it unauthenticated.
 func TestWaitForReadiness_FailsIfInternalPortIsUnauthenticated(t *testing.T) {
@@ -67,9 +67,9 @@ func TestWaitForReadiness_FailsIfInternalPortIsUnauthenticated(t *testing.T) {
 	}))
 	defer internal.Close()
 
-	err := waitForReadiness(context.Background(), portOf(t, external.URL), portOf(t, internal.URL), "bearer", time.Second)
+	err := WaitForReadiness(context.Background(), portOf(t, external.URL), portOf(t, internal.URL), "bearer", time.Second)
 	if err == nil {
-		t.Fatalf("expected waitForReadiness to fail closed when the internal port doesn't require auth")
+		t.Fatalf("expected WaitForReadiness to fail closed when the internal port doesn't require auth")
 	}
 }
 
@@ -84,34 +84,34 @@ func TestWaitForReadiness_SucceedsWhenProxyUpAndInternalPortEnforcesAuth(t *test
 	}))
 	defer internal.Close()
 
-	err := waitForReadiness(context.Background(), portOf(t, external.URL), portOf(t, internal.URL), "bearer", time.Second)
+	err := WaitForReadiness(context.Background(), portOf(t, external.URL), portOf(t, internal.URL), "bearer", time.Second)
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 }
 
-// Regression for the spawn race: startAuthProxy binds and serves synchronously,
+// Regression for the spawn race: StartAuthProxy binds and serves synchronously,
 // but opencode's listener on internalPort comes up later. Before it's
 // listening, the proxy's ErrorHandler answers polls with a genuine 502 — a
-// real, err==nil HTTP response, not a transport failure. waitForReadiness must
+// real, err==nil HTTP response, not a transport failure. WaitForReadiness must
 // not mistake that for "ready": doing so triggers a one-shot
 // requireOpenCodeAuthEnforced probe against a port nothing is listening on yet.
 // In production the proxy always wins this race against opencode's startup.
 func TestWaitForReadiness_SurvivesProxy502BeforeBackendListens(t *testing.T) {
-	internalPort, err := getFreePort()
+	internalPort, err := GetFreePort()
 	if err != nil {
 		t.Fatalf("reserve internal port: %v", err)
 	}
-	externalPort, err := getFreePort()
+	externalPort, err := GetFreePort()
 	if err != nil {
 		t.Fatalf("reserve external port: %v", err)
 	}
 
-	proxy, err := startAuthProxy(context.Background(), externalPort, internalPort, "bearer", "opencode-pw")
+	proxy, err := StartAuthProxy(context.Background(), externalPort, internalPort, "bearer", "opencode-pw")
 	if err != nil {
 		t.Fatalf("start auth proxy: %v", err)
 	}
-	defer proxy.shutdown()
+	defer proxy.Shutdown()
 
 	// Nothing listens on internalPort yet — the proxy's first polls hit
 	// connection-refused and answer 502. Only after a delay does the "opencode"
@@ -132,9 +132,9 @@ func TestWaitForReadiness_SurvivesProxy502BeforeBackendListens(t *testing.T) {
 		_ = backend.Serve(l)
 	}()
 
-	err = waitForReadiness(context.Background(), externalPort, internalPort, "bearer", 2*time.Second)
+	err = WaitForReadiness(context.Background(), externalPort, internalPort, "bearer", 2*time.Second)
 	if err != nil {
-		t.Fatalf("expected waitForReadiness to survive the proxy's pre-backend 502s and succeed once opencode starts listening, got %v", err)
+		t.Fatalf("expected WaitForReadiness to survive the proxy's pre-backend 502s and succeed once opencode starts listening, got %v", err)
 	}
 }
 
@@ -212,7 +212,7 @@ func TestSSEDecode_TerminalTypeDetected(t *testing.T) {
 	}
 }
 
-// streamSessionEvents must forward OUR session's events verbatim as ndjson,
+// StreamSession must forward OUR session's events verbatim as ndjson,
 // filter a sibling session's events (the isolation guarantee on the read side),
 // and stop at the terminal event.
 func TestStreamSessionEvents_ForwardsOwnSessionAndFiltersSibling(t *testing.T) {
@@ -235,8 +235,8 @@ func TestStreamSessionEvents_ForwardsOwnSessionAndFiltersSibling(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	if err := streamSessionEvents(context.Background(), srv.URL, "bearer", "mine", &buf, nil); err != nil {
-		t.Fatalf("streamSessionEvents: %v", err)
+	if err := StreamSession(context.Background(), srv.URL, "bearer", "mine", &buf, nil); err != nil {
+		t.Fatalf("StreamSession: %v", err)
 	}
 	out := buf.String()
 	if !strings.Contains(out, `"sessionID":"mine"`) || !strings.Contains(out, "hello") {
@@ -671,8 +671,8 @@ func TestStreamSessionEvents_ForwardsToolFramesAlongsideTextDeltas(t *testing.T)
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	if err := streamSessionEvents(context.Background(), srv.URL, "bearer", "mine", &buf, nil); err != nil {
-		t.Fatalf("streamSessionEvents: %v", err)
+	if err := StreamSession(context.Background(), srv.URL, "bearer", "mine", &buf, nil); err != nil {
+		t.Fatalf("StreamSession: %v", err)
 	}
 	out := buf.String()
 
@@ -742,9 +742,9 @@ func TestStreamSessionEvents_ForwardsToolFramesAlongsideTextDeltas(t *testing.T)
 
 // A transport failure on the internal probe (opencode's listener not up yet, a
 // reset) must be classified as retryable — not a security verdict — so
-// waitForReadiness keeps polling instead of aborting the spawn.
+// WaitForReadiness keeps polling instead of aborting the spawn.
 func TestRequireOpenCodeAuthEnforced_TransportErrorIsRetryable(t *testing.T) {
-	port, err := getFreePort() // nothing listening here
+	port, err := GetFreePort() // nothing listening here
 	if err != nil {
 		t.Fatalf("reserve port: %v", err)
 	}

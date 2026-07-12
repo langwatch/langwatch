@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// freePortForTest mirrors getFreePort but with t.Fatal on error so tests stay
+// freePortForTest mirrors GetFreePort but with t.Fatal on error so tests stay
 // clean.
 func freePortForTest(t *testing.T) int {
 	t.Helper()
@@ -28,11 +28,11 @@ func freePortForTest(t *testing.T) int {
 }
 
 func TestGenerateBearerToken_UniqueAndLongEnough(t *testing.T) {
-	a, err := generateBearerToken()
+	a, err := GenerateBearerToken()
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
-	b, err := generateBearerToken()
+	b, err := GenerateBearerToken()
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -68,11 +68,11 @@ func TestAuthProxy_BearerGate(t *testing.T) {
 
 	token := "test-token-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	port := freePortForTest(t)
-	proxy, err := startAuthProxy(context.Background(), port, internalPort, token, openCodePassword)
+	proxy, err := StartAuthProxy(context.Background(), port, internalPort, token, openCodePassword)
 	if err != nil {
-		t.Fatalf("startAuthProxy: %v", err)
+		t.Fatalf("StartAuthProxy: %v", err)
 	}
-	defer proxy.shutdown()
+	defer proxy.Shutdown()
 	waitForListenerOrFail(t, port)
 
 	cases := []struct {
@@ -122,16 +122,16 @@ func TestAuthProxy_TokensDoNotInterchangeAcrossProxies(t *testing.T) {
 
 	portA := freePortForTest(t)
 	portB := freePortForTest(t)
-	proxyA, err := startAuthProxy(context.Background(), portA, internalPort, tokenA, passwordA)
+	proxyA, err := StartAuthProxy(context.Background(), portA, internalPort, tokenA, passwordA)
 	if err != nil {
-		t.Fatalf("startAuthProxy A: %v", err)
+		t.Fatalf("StartAuthProxy A: %v", err)
 	}
-	defer proxyA.shutdown()
-	proxyB, err := startAuthProxy(context.Background(), portB, internalPort, tokenB, passwordB)
+	defer proxyA.Shutdown()
+	proxyB, err := StartAuthProxy(context.Background(), portB, internalPort, tokenB, passwordB)
 	if err != nil {
-		t.Fatalf("startAuthProxy B: %v", err)
+		t.Fatalf("StartAuthProxy B: %v", err)
 	}
-	defer proxyB.shutdown()
+	defer proxyB.Shutdown()
 	waitForListenerOrFail(t, portA)
 	waitForListenerOrFail(t, portB)
 
@@ -197,11 +197,11 @@ func TestWorkerIsolation_SiblingCannotAuthenticateWithoutPassword(t *testing.T) 
 	t.Run("authProxy with the real password gets through", func(t *testing.T) {
 		bearer := "bearer-for-worker-b-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 		externalPort := freePortForTest(t)
-		proxy, err := startAuthProxy(context.Background(), externalPort, internalPort, bearer, password)
+		proxy, err := StartAuthProxy(context.Background(), externalPort, internalPort, bearer, password)
 		if err != nil {
-			t.Fatalf("startAuthProxy: %v", err)
+			t.Fatalf("StartAuthProxy: %v", err)
 		}
-		defer proxy.shutdown()
+		defer proxy.Shutdown()
 		waitForListenerOrFail(t, externalPort)
 
 		req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/", externalPort), nil)
