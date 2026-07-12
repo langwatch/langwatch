@@ -16,6 +16,13 @@ import {
 } from "~/server/services/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/services/langy/streaming/langyTurnAccess";
 import { AGENT_CHAT_TIMEOUT_MS } from "~/server/services/langy/execution/langy-turn-errors";
+import type { Session } from "~/server/auth";
+import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
+import {
+  langyTurnContextSchema,
+  type LangyTurnContext,
+} from "~/server/services/langy/langyTurnContext.schema";
+import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { checkProjectPermission, isDemoProjectId } from "../rbac";
 import {
   langyConversationDetailSchema,
@@ -67,6 +74,61 @@ const langyReadProcedure = protectedProcedure
     }
     return next();
   });
+
+/**
+ * The turn-start procedure: the read gate PLUS the Phase-1 per-user message
+ * rate limit that used to live in the Hono `/langy/chat` handler. Redis-backed;
+ * fails open when Redis is down (dev/test stay usable). A limited caller is
+ * refused BEFORE reaching the app layer, so it never mints keys or dispatches a
+ * turn — exactly the precedence the route enforced.
+ */
+const langyTurnProcedure = langyReadProcedure.use(async ({ ctx, input, next }) => {
+  const rl = await checkLangyMessageRateLimit({
+    userId: ctx.session.user.id,
+    projectId: (input as { projectId: string }).projectId,
+  });
+  if (!rl.allowed) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: "Too many messages. Please slow down.",
+    });
+  }
+  return next();
+});
+
+/** One chat message on the wire — role + opaque parts (bounded downstream). */
+const langyTurnMessageSchema = z.object({
+  role: z.enum(["user", "assistant", "system"]),
+  parts: z.array(z.record(z.string(), z.unknown())).default([]),
+});
+
+/**
+ * Per-send model override from the sidebar picker. Shape-validated here;
+ * the value is checked against the project's Langy VK allowlist in the service.
+ */
+const langyModelOverrideSchema = z
+  .string()
+  .regex(
+    /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/,
+    "modelOverride must be in 'provider/model' shape",
+  )
+  .max(200);
+
+/** Inputs shared by create + continue (the SAME turn-start operation). */
+const langyTurnInputShape = {
+  messages: z.array(langyTurnMessageSchema).min(1),
+  modelOverride: langyModelOverrideSchema.optional(),
+  /**
+   * Why the client is sending. `regenerate-message` RE-DRIVES the last turn
+   * against the message already on record (so it is NOT re-posted).
+   */
+  trigger: z
+    .enum(["submit-message", "regenerate-message", "resume-stream"])
+    .optional(),
+  // Composer context chips (page context + skills) — bounded + sanitised in
+  // renderLangyTurnContext; refs are never resolved by the control plane.
+  ...langyTurnContextSchema.shape,
+} as const;
 
 function toListItemDto(item: ConversationListItem): LangyConversationListItemDto {
   return {
@@ -120,6 +182,42 @@ async function canWatchTurn({
     userId,
   });
   return !!conv;
+}
+
+/**
+ * Dispatch a turn through the app-layer turn service. Create and Continue are
+ * the SAME operation — `isNewConversation` is the only difference (it emits the
+ * semantically-first `conversation_started`). The service throws DomainErrors,
+ * which the shared `domainErrorMiddleware` maps to coded TRPCErrors carrying
+ * `data.domainError` (read by the client's `readLangyTrpcError`).
+ */
+async function startTurn({
+  input,
+  session,
+  isNewConversation,
+}: {
+  input: {
+    projectId: string;
+    conversationId?: string | null;
+    messages: LangyChatMessageInput[];
+    modelOverride?: string;
+    trigger?: "submit-message" | "regenerate-message" | "resume-stream";
+    pageContext?: LangyTurnContext["pageContext"];
+    skills?: LangyTurnContext["skills"];
+  };
+  session: Session;
+  isNewConversation: boolean;
+}): Promise<{ conversationId: string; turnId: string }> {
+  return getApp().langy.turns.startConversationTurn({
+    projectId: input.projectId,
+    session,
+    requestedConversationId: input.conversationId ?? null,
+    messages: input.messages,
+    ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
+    isRetry: input.trigger === "regenerate-message",
+    isNewConversation,
+    turnContext: { pageContext: input.pageContext, skills: input.skills },
+  });
 }
 
 export const langyRouter = createTRPCRouter({
@@ -251,6 +349,57 @@ export const langyRouter = createTRPCRouter({
       });
       return { success };
     }),
+
+  /**
+   * Start the FIRST turn of a NEW conversation. Mints a fresh conversation id,
+   * emits the semantically-first `conversation_started`, then dispatches the
+   * turn. Returns the ids the client subscribes to `onTurnStream` with.
+   *
+   * This is the tRPC replacement for `POST /api/langy/chat` on the create path.
+   * The Phase-1 gate (session + demo refusal + `evaluations:view` + rate limit)
+   * is the `langyTurnProcedure`; the turn service throws DomainErrors that the
+   * shared middleware maps to coded TRPCErrors.
+   */
+  createConversation: langyTurnProcedure
+    .input(z.object(langyTurnInputShape))
+    .mutation(
+      async ({
+        input,
+        ctx,
+      }): Promise<{ conversationId: string; turnId: string }> => {
+        return startTurn({
+          input: { ...input, messages: input.messages as LangyChatMessageInput[] },
+          session: ctx.session,
+          isNewConversation: true,
+        });
+      },
+    ),
+
+  /**
+   * Continue an EXISTING conversation (same operation as create, minus the
+   * first-message marker). Requires the conversation id; ownership is enforced
+   * in the service (`ensureConversation`), which throws
+   * `LangyConversationNotOwnedError` for someone else's conversation.
+   */
+  continueConversation: langyTurnProcedure
+    .input(
+      z.object({
+        conversationId: z.string().min(1),
+        ...langyTurnInputShape,
+      }),
+    )
+    .mutation(
+      async ({
+        input,
+        ctx,
+      }): Promise<{ conversationId: string; turnId: string }> => {
+        return startTurn({
+          input: { ...input, messages: input.messages as LangyChatMessageInput[] },
+          session: ctx.session,
+          isNewConversation: false,
+        });
+      },
+    ),
 
   /**
    * Count of conversations touched since a timestamp — the "N new" pill. The
