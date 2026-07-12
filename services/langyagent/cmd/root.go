@@ -9,7 +9,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	langyagent "github.com/langwatch/langwatch/services/langyagent"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/controlplane"
-	"github.com/langwatch/langwatch/services/langyagent/adapters/workerpool"
+	"github.com/langwatch/langwatch/services/langyagent/app/workerpool"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 )
 

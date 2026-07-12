@@ -10,8 +10,8 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/lifecycle"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/langyagent/adapters/workerpool"
 	"github.com/langwatch/langwatch/services/langyagent/app"
+	"github.com/langwatch/langwatch/services/langyagent/app/workerpool"
 	"github.com/langwatch/langwatch/services/langyagent/transport/rpc"
 )
 
