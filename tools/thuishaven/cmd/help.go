@@ -47,10 +47,13 @@ COMMANDS
                   install deps, and bring its stack up on a hostname. <ref> is a
                   PR number or URL (works for fork PRs too). A reused worktree is
                   fetched + reset to the PR's current head, so you always try the
-                  latest push. Flags: --dry-run (resolve + print the plan, create
+                  latest push — any uncommitted edits there are autostashed first
+                  (restore with the 'git stash apply <sha>' it prints) so nothing
+                  is lost. Flags: --dry-run (resolve + print the plan, create
                   nothing), --no-install, --force (a non-open PR), --trusted (run
                   install lifecycle scripts for a fork — see below; --allow-scripts
-                  is an alias). Shares the
+                  is an alias), --discard-local-changes (overwrite those edits
+                  instead of stashing them). Shares the
                   managed Postgres/ClickHouse/Redis for now — per-PR isolation is
                   the follow-up in specs/setup/haven-try-pr-plan.md.
                   TRUST: a fork PR's install runs with --ignore-scripts by default

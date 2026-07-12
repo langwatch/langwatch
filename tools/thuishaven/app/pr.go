@@ -20,6 +20,10 @@ type TryPRParams struct {
 	Force        bool   // proceed even if the PR is not open
 	DryRun       bool   // resolve + print the plan, create nothing
 	AllowScripts bool   // run install lifecycle scripts even for a fork PR (--trusted)
+	// DiscardLocalChanges overwrites a reused worktree's uncommitted tracked edits
+	// on refresh instead of stashing them first (--discard-local-changes). Off by
+	// default: a refresh autostashes local work so nothing is ever silently lost.
+	DiscardLocalChanges bool
 }
 
 // prView is the slice of `gh pr view --json` we read.
@@ -92,7 +96,7 @@ func TryPR(
 		// serves stale code. refreshPRWorktree also fails loudly if the dir is not a
 		// usable git worktree, so isDir alone isn't trusted as the reuse gate.
 		fmt.Printf("↺ reusing existing worktree %s — refreshing to PR head\n", worktree)
-		if err := refreshPRWorktree(ctx, worktree, view.Number); err != nil {
+		if err := refreshPRWorktree(ctx, worktree, view.Number, p.DiscardLocalChanges); err != nil {
 			return err
 		}
 	} else {
@@ -153,7 +157,27 @@ func pnpmInstallArgs(view prView, allowScripts bool) []string {
 // head. The PR head branch (haven-pr-N) is checked out here, and git refuses to
 // fetch straight into a checked-out branch, so fetch to FETCH_HEAD and hard-reset
 // onto it — which moves the branch and the working tree to the latest commit.
-func refreshPRWorktree(ctx context.Context, worktree string, number int) error {
+//
+// The hard-reset would silently clobber any uncommitted edits a developer made
+// while poking at the PR, so by default we autostash them first (the same safety
+// net `git rebase`/`git pull` get from --autostash) — nothing is lost, and the
+// stash's sha is printed so they can restore exactly those edits. --discard-local-
+// changes opts out and overwrites instead. (git reset --hard only destroys
+// tracked-file modifications; untracked files survive it, and stashing them would
+// sweep up the generated artifacts a prior `haven up` leaves behind — so both the
+// dirty-check and the stash are scoped to tracked changes.)
+func refreshPRWorktree(ctx context.Context, worktree string, number int, discardLocalChanges bool) error {
+	dirty, err := worktreeHasTrackedChanges(ctx, worktree)
+	if err != nil {
+		return err
+	}
+	if dirty {
+		if discardLocalChanges {
+			fmt.Printf("⚠ --discard-local-changes: overwriting uncommitted edits in %s\n", worktree)
+		} else if err := autostashLocalChanges(ctx, worktree, number); err != nil {
+			return err
+		}
+	}
 	fetchSpec := fmt.Sprintf("pull/%d/head", number)
 	if err := runStreaming(ctx, worktree, "git", "fetch", "-f", "origin", fetchSpec); err != nil {
 		return fmt.Errorf("git fetch %s (reuse) in %s: %w", fetchSpec, worktree, err)
@@ -162,6 +186,71 @@ func refreshPRWorktree(ctx context.Context, worktree string, number int) error {
 		return fmt.Errorf("git reset --hard FETCH_HEAD in %s: %w", worktree, err)
 	}
 	return nil
+}
+
+// autostashLocalChanges tucks the worktree's uncommitted tracked edits into a git
+// stash before a refresh clobbers them. It prints the stash's commit sha so the
+// developer restores exactly these edits with `git stash apply <sha>` — apply, not
+// pop, and by sha, because git's stash stack is shared across every worktree of
+// the repo, so a bare pop could grab another worktree's entry.
+func autostashLocalChanges(ctx context.Context, worktree string, number int) error {
+	msg := fmt.Sprintf("haven pr %d: autostash before refresh", number)
+	if err := runStreaming(ctx, worktree, "git", "stash", "push", "-m", msg); err != nil {
+		return fmt.Errorf("git stash in %s failed: %w", worktree, err)
+	}
+	sha, err := gitRevParse(ctx, worktree, "stash@{0}")
+	if err != nil {
+		// The stash exists; we just couldn't resolve its sha for the hint.
+		fmt.Printf("↥ stashed your local changes (find it with `git stash list`, restore with `git stash apply`)\n")
+		return nil
+	}
+	fmt.Printf("↥ stashed your local changes — restore them here with: git stash apply %s\n", sha)
+	return nil
+}
+
+// worktreeHasTrackedChanges reports whether the worktree has staged or unstaged
+// modifications to tracked files — a non-empty `git status --porcelain
+// --untracked-files=no`. A git error (e.g. the dir isn't a usable worktree)
+// surfaces loudly, doubling as the reuse-gate isDir alone can't provide.
+func worktreeHasTrackedChanges(ctx context.Context, worktree string) (bool, error) {
+	out, err := gitOutput(ctx, worktree, "status", "--porcelain", "--untracked-files=no")
+	if err != nil {
+		return false, fmt.Errorf("git status in %s failed (is it a git worktree?)%s", worktree, gitStderrHint(err))
+	}
+	return porcelainIsDirty(out), nil
+}
+
+// gitRevParse resolves a rev (e.g. "stash@{0}") to its full sha in the worktree.
+func gitRevParse(ctx context.Context, worktree, rev string) (string, error) {
+	out, err := gitOutput(ctx, worktree, "rev-parse", rev)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// gitOutput runs a git subcommand in worktree and returns its stdout.
+func gitOutput(ctx context.Context, worktree string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = worktree
+	out, err := cmd.Output()
+	return string(out), err
+}
+
+// gitStderrHint turns an *exec.ExitError's captured stderr into a `: <msg>`
+// suffix for error wrapping, or "" when there's nothing useful.
+func gitStderrHint(err error) string {
+	if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+		return ": " + strings.TrimSpace(string(ee.Stderr))
+	}
+	return ""
+}
+
+// porcelainIsDirty reports whether `git status --porcelain` output signals
+// changes — any non-blank content. Split out so the decision is unit-testable
+// without a real worktree.
+func porcelainIsDirty(status string) bool {
+	return strings.TrimSpace(status) != ""
 }
 
 // resolvePR asks gh for the PR's number/state/head. gh accepts a bare number

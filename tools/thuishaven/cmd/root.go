@@ -182,13 +182,14 @@ var commands = map[string]command{
 	},
 	"pr": func(ctx context.Context, d deps, rest []string) error {
 		return app.TryPR(ctx, app.TryPRParams{
-			Ref:          firstNonFlag(rest),
-			RepoRoot:     d.worktree,
-			WorktreeBase: prWorktreeBase(d.worktree),
-			NoInstall:    hasFlag(rest, "--no-install"),
-			Force:        hasFlag(rest, "--force"),
-			DryRun:       hasFlag(rest, "--dry-run"),
-			AllowScripts: hasFlag(rest, "--trusted") || hasFlag(rest, "--allow-scripts"),
+			Ref:                 firstNonFlag(rest),
+			RepoRoot:            d.worktree,
+			WorktreeBase:        prWorktreeBase(d.worktree),
+			NoInstall:           hasFlag(rest, "--no-install"),
+			Force:               hasFlag(rest, "--force"),
+			DryRun:              hasFlag(rest, "--dry-run"),
+			AllowScripts:        hasFlag(rest, "--trusted") || hasFlag(rest, "--allow-scripts"),
+			DiscardLocalChanges: hasFlag(rest, "--discard-local-changes"),
 		}, runHavenUpIn)
 	},
 	"setup":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Setup(ctx) },
