@@ -23,6 +23,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/app/runner/sandboxed"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/assets"
 	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
 )
 
@@ -140,19 +141,19 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 	if err := os.MkdirAll(opts.SessionsRoot, 0o755); err != nil {
 		return nil, fmt.Errorf("mkdir sessions root: %w", err)
 	}
-	// Read the shared AGENTS.md ONCE here so no per-worker spawn touches disk for
-	// it — only the per-worker ${LANGWATCH_ENDPOINT} ReplaceAll runs at spawn. A
-	// read failure is logged, not fatal: /workspace may not be mounted in every
-	// dev preset, and a spawn then fails with a clear error instead of crash-
-	// looping the manager at boot.
-	var agentsTemplate string
-	if raw, err := os.ReadFile(filepath.Join(opts.WorkspaceRoot, "AGENTS.md")); err != nil {
-		clog.Get(ctx).Warn("read shared AGENTS.md at startup failed; worker spawns will fail until it is present",
-			zap.String("workspace_root", opts.WorkspaceRoot),
-			zap.Error(err),
-		)
-	} else {
-		agentsTemplate = string(raw)
+	// AGENTS.md + skills are EMBEDDED in the binary (internal/assets), not seeded
+	// into /workspace by the entrypoint. Read the template once (only the per-worker
+	// ${LANGWATCH_ENDPOINT} ReplaceAll runs at spawn) and materialize the skills tree
+	// onto disk under WorkspaceRoot/skills so each worker's opencode can discover it;
+	// setupWorkerHome symlinks each worker home at that path. Both are fatal on
+	// failure — a manager that can't provide the system prompt or skills must not
+	// accept traffic and silently spawn crippled workers.
+	agentsTemplate, err := assets.AgentsTemplate()
+	if err != nil {
+		return nil, fmt.Errorf("load embedded AGENTS.md: %w", err)
+	}
+	if err := assets.MaterializeSkills(filepath.Join(opts.WorkspaceRoot, "skills")); err != nil {
+		return nil, fmt.Errorf("materialize embedded skills: %w", err)
 	}
 	tel := opts.Telemetry
 	if tel == nil {

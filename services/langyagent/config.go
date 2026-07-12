@@ -99,14 +99,14 @@ type Config struct {
 	// cross-check of the CONNECT authority. Default ON.
 	EgressSNICrossCheck bool `env:"LANGY_EGRESS_SNI_CROSSCHECK"`
 
-	// WorkspaceRoot is the shared-templates directory the pod entrypoint seeds
-	// with AGENTS.md and skills/ (see entrypoint.sh). setupWorkerHome reads
-	// ${WorkspaceRoot}/AGENTS.md and symlinks ${WorkspaceRoot}/skills into each
-	// worker home. In the container this is /workspace (an emptyDir populated at
-	// boot). Overridable so the manager can run OUTSIDE the container in local
-	// dev, where `/workspace` cannot be created at the filesystem root — point it
-	// at a writable dir seeded with the same two entries. Independent of
-	// SESSIONS_ROOT (the per-conversation home dirs), which stays separate.
+	// WorkspaceRoot is the directory the manager materializes the embedded skills
+	// tree into at boot (workerpool.New → internal/assets.MaterializeSkills), and
+	// that setupWorkerHome symlinks ${WorkspaceRoot}/skills into each worker home.
+	// AGENTS.md is NOT here — it is read from the embedded binary. In the container
+	// this is /workspace (an emptyDir). Overridable so the manager can run OUTSIDE
+	// the container in local dev, where `/workspace` cannot be created at the
+	// filesystem root — point it at any writable dir (the manager fills skills/
+	// itself). Independent of SESSIONS_ROOT (the per-conversation home dirs).
 	WorkspaceRoot string `env:"LANGY_WORKSPACE_ROOT" validate:"required"`
 
 	// UnsafeDevDisableIsolation disables the ADR-033 per-worker UID sandbox: no
