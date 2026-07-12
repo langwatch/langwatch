@@ -33,7 +33,7 @@ const logger = createLogger("langwatch:langy-internal");
  * A plain `===` leaks the secret one byte at a time to anything that can time
  * our responses, and this surface is reachable from inside the cluster.
  */
-async function verifyLangyInternalSecret(c: Context, next: Next) {
+export async function verifyLangyInternalSecret(c: Context, next: Next) {
   const secret = process.env.LANGY_INTERNAL_SECRET;
   if (!secret) {
     logger.error("LANGY_INTERNAL_SECRET is not configured");
