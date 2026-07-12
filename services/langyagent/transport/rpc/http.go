@@ -50,24 +50,25 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// and the chart probes still call /health.
 	mux.HandleFunc("GET /health", healthAlias(deps.App))
 
+	// Streaming verb: chat returns an arbitrarily long ndjson turn, so it does not
+	// fit the typed request/response RPC and stays a bespoke handler.
 	mux.Handle("POST /chat", requireInternalSecret(
 		deps.InternalSecret,
 		chatHandler(deps.App, deps.MaxRequestBodyBytes),
 	))
 
-	// Boot the worker ahead of the turn. The control plane fires this the moment
-	// it knows a turn is coming and does not wait for it; see warmHandler.
+	// Typed RPC verbs (RPC.Handle*): the generic adapters decode+validate the body
+	// and serialize the result. Warm boots the worker ahead of the turn (fire-and-
+	// forget, 204); probe answers "do you already have a matching worker?" so the
+	// control plane can skip minting a session key a reused worker would discard.
+	rpc := NewRPC(deps.App, deps.MaxRequestBodyBytes)
 	mux.Handle("POST /warm", requireInternalSecret(
 		deps.InternalSecret,
-		warmHandler(deps.App, deps.MaxRequestBodyBytes),
+		handleNoContent(rpc.maxBodyBytes, rpc.HandleWarm),
 	))
-
-	// Read-only pre-flight: "do you already have a worker with these
-	// capabilities?" The control plane uses the answer to skip minting a session
-	// key that a reused worker would only discard. Spawns nothing.
 	mux.Handle("POST /worker/probe", requireInternalSecret(
 		deps.InternalSecret,
-		probeHandler(deps.App, deps.MaxRequestBodyBytes),
+		handle(rpc.maxBodyBytes, rpc.HandleProbe),
 	))
 
 	// Middleware chain — applied so RequestID is outermost (mirrors aigateway).

@@ -1,14 +1,5 @@
 package rpc
 
-import (
-	"encoding/json"
-	"net/http"
-
-	"github.com/langwatch/langwatch/pkg/herr"
-	"github.com/langwatch/langwatch/services/langyagent/app"
-	"github.com/langwatch/langwatch/services/langyagent/domain"
-)
-
 // probeRequest asks whether a worker with these capabilities is already running.
 //
 // Note what is NOT here: a LangWatch session key. That is the entire point. The
@@ -34,46 +25,6 @@ type probeResponse struct {
 	// Alive: a worker is running for this conversation whose capabilities match.
 	// The control plane reads this as "you do not need to mint a session key".
 	Alive bool `json:"alive"`
-}
-
-// probeHandler answers the control plane's pre-flight so it can skip minting a
-// session key when a live worker would just discard it.
-//
-// This is a READ. It spawns nothing, claims nothing, and mutates nothing — a
-// probe must never be able to start a turn or boot a worker, or a stray call
-// would cost exactly what we are trying to save.
-//
-// The answer is advisory and may be stale by the time the turn lands; Acquire is
-// the authority and refuses a keyless spawn with ErrCredentialsRequired. That is
-// deliberate: making this endpoint authoritative would mean holding the pool lock
-// across the control plane's round trip.
-func probeHandler(application *app.App, maxBodyBytes int64) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		req, err := decode[probeRequest](w, r, maxBodyBytes)
-		if err != nil {
-			herr.WriteHTTP(w, err)
-			return
-		}
-		if !domain.IsValidConversationID(req.ConversationID) {
-			herr.WriteHTTP(w, herr.New(ctx, domain.ErrInvalidConversationID, herr.M{"message": "invalid conversationId"}))
-			return
-		}
-
-		// Build the signature through the SAME function Acquire uses, so the probe
-		// can never answer a question subtly different from the one that matters.
-		sig := domain.SignatureOf(domain.Credentials{
-			Model:           req.Model,
-			GithubToken:     githubTokenSentinel(req.HasGithubAuth),
-			EgressAllowlist: req.EgressAllowlist,
-		})
-
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(probeResponse{
-			Alive: application.HasLiveWorker(req.ConversationID, sig),
-		})
-	}
 }
 
 // githubTokenSentinel turns the boolean the probe carries back into the shape
