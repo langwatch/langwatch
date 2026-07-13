@@ -261,7 +261,7 @@ export class TraceSpansBatchResolverContractError extends Error {
     );
   }
 
-  /** Right count, wrong order — the silent-corruption case. */
+  /** Right count, wrong pairing — the silent-corruption case. */
   static misaligned({
     index,
     expected,
@@ -272,7 +272,7 @@ export class TraceSpansBatchResolverContractError extends Error {
     got: string;
   }): TraceSpansBatchResolverContractError {
     return new TraceSpansBatchResolverContractError(
-      `resolveTraceSpansBatch returned a resolution for trace "${got}" at position ${index}, where trace "${expected}" was supplied; resolutions must come back in input order`,
+      `resolveTraceSpansBatch returned ${got} at position ${index}, where ${expected} was supplied; resolutions must come back in input order`,
     );
   }
 }
@@ -2417,18 +2417,33 @@ export class ClickHouseTraceService {
 
       // Cardinality alone does NOT catch the silent-corruption case: a resolver
       // that returns the right COUNT in the wrong ORDER scatters each trace's IO
-      // onto its neighbour. Resolved spans are derived from the input spans, so
-      // they carry the trace identity the resolution itself lacks — use it to
-      // check the positional pairing actually holds. A trace with no spans has
-      // no identity to compare, so it is skipped rather than guessed at.
+      // onto its neighbour. Both resolvers derive resolvedSpans by mapping over
+      // the input spans, so a conforming resolution carries (a) the same span
+      // count and (b) the trace identity the ResolvedTraceSpans type itself
+      // lacks. Check both: a trace CAN legitimately have zero spans (the read
+      // builds its map from summary rows), and such a trace has no identity to
+      // compare — but the span count still catches it being swapped with a
+      // spans-ful one, which is the case that would otherwise silently strip a
+      // real trace's spans. Two span-less traces transposed stay invisible, and
+      // are harmless: their resolutions are empty and interchangeable.
       for (const [index, spans] of spansPerTrace.entries()) {
+        const resolution = resolutions[index];
+
+        if (resolution?.resolvedSpans.length !== spans.length) {
+          throw TraceSpansBatchResolverContractError.misaligned({
+            index,
+            expected: `${spans.length} span(s)${spans[0] ? ` for trace "${spans[0].traceId}"` : ""}`,
+            got: `${resolution?.resolvedSpans.length ?? 0} span(s)`,
+          });
+        }
+
         const expected = spans[0]?.traceId;
-        const got = resolutions[index]?.resolvedSpans[0]?.traceId;
+        const got = resolution.resolvedSpans[0]?.traceId;
         if (expected !== undefined && got !== undefined && expected !== got) {
           throw TraceSpansBatchResolverContractError.misaligned({
             index,
-            expected,
-            got,
+            expected: `trace "${expected}"`,
+            got: `trace "${got}"`,
           });
         }
       }

@@ -367,6 +367,53 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
           ),
         ).rejects.toThrow(/resolutions must come back in input order/);
       });
+
+      // The identity check has a blind spot, and this is it. A trace can
+      // legitimately have ZERO spans — the read builds its map from summary rows
+      // and defaults spans to [] — and a span-less trace has no traceId on
+      // EITHER side to compare. Swap it with a spans-ful trace and identity sees
+      // nothing at either index, while the real trace silently loses its spans.
+      // Only the span-count check catches this.
+      it("catches a swap with a span-less trace, which has no identity on either side", async () => {
+        // Two summary rows, but span rows for TRACE_A only — so TRACE_B enters
+        // the resolver with an empty spans array, exactly as production would.
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve([
+                makeSummaryRow(TRACE_A),
+                makeSummaryRow(TRACE_B),
+              ]),
+          })
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve([
+                makeSpanRowWithEventRef(TRACE_A, "span-a", {
+                  tenantId: PROJECT_ID,
+                  previewOutput: PREVIEW_OUTPUT,
+                }),
+              ]),
+          });
+
+        const service = buildServiceWithBatchResolver((_projectId, spans) =>
+          // Right count (2 for 2), transposed: TRACE_A's index gets the span-less
+          // resolution, TRACE_B's index gets TRACE_A's spans.
+          Promise.resolve([
+            passthrough(spans[1] ?? []),
+            passthrough(spans[0] ?? []),
+          ]),
+        );
+
+        await expect(
+          service.getTracesWithSpans(
+            PROJECT_ID,
+            [TRACE_A, TRACE_B],
+            protections,
+            { from: 0, to: Date.now() },
+            { resolveBlobs: true },
+          ),
+        ).rejects.toThrow(/resolutions must come back in input order/);
+      });
     });
   });
 
