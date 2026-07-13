@@ -268,4 +268,42 @@ describe("prepareLitellmParams", () => {
       });
     });
   });
+
+  describe("when provider is the legacy azure_ai alias (#5760)", () => {
+    /** @scenario prepareLitellmParams normalizes the azure_ai alias */
+    it("normalizes azure_ai to azure so the endpoint + api key are still emitted", async () => {
+      // A provider row can carry provider="azure_ai" — the LiteLLM-era Azure
+      // prefix — because `provider` is a free string (registry.ts) reachable via
+      // API/import/legacy rows, and the Go gateway already aliases azure_ai ->
+      // Azure (services/nlpgo/adapters/gatewayproxy/headers.go). Without
+      // normalizing here, `modelProviders["azure_ai"]` is undefined, so BOTH the
+      // api key and the endpoint are silently dropped: `api_base` is never
+      // emitted, the gateway receives no x-litellm-api_base header, and Azure
+      // 502s "endpoint not set" even though the customer set the endpoint
+      // correctly. This is the config shape behind the #5760 report — the
+      // committed Go-side dual-name read cannot help because api_base never ships.
+      const provider = {
+        provider: "azure_ai",
+        enabled: true,
+        customKeys: {
+          AZURE_OPENAI_API_KEY: "sk-azure-real",
+          AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+        },
+        extraHeaders: null,
+        deploymentMapping: null,
+      };
+
+      const params = await prepareLitellmParams({
+        model: "azure_ai/gpt-5-mini",
+        modelProvider: provider,
+        projectId: "project-123",
+      });
+
+      // The endpoint + key reach LiteLLM (-> x-litellm-api_base / -api_key),
+      // and the model routes as azure/ so Bifrost selects the Azure provider.
+      expect(params.api_base).toBe("https://acme.openai.azure.com");
+      expect(params.api_key).toBe("sk-azure-real");
+      expect(params.model).toBe("azure/gpt-5-mini");
+    });
+  });
 });

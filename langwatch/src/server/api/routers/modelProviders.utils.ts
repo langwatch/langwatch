@@ -290,6 +290,20 @@ export const prepareLitellmParams = async ({
   modelProvider: MaybeStoredModelProvider;
   projectId: string;
 }) => {
+  // Normalize gateway provider aliases so credential resolution matches the Go
+  // gateway's providerForPrefix aliasing
+  // (services/nlpgo/adapters/gatewayproxy/headers.go). A provider stored as
+  // "azure_ai" (the LiteLLM-era Azure prefix; `provider` is z.string() so it is
+  // reachable via API/import/legacy rows) IS Azure OpenAI. Without this, the
+  // registry lookups below miss (modelProviders["azure_ai"] is undefined), so
+  // the api key AND endpoint are silently dropped — the gateway then 502s
+  // "endpoint not set" even though the customer set the endpoint correctly,
+  // and the Go-side dual-name read (#5762) can't help because api_base is never
+  // emitted. See #5760.
+  if (modelProvider.provider === "azure_ai") {
+    modelProvider = { ...modelProvider, provider: "azure" };
+  }
+
   const params: Record<string, string> = {};
 
   // Normalise the incoming wire value for LiteLLM. After iter 109 two
