@@ -30,6 +30,47 @@ export const isMetricsAuthorized = (req: IncomingMessage): boolean => {
   );
 };
 
+/**
+ * Collapses ID-shaped path segments to `{id}` so the `path` label on the HTTP
+ * request histogram stays low-cardinality (route template, not raw URL).
+ *
+ * Every distinct label value is a permanent series in this process's registry
+ * AND in Prometheus's head, held for the lifetime of the process. The
+ * Next.js → Hono migration (#3170) dropped the route-template normalization
+ * the original middleware had, so raw URLs — `/api/traces/trace_<nanoid>` and
+ * friends — accumulate one series per entity ever requested and grow the
+ * registry without bound. A path label must never contain per-entity IDs.
+ */
+export const normalizeMetricsPath = (path: string): string => {
+  const segments = path.replace(/\/{2,}/g, "/").split("/");
+  const normalized = segments.map((segment) => {
+    if (segment === "") return segment;
+    // percent-encoded leftovers (`abc%3D%3D`) are never route words
+    if (segment.includes("%")) return "{id}";
+    // purely numeric
+    if (/^\d+$/.test(segment)) return "{id}";
+    // uuid
+    if (
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        segment,
+      )
+    )
+      return "{id}";
+    // bare hex ids (trace ids are 16/32 hex chars)
+    if (/^[0-9a-f]{8,}$/i.test(segment)) return "{id}";
+    // prefixed entity ids: trace_…, project_…, prompt_…, eval_… — the tail of
+    // a generated id always carries a digit or uppercase, which route words
+    // (`batch_clustering`) never do
+    if (/^[a-z]+_[A-Za-z0-9_-]{6,}$/.test(segment) && /[A-Z0-9]/.test(segment))
+      return "{id}";
+    // long unprefixed tokens (nanoid, base64ish)
+    if (/^[A-Za-z0-9_-]{16,}$/.test(segment) && /\d/.test(segment))
+      return "{id}";
+    return segment;
+  });
+  return normalized.join("/") || "/";
+};
+
 type Endpoint =
   | "collector"
   | "log_steps"
