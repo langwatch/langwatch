@@ -635,6 +635,27 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
   removeTarget: (targetId) => {
     set((state) => {
+      // Removing this target must also drop it from any comparison that
+      // references it as a variant — otherwise the comparison keeps a
+      // phantom entry (ComparisonConfigForm renders nothing for an
+      // unresolvable id, so there's no way to remove it from the UI either)
+      // and the orchestrator's resolveVariants silently produces zero cells
+      // forever, with no error surfaced anywhere.
+      const dropVariant = <T extends { comparison?: { variants: string[] } }>(
+        carrier: T,
+      ): T =>
+        carrier.comparison
+          ? {
+              ...carrier,
+              comparison: {
+                ...carrier.comparison,
+                variants: carrier.comparison.variants.filter(
+                  (v) => v !== targetId,
+                ),
+              },
+            }
+          : carrier;
+
       // Also remove this target's mappings from all evaluators
       // With per-dataset structure: mappings[datasetId][targetId][inputField]
       const evaluators = state.evaluators.map((e) => {
@@ -644,7 +665,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           delete newTargetMappings[targetId];
           newMappings[datasetId] = newTargetMappings;
         }
-        return { ...e, mappings: newMappings };
+        return dropVariant({ ...e, mappings: newMappings });
       });
 
       // Also remove mappings that reference this target from other targets
@@ -669,7 +690,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
             }
             newMappings[datasetId] = newFieldMappings;
           }
-          return { ...target, mappings: newMappings };
+          return dropVariant({ ...target, mappings: newMappings });
         });
 
       return { targets, evaluators };

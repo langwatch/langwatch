@@ -660,34 +660,6 @@ export function EvaluationsV3Table({
         return;
       }
 
-      // Pairwise evaluators always open their dedicated target-picker form
-      // (ComparisonConfigForm), regardless of whether targets exist yet.
-      // useOpenEvaluatorEditor routes pairwise_compare to ComparisonConfigForm
-      // and ignores the `target` / `targetName` params, so we pass a stub
-      // when no real target exists yet.
-      if (added.evaluatorType === "langevals/pairwise_compare") {
-        const stubTarget: TargetConfig = firstTarget ?? {
-          id: "",
-          type: "prompt",
-          inputs: [],
-          outputs: [],
-          mappings: {},
-        };
-        openEvaluatorEditor({
-          evaluator: added,
-          target: stubTarget,
-          targetName: firstTarget
-            ? (resolveTargetNameFromCache({
-                target: firstTarget,
-                utils: trpcUtils,
-                projectId: project?.id,
-              }) ?? "")
-            : "",
-          isCodeEvaluator: false,
-        });
-        return;
-      }
-
       if (
         firstTarget &&
         evaluatorHasMissingMappings(

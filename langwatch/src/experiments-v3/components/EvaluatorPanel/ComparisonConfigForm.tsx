@@ -170,6 +170,7 @@ function VariantsMultiSelect({
         Variants (pick 2 or more)
         <FieldInfoTooltip
           testId="comparison-variants-info"
+          trigger="hover"
           description="The columns whose outputs are compared. If a column is already scored by its own evaluators, those scores are passed to the judge along with the output, so it can take them into account."
         />
       </Field.Label>
@@ -463,6 +464,7 @@ function GoldenAnswerSection({
           </Text>
           <FieldInfoTooltip
             testId="comparison-has-golden-answer-info"
+            trigger="hover"
             description="Compare each candidate against a reference answer. Turn off to let the judge compare the candidates directly on their own merits, with no reference answer involved."
           />
         </HStack>
@@ -594,12 +596,14 @@ function RandomizeOrderSection({
           </Text>
           <FieldInfoTooltip
             testId="comparison-randomize-order-info"
+            trigger="hover"
             description="Judges tend to favour whichever candidate they read first. Shuffling each row's candidates cancels that out. The same row always gets the same order, so re-running gives you comparable verdicts."
           />
         </HStack>
         <Switch
           checked={randomizeOrder}
           onCheckedChange={({ checked }) => setRandomizeOrder(checked)}
+          inputProps={{ "aria-label": "Shuffle candidate order" }}
           data-testid="comparison-randomize-order"
         />
       </HStack>
@@ -658,6 +662,7 @@ function MetricsSection({
         </Text>
         <FieldInfoTooltip
           testId="comparison-include-metrics-info"
+          trigger="hover"
           description="Inject per-candidate cost and latency into the judge prompt so it can prefer the cheaper or faster variant when quality is comparable."
         />
       </HStack>

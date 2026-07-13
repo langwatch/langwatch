@@ -1,14 +1,24 @@
-import { Button, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
-import { Swords } from "lucide-react";
+import { Box, Button, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
+import { CircleAlert, Swords } from "lucide-react";
 import { useMemo } from "react";
 
+import { Tooltip } from "~/components/ui/tooltip";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useOpenComparisonEditor } from "../hooks/useOpenEvaluatorEditor";
 import { useTargetNames } from "../hooks/useTargetName";
 import { computeComparisonAggregate } from "../utils/computeAggregates";
+import { getEvaluatorMissingMappings } from "../utils/mappingValidation";
 import { toComparisonConfig } from "../utils/normalizeComparison";
 import { disambiguateNames } from "../utils/variantDisambiguation";
 import { ComparisonScoreboard } from "./TargetSection/ComparisonScoreboard";
+
+// Matches the pulse used for the equivalent per-target alert
+// (TargetHeader.tsx) — same visual language for "needs your attention".
+const pulseAnimation = keyframes`
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+`;
 
 /**
  * Header for a chip-style comparison evaluator's dedicated result column.
@@ -34,6 +44,9 @@ export function ComparisonColumnHeader({
   );
   const results = useEvaluationsV3Store((state) => state.results);
   const allTargets = useEvaluationsV3Store((state) => state.targets);
+  const activeDatasetId = useEvaluationsV3Store(
+    (state) => state.activeDatasetId,
+  );
 
   const comparison = evaluator ? toComparisonConfig(evaluator) : undefined;
   const variantIds = comparison?.variants;
@@ -70,6 +83,16 @@ export function ComparisonColumnHeader({
 
   const openComparisonEditor = useOpenComparisonEditor();
 
+  // Unlike a per-target chip, this is the ONLY surface that can carry a
+  // missing-config cue for a chip-style comparison — it has no column of its
+  // own elsewhere, and Run's validation redirect only surfaces the problem
+  // after the user already hit Run. targetId is unused by the comparison
+  // branch of getEvaluatorMissingMappings (it validates comparison.variants
+  // directly), so "" is fine here.
+  const hasMissingMappings =
+    !!evaluator &&
+    !getEvaluatorMissingMappings(evaluator, activeDatasetId, "").isValid;
+
   return (
     <HStack gap={1.5} width="full">
       <Button
@@ -88,6 +111,26 @@ export function ComparisonColumnHeader({
           {name}
         </Text>
       </Button>
+      {hasMissingMappings && (
+        <Tooltip
+          content="Needs configuration — click to pick variants"
+          positioning={{ placement: "top" }}
+          openDelay={0}
+          showArrow
+        >
+          <Box
+            css={{ animation: `${pulseAnimation} 2s ease-in-out infinite` }}
+            flexShrink={0}
+            data-testid="comparison-missing-mapping-alert"
+            onClick={() => evaluator && openComparisonEditor(evaluator)}
+            cursor="pointer"
+            _hover={{ transform: "scale(1.2)" }}
+            transition="transform 0.15s"
+          >
+            <Icon as={CircleAlert} color="yellow.fg" boxSize={4} />
+          </Box>
+        </Tooltip>
+      )}
       <Spacer />
       {aggregate && (
         <ComparisonScoreboard

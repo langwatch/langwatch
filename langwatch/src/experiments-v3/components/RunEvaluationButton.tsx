@@ -19,8 +19,10 @@ import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
+import { useOpenComparisonEditor } from "../hooks/useOpenEvaluatorEditor";
 import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
 import { useResolveTargetName } from "../hooks/useResolveTargetName";
+import { isComparisonEvaluator } from "../types";
 import {
   convertFromUIMapping,
   convertToUIMapping,
@@ -37,6 +39,7 @@ export const RunEvaluationButton = ({
 }: RunEvaluationButtonProps) => {
   const { openDrawer } = useDrawer();
   const { openTargetEditor } = useOpenTargetEditor();
+  const openComparisonEditor = useOpenComparisonEditor();
   const resolveTargetName = useResolveTargetName();
   const { status, progress, execute, abort, isAborting } =
     useExecuteEvaluation();
@@ -89,6 +92,19 @@ export const RunEvaluationButton = ({
         void openTargetEditor(target);
       } else if (validation.firstInvalidEvaluator) {
         const { evaluator, targetId } = validation.firstInvalidEvaluator;
+
+        // A chip-style comparison evaluator isn't tied to one target — it
+        // needs the variants/golden-field picker (ComparisonConfigForm), not
+        // the generic per-target mappings UI below. Without comparisonContext
+        // wired, the drawer renders nothing to fix the reported problem: no
+        // picker, and Save stays disabled since the local comparison state
+        // falls back to empty. openComparisonEditor is the same entry point
+        // the column header uses to edit an existing comparison.
+        if (isComparisonEvaluator(evaluator)) {
+          openComparisonEditor(evaluator);
+          return;
+        }
+
         const target = targets.find((r) => r.id === targetId);
 
         // Build mappingsConfig for the evaluator drawer

@@ -433,10 +433,13 @@ def test_slot_label_helper_rejects_negative_index():
         _slot_label(-1)
 
 
-def test_pairwise_compare_evaluator_is_untouched():
-    """Regression check: importing the new evaluator does not shadow or
-    modify the existing pairwise_compare module. Ensures our 'don't
-    touch pairwise' invariant is enforceable at test time."""
+def test_pairwise_compare_evaluator_is_independent():
+    """Regression check: importing the new evaluator does not shadow the
+    existing pairwise_compare module or couple the two classes together.
+    pairwise_compare.py itself does change in this PR (deprecation marker
+    on its name/docstring) — this only guards that the two evaluators stay
+    structurally independent, not that pairwise_compare is byte-for-byte
+    untouched."""
     from langevals_langevals import pairwise_compare, select_best_compare
 
     # The two evaluator classes must be siblings, neither inheriting from

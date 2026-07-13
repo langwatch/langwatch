@@ -6,6 +6,7 @@
  */
 
 import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
+import { resolveVerdictLabel } from "~/experiments-v3/utils/normalizeComparison";
 
 /**
  * Run data with color assignment for comparison mode
@@ -562,6 +563,14 @@ const detectComparisonColumns = (
   const isSlotLabel = (v: string): v is "A" | "B" | "tie" =>
     v === "A" || v === "B" || v === "tie";
 
+  // "tie" is valid vocabulary under BOTH the legacy 2-slot and current N-way
+  // contract, so seeing it alone is not evidence of the legacy shape — only
+  // "A"/"B" are. Treating "tie" as slot evidence (as `isSlotLabel` does for
+  // the label-shape filter below) made an all-tie bucket with no resolvable
+  // candidate ids wrongly fall back to a hardcoded 2-variant slice, silently
+  // dropping any 3rd+ variant.
+  const isLegacySlotLabel = (v: string): v is "A" | "B" => v === "A" || v === "B";
+
   // Also treat any evaluator whose type or display name looks like a
   // comparison judge as one, even if this row's label doesn't match a known
   // target id or slot letter. Real-world dogfood found the label sometimes
@@ -648,9 +657,9 @@ const detectComparisonColumns = (
     }
 
     if (!hasLabel) continue;
-    if (isSlotLabel(label)) {
+    if (isLegacySlotLabel(label)) {
       bucket.sawSlotLabels = true;
-    } else {
+    } else if (!isSlotLabel(label)) {
       const resolved = resolveToTargetId(label) ?? label;
       if (!bucket.winningLabels.includes(resolved)) {
         bucket.winningLabels.push(resolved);
@@ -696,11 +705,23 @@ const detectComparisonColumns = (
       let winnerId: string | null;
       if (rawLabel === "tie") {
         winnerId = null;
-      } else if (rawLabel === "A" || rawLabel === "B") {
-        // Legacy slot contract: position in the variant list names the winner.
-        winnerId = variants[rawLabel === "A" ? 0 : 1]?.id ?? null;
       } else {
-        winnerId = resolveToTargetId(rawLabel) ?? rawLabel;
+        // Reuse the same A/B-position mapping every other surface uses
+        // (resolveVerdictLabel) instead of re-deriving it here, so the two
+        // never drift. `variants` can carry a null-id padding slot (see
+        // above) — map those to "" so resolveVerdictLabel's `?? label`
+        // fallback (meant for "position doesn't exist") isn't triggered by
+        // "position exists but has no real id"; both cases are handled the
+        // same way just below (treated as no resolvable winner).
+        const resolved = resolveVerdictLabel({
+          label: rawLabel,
+          variants: variants.map((v) => v.id ?? ""),
+        });
+        const isUnresolvedSlot =
+          resolved === "" || resolved === "A" || resolved === "B";
+        winnerId = isUnresolvedSlot
+          ? null
+          : (resolveToTargetId(resolved) ?? resolved);
       }
 
       // Look up the winning variant's actual output text so the row cell can

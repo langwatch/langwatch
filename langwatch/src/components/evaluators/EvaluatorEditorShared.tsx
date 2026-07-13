@@ -530,8 +530,14 @@ export function useEvaluatorEditorController(
   // orchestrator skips it outright ("fewer than 2 variants configured"). Gate
   // Save and Apply on it rather than letting the user create a column that
   // silently never runs.
+  //
+  // Filter empty slots, not just array length: a folded legacy pairwise
+  // config (fromPairwise) always returns a 2-element `variants` array even
+  // when one or both slots are unset, so `.length` alone can't tell a fully
+  // configured comparison from an under-filled one.
   const hasEnoughVariants =
-    !isComparisonEvaluatorType(evaluatorType) || comparison.variants.length >= 2;
+    !isComparisonEvaluatorType(evaluatorType) ||
+    comparison.variants.filter(Boolean).length >= 2;
   const isValid = !!name && name.trim().length > 0 && hasEnoughVariants;
 
   const handleSave = useCallback(() => {

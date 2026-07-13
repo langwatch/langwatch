@@ -399,6 +399,62 @@ describe("orchestrator", () => {
       );
     });
 
+    // #5101 is specifically about N-way (3+) comparisons, not just the
+    // 2-slot pairwise case every other test in this suite exercises —
+    // every candidate must reach the judge, not just the first two.
+    describe("given three or more variants", () => {
+      it("includes every variant's output as a candidate", () => {
+        const state = createTestState(3, 0);
+        state.targets.push({
+          id: "comparison-target",
+          type: "evaluator",
+          targetEvaluatorId: "db-select-best-evaluator",
+          inputs: [],
+          outputs: [{ identifier: "label", type: "str" }],
+          mappings: {},
+          comparison: {
+            variants: ["target-1", "target-2", "target-3"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        });
+
+        const completedTargetOutputs = new Map([
+          [
+            "0:target-1",
+            { output: { output: "answer from 1" }, cost: 0.01, duration: 100 },
+          ],
+          [
+            "0:target-2",
+            { output: { output: "answer from 2" }, cost: 0.02, duration: 110 },
+          ],
+          [
+            "0:target-3",
+            { output: { output: "answer from 3" }, cost: 0.03, duration: 120 },
+          ],
+        ]);
+
+        const { cells } = generateComparisonCells(
+          state,
+          createTestDataset(1),
+          completedTargetOutputs,
+        );
+
+        expect(cells).toHaveLength(1);
+        expect(cells[0]?.comparison?.candidates).toHaveLength(3);
+        expect(cells[0]?.comparison?.candidates.map((c) => c.id)).toEqual([
+          "target-1",
+          "target-2",
+          "target-3",
+        ]);
+        expect(cells[0]?.comparison?.candidates[2]?.output).toBe(
+          '{"output":"answer from 3"}',
+        );
+      });
+    });
+
     // langevals types CandidateInput.output as `str`. Pydantic will not coerce
     // a dict / list / number, so anything non-string reaching the judge 422s
     // the run. A target emitting a structured output must therefore be either
@@ -954,6 +1010,50 @@ describe("orchestrator", () => {
 
       expect(cells).toHaveLength(0);
     });
+
+    // Regression: a legacy pairwise config folded in by fromPairwise copies
+    // goldenField verbatim, so hasGoldenAnswer:false can coexist with a
+    // stale non-empty goldenField. buildEvaluatorInputs (the runtime path)
+    // already gates on `hasGoldenAnswer !== false && goldenField`; the
+    // column-target synthetic's static value-mapping must agree, or the
+    // judge gets a golden reference the runtime path deliberately omitted.
+    it("omits golden from the synthetic mapping when hasGoldenAnswer is false, even with a stale goldenField", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          hasGoldenAnswer: false,
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const completedTargetOutputs = new Map([
+        ["0:target-1", { output: { output: "answer from A" } }],
+        ["0:target-2", { output: { output: "answer from B" } }],
+      ]);
+
+      const { cells } = generateComparisonCells(
+        state,
+        createTestDataset(1),
+        completedTargetOutputs,
+      );
+
+      expect(cells).toHaveLength(1);
+      const mappings = cells[0]?.evaluatorConfigs[0]?.mappings as Record<
+        string,
+        Record<string, Record<string, { value: unknown }>>
+      >;
+      expect(mappings["dataset-1"]?.["pairwise-target"]?.golden?.value).toBe(
+        undefined,
+      );
+    });
   });
 
   describe("generateCells with evaluator-all-rows scope", () => {
@@ -1082,6 +1182,78 @@ describe("orchestrator", () => {
           0: { output: "result-0" },
         },
         traceIds: {},
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(0);
+    });
+
+    // A comparison evaluator needs every variant's output, not one target's —
+    // attaching it here would silently produce an empty input object (see the
+    // matching Phase-1 skip a few tests up) rather than a real comparison run.
+    it("skips a comparison evaluator instead of attaching it to a single-target cell", () => {
+      const state = createTestState(1, 0);
+      state.evaluators.push({
+        id: "cmp-eval",
+        evaluatorType: "langevals/select_best_compare",
+        name: "Comparison",
+        settings: {},
+        inputs: [],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        comparison: {
+          variants: ["target-1"],
+          hasGoldenAnswer: false,
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      } as EvaluationsV3State["evaluators"][number]);
+      const datasetRows = createTestDataset(2);
+      const scope: ExecutionScope = {
+        type: "evaluator-all-rows",
+        targetId: "target-1",
+        evaluatorId: "cmp-eval",
+        precomputedTargetOutputs: {
+          0: { output: "result-0" },
+          1: { output: "result-1" },
+        },
+        traceIds: {},
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(0);
+    });
+  });
+
+  describe("generateCells with evaluator scope", () => {
+    // Same reasoning as the evaluator-all-rows guard above — a comparison
+    // evaluator can't run against one target's precomputed output.
+    it("skips a comparison evaluator instead of attaching it to a single-target cell", () => {
+      const state = createTestState(1, 0);
+      state.evaluators.push({
+        id: "cmp-eval",
+        evaluatorType: "langevals/select_best_compare",
+        name: "Comparison",
+        settings: {},
+        inputs: [],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        comparison: {
+          variants: ["target-1"],
+          hasGoldenAnswer: false,
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      } as EvaluationsV3State["evaluators"][number]);
+      const datasetRows = createTestDataset(1);
+      const scope: ExecutionScope = {
+        type: "evaluator",
+        targetId: "target-1",
+        rowIndex: 0,
+        evaluatorId: "cmp-eval",
+        targetOutput: { output: "result-0" },
       };
 
       const cells = generateCells(state, datasetRows, scope);

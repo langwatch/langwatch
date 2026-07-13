@@ -36,9 +36,10 @@ from litellm.files.main import ModelResponse
 from pydantic import BaseModel, Field
 
 
-# Braces around placeholders are single-brace (str.format slots).
-# Any literal braces in the template must be doubled. Tool-call schema
-# below drives the response shape, so no JSON example is embedded.
+# Placeholders are substituted literally (not str.format), so a stray
+# brace in a customized prompt is passed through verbatim rather than
+# raising KeyError. Tool-call schema below drives the response shape,
+# so no JSON example is embedded.
 #
 # Deliberately generic — no correctness/completeness/style rubric baked
 # in. The judge decides what "better" means for the task at hand rather
@@ -241,11 +242,19 @@ class SelectBestCompareEvaluator(
         if prompt_is_golden_free:
             effective_prompt = DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
 
-        rendered_prompt = effective_prompt.format(
-            input=entry.input or "",
-            golden=entry.golden or "",
-            candidates=candidates_block,
-        )
+        # `str.format` raises KeyError on any stray brace the user's custom
+        # prompt happens to contain (e.g. a pasted JSON example or a rubric
+        # like "score out of {10}"), surfacing as an opaque evaluator error
+        # instead of a working evaluation. Mirrors pairwise_compare's fix for
+        # the same hazard: literal substitution for the slots we know about;
+        # anything else (including unmatched braces) passes through verbatim.
+        rendered_prompt = effective_prompt
+        for key, val in {
+            "input": entry.input or "",
+            "golden": entry.golden or "",
+            "candidates": candidates_block,
+        }.items():
+            rendered_prompt = rendered_prompt.replace("{" + key + "}", str(val))
 
         slot_labels = list(slot_to_candidate.keys())
         winner_enum = slot_labels + (["tie"] if self.settings.allow_tie else [])

@@ -127,7 +127,16 @@ export const generateCells = (
       (e) => e.id === scope.evaluatorId,
     );
 
-    if (!targetConfig || !evaluatorConfig) return cells;
+    // A comparison evaluator needs every variant's output, not one target's
+    // — the same reason Phase 1 skips it (see the comparison-skip comment
+    // below). Attaching it to a single-target cell here would silently
+    // produce an empty input object rather than a real comparison run.
+    if (
+      !targetConfig ||
+      !evaluatorConfig ||
+      isComparisonEvaluator(evaluatorConfig)
+    )
+      return cells;
 
     for (const [rowIndexStr, targetOutput] of Object.entries(
       scope.precomputedTargetOutputs,
@@ -163,7 +172,14 @@ export const generateCells = (
     );
     const datasetEntry = datasetRows[scope.rowIndex];
 
-    if (targetConfig && evaluatorConfig && datasetEntry) {
+    // See the matching guard in the evaluator-all-rows branch above — a
+    // comparison evaluator can't run against one target's precomputed output.
+    if (
+      targetConfig &&
+      evaluatorConfig &&
+      !isComparisonEvaluator(evaluatorConfig) &&
+      datasetEntry
+    ) {
       cells.push({
         rowIndex: scope.rowIndex,
         targetId: scope.targetId,
@@ -247,7 +263,7 @@ export const generateCells = (
       // Skip column-style comparison targets (pairwise #5100, N-way #5101)
       // in Phase 1 — they need every variant's output, which is not yet
       // available in a single per-target cell. Picked up by
-      // generatePairwiseCells / generateSelectBestCells in Phase 2.
+      // generateComparisonCells in Phase 2.
       if (
         targetConfig.type === "evaluator" &&
         isComparisonEvaluator(targetConfig)
@@ -262,7 +278,7 @@ export const generateCells = (
         // Comparison evaluators (pairwise #5100, N-way #5101) run in Phase 2
         // once every variant's output exists — they would crash here because
         // the other candidates' outputs are not available within a single
-        // per-target cell. See generatePairwiseCells / generateSelectBestCells.
+        // per-target cell. See generateComparisonCells.
         evaluatorConfigs: state.evaluators.filter(
           (e) => !isComparisonEvaluator(e),
         ),
@@ -671,11 +687,19 @@ export const generateComparisonCells = (
             },
             row_index: { type: "value", value: rowIndex },
             input: { type: "value", value: resolvedInput },
+            // Same #5378 gate buildEvaluatorInputs applies at runtime
+            // (hasGoldenAnswer !== false && goldenField). Without it here
+            // too, a legacy pairwise config folded in with hasGoldenAnswer
+            // false but a stale non-empty goldenField (fromPairwise copies
+            // it verbatim) would still bake a golden reference into this
+            // synthetic's static value mapping while the runtime path
+            // correctly omits it — the two disagreeing on the same config.
             golden: {
               type: "value",
-              value: cfg.goldenField
-                ? datasetEntry[cfg.goldenField]
-                : undefined,
+              value:
+                cfg.hasGoldenAnswer !== false && cfg.goldenField
+                  ? datasetEntry[cfg.goldenField]
+                  : undefined,
             },
           },
         },

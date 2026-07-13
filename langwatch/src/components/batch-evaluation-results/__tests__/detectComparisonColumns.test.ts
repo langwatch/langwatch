@@ -158,6 +158,28 @@ describe("detecting comparison columns", () => {
         expect(column.verdictsByRow[0]?.reasoning).toBe("B is warmer");
       });
     });
+
+    describe("when every row ties and inputs carry no candidate ids", () => {
+      // "tie" is valid vocabulary under both the legacy 2-slot and current
+      // N-way contract, so seeing it alone must NOT be treated as evidence
+      // of the legacy shape — only "A"/"B" are. A prior bug treated "tie"
+      // as slot evidence, so a genuinely-3-way bucket with no other signal
+      // wrongly fell back to a hardcoded 2-variant slice, silently dropping
+      // the third variant.
+      it("does not collapse to a hardcoded 2 variants", () => {
+        const run = createRun([
+          { evaluator: "cmp-1", status: "processed", index: 0, label: "tie", inputs: {} },
+          { evaluator: "cmp-1", status: "processed", index: 1, label: "tie", inputs: {} },
+        ]);
+
+        const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
+
+        expect(column.variants.map((v) => v.id)).not.toEqual([
+          "target-a",
+          "target-b",
+        ]);
+      });
+    });
   });
 
   describe("given a legacy pairwise run", () => {
