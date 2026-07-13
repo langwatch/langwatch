@@ -6,6 +6,7 @@
  * marker shaping) use a fake stored-objects service; only the object-store
  * byte I/O is faked, never the offload logic itself.
  */
+import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
@@ -13,36 +14,88 @@ import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
   EVAL_INPUTS_INLINE_MAX_BYTES,
   EVAL_INPUTS_PREVIEW_BYTES,
+  EVAL_INPUTS_STORED_OBJECT_PURPOSE,
   isStoredObjectMarker,
   offloadInputsIfOversized,
   resolveInputsMarker,
   STORED_OBJECT_MARKER_KEY,
 } from "../evaluation-inputs-offload";
 
+interface FakeStoredEntry {
+  bytes: Buffer;
+  purpose: string;
+}
+
 /**
- * In-memory stand-in for StoredObjectsService: records what was stored and
- * streams it back on getById. Only the byte I/O is faked.
+ * In-memory stand-in for StoredObjectsService: records what was stored (bytes
+ * and purpose) and streams it back on getById with a row carrying that
+ * purpose. Only the byte I/O is faked.
  */
 function makeFakeStoredObjects(): StoredObjectsService & {
-  stored: Map<string, Buffer>;
+  stored: Map<string, FakeStoredEntry>;
 } {
-  const stored = new Map<string, Buffer>();
+  const stored = new Map<string, FakeStoredEntry>();
   let seq = 0;
   const fake = {
     stored,
-    async storeFromBytes({ bytes }: { bytes: Buffer }) {
+    async storeFromBytes({
+      bytes,
+      purpose,
+    }: {
+      bytes: Buffer;
+      purpose: string;
+    }) {
       const id = `so-${++seq}`;
-      stored.set(id, Buffer.from(bytes));
+      stored.set(id, { bytes: Buffer.from(bytes), purpose });
       return { id, mediaType: "application/json", isDuplicate: false };
     },
     async getById({ id }: { id: string }) {
-      const bytes = stored.get(id);
-      if (!bytes) return null;
-      return { row: {} as never, stream: Readable.from([bytes]) };
+      const entry = stored.get(id);
+      if (!entry) return null;
+      return {
+        row: { purpose: entry.purpose } as never,
+        stream: Readable.from([entry.bytes]),
+      };
     },
   };
   return fake as unknown as StoredObjectsService & {
-    stored: Map<string, Buffer>;
+    stored: Map<string, FakeStoredEntry>;
+  };
+}
+
+/** Seeds the fake store with raw bytes under a purpose and returns the id. */
+function seedObject(
+  storedObjects: StoredObjectsService & {
+    stored: Map<string, FakeStoredEntry>;
+  },
+  { bytes, purpose }: { bytes: Buffer; purpose: string },
+): string {
+  const id = `seed-${storedObjects.stored.size + 1}`;
+  storedObjects.stored.set(id, { bytes, purpose });
+  return id;
+}
+
+/** Builds a resolvable marker referencing the given id/bytes. */
+function markerFor({
+  id,
+  bytes,
+  sha256,
+}: {
+  id: string;
+  bytes: Buffer;
+  sha256?: string | null;
+}) {
+  return {
+    [STORED_OBJECT_MARKER_KEY]: {
+      id,
+      sizeBytes: bytes.length,
+      sha256:
+        sha256 === undefined
+          ? createHash("sha256").update(bytes).digest("hex")
+          : sha256,
+      preview: bytes.toString("utf8").slice(0, 32),
+      truncatedPreview: true,
+    },
   };
 }
 
@@ -361,6 +414,70 @@ describe("resolveInputsMarker", () => {
 
       expect(resolved).toBe(marker);
       expect(getSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a marker resolving to an object of another purpose", () => {
+    it("returns the marker with its preview and does not surface foreign bytes", async () => {
+      const storedObjects = makeFakeStoredObjects();
+      const bytes = Buffer.from(JSON.stringify({ secret: "other-owner" }));
+      // Same project, but a trace_content object - not evaluation inputs.
+      const id = seedObject(storedObjects, {
+        bytes,
+        purpose: "trace_content",
+      });
+      // sha matches so the ONLY reason to reject is the purpose mismatch.
+      const marker = markerFor({ id, bytes });
+
+      const resolved = await resolveInputsMarker({
+        inputs: marker,
+        projectId: "proj-1",
+        storedObjects,
+      });
+
+      expect(resolved).toBe(marker);
+    });
+  });
+
+  describe("given a marker whose object bytes fail sha256 verification", () => {
+    it("returns the marker with its preview and does not surface the tampered bytes", async () => {
+      const storedObjects = makeFakeStoredObjects();
+      const bytes = Buffer.from(JSON.stringify({ input: "diverged" }));
+      const id = seedObject(storedObjects, {
+        bytes,
+        purpose: EVAL_INPUTS_STORED_OBJECT_PURPOSE,
+      });
+      // Correct purpose, but the marker's recorded hash does not match bytes.
+      const marker = markerFor({ id, bytes, sha256: "f".repeat(64) });
+
+      const resolved = await resolveInputsMarker({
+        inputs: marker,
+        projectId: "proj-1",
+        storedObjects,
+      });
+
+      expect(resolved).toBe(marker);
+    });
+  });
+
+  describe("given a well-formed marker with matching purpose and hash", () => {
+    it("resolves to the full inputs", async () => {
+      const storedObjects = makeFakeStoredObjects();
+      const inputs = { input: "hello", output: "world", n: [1, 2, 3] };
+      const bytes = Buffer.from(JSON.stringify(inputs));
+      const id = seedObject(storedObjects, {
+        bytes,
+        purpose: EVAL_INPUTS_STORED_OBJECT_PURPOSE,
+      });
+      const marker = markerFor({ id, bytes });
+
+      const resolved = await resolveInputsMarker({
+        inputs: marker,
+        projectId: "proj-1",
+        storedObjects,
+      });
+
+      expect(resolved).toEqual(inputs);
     });
   });
 });

@@ -120,6 +120,45 @@ export function isStoredObjectMarker(
   );
 }
 
+/** Reserved key carrying the compact, safe list projection of a marker. */
+export const OFFLOADED_INPUTS_PROJECTION_KEY = "_lw_offloaded" as const;
+
+/**
+ * Compact, safe projection of an offload marker for multi-trace / list reads.
+ * It exposes only the human-readable preview and whether it is truncated -
+ * never the internal storage plumbing (`id`, `sha256`, the raw marker key).
+ * List consumers cannot resolve the full inputs; they fetch those lazily
+ * through the single-evaluation seam (getEvaluationInputs) when needed.
+ */
+export interface OffloadedInputsProjection {
+  [OFFLOADED_INPUTS_PROJECTION_KEY]: {
+    /** First EVAL_INPUTS_PREVIEW_BYTES of the serialized inputs, as a string. */
+    preview: string;
+    /** True when `preview` is a prefix of longer inputs (always true here). */
+    truncated: boolean;
+    /** Byte length of the serialized inputs that were offloaded. */
+    sizeBytes: number;
+  };
+}
+
+/**
+ * Projects an offload marker to the compact, leak-free shape safe to ship on
+ * list/multi-trace read paths. Drops `id` and `sha256` so no internal storage
+ * reference ever crosses the service boundary on those paths.
+ */
+export function projectMarkerForList(
+  value: StoredObjectInputsMarker,
+): OffloadedInputsProjection {
+  const marker = value[STORED_OBJECT_MARKER_KEY];
+  return {
+    [OFFLOADED_INPUTS_PROJECTION_KEY]: {
+      preview: marker.preview,
+      truncated: marker.truncatedPreview,
+      sizeBytes: marker.sizeBytes,
+    },
+  };
+}
+
 function readByteEnv(name: string, fallback: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw.trim() === "") return fallback;
@@ -401,12 +440,41 @@ export async function resolveInputsMarker({
       );
       return inputs;
     }
+    // Integrity: the fetched row must be an evaluation-inputs object. A marker
+    // pointing (via a same-project id) at an object of another purpose is a
+    // misreference; surfacing its bytes would leak unrelated content, so fail
+    // safe to the marker/preview instead. Cross-tenant is already blocked by
+    // the project_id scoping on getById.
+    if (result.row.purpose !== EVAL_INPUTS_STORED_OBJECT_PURPOSE) {
+      logger.warn(
+        {
+          projectId,
+          storedObjectId: marker.id,
+          purpose: result.row.purpose,
+        },
+        "Offloaded evaluation inputs object has an unexpected purpose; returning marker with preview",
+      );
+      return inputs;
+    }
     // Bound the read: the object we wrote is at most the hard ceiling, so a
     // stream beyond it is a tampered/unexpected object and must not OOM.
     const buffer = await streamToBuffer(
       result.stream,
       EVAL_INPUTS_HARD_CEILING_BYTES,
     );
+    // Integrity: when the marker carries the content hash, the fetched bytes
+    // must hash to it. A mismatch means the durable object diverged from what
+    // was offloaded (overwrite, corruption); fail safe to the marker/preview.
+    if (marker.sha256) {
+      const actualSha256 = createHash("sha256").update(buffer).digest("hex");
+      if (actualSha256 !== marker.sha256) {
+        logger.warn(
+          { projectId, storedObjectId: marker.id },
+          "Offloaded evaluation inputs failed sha256 verification; returning marker with preview",
+        );
+        return inputs;
+      }
+    }
     const parsed: unknown = JSON.parse(buffer.toString("utf8"));
     if (
       typeof parsed === "object" &&

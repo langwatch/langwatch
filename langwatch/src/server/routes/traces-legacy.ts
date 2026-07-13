@@ -115,10 +115,14 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
       return c.json({ message: "Trace not found." }, 404);
     }
 
+    // Single-trace read: resolve offloaded-inputs markers (ADR-040) to the
+    // full inputs for parity with pre-offload behavior. Bounded - one trace's
+    // evaluations, each capped at the hard ceiling.
     const evaluationsMap = await traceService.getEvaluationsMultiple(
       project.id,
       [traceId],
       protections,
+      { resolveOffloadedInputs: true },
     );
     const evaluations = evaluationsMap[traceId] ?? [];
 

@@ -7,12 +7,27 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { createLogger } from "~/utils/logger/server";
 import type { StoredObject } from "./stored-object";
 import { storedObjectSchema } from "./stored-object";
 
 const TABLE_NAME = "stored_objects" as const;
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
+const logger = createLogger("langwatch:stored-objects:repository");
+
+/**
+ * OOM guards for the storage-accounting `sum(size_bytes)` scan. This query
+ * class (unbounded aggregate over a heavy column) caused two prior production
+ * OOM outages, so it mirrors the storage meter's mandated bounds: cap the read
+ * streams to keep peak memory well under the per-query limit, and a coarse
+ * execution ceiling so one pathological tenant can't grind for a minute. A
+ * read that trips either bound is degraded to zero by the caller.
+ */
+const SUM_SIZE_BYTES_CLICKHOUSE_SETTINGS = {
+  max_threads: 2,
+  max_execution_time: 45,
+} as const;
 
 /**
  * ClickHouse repository for stored_objects rows.
@@ -290,39 +305,52 @@ export class StoredObjectsRepository {
           ? "AND purpose = {purpose:String}"
           : "";
 
-        const result = await client.query({
-          query: `
-            SELECT
-              sum(t.size_bytes) AS total_bytes,
-              count()           AS object_count
-            FROM ${TABLE_NAME} AS t
-            WHERE t.project_id = {projectId:String}
-              ${purposePredicate}
-              AND (t.project_id, t.id, t.inserted_at) IN (
-                SELECT project_id, id, max(inserted_at)
-                FROM ${TABLE_NAME}
-                WHERE project_id = {projectId:String}
-                  ${innerPurposePredicate}
-                GROUP BY project_id, id
-              )
-          `,
-          query_params: purpose
-            ? { projectId, purpose }
-            : { projectId },
-          format: "JSONEachRow",
-        });
+        // Degrade-to-0 on any failure (memory/time bound tripped, ClickHouse
+        // unavailable): a storage-usage display must never 500. NOTE: the
+        // degraded 0 is display-safe only - it UNDER-reports, so it must never
+        // feed billing/metered usage (ADR-027 billing hazard).
+        try {
+          const result = await client.query({
+            query: `
+              SELECT
+                sum(t.size_bytes) AS total_bytes,
+                count()           AS object_count
+              FROM ${TABLE_NAME} AS t
+              WHERE t.project_id = {projectId:String}
+                ${purposePredicate}
+                AND (t.project_id, t.id, t.inserted_at) IN (
+                  SELECT project_id, id, max(inserted_at)
+                  FROM ${TABLE_NAME}
+                  WHERE project_id = {projectId:String}
+                    ${innerPurposePredicate}
+                  GROUP BY project_id, id
+                )
+            `,
+            query_params: purpose ? { projectId, purpose } : { projectId },
+            format: "JSONEachRow",
+            clickhouse_settings: SUM_SIZE_BYTES_CLICKHOUSE_SETTINGS,
+          });
 
-        const rows = await result.json<{
-          total_bytes: string | number | null;
-          object_count: string | number | null;
-        }>();
-        const raw = rows[0];
-        const totalBytes = raw?.total_bytes != null ? Number(raw.total_bytes) : 0;
-        const objectCount =
-          raw?.object_count != null ? Number(raw.object_count) : 0;
-        span.setAttribute("stored_objects.total_bytes", totalBytes);
-        span.setAttribute("stored_objects.object_count", objectCount);
-        return { totalBytes, objectCount };
+          const rows = await result.json<{
+            total_bytes: string | number | null;
+            object_count: string | number | null;
+          }>();
+          const raw = rows[0];
+          const totalBytes =
+            raw?.total_bytes != null ? Number(raw.total_bytes) : 0;
+          const objectCount =
+            raw?.object_count != null ? Number(raw.object_count) : 0;
+          span.setAttribute("stored_objects.total_bytes", totalBytes);
+          span.setAttribute("stored_objects.object_count", objectCount);
+          return { totalBytes, objectCount };
+        } catch (error) {
+          logger.warn(
+            { projectId, ...(purpose ? { purpose } : {}), error },
+            "Stored-objects size sum failed; degrading to 0 (display-safe, not for billing)",
+          );
+          span.setAttribute("stored_objects.degraded", true);
+          return { totalBytes: 0, objectCount: 0 };
+        }
       },
     );
   }

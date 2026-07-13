@@ -157,4 +157,44 @@ describe("StoredObjectsRepository", () => {
       });
     });
   });
+
+  describe("sumSizeBytesByProject", () => {
+    describe("when the aggregate succeeds", () => {
+      it("returns the summed bytes and count with the mandated OOM guards", async () => {
+        mockQueryResult.json.mockResolvedValue([
+          { total_bytes: "4096", object_count: "3" },
+        ]);
+
+        const result = await repo.sumSizeBytesByProject({
+          projectId: "proj-1",
+        });
+
+        expect(result).toEqual({ totalBytes: 4096, objectCount: 3 });
+        const call = mockQuery.mock.calls[0]![0];
+        // Tenant-scoped and bounded: the OOM guards must ride on the query.
+        expect(call.query_params).toMatchObject({ projectId: "proj-1" });
+        expect(call.query).toContain("project_id");
+        expect(call.clickhouse_settings).toEqual({
+          max_threads: 2,
+          max_execution_time: 45,
+        });
+      });
+    });
+
+    describe("when the query fails (memory/time bound tripped or CH down)", () => {
+      it("degrades to zero instead of throwing", async () => {
+        mockQuery.mockRejectedValueOnce(
+          new Error(
+            "Memory limit (for query) exceeded: would use 6.60 GiB, maximum: 3.50 GiB",
+          ),
+        );
+
+        const result = await repo.sumSizeBytesByProject({
+          projectId: "proj-1",
+        });
+
+        expect(result).toEqual({ totalBytes: 0, objectCount: 0 });
+      });
+    });
+  });
 });
