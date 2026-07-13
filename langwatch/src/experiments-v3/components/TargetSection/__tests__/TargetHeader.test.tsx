@@ -676,7 +676,7 @@ describe("TargetHeader", () => {
       useEvaluationsV3Store.getState().reset?.();
     });
 
-    /** @scenario Clicking a variant name highlights its source column */
+    /** @scenario Clicking the winner highlights its source column */
     it("glows the header when this target is the highlighted variant", () => {
       useEvaluationsV3Store.setState({
         ui: {
