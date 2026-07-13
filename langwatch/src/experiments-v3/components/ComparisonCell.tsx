@@ -3,6 +3,7 @@ import { Box, HStack, Icon, Popover, Text, VStack } from "@chakra-ui/react";
 import { CircleAlert, Equal, Trophy } from "lucide-react";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { scrollToTargetColumn } from "../hooks/useOpenTargetEditor";
 import { useTargetName } from "../hooks/useTargetName";
 import type { TargetConfig } from "../types";
 import {
@@ -172,10 +173,16 @@ export function ComparisonCell({
     (state) => state.setHighlightedVariantTargetId,
   );
   const toggleHighlight = (targetId: string, outcome: "won" | "lost") => {
+    const isTurningOn = highlightedVariantTargetId !== targetId;
     setHighlightedVariantTargetId(
-      highlightedVariantTargetId === targetId ? undefined : targetId,
+      isTurningOn ? targetId : undefined,
       outcome,
     );
+    // Scroll the winner's column into view — it's often off-screen to the
+    // right of the Comparison column, so the highlight alone is invisible.
+    if (isTurningOn) {
+      scrollToTargetColumn(targetId);
+    }
   };
 
   if (isLoading || parsed.status === "running") {
