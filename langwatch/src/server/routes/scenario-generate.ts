@@ -6,7 +6,7 @@
  * Uses the Vercel AI SDK to generate a structured scenario object
  * (name, situation, criteria) from a user prompt.
  */
-import { generateObject } from "ai";
+import { generateObject, RetryError } from "ai";
 import { z } from "zod";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/api/rbac";
@@ -89,7 +89,32 @@ When refining an existing scenario, incorporate the user's feedback while preser
 // does NOT make a broken gateway succeed (that's #5762) — it guarantees the
 // endpoint always returns a fast, clean JSON envelope regardless of provider.
 const SCENARIO_GENERATE_MAX_RETRIES = 1;
-const SCENARIO_GENERATE_TIMEOUT_MS = 30_000;
+const SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS = 30_000;
+
+// Read at call time (not module load) so ops can tune the cap without a deploy
+// and the regression test can drive a real, fast abort against a hanging
+// gateway — see scenario-generate.unit.test.ts. A non-positive/NaN override
+// falls back to the default.
+function scenarioGenerateTimeoutMs(): number {
+  const override = Number(process.env.SCENARIO_GENERATE_TIMEOUT_MS);
+  return Number.isFinite(override) && override > 0
+    ? override
+    : SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS;
+}
+
+/**
+ * True when `error` is (or wraps) an abort — the AbortSignal.timeout cap firing.
+ * `AbortSignal.timeout().reason` is a `DOMException` (name "TimeoutError"), which
+ * is NOT `instanceof Error` in this runtime, so match on the `name` property
+ * directly. The AI SDK re-throws aborts unwrapped, but unwrap an exhausted-retry
+ * `RetryError` too so a wrapped abort still maps to the clean 504.
+ */
+function isAbortLikeError(error: unknown): boolean {
+  const root =
+    RetryError.isInstance(error) && error.lastError ? error.lastError : error;
+  const name = (root as { name?: unknown } | null | undefined)?.name;
+  return name === "TimeoutError" || name === "AbortError";
+}
 
 const secured = createServiceApp({ basePath: "/api/scenario" });
 
@@ -139,7 +164,7 @@ secured.access(
       system: SYSTEM_PROMPT,
       prompt: userPrompt,
       maxRetries: SCENARIO_GENERATE_MAX_RETRIES,
-      abortSignal: AbortSignal.timeout(SCENARIO_GENERATE_TIMEOUT_MS),
+      abortSignal: AbortSignal.timeout(scenarioGenerateTimeoutMs()),
     });
 
     return c.json({ scenario: result.object });
@@ -162,10 +187,7 @@ secured.access(
     // The abort cap fired (slow/hung gateway). Answer with a clean, fast
     // JSON envelope instead of leaving the request open for an upstream
     // proxy to fill with an html timeout page (langwatch#5758).
-    if (
-      error instanceof Error &&
-      (error.name === "TimeoutError" || error.name === "AbortError")
-    ) {
+    if (isAbortLikeError(error)) {
       logger.warn({ error }, "Scenario generation timed out");
       return c.json(
         {

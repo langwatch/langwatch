@@ -15,7 +15,7 @@
  */
 import { APICallError } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetServerAuthSession = vi.fn();
 vi.mock("~/server/auth", async (importOriginal) => ({
@@ -74,6 +74,10 @@ describe("POST /api/scenario/generate — gateway-failure resilience (#5758)", (
     mockHasProjectPermission.mockResolvedValue(true);
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   describe("given the gateway keeps returning a retryable 502", () => {
     it("bounds the dispatch to 2 attempts, not the SDK default of 3", async () => {
       let attempts = 0;
@@ -94,7 +98,7 @@ describe("POST /api/scenario/generate — gateway-failure resilience (#5758)", (
       expect(attempts).toBe(2);
     });
 
-    it("answers with a JSON envelope, never a thrown/htmlerror", async () => {
+    it("answers with a JSON envelope, not a thrown error or HTML", async () => {
       mockGetVercelAIModel.mockResolvedValue(
         new MockLanguageModelV3({
           doGenerate: async () => {
@@ -112,20 +116,34 @@ describe("POST /api/scenario/generate — gateway-failure resilience (#5758)", (
     });
   });
 
-  describe("given the gateway hangs and the abort cap fires", () => {
-    it("maps the timeout to a fast 504 JSON message instead of stranding the request", async () => {
+  describe("given the gateway hangs past the abort cap", () => {
+    it("aborts via a real AbortSignal.timeout and returns a fast 504 JSON message", async () => {
+      // Drive a real, short abort cap (not the 30s default) against a gateway
+      // that honours the AbortSignal the SDK forwards but never resolves on
+      // its own — the shape of a genuinely hung upstream.
+      vi.stubEnv("SCENARIO_GENERATE_TIMEOUT_MS", "80");
       mockGetVercelAIModel.mockResolvedValue(
         new MockLanguageModelV3({
-          doGenerate: async () => {
-            throw Object.assign(new Error("The operation timed out."), {
-              name: "TimeoutError",
-            });
-          },
+          doGenerate: ({ abortSignal }) =>
+            new Promise((_resolve, reject) => {
+              if (abortSignal?.aborted) {
+                reject(abortSignal.reason);
+                return;
+              }
+              abortSignal?.addEventListener("abort", () =>
+                reject(abortSignal.reason),
+              );
+            }),
         }),
       );
 
       const res = await post(validBody);
 
+      // Falsifiable at the REAL seam: delete the handler's `abortSignal` and
+      // this doGenerate never rejects — the request hangs and the test times
+      // out. So this pins the EXISTENCE of the cap, not just an error-name ->
+      // 504 mapping. It also proves a real AbortSignal.timeout reaches the
+      // handler as a catchable abort (the TimeoutError name survives the SDK).
       expect(res.status).toBe(504);
       expect(res.headers.get("content-type")).toContain("application/json");
       const payload = (await res.json()) as { error?: string };
