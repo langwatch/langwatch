@@ -174,12 +174,27 @@ function setupGetAllWithSpansMocks() {
     .mockResolvedValueOnce({ json: () => Promise.resolve([]) });
 }
 
-/** Mocks the getTracesByThreadId query sequence (DISTINCT TraceId, then joined). */
+/**
+ * Mocks the getTracesByThreadId query sequence: DISTINCT TraceId, the hint-less
+ * OccurredAt-range resolve, then the joined summary + spans reads.
+ *
+ * The thread path knows only trace ids, so it passes no `occurredAt` hint and
+ * fetchTracesWithSpansJoined resolves the partition window itself first (#5231).
+ * That is a real query and consumes a mock — omit it and every later mock shifts
+ * by one, so the spans read silently gets the summary's rows.
+ */
 function setupThreadMocks() {
   mockClickHouseQuery
     // SELECT DISTINCT TraceId (JSONEachRow → result.json())
     .mockResolvedValueOnce({
       json: () => Promise.resolve([{ TraceId: TRACE_ID }]),
+    })
+    // resolveOccurredAtRange: min/max OccurredAt for partition pruning (#5231)
+    .mockResolvedValueOnce({
+      json: () =>
+        Promise.resolve([
+          { fromMs: 1_700_000_000_000, toMs: 1_700_000_100_000 },
+        ]),
     })
     // fetchTracesWithSpansJoined: summary, spans
     .mockResolvedValueOnce({
