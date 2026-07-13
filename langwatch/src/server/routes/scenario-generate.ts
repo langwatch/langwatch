@@ -75,6 +75,22 @@ Given a description of an agent and desired scenario, generate:
 
 When refining an existing scenario, incorporate the user's feedback while preserving the overall structure and any parts they haven't asked to change.`;
 
+// Bound the LLM dispatch so a failing or slow gateway can't hold the request
+// open long enough for a front reverse-proxy / ingress / CDN to give up and
+// return its OWN html error page — which the browser then tries to JSON.parse,
+// yielding the customer's `Unexpected token '<', "<!DOCTYPE "...` (langwatch#5758).
+// The generate call routes through the same nlp-service /go/proxy path as the
+// scenario User-Simulator, so when that gateway is misconfigured (e.g. the
+// Azure "endpoint not set" bug fixed server-side by #5762) an UNBOUNDED call
+// retried 3× (the AI SDK default) and burned ~6s per attempt-set before the
+// app answered — plenty of time for an upstream proxy to substitute html.
+// `maxRetries: 1` matches the sibling generateObject caller (ai-query.ts); the
+// abort cap mirrors the gateway-call timeout in trace-api-span-query.ts. This
+// does NOT make a broken gateway succeed (that's #5762) — it guarantees the
+// endpoint always returns a fast, clean JSON envelope regardless of provider.
+const SCENARIO_GENERATE_MAX_RETRIES = 1;
+const SCENARIO_GENERATE_TIMEOUT_MS = 30_000;
+
 const secured = createServiceApp({ basePath: "/api/scenario" });
 
 secured.access(
@@ -122,6 +138,8 @@ secured.access(
       schema: scenarioSchema,
       system: SYSTEM_PROMPT,
       prompt: userPrompt,
+      maxRetries: SCENARIO_GENERATE_MAX_RETRIES,
+      abortSignal: AbortSignal.timeout(SCENARIO_GENERATE_TIMEOUT_MS),
     });
 
     return c.json({ scenario: result.object });
@@ -138,6 +156,23 @@ secured.access(
       return c.json(
         { error: handled.message, domainError: handled.serialize() },
         { status: handled.httpStatus as 400 },
+      );
+    }
+
+    // The abort cap fired (slow/hung gateway). Answer with a clean, fast
+    // JSON envelope instead of leaving the request open for an upstream
+    // proxy to fill with an html timeout page (langwatch#5758).
+    if (
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError")
+    ) {
+      logger.warn({ error }, "Scenario generation timed out");
+      return c.json(
+        {
+          error:
+            "Scenario generation took too long and was stopped. This is usually temporary — please try again in a moment.",
+        },
+        { status: 504 },
       );
     }
 
