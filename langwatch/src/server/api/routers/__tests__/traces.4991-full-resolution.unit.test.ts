@@ -230,6 +230,9 @@ describe("traces router — #4991 AC2 public-share thread read", () => {
     { trace_id: "t3", timestamps: { started_at: 300 } },
   ];
 
+  /** Stands in for a de-offloaded value — anything the 64 KB preview is not. */
+  const FULL_VALUE = "the full, de-offloaded conversation value";
+
   let publicCaller: ReturnType<typeof tracesRouter.createCaller>;
   let mockFindMany: ReturnType<typeof vi.fn>;
 
@@ -248,6 +251,19 @@ describe("traces router — #4991 AC2 public-share thread read", () => {
     return tracesRouter.createCaller(ctx);
   }
 
+  /** Reads thread-1 as the anonymous public-share caller. */
+  function readThreadAsPublicCaller({
+    traceId = "t2",
+  }: {
+    traceId?: string;
+  } = {}) {
+    return publicCaller.getTracesByThreadId({
+      projectId: "project_123",
+      threadId: "thread-1",
+      traceId,
+    });
+  }
+
   beforeEach(() => {
     mockFindMany = vi.fn();
     mockGetTracesByThreadId.mockResolvedValue(previewTraces);
@@ -258,64 +274,67 @@ describe("traces router — #4991 AC2 public-share thread read", () => {
     beforeEach(() => {
       // Only t2 is shared; t1 and t3 are private siblings in the same thread.
       mockFindMany.mockResolvedValue([{ resourceId: "t2" }]);
+      // The resolved value is distinguishable from the preview, so a test that
+      // claims to return "fully-resolved" traces can actually tell them apart.
       mockGetTracesWithSpans.mockResolvedValue([
-        { trace_id: "t2", timestamps: { started_at: 200 } },
+        {
+          trace_id: "t2",
+          timestamps: { started_at: 200 },
+          output: { value: FULL_VALUE },
+        },
       ]);
     });
 
-    it("reads the thread PREVIEW-only, never resolving blobs pre-authorization", async () => {
-      await publicCaller.getTracesByThreadId({
-        projectId: "project_123",
-        threadId: "thread-1",
-        traceId: "t2",
+    describe("when the public caller reads the thread", () => {
+      it("reads the thread PREVIEW-only, never resolving blobs pre-authorization", async () => {
+        await readThreadAsPublicCaller();
+
+        expect(mockGetTracesByThreadId).toHaveBeenCalledWith(
+          "project_123",
+          "thread-1",
+          expect.any(Object),
+          { full: false },
+        );
+        expect(mockGetTracesByThreadId).not.toHaveBeenCalledWith(
+          "project_123",
+          "thread-1",
+          expect.any(Object),
+          { full: true },
+        );
       });
 
-      expect(mockGetTracesByThreadId).toHaveBeenCalledWith(
-        "project_123",
-        "thread-1",
-        expect.any(Object),
-        { full: false },
-      );
-      expect(mockGetTracesByThreadId).not.toHaveBeenCalledWith(
-        "project_123",
-        "thread-1",
-        expect.any(Object),
-        { full: true },
-      );
-    });
+      it("resolves full IO for ONLY the authorized trace ids", async () => {
+        await readThreadAsPublicCaller();
 
-    it("resolves full IO for ONLY the authorized trace ids", async () => {
-      await publicCaller.getTracesByThreadId({
-        projectId: "project_123",
-        threadId: "thread-1",
-        traceId: "t2",
+        // Not ["t1","t2","t3"] — the unauthorized siblings are never de-offloaded.
+        expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
+          "project_123",
+          ["t2"],
+          expect.any(Object),
+          undefined,
+          { full: true },
+        );
+        // …and that is the ONLY resolution call. toHaveBeenCalledWith alone would
+        // still pass if a second call leaked the unauthorized siblings through.
+        expect(mockGetTracesWithSpans).toHaveBeenCalledTimes(1);
       });
 
-      // Not ["t1","t2","t3"] — the unauthorized siblings are never de-offloaded.
-      expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
-        "project_123",
-        ["t2"],
-        expect.any(Object),
-        undefined,
-        { full: true },
-      );
-    });
+      it("returns the FULL value, not the preview", async () => {
+        const result = await readThreadAsPublicCaller();
 
-    it("returns the fully-resolved authorized traces", async () => {
-      const result = await publicCaller.getTracesByThreadId({
-        projectId: "project_123",
-        threadId: "thread-1",
-        traceId: "t2",
+        expect(result.map((t: { trace_id: string }) => t.trace_id)).toEqual([
+          "t2",
+        ]);
+        expect(
+          result.map((t: { output?: { value?: string } }) => t.output?.value),
+        ).toEqual([FULL_VALUE]);
       });
-
-      expect(result.map((t: { trace_id: string }) => t.trace_id)).toEqual([
-        "t2",
-      ]);
     });
   });
 
   describe("given several traces in the thread are publicly shared", () => {
     beforeEach(() => {
+      // t1 and t3 shared; t2 sits BETWEEN them and is not.
       mockFindMany.mockResolvedValue([
         { resourceId: "t1" },
         { resourceId: "t3" },
@@ -329,17 +348,32 @@ describe("traces router — #4991 AC2 public-share thread read", () => {
       ]);
     });
 
-    it("returns them in the thread's order, not the bulk read's order", async () => {
-      const result = await publicCaller.getTracesByThreadId({
-        projectId: "project_123",
-        threadId: "thread-1",
-        traceId: "t1",
+    describe("when the public caller reads the thread", () => {
+      // The load-bearing exclusion case: a partial-authorization regression that
+      // resolved ["t1","t2","t3"] would still return the right traces (the mock's
+      // return value doesn't depend on its args), so ONLY an assertion on the
+      // call args can catch the unauthorized sibling being de-offloaded.
+      it("excludes the unauthorized sibling from the resolution call", async () => {
+        await readThreadAsPublicCaller({ traceId: "t1" });
+
+        expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
+          "project_123",
+          ["t1", "t3"],
+          expect.any(Object),
+          undefined,
+          { full: true },
+        );
+        expect(mockGetTracesWithSpans).toHaveBeenCalledTimes(1);
       });
 
-      expect(result.map((t: { trace_id: string }) => t.trace_id)).toEqual([
-        "t1",
-        "t3",
-      ]);
+      it("returns them in the thread's order, not the bulk read's order", async () => {
+        const result = await readThreadAsPublicCaller({ traceId: "t1" });
+
+        expect(result.map((t: { trace_id: string }) => t.trace_id)).toEqual([
+          "t1",
+          "t3",
+        ]);
+      });
     });
   });
 
@@ -348,15 +382,21 @@ describe("traces router — #4991 AC2 public-share thread read", () => {
       mockFindMany.mockResolvedValue([]);
     });
 
-    it("returns empty and issues zero blob resolution", async () => {
-      const result = await publicCaller.getTracesByThreadId({
-        projectId: "project_123",
-        threadId: "thread-1",
-        traceId: "t2",
-      });
+    describe("when the public caller reads the thread", () => {
+      it("returns empty and issues zero blob resolution", async () => {
+        const result = await readThreadAsPublicCaller();
 
-      expect(result).toEqual([]);
-      expect(mockGetTracesWithSpans).not.toHaveBeenCalled();
+        expect(result).toEqual([]);
+        expect(mockGetTracesWithSpans).not.toHaveBeenCalled();
+        // Still preview-only on the way in — the thread was never de-offloaded
+        // just to discover nothing in it was shared.
+        expect(mockGetTracesByThreadId).toHaveBeenCalledWith(
+          "project_123",
+          "thread-1",
+          expect.any(Object),
+          { full: false },
+        );
+      });
     });
   });
 });
