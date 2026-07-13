@@ -1903,10 +1903,19 @@ export function EvaluationsV3Table({
                         columnType,
                         isFixedWidth,
                       ),
-                      ...(isHighlightedColumn && {
-                        boxShadow: `inset 0 0 0 2px var(--chakra-colors-${highlightColor}-400)`,
-                        background: `var(--chakra-colors-${highlightColor}-subtle)`,
-                      }),
+                      // Always present (not conditionally spread) so the
+                      // browser has a "from" and "to" value to interpolate —
+                      // the highlight is a brief auto-clearing flash (see
+                      // HIGHLIGHT_VARIANT_DURATION_MS), so it needs to fade
+                      // out smoothly rather than snapping off.
+                      transition:
+                        "box-shadow 300ms ease, background-color 300ms ease",
+                      boxShadow: isHighlightedColumn
+                        ? `inset 0 0 0 2px var(--chakra-colors-${highlightColor}-400)`
+                        : "inset 0 0 0 0 transparent",
+                      background: isHighlightedColumn
+                        ? `var(--chakra-colors-${highlightColor}-subtle)`
+                        : "transparent",
                     }}
                     // Add data attribute for target columns to enable scroll-to behavior
                     {...(targetId && { "data-target-column": targetId })}

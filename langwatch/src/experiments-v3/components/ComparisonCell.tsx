@@ -1,4 +1,5 @@
 import type { MouseEvent } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Box, HStack, Icon, Popover, Text, VStack } from "@chakra-ui/react";
 import { CircleAlert, Equal, Trophy } from "lucide-react";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
@@ -10,6 +11,20 @@ import {
   labelNamesVariant,
   resolveVerdictLabel,
 } from "../utils/normalizeComparison";
+
+/** Grace period before a hover-out clears the highlight, so moving the
+ * pointer from one winner name straight to another doesn't flicker off
+ * in between — same pattern as FieldInfoTooltip's hover handling. */
+const HOVER_CLEAR_DELAY_MS = 150;
+
+/**
+ * Auto-dismiss delay for a CLICK-triggered highlight only. Click is the
+ * touch/no-hover fallback, which has no "leave" event to clear it, so it
+ * gets a deliberate "look here" flash instead of sticking forever. Hovering
+ * never uses this — it clears via HOVER_CLEAR_DELAY_MS on leave instead, so
+ * genuinely holding the pointer there for longer than this isn't cut off.
+ */
+const CLICK_HIGHLIGHT_DURATION_MS = 2000;
 
 type ComparisonCellProps = {
   result: unknown;
@@ -118,12 +133,16 @@ function WinnerLabel({
   target,
   fallback,
   label,
-  onPick,
+  onHoverStart,
+  onHoverEnd,
+  onClickPreview,
 }: {
   target: TargetConfig | undefined;
   fallback: string;
   label: string | undefined;
-  onPick: (targetId: string) => void;
+  onHoverStart: (targetId: string) => void;
+  onHoverEnd: (targetId: string) => void;
+  onClickPreview: (targetId: string) => void;
 }) {
   const resolved = useTargetName(target ?? (PLACEHOLDER_TARGET as TargetConfig));
   const isWinner =
@@ -140,9 +159,13 @@ function WinnerLabel({
       color="green.fg"
       cursor="pointer"
       _hover={{ textDecoration: "underline" }}
+      onMouseEnter={() => onHoverStart(target.id)}
+      onMouseLeave={() => onHoverEnd(target.id)}
+      // Click still previews the column too — hover has no equivalent on
+      // touch, so this keeps the feature reachable there.
       onClick={(e: MouseEvent) => {
         e.stopPropagation();
-        onPick(target.id);
+        onClickPreview(target.id);
       }}
       onDoubleClick={(e: MouseEvent) => e.stopPropagation()}
       data-testid="comparison-winner"
@@ -166,23 +189,52 @@ export function ComparisonCell({
 }: ComparisonCellProps) {
   const parsed = parseEvaluationResult(result);
 
-  const highlightedVariantTargetId = useEvaluationsV3Store(
-    (state) => state.ui.highlightedVariantTargetId,
-  );
   const setHighlightedVariantTargetId = useEvaluationsV3Store(
     (state) => state.setHighlightedVariantTargetId,
   );
-  const toggleHighlight = (targetId: string, outcome: "won" | "lost") => {
-    const isTurningOn = highlightedVariantTargetId !== targetId;
-    setHighlightedVariantTargetId(
-      isTurningOn ? targetId : undefined,
-      outcome,
-    );
-    // Scroll the winner's column into view — it's often off-screen to the
-    // right of the Comparison column, so the highlight alone is invisible.
-    if (isTurningOn) {
-      scrollToTargetColumn(targetId);
-    }
+  const hoverClearTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const cancelHoverClear = useCallback(() => {
+    if (hoverClearTimer.current) clearTimeout(hoverClearTimer.current);
+    hoverClearTimer.current = undefined;
+  }, []);
+  // A pending clear would fire after unmount and set state on a dead component.
+  useEffect(() => cancelHoverClear, [cancelHoverClear]);
+
+  // Hovering a winner name previews its column: highlights it and scrolls
+  // it into view (it's often off-screen to the right of the Comparison
+  // column). Moving the pointer straight to another winner swaps which
+  // column is previewed with no flicker in between; leaving clears it —
+  // no click needed to dismiss.
+  const highlightVariant = (targetId: string) => {
+    cancelHoverClear();
+    setHighlightedVariantTargetId(targetId, "won");
+    scrollToTargetColumn(targetId);
+  };
+  const clearHighlightSoon = (
+    targetId: string,
+    delayMs: number = HOVER_CLEAR_DELAY_MS,
+  ) => {
+    cancelHoverClear();
+    hoverClearTimer.current = setTimeout(() => {
+      // Only clear if this variant is still the one highlighted — the
+      // pointer may have already moved to a different winner by now.
+      const current =
+        useEvaluationsV3Store.getState().ui.highlightedVariantTargetId;
+      if (current === targetId) {
+        setHighlightedVariantTargetId(undefined);
+      }
+    }, delayMs);
+  };
+  // Click has no "leave" event to clear it (the touch/no-hover fallback),
+  // so it schedules its own longer auto-dismiss instead of lingering
+  // forever. A real hover-enter right after still cancels this via
+  // cancelHoverClear() in highlightVariant, same as it cancels a pending
+  // hover-leave.
+  const highlightVariantFromClick = (targetId: string) => {
+    highlightVariant(targetId);
+    clearHighlightSoon(targetId, CLICK_HIGHLIGHT_DURATION_MS);
   };
 
   if (isLoading || parsed.status === "running") {
@@ -314,7 +366,9 @@ export function ComparisonCell({
             target={t}
             fallback={t?.id ?? `Candidate ${i + 1}`}
             label={label}
-            onPick={(targetId) => toggleHighlight(targetId, "won")}
+            onHoverStart={highlightVariant}
+            onHoverEnd={clearHighlightSoon}
+            onClickPreview={highlightVariantFromClick}
           />
         ))}
       </HStack>
