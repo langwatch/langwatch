@@ -436,6 +436,14 @@ Feature: Externalize event byte content to stored_objects
     Then the run conversation keeps the user turn with its document attachment
     And the document stays available under its original filename
 
+  @integration
+  Scenario: A document attachment renders as a labeled chip that opens the file in a new tab
+    Given a run conversation carrying a stored document attachment named "document.pdf"
+    When the conversation renders
+    Then the attachment shows a file icon and its filename
+    And activating it opens the stored document in a new browser tab
+    And downloading from the opened document keeps the original filename
+
   @unit
   Scenario: Documented image and file attachment shapes validate on the wire
     Given message content carrying an AI-SDK image part with inline image data
@@ -774,6 +782,7 @@ Feature: Externalize event byte content to stored_objects
   #                                                                          -> Scenario: S3 client falls back to default chain when credentials are partial — prevents misleading 'empty string credentials' bug
   # AC41 "Documented image/file attachment shapes accepted and externalized" -> Scenario: A simulated user message with an image attachment shows the image in the run conversation
   #                                                                          -> Scenario: A simulated user message with a document attachment stays available under its original filename
+  #                                                                          -> Scenario: A document attachment renders as a labeled chip that opens the file in a new tab
   #                                                                          -> Scenario: Documented image and file attachment shapes validate on the wire
   #                                                                          -> Scenario: AI-SDK file parts with a document mediaType validate on the wire
   #                                                                          -> Scenario: AI-SDK image parts with http(s) URLs validate and pass through unchanged

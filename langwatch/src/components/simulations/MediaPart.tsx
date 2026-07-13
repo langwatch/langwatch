@@ -7,8 +7,11 @@
  *  - Missing: when the URL returns a 404/missing status, renders a placeholder badge.
  *
  * Uses native HTML5 <audio>, <img>, <video> — no third-party player library.
+ * Non-media binary parts (documents) render as an attachment chip that opens
+ * the stored file in a new tab.
  */
-import { Badge, Box, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Icon, Text, VStack } from "@chakra-ui/react";
+import { ExternalLink, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "~/utils/api";
 import type { AudioPlaybackProps } from "./useSequentialAudioPlayback";
@@ -99,11 +102,7 @@ interface MediaPartProps {
  * Renders a single AG-UI media content part as a native HTML5 media element,
  * a data: URI, or a missing-badge placeholder.
  */
-export function MediaPart({
-  part,
-  projectId,
-  audioPlayback,
-}: MediaPartProps) {
+export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   // Resolve src and category from the part shape
   let src: string;
   let mimeType: string | undefined;
@@ -135,7 +134,9 @@ export function MediaPart({
     !src.startsWith("data:") &&
     (part.type === "binary" ? !!part.url : part.source.type === "url");
 
-  const [status, setStatus] = useState<LoadStatus>(isUrlBased ? "loading" : "ok");
+  const [status, setStatus] = useState<LoadStatus>(
+    isUrlBased ? "loading" : "ok",
+  );
 
   // Probe at most once per <src>: a single failed audio/video element can fire
   // `error` repeatedly while the browser retries decoders, and a long scenario
@@ -298,11 +299,62 @@ export function MediaPart({
     );
   }
 
-  // binary fallback — link to download
+  // binary fallback — attachment chip. Stored-object URLs open in a new tab
+  // (the /api/files read route serves Content-Disposition: inline, so PDFs
+  // render in the browser's viewer); legacy inline base64 falls back to a
+  // download, since browsers block top-frame navigation to data: URIs.
+  // Stored objects are content-addressed and carry no filename of their own,
+  // so pass the message-level one along — downloads from the opened viewer
+  // then keep the original name instead of the object id.
+  const filename = part.type === "binary" ? part.filename : undefined;
+  const chipHref =
+    isUrlBased && filename && extractStoredObjectId(src)
+      ? `${src}?filename=${encodeURIComponent(filename)}`
+      : src;
+  const documentLike =
+    mimeType === "application/pdf" || (mimeType?.startsWith("text/") ?? false);
   return (
-    <Box data-testid="media-part-binary">
-      <a href={src} download={part.type === "binary" ? part.filename : undefined}>
-        {part.type === "binary" && part.filename ? part.filename : mimeType ?? "file"}
+    <Box asChild data-testid="media-part-binary">
+      <a
+        href={chipHref}
+        {...(isUrlBased
+          ? { target: "_blank", rel: "noopener noreferrer" }
+          : { download: filename ?? "" })}
+        aria-label={
+          isUrlBased
+            ? `Open ${filename ?? "attachment"} in a new tab`
+            : `Download ${filename ?? "attachment"}`
+        }
+      >
+        <Box
+          display="inline-flex"
+          alignItems="center"
+          gap={2}
+          paddingX={3}
+          paddingY={2}
+          borderRadius="md"
+          bg="bg.subtle"
+          border="1px solid"
+          borderColor="border"
+          _hover={{ bg: "bg.muted" }}
+        >
+          <Icon
+            as={documentLike ? FileText : File}
+            boxSize={4}
+            color="fg.muted"
+          />
+          <Text fontSize="sm" fontWeight="medium">
+            {filename ?? mimeType ?? "file"}
+          </Text>
+          {isUrlBased && (
+            <Icon
+              as={ExternalLink}
+              boxSize={3}
+              color="fg.subtle"
+              data-testid="media-part-binary-open"
+            />
+          )}
+        </Box>
       </a>
     </Box>
   );
