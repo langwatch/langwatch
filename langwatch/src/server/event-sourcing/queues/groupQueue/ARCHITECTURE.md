@@ -239,10 +239,18 @@ The queue is built so a transient infrastructure failure never drops a job, and 
 - **Missing blob** (offloaded body genuinely gone — TTL backstop kicked in, or a manual purge) → decode returns null, the dispatcher logs and completes the slot. The work is expected to recover via event replay.
 - **Transient blob-store error** (network blip, 5xx) → classified `TransientBlobStoreError`, the job is re-staged with the SAME envelope (no re-encode, no holder churn). Distinguished from `Missing` so a transient store outage can't mass-drop every in-flight offloaded job.
 - **Decode tenant mismatch** → refuse to fetch, log tenant-attributed, drop to fail-safe.
-- **Oversized blob** (object exceeds the read cap mid-stream) → treated as missing → fail-safe.
+- **Oversized value** (staged value or decompressed blob exceeds `MAX_BLOB_BYTES` at decode) → parked unparsed via the poison guard below.
 - **Holder Lua failure** → log + rely on the TTL backstop.
 
 The fail-safe always prefers "complete the slot and let replay handle it" over "stall the queue" — event sourcing's append-only event log is the durable source of truth.
+
+### Poison guard (claim-side)
+
+Job-level retry accounting assumes the process survives the job. A payload that seizes the event loop breaks that assumption: the liveness probe kills the process before any catch/retry runs, the group's job is redelivered on the next boot, and the crash loop repeats fleet-wide. The guard closes that gap at claim time (`specs/event-sourcing/poison-group-park-guard.feature`):
+
+- **Claim strikes** - `processWithRetries` records a per-group strike in Redis (`{queue}:gq:group:{groupId}:strikes`, 1h TTL) before decoding and clears it in a `finally` on every surviving path. Only a job that kills the process leaves a strike behind. Once strikes exceed `LANGWATCH_GQ_POISON_STRIKE_THRESHOLD` (default 3, `0` disables), the claim parks the group into the blocked set with a stored explanation instead of running the killer again.
+- **Decode cap** - staged values whose serialized (or decompressed) size exceeds `MAX_BLOB_BYTES` park the group unparsed. These are legacy bare-JSON values or tampered envelopes that predate or bypass the encode cap; dropping them to replay would just re-materialize the same value.
+- **Recovery** - parked groups appear in the ops blocked summary with the stored error. Every operator exit resets the strike count: unblock, drain, and move-to-DLQ all clear the strikes key, so a group re-created under the same id gets a fresh run instead of insta-parking on stale strikes within the 1h TTL. Draining discards the staged copies (event replay can rebuild).
 
 ---
 
@@ -254,6 +262,7 @@ The fail-safe always prefers "complete the slot and let replay handle it" over "
 | `gqJobsRetriedTotal` / `gqJobsExhaustedTotal` / `gqJobsNonRetryableTotal` | failure characterisation |
 | `gqJobsDedupedTotal` / `gqJobsDelayedTotal` | dedup + delay activity |
 | `gqGroupsBlockedTotal` | how often a group blocks (retries / pauses) |
+| `gqGroupsPoisonParkedTotal` | claim-side poison guard parks (`reason`: claim_strikes, oversized_payload) |
 | `gqJobDelayMilliseconds` / `gqJobDurationMilliseconds` | latency + processing time |
 | `gqRetryAttempt` / `gqRetryBackoffMilliseconds` | retry distribution |
 

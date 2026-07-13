@@ -151,8 +151,14 @@ const dlpCheck = async (
   text: string,
   piiRedactionLevel: PIIRedactionLevel,
 ): Promise<google.privacy.dlp.v2.IFinding[]> => {
+  const credentials = getCredentials();
+  if (!credentials) {
+    throw new Error(
+      "Google DLP redaction requested but GOOGLE_APPLICATION_CREDENTIALS is not configured. Configure the credentials or lower the data-privacy PII level for this scope.",
+    );
+  }
   const [response] = await getDlpClient().inspectContent({
-    parent: `projects/${getCredentials()!.project_id}/locations/global`,
+    parent: `projects/${credentials.project_id}/locations/global`,
     inspectConfig: {
       infoTypes: (piiRedactionLevel === "ESSENTIAL"
         ? essentialInfoTypes
