@@ -1792,6 +1792,14 @@ export function EvaluationsV3Table({
           top: 0,
           zIndex: 11,
           backgroundColor: "var(--chakra-colors-bg-panel)",
+          // Promotes the sticky cell to its own GPU compositing layer.
+          // Without it the browser can paint the sticky header a frame
+          // behind the scrolling body during fast/inertial scroll (each
+          // row's rich content — long generated text, evaluator chips —
+          // costs real paint time), so body content flashes through the
+          // header for a frame even though both are correctly positioned
+          // once scrolling settles. Standard fix for this class of bug.
+          willChange: "transform",
         },
         // Column header row (second row in thead)
         "& thead tr:nth-of-type(2) th": {
@@ -1799,6 +1807,7 @@ export function EvaluationsV3Table({
           top: `${superHeaderHeight}px`,
           zIndex: 10,
           backgroundColor: "var(--chakra-colors-bg-panel)",
+          willChange: "transform",
         },
         // Resize handle styles - wider hit area, narrow visible indicator
         "& .resizer": {
@@ -1903,19 +1912,24 @@ export function EvaluationsV3Table({
                         columnType,
                         isFixedWidth,
                       ),
-                      // Always present (not conditionally spread) so the
-                      // browser has a "from" and "to" value to interpolate —
-                      // the highlight is a brief auto-clearing flash (see
-                      // HIGHLIGHT_VARIANT_DURATION_MS), so it needs to fade
-                      // out smoothly rather than snapping off.
+                      // The highlight is a brief auto-clearing flash (see
+                      // CLICK_HIGHLIGHT_DURATION_MS in ComparisonCell), so it
+                      // needs to fade smoothly rather than snapping off.
+                      // boxShadow always has a value (harmless — headers
+                      // don't normally use one) so it has a "from" and "to"
+                      // to interpolate. background is left unset when not
+                      // highlighted rather than forced to "transparent" —
+                      // this inline style would otherwise override the
+                      // header's own opaque background (needed so scrolled
+                      // rows don't show through the sticky header).
                       transition:
                         "box-shadow 300ms ease, background-color 300ms ease",
                       boxShadow: isHighlightedColumn
                         ? `inset 0 0 0 2px var(--chakra-colors-${highlightColor}-400)`
                         : "inset 0 0 0 0 transparent",
-                      background: isHighlightedColumn
-                        ? `var(--chakra-colors-${highlightColor}-subtle)`
-                        : "transparent",
+                      ...(isHighlightedColumn && {
+                        background: `var(--chakra-colors-${highlightColor}-subtle)`,
+                      }),
                     }}
                     // Add data attribute for target columns to enable scroll-to behavior
                     {...(targetId && { "data-target-column": targetId })}
