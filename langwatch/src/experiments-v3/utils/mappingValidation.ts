@@ -179,7 +179,11 @@ export const getTargetMissingMappings = (
     ? toComparisonConfig(target)
     : undefined;
   if (targetComparison) {
-    if (targetComparison.variants.length < 2) {
+    // Filter empty slots, not just array length: a folded legacy pairwise
+    // config keeps both variantA/variantB positions even when one is unset
+    // (see fromPairwise in normalizeComparison.ts), so an under-filled
+    // config can have variants.length === 2 while one entry is "".
+    if (targetComparison.variants.filter(Boolean).length < 2) {
       missingMappings.push({
         fieldId: "variants",
         fieldName: "Variants",
@@ -466,7 +470,9 @@ export const getEvaluatorMissingMappings = (
   // in getTargetMissingMappings.
   const comparison = toComparisonConfig(evaluator);
   if (comparison) {
-    if (comparison.variants.length < 2) {
+    // Filter empty slots, not just array length — see the analogous comment
+    // in getTargetMissingMappings.
+    if (comparison.variants.filter(Boolean).length < 2) {
       missingMappings.push({
         fieldId: "variants",
         fieldName: "Variants",

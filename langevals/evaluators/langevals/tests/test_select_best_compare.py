@@ -170,6 +170,42 @@ def test_deterministic_shuffle_by_row_index():
     assert captured_prompts[0] == captured_prompts[1]
 
 
+def test_shuffle_actually_reorders_candidates():
+    """
+    Regression: the determinism test above only proves the SAME seed
+    produces the SAME order twice — a no-op shuffle (e.g. one that shuffles
+    a copy that's then discarded, or never calls .shuffle() at all) would
+    pass it just as well, since two no-ops of the same input are trivially
+    equal. Assert against the actual, computed permutation for a known seed
+    (row_index=42 over 5 candidates, matching random.Random(42).shuffle on
+    a 5-element list) so a shuffle that silently no-ops is caught.
+    """
+    evaluator = SelectBestCompareEvaluator(settings=SelectBestCompareSettings())
+    entry = _make_entry(num_candidates=5, row_index=42)
+
+    captured: list[str] = []
+
+    def capture(**kwargs):
+        captured.append(kwargs["messages"][1]["content"])
+        return _mock_completion_response("ok", "A")
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=capture,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    prompt = captured[0]
+    positions = {f"output_{i}": prompt.index(f"output_{i}") for i in range(5)}
+    rendered_order = sorted(positions, key=lambda k: positions[k])
+
+    assert rendered_order != [f"output_{i}" for i in range(5)]
+    assert rendered_order == ["output_3", "output_1", "output_2", "output_4", "output_0"]
+
+
 def test_no_shuffle_when_randomize_order_disabled():
     """
     With randomize_order=False, candidates appear in the prompt in

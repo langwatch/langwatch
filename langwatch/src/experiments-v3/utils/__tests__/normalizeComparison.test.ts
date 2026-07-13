@@ -23,6 +23,22 @@ describe("toComparisonConfig", () => {
       expect(config?.variants).toEqual(["target-a", "target-b"]);
     });
 
+    // Regression: variantA/variantB used to be `.filter()`ed to drop an
+    // empty slot, which collapsed an incomplete config's other slot into
+    // position 0 — a stored "A" verdict would then resolve to whatever was
+    // in variantB instead of the (missing) variantA. Both positions must
+    // survive, even empty, so resolveVariants' own "target not found" guard
+    // is what rejects an incomplete config, not a silent position shift.
+    describe("when one slot is empty", () => {
+      it("keeps the filled slot at its original position instead of shifting it to index 0", () => {
+        const config = toComparisonConfig({
+          pairwise: { ...legacyPairwise, variantA: "" },
+        });
+
+        expect(config?.variants).toEqual(["", "target-b"]);
+      });
+    });
+
     it("carries the golden field across", () => {
       const config = toComparisonConfig({ pairwise: legacyPairwise });
 

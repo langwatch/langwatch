@@ -30,6 +30,19 @@ import type { EvaluationV3Event, ExecutionScope } from "../types";
 const hasNlpService =
   !!process.env.LANGWATCH_NLP_SERVICE && !!process.env.OPENAI_API_KEY;
 
+// KNOWN PRE-EXISTING GAP (unrelated to #5101/#5528, predates this PR): running
+// this file locally with both env vars set — the only way `hasNlpService` is
+// ever true, since CI never provides OPENAI_API_KEY and always skips this
+// whole describe block — currently throws "App not initialized. Call
+// initializeDefaultApp() first." from every single test here, including ones
+// untouched by this PR. `runOrchestrator` calls `getApp().experimentRuns`
+// (added February, see git blame on orchestrator.ts around that call), but
+// nothing in this suite's setupFiles or a beforeAll ever calls
+// initializeDefaultApp(). Not fixed here: it wires the entire app
+// composition (DB, event sourcing, outbox) and doing that safely — without
+// destabilizing whatever else runs in the same vitest worker — is its own
+// investigation, out of scope for a Comparison-feature PR. Left as a
+// separate, real, unfixed problem for whoever owns this suite.
 describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
   let project: Project;
 
@@ -2344,6 +2357,153 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         if (doneEvent?.type === "done") {
           expect(doneEvent.summary.totalCells).toBe(3);
           expect(doneEvent.summary.completedCells).toBe(3);
+        }
+      } finally {
+        await prisma.evaluator.delete({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
+  });
+
+  describe("comparison column-target execution", () => {
+    // End-to-end wire-payload test (#5101/#5528): every other target/evaluator
+    // path has integration coverage that hits the real NLP engine, but
+    // Comparison did not — the TS side is unit-tested with mocked cells and
+    // the Python side with a mocked litellm, so nothing proved the real
+    // generateComparisonCells payload is accepted by the real
+    // select_best_compare endpoint. That's the exact boundary-serialization
+    // bug class this PR's own comments describe hitting twice (a 422 from
+    // dict-coercion, a dropped "Data required"). This exercises the full
+    // path: two real prompt targets produce real outputs, a real DB
+    // Comparison evaluator judges them via the real langevals endpoint.
+    it("judges two real prompt outputs via the real select_best_compare endpoint", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      const evaluatorId = `evaluator_${nanoid()}`;
+      await prisma.evaluator.create({
+        data: {
+          id: evaluatorId,
+          projectId: project.id,
+          name: "Test Comparison Evaluator",
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/select_best_compare",
+            settings: { model: "openai/gpt-5-mini" },
+          },
+        },
+      });
+
+      try {
+        const variantA: TargetConfig = {
+          ...createTargetConfig("target-a"),
+          localPromptConfig: {
+            ...createPromptConfig(),
+            messages: [
+              {
+                role: "system",
+                content:
+                  "Respond with only the single word 'apple', nothing else.",
+              },
+              { role: "user", content: "{{input}}" },
+            ],
+          },
+        };
+        const variantB: TargetConfig = {
+          ...createTargetConfig("target-b"),
+          localPromptConfig: {
+            ...createPromptConfig(),
+            messages: [
+              {
+                role: "system",
+                content:
+                  "Respond with only the single word 'orange', nothing else.",
+              },
+              { role: "user", content: "{{input}}" },
+            ],
+          },
+        };
+        const comparisonTarget: TargetConfig = {
+          id: "target-comparison",
+          type: "evaluator",
+          targetEvaluatorId: evaluatorId,
+          inputs: [],
+          outputs: [
+            { identifier: "label", type: "str" },
+            { identifier: "score", type: "float" },
+          ],
+          mappings: {},
+          comparison: {
+            variants: ["target-a", "target-b"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        };
+
+        const state = createTestState(
+          [variantA, variantB, comparisonTarget],
+          [],
+        );
+        const datasetRows = [
+          { question: "Name a fruit.", expected: "apple" },
+        ];
+        const datasetColumns = [
+          { id: "question", name: "question", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; name: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(evaluatorId, {
+            id: dbEvaluator.id,
+            name: dbEvaluator.name,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        const comparisonResults = events.filter(
+          (e) =>
+            e.type === "evaluator_result" && e.targetId === "target-comparison",
+        );
+        expect(comparisonResults).toHaveLength(1);
+
+        const verdict = comparisonResults[0];
+        if (verdict?.type === "evaluator_result") {
+          const result = verdict.result as {
+            status?: string;
+            label?: string;
+            error_type?: string;
+          };
+          // The real endpoint must accept the payload and return a judged
+          // verdict — not the serialization-boundary errors this class of
+          // bug produces (422 dict-coercion, "Data required").
+          expect(result.error_type).toBeUndefined();
+          expect(result.status).toBe("processed");
+          expect(["target-a", "target-b"]).toContain(result.label);
         }
       } finally {
         await prisma.evaluator.delete({

@@ -1,5 +1,4 @@
 import type { MouseEvent } from "react";
-import { useEffect, useRef } from "react";
 import { Box, HStack, Icon, Popover, Text, VStack } from "@chakra-ui/react";
 import { CircleAlert, Equal, Trophy } from "lucide-react";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
@@ -19,6 +18,19 @@ import {
  * "look here" flash the user asks for explicitly, not a passive preview.
  */
 const CLICK_HIGHLIGHT_DURATION_MS = 2000;
+
+/**
+ * Pending auto-clear for the click-triggered highlight. Module-scoped, not
+ * a per-`ComparisonCell`-instance ref: the highlight itself
+ * (highlightedVariantTargetId) is a single, global piece of store state, but
+ * every row renders its own ComparisonCell. If the same variant wins two
+ * different rows and both winners are clicked within the highlight window,
+ * a per-instance ref can't see the OTHER row's pending timer — the earlier
+ * row's timer fires on schedule and clears a highlight the later click
+ * expected to still be showing, up to CLICK_HIGHLIGHT_DURATION_MS early.
+ * A shared timer means the latest click always wins.
+ */
+let clickHighlightClearTimer: ReturnType<typeof setTimeout> | undefined;
 
 type ComparisonCellProps = {
   result: unknown;
@@ -178,26 +190,19 @@ export function ComparisonCell({
   const setHighlightedVariantTargetId = useEvaluationsV3Store(
     (state) => state.setHighlightedVariantTargetId,
   );
-  const clearTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
-  // A pending clear would fire after unmount and set state on a dead component.
-  useEffect(
-    () => () => {
-      if (clearTimer.current) clearTimeout(clearTimer.current);
-    },
-    [],
-  );
 
   // Clicking a winner's name highlights its column and scrolls it into
   // view (it's often off-screen to the right of the Comparison column),
   // then auto-clears after a brief flash rather than requiring a second
-  // click to dismiss.
+  // click to dismiss. Uses the module-level clickHighlightClearTimer (not a
+  // per-instance ref) so a click in one row correctly cancels a pending
+  // clear scheduled by a click in a DIFFERENT row — see that variable's
+  // comment for the cross-row race this avoids.
   const highlightVariantFromClick = (targetId: string) => {
-    if (clearTimer.current) clearTimeout(clearTimer.current);
+    if (clickHighlightClearTimer) clearTimeout(clickHighlightClearTimer);
     setHighlightedVariantTargetId(targetId, "won");
     scrollToTargetColumn(targetId);
-    clearTimer.current = setTimeout(() => {
+    clickHighlightClearTimer = setTimeout(() => {
       // Only clear if this variant is still the one highlighted — a
       // second click may have already picked a different winner by now.
       const current =

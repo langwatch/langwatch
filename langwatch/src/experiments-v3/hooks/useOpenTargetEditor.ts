@@ -317,7 +317,7 @@ export const useOpenTargetEditor = () => {
         }
       } else if (target.type === "evaluator" && target.targetEvaluatorId) {
         // Pairwise column-target (#5100): when the target carries a `pairwise`
-        // config, render the clean PairwiseConfigForm (Variant A / Variant B /
+        // config, render the clean ComparisonConfigForm (Variant A / Variant B /
         // Golden) instead of the per-row mappings UI. Derived field mappings
         // are written into target.mappings on every change so the orchestrator
         // sees a normal mapped target at run time. Strictly additive: every

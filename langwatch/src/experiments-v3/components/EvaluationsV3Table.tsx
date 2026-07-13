@@ -115,13 +115,17 @@ type EvaluatorDbConfig = {
 // A comparison evaluator is ready to render its own result column once at
 // least two variants are picked and the golden-field requirement is satisfied
 // (see isGoldenFieldSatisfied). Legacy pairwise configs qualify too — they
-// normalize to exactly two variants. Exported so it can be unit-tested
-// directly instead of only through a full table render.
+// normalize to exactly two variants, though a folded config keeps both
+// variantA/variantB positions even when one is unset (see fromPairwise in
+// normalizeComparison.ts), so an under-filled legacy config can still have
+// variants.length === 2 with one entry "" — filter empty slots, not just
+// array length. Exported so it can be unit-tested directly instead of only
+// through a full table render.
 export const isComparisonConfigured = (e: EvaluatorConfig) => {
   const comparison = toComparisonConfig(e);
   return (
     !!comparison &&
-    comparison.variants.length >= 2 &&
+    comparison.variants.filter(Boolean).length >= 2 &&
     isGoldenFieldSatisfied(comparison)
   );
 };
@@ -657,8 +661,8 @@ export function EvaluationsV3Table({
       }
 
       // Pairwise evaluators always open their dedicated target-picker form
-      // (PairwiseConfigForm), regardless of whether targets exist yet.
-      // useOpenEvaluatorEditor routes pairwise_compare to PairwiseConfigForm
+      // (ComparisonConfigForm), regardless of whether targets exist yet.
+      // useOpenEvaluatorEditor routes pairwise_compare to ComparisonConfigForm
       // and ignores the `target` / `targetName` params, so we pass a stub
       // when no real target exists yet.
       if (added.evaluatorType === "langevals/pairwise_compare") {

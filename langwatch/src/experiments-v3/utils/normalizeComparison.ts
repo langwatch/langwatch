@@ -29,6 +29,14 @@ type ComparisonCarrier = {
  * against those positions, so the order is load-bearing, not cosmetic.
  * The two per-slot output paths collapse into the per-variant map.
  *
+ * Deliberately NOT filtering out an empty slot: a pairwise config always has
+ * exactly two positions, and dropping an empty one would shift the other
+ * into position 0, so a stored `"A"` verdict would resolve to whatever is in
+ * `variantB` instead of the (missing) `variantA` slot. Keeping both
+ * positions — even when one is empty — means an incomplete pairwise config
+ * fails resolveVariants' "variant target not found" check instead of
+ * silently misresolving to the wrong candidate.
+ *
  * Legacy pairwise had no `randomizeOrder` (it mitigated position bias with
  * swap-and-confirm, which the comparison judge does not have). Defaulting it on
  * gives a re-run of an old column the strongest mitigation still available.
@@ -36,9 +44,7 @@ type ComparisonCarrier = {
 const fromPairwise = (
   pairwise: PairwiseEvaluatorConfig,
 ): ComparisonEvaluatorConfig => {
-  const variants = [pairwise.variantA, pairwise.variantB].filter(
-    (id): id is string => !!id,
-  );
+  const variants = [pairwise.variantA, pairwise.variantB];
 
   const variantOutputPaths: Record<string, string[]> = {};
   if (pairwise.variantA && pairwise.variantAOutputPath?.length) {

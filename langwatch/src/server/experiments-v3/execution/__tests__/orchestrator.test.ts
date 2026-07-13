@@ -919,6 +919,41 @@ describe("orchestrator", () => {
 
       expect(cells).toHaveLength(0);
     });
+
+    // Regression: resolveVariants (shared by both comparison carriers) used
+    // to only check variant count. The column-target loop (above) additionally
+    // guarded with isGoldenFieldSatisfied before calling it, but the
+    // chip-style loop (evaluator.comparison) did not — a chip comparison
+    // with hasGoldenAnswer:true and no goldenField ran anyway, feeding the
+    // judge an empty `golden` while its own settings claimed golden-aware.
+    it("also skips a chip-style comparison when hasGoldenAnswer is true and goldenField is empty", () => {
+      const state = createTestState(2, 0);
+      state.evaluators.push({
+        id: "eval-chip-comparison",
+        evaluatorType: "langevals/select_best_compare",
+        inputs: [],
+        mappings: {},
+        comparison: {
+          variants: ["target-1", "target-2"],
+          hasGoldenAnswer: true,
+          goldenField: "",
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      } as EvaluationsV3State["evaluators"][0]);
+      const completedTargetOutputs = new Map([
+        ["0:target-1", { output: { output: "answer from A" } }],
+        ["0:target-2", { output: { output: "answer from B" } }],
+      ]);
+
+      const { cells } = generateComparisonCells(
+        state,
+        createTestDataset(1),
+        completedTargetOutputs,
+      );
+
+      expect(cells).toHaveLength(0);
+    });
   });
 
   describe("generateCells with evaluator-all-rows scope", () => {

@@ -452,7 +452,14 @@ export const generateComparisonCells = (
     return t.id;
   };
 
-  /** Resolve configured variant ids to their TargetConfigs, or null if unusable. */
+  /**
+   * Resolve configured variant ids to their TargetConfigs, or null if
+   * unusable. Applies the same "is this comparison usable" gate to every
+   * comparison carrier — chip-style (evaluator.comparison) and column-style
+   * (target.comparison) alike — so a comparison missing its golden field
+   * (see isGoldenFieldSatisfied, #5378) is skipped consistently rather than
+   * running with an empty `golden` while its settings claim golden-aware.
+   */
   const resolveVariants = (
     cfg: ComparisonEvaluatorConfig,
     ownerId: string,
@@ -461,6 +468,18 @@ export const generateComparisonCells = (
       logger.warn(
         { ownerId, variants: cfg.variants },
         "Comparison skipped: fewer than 2 variants configured",
+      );
+      return null;
+    }
+    if (!isGoldenFieldSatisfied(cfg)) {
+      logger.debug(
+        {
+          ownerId,
+          variants: cfg.variants,
+          hasGoldenAnswer: cfg.hasGoldenAnswer,
+          goldenField: cfg.goldenField,
+        },
+        "Comparison skipped: golden field not configured",
       );
       return null;
     }
@@ -584,24 +603,12 @@ export const generateComparisonCells = (
     const cfg = toComparisonConfig(target);
     if (!cfg || !target.targetEvaluatorId) continue;
 
-    // Skip column-targets the user hasn't finished configuring (see
-    // isGoldenFieldSatisfied for the golden-field rule, #5378). Without two
-    // variants — or a golden field when one is required — the judge endpoint
-    // would 400 and the cell would render that as a verdict-shaped error,
-    // confusing for users who haven't opened the drawer yet.
-    if (cfg.variants.length < 2 || !isGoldenFieldSatisfied(cfg)) {
-      logger.debug(
-        {
-          targetId: target.id,
-          variants: cfg.variants,
-          hasGoldenAnswer: cfg.hasGoldenAnswer,
-          goldenField: cfg.goldenField,
-        },
-        "Comparison column-target skipped: variants or golden field not configured",
-      );
-      continue;
-    }
-
+    // Variant-count and golden-field gating (#5378) now live in
+    // resolveVariants, shared with the chip-style loop above — a
+    // column-target the user hasn't finished configuring (fewer than two
+    // variants, or a golden field the settings claim but didn't pick) is
+    // skipped the same way a chip-style comparison would be, rather than
+    // hitting the judge endpoint and rendering a verdict-shaped 400 error.
     const resolvedVariants = resolveVariants(cfg, target.id);
     if (!resolvedVariants) continue;
 
@@ -1156,11 +1163,15 @@ export async function* executeWorkflowCell(
 // a return-then-assign) to preserve the original behavior of setting
 // `inputs.input = undefined` when a mapping matches a missing column,
 // which downstream consumers already tolerate.
-const assignMappedInput = (
-  inputs: Record<string, unknown>,
-  mappings: Record<string, FieldMapping>,
-  datasetEntry: Record<string, unknown>,
-): void => {
+const assignMappedInput = ({
+  inputs,
+  mappings,
+  datasetEntry,
+}: {
+  inputs: Record<string, unknown>;
+  mappings: Record<string, FieldMapping>;
+  datasetEntry: Record<string, unknown>;
+}): void => {
   const inputMapping = mappings.input;
   if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
     inputs.input = datasetEntry[inputMapping.sourceField];
@@ -1200,7 +1211,11 @@ const buildEvaluatorInputs = (
     const firstVariantMappings = firstVariantId
       ? (evaluator.mappings[datasetId]?.[firstVariantId] ?? {})
       : {};
-    assignMappedInput(inputs, firstVariantMappings, cell.datasetEntry);
+    assignMappedInput({
+      inputs,
+      mappings: firstVariantMappings,
+      datasetEntry: cell.datasetEntry,
+    });
 
     // Golden is optional (#5378). Only send it when the user opted into
     // golden-answer comparison AND picked a column. Missing either → the
