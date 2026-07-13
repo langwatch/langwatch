@@ -1094,6 +1094,175 @@ describe("extractInlineMediaFromEvent", () => {
     });
   });
 
+  describe("when a data URI carries MIME parameters (RFC 2397)", () => {
+    it("resolves the bare type before the first semicolon for OpenAI file parts", async () => {
+      const base64Payload = makeBase64Payload("%PDF-1.4 parameterized");
+      const storedId = "stored-param-file-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: "application/pdf",
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "file",
+          file: {
+            filename: "doc.pdf",
+            file_data: `data:application/pdf;name=doc.pdf;base64,${base64Payload}`,
+          },
+        },
+      ]);
+
+      await extractInlineMediaFromEvent({ ...BASE_PARAMS, event, service });
+
+      // Never "application/pdf;name=doc.pdf" — that fails the readback
+      // allowlist and would leak parameters into storage Content-Type.
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({ mediaType: "application/pdf" }),
+      );
+    });
+
+    it("resolves the bare type for bareImage data URIs (the twin parser path)", async () => {
+      const base64Payload = makeBase64Payload("PNG_BYTES");
+      const storedId = "stored-param-image-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: "image/png",
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "image",
+          image: `data:image/png;name=x.png;base64,${base64Payload}`,
+        },
+      ]);
+
+      await extractInlineMediaFromEvent({ ...BASE_PARAMS, event, service });
+
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({ mediaType: "image/png" }),
+      );
+    });
+  });
+
+  describe("when an OpenAI file part carries a non-readback-safe document type", () => {
+    it("still externalizes it — the chip downloads bytes verbatim, so the octet-stream readback downgrade is acceptable", async () => {
+      const base64Payload = makeBase64Payload("col1,col2\n1,2");
+      const storedId = "stored-csv-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: "text/csv",
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "file",
+          file: { filename: "report.csv", file_data: base64Payload },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({ mediaType: "text/csv" }),
+      );
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
+      expect(content[0]).toMatchObject({
+        type: "binary",
+        filename: "report.csv",
+        url: `/api/files/proj-1/${storedId}`,
+      });
+      expect(refs).toHaveLength(1);
+    });
+  });
+
+  describe("when an OpenAI file part carries a malformed data URI", () => {
+    it("passes through unchanged when the data URI has no comma", async () => {
+      const service = makeService();
+      const event = makeEventWithContent([
+        {
+          type: "file",
+          file: { filename: "x.pdf", file_data: "data:application/pdf;base64" },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(rewrittenEvent).toBe(event);
+      expect(refs).toHaveLength(0);
+      expect(service.storeFromBytes).not.toHaveBeenCalled();
+    });
+
+    it("passes through unchanged when the data URI lacks the base64 marker", async () => {
+      const service = makeService();
+      const event = makeEventWithContent([
+        {
+          type: "file",
+          file: { filename: "x.txt", file_data: "data:text/plain,hello" },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(rewrittenEvent).toBe(event);
+      expect(refs).toHaveLength(0);
+      expect(service.storeFromBytes).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a raw-base64 OpenAI file part has an unrecognized extension", () => {
+    it("externalizes it as application/octet-stream (generic download)", async () => {
+      const base64Payload = makeBase64Payload("mystery-bytes");
+      const storedId = "stored-unknown-ext-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: "application/octet-stream",
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "file",
+          file: { filename: "artifact.xyz", file_data: base64Payload },
+        },
+      ]);
+
+      await extractInlineMediaFromEvent({ ...BASE_PARAMS, event, service });
+
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({ mediaType: "application/octet-stream" }),
+      );
+    });
+  });
+
   describe("when an event has an OpenAI file part with an audio data URI", () => {
     it("routes to the input_audio externalization path so the rewrite stays playable", async () => {
       const base64Payload = makeBase64Payload("WAV_BYTES");

@@ -39,18 +39,23 @@ import { prisma } from "~/server/db";
 // onError handler turns that into a 500 — masking the route logic entirely.
 // Hoisted so the DELETE scope-guard tests can control the set-scoped run-id
 // lookup and assert which runs get archived (or that none do).
-const { mockGetRunIdsForSet, mockDeleteRun } = vi.hoisted(() => ({
-  mockGetRunIdsForSet: vi
-    .fn()
-    .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
-  mockDeleteRun: vi.fn().mockResolvedValue(undefined),
-}));
+const { mockGetRunIdsForSet, mockDeleteRun, mockMessageSnapshot } = vi.hoisted(
+  () => ({
+    mockGetRunIdsForSet: vi
+      .fn()
+      .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
+    mockDeleteRun: vi.fn().mockResolvedValue(undefined),
+    // Hoisted so tests can assert the REWRITTEN payload reaches dispatch —
+    // the seam between "route returned 201" and "the user sees the turn".
+    mockMessageSnapshot: vi.fn().mockResolvedValue(undefined),
+  }),
+);
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     simulations: {
       startRun: vi.fn().mockResolvedValue(undefined),
-      messageSnapshot: vi.fn().mockResolvedValue(undefined),
+      messageSnapshot: mockMessageSnapshot,
       textMessageStart: vi.fn().mockResolvedValue(undefined),
       textMessageEnd: vi.fn().mockResolvedValue(undefined),
       finishRun: vi.fn().mockResolvedValue(undefined),
@@ -530,6 +535,7 @@ describe("POST /api/scenario-events (ingest)", () => {
     /** @scenario "A simulated user message with an image attachment shows the image in the run conversation" */
     it("returns 201 (not 400) and externalizes the image bytes via storeFromBytes", async () => {
       const extractedId = `stored-${nanoid(8)}`;
+      mockMessageSnapshot.mockClear();
       mockStoreFromBytes.mockResolvedValueOnce({
         id: extractedId,
         mediaType: "image/webp",
@@ -560,6 +566,77 @@ describe("POST /api/scenario-events (ingest)", () => {
           mediaType: "image/webp",
           purpose: "scenario_event",
           bytes: Buffer.from("fake-webp-bytes"),
+        }),
+      );
+
+      // The dispatched snapshot carries the REWRITTEN payload: the image part
+      // references the stored object and no inline base64 survives — this is
+      // what the read path folds into the run the user sees.
+      expect(mockMessageSnapshot).toHaveBeenCalledOnce();
+      const dispatched = mockMessageSnapshot.mock.calls[0]?.[0] as {
+        messages: Array<{ content: Array<Record<string, unknown>> }>;
+      };
+      expect(dispatched.messages[0]?.content[1]).toEqual({
+        type: "image",
+        image: `/api/files/${testProjectId}/${extractedId}`,
+      });
+      expect(JSON.stringify(dispatched.messages)).not.toContain("base64,");
+    });
+  });
+
+  describe("when a MESSAGE_SNAPSHOT carries an AI-SDK file turn ({type:'file', mediaType, data})", () => {
+    /** @scenario "AI-SDK file parts with a document mediaType validate on the wire" */
+    it("returns 201 (not 400) and externalizes the file bytes via storeFromBytes", async () => {
+      const extractedId = `stored-${nanoid(8)}`;
+      mockStoreFromBytes.mockResolvedValueOnce({
+        id: extractedId,
+        mediaType: "application/pdf",
+        isDuplicate: false,
+      });
+
+      const scenarioRunId = `run-${nanoid(6)}`;
+      const body = {
+        type: ScenarioEventType.MESSAGE_SNAPSHOT,
+        timestamp: Date.now(),
+        batchRunId: `batch-${nanoid(6)}`,
+        scenarioId: `scenario-${nanoid(6)}`,
+        scenarioRunId,
+        scenarioSetId: "default",
+        messages: [
+          {
+            id: `msg-${nanoid(6)}`,
+            role: "user",
+            content: [
+              { type: "text", text: "Please summarize this document." },
+              {
+                type: "file",
+                mediaType: "application/pdf",
+                data: Buffer.from("%PDF-1.4 ai-sdk file bytes").toString(
+                  "base64",
+                ),
+                filename: "document.pdf",
+              },
+            ],
+          },
+        ],
+      };
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(201);
+      expect(mockStoreFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: testProjectId,
+          mediaType: "application/pdf",
+          purpose: "scenario_event",
+          bytes: Buffer.from("%PDF-1.4 ai-sdk file bytes"),
         }),
       );
     });

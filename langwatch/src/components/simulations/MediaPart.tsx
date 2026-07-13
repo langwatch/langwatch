@@ -308,7 +308,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   // then keep the original name instead of the object id.
   const filename = part.type === "binary" ? part.filename : undefined;
   const chipHref =
-    isUrlBased && filename && extractStoredObjectId(src)
+    filename && storedObjectId
       ? `${src}?filename=${encodeURIComponent(filename)}`
       : src;
   const isDocumentLike =

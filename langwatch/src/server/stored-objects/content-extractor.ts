@@ -36,7 +36,10 @@ import { binaryInputPartSchema } from "./binary-part";
 import { coerceContentToArray } from "./coerce-content-to-array";
 import { isReadbackSafe } from "./safe-media-types";
 import type { StoredObjectsService } from "./stored-objects.service";
-import { visitContentPartAsync } from "./visit-content-part";
+import {
+  parseBase64DataUri,
+  visitContentPartAsync,
+} from "./visit-content-part";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");
 
@@ -60,30 +63,6 @@ export interface ExtractedRef {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Parse a `data:` URI into its mime type + base64 payload. Returns null when
- * the input isn't a `data:<mime>;base64,<...>` shape; non-base64 data URIs
- * (`data:<mime>,<urlencoded>`) are out of scope — extraction is for binary
- * payloads only, not for short URL-encoded text data.
- *
- * Spec: RFC 2397, but only the `base64` form. Examples we accept:
- *   data:image/png;base64,iVBORw0KGgo...
- *   data:audio/wav;base64,UklGR...
- */
-function parseBase64DataUri(
-  uri: string,
-): { mimeType: string; base64: string } | null {
-  if (!uri.startsWith("data:")) return null;
-  const commaIdx = uri.indexOf(",");
-  if (commaIdx === -1) return null;
-  const header = uri.slice(5, commaIdx); // strip "data:"
-  const payload = uri.slice(commaIdx + 1);
-  if (!header.endsWith(";base64")) return null;
-  const mimeType = header.slice(0, -7); // strip ";base64"
-  if (!mimeType) return null;
-  return { mimeType, base64: payload };
-}
 
 /**
  * Rewrites a single content part, storing any inline bytes via the service.
@@ -163,6 +142,12 @@ async function processContentPart({
     },
 
     async binary(binPart) {
+      // Unlike the media/document handler above, this path deliberately has
+      // no isReadbackSafe gate: binary parts render as a download chip, not
+      // inline, so a non-allowlisted type (text/csv, application/json, ...)
+      // coming back as application/octet-stream still round-trips the exact
+      // bytes — and the chip carries the original filename for the save.
+      //
       // Enforce exactly-one-of(data, url, id) at the boundary before touching.
       // AG-UI's InputContentSchema permits the ambiguous cases; rejecting them
       // here matches the runtime invariant the extractor depends on.

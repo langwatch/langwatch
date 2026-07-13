@@ -179,13 +179,10 @@ export function visitContentPart<R>(
   // go to `binary` (generic externalisation by mimeType).
   if (o["type"] === "file" && typeof o["mediaType"] === "string") {
     // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
-    // file part should route the same as `audio/wav`. Normalise the type
-    // discriminator for the `audio/` prefix check + format mapping, but keep
-    // the original-case mimeType on the dispatched part so downstream
-    // consumers that pattern-match the exact value (e.g. an explicit
-    // allowlist) don't silently see a different string than the wire shape.
-    const mimeTypeRaw = o["mediaType"];
-    const mimeType = mimeTypeRaw.toLowerCase();
+    // file part routes the same as `audio/wav`. The dispatched part carries
+    // the lowercased type — the readback allowlist and storage Content-Type
+    // both expect the canonical form.
+    const mimeType = o["mediaType"].toLowerCase();
     const data = typeof o["data"] === "string" ? o["data"] : undefined;
     const url = typeof o["url"] === "string" ? o["url"] : undefined;
     if (data || url) {
@@ -371,13 +368,10 @@ export async function visitContentPartAsync<R>(
   // go to `binary` (generic externalisation by mimeType).
   if (o["type"] === "file" && typeof o["mediaType"] === "string") {
     // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
-    // file part should route the same as `audio/wav`. Normalise the type
-    // discriminator for the `audio/` prefix check + format mapping, but keep
-    // the original-case mimeType on the dispatched part so downstream
-    // consumers that pattern-match the exact value (e.g. an explicit
-    // allowlist) don't silently see a different string than the wire shape.
-    const mimeTypeRaw = o["mediaType"];
-    const mimeType = mimeTypeRaw.toLowerCase();
+    // file part routes the same as `audio/wav`. The dispatched part carries
+    // the lowercased type — the readback allowlist and storage Content-Type
+    // both expect the canonical form.
+    const mimeType = o["mediaType"].toLowerCase();
     const data = typeof o["data"] === "string" ? o["data"] : undefined;
     const url = typeof o["url"] === "string" ? o["url"] : undefined;
     if (data || url) {
@@ -479,14 +473,43 @@ export async function visitContentPartAsync<R>(
 }
 
 /**
+ * Parse a `data:` URI into its mime type + base64 payload. Returns null when
+ * the input isn't a `data:<mime>[;param=value...];base64,<...>` shape;
+ * non-base64 data URIs (`data:<mime>,<urlencoded>`) are out of scope —
+ * extraction is for binary payloads only, not for short URL-encoded text.
+ *
+ * Spec: RFC 2397, only the `base64` form. The mime type is the substring
+ * BEFORE the first `;`, so parameterized URIs
+ * (`data:application/pdf;name=doc.pdf;base64,...`) resolve to the bare type —
+ * never a parameter-laden string that would fail the readback allowlist or
+ * leak into storage Content-Type headers. Lowercased per RFC 2045 §5.1.
+ *
+ * Single source of truth for both the visitor's file dispatch and the
+ * content-extractor's image/bareImage handlers — one parser, one behaviour.
+ */
+export function parseBase64DataUri(
+  uri: string,
+): { mimeType: string; base64: string } | null {
+  if (!uri.startsWith("data:")) return null;
+  const commaIdx = uri.indexOf(",");
+  if (commaIdx === -1) return null;
+  const header = uri.slice(5, commaIdx); // strip "data:"
+  if (!header.endsWith(";base64")) return null;
+  const semiIdx = header.indexOf(";");
+  const mimeType = header.slice(0, semiIdx).toLowerCase();
+  if (!mimeType) return null;
+  return { mimeType, base64: uri.slice(commaIdx + 1) };
+}
+
+/**
  * Decode an OpenAI ChatCompletion `file` payload ({file_data, filename,
  * file_id}) into a binary part the visitor can dispatch. `file_data` accepts
  * both a base64 data: URI (the shape the scenario multimodal-files docs
  * instruct) and raw base64 (the OpenAI API wire format), resolving the mime
  * type from the data URI header or the filename extension. Returns null when
- * the payload carries no bytes (e.g. provider-hosted `file_id` references),
- * so the caller can fall through to `unknown` and pass the part along
- * unchanged.
+ * the payload carries no bytes (e.g. provider-hosted `file_id` references)
+ * or the data URI is malformed, so the caller can fall through to `unknown`
+ * and pass the part along unchanged.
  */
 function openAiFilePayloadToBinaryPart(
   file: Record<string, unknown>,
@@ -498,16 +521,12 @@ function openAiFilePayloadToBinaryPart(
     typeof file["filename"] === "string" ? file["filename"] : undefined;
 
   if (fileData.startsWith("data:")) {
-    const commaIdx = fileData.indexOf(",");
-    if (commaIdx === -1) return null;
-    const header = fileData.slice(5, commaIdx);
-    if (!header.endsWith(";base64")) return null;
-    const mimeType = header.slice(0, -7).toLowerCase();
-    if (!mimeType) return null;
+    const parsed = parseBase64DataUri(fileData);
+    if (!parsed) return null;
     return {
       type: "binary",
-      mimeType,
-      data: fileData.slice(commaIdx + 1),
+      mimeType: parsed.mimeType,
+      data: parsed.base64,
       filename,
     };
   }

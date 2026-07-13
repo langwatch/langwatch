@@ -381,7 +381,7 @@ describe("<ScenarioMessageRenderer/>", () => {
               filename: "document.pdf",
             },
           ],
-        } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
+        },
       ]);
 
       const chip = screen.getByTestId("media-part-binary");
@@ -423,7 +423,7 @@ describe("<ScenarioMessageRenderer/>", () => {
               filename: "legacy.pdf",
             },
           ],
-        } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
+        },
       ]);
 
       const chip = screen.getByTestId("media-part-binary");
