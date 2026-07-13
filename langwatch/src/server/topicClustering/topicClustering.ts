@@ -352,7 +352,7 @@ export async function fetchTracesFromClickHouse(
         SELECT TraceId
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+          AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
           AND OccurredAt < now64(3)
         GROUP BY TenantId, TraceId
         ${pageHavingClause}
@@ -367,13 +367,13 @@ export async function fetchTracesFromClickHouse(
         toString(toUnixTimestamp64Milli(t.OccurredAt)) AS OccurredAtMs
       FROM trace_summaries t
       WHERE TenantId = {tenantId:String}
-        AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+        AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
         AND OccurredAt < now64(3)
         AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+            AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
             AND OccurredAt < now64(3)
             AND TraceId IN (SELECT TraceId FROM page)
           GROUP BY TenantId, TraceId
@@ -381,7 +381,7 @@ export async function fetchTracesFromClickHouse(
     `,
     query_params: {
       tenantId: projectId,
-      twelveMonthsAgo: fetchWindowStartMs,
+      fetchWindowStartMs,
       topicIds: topicIds.length > 0 ? topicIds : ["__none__"],
       subtopicIds: subtopicIds.length > 0 ? subtopicIds : ["__none__"],
       ...(searchAfter
