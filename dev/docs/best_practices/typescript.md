@@ -4,6 +4,7 @@
 - **Zod for shared types**: Define once, `infer` the TS type
 - **Single export per file**: Thin files, single responsibility
 - **Colocate interfaces**: Only extract to `types.ts` when shared across files
+- **Constants files**: Name module-level constant collections `<singularDomainNoun>.constants.ts` (e.g. `modelProvider.constants.ts`, `scenario.constants.ts`) — the singular domain noun, matching the sibling `<domain>.service.ts` / `.repository.ts` files, not the plural directory name
 - **Service wrappers**: Use `get` keyword for repository passthrough, not `bind`
 - **Named parameters over positional**: For functions with 2+ parameters, prefer object destructuring. Makes call sites self-documenting and parameter order irrelevant.
 

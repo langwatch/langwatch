@@ -5,7 +5,7 @@ import type { ModelProviderService } from "../../modelProviders/modelProvider.se
 import {
   PROVIDER_DEFAULT_MODELS,
   PROVIDER_RESOLUTION_ORDER,
-} from "../../modelProviders/providerDefaultModels";
+} from "../../modelProviders/modelProvider.constants";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
