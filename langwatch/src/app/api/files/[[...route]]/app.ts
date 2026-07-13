@@ -132,7 +132,7 @@ function streamFileResponse({
   requestedFilename,
 }: {
   row: { id: string; size_bytes: number };
-  stream: import("node:stream").Readable;
+  stream: Readable;
   method: "GET" | "HEAD";
   mediaType: string;
   requestedFilename?: string;

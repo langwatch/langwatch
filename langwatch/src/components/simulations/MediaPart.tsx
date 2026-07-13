@@ -311,7 +311,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
     isUrlBased && filename && extractStoredObjectId(src)
       ? `${src}?filename=${encodeURIComponent(filename)}`
       : src;
-  const documentLike =
+  const isDocumentLike =
     mimeType === "application/pdf" || (mimeType?.startsWith("text/") ?? false);
   return (
     <Box asChild data-testid="media-part-binary">
@@ -339,7 +339,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
           _hover={{ bg: "bg.muted" }}
         >
           <Icon
-            as={documentLike ? FileText : File}
+            as={isDocumentLike ? FileText : File}
             boxSize={4}
             color="fg.muted"
           />
