@@ -528,6 +528,36 @@ func TestCredentialToBifrostKey_DeepSeekDefaultsBaseURL(t *testing.T) {
 	}
 }
 
+// Azure's resource endpoint must reach Bifrost's AzureKeyConfig.Endpoint.
+// The /go/proxy path (gatewayproxy.ParseCredentialFromHeaders) carries the
+// customer's Azure endpoint under Extra["api_base"] — the litellm-era name
+// that TestParseCredentialFromHeaders_Azure_PicksUpAllKnobs pins — while the
+// control-plane VK path (config.materialiser.ts / config_wire.go) uses
+// "endpoint". This branch reads only "endpoint" today, so every Azure
+// scenario/playground call dispatched via /go/proxy hands Bifrost an empty
+// endpoint and Bifrost returns provider_timeout "endpoint not set" (#5760).
+// The Azure branch must accept BOTH names, mirroring credBaseURL for vLLM.
+//
+// Spec: specs/ai-gateway/azure-endpoint-from-api-base.feature
+func TestCredentialToBifrostKey_Azure_EndpointFromApiBase(t *testing.T) {
+	cred := domain.Credential{
+		ID:            "mp-azure",
+		ProviderID:    domain.ProviderAzure,
+		APIKey:        "az-key",
+		Extra:         map[string]string{"api_base": "https://acme.openai.azure.com"},
+		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
+	}
+	key := credentialToBifrostKey(cred, bfschemas.Azure)
+
+	if key.AzureKeyConfig == nil {
+		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
+	}
+	if got := key.AzureKeyConfig.Endpoint.Val; got != "https://acme.openai.azure.com" {
+		t.Fatalf("AzureKeyConfig.Endpoint = %q, want the api_base endpoint "+
+			"(#5760: /go/proxy Azure sends the endpoint as api_base, not endpoint)", got)
+	}
+}
+
 func TestNormalizeOpenAICompatBaseURL(t *testing.T) {
 	cases := map[string]string{
 		"http://h:8000/v1":  "http://h:8000",
