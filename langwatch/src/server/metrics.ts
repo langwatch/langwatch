@@ -63,8 +63,12 @@ export const normalizeMetricsPath = (path: string): string => {
     // (`batch_clustering`) never do
     if (/^[a-z]+_[A-Za-z0-9_-]{6,}$/.test(segment) && /[A-Z0-9]/.test(segment))
       return "{id}";
-    // long unprefixed tokens (nanoid, base64ish)
-    if (/^[A-Za-z0-9_-]{16,}$/.test(segment) && /\d/.test(segment))
+    // long unprefixed tokens (nanoid, base64ish) — a digit or an uppercase
+    // letter marks a generated token; route words are lowercase-only
+    if (
+      /^[A-Za-z0-9_-]{16,}$/.test(segment) &&
+      (/\d/.test(segment) || /[A-Z]/.test(segment))
+    )
       return "{id}";
     return segment;
   });

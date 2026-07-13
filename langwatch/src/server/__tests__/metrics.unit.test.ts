@@ -212,6 +212,12 @@ describe("normalizeMetricsPath", () => {
       );
     });
 
+    it("collapses digit-free nanoid tokens to {id}", () => {
+      expect(normalizeMetricsPath("/share/oSjKKVKjjGwZaKqBt")).toBe(
+        "/share/{id}",
+      );
+    });
+
     it("keeps the id inside a longer route template", () => {
       expect(normalizeMetricsPath("/api/trace/trace_A1b2C3d4E5f6/share")).toBe(
         "/api/trace/{id}/share",
