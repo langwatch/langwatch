@@ -28,6 +28,7 @@ const metricNames = [
   "gq_envelope_gq2_downgrade_total",
   "gq_payload_too_large_total",
   "gq_groups_poison_parked_total",
+  "gq_poison_isolation_runs_total",
   "gq_retry_encode_failures_total",
 ] as const;
 

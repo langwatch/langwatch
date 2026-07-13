@@ -170,10 +170,13 @@ describe("GET /:traceId", () => {
       const res = await makeRequest("trace-abc", { format: "json" });
 
       expect(res.status).toBe(200);
+      // Single-trace read: offloaded-inputs markers resolve to full inputs
+      // (ADR-040), so the route passes the resolve option.
       expect(mockGetEvaluationsMultiple).toHaveBeenCalledWith(
         "project-123",
         ["trace-abc"],
         expect.any(Object),
+        { resolveOffloadedInputs: true },
       );
     });
 
@@ -231,6 +234,7 @@ describe("GET /:traceId", () => {
         "project-123",
         [fullId],
         expect.any(Object),
+        { resolveOffloadedInputs: true },
       );
     });
   });
