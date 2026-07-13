@@ -413,8 +413,13 @@ function GoldenAnswerSection({
   // the current prompt exactly matches a shipped default so hand-tuned
   // prompts survive toggling. Same pattern PairwiseConfigForm uses.
   const isDefaultPrompt = useCallback(
-    (value: string | undefined, target: string): boolean =>
-      typeof value === "string" && value.trim() === target.trim(),
+    ({
+      value,
+      target,
+    }: {
+      value: string | undefined;
+      target: string;
+    }): boolean => typeof value === "string" && value.trim() === target.trim(),
     [],
   );
   useEffect(() => {
@@ -423,10 +428,10 @@ function GoldenAnswerSection({
     if (typeof watchedPrompt !== "string") return;
     const shouldBeGoldenAware = watchedHasGoldenAnswer !== false;
     const nextPrompt = shouldBeGoldenAware
-      ? isDefaultPrompt(watchedPrompt, GOLDEN_FREE_JUDGE_PROMPT)
+      ? isDefaultPrompt({ value: watchedPrompt, target: GOLDEN_FREE_JUDGE_PROMPT })
         ? GOLDEN_AWARE_JUDGE_PROMPT
         : null
-      : isDefaultPrompt(watchedPrompt, GOLDEN_AWARE_JUDGE_PROMPT)
+      : isDefaultPrompt({ value: watchedPrompt, target: GOLDEN_AWARE_JUDGE_PROMPT })
         ? GOLDEN_FREE_JUDGE_PROMPT
         : null;
     if (nextPrompt && nextPrompt !== watchedPrompt) {
@@ -464,6 +469,7 @@ function GoldenAnswerSection({
         <Switch
           checked={hasGoldenAnswer}
           onCheckedChange={({ checked }) => setHasGoldenAnswer(checked)}
+          inputProps={{ "aria-label": "Has golden answer" }}
           data-testid="comparison-has-golden-answer"
         />
       </HStack>
@@ -625,7 +631,7 @@ function MetricsSection({
   const current = (watchedMetrics ?? draft.includeMetrics ?? []) as Metric[];
 
   const toggle = useCallback(
-    (metric: Metric, on: boolean) => {
+    ({ metric, on }: { metric: Metric; on: boolean }) => {
       const next = on
         ? Array.from(new Set([...current, metric]))
         : current.filter((m) => m !== metric);
@@ -660,7 +666,10 @@ function MetricsSection({
           <Text fontSize="13px">Include cost</Text>
           <Switch
             checked={current.includes("cost")}
-            onCheckedChange={({ checked }) => toggle("cost", checked)}
+            onCheckedChange={({ checked }) =>
+              toggle({ metric: "cost", on: checked })
+            }
+            inputProps={{ "aria-label": "Include cost" }}
             data-testid="comparison-include-cost"
           />
         </HStack>
@@ -668,7 +677,10 @@ function MetricsSection({
           <Text fontSize="13px">Include duration</Text>
           <Switch
             checked={current.includes("duration")}
-            onCheckedChange={({ checked }) => toggle("duration", checked)}
+            onCheckedChange={({ checked }) =>
+              toggle({ metric: "duration", on: checked })
+            }
+            inputProps={{ "aria-label": "Include duration" }}
             data-testid="comparison-include-duration"
           />
         </HStack>

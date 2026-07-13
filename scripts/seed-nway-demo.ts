@@ -9,7 +9,6 @@
  * Prints the login link + project slug at the end.
  */
 import { PrismaClient } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 
 const prisma = new PrismaClient();
 
