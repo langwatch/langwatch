@@ -147,6 +147,14 @@ export function ScenarioMessageRenderer({
             );
 
           case "media": {
+            // Audio/video players stretch to the container width; attachment
+            // chips hug the message side like a bubble would (user sent it →
+            // right, agent → left). Mirrored into data-media-align because
+            // jsdom cannot read the compiled flex styles.
+            const innerAlign =
+              item.part.type === "binary"
+                ? alignForRole(item.role)
+                : ("stretch" as const);
             return (
               <VStack
                 key={item.id}
@@ -155,7 +163,8 @@ export function ScenarioMessageRenderer({
                 width="100%"
               >
                 <VStack
-                  align="stretch"
+                  align={innerAlign}
+                  data-media-align={innerAlign}
                   gap={1}
                   width={{ base: "100%", md: "min(420px, 95%)" }}
                 >
