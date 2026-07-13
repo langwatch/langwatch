@@ -860,17 +860,43 @@ export class ClickHouseTraceService {
               dateField,
             });
 
-          // When includeSpans is requested, fetch and attach actual spans.
-          // resolveBlobs is opt-in (download/export — #4991 AC1) so the
-          // list/search grid stays on the preview with zero event_log reads
-          // (#4888 AC2 / ADR-022 — AC5).
-          if (options.includeSpans && traces.length > 0) {
-            traces = await this.enrichTracesWithSpans(
+          // Spans are fetched when the caller wants them OR when it wants full
+          // IO — because those are not the same thing.
+          //
+          // Blob resolution lives inside the span read: the full (>64 KB) value
+          // is recoverable ONLY by de-offloading the spans' eventref pointers
+          // and recomputing trace IO from them. trace_summaries holds nothing
+          // but the 64 KB preview. So a content-consuming SUMMARY read — a
+          // summary-mode export, a spans-less download — must still fetch and
+          // resolve spans, then throw them away.
+          //
+          // Gating the fetch on includeSpans alone (as this did) made
+          // resolveBlobs INERT for exactly those callers: the flag was set, no
+          // event_log read was ever issued, and the truncated preview shipped
+          // silently. That is #4991 AC1's bug, surviving on the paths the fix
+          // was supposed to cover.
+          //
+          // resolveBlobs stays opt-in, so the list/search grid and the
+          // aggregations still issue ZERO event_log reads (#4888 AC2 /
+          // ADR-022 — AC5): they never ask for full IO, so nothing resolves,
+          // whether or not they ask for spans.
+          const wantsSpans = options.includeSpans === true;
+          const wantsFullIo = options.resolveBlobs === true;
+
+          if ((wantsSpans || wantsFullIo) && traces.length > 0) {
+            const enriched = await this.enrichTracesWithSpans(
               traces,
               input.projectId,
               protections,
-              options.resolveBlobs === true,
+              wantsFullIo,
             );
+
+            // A summary caller keeps the recomputed trace-level IO but not the
+            // spans it never asked for — the payload shape stays exactly as it
+            // was before this branch could run for them.
+            traces = wantsSpans
+              ? enriched
+              : enriched.map((trace) => ({ ...trace, spans: [] }));
           }
 
           // Generate new scrollId from last trace. The cursor seeks on the

@@ -439,6 +439,56 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
 });
 
 // ---------------------------------------------------------------------------
+// AC1 — a SUMMARY read (no spans emitted) still resolves trace-level IO
+//
+// The bug this guards: resolution lives inside enrichTracesWithSpans, which used
+// to run only `if (options.includeSpans)`. A summary export / spans-less download
+// sets includeSpans=false, so resolveBlobs was never even READ — the flag was
+// inert and the truncated 64 KB preview shipped anyway. Setting resolveBlobs:true
+// at the call sites (ExportService, getAllForDownload) fixed nothing on its own;
+// a router-level test asserting the flag is FORWARDED cannot see that, because it
+// passes whether or not the flag has any runtime effect. This test reads through
+// the REAL service and asserts the VALUE.
+// ---------------------------------------------------------------------------
+
+describe("ClickHouseTraceService.getAllTracesForProject — #4991 AC1 summary read", () => {
+  describe("given a >64 KB offloaded trace and resolveBlobs WITHOUT includeSpans", () => {
+    describe("when a summary export / spans-less download reads it", () => {
+      it("resolves the trace-level output to the FULL value, not the preview", async () => {
+        setupGetAllWithSpansMocks();
+        const { blobStore, getFromEventLog } = makeEventRefBlobStore();
+        const service = buildService(blobStore);
+
+        const result = await service.getAllTracesForProject(
+          baseInput,
+          protections,
+          { includeSpans: false, resolveBlobs: true },
+        );
+
+        const trace = result!.groups.flat()[0]!;
+        expect(getFromEventLog).toHaveBeenCalled();
+        expect(trace.output?.value).toBe(FULL_OUTPUT);
+      });
+
+      it("emits no spans (the caller asked for a summary)", async () => {
+        setupGetAllWithSpansMocks();
+        const { blobStore } = makeEventRefBlobStore();
+        const service = buildService(blobStore);
+
+        const result = await service.getAllTracesForProject(
+          baseInput,
+          protections,
+          { includeSpans: false, resolveBlobs: true },
+        );
+
+        const trace = result!.groups.flat()[0]!;
+        expect(trace.spans ?? []).toEqual([]);
+      });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // AC5 — list/search grid keeps preview, ZERO event_log reads
 // ---------------------------------------------------------------------------
 
