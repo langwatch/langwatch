@@ -439,6 +439,64 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
 });
 
 // ---------------------------------------------------------------------------
+// getTracesByThreadId's chronological ordering is a CONTRACT, not an incident.
+//
+// The underlying bulk read returns trace-id order; this method re-sorts. The
+// public-share branch of the tRPC thread route re-projects its authorized subset
+// onto that order rather than re-deriving one — so if this sort were dropped, the
+// anonymous (least-exercised) path would silently mis-order and the router's own
+// tests, which mock this service, would not notice. Pin it here, at the seam that
+// owns it.
+// ---------------------------------------------------------------------------
+
+describe("ClickHouseTraceService.getTracesByThreadId — ordering contract", () => {
+  describe("given a thread whose traces come back from the bulk read out of order", () => {
+    describe("when the thread is read", () => {
+      it("returns traces sorted chronologically", async () => {
+        const EARLY = "trace-early";
+        const LATE = "trace-late";
+
+        mockClickHouseQuery
+          // SELECT DISTINCT TraceId
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve([{ TraceId: LATE }, { TraceId: EARLY }]),
+          })
+          // resolveOccurredAtRange (hint-less thread read)
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve([
+                { fromMs: 1_700_000_000_000, toMs: 1_700_000_100_000 },
+              ]),
+          })
+          // joined summary rows — deliberately LATE first, as a trace-id-ordered
+          // read may well return them.
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve([
+                makeSummaryRow(LATE, { occurredAt: 1_700_000_090_000 }),
+                makeSummaryRow(EARLY, { occurredAt: 1_700_000_010_000 }),
+              ]),
+          })
+          // joined span rows
+          .mockResolvedValueOnce({ json: () => Promise.resolve([]) });
+
+        const { blobStore } = makeEventRefBlobStore();
+        const service = buildService(blobStore);
+
+        const traces = await service.getTracesByThreadId(
+          PROJECT_ID,
+          "thread-1",
+          protections,
+        );
+
+        expect(traces.map((t) => t.trace_id)).toEqual([EARLY, LATE]);
+      });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // AC1 — a SUMMARY read (no spans emitted) still resolves trace-level IO
 //
 // The bug this guards: resolution lives inside enrichTracesWithSpans, which used

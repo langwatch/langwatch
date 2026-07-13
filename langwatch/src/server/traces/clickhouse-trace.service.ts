@@ -521,7 +521,16 @@ export class ClickHouseTraceService {
    * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the
    *   thread-detail read resolves full IO (#4991). Customer thread views that
    *   construct without a blob resolver get a no-op. Defaults to false.
-   * @returns Array of Trace objects (empty array if no matching traces found)
+   * @returns Array of Trace objects, **sorted chronologically by
+   *   `timestamps.started_at` ascending** (empty array if no matching traces).
+   *   The ordering is part of this method's contract, not an incidental detail:
+   *   the underlying bulk read returns trace-id order, and callers rely on the
+   *   chronological order this restores. The public-share branch of the
+   *   `getTracesByThreadId` tRPC route re-projects its authorized subset onto
+   *   this order rather than re-deriving one, so dropping the sort here would
+   *   silently mis-order that (anonymous, least-exercised) path. Pinned by
+   *   "returns traces sorted chronologically" in
+   *   clickhouse-trace.service-4991-bulk.unit.test.ts.
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTracesByThreadId(
