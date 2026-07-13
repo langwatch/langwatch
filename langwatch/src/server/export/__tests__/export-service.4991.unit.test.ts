@@ -3,9 +3,9 @@
  *
  * A trace export consumes content: a truncated value is data loss in the CSV/
  * JSONL. Proves (a) ExportService.create() constructs TraceService WITH
- * blob-resolution deps, and (b) a FULL export opts resolveBlobs into the
- * getAllTracesForProject options (summary export, which reads no span content,
- * does not).
+ * blob-resolution deps, and (b) BOTH export modes opt resolveBlobs into the
+ * getAllTracesForProject options — full mode because it emits span IO, summary
+ * mode because it still emits trace-level input/output.
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
@@ -141,9 +141,16 @@ describe("ExportService — #4991 AC1 full export resolution", () => {
     });
   });
 
-  describe("given a SUMMARY export (no span content read)", () => {
+  // A SUMMARY export reads NO span content — but it is still a content-consuming
+  // read: buildSummaryRow emits trace-level `trace.input.value` / `trace.output
+  // .value` (serializers/csv-serializer.ts:91-92), and the summary JSON
+  // serializer does the same. Gating resolution on includeSpans therefore
+  // silently shipped the truncated 64 KB preview for any offloaded (>64 KB)
+  // trace, with no error and no indication data was cut — the exact data-loss
+  // bug this PR exists to fix, just on the other export mode.
+  describe("given a SUMMARY export (reads trace-level input/output)", () => {
     describe("when exportTraces streams a batch", () => {
-      it("does NOT opt resolveBlobs in (stays on the preview, zero event_log reads)", async () => {
+      it("opts resolveBlobs in so an offloaded trace is not truncated to its preview", async () => {
         const { traceService, optionsSeen } =
           buildOptionsCapturingTraceService();
         const service = new ExportService({ traceService });
@@ -151,7 +158,42 @@ describe("ExportService — #4991 AC1 full export resolution", () => {
         await drainExport(service, buildExportRequest({ mode: "summary" }));
 
         expect(optionsSeen.length).toBeGreaterThan(0);
-        expect(optionsSeen.every((o) => o.resolveBlobs === false)).toBe(true);
+        expect(optionsSeen.every((o) => o.resolveBlobs === true)).toBe(true);
+      });
+
+      it("reads no span content (includeSpans stays false)", async () => {
+        const { traceService, optionsSeen } =
+          buildOptionsCapturingTraceService();
+        const service = new ExportService({ traceService });
+
+        await drainExport(service, buildExportRequest({ mode: "summary" }));
+
+        expect(optionsSeen.every((o) => o.includeSpans === false)).toBe(true);
+      });
+    });
+  });
+
+  // Grounds WHY the assertion above must hold: prove the summary payload really
+  // does carry the trace-level IO value. If a future change stopped emitting
+  // input/output in summary rows, resolving blobs there would become dead cost
+  // and this test would tell us so.
+  describe("given a SUMMARY csv export of a trace with trace-level IO", () => {
+    describe("when the export is drained", () => {
+      it("emits the trace input/output value into the payload", async () => {
+        const { traceService } = buildOptionsCapturingTraceService();
+        const service = new ExportService({ traceService });
+
+        let payload = "";
+        for await (const { chunk } of service.exportTraces({
+          request: buildExportRequest({ mode: "summary", format: "csv" }),
+          protections,
+        })) {
+          payload += chunk;
+        }
+
+        // The stub trace carries input "hello" / output "world".
+        expect(payload).toContain("hello");
+        expect(payload).toContain("world");
       });
     });
   });
