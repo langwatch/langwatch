@@ -47,6 +47,27 @@ export class NlpgoHandledError extends DomainError {
  * Unwraps the AI SDK's RetryError to the last attempt, since
  * generateObject surfaces exhausted retries that way.
  */
+/**
+ * True when `error` is an abort — e.g. an `AbortSignal.timeout` cap firing.
+ * `AbortSignal.timeout().reason` is a `DOMException` (name "TimeoutError"), not
+ * `instanceof Error` in this runtime, so match on the `name` property directly.
+ * Mirrors the abort names in `@ai-sdk/provider-utils`' `isAbortError`
+ * ("AbortError" / "TimeoutError" / Next.js "ResponseAborted") — kept as a local
+ * copy because `ai` doesn't re-export it and provider-utils isn't a direct dep.
+ * No `RetryError` unwrap: the AI SDK re-throws aborts RAW before wrapping, so an
+ * abort is never a `RetryError.lastError` (verified against ai@6.0.217). Lives
+ * here beside `nlpgoHandledErrorFrom` so every `generateObject` caller can share
+ * one abort predicate.
+ */
+export function isAbortLikeError(error: unknown): boolean {
+  const name = (error as { name?: unknown } | null | undefined)?.name;
+  return (
+    name === "AbortError" ||
+    name === "TimeoutError" ||
+    name === "ResponseAborted"
+  );
+}
+
 export function nlpgoHandledErrorFrom(error: unknown): NlpgoHandledError | null {
   const cause = RetryError.isInstance(error) ? error.lastError : error;
   if (!APICallError.isInstance(cause) || !cause.responseBody) {
