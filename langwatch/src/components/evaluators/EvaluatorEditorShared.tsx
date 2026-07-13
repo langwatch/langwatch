@@ -905,11 +905,20 @@ export function EvaluatorEditorFooter({
     isValid,
     saveButtonText,
     onLocalConfigChange,
+    onComparisonChange,
     handleSave,
     handleDiscard,
     handleApply,
     handleClose,
   } = controller;
+
+  // Only a comparison editor mirrors its config into the store live (via
+  // onComparisonChange), so only there does an unrunnable (sub-2-variant)
+  // config need Apply gated. For every other local-config evaluator — an
+  // unnamed LLM-judge whose name isValid deliberately rejects — Apply must
+  // keep its original always-enabled behavior, so gating on isValid here
+  // doesn't newly trap them behind the name requirement.
+  const isComparisonEditor = !!onComparisonChange;
 
   if (onLocalConfigChange) {
     return (
@@ -939,13 +948,13 @@ export function EvaluatorEditorFooter({
           colorPalette="blue"
           size="sm"
           onClick={handleApply}
-          // Same gate as Save (right): a comparison below its 2-variant
-          // minimum must not be applyable either, or `onComparisonChange`
-          // has already mirrored an unrunnable config into the store live
-          // and Apply just closes over it. Benign for non-comparison
-          // evaluators — isValid there only requires a non-empty name,
-          // which Save already enforces identically.
-          disabled={!isValid || isSaving}
+          // A comparison below its 2-variant minimum must not be applyable —
+          // onComparisonChange has already mirrored an unrunnable config into
+          // the store live and Apply just closes over it. The ENTIRE guard is
+          // scoped to the comparison editor: base had no `disabled` on Apply
+          // at all, so a non-comparison editor (e.g. a still-unnamed LLM
+          // judge) keeps Apply always-enabled, pixel-identical to before.
+          disabled={isComparisonEditor && (!isValid || isSaving)}
           data-testid="evaluator-apply-button"
         >
           Apply

@@ -123,7 +123,14 @@ export function FieldInfoTooltip({
             autoFocus: false,
           }
         : {})}
-      positioning={{ placement: "right-start", gutter: 8 }}
+      // gutter only in hover mode (the wider gap keeps the pointer from
+      // crossing an empty seam and closing mid-hover). Click mode keeps the
+      // original positioning exactly, so the existing gateway callers are
+      // pixel-identical to before this component moved.
+      positioning={{
+        placement: "right-start",
+        ...(isHover && { gutter: 8 }),
+      }}
     >
       <Popover.Trigger asChild>
         <IconButton
