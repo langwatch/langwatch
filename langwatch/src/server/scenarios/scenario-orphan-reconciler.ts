@@ -88,8 +88,9 @@ export function isOrphanedQueuedRun({
  * INTENTIONALLY cross-tenant: this is a startup ops reconciler (like the
  * storage-metering / TTL scans) and runs with the shared ClickHouse client, so
  * it deliberately omits the per-tenant `TenantId = {...}` filter that every
- * other simulation_runs query carries. This is the one documented exception to
- * the per-tenant rule.
+ * other simulation_runs query carries. See the "Boot-time system sweeps" carve-out
+ * in dev/docs/best_practices/clickhouse-queries.md for when this is allowed; the
+ * IN_PROGRESS sweep in orphaned-run-reconciliation.clickhouse.ts is the other one.
  *
  * Latest version per (TenantId, ScenarioRunId) is resolved with GROUP BY +
  * argMax(col, UpdatedAt) (never max(col)). simulation_runs is a
