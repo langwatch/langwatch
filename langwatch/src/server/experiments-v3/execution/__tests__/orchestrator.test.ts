@@ -472,13 +472,13 @@ describe("orchestrator", () => {
         });
       });
 
-      // A null output still counts as "the target ran", so the cell is built.
-      // The candidate must be empty rather than the four characters "null":
-      // langevals drops empty candidates and skips the row for having fewer
-      // than two, which is the honest outcome. Judging the word "null" is not.
+      // A null output still counts as "the target ran", so it passes the
+      // missing-output check. But null has no text to compare, and judging the
+      // four characters "null" against real answers is worse than skipping. The
+      // row is skipped with an empty-output reason rather than judged.
       describe("when the output is null", () => {
-        it("empties the candidate instead of judging the text 'null'", () => {
-          const { cells } = generateComparisonCells(
+        it("skips the row instead of judging the text 'null'", () => {
+          const { cells, skipReasons } = generateComparisonCells(
             structuredState(),
             createTestDataset(1),
             new Map([
@@ -487,7 +487,9 @@ describe("orchestrator", () => {
             ]) as never,
           );
 
-          expect(cells[0]?.comparison?.candidates[0]?.output).toBe("");
+          expect(cells).toHaveLength(0);
+          expect(skipReasons[0]?.kind).toBe("empty-output");
+          expect(skipReasons[0]?.variantNames).toEqual(["target-1"]);
         });
       });
     });
@@ -624,12 +626,13 @@ describe("orchestrator", () => {
           expect(output).toContain("- Faithfulness: score=0.91");
         });
 
-        // The scores used to be appended even when the variant produced no
-        // output, leaving a candidate that was a score block and nothing else.
-        // langevals only drops EMPTY candidates, so that one survived and the
-        // judge scored a variant that had said nothing against ones that had.
-        it("keeps an empty output empty rather than sending scores alone", () => {
-          const { cells } = generateComparisonCells(
+        // A variant that produced no output must not have its score block
+        // appended — that would leave a candidate that was scores and nothing
+        // else, which langevals won't drop, so the judge would score a variant
+        // that had said nothing. The row is skipped with an empty-output reason
+        // instead.
+        it("skips the row rather than sending a scores-only candidate", () => {
+          const { cells, skipReasons } = generateComparisonCells(
             scoredState(),
             createTestDataset(1),
             new Map([
@@ -639,16 +642,18 @@ describe("orchestrator", () => {
             scores,
           );
 
-          expect(cells[0]?.comparison?.candidates[0]?.output).toBe("");
+          expect(cells).toHaveLength(0);
+          expect(skipReasons[0]?.kind).toBe("empty-output");
+          expect(skipReasons[0]?.variantNames).toEqual(["target-1"]);
         });
 
-        // An unserializable output (circular refs, BigInt) has no text to carry
-        // the scores, so it empties out and the row is skipped.
-        it("empties an unserializable output", () => {
+        // An unserializable output (circular refs, BigInt) has no text to
+        // carry, so the row is skipped for the same reason.
+        it("skips the row when an output cannot be serialized", () => {
           const circular: Record<string, unknown> = { answer: "from A" };
           circular.self = circular;
 
-          const { cells } = generateComparisonCells(
+          const { cells, skipReasons } = generateComparisonCells(
             scoredState(),
             createTestDataset(1),
             new Map([
@@ -658,7 +663,8 @@ describe("orchestrator", () => {
             scores,
           );
 
-          expect(cells[0]?.comparison?.candidates[0]?.output).toBe("");
+          expect(cells).toHaveLength(0);
+          expect(skipReasons[0]?.kind).toBe("empty-output");
         });
       });
     });
@@ -778,7 +784,65 @@ describe("orchestrator", () => {
 
       expect(cells).toHaveLength(0);
       expect(skipReasons).toHaveLength(1);
-      expect(skipReasons[0]?.missingVariantNames).toEqual(["target-2"]);
+      expect(skipReasons[0]?.kind).toBe("missing-output");
+      expect(skipReasons[0]?.variantNames).toEqual(["target-2"]);
+    });
+
+    // A saved comparison can point at an output field the target no longer
+    // emits — someone renamed it on the prompt. The target still runs, so the
+    // missing-output check passes it, but the picked field resolves to nothing.
+    // The row is skipped with a distinct reason, not judged one candidate short.
+    describe("when a picked output field no longer exists", () => {
+      const stateWithPath = (path: string[]) => {
+        const state = createTestState(2, 0);
+        state.targets.push({
+          id: "comparison-target",
+          type: "evaluator",
+          targetEvaluatorId: "db-select-best-evaluator",
+          inputs: [],
+          outputs: [{ identifier: "label", type: "str" }],
+          mappings: {},
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+            variantOutputPaths: { "target-1": path },
+          },
+        });
+        return state;
+      };
+
+      const structuredOutputs = new Map([
+        ["0:target-1", { output: { answer: "from A" }, cost: 0, duration: 1 }],
+        ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
+      ]);
+
+      it("skips the row with an empty-output reason naming the variant", () => {
+        const { cells, skipReasons } = generateComparisonCells(
+          stateWithPath(["renamed"]),
+          createTestDataset(1),
+          structuredOutputs,
+        );
+
+        expect(cells).toHaveLength(0);
+        expect(skipReasons).toHaveLength(1);
+        expect(skipReasons[0]?.kind).toBe("empty-output");
+        expect(skipReasons[0]?.variantNames).toEqual(["target-1"]);
+      });
+
+      it("judges the row when the picked field does exist", () => {
+        const { cells, skipReasons } = generateComparisonCells(
+          stateWithPath(["answer"]),
+          createTestDataset(1),
+          structuredOutputs,
+        );
+
+        expect(skipReasons).toHaveLength(0);
+        expect(cells).toHaveLength(1);
+        expect(cells[0]?.comparison?.candidates[0]?.output).toBe("from A");
+      });
     });
 
     // #5378: golden field is only required when the user hasn't opted out

@@ -305,8 +305,18 @@ export type ComparisonSkipReason = {
   targetId: string;
   /** The evaluator (or column-target) id whose cell would have run. */
   evaluatorId: string;
-  /** Display-friendly identifiers of the variants that produced no output. */
-  missingVariantNames: string[];
+  /**
+   * Why the row was skipped:
+   *  - "missing-output": a variant hasn't produced output yet — re-running the
+   *    upstream target fixes it.
+   *  - "empty-output": a variant ran but its comparison text came out empty —
+   *    the picked output field is gone (renamed schema) or the output was
+   *    empty/unserializable. Re-running the target will NOT help; the config or
+   *    the output is the problem.
+   */
+  kind: "missing-output" | "empty-output";
+  /** Display-friendly identifiers of the variants that triggered the skip. */
+  variantNames: string[];
 };
 
 /**
@@ -478,8 +488,9 @@ export const generateComparisonCells = (
     resolvedVariants: TargetConfig[],
     rowIndex: number,
   ):
-    | { candidates: ExecutionCell["comparison"]; missing?: never }
-    | { candidates?: never; missing: string[] } => {
+    | { candidates: ExecutionCell["comparison"]; missing?: never; empty?: never }
+    | { candidates?: never; missing: string[]; empty?: never }
+    | { candidates?: never; missing?: never; empty: string[] } => {
     const outputs = cfg.variants.map((id) =>
       completedTargetOutputs.get(`${rowIndex}:${id}`),
     );
@@ -491,11 +502,10 @@ export const generateComparisonCells = (
 
     const candidates = cfg.variants.map((variantId, i) => {
       // Narrow to the chosen field first, serialize it, then append the
-      // scores. An empty candidate stays empty: langevals drops it and skips
-      // the row, which is the honest outcome. Appending the block regardless
-      // produced a candidate that was nothing but scores — no output at all —
-      // which langevals would not drop, so the judge scored a variant that had
-      // said nothing against ones that had.
+      // scores. Appending the score block only when there IS text keeps an
+      // empty candidate empty: appending regardless produced a candidate that
+      // was nothing but scores, which langevals won't drop, so the judge scored
+      // a variant that had said nothing against ones that had.
       const text = toCandidateText(
         pickOutputPath(outputs[i]!.output, cfg.variantOutputPaths?.[variantId]),
       );
@@ -506,6 +516,16 @@ export const generateComparisonCells = (
         duration: outputs[i]!.duration,
       };
     });
+
+    // A candidate whose text is empty — the picked field is gone, or the output
+    // was empty/unserializable — can't be judged. langevals would drop it and
+    // skip the row silently; surface it as a skip reason instead, so a renamed
+    // output field doesn't turn into a verdict computed from one fewer
+    // candidate (or a bare "no verdict" for a two-way).
+    const empty = resolvedVariants
+      .filter((_, i) => candidates[i]!.output === "")
+      .map(variantIdentifierFor);
+    if (empty.length > 0) return { empty };
 
     return { candidates: { candidates } };
   };
@@ -526,12 +546,13 @@ export const generateComparisonCells = (
       if (!datasetEntry) continue;
 
       const built = buildCandidates(cfg, resolvedVariants, rowIndex);
-      if (built.missing) {
+      if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
           targetId: anchorVariant.id,
           evaluatorId: evaluator.id,
-          missingVariantNames: built.missing,
+          kind: built.missing ? "missing-output" : "empty-output",
+          variantNames: built.missing ?? built.empty,
         });
         continue;
       }
@@ -589,12 +610,13 @@ export const generateComparisonCells = (
       if (!datasetEntry) continue;
 
       const built = buildCandidates(cfg, resolvedVariants, rowIndex);
-      if (built.missing) {
+      if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
           targetId: target.id,
           evaluatorId: target.id,
-          missingVariantNames: built.missing,
+          kind: built.missing ? "missing-output" : "empty-output",
+          variantNames: built.missing ?? built.empty,
         });
         continue;
       }
@@ -1902,9 +1924,8 @@ export async function* runOrchestrator(
         );
 
         // Emit a synthetic evaluator_result error event for each row we had
-        // to skip because a variant didn't produce output. Without this the
-        // comparison column would sit at "No verdict yet" indefinitely with
-        // no indication that the upstream prompt is the actual problem.
+        // to skip. Without this the comparison column would sit at "No verdict
+        // yet" indefinitely with no indication of what the real problem is.
         //
         // pushEvent feeds the SSE stream so the UI cell re-renders into the
         // friendlyError surface immediately; processEventForStorage also
@@ -1916,10 +1937,21 @@ export async function* runOrchestrator(
             aborted = true;
             break;
           }
-          const which = formatList(reason.missingVariantNames);
-          const noun =
-            reason.missingVariantNames.length > 1 ? "outputs" : "output";
-          const detail = `Waiting on ${which} — no ${noun} for this row yet. Run ${which} first, then re-run this comparison.`;
+          const which = formatList(reason.variantNames);
+          const { detail, errorType } =
+            reason.kind === "missing-output"
+              ? {
+                  detail: `Waiting on ${which} — no ${
+                    reason.variantNames.length > 1 ? "outputs" : "output"
+                  } for this row yet. Run ${which} first, then re-run this comparison.`,
+                  errorType: "MissingVariantOutput",
+                }
+              : {
+                  // Re-running won't help — the output is empty or the picked
+                  // field is gone. Point the user at the output-field config.
+                  detail: `${which} produced no text to compare for this row. Check the output field selected for ${which}.`,
+                  errorType: "EmptyVariantOutput",
+                };
           const skipEvent: EvaluationV3Event = {
             type: "evaluator_result",
             rowIndex: reason.rowIndex,
@@ -1928,7 +1960,7 @@ export async function* runOrchestrator(
             result: {
               status: "error",
               details: detail,
-              error_type: "MissingVariantOutput",
+              error_type: errorType,
             } as unknown as SingleEvaluationResult,
           };
           pushEvent(skipEvent);
