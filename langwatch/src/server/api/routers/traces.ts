@@ -230,34 +230,71 @@ export const tracesRouter = createTRPCRouter({
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
       );
-      const tracesGrouped = await traceService.getTracesByThreadId(
+
+      // SECURITY (#4991): full blob resolution de-offloads the whole IO value
+      // from event_log and must NEVER run pre-authorization. For an authorized
+      // (non-public) caller the whole thread is theirs to read, so resolve full
+      // up front. For a public-share caller — an anonymous, publicProcedure
+      // path — resolving the full thread first would (a) de-offload traces the
+      // caller is not authorized to see and (b) let a single valid share link
+      // amplify unbounded event_log reads across every other trace in the
+      // thread. So the public branch reads PREVIEW ONLY, authorizes down to the
+      // shared trace IDs, then resolves full IO for JUST those authorized IDs.
+      if (!ctx.publiclyShared) {
+        return traceService.getTracesByThreadId(
+          projectId,
+          threadId,
+          protections,
+          { full: true },
+        );
+      }
+
+      // Public-share path: preview-only read (zero event_log resolution).
+      const previewTraces = await traceService.getTracesByThreadId(
         projectId,
         threadId,
         protections,
-        { full: true },
+        { full: false },
       );
-
-      if (!ctx.publiclyShared) {
-        return tracesGrouped;
-      }
 
       const publicSharedTraces = await ctx.prisma.publicShare.findMany({
         where: {
           projectId: projectId,
           resourceType: PublicShareResourceTypes.TRACE,
           resourceId: {
-            in: tracesGrouped.map((trace) => trace.trace_id),
+            in: previewTraces.map((trace) => trace.trace_id),
           },
         },
       });
 
-      const filteredTraces = tracesGrouped.filter((trace) =>
-        publicSharedTraces.some(
-          (publicShare) => publicShare.resourceId === trace.trace_id,
-        ),
+      const authorizedTraceIds = previewTraces
+        .filter((trace) =>
+          publicSharedTraces.some(
+            (publicShare) => publicShare.resourceId === trace.trace_id,
+          ),
+        )
+        .map((trace) => trace.trace_id);
+
+      if (authorizedTraceIds.length === 0) {
+        return [];
+      }
+
+      // Resolve full IO for ONLY the post-authorization trace IDs.
+      const authorizedTraces = await traceService.getTracesWithSpans(
+        projectId,
+        authorizedTraceIds,
+        protections,
+        undefined,
+        { full: true },
       );
 
-      return filteredTraces;
+      // Preserve the chronological order the thread view expects.
+      authorizedTraces.sort(
+        (a, b) =>
+          (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
+      );
+
+      return authorizedTraces;
     }),
 
   getTracesWithSpans: protectedProcedure
