@@ -55,14 +55,14 @@ vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
 }));
 
 // `getAllForDownload` is a tRPC *mutation*, so the auditLogMutations middleware
-// runs and writes an audit row. It reaches for the `prisma` SINGLETON exported by
-// ~/server/db — not `ctx.prisma` — so overriding the context is not enough: the
-// real client tries to open a Postgres connection the unit shard has no server
-// for. That both fails the assertion and leaves a pending socket that keeps the
-// vitest worker's event loop alive. Stub the singleton so the audit write is a
-// no-op and this stays a true unit test of the router's call-site wiring.
-vi.mock("~/server/db", () => ({
-  prisma: { auditLog: { create: vi.fn().mockResolvedValue({}) } },
+// runs and writes an audit row via the `prisma` SINGLETON — not `ctx.prisma` —
+// so overriding the context is not enough: the real client tries to open a
+// Postgres connection the unit shard has no server for. That both fails the
+// assertion and leaves a pending socket that keeps the vitest worker alive.
+// Stub the audit function itself, matching translate/apiKey.myBindings/
+// workflows.generateCommitMessage in this directory.
+vi.mock("../../../auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("../../rbac", async (importOriginal) => {
@@ -221,10 +221,13 @@ describe("traces router — #4991 AC2 thread reads", () => {
 // ---------------------------------------------------------------------------
 
 describe("traces router — #4991 AC2 public-share thread read", () => {
+  // The thread read returns traces already sorted chronologically (the CH
+  // service sorts before returning), so the fixture is sorted too — the router
+  // relies on that order rather than re-deriving one.
   const previewTraces = [
-    { trace_id: "t3", timestamps: { started_at: 300 } },
     { trace_id: "t1", timestamps: { started_at: 100 } },
     { trace_id: "t2", timestamps: { started_at: 200 } },
+    { trace_id: "t3", timestamps: { started_at: 300 } },
   ];
 
   let publicCaller: ReturnType<typeof tracesRouter.createCaller>;
@@ -317,15 +320,16 @@ describe("traces router — #4991 AC2 public-share thread read", () => {
         { resourceId: "t1" },
         { resourceId: "t3" },
       ]);
-      // Deliberately returned out of chronological order, as the underlying
-      // trace-id-keyed bulk read does.
+      // getTracesWithSpans comes back in TRACE-ID order, not thread order — so
+      // hand it back deliberately scrambled. The router must not pass this
+      // through; it re-projects onto the thread's order.
       mockGetTracesWithSpans.mockResolvedValue([
         { trace_id: "t3", timestamps: { started_at: 300 } },
         { trace_id: "t1", timestamps: { started_at: 100 } },
       ]);
     });
 
-    it("returns them in chronological order", async () => {
+    it("returns them in the thread's order, not the bulk read's order", async () => {
       const result = await publicCaller.getTracesByThreadId({
         projectId: "project_123",
         threadId: "thread-1",
@@ -409,6 +413,26 @@ describe("traces router — #4991 AC1 download", () => {
         expect.any(Object),
         expect.any(Object),
         expect.objectContaining({ downloadMode: true, resolveBlobs: true }),
+      );
+    });
+  });
+
+  // A download returns trace-level input/output whether or not spans are
+  // included, so gating resolveBlobs on includeSpans truncated any offloaded
+  // trace in a spans-less download — the same bug fixed in ExportService for
+  // summary-mode exports. Falsifiable: restore `resolveBlobs: input.includeSpans`
+  // and this fails while the includeSpans:true case above still passes.
+  describe("when getAllForDownload is called WITHOUT includeSpans", () => {
+    it("still opts resolveBlobs in, so the download is not truncated", async () => {
+      await caller.getAllForDownload({ ...baseFilters, includeSpans: false });
+      expect(mockGetAllTracesForProject).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(Object),
+        expect.objectContaining({
+          downloadMode: true,
+          includeSpans: false,
+          resolveBlobs: true,
+        }),
       );
     });
   });

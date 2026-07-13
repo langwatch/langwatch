@@ -154,15 +154,12 @@ export class ExportService {
         {
           downloadMode: true,
           includeSpans,
-          // SECURITY/correctness (#4991): BOTH export modes are content-consuming
-          // reads. Full mode emits span IO; summary mode still emits trace-level
-          // `trace.input`/`trace.output` (see csv/json summary serializers). For
-          // an offloaded (>64 KB) trace, gating resolution on `includeSpans`
-          // would silently ship the truncated 64 KB preview in a summary export
-          // with no error and no indication data was cut. Resolve blobs for every
-          // export mode so no export path serves the preview it shouldn't. Exports
-          // are a bounded/streamed bulk read via this PR's batch resolver, so the
-          // extra event_log reads stay pool-safe.
+          // DATA LOSS (#4991): summary mode reads no span content, but it still
+          // emits trace-level `trace.input`/`trace.output` (see the csv/json
+          // summary serializers) — so it is content-consuming too. Gating on
+          // `includeSpans` therefore shipped the truncated 64 KB preview for any
+          // offloaded trace, silently. Resolve for every export mode; the batch
+          // resolver keeps the extra event_log reads bounded.
           resolveBlobs: true,
           scrollId: scrollId ?? null,
         },

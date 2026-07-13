@@ -17,9 +17,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
+import type { ResolvedTraceSpans } from "../resolve-offloaded-traces";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 import { resolveOffloadedTracesBatch } from "../resolve-offloaded-traces-batch";
 import type { GetAllTracesForProjectInput } from "../types";
@@ -264,37 +266,126 @@ describe("ClickHouseTraceService.getAllTracesForProject — #4991 AC1 export", (
 });
 
 // ---------------------------------------------------------------------------
-// Batch-resolver contract — one resolution per input trace, in input order
+// Batch-resolver contract — one resolution per input trace, IN INPUT ORDER
 //
-// ResolveTraceSpansBatchFn is INJECTED, so the 1:1 invariant is a convention its
-// type cannot enforce. A resolver that drops an entry used to flow into a
-// `resolutions[i]!` non-null assertion and silently pair the wrong resolved
-// spans with the wrong trace summary. Drive a NON-CONFORMING resolver through
-// the real service and observe the failure, rather than asserting on a string.
+// ResolveTraceSpansBatchFn is INJECTED and ResolvedTraceSpans carries no trace
+// identity, so the pairing is purely positional and the type cannot enforce it.
+// Two distinct ways to break it, and the ORDER one is the dangerous half: it
+// keeps the count, so a length-only guard waves it through and each trace's IO
+// is scattered onto its neighbour. Drive genuinely non-conforming resolvers
+// through the REAL service and observe the failure, rather than asserting on a
+// string.
 // ---------------------------------------------------------------------------
 
-describe("ClickHouseTraceService — batch-resolver cardinality contract", () => {
-  /** Service wired with a batch resolver that drops every resolution. */
-  function buildServiceWithDroppingBatchResolver(): ClickHouseTraceService {
+describe("ClickHouseTraceService — batch-resolver contract", () => {
+  /** Service wired with a batch resolver of the caller's choosing. */
+  function buildServiceWithBatchResolver(
+    resolve: (
+      projectId: string,
+      spansPerTrace: NormalizedSpan[][],
+    ) => Promise<ResolvedTraceSpans[]>,
+  ): ClickHouseTraceService {
     return new ClickHouseTraceService(
       { project: { findUnique: vi.fn() } } as never,
       undefined,
-      // Violates the contract: returns 0 resolutions for N input traces.
-      () => Promise.resolve([]),
+      resolve,
     );
   }
 
-  describe("given an injected batch resolver that returns fewer resolutions than input traces", () => {
+  /** Passthrough resolution for a trace's spans (resolves nothing). */
+  function passthrough(spans: NormalizedSpan[]): ResolvedTraceSpans {
+    return {
+      resolvedSpans: spans,
+      recomputedInput: null,
+      recomputedOutput: null,
+      anyResolved: false,
+    };
+  }
+
+  describe("given a resolver that returns FEWER resolutions than input traces", () => {
     describe("when a resolveBlobs read runs", () => {
-      it("throws a descriptive error naming the mismatch", async () => {
+      it("throws naming the cardinality mismatch", async () => {
         setupThreadMocks();
-        const service = buildServiceWithDroppingBatchResolver();
+        // Violates the contract: 0 resolutions for 1 input trace.
+        const service = buildServiceWithBatchResolver(() =>
+          Promise.resolve([]),
+        );
 
         await expect(
           service.getTracesByThreadId(PROJECT_ID, "thread-1", protections, {
             resolveBlobs: true,
           }),
         ).rejects.toThrow(/returned 0 resolution\(s\) for 1 trace\(s\)/);
+      });
+    });
+  });
+
+  describe("given a resolver that returns the right COUNT in the WRONG ORDER", () => {
+    const TRACE_A = "trace-a";
+    const TRACE_B = "trace-b";
+
+    /** Two traces, each with one span — mocked for a direct getTracesWithSpans read. */
+    function setupTwoTraceMocks() {
+      mockClickHouseQuery
+        // fetchTracesWithSpansJoined: summary rows
+        .mockResolvedValueOnce({
+          json: () =>
+            Promise.resolve([makeSummaryRow(TRACE_A), makeSummaryRow(TRACE_B)]),
+        })
+        // fetchTracesWithSpansJoined: span rows
+        .mockResolvedValueOnce({
+          json: () =>
+            Promise.resolve([
+              makeSpanRowWithEventRef(TRACE_A, "span-a", {
+                tenantId: PROJECT_ID,
+                previewOutput: PREVIEW_OUTPUT,
+              }),
+              makeSpanRowWithEventRef(TRACE_B, "span-b", {
+                tenantId: PROJECT_ID,
+                previewOutput: PREVIEW_OUTPUT,
+              }),
+            ]),
+        });
+    }
+
+    describe("when a resolveBlobs read runs", () => {
+      it("throws naming the misaligned trace, instead of scattering each trace's IO onto its neighbour", async () => {
+        setupTwoTraceMocks();
+        const service = buildServiceWithBatchResolver((_projectId, spans) =>
+          // Right count (2 for 2), reversed order — the silent-corruption case
+          // a length-only guard cannot see.
+          Promise.resolve([...spans].reverse().map(passthrough)),
+        );
+
+        await expect(
+          service.getTracesWithSpans(
+            PROJECT_ID,
+            [TRACE_A, TRACE_B],
+            protections,
+            { from: 0, to: Date.now() },
+            { resolveBlobs: true },
+          ),
+        ).rejects.toThrow(/resolutions must come back in input order/);
+      });
+    });
+  });
+
+  describe("given a CONFORMING resolver", () => {
+    describe("when a resolveBlobs read runs", () => {
+      it("passes the contract check and returns the traces", async () => {
+        setupThreadMocks();
+        const service = buildServiceWithBatchResolver((_projectId, spans) =>
+          Promise.resolve(spans.map(passthrough)),
+        );
+
+        const traces = await service.getTracesByThreadId(
+          PROJECT_ID,
+          "thread-1",
+          protections,
+          { resolveBlobs: true },
+        );
+
+        expect(traces.map((t) => t.trace_id)).toEqual([TRACE_ID]);
       });
     });
   });

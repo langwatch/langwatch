@@ -232,20 +232,48 @@ export class ClickHouseClientUnavailableError extends Error {
 
 /**
  * Thrown when an injected {@link ResolveTraceSpansBatchFn} breaks its contract by
- * not returning exactly one resolution per input trace, in input order. The type
- * cannot enforce that invariant, so it is enforced at the call boundary. Never
- * caused by data — always a resolver (or test-double) bug.
+ * not returning exactly one resolution per input trace, in input order.
+ * `ResolvedTraceSpans` carries no trace identity of its own, so the pairing is
+ * purely positional and the type cannot enforce it — it is enforced at the call
+ * boundary instead. Never caused by data; always a resolver (or test-double) bug.
  *
- * Like {@link ClickHouseClientUnavailableError}, the read paths' generic
- * try/catch re-throws this UNWRAPPED, so the mismatch reaches the caller instead
- * of being flattened into "Failed to fetch traces from ClickHouse".
+ * The read paths flatten failures into a generic "Failed to fetch traces…"; both
+ * of them allowlist this class by `instanceof` and re-throw it unwrapped, so a
+ * contract violation reaches the caller with the mismatch intact rather than
+ * masquerading as a ClickHouse fetch failure.
  */
-export class TraceSpansBatchCardinalityError extends Error {
-  constructor({ got, expected }: { got: number; expected: number }) {
-    super(
+export class TraceSpansBatchResolverContractError extends Error {
+  private constructor(message: string) {
+    super(message);
+    this.name = "TraceSpansBatchResolverContractError";
+  }
+
+  /** Wrong number of resolutions — entries were dropped or invented. */
+  static cardinality({
+    got,
+    expected,
+  }: {
+    got: number;
+    expected: number;
+  }): TraceSpansBatchResolverContractError {
+    return new TraceSpansBatchResolverContractError(
       `resolveTraceSpansBatch returned ${got} resolution(s) for ${expected} trace(s); it must return exactly one per input trace, in input order`,
     );
-    this.name = "TraceSpansBatchCardinalityError";
+  }
+
+  /** Right count, wrong order — the silent-corruption case. */
+  static misaligned({
+    index,
+    expected,
+    got,
+  }: {
+    index: number;
+    expected: string;
+    got: string;
+  }): TraceSpansBatchResolverContractError {
+    return new TraceSpansBatchResolverContractError(
+      `resolveTraceSpansBatch returned a resolution for trace "${got}" at position ${index}, where trace "${expected}" was supplied; resolutions must come back in input order`,
+    );
   }
 }
 
@@ -392,7 +420,8 @@ export class ClickHouseTraceService {
           // A resolver-contract violation is a code bug, not a fetch failure —
           // surface it verbatim rather than flattening it into the generic
           // message and losing the mismatch.
-          if (error instanceof TraceSpansBatchCardinalityError) throw error;
+          if (error instanceof TraceSpansBatchResolverContractError)
+            throw error;
           this.logger.error(
             {
               projectId,
@@ -561,7 +590,8 @@ export class ClickHouseTraceService {
         } catch (error) {
           // See getTracesWithSpans: a resolver-contract violation is a code bug,
           // not a fetch failure — surface it verbatim.
-          if (error instanceof TraceSpansBatchCardinalityError) throw error;
+          if (error instanceof TraceSpansBatchResolverContractError)
+            throw error;
           this.logger.error(
             {
               projectId,
@@ -662,6 +692,13 @@ export class ClickHouseTraceService {
           );
           return traces;
         } catch (error) {
+          // Third flattening catch on this class, and it sits ABOVE
+          // getTracesWithSpans — so a contract violation re-thrown unwrapped by
+          // that method lands here and would be flattened again. Allowlist it,
+          // same as the other two. (Live path: called with resolveBlobs from the
+          // thread router and the evaluation-execution service.)
+          if (error instanceof TraceSpansBatchResolverContractError)
+            throw error;
           this.logger.error(
             {
               projectId,
@@ -2372,10 +2409,28 @@ export class ClickHouseTraceService {
       // letting a downstream non-null assertion crash with no context (or not
       // crash at all, and just scatter the wrong IO onto the wrong span).
       if (resolutions.length !== spansPerTrace.length) {
-        throw new TraceSpansBatchCardinalityError({
+        throw TraceSpansBatchResolverContractError.cardinality({
           got: resolutions.length,
           expected: spansPerTrace.length,
         });
+      }
+
+      // Cardinality alone does NOT catch the silent-corruption case: a resolver
+      // that returns the right COUNT in the wrong ORDER scatters each trace's IO
+      // onto its neighbour. Resolved spans are derived from the input spans, so
+      // they carry the trace identity the resolution itself lacks — use it to
+      // check the positional pairing actually holds. A trace with no spans has
+      // no identity to compare, so it is skipped rather than guessed at.
+      for (const [index, spans] of spansPerTrace.entries()) {
+        const expected = spans[0]?.traceId;
+        const got = resolutions[index]?.resolvedSpans[0]?.traceId;
+        if (expected !== undefined && got !== undefined && expected !== got) {
+          throw TraceSpansBatchResolverContractError.misaligned({
+            index,
+            expected,
+            got,
+          });
+        }
       }
 
       return resolutions;

@@ -1,4 +1,5 @@
 import { on } from "node:events";
+import type { PrismaClient } from "@prisma/client";
 import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
@@ -10,6 +11,8 @@ import {
 } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
+import type { Trace } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { createLogger } from "~/utils/logger/server";
@@ -30,6 +33,77 @@ import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
 export { getAllForProjectInput };
 
 const logger = createLogger("langwatch:traces:sse-subscription");
+
+/**
+ * Reads a thread on behalf of an ANONYMOUS public-share caller, who is entitled
+ * to only the individually-shared traces within it — not the whole thread.
+ *
+ * Order matters here, and it is a security property (#4991, #5082): resolving
+ * `{ full: true }` de-offloads the entire IO value out of `event_log`, so doing
+ * it before authorization narrows the set would let one valid share link amplify
+ * unbounded `event_log` reads across every other trace in the thread — traces
+ * this caller may not read. That is the ClickHouse connection-pool exhaustion
+ * the ADR-022 offload exists to prevent, reachable unauthenticated.
+ *
+ * So: read PREVIEW-only (zero `event_log` reads), authorize down to the shared
+ * trace ids, and only then resolve full IO — for those ids alone.
+ */
+async function readPubliclySharedThread({
+  traceService,
+  prisma,
+  projectId,
+  threadId,
+  protections,
+}: {
+  traceService: TraceService;
+  prisma: PrismaClient;
+  projectId: string;
+  threadId: string;
+  protections: Protections;
+}): Promise<Trace[]> {
+  const previewTraces = await traceService.getTracesByThreadId(
+    projectId,
+    threadId,
+    protections,
+    { full: false },
+  );
+
+  const publicShares = await prisma.publicShare.findMany({
+    where: {
+      projectId,
+      resourceType: PublicShareResourceTypes.TRACE,
+      resourceId: { in: previewTraces.map((trace) => trace.trace_id) },
+    },
+  });
+
+  const authorizedTraceIds = previewTraces
+    .filter((trace) =>
+      publicShares.some((share) => share.resourceId === trace.trace_id),
+    )
+    .map((trace) => trace.trace_id);
+
+  if (authorizedTraceIds.length === 0) {
+    return [];
+  }
+
+  const authorizedTraces = await traceService.getTracesWithSpans(
+    projectId,
+    authorizedTraceIds,
+    protections,
+    undefined,
+    { full: true },
+  );
+
+  // `authorizedTraceIds` already carries the thread's canonical order — the
+  // preview read returned it sorted, and filter/map preserve that. A direct
+  // getTracesWithSpans call comes back in trace-id order instead, so re-project
+  // onto the ids rather than re-deriving an ordering here; the thread read stays
+  // the single owner of what "thread order" means.
+  const resolvedById = new Map(
+    authorizedTraces.map((trace) => [trace.trace_id, trace]),
+  );
+  return authorizedTraceIds.flatMap((id) => resolvedById.get(id) ?? []);
+}
 
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -231,15 +305,8 @@ export const tracesRouter = createTRPCRouter({
         buildTraceBlobResolutionDeps(),
       );
 
-      // SECURITY (#4991): full blob resolution de-offloads the whole IO value
-      // from event_log and must NEVER run pre-authorization. For an authorized
-      // (non-public) caller the whole thread is theirs to read, so resolve full
-      // up front. For a public-share caller — an anonymous, publicProcedure
-      // path — resolving the full thread first would (a) de-offload traces the
-      // caller is not authorized to see and (b) let a single valid share link
-      // amplify unbounded event_log reads across every other trace in the
-      // thread. So the public branch reads PREVIEW ONLY, authorizes down to the
-      // shared trace IDs, then resolves full IO for JUST those authorized IDs.
+      // An authorized caller owns the whole thread, so resolve it full up front.
+      // An anonymous public-share caller does not — see readPubliclySharedThread.
       if (!ctx.publiclyShared) {
         return traceService.getTracesByThreadId(
           projectId,
@@ -249,52 +316,13 @@ export const tracesRouter = createTRPCRouter({
         );
       }
 
-      // Public-share path: preview-only read (zero event_log resolution).
-      const previewTraces = await traceService.getTracesByThreadId(
+      return readPubliclySharedThread({
+        traceService,
+        prisma: ctx.prisma,
         projectId,
         threadId,
         protections,
-        { full: false },
-      );
-
-      const publicSharedTraces = await ctx.prisma.publicShare.findMany({
-        where: {
-          projectId: projectId,
-          resourceType: PublicShareResourceTypes.TRACE,
-          resourceId: {
-            in: previewTraces.map((trace) => trace.trace_id),
-          },
-        },
       });
-
-      const authorizedTraceIds = previewTraces
-        .filter((trace) =>
-          publicSharedTraces.some(
-            (publicShare) => publicShare.resourceId === trace.trace_id,
-          ),
-        )
-        .map((trace) => trace.trace_id);
-
-      if (authorizedTraceIds.length === 0) {
-        return [];
-      }
-
-      // Resolve full IO for ONLY the post-authorization trace IDs.
-      const authorizedTraces = await traceService.getTracesWithSpans(
-        projectId,
-        authorizedTraceIds,
-        protections,
-        undefined,
-        { full: true },
-      );
-
-      // Preserve the chronological order the thread view expects.
-      authorizedTraces.sort(
-        (a, b) =>
-          (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
-      );
-
-      return authorizedTraces;
     }),
 
   getTracesWithSpans: protectedProcedure
@@ -533,10 +561,12 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      // Download consumes trace content — resolve full IO when spans are
-      // included so exported rows carry the whole value, not the 64 KB preview
-      // (#4991 AC1). resolveBlobs is gated on includeSpans (resolution runs
-      // during span enrichment).
+      // A download consumes trace content, so it must never serve the 64 KB
+      // preview (#4991 AC1) — and that holds whether or not spans are included,
+      // because the returned traces carry trace-level `input`/`output` either
+      // way. Gating resolveBlobs on includeSpans (as this did) silently
+      // truncated any offloaded trace in a spans-less download, the same
+      // data-loss bug fixed in ExportService for summary-mode exports.
       const traceService = TraceService.create(
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
@@ -551,7 +581,7 @@ export const tracesRouter = createTRPCRouter({
         {
           downloadMode: true,
           includeSpans: input.includeSpans,
-          resolveBlobs: input.includeSpans,
+          resolveBlobs: true,
           scrollId: input.scrollId,
         },
       );
