@@ -857,17 +857,17 @@ export function EvaluatorEditorBody({
         )}
 
         {!isComparison && mappingsConfig && onMappingChange && (
-            <Box paddingTop={4}>
-              <EvaluatorMappingsSection
-                evaluatorDef={effectiveEvaluatorDef}
-                level={mappingsConfig.level}
-                providedSources={mappingsConfig.availableSources}
-                initialMappings={mappingsConfig.initialMappings}
-                onMappingChange={onMappingChange}
-                scrollToMissingOnMount={true}
-              />
-            </Box>
-          )}
+          <Box paddingTop={4}>
+            <EvaluatorMappingsSection
+              evaluatorDef={effectiveEvaluatorDef}
+              level={mappingsConfig.level}
+              providedSources={mappingsConfig.availableSources}
+              initialMappings={mappingsConfig.initialMappings}
+              onMappingChange={onMappingChange}
+              scrollToMissingOnMount={true}
+            />
+          </Box>
+        )}
       </VStack>
     </FormProvider>
   );
