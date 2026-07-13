@@ -63,9 +63,13 @@ func (s Stack) OverlayEnv() []string {
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
 	}
 	// A stable local API key so the seed always mints the same credential and any
-	// agent can authenticate without rediscovering it per worktree.
+	// agent can authenticate without rediscovering it per worktree. Emitted as
+	// HAVEN_SEED_LANGWATCH_API_KEY, never LANGWATCH_API_KEY: the latter is the langwatch
+	// SDK trigger, and a platform process that had it set would self-instrument into
+	// its own trace ingest. The TS + Go platform entry points panic if LANGWATCH_API_KEY
+	// is ever set; domain_test.go pins that this overlay never emits it.
 	if s.LocalAPIKey != "" {
-		env = append(env, "LANGWATCH_API_KEY="+s.LocalAPIKey)
+		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+s.LocalAPIKey)
 	}
 	// The rest of the static seeded identity (see prisma/seed.ts's header comment
 	// for the full rationale) — same story: fixed values so any worktree or agent
