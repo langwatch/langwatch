@@ -55,6 +55,11 @@ type CancelledNotification = Extract<
   { type: "cancelled" }
 >;
 
+type PaymentFailedNotification = Extract<
+  SubscriptionNotificationPayload,
+  { type: "payment_failed" }
+>;
+
 type NotificationServiceOptions = {
   config: Pick<
     AppConfig,
@@ -80,6 +85,18 @@ const formatDate = (value?: Date | null) =>
         timeStyle: "short",
       }).format(value)
     : "Now";
+
+const formatCurrencyCents = ({
+  cents,
+  currency,
+}: {
+  cents: number;
+  currency: string;
+}) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
 
 const buildProspectiveBlocks = (
   payload: ProspectiveNotification,
@@ -259,6 +276,101 @@ const buildCancelledBlocks = (
   ];
 };
 
+const getStripeSubscriptionLink = ({
+  stripeSubscriptionId,
+  livemode,
+}: {
+  stripeSubscriptionId: string;
+  livemode: boolean;
+}): string =>
+  `https://dashboard.stripe.com/${livemode ? "" : "test/"}subscriptions/${stripeSubscriptionId}`;
+
+const paymentFailedContextText = (
+  priorFailure: PaymentFailedNotification["priorFailure"],
+): string | null => {
+  switch (priorFailure.kind) {
+    case "no-prior-failure":
+      return "No prior unresolved failure for this subscription.";
+    case "earlier-cycle":
+      return `Previous failure: ${formatDate(priorFailure.at)}`;
+    case "same-invoice-retry":
+      return null;
+  }
+};
+
+const buildPaymentFailedBlocks = (
+  payload: PaymentFailedNotification,
+  adminLink: string,
+): IncomingWebhookSendArguments["blocks"] => {
+  const contextText = paymentFailedContextText(payload.priorFailure);
+
+  return [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: payload.livemode
+          ? "Subscription payment failed"
+          : "Subscription payment failed (test mode)",
+      },
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Organization:* ${payload.organizationName}`,
+        },
+        { type: "mrkdwn", text: `*Plan:* ${payload.plan}` },
+        ...(payload.amountDue
+          ? [
+              {
+                type: "mrkdwn" as const,
+                text: `*Amount due:* ${formatCurrencyCents(payload.amountDue)}`,
+              },
+            ]
+          : []),
+        ...(payload.attemptCount != null
+          ? [
+              {
+                type: "mrkdwn" as const,
+                text: `*Attempt:* ${payload.attemptCount} for this invoice`,
+              },
+            ]
+          : []),
+      ],
+    },
+    ...(contextText
+      ? [
+          {
+            type: "context" as const,
+            elements: [{ type: "mrkdwn" as const, text: contextText }],
+          },
+        ]
+      : []),
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Open org in admin" },
+          url: adminLink,
+          action_id: "subscription_payment_failed_admin",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Open in Stripe" },
+          url: getStripeSubscriptionLink({
+            stripeSubscriptionId: payload.stripeSubscriptionId,
+            livemode: payload.livemode,
+          }),
+          action_id: "subscription_payment_failed_stripe",
+        },
+      ],
+    },
+  ];
+};
+
 // ---------------------------------------------------------------------------
 // NotificationService - Channel dispatch (HOW to send)
 // ---------------------------------------------------------------------------
@@ -429,6 +541,9 @@ export class NotificationService {
       case "cancelled":
         blocks = buildCancelledBlocks(payload, adminLink);
         break;
+      case "payment_failed":
+        blocks = buildPaymentFailedBlocks(payload, adminLink);
+        break;
     }
 
     await this.sendSlackMessage({
@@ -469,10 +584,10 @@ export class NotificationService {
   async sendSlackLicensePurchase(
     payload: LicensePurchaseNotificationPayload,
   ): Promise<void> {
-    const amountFormatted = new Intl.NumberFormat("en-US", {
-      style: "currency",
+    const amountFormatted = formatCurrencyCents({
+      cents: payload.amountPaid,
       currency: payload.currency,
-    }).format(payload.amountPaid / 100);
+    });
 
     await this.sendSlackMessage({
       channelUrl: this.config.slackSubscriptionsChannel,

@@ -61,10 +61,46 @@ type CancelledSubscriptionNotification = SubscriptionNotificationBase & {
   cancellationDate?: Date | null;
 };
 
+/**
+ * Where a payment failure sits relative to earlier recorded failures,
+ * resolved by the webhook service (domain knowledge — the Slack builder
+ * only renders it):
+ * - `no-prior-failure`: nothing recorded before this event (the date resets
+ *   on successful payment, so this is not necessarily the first failure ever)
+ * - `same-invoice-retry`: a failure was already recorded during this
+ *   invoice's dunning cycle; the attempt count carries the retry signal
+ * - `earlier-cycle`: the previous recorded failure predates this invoice's
+ *   creation, i.e. it carried over from an earlier dunning cycle
+ */
+export type PaymentFailurePrior =
+  | { kind: "no-prior-failure" }
+  | { kind: "same-invoice-retry" }
+  | { kind: "earlier-cycle"; at: Date };
+
+/**
+ * Internal ops alert for a failed Stripe invoice charge. One alert per
+ * `invoice.payment_failed` event is sent (no dedup) — Stripe fires one per
+ * retry attempt and retries of the same invoice can be days apart, so
+ * elapsed time alone cannot tell a retry from a new failure. The retry
+ * signal instead comes from the invoice itself: `attemptCount` says which
+ * attempt this is, and `priorFailure` classifies any previously recorded
+ * failure against the invoice's creation date.
+ */
+type PaymentFailedSubscriptionNotification = SubscriptionNotificationBase & {
+  type: "payment_failed";
+  subscriptionId: string;
+  stripeSubscriptionId: string;
+  livemode: boolean;
+  amountDue?: { cents: number; currency: string } | null;
+  attemptCount?: number | null;
+  priorFailure: PaymentFailurePrior;
+};
+
 export type SubscriptionNotificationPayload =
   | ProspectiveSubscriptionNotification
   | ConfirmedSubscriptionNotification
-  | CancelledSubscriptionNotification;
+  | CancelledSubscriptionNotification
+  | PaymentFailedSubscriptionNotification;
 
 export type ResourceLimitNotificationContext = {
   organizationId: string;
