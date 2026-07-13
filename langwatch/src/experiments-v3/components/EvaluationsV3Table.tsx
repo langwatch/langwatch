@@ -52,6 +52,7 @@ import type {
   ComparisonEvaluatorConfig,
   DatasetColumn,
   DatasetReference,
+  EvaluationResults,
   EvaluatorConfig,
   FieldMapping,
   SavedRecord,
@@ -124,6 +125,43 @@ export const isComparisonConfigured = (e: EvaluatorConfig) => {
     isGoldenFieldSatisfied(comparison)
   );
 };
+
+/**
+ * Per-row evaluator results for one target: every per-target evaluator's
+ * verdict, plus — for a column-target comparison (target.type === "evaluator"
+ * with an embedded comparison config) — the target's own row keyed by its own
+ * id, since the target IS the evaluator for this row-shaping purpose. Reads
+ * `toComparisonConfig(target)` rather than the raw `target.pairwise` field:
+ * normalizeTargets rewrites `pairwise` to `comparison` at load, so a check
+ * against the raw legacy field is always false post-normalization and would
+ * silently drop every column-target comparison's row data. Exported so it can
+ * be unit-tested directly instead of only through a full table render.
+ */
+export const buildTargetEvaluatorsForRow = (
+  target: TargetConfig,
+  evaluators: EvaluatorConfig[],
+  results: EvaluationResults,
+  rowIndex: number,
+): Record<string, unknown> =>
+  Object.fromEntries([
+    ...evaluators.map(
+      (evaluator) =>
+        [
+          evaluator.id,
+          results.evaluatorResults[target.id]?.[evaluator.id]?.[rowIndex] ??
+            null,
+        ] as [string, unknown],
+    ),
+    ...(toComparisonConfig(target)
+      ? [
+          [
+            target.id,
+            results.evaluatorResults[target.id]?.[target.id]?.[rowIndex] ??
+              null,
+          ] as [string, unknown],
+        ]
+      : []),
+  ]);
 
 // ============================================================================
 // Main Component
@@ -1159,24 +1197,12 @@ export function EvaluationsV3Table({
             {
               output: results.targetOutputs[target.id]?.[index] ?? null,
               // All evaluators apply to all targets
-              evaluators: Object.fromEntries([
-                ...evaluators.map((evaluator) => [
-                  evaluator.id,
-                  results.evaluatorResults[target.id]?.[evaluator.id]?.[
-                    index
-                  ] ?? null,
-                ]),
-                ...(target.pairwise
-                  ? [
-                      [
-                        target.id,
-                        results.evaluatorResults[target.id]?.[target.id]?.[
-                          index
-                        ] ?? null,
-                      ],
-                    ]
-                  : []),
-              ] as Array<[string, unknown]>),
+              evaluators: buildTargetEvaluatorsForRow(
+                target,
+                evaluators,
+                results,
+                index,
+              ),
               // Error for this target/row
               error: results.errors[target.id]?.[index] ?? null,
               // Loading if this specific cell is in the executing set AND has no output/error yet

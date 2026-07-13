@@ -18,6 +18,10 @@ import {
   getFlowCallbacks,
   useDrawer,
 } from "~/hooks/useDrawer";
+import {
+  COMPARISON_EVALUATOR_TYPE,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
+} from "~/experiments-v3/types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -90,7 +94,20 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
           (evaluator.config as { evaluatorType?: string } | null)
             ?.evaluatorType === props.filterEvaluatorType,
       )
-    : evaluatorsQuery.data;
+    : // Comparison evaluators (current + legacy pairwise) judge target
+      // columns against each other and only make sense wired through the
+      // Comparison card in TargetTypeSelectorDrawer, which sets their
+      // `variants`/`goldenField`. Attached here as a per-target chip
+      // instead, they'd have no variants configured and nothing to judge.
+      evaluatorsQuery.data?.filter((evaluator) => {
+        const evaluatorType = (
+          evaluator.config as { evaluatorType?: string } | null
+        )?.evaluatorType;
+        return (
+          evaluatorType !== COMPARISON_EVALUATOR_TYPE &&
+          evaluatorType !== LEGACY_PAIRWISE_EVALUATOR_TYPE
+        );
+      });
 
   const deleteMutation = api.evaluators.delete.useMutation({
     onSuccess: () => {
