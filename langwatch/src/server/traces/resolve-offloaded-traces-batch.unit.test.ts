@@ -72,6 +72,10 @@ function makeSpan(
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
+    // Required (nullable) since #5012 wired per-span cost into NormalizedSpan.
+    // Blob resolution is cost-agnostic, so null is the honest fixture value.
+    cost: null,
+    nonBilledCost: null,
     ...overrides,
   };
 }
