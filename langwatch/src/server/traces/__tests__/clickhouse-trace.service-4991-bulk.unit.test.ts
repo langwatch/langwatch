@@ -249,6 +249,43 @@ describe("ClickHouseTraceService.getAllTracesForProject — #4991 AC1 export", (
 });
 
 // ---------------------------------------------------------------------------
+// Batch-resolver contract — one resolution per input trace, in input order
+//
+// ResolveTraceSpansBatchFn is INJECTED, so the 1:1 invariant is a convention its
+// type cannot enforce. A resolver that drops an entry used to flow into a
+// `resolutions[i]!` non-null assertion and silently pair the wrong resolved
+// spans with the wrong trace summary. Drive a NON-CONFORMING resolver through
+// the real service and observe the failure, rather than asserting on a string.
+// ---------------------------------------------------------------------------
+
+describe("ClickHouseTraceService — batch-resolver cardinality contract", () => {
+  /** Service wired with a batch resolver that drops every resolution. */
+  function buildServiceWithDroppingBatchResolver(): ClickHouseTraceService {
+    return new ClickHouseTraceService(
+      { project: { findUnique: vi.fn() } } as never,
+      undefined,
+      // Violates the contract: returns 0 resolutions for N input traces.
+      () => Promise.resolve([]),
+    );
+  }
+
+  describe("given an injected batch resolver that returns fewer resolutions than input traces", () => {
+    describe("when a resolveBlobs read runs", () => {
+      it("throws a descriptive error naming the mismatch", async () => {
+        setupThreadMocks();
+        const service = buildServiceWithDroppingBatchResolver();
+
+        await expect(
+          service.getTracesByThreadId(PROJECT_ID, "thread-1", protections, {
+            resolveBlobs: true,
+          }),
+        ).rejects.toThrow(/returned 0 resolution\(s\) for 1 trace\(s\)/);
+      });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // AC5 — list/search grid keeps preview, ZERO event_log reads
 // ---------------------------------------------------------------------------
 

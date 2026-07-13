@@ -62,12 +62,22 @@ interface SpanPlan {
 /** Internal: outcome of a single event_log fetch. */
 type FetchResult = { ok: true; value: string } | { ok: false; error: unknown };
 
-/** Builds the dedup key for a fetch task. NUL separator can't collide with ids. */
-function fetchKeyOf(
-  aggregateId: string,
-  eventId: string,
-  field: string,
-): string {
+/**
+ * Builds the dedup key for a fetch task. NUL separator can't collide with ids.
+ *
+ * Named params, not positional: all three args are plain strings, so a caller
+ * that transposed two of them would compile cleanly and silently dedupe/fetch
+ * the wrong event_log row onto the wrong span.
+ */
+function fetchKeyOf({
+  aggregateId,
+  eventId,
+  field,
+}: {
+  aggregateId: string;
+  eventId: string;
+  field: string;
+}): string {
   return `${aggregateId}\u0000${eventId}\u0000${field}`;
 }
 
@@ -182,7 +192,7 @@ export async function resolveOffloadedTracesBatch({
       // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
       const aggregateId = span.traceId;
       const refs = eventrefEntries.map(({ attrKey, field, eventId }) => {
-        const fetchKey = fetchKeyOf(aggregateId, eventId, field);
+        const fetchKey = fetchKeyOf({ aggregateId, eventId, field });
         if (!fetchTasks.has(fetchKey)) {
           fetchTasks.set(fetchKey, { eventId, field, aggregateId });
         }

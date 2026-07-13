@@ -231,6 +231,25 @@ export class ClickHouseClientUnavailableError extends Error {
 }
 
 /**
+ * Thrown when an injected {@link ResolveTraceSpansBatchFn} breaks its contract by
+ * not returning exactly one resolution per input trace, in input order. The type
+ * cannot enforce that invariant, so it is enforced at the call boundary. Never
+ * caused by data — always a resolver (or test-double) bug.
+ *
+ * Like {@link ClickHouseClientUnavailableError}, the read paths' generic
+ * try/catch re-throws this UNWRAPPED, so the mismatch reaches the caller instead
+ * of being flattened into "Failed to fetch traces from ClickHouse".
+ */
+export class TraceSpansBatchCardinalityError extends Error {
+  constructor({ got, expected }: { got: number; expected: number }) {
+    super(
+      `resolveTraceSpansBatch returned ${got} resolution(s) for ${expected} trace(s); it must return exactly one per input trace, in input order`,
+    );
+    this.name = "TraceSpansBatchCardinalityError";
+  }
+}
+
+/**
  * Service for fetching traces from ClickHouse.
  *
  * Fetches trace summaries and, when needed, span rows via separate ClickHouse
@@ -370,6 +389,10 @@ export class ClickHouseTraceService {
 
           return traces;
         } catch (error) {
+          // A resolver-contract violation is a code bug, not a fetch failure —
+          // surface it verbatim rather than flattening it into the generic
+          // message and losing the mismatch.
+          if (error instanceof TraceSpansBatchCardinalityError) throw error;
           this.logger.error(
             {
               projectId,
@@ -536,6 +559,9 @@ export class ClickHouseTraceService {
           );
           return traces;
         } catch (error) {
+          // See getTracesWithSpans: a resolver-contract violation is a code bug,
+          // not a fetch failure — surface it verbatim.
+          if (error instanceof TraceSpansBatchCardinalityError) throw error;
           this.logger.error(
             {
               projectId,
@@ -2331,7 +2357,28 @@ export class ClickHouseTraceService {
     resolveBlobs?: boolean;
   }): Promise<ResolvedTraceSpans[]> {
     if (resolveBlobs === true && this.resolveTraceSpansBatch) {
-      return this.resolveTraceSpansBatch(projectId, spansPerTrace);
+      const resolutions = await this.resolveTraceSpansBatch(
+        projectId,
+        spansPerTrace,
+      );
+
+      // ResolveTraceSpansBatchFn is INJECTED, so "one resolution per input
+      // trace, in input order" is a convention its type cannot enforce. Today's
+      // resolver honours it via .map, but a future resolver (or a test double)
+      // that drops or reorders entries would silently pair the wrong resolved
+      // spans with the wrong trace summary on this hot bulk-read path — shared
+      // by export, thread, and the dataset/sample builders. Fail loudly at the
+      // boundary, where the offending resolver is still nameable, instead of
+      // letting a downstream non-null assertion crash with no context (or not
+      // crash at all, and just scatter the wrong IO onto the wrong span).
+      if (resolutions.length !== spansPerTrace.length) {
+        throw new TraceSpansBatchCardinalityError({
+          got: resolutions.length,
+          expected: spansPerTrace.length,
+        });
+      }
+
+      return resolutions;
     }
 
     if (resolveBlobs === true && this.resolveTraceSpans) {
