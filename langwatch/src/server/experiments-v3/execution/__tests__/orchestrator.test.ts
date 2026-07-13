@@ -772,6 +772,57 @@ describe("orchestrator", () => {
       expect(cells[0]?.comparison?.candidates[1]?.id).toBe("be-formal");
     });
 
+    // Two variants pointing at the SAME prompt (compare v1 vs v2, the case
+    // comparison.feature adds "same-name variants" for) resolve to the same
+    // handle. Using the handle as candidate id would make the winning label
+    // name two candidates at once, so the winner is unattributable. The
+    // colliding entries must fall back to their unique target ids instead.
+    it("falls back to target ids when two variants share the same prompt handle", () => {
+      const state = createTestState(2, 0);
+      const variantA = state.targets[0]!;
+      const variantB = state.targets[1]!;
+      // Both point at the SAME prompt → same handle.
+      (variantA as { type: string; promptId?: string }).type = "prompt";
+      (variantA as { type: string; promptId?: string }).promptId = "prompt_X";
+      (variantB as { type: string; promptId?: string }).type = "prompt";
+      (variantB as { type: string; promptId?: string }).promptId = "prompt_X";
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        pairwise: {
+          variantA: variantA.id,
+          variantB: variantB.id,
+          hasGoldenAnswer: true,
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const loadedPrompts = new Map<
+        string,
+        { handle: string } & Record<string, unknown>
+      >([["prompt_X", { handle: "shared-handle" } as never]]);
+
+      const { cells } = generateComparisonCells(
+        state,
+        createTestDataset(1),
+        new Map([
+          ["0:" + variantA.id, { output: "a" }],
+          ["0:" + variantB.id, { output: "b" }],
+        ]),
+        undefined,
+        loadedPrompts as never,
+      );
+
+      const ids = cells[0]?.comparison?.candidates.map((c) => c.id) ?? [];
+      // Distinct — the winner is attributable to exactly one variant.
+      expect(new Set(ids).size).toBe(2);
+      expect(ids).toEqual([variantA.id, variantB.id]);
+    });
+
     it("falls back to target id (not promptId) when handle is unavailable", () => {
       const state = createTestState(2, 0);
       // Prompt-typed variants with promptIds but NO entry in loadedPrompts —

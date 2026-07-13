@@ -223,4 +223,14 @@ describe("resolveVerdictLabel", () => {
       );
     });
   });
+
+  describe("given a variant whose id is literally a slot letter", () => {
+    it("names that variant directly rather than slot-mapping to position 0", () => {
+      // A current-run label "B" that matches a variant id is that variant, not
+      // legacy slot B → must resolve to itself, not variants[0].
+      expect(
+        resolveVerdictLabel({ label: "B", variants: ["A", "B", "C"] }),
+      ).toBe("B");
+    });
+  });
 });

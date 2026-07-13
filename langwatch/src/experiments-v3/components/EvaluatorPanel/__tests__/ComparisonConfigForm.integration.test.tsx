@@ -158,6 +158,46 @@ describe("ComparisonConfigForm", () => {
     });
   });
 
+  // #5378: golden answer is opt-in. The Golden field picker is gated behind
+  // the "Has golden answer" toggle (comparison.feature:175, :180). The deleted
+  // PairwiseConfigForm test covered this; it must not go uncovered in the
+  // merged form.
+  describe("the has-golden-answer toggle", () => {
+    it("shows the golden field picker when on (the default)", () => {
+      renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
+
+      expect(
+        screen.getByTestId("comparison-golden-field"),
+      ).toBeInTheDocument();
+    });
+
+    it("hides the golden field picker when the user turns it off", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      renderForm({
+        value: baseConfig({ hasGoldenAnswer: true }),
+        onChange,
+      });
+
+      // Picker visible before the toggle.
+      expect(
+        screen.getByTestId("comparison-golden-field"),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("comparison-has-golden-answer"));
+
+      // Turning it off both clears goldenField and hides the picker.
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ hasGoldenAnswer: false, goldenField: "" }),
+      );
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("comparison-golden-field"),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
   // Restored from PairwiseConfigForm, which had a per-variant output picker
   // before the forms merged. Without it a variant emitting a structured
   // output cannot be narrowed to a field. Which field is a per-variant call:

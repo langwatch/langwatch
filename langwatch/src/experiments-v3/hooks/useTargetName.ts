@@ -169,8 +169,10 @@ export const useTargetNames = (
   });
 
   // api.useQueries returns a new array every render, so key the memo on the
-  // resolved names themselves rather than on the query objects.
-  const namesKey = names.join("|");
+  // resolved names themselves rather than on the query objects. JSON.stringify
+  // (not join) so distinct lists can't alias to the same key — ["a|b"] and
+  // ["a","b"] both join to "a|b" but stringify differently.
+  const namesKey = JSON.stringify(names);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(() => names, [namesKey]);
 };

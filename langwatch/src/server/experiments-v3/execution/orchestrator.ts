@@ -469,6 +469,34 @@ export const generateComparisonCells = (
   };
 
   /**
+   * Collision-safe candidate identifiers for a comparison's resolved variants.
+   *
+   * variantIdentifierFor prefers a prompt's HANDLE, which the judge echoes back
+   * as the winning label. But two variants can point at the SAME prompt (the
+   * "reuse the same prompt as two variants" case #5101 adds a spec for —
+   * comparing v1 vs v2, or one prompt with different model overrides) and so
+   * resolve to the SAME handle. The judge still picks a slot correctly, but it
+   * returns a label shared by two candidates, so every downstream consumer
+   * (scoreboard, win-rate chart, per-row winner) credits BOTH variants for the
+   * win and can never name the second as the sole winner.
+   *
+   * When a handle is shared by 2+ variants, fall back to the internal target id
+   * (always unique) for exactly the colliding entries. labelNamesVariant and
+   * detectComparisonColumns both accept target.id as a label, so it round-trips;
+   * the handle is still shown as the display name via useTargetName.
+   */
+  const buildVariantIdentifiers = (
+    resolvedVariants: TargetConfig[],
+  ): string[] => {
+    const raw = resolvedVariants.map(variantIdentifierFor);
+    const counts = new Map<string, number>();
+    for (const id of raw) counts.set(id, (counts.get(id) ?? 0) + 1);
+    return raw.map((id, i) =>
+      (counts.get(id) ?? 0) > 1 ? resolvedVariants[i]!.id : id,
+    );
+  };
+
+  /**
    * Resolve configured variant ids to their TargetConfigs, or null if
    * unusable. Applies the same "is this comparison usable" gate to every
    * comparison carrier — chip-style (evaluator.comparison) and column-style
@@ -521,6 +549,7 @@ export const generateComparisonCells = (
   const buildCandidates = (
     cfg: ComparisonEvaluatorConfig,
     resolvedVariants: TargetConfig[],
+    variantIds: string[],
     rowIndex: number,
   ):
     | { candidates: ExecutionCell["comparison"]; missing?: never; empty?: never }
@@ -530,9 +559,7 @@ export const generateComparisonCells = (
       completedTargetOutputs.get(`${rowIndex}:${id}`),
     );
 
-    const missing = resolvedVariants
-      .filter((_, i) => !outputs[i])
-      .map(variantIdentifierFor);
+    const missing = variantIds.filter((_, i) => !outputs[i]);
     if (missing.length > 0) return { missing };
 
     const candidates = cfg.variants.map((variantId, i) => {
@@ -545,7 +572,10 @@ export const generateComparisonCells = (
         pickOutputPath(outputs[i]!.output, cfg.variantOutputPaths?.[variantId]),
       );
       return {
-        id: variantIdentifierFor(resolvedVariants[i]!),
+        // Collision-safe id (handle, or target.id when a handle is shared) so
+        // the winning label always names exactly one variant — see
+        // buildVariantIdentifiers.
+        id: variantIds[i]!,
         output: text ? text + evaluatorScoresBlock(rowIndex, variantId) : text,
         cost: outputs[i]!.cost,
         duration: outputs[i]!.duration,
@@ -557,9 +587,7 @@ export const generateComparisonCells = (
     // skip the row silently; surface it as a skip reason instead, so a renamed
     // output field doesn't turn into a verdict computed from one fewer
     // candidate (or a bare "no verdict" for a two-way).
-    const empty = resolvedVariants
-      .filter((_, i) => candidates[i]!.output === "")
-      .map(variantIdentifierFor);
+    const empty = variantIds.filter((_, i) => candidates[i]!.output === "");
     if (empty.length > 0) return { empty };
 
     return { candidates: { candidates } };
@@ -574,13 +602,14 @@ export const generateComparisonCells = (
     const resolvedVariants = resolveVariants(cfg, evaluator.id);
     if (!resolvedVariants) continue;
 
+    const variantIds = buildVariantIdentifiers(resolvedVariants);
     const anchorVariant = resolvedVariants[0]!;
 
     for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const built = buildCandidates(cfg, resolvedVariants, rowIndex);
+      const built = buildCandidates(cfg, resolvedVariants, variantIds, rowIndex);
       if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
@@ -628,11 +657,13 @@ export const generateComparisonCells = (
     const resolvedVariants = resolveVariants(cfg, target.id);
     if (!resolvedVariants) continue;
 
+    const variantIds = buildVariantIdentifiers(resolvedVariants);
+
     for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const built = buildCandidates(cfg, resolvedVariants, rowIndex);
+      const built = buildCandidates(cfg, resolvedVariants, variantIds, rowIndex);
       if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
@@ -1489,7 +1520,10 @@ export async function* runOrchestrator(
 
   // Generate cells to execute
   const cells = generateCells(state, datasetRows, scope);
-  const totalCells = cells.length;
+  // Phase-1 count only; grows by the Phase-2 (comparison) cell count once
+  // those are generated after Phase 1 finishes, so the final summary's
+  // completedCells (which counts both phases) never exceeds totalCells.
+  let totalCells = cells.length;
 
   logger.info(
     {
@@ -1962,6 +1996,10 @@ export async function* runOrchestrator(
           loadedPrompts,
         );
 
+        // Fold Phase-2 cells into the run total now that we know how many
+        // there are, so progress and the final summary stay consistent.
+        totalCells += phase2Cells.length;
+
         // Emit a synthetic evaluator_result error event for each row we had
         // to skip. Without this the comparison column would sit at "No verdict
         // yet" indefinitely with no indication of what the real problem is.
@@ -2056,7 +2094,7 @@ export async function* runOrchestrator(
                 pushEvent({
                   type: "progress",
                   completed,
-                  total: totalCells + phase2Cells.length,
+                  total: totalCells,
                 });
               } finally {
                 semaphore.release();

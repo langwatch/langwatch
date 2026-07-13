@@ -939,6 +939,13 @@ export function EvaluatorEditorFooter({
           colorPalette="blue"
           size="sm"
           onClick={handleApply}
+          // Same gate as Save (right): a comparison below its 2-variant
+          // minimum must not be applyable either, or `onComparisonChange`
+          // has already mirrored an unrunnable config into the store live
+          // and Apply just closes over it. Benign for non-comparison
+          // evaluators — isValid there only requires a non-empty name,
+          // which Save already enforces identically.
+          disabled={!isValid || isSaving}
           data-testid="evaluator-apply-button"
         >
           Apply

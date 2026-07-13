@@ -77,9 +77,9 @@ export function ComparisonConfigForm({
   targets,
   datasetColumns,
 }: ComparisonConfigFormProps) {
-  // Same local-draft + ref pattern PairwiseConfigForm uses so back-to-back
-  // picks against a stale `value` prop don't stomp each other. Parent-
-  // pushed value changes still resync `draft`.
+  // Local-draft + ref pattern so back-to-back picks against a stale `value`
+  // prop don't stomp each other. Parent-pushed value changes still resync
+  // `draft`.
   const [draft, setDraft] = useState<ComparisonEvaluatorConfig>(value);
   useEffect(() => {
     setDraft(value);
@@ -352,8 +352,7 @@ function VariantCard({
 /**
  * Menu item for a target the user can add. Split into its own component so
  * `useTargetName` runs at a stable hook position (Rules of Hooks) even as
- * the remaining-targets list shrinks with each pick. Same rationale as
- * PairwiseConfigForm's TargetNameContributor.
+ * the remaining-targets list shrinks with each pick.
  */
 function VariantMenuItem({
   target,
@@ -376,8 +375,8 @@ function VariantMenuItem({
 
 /**
  * "Has golden answer" toggle plus the Golden field picker it gates.
- * Parity with PairwiseConfigForm's #5378 opt-out: source of truth is the
- * parent form's `settings.has_golden_answer` (the field the judge reads);
+ * Golden-answer is opt-in (#5378): source of truth is the parent form's
+ * `settings.has_golden_answer` (the field the judge reads);
  * `comparison.hasGoldenAnswer` is mirrored on every write so the
  * orchestrator's cell-generation guard and the missing-mappings validator
  * — which only see `evaluator.comparison`, not the evaluator's Python
@@ -412,7 +411,7 @@ function GoldenAnswerSection({
   // correct prompt is enforced regardless of HOW state changed (click,
   // form init, external setValue, load from persistence). Only swap when
   // the current prompt exactly matches a shipped default so hand-tuned
-  // prompts survive toggling. Same pattern PairwiseConfigForm uses.
+  // prompts survive toggling.
   const isDefaultPrompt = useCallback(
     ({
       value,

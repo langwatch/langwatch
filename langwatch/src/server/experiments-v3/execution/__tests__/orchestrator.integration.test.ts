@@ -1,5 +1,5 @@
 import type { Project } from "@prisma/client";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type {
   DatasetColumn,
   EvaluationsV3State,
@@ -11,6 +11,8 @@ import {
   createInitialResults,
   createInitialUIState,
 } from "~/experiments-v3/types";
+import { resetApp } from "~/server/app-layer/app";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { getTestProject } from "~/utils/testUtils";
 import { abortManager } from "../abortManager";
@@ -30,19 +32,16 @@ import type { EvaluationV3Event, ExecutionScope } from "../types";
 const hasNlpService =
   !!process.env.LANGWATCH_NLP_SERVICE && !!process.env.OPENAI_API_KEY;
 
-// KNOWN PRE-EXISTING GAP (unrelated to #5101/#5528, predates this PR): running
-// this file locally with both env vars set — the only way `hasNlpService` is
-// ever true, since CI never provides OPENAI_API_KEY and always skips this
-// whole describe block — currently throws "App not initialized. Call
-// initializeDefaultApp() first." from every single test here, including ones
-// untouched by this PR. `runOrchestrator` calls `getApp().experimentRuns`
-// (added February, see git blame on orchestrator.ts around that call), but
-// nothing in this suite's setupFiles or a beforeAll ever calls
-// initializeDefaultApp(). Not fixed here: it wires the entire app
-// composition (DB, event sourcing, outbox) and doing that safely — without
-// destabilizing whatever else runs in the same vitest worker — is its own
-// investigation, out of scope for a Comparison-feature PR. Left as a
-// separate, real, unfixed problem for whoever owns this suite.
+// `runOrchestrator` calls `getApp().experimentRuns`, which throws
+// "App not initialized" unless the composition is booted first — so the whole
+// suite needs a real app singleton, not just the NLP service. We boot it in
+// beforeAll (idempotent: reuses an app another file already initialized) and
+// tear it down in afterAll via resetApp so its Redis/BullMQ handles don't leak
+// into the next file. This whole block is skipIf(!hasNlpService)-gated and CI
+// never sets OPENAI_API_KEY, so none of this runs in CI — it only makes the
+// suite runnable locally with both env vars set, following the same
+// initializeDefaultApp + resetApp pattern presets.outboxWiring.integration
+// uses.
 describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
   let project: Project;
 
@@ -58,14 +57,21 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       console.warn("OPENAI_API_KEY not set, tests may fail");
     }
 
+    // Boot the app composition so getApp() (used by runOrchestrator) resolves.
+    initializeDefaultApp();
+
     // Get or create test project
     project = await getTestProject("orchestrator-integration");
+  });
+
+  afterAll(async () => {
+    await resetApp();
   });
 
   // Helper to create a simple prompt config
   const createPromptConfig = (): LocalPromptConfig => ({
     llm: {
-      model: "openai/gpt-4o-mini",
+      model: "openai/gpt-5-mini",
       temperature: 0,
       maxTokens: 50,
     },

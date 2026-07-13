@@ -100,6 +100,14 @@ export const normalizeTargets = (targets: TargetConfig[]): TargetConfig[] =>
  * Runs before the merge stored slot letters (`"A"` / `"B"`); runs after store
  * the winning candidate's identifier directly. Both still live in the database,
  * so both must resolve. `"tie"` passes through untouched.
+ *
+ * A label that already matches one of `variants` is a current-shape verdict
+ * naming a variant directly — return it as-is even when it is literally `"A"`
+ * or `"B"` (a variant whose target id happens to be a slot letter), so the
+ * slot-position mapping only fires for genuine legacy verdicts whose label
+ * matches no variant. (A prompt HANDLE that is literally `"A"`/`"B"` still
+ * can't be disambiguated here since the callers pass target ids, not handles —
+ * an accepted, near-zero residual: handles aren't single uppercase letters.)
  */
 export const resolveVerdictLabel = ({
   label,
@@ -108,6 +116,7 @@ export const resolveVerdictLabel = ({
   label: string;
   variants: string[];
 }): string => {
+  if (variants.includes(label)) return label;
   if (label === "A") return variants[0] ?? label;
   if (label === "B") return variants[1] ?? label;
   return label;
