@@ -58,6 +58,8 @@ The unconditional repository cap is deliberately coarser than the offload (it tr
 - Offloaded bytes are attributable per tenant through `size_bytes`, surfaced by `getStorageUsageByProject` and the storage-stats collector.
 - **Retention gotcha (accepted, with follow-up):** `stored_objects` has no TTL (its migration defines no `TTL` clause, and the no-retention invariant is pinned by a test). Offloaded evaluation inputs therefore outlive the `evaluation_runs` row TTL: the row expires on the retention schedule, but the durable object persists until the project is deleted (the stored-objects project-delete cascade removes it). This is accepted for now. Follow-up: a retention-aware sweep that deletes `purpose = "evaluation_inputs"` objects whose owning evaluation has aged out, so offloaded inputs honor the same retention window as the row.
 - The hard-ceiling case loses full content for pathological (>50 MiB) inputs. This is observable via the structured warning and is a conscious trade against unbounded PUTs.
+- **Kill-switch residual (accepted):** with `ops_evaluation_payload_offload_disabled` flipped, inputs flow inline again and only the unconditional 8 MiB repository cap bounds the row. 8 MiB × ~8K rows per granule re-approaches the fat-row merge-memory class at a higher threshold, so the switch is an *emergency* lever for object-storage trouble, not a steady state - revert it as soon as storage recovers.
+- The marker resolve path verifies the stored row's `purpose` and the content SHA-256 against the marker before returning resolved inputs; a mismatch (marker-shaped user input pointing at an unrelated same-project object, or corrupted content) degrades to the marker's preview instead of returning foreign bytes.
 
 ## References
 

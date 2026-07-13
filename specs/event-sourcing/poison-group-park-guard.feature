@@ -19,9 +19,18 @@ Feature: GroupQueue poison-group park guard
   #     strike in Redis BEFORE decoding, and clears it on every code path
   #     where the process survives (success, retry, exhausted-park, transient
   #     re-stage, graceful drain). A blocked event loop cannot run signal
-  #     handlers or clears, so only genuine loop-killers accumulate strikes.
-  #     At claim, strikes >= threshold parks the group via the existing
-  #     blocked-set mechanism with an explanatory stored error.
+  #     handlers or clears, so only loop-killing crashes leave strikes behind.
+  #   - Strikes select a SUSPECT, never park by themselves: every group
+  #     co-in-flight with the killer dies with the same uncleared strike (up
+  #     to globalConcurrency innocents per crash, redelivered as the same
+  #     cohort after the active TTL), so counting cannot tell the poison from
+  #     its bystanders.
+  #   - Isolation: a suspect over the threshold runs SOLO in the worker -
+  #     intake paused, every other in-flight job settled - behind an isolation
+  #     marker written to Redis before any decode/handler work. A death during
+  #     a marked solo run is attributable beyond doubt; the surviving marker
+  #     parks the group on its next claim. A healthy bystander survives its
+  #     solo run, clears marker and strikes, and never parks.
   #   - Decode size guard: staged values larger than the encode-side cap
   #     (legacy/bare payloads that predate or bypass envelope writes) are
   #     parked without being JSON.parsed; gunzip output is bounded so a
@@ -32,14 +41,34 @@ Feature: GroupQueue poison-group park guard
   Background:
     Given a GroupQueue with jobs routed through queue-manager facades
 
-  Scenario: a group whose jobs repeatedly kill the worker is parked at claim
+  Scenario: a group that dies during an isolation run is parked at its next claim
     Given a group whose staged job blocks the event loop until the process is killed
-    And the group has accumulated claim strikes at or above the poison threshold
+    And the group's isolation marker survived the worker's death
     When a worker claims the group again after a restart
     Then the group is moved to the blocked set before the job payload is decoded
-    And the stored group error explains the park with the accumulated strike count
+    And the stored group error explains that the death happened in isolation
     And the staged job remains staged for operator inspection or replay
     And other groups continue to dispatch and process normally
+
+  Scenario: a suspect group is run in isolation instead of being parked on strikes alone
+    Given a group whose claim strikes exceed the poison threshold
+    When a worker claims the group
+    Then the group's job runs while no other job is in flight in the process
+    And an isolation marker is written before the job runs and cleared after it settles
+    And the group is not parked
+
+  Scenario: a bystander that inherited strikes from another group's crashes heals
+    Given a healthy group whose claim strikes exceed the poison threshold because it was co-in-flight with a poison group
+    When a worker claims the group and its isolation run completes
+    Then its claim strikes and isolation marker are cleared
+    And the group is never moved to the blocked set
+
+  Scenario: a second suspect defers while an isolation run is active
+    Given one suspect group already running in isolation in the worker process
+    And another group whose claim strikes exceed the poison threshold
+    When the worker claims the second group
+    Then the second group's job is re-staged with backoff instead of running
+    And its claim strikes are preserved for a later isolation attempt
 
   Scenario: claim strikes are cleared when processing survives
     Given a group whose job is claimed and processed to completion
@@ -93,16 +122,19 @@ Feature: GroupQueue poison-group park guard
     Given a group parked by the poison guard
     When an operator unblocks the group via the ops surface
     Then its claim strikes are reset
+    And its isolation-death marker is cleared
     And the group returns to normal dispatch
 
   Scenario: draining a parked poison group resets its claim strikes
     Given a group parked by the poison guard
     When an operator drains the group via the ops surface
     Then its claim strikes are reset
+    And its isolation-death marker is cleared
     And a new job arriving under the same group id is dispatched normally
 
   Scenario: moving a parked poison group to the dead-letter queue resets its claim strikes
     Given a group parked by the poison guard
     When an operator moves the group to the dead-letter queue via the ops surface
     Then its claim strikes are reset
+    And its isolation-death marker is cleared
     And a new job arriving under the same group id is dispatched normally

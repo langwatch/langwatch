@@ -1,8 +1,9 @@
-import { gzipSync } from "node:zlib";
+import { gzipSync, zstdCompressSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
 import { MAX_BLOB_BYTES } from "../blobConstants";
+import { decompress } from "../bodyCodec";
 import { decodeJobEnvelope, PayloadTooLargeError } from "../jobEnvelope";
 
 /**
@@ -61,6 +62,33 @@ describe("decodeJobEnvelope decode cap", () => {
       await expect(decodeJobEnvelope({ value: envelope })).rejects.toThrow(
         PayloadTooLargeError,
       );
+    });
+  });
+
+  describe("given a zstd blob that would decompress past the cap", () => {
+    /** @scenario a compressed staged value that would decompress past the cap is parked */
+    it("throws the over-limit shape boundedDecompress converts to a park", async () => {
+      // Pins the zstd over-cap error contract: jobEnvelope's boundedDecompress
+      // catches code ERR_BUFFER_TOO_LARGE (or a RangeError naming the output
+      // length) and converts it to PayloadTooLargeError → park. zstd blobs only
+      // flow through the tiered/blob path (never the inline `e` header), so the
+      // contract is pinned here at the codec seam; a Node version changing the
+      // error shape fails this test instead of silently dropping zstd bombs to
+      // replay.
+      const bomb = zstdCompressSync(
+        Buffer.from(JSON.stringify({ value: "0".repeat(MAX_BLOB_BYTES + 1024) })),
+      );
+
+      const error = await decompress(bomb).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(error).not.toBeNull();
+      const code = (error as NodeJS.ErrnoException).code;
+      const isCaughtShape =
+        code === "ERR_BUFFER_TOO_LARGE" ||
+        (error instanceof RangeError && /output length/i.test(error.message));
+      expect(isCaughtShape).toBe(true);
     });
   });
 

@@ -195,6 +195,13 @@ export const CLAUDE_TRUNCATED_LOGS_ATTR = "langwatch.claude_code.truncated_logs"
  * {@link CLAUDE_TRUNCATED_LOGS_ATTR} is set). The exact count when the reactor's
  * uncapped count query succeeds; a lower bound (>= 1) when that query fails and
  * the reactor falls back to `fetched - cap` (only the `cap + 1` fetch is known).
+ *
+ * Best-effort, not convergent: the reactor re-fires as the turn grows and
+ * re-emits the root span with an identical StartTime, and the span table's
+ * ReplacingMergeTree(StartTime) keeps an arbitrary version on a tie - so the
+ * surviving count may lag the final total. The truncation FLAG is stable
+ * (once over the cap, always over); only this count is imprecise. Treat it as
+ * an incident magnitude indicator, not an exact ledger.
  */
 export const CLAUDE_DROPPED_LOG_COUNT_ATTR =
   "langwatch.claude_code.dropped_log_count";

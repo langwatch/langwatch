@@ -1620,12 +1620,14 @@ export function readTenantCap(): number {
 
 /**
  * Poison guard (specs/event-sourcing/poison-group-park-guard.feature): a group
- * is parked once this many consecutive claims ended with the process dying
- * before the strike could be cleared. Deaths tolerated = threshold; the claim
- * after that parks. Kept small: every extra strike is another fleet-wide
- * worker crash. Interleaved victims of someone else's poison clear their
- * single strike on their next healthy claim, so only the group that keeps
- * killing workers ever reaches the threshold.
+ * becomes a SUSPECT once this many consecutive claims ended with the process
+ * dying before the strike could be cleared. Strikes never park by themselves -
+ * every group co-in-flight with the killer shares the same uncleared-strike
+ * signature, so counting cannot tell the poison from its bystanders. A suspect
+ * is instead run in process-local isolation (solo, behind an awaited marker);
+ * only a marker that survives a process death parks the group. Kept small:
+ * every strike below the threshold is another fleet-wide worker crash before
+ * the first isolation attempt.
  */
 export const DEFAULT_CLAIM_STRIKE_THRESHOLD = 3;
 
@@ -2260,6 +2262,47 @@ export class GroupStagingScripts {
     const raw = await this.redis.get(this.claimStrikesKey(groupId));
     const n = raw === null ? 0 : Number.parseInt(raw, 10);
     return Number.isFinite(n) ? n : 0;
+  }
+
+  private isolationKey(groupId: string): string {
+    return `${this.keyPrefix}group:${groupId}:isolating`;
+  }
+
+  /**
+   * Poison-guard isolation marker (specs/event-sourcing/poison-group-park-guard.feature).
+   *
+   * Written (awaited) immediately before a suspect group's job runs SOLO in the
+   * worker process - no other job in flight - and deleted when that run
+   * settles. Because the marker is only ever set while the group's job is the
+   * process's sole running work, a marker that survives into the group's next
+   * claim proves the process died while executing exactly this group's job:
+   * the one death signature that is attributable beyond doubt. That is the
+   * only condition under which the guard parks (claim strikes alone select a
+   * suspect for isolation; they never park by themselves, because every
+   * co-in-flight group of a crash shares the same strike pattern).
+   *
+   * Same TTL as the strike counter: a stale marker (e.g. a failed clear on a
+   * healthy run) self-expires instead of parking the group hours later.
+   */
+  async markIsolationStarted(groupId: string): Promise<void> {
+    await this.redis.set(
+      this.isolationKey(groupId),
+      "1",
+      "EX",
+      CLAIM_STRIKE_TTL_SECONDS,
+    );
+  }
+
+  async clearIsolationMarker(groupId: string): Promise<void> {
+    await this.redis.del(this.isolationKey(groupId));
+  }
+
+  /**
+   * True when a prior isolation run of this group never cleared its marker -
+   * i.e. the process died while this group's job was the only work in flight.
+   */
+  async wasIsolationInterrupted(groupId: string): Promise<boolean> {
+    return (await this.redis.exists(this.isolationKey(groupId))) === 1;
   }
 
   /**
