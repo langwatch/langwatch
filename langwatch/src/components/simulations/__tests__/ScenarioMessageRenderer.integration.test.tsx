@@ -399,6 +399,15 @@ describe("<ScenarioMessageRenderer/>", () => {
       // File icon plus the open-in-new-tab affordance.
       expect(chip.querySelector("svg")).not.toBeNull();
       expect(screen.getByTestId("media-part-binary-open")).toBeInTheDocument();
+
+      // The user sent the attachment, so the chip hugs the right side like a
+      // user bubble (audio players stretch instead — see data-media-align).
+      const mediaWrapper = chip.closest("[data-media-align]");
+      expect(mediaWrapper).toHaveAttribute("data-media-align", "flex-end");
+      expect(chip.closest("[data-align]")).toHaveAttribute(
+        "data-align",
+        "flex-end",
+      );
     });
 
     it("falls back to a download link for legacy inline base64 attachments", () => {
