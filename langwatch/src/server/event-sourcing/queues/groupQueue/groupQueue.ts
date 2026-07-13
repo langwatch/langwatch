@@ -828,8 +828,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    *   (bounded; runs un-isolated after MAX_ISOLATION_DEFERRALS so a busy
    *   process cannot starve the group) and keep the strikes;
    * - quiesce timeout / marker write failure / shutdown → run WITHOUT a marker
-   *   (outcome `unattributed`): a death here cannot be pinned on this group,
-   *   the strikes survive, and the next claim tries isolation again.
+   *   (outcome `unattributed`): a death here cannot be pinned on this group
+   *   and leaves the strikes behind (a dead process never reaches the clear),
+   *   so the next claim re-attempts isolation. SURVIVING the run clears the
+   *   strikes like any other survival - strikes count consecutive claims that
+   *   died, and a survived claim breaks that chain; a genuinely poisonous
+   *   group re-accumulates them and converges on a marked solo run.
    */
   private async runSuspectInIsolation(
     dispatched: DispatchResult,
@@ -869,7 +873,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // Deferral budget exhausted: run unattributed WITHOUT acquiring the
       // isolation slot (the real holder still owns the pause/resume), rather
       // than starving the group behind a permanently-busy isolation slot.
-      // Strikes survive, so the suspect stays a suspect.
+      // Survival clears the strikes (a survived claim breaks the
+      // consecutive-deaths chain); a death leaves them for the next claim.
       gqPoisonIsolationRunsTotal.inc({
         queue_name: this.queueName,
         outcome: "unattributed",
@@ -922,7 +927,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         },
         marked
           ? "Poison guard: running suspect group in isolation"
-          : "Poison guard: running suspect group without isolation attribution (quiesce or marker unavailable); strikes kept for a later attempt",
+          : "Poison guard: running suspect group without isolation attribution (quiesce or marker unavailable); a death keeps the strikes for a later attempt",
       );
 
       try {

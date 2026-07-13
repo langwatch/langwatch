@@ -76,8 +76,13 @@ const logger = createLogger("langwatch:evaluations:inputs-offload");
  * that every existing `JSON.stringify(inputs)` / `JSON.parse(Inputs)` seam
  * keeps working; consumers that don't resolve it simply see an object with
  * one reserved key.
+ *
+ * A type alias (not an interface) on purpose: aliases get an implicit index
+ * signature, so a value narrowed by {@link isStoredObjectMarker} is directly
+ * assignable to the `Record<string, unknown>` seams it flows through - no
+ * cast at the call sites.
  */
-export interface StoredObjectInputsMarker {
+export type StoredObjectInputsMarker = {
   [STORED_OBJECT_MARKER_KEY]: {
     /** stored_objects id - resolve via StoredObjectsService.getById. */
     id: string;
@@ -104,7 +109,7 @@ export interface StoredObjectInputsMarker {
      */
     offloadFailed?: boolean;
   };
-}
+};
 
 /** Type guard: is this value an offload marker (not plain inputs)? */
 export function isStoredObjectMarker(

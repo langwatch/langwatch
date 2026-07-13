@@ -271,10 +271,7 @@ export class EvaluationService {
         const inputs = evaluation.inputs;
         if (!isStoredObjectMarker(inputs)) continue;
         evaluation.inputs = resolveOffloadedInputs
-          ? await this.resolveInputsMarker({
-              projectId,
-              inputs: inputs as unknown as Record<string, unknown>,
-            })
+          ? await this.resolveInputsMarker({ projectId, inputs })
           : projectMarkerForList(inputs);
       }
     }
