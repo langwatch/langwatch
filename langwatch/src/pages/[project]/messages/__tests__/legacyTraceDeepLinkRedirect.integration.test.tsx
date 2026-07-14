@@ -54,4 +54,31 @@ describe("legacy trace deep-link redirects", () => {
       );
     });
   });
+
+  describe("when the link is malformed", () => {
+    /** @scenario "A malformed trace link lands on not-found instead of a blank page" */
+    it("redirects to not-found when the trace id is missing", () => {
+      mockQuery = { project: "acme" };
+
+      render(<TraceDetailsRedirect />);
+
+      expect(mockReplace).toHaveBeenCalledWith("/404");
+    });
+
+    it("redirects to not-found when the project slug is missing", () => {
+      mockQuery = { trace: "trace-1" };
+
+      render(<TraceDetailsRedirect />);
+
+      expect(mockReplace).toHaveBeenCalledWith("/404");
+    });
+
+    it("redirects the span deep link to not-found when the trace id is missing", () => {
+      mockQuery = { project: "acme", span: "span-9" };
+
+      render(<TraceDetailsWithSpanRedirect />);
+
+      expect(mockReplace).toHaveBeenCalledWith("/404");
+    });
+  });
 });
