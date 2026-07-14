@@ -1,8 +1,7 @@
 Feature: Event-sourced custom-graph threshold alerts
   As an operator running custom-graph threshold alerts
-  I want them to fire in near real time, resolve on their own,
-  and not double-fire while I'm rolling out the new path
-  So that I get timely, trustworthy alerts during and after the migration.
+  I want them to fire in near real time, resolve on their own, and not double-fire during rollout
+  So that alerts stay timely and trustworthy during and after the migration.
 
   Background:
     Given a project owns active custom-graph triggers
@@ -77,15 +76,34 @@ Feature: Event-sourced custom-graph threshold alerts
     Then the notification subject renders the operator's template
     And the alert-default template is not used
 
+  Scenario: graph alert templates receive the graph's data, not trace data
+    Given the project is on the event-sourced path
+    When the alert fires
+    Then the template context carries the metric's recent numeric history
+    And a prebuilt trend sparkline of that history
+    And the metric's value over the preceding window
+    And no trace matches are present in the context
+
+  Scenario: graph alert notification links to the incident window
+    Given the project is on the event-sourced path
+    When the alert fires
+    Then the notification's dashboard link opens the graph at the window the breach was evaluated over
+    And not at the time the reader clicks the link
+
+  Scenario: previewing or test-firing a graph alert renders the alert shape
+    Given the operator is authoring a graph alert in the automations drawer
+    When they preview the templates or send a test notification
+    Then the rendered output uses the alert-default templates and an example alert context
+    And not the trace-iteration example used for trace-based automations
+
   Rule: eval-metric graph triggers fire on the same event-sourced path
 
-    The Phase 6 extension wires eval-metric custom-graph triggers
-    (`evaluations.evaluation_score`, `evaluations.evaluation_pass_rate`,
-    `evaluations.evaluation_runs`) onto the same real-time path and the
-    same heartbeat, source-aware so the recency check queries
-    `evaluation_analytics` instead of `trace_analytics`. The
+    Eval-metric custom-graph triggers (`evaluations.evaluation_score`,
+    `evaluations.evaluation_pass_rate`, `evaluations.evaluation_runs`) run on
+    the same real-time path and heartbeat, source-aware so the recency check
+    queries `evaluation_analytics` instead of `trace_analytics`. The
     `release_es_graph_triggers_firing` flag is shared with the trace path —
-    operators do not toggle a second flag.
+    no second toggle.
 
     Scenario: flag off, eval-metric threshold breaches via cron
       Given the project is on the legacy path

@@ -30,7 +30,13 @@ import type {
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "../types";
-import { collectStringValues, dateTrunc, hasFilterValues } from "./_shared";
+import {
+  collectStringValues,
+  dateTrunc,
+  hasFilterValues,
+  isPercentile,
+  percentileFor,
+} from "./_shared";
 
 const SLIM_TABLE = "evaluation_analytics" as const;
 const ea = "ea";
@@ -115,24 +121,7 @@ function evalSlimGroupByExpression(groupBy?: string): string | null {
   }
 }
 
-function isPercentile(agg: AggregationTypes): boolean {
-  return agg === "median" || agg === "p90" || agg === "p95" || agg === "p99";
-}
-
-function percentileFor(agg: AggregationTypes): number {
-  switch (agg) {
-    case "median":
-      return 0.5;
-    case "p90":
-      return 0.9;
-    case "p95":
-      return 0.95;
-    case "p99":
-      return 0.99;
-    default:
-      throw new Error(`Not a percentile aggregation: ${agg}`);
-  }
-}
+// isPercentile + percentileFor moved to _shared.
 
 function evalSlimAggExpression(agg: AggregationTypes, column: string): string {
   if (isPercentile(agg)) {

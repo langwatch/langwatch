@@ -1,7 +1,5 @@
 import type { EvaluationAnalyticsRollupRepository } from "~/server/app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { AppendStore } from "../../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import { BaseAnalyticsRollupAppendStore } from "../../shared/analyticsStoreBase";
 import type { EvaluationAnalyticsRollupRow } from "./evaluationAnalyticsRollup.mapProjection";
 
 /**
@@ -11,17 +9,8 @@ import type { EvaluationAnalyticsRollupRow } from "./evaluationAnalyticsRollup.m
  * context and stamps it onto the row's `_retention_days` column, then
  * delegates to the repository.
  */
-export class EvaluationAnalyticsRollupAppendStore
-  implements AppendStore<EvaluationAnalyticsRollupRow>
-{
-  constructor(private readonly repo: EvaluationAnalyticsRollupRepository) {}
-
-  async append(
-    record: EvaluationAnalyticsRollupRow,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
-    const retentionDays =
-      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    await this.repo.insertRow(record, retentionDays);
+export class EvaluationAnalyticsRollupAppendStore extends BaseAnalyticsRollupAppendStore<EvaluationAnalyticsRollupRow> {
+  constructor(repo: EvaluationAnalyticsRollupRepository) {
+    super(repo, { retentionCategory: "traces" });
   }
 }

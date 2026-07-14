@@ -138,8 +138,16 @@ export function parseTimeseriesRows(
   return { previousPeriod: correctedPrevious, currentPeriod };
 }
 
-/** Build the result key name that matches the ES-shaped frontend contract. */
-function buildSeriesName(series: SeriesInputType, index: number): string {
+/**
+ * Build the result key name that matches the ES-shaped frontend contract.
+ * Exported as the single encoder for bucket keys — consumers reading values
+ * back out of a `TimeseriesResult` (e.g. the graph-trigger evaluator) must
+ * derive their lookup key here, NOT from a stored series identifier: stored
+ * trigger identifiers use `{index}/{key|metric}/{aggregation}` while result
+ * buckets are keyed `{queryIndex}/{metric}/{aggregation}[/{key}]` with
+ * `terms` rewritten to `cardinality`.
+ */
+export function buildSeriesName(series: SeriesInputType, index: number): string {
   const aggregation =
     series.aggregation === "terms" ? "cardinality" : series.aggregation;
   if (series.pipeline) {

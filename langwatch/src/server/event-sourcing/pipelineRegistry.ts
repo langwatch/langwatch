@@ -18,6 +18,7 @@ import type { Cluster, Redis } from "ioredis";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { resolveClaudeTurnLogCap } from "~/server/app-layer/traces/claude-code-log-to-span";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
@@ -236,7 +237,7 @@ export interface PipelineRegistryDeps {
    * so oversized commands (> 256 KB) are fetched from S3 and the spool is
    * best-effort DELETEd after event_log INSERT succeeds.
    */
-  blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
+  blobStore?: BlobStore;
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
@@ -945,6 +946,7 @@ export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
 // ============================================================================
 
 import { getApp } from "../app-layer/app";
+// StaticPipelineDefinition is already imported at the top of the file.
 
 export interface ProjectionMetadata {
   projectionName: string;

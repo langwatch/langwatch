@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphEvalStagePayload } from "~/server/event-sourcing/outbox/payload";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
@@ -29,12 +29,14 @@ function makeTrigger(
     projectId,
     name: id,
     action: TriggerAction.SEND_EMAIL,
+    triggerKind: TriggerKind.ALERT,
     actionParams,
     filters: {},
     alertType: null,
     message: null,
     customGraphId,
     notificationCadence: "immediate",
+    filterQuery: null,
     traceDebounceMs: 30_000,
     templates: {
       slackTemplateType: null,

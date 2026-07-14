@@ -1,100 +1,24 @@
-import { AlertType, type Prisma, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { redactSlackActionParams } from "~/automations/providers/definitions/slack/secret";
+import { type SlackActionParams } from "~/automations/providers/definitions/slack/shared";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-// TypeScript interface for actionParams
+/**
+ * Read-side hydration shape for the `Add / Edit alert` bell icon on the
+ * graph card header (GraphCardHeader.tsx). Writes go through the
+ * automations router (`automation.upsert`) as of ADR-034 Phase 5.2;
+ * this router only reads the persisted graph-alert Trigger row.
+ */
 interface AlertActionParams {
   members?: string[];
   slackWebhook?: string;
   seriesName?: string;
 }
-
-// Base alert schema with all optional fields
-const alertSchemaBase = z.object({
-  enabled: z.boolean(),
-  threshold: z.number().optional(),
-  operator: z.enum(["gt", "lt", "gte", "lte", "eq"]).optional(),
-  timePeriod: z.number().optional(),
-  type: z.nativeEnum(AlertType).optional(),
-  action: z.nativeEnum(TriggerAction).optional(),
-  actionParams: z
-    .object({
-      members: z.array(z.string()).optional(),
-      slackWebhook: z.string().optional(),
-      seriesName: z.string().optional(),
-    })
-    .optional(),
-});
-
-// Reusable validation function for alert schema
-const alertSchemaRefinement = (
-  data: z.infer<typeof alertSchemaBase>,
-  ctx: z.RefinementCtx,
-) => {
-  if (data.enabled) {
-    if (data.threshold === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "threshold is required when enabled is true",
-        path: ["threshold"],
-      });
-    }
-    if (data.operator === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "operator is required when enabled is true",
-        path: ["operator"],
-      });
-    }
-    if (data.timePeriod === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "timePeriod is required when enabled is true",
-        path: ["timePeriod"],
-      });
-    }
-  }
-};
-
-// Reusable alert schema with conditional validation
-const alertSchema = alertSchemaBase.superRefine(alertSchemaRefinement);
-
-// Helper function to build trigger data for graph alerts
-const buildGraphAlertTriggerData = (
-  id: string,
-  name: string,
-  projectId: string,
-  action: TriggerAction,
-  actionParams: AlertActionParams & {
-    threshold: number;
-    operator: string;
-    timePeriod: number;
-  },
-  alertType: AlertType,
-  customGraphId: string,
-) => {
-  return {
-    id,
-    name: `Alert: ${name}`,
-    projectId,
-    action,
-    actionParams: {
-      ...actionParams,
-      threshold: actionParams.threshold,
-      operator: actionParams.operator,
-      timePeriod: actionParams.timePeriod,
-    },
-    filters: {},
-    alertType,
-    active: true,
-    customGraphId,
-  };
-};
 
 export const graphsRouter = createTRPCRouter({
   create: protectedProcedure
@@ -104,13 +28,11 @@ export const graphsRouter = createTRPCRouter({
         name: z.string(),
         graph: z.string(),
         filterParams: z.any().optional(),
-        alert: alertSchema.optional(),
         dashboardId: z.string().optional(),
         gridColumn: z.number().min(0).max(1).optional(),
         gridRow: z.number().min(0).optional(),
         colSpan: z.number().min(1).max(2).optional(),
         rowSpan: z.number().min(1).max(2).optional(),
-        alertName: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("analytics:create"))
@@ -143,28 +65,10 @@ export const graphsRouter = createTRPCRouter({
         },
       });
 
-      // Create trigger if alert is enabled
-      if (input.alert?.enabled && input.alert.action && input.alert.type) {
-        const triggerName = input.alertName ?? input.name;
-        const triggerData = buildGraphAlertTriggerData(
-          nanoid(),
-          triggerName,
-          input.projectId,
-          input.alert.action,
-          {
-            ...input.alert.actionParams,
-            threshold: input.alert.threshold!,
-            operator: input.alert.operator!,
-            timePeriod: input.alert.timePeriod!,
-          },
-          input.alert.type,
-          customGraph.id,
-        );
-
-        await ctx.prisma.trigger.create({
-          data: triggerData,
-        });
-      }
+      // Alert-writing lives on `automation.upsert` with `customGraphId`
+      // as of ADR-034 Phase 5.2. The dashboard chart's `Add alert` bell
+      // opens the automations drawer; this router no longer accepts an
+      // `alert` field.
 
       return customGraph;
     }),
@@ -193,7 +97,23 @@ export const graphsRouter = createTRPCRouter({
         },
       });
 
-      return graphs;
+      // The included trigger row carries the encrypted Slack bot token in
+      // actionParams — strip it before the rows leave the server (ADR-041:
+      // the token never reaches the client), same redaction the automations
+      // router applies on its read paths.
+      return graphs.map((graph) =>
+        graph.trigger
+          ? {
+              ...graph,
+              trigger: {
+                ...graph.trigger,
+                actionParams: redactSlackActionParams(
+                  (graph.trigger.actionParams ?? {}) as SlackActionParams,
+                ),
+              },
+            }
+          : graph,
+      );
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
@@ -305,13 +225,6 @@ export const graphsRouter = createTRPCRouter({
         graph: z.string(),
         graphId: z.string(),
         filterParams: z.any().optional(),
-        alert: alertSchemaBase
-          .extend({
-            triggerId: z.string().optional(),
-          })
-          .superRefine(alertSchemaRefinement)
-          .optional(),
-        alertName: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("analytics:update"))
@@ -327,59 +240,10 @@ export const graphsRouter = createTRPCRouter({
         },
       });
 
-      // Handle trigger update/create/delete
-      const existingTrigger = await prisma.trigger.findUnique({
-        where: { customGraphId: input.graphId, projectId: input.projectId },
-      });
-
-      if (input.alert?.enabled && input.alert.action && input.alert.type) {
-        const triggerName = input.alertName ?? input.name;
-        if (existingTrigger) {
-          // Update existing trigger
-          await prisma.trigger.update({
-            where: { id: existingTrigger.id, projectId: input.projectId },
-            data: {
-              name: `Alert: ${triggerName}`,
-              action: input.alert.action,
-              actionParams: {
-                ...input.alert.actionParams,
-                threshold: input.alert.threshold!,
-                operator: input.alert.operator!,
-                timePeriod: input.alert.timePeriod!,
-              } as Prisma.InputJsonValue,
-              alertType: input.alert.type,
-              active: true,
-              deleted: false,
-            },
-          });
-        } else {
-          // Create new trigger
-          const triggerData = buildGraphAlertTriggerData(
-            nanoid(),
-            triggerName,
-            input.projectId,
-            input.alert.action,
-            {
-              ...input.alert.actionParams,
-              threshold: input.alert.threshold!,
-              operator: input.alert.operator!,
-              timePeriod: input.alert.timePeriod!,
-            },
-            input.alert.type,
-            input.graphId,
-          );
-
-          await prisma.trigger.create({
-            data: triggerData,
-          });
-        }
-      } else if (existingTrigger) {
-        // Disable trigger if alert is disabled
-        await prisma.trigger.update({
-          where: { id: existingTrigger.id, projectId: input.projectId },
-          data: { active: false, deleted: true },
-        });
-      }
+      // Alert-writing lives on `automation.upsert` with `customGraphId`
+      // as of ADR-034 Phase 5.2. The bell icon in the chart-card header
+      // opens the automations drawer for edit; this router no longer
+      // accepts an `alert` field.
 
       return customGraph;
     }),

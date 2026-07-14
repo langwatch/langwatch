@@ -1,6 +1,15 @@
-import { Box, Button, Heading, HStack, Spacer, Text } from "@chakra-ui/react";
-import type { TriggerAction } from "@prisma/client";
-import { Mail } from "lucide-react";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Skeleton,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { AlertType, TriggerKind, type TriggerAction } from "@prisma/client";
+import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
@@ -31,53 +40,99 @@ import {
   type TriggerFilterValue,
 } from "~/server/filters/types";
 import {
+  defaultsForSourceKind,
+} from "~/shared/templating/defaults";
+import {
   EXAMPLE_MATCHES,
   TEMPLATE_VARIABLES,
 } from "~/shared/templating/exampleContext";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import { renderTriggerSlack } from "~/shared/templating/renderSlack";
 import {
+  buildExampleGraphAlertTemplateContext,
+  buildExampleReportTemplateContext,
   buildTemplateContext,
+  type GraphAlertTemplateContext,
+  type ReportTemplateContext,
   type TemplateContext,
 } from "~/shared/templating/templateContext";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { MainSectionList } from "./components/MainSectionList";
-import { CadenceSecondaryDrawer } from "./components/secondaries/CadenceSecondaryDrawer";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
-import { FiltersSecondaryDrawer } from "./components/secondaries/FiltersSecondaryDrawer";
 import {
   type AutomationDraft,
   actionParamsFromDraft,
+  buildTestFirePayload,
+  cadenceIsSet,
+  extractGraphAlertFromTriggerRow,
+  extractReportFromTriggerRow,
   filtersAreSet,
   INITIAL_DRAFT,
   notifyChannel,
+  presetLabels,
+  reportInputFromDraft,
+  subjectIsSet,
   templatesFromDraft,
 } from "./logic/draftReducer";
+import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
+import { REPORT_TEMPLATE_VARIABLES } from "./editors/reportVariables";
 import { explainDomainError, readDomainError } from "./logic/errorExplainer";
+import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
 import {
-  useCadenceConfirmed,
   useConditionsSet,
   useConfigComplete,
   useDraft,
-  useIsNotifyAction,
   useSection,
 } from "./state/selectors";
 
-function saveDisabledReason(
-  conditionsSet: boolean,
-  configComplete: boolean,
-  actionPicked: boolean,
-  cadenceNeedsReview: boolean,
-): string {
+/** Facet-ordered "why can't I save yet" copy: Name → Type → Subject →
+ *  Cadence → Severity → Delivery. Type is always chosen (the source defaults
+ *  to an automation), so it never contributes a message. */
+function saveDisabledReason({
+  draft,
+  nameSet,
+  configComplete,
+  actionPicked,
+}: {
+  draft: AutomationDraft;
+  nameSet: boolean;
+  configComplete: boolean;
+  actionPicked: boolean;
+}): string {
   const missing: string[] = [];
-  if (!conditionsSet) missing.push("set a trigger");
-  if (!actionPicked) missing.push("pick a type");
+  if (!nameSet) missing.push("give it a name");
+  if (!subjectIsSet(draft)) missing.push(subjectTodo(draft));
+  else if (!cadenceIsSet(draft)) missing.push(cadenceTodo(draft));
+  if (draft.source === "customGraph" && draft.alertType === null)
+    missing.push("set a severity");
+  if (!actionPicked) missing.push("pick a delivery channel");
   else if (!configComplete) missing.push("complete the setup");
-  if (cadenceNeedsReview) missing.push("review the cadence");
   if (missing.length === 0) return "";
   return `To save, ${missing.join(" and ")}.`;
+}
+
+function subjectTodo(draft: AutomationDraft): string {
+  switch (draft.source) {
+    case "customGraph":
+      return "pick a graph and series to watch";
+    case "report":
+      return "choose what to send";
+    case "trace":
+      return "choose which traces to act on";
+  }
+}
+
+function cadenceTodo(draft: AutomationDraft): string {
+  switch (draft.source) {
+    case "customGraph":
+      return "set the alert threshold";
+    case "report":
+      return "set a schedule";
+    case "trace":
+      return "";
+  }
 }
 
 /**
@@ -97,12 +152,38 @@ function saveDisabledReason(
 export function AutomationDrawer({
   automationId,
   source,
+  prefilledGraphId,
+  prefilledSeriesName,
+  initialSource,
+  initialName,
+  initialAction,
+  initialFilters,
+  initialFilterQuery,
 }: {
   automationId?: string;
   /** Marker query param set by the email "Edit automation" footer link so the
    *  drawer can surface a one-line landing banner. Any other value (or
    *  undefined) renders the drawer normally. */
   source?: string;
+  /** When set, the drawer opens in graph-alert mode with the graph
+   *  pre-filled and locked. Used by the dashboard "Add alert" entry
+   *  point (Phase 5.2). */
+  prefilledGraphId?: string;
+  prefilledSeriesName?: string;
+  /** Fresh-create prefills, set by the Alerts & automations page's "New
+   *  alert" button and use-case cards. `initialSource: "customGraph"` opens
+   *  the drawer as a new alert (severity seeded to Warning, graph left for
+   *  the user to pick — unlike `prefilledGraphId`, nothing is locked).
+   *  `initialFilters` is a JSON-encoded trigger filter object (the persisted
+   *  shape), sanitized on the way in like the edit-hydration path. */
+  initialSource?: string;
+  initialName?: string;
+  initialAction?: string;
+  initialFilters?: string;
+  /** ADR-043 Subject facet: a Traces-V2 liqe query to seed a fresh trace
+   *  automation with — set by the traces view's "Automate" button so the
+   *  current filter becomes the automation's subject. */
+  initialFilterQuery?: string;
 }) {
   const { project, organization, team } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
@@ -114,9 +195,21 @@ export function AutomationDrawer({
   const section = useSection();
   const conditionsSet = useConditionsSet();
   const configComplete = useConfigComplete();
-  const isNotify = useIsNotifyAction();
-  const cadenceConfirmed = useCadenceConfirmed();
-  const cadenceNeedsReview = isNotify && !cadenceConfirmed;
+  const isGraphAlert = draft.source === "customGraph";
+  const isReport = draft.source === "report";
+  // Single source of truth for every heading / button / toast noun. Treat a
+  // graph-prefilled create as an alert from the first paint so the title
+  // doesn't flash "Add automation" before the prefill effect lands.
+  const labels = presetLabels(
+    prefilledGraphId ? "customGraph" : draft.source,
+    !!automationId,
+  );
+  // A saved graph alert or report can't become a trace automation mid-edit
+  // (the kind decides the row's whole shape — schedule, source, dispatcher),
+  // and a drawer opened from a specific chart is pinned to that alert — lock
+  // the Type cards visibly in all three cases.
+  const sourceLocked =
+    (!!automationId && (isGraphAlert || isReport)) || !!prefilledGraphId;
   const dispatch = useAutomationStore((s) => s.dispatch);
   const setSection = useAutomationStore((s) => s.setSection);
   const hydrate = useAutomationStore((s) => s.hydrate);
@@ -143,6 +236,97 @@ export function AutomationDrawer({
       dispatch({ type: "SET_FILTERS", value: filterParams.filters });
       prefilledFromTraces.current = true;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pre-fill graph-alert mode from drawer params on a fresh create. Used
+  // by the dashboard "Add alert" entry (Phase 5.2). When set, the drawer
+  // opens with source = customGraph and the graph / series already
+  // selected and locked, so the author lands on the threshold rule.
+  const prefilledFromGraph = useRef(false);
+  useEffect(() => {
+    if (automationId) return;
+    if (prefilledFromGraph.current) return;
+    if (!prefilledGraphId) return;
+    dispatch({ type: "SET_SOURCE", value: "customGraph" });
+    dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: prefilledGraphId });
+    if (prefilledSeriesName) {
+      const currentGraphAlert = useAutomationStore.getState().draft.graphAlert;
+      dispatch({
+        type: "SET_GRAPH_ALERT",
+        value: { ...currentGraphAlert, seriesName: prefilledSeriesName },
+      });
+    }
+    // Seed a severity so the prefilled create can save without a detour
+    // through the When secondary — the author can still change it there.
+    dispatch({ type: "SET_ALERT_TYPE", value: AlertType.WARNING });
+    prefilledFromGraph.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pre-fill identity + kind from drawer params on a fresh create. Set by
+  // the Alerts & automations page ("New alert" opens straight into alert
+  // mode; use-case cards seed a name and action too). Ordering matters:
+  // SET_SOURCE runs first because switching to customGraph resets any
+  // action that alerts don't support.
+  const prefilledFromParams = useRef(false);
+  useEffect(() => {
+    if (automationId) return;
+    if (prefilledFromParams.current) return;
+    if (
+      !initialSource &&
+      !initialName &&
+      !initialAction &&
+      !initialFilters &&
+      !initialFilterQuery
+    ) {
+      return;
+    }
+    if (initialSource === "customGraph") {
+      dispatch({ type: "SET_SOURCE", value: "customGraph" });
+      // Alerts require a severity — seed the default so the fresh draft can
+      // save without a detour; the author can change it next to the name.
+      dispatch({ type: "SET_ALERT_TYPE", value: AlertType.WARNING });
+    }
+    if (initialSource === "report") {
+      dispatch({ type: "SET_SOURCE", value: "report" });
+    }
+    if (initialName) {
+      dispatch({ type: "SET_NAME", value: initialName });
+    }
+    if (initialAction && initialAction in CLIENT_PROVIDERS) {
+      dispatch({
+        type: "SET_ACTION",
+        value: initialAction as TriggerAction,
+      });
+    }
+    // Same defensive parse as edit hydration — a malformed param falls back
+    // to no filters rather than crashing the open.
+    if (initialFilters && initialSource !== "customGraph") {
+      try {
+        const raw = JSON.parse(initialFilters) as Record<
+          string,
+          TriggerFilterValue
+        >;
+        const { sanitized } = sanitizeTriggerFilters(raw);
+        dispatch({
+          type: "SET_FILTERS",
+          value: sanitized as Partial<Record<FilterField, FilterParam>>,
+        });
+      } catch {
+        // Ignore malformed prefill — the user sets conditions themselves.
+      }
+    }
+    // ADR-043: seed the trace-subject query from the traces view's Automate
+    // button. Only for a trace automation — customGraph/report don't carry one.
+    if (
+      initialFilterQuery &&
+      initialSource !== "customGraph" &&
+      initialSource !== "report"
+    ) {
+      dispatch({ type: "SET_FILTER_QUERY", value: initialFilterQuery });
+    }
+    prefilledFromParams.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -191,13 +375,36 @@ export function AutomationDrawer({
       }
     }
     const { sanitized } = sanitizeTriggerFilters(filtersRaw);
+    // The row's KIND is what it is — a REPORT hydrated as a trace automation
+    // would lose its schedule and content source on the next Save (the router
+    // rewrites the row from what the drawer sends). `customGraphId` is only a
+    // reliable signal for alerts, so read `triggerKind` first.
+    const isReportRow = row.triggerKind === TriggerKind.REPORT;
     const next: AutomationDraft = {
       ...INITIAL_DRAFT,
       action,
       name: row.name,
       alertType: row.alertType,
-      source: row.customGraphId ? "customGraph" : "trace",
+      source: isReportRow
+        ? "report"
+        : row.customGraphId
+          ? "customGraph"
+          : "trace",
       customGraphId: row.customGraphId,
+      // ADR-043: a trace automation — and a trace-query report — edited from a
+      // saved row keeps its liqe query so the Subject editor rehydrates it
+      // (null for legacy rows and for graph/dashboard sources).
+      filterQuery: row.filterQuery ?? null,
+      // Pull the threshold rule out of actionParams when this row is a
+      // graph alert so the threshold form pre-populates on edit.
+      graphAlert: row.customGraphId
+        ? extractGraphAlertFromTriggerRow(row.actionParams)
+        : INITIAL_DRAFT.graphAlert,
+      // Same for a report's content source + schedule, so the Subject and
+      // Cadence facets open on what was saved rather than the blank defaults.
+      report: isReportRow
+        ? extractReportFromTriggerRow(row.actionParams)
+        : INITIAL_DRAFT.report,
       filters: sanitized as Partial<Record<FilterField, FilterParam>>,
       // Defensive narrow: column is a free-form TEXT (see the repo parser).
       notificationCadence: (
@@ -285,17 +492,93 @@ export function AutomationDrawer({
   const channel = notifyChannel(draft);
   const [preview, setPreview] = useState<NotifyPreview | undefined>(undefined);
   const previewToken = useRef(0);
-  const previewContext = useMemo<TemplateContext>(
-    () => ({
+  // Resolve the selected graph's name + the monitored series' human label
+  // so the alert preview / test-fire / conditions summary read like the
+  // real fire will, not like placeholders.
+  const { graphName, seriesLabel } = useGraphAlertLabels({
+    projectId,
+    enabled: isGraphAlert,
+    customGraphId: draft.customGraphId,
+    seriesName: draft.graphAlert.seriesName,
+  });
+
+  // Seed the name from the watched graph once its row loads — "Latency
+  // p95 alert" beats an empty field on the golden Add-alert path. Only
+  // when the author hasn't typed anything, and only once.
+  const seededNameFromGraph = useRef(false);
+  useEffect(() => {
+    if (automationId || seededNameFromGraph.current) return;
+    if (!prefilledGraphId || !graphName) return;
+    if (useAutomationStore.getState().draft.name.trim() !== "") return;
+    dispatch({ type: "SET_NAME", value: `${graphName} alert` });
+    seededNameFromGraph.current = true;
+  }, [automationId, prefilledGraphId, graphName, dispatch]);
+  const previewContext = useMemo<
+    TemplateContext | GraphAlertTemplateContext | ReportTemplateContext
+  >(() => {
+    if (isReport) {
+      // Report-shaped example data, so the preview shows the traces or the
+      // chart the report will really send — not an empty trace-shaped message.
+      return buildExampleReportTemplateContext({
+        baseHost:
+          typeof window !== "undefined"
+            ? window.location.origin
+            : "https://app.langwatch.ai",
+        project: {
+          name: project?.name ?? "Project",
+          slug: project?.slug ?? "project",
+        },
+        trigger: { name: draft.name || "Example report" },
+        sourceKind: draft.report.sourceKind,
+        chartTitles: graphName ? [graphName] : undefined,
+      });
+    }
+    if (isGraphAlert) {
+      // Alert-shaped example context + the draft's actual rule, so the
+      // preview shows what a real fire renders — not the trace shape.
+      return buildExampleGraphAlertTemplateContext({
+        baseHost:
+          typeof window !== "undefined"
+            ? window.location.origin
+            : "https://app.langwatch.ai",
+        project: {
+          name: project?.name ?? "Project",
+          slug: project?.slug ?? "project",
+        },
+        trigger: {
+          name: draft.name || "Example alert",
+          alertType: draft.alertType,
+        },
+        graph: graphName ? { name: graphName } : undefined,
+        metricLabel: seriesLabel ?? undefined,
+        condition: {
+          operator: draft.graphAlert.operator,
+          threshold: draft.graphAlert.threshold,
+          timePeriodMinutes: draft.graphAlert.timePeriod,
+        },
+      });
+    }
+    return {
       ...exampleContext,
       trigger: {
         ...exampleContext.trigger,
         name: draft.name || "Your automation",
         alertType: draft.alertType,
       },
-    }),
-    [exampleContext, draft.name, draft.alertType],
-  );
+    };
+  }, [
+    exampleContext,
+    isGraphAlert,
+    isReport,
+    graphName,
+    seriesLabel,
+    project?.name,
+    project?.slug,
+    draft.name,
+    draft.alertType,
+    draft.graphAlert,
+    draft.report.sourceKind,
+  ]);
 
   useEffect(() => {
     if (!channel || section !== "configuration") {
@@ -304,6 +587,21 @@ export function AutomationDrawer({
     }
     const token = ++previewToken.current;
     const templates = templatesFromDraft(draft);
+    // A report renders against the report defaults, an alert against the alert
+    // defaults — otherwise the preview shows a message the dispatcher would
+    // never send. Same resolver the providers and dispatch use, so the three
+    // surfaces cannot drift apart.
+    const previewDefaults = defaultsForSourceKind(
+      isGraphAlert ? "graphAlert" : isReport ? "report" : "trace"
+    );
+    // Mirror the provider's delivery rules (Slack: modern blocks render only
+    // over a bot connection) so the preview never promises more than the
+    // configured channel will deliver.
+    const entry = draft.action ? CLIENT_PROVIDERS[draft.action] : undefined;
+    const renderOptions =
+      entry && isNotifyEntry(entry) && entry.client.previewOptions
+        ? entry.client.previewOptions(draft.slices[draft.action!] as never)
+        : {};
     void (async () => {
       try {
         if (channel === "email") {
@@ -311,6 +609,7 @@ export function AutomationDrawer({
             subjectTemplate: templates.emailSubjectTemplate,
             bodyTemplate: templates.emailBodyTemplate,
             context: previewContext,
+            defaults: previewDefaults,
           });
           if (token === previewToken.current) {
             setPreview({
@@ -332,6 +631,8 @@ export function AutomationDrawer({
                   : null,
             template: templates.slackTemplate,
             context: previewContext,
+            defaults: previewDefaults,
+            allowGatedBlocks: renderOptions.allowGatedBlocks ?? false,
           });
           if (token === previewToken.current) {
             setPreview({
@@ -349,11 +650,32 @@ export function AutomationDrawer({
         if (token === previewToken.current) setPreview(undefined);
       }
     })();
-  }, [channel, section, draft.action, draft.slices, previewContext]);
+  }, [
+    channel,
+    section,
+    draft.action,
+    draft.slices,
+    previewContext,
+    isGraphAlert,
+    isReport,
+  ]);
+
+  // Edit mode must not render the (blank) INITIAL_DRAFT form while the saved
+  // row is still loading: a keystroke during the load makes the hydration
+  // guard above treat the draft as already-edited and skip hydration, so a
+  // later Save would overwrite the saved automation with a near-blank draft.
+  // Show a skeleton until the row lands, and an error state if it never does.
+  const editLoading = !!automationId && triggerQuery.isLoading;
+  const editError = !!automationId && triggerQuery.isError;
 
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
-  const canSave = conditionsSet && configComplete && !cadenceNeedsReview;
+  const nameSet = draft.name.trim().length > 0;
+  // Cadence is an always-visible inline facet now (ADR-043), so there is no
+  // "confirm the cadence" detour to gate on — subject + cadence validity is
+  // folded into conditionsSet.
+  const canSave =
+    nameSet && conditionsSet && configComplete && !editLoading && !editError;
 
   const onTestFire = useCallback(() => {
     if (!channel || !projectId || !draft.action) return;
@@ -363,16 +685,19 @@ export function AutomationDrawer({
       draft.slices[draft.action] as never,
     );
     testFire.mutate(
-      {
+      // Alert drafts carry a non-null `graphAlert` so the server renders the
+      // alert-shaped example context (not trace matches) — see
+      // `buildTestFirePayload`.
+      buildTestFirePayload({
+        draft,
         projectId,
         channel,
-        trigger: {
-          name: draft.name || "Your automation",
-          alertType: draft.alertType,
-        },
-        draft: templatesFromDraft(draft),
         webhook: target.webhook,
-      },
+        botDestination: target.botDestination,
+        automationId,
+        graphName,
+        seriesLabel,
+      }),
       {
         onSuccess: (r) => {
           pushAttempt({
@@ -388,7 +713,7 @@ export function AutomationDrawer({
             description:
               r.channel === "email"
                 ? "Sent to your inbox."
-                : "Posted to the Slack webhook.",
+                : "Posted to Slack.",
             meta: { closable: true },
           });
         },
@@ -413,7 +738,16 @@ export function AutomationDrawer({
         },
       },
     );
-  }, [channel, draft, projectId, testFire, pushAttempt]);
+  }, [
+    channel,
+    draft,
+    projectId,
+    testFire,
+    pushAttempt,
+    isGraphAlert,
+    graphName,
+    seriesLabel,
+  ]);
 
   const onSave = useCallback(() => {
     if (!canSave || !draft.action) return;
@@ -428,8 +762,24 @@ export function AutomationDrawer({
         action: draft.action,
         alertType: draft.alertType ?? undefined,
         filters: draft.source === "customGraph" ? {} : draft.filters,
+        // ADR-043 Subject facet: send the liqe query for a trace automation AND
+        // for a report — a trace-query report is scoped by exactly this query,
+        // and the router persists it for that source (it nulls the column for
+        // graph/dashboard report sources itself). Only a graph alert never has
+        // one. When set the router persists `filters` as `{}` and matches the
+        // query in-memory.
+        filterQuery:
+          draft.source === "customGraph" ? null : draft.filterQuery || null,
         customGraphId:
           draft.source === "customGraph" ? draft.customGraphId : null,
+        // The graph-alert threshold rule travels alongside the destination
+        // keys; the router merges them into the persisted `actionParams`.
+        graphAlert:
+          draft.source === "customGraph" ? draft.graphAlert : undefined,
+        report:
+          draft.source === "report"
+            ? reportInputFromDraft(draft.report)
+            : undefined,
         actionParams: actionParamsFromDraft(draft) as never,
         templates: templatesFromDraft(draft),
         notificationCadence: draft.notificationCadence,
@@ -438,11 +788,17 @@ export function AutomationDrawer({
       {
         onSuccess: () => {
           toaster.create({
-            title: automationId ? "Automation updated" : "Automation created",
+            title: automationId ? labels.updatedToast : labels.createdToast,
             type: "success",
             meta: { closable: true },
           });
           void queryClient.automation.getTriggers.invalidate();
+          // The dashboard chart card reads its alert state off the graph, not
+          // off the trigger list: without these the card still offers "Add
+          // alert" after one was just created, and clicking it re-enters CREATE
+          // mode — whose upsert overwrites the trigger that was just saved.
+          void queryClient.graphs.getAll.invalidate();
+          void queryClient.graphs.getById.invalidate();
           closeDrawer();
         },
         onError: (err) => {
@@ -470,8 +826,13 @@ export function AutomationDrawer({
     upsert,
   ]);
 
+  // Alerts always deliver immediately (the server pins their cadence), so
+  // template pickers and variable filtering treat them as immediate even if
+  // the dormant draft cadence says otherwise.
   const cadenceMode: "immediate" | "digest" =
-    draft.notificationCadence === "immediate" ? "immediate" : "digest";
+    isGraphAlert || draft.notificationCadence === "immediate"
+      ? "immediate"
+      : "digest";
   const hasEvaluationFilter = Object.keys(draft.filters).some((k) =>
     k.startsWith("evaluations."),
   );
@@ -481,8 +842,18 @@ export function AutomationDrawer({
       projectId,
       organizationId: organization?.id,
       teamSlug: team?.slug,
-      variables: TEMPLATE_VARIABLES,
-      example: exampleContext,
+      // Lets a provider (Slack channel picker) act on the stored secret of the
+      // automation being edited without the author retyping it.
+      automationId,
+      // Each source renders against its OWN context — autocomplete, hover, and
+      // the unknown-variable check all follow the matching list, so a report
+      // never offers `match.trace.*` variables that would render empty.
+      variables: isReport
+        ? REPORT_TEMPLATE_VARIABLES
+        : isGraphAlert
+          ? ALERT_TEMPLATE_VARIABLES
+          : TEMPLATE_VARIABLES,
+      example: previewContext,
       preview,
       // Synchronous render — there is never a loading state to show.
       previewLoading: false,
@@ -491,17 +862,38 @@ export function AutomationDrawer({
       setNotificationCadence: (value) =>
         dispatch({ type: "SET_CADENCE", value: value as NotificationCadence }),
       hasEvaluationFilter,
+      // Providers seed editor defaults from this AND filter the template
+      // gallery by it, so a report never offers the per-trace layouts.
+      sourceKind:
+        draft.source === "customGraph"
+          ? "graphAlert"
+          : draft.source === "report"
+            ? "report"
+            : "trace",
+      // Narrows a report's layouts to the content it actually sends.
+      reportSourceKind:
+        draft.source === "report" ? draft.report.sourceKind : undefined,
+      // Lets a notify provider offer a "Send test" button inside its config.
+      onTestFire,
+      testFireLoading: testFire.isLoading,
     }),
     [
       projectId,
       organization?.id,
       team?.slug,
-      exampleContext,
+      automationId,
+      previewContext,
+      isGraphAlert,
+      isReport,
       preview,
       cadenceMode,
       draft.notificationCadence,
       dispatch,
       hasEvaluationFilter,
+      draft.source,
+      draft.report.sourceKind,
+      onTestFire,
+      testFire.isLoading,
     ],
   );
 
@@ -534,27 +926,73 @@ export function AutomationDrawer({
         <Drawer.Content bg="bg">
           <Drawer.Header>
             <Drawer.CloseTrigger />
-            <Heading size="md">
-              {automationId ? "Edit automation" : "Add automation"}
-            </Heading>
+            <Heading size="md">{labels.title}</Heading>
           </Drawer.Header>
           <Drawer.Body>
             {source === "email-link" ? <EmailLinkLandingBanner /> : null}
-            <MainSectionList
-              onTestFire={onTestFire}
-              testFireLoading={testFire.isLoading}
-            />
+            {/* The form was visually heavy — every control at its default size.
+                Rather than thread a smaller `size` through dozens of controls
+                across every section (and drift over time), scale the whole form
+                surface down here. Contained to the drawer body, so the
+                header/footer and the rest of the app are untouched. */}
+            {editError ? (
+              <Box
+                padding={3}
+                borderRadius="md"
+                border="1px solid"
+                colorPalette="red"
+                borderColor="colorPalette.muted"
+                bg="colorPalette.subtle"
+              >
+                <Text textStyle="sm" color="fg">
+                  Couldn't load this {labels.noun}. Close the drawer and try
+                  again.
+                </Text>
+              </Box>
+            ) : editLoading ? (
+              <VStack align="stretch" gap={4} data-testid="automation-edit-loading">
+                <Skeleton height="32px" width="60%" />
+                <Skeleton height="80px" width="full" />
+                <Skeleton height="80px" width="full" />
+                <Skeleton height="80px" width="full" />
+              </VStack>
+            ) : (
+              <Box css={{ zoom: 0.9 }}>
+                <MainSectionList
+                  isEdit={!!automationId}
+                  sourceLocked={sourceLocked}
+                  prefilledGraphId={prefilledGraphId}
+                />
+              </Box>
+            )}
           </Drawer.Body>
           <Drawer.Footer>
             <HStack width="full">
               <Spacer />
+              {/* Send test sits next to Save (ADR-043 feedback): once a notify
+                  channel is set up, fire the real message before committing. */}
+              {channel && !editLoading && !editError ? (
+                <Tooltip
+                  content="Finish the delivery setup to send a test."
+                  disabled={configComplete}
+                >
+                  <Button
+                    variant="outline"
+                    onClick={onTestFire}
+                    loading={testFire.isLoading}
+                    disabled={!configComplete}
+                  >
+                    <Send size={14} /> Send test
+                  </Button>
+                </Tooltip>
+              ) : null}
               <Tooltip
-                content={saveDisabledReason(
-                  conditionsSet,
+                content={saveDisabledReason({
+                  draft,
+                  nameSet,
                   configComplete,
-                  !!draft.action,
-                  cadenceNeedsReview,
-                )}
+                  actionPicked: !!draft.action,
+                })}
                 disabled={canSave}
               >
                 <Button
@@ -563,7 +1001,7 @@ export function AutomationDrawer({
                   loading={upsert.isLoading}
                   disabled={!canSave}
                 >
-                  {automationId ? "Save changes" : "Create automation"}
+                  {labels.saveButton}
                 </Button>
               </Tooltip>
             </HStack>
@@ -571,36 +1009,10 @@ export function AutomationDrawer({
         </Drawer.Content>
       </Drawer.Root>
 
-      <FiltersSecondaryDrawer
-        open={section === "filters"}
-        source={draft.source}
-        filters={draft.filters}
-        customGraphId={draft.customGraphId}
-        projectId={projectId}
-        onSave={({ source, filters, customGraphId }) => {
-          dispatch({ type: "SET_SOURCE", value: source });
-          if (source === "trace") {
-            dispatch({ type: "SET_FILTERS", value: filters });
-          } else {
-            dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: customGraphId });
-          }
-          setSection(null);
-        }}
-        onCancel={() => setSection(null)}
-      />
-
       <ConfigurationSecondaryDrawer
         open={section === "configuration"}
         ctx={configCtx}
         onDone={() => setSection(null)}
-      />
-
-      <CadenceSecondaryDrawer
-        open={section === "cadence"}
-        onDone={() => {
-          dispatch({ type: "CONFIRM_CADENCE" });
-          setSection(null);
-        }}
       />
 
       <Dialog.Root
@@ -616,7 +1028,7 @@ export function AutomationDrawer({
           </Dialog.Header>
           <Dialog.Body>
             <Text color="fg.muted" textStyle="sm">
-              This automation has changes you haven't saved yet. Close the
+              This {labels.noun} has changes you haven't saved yet. Close the
               drawer and discard them?
             </Text>
           </Dialog.Body>

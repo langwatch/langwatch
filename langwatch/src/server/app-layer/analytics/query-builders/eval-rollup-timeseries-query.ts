@@ -207,6 +207,11 @@ export function buildEvalRollupTimeseriesQuery(
         `Eval rollup builder cannot serve aggregation "${s.aggregation}". Percentiles + uniq go to slim.`,
       );
     }
+    if (s.key !== undefined) {
+      throw new Error(
+        `Eval rollup builder cannot serve series with key="${s.key}" — the router should have routed this to slim or evaluation_runs (no EvaluatorId column on evaluation_analytics_rollup; see migration 00039).`,
+      );
+    }
     const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
     const expr = evalRollupAggExpression(s.metric, s.aggregation);
     selectExprs.push(`${expr} AS ${alias}`);

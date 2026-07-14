@@ -48,6 +48,10 @@ import {
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
 import type { FilterField } from "~/server/filters/types";
 import {
+  collectStringValues,
+  hasFilterValues,
+} from "../query-builders/_shared";
+import {
   type AnalyticsMetricSource,
   getMetricSource,
 } from "./field-availability";
@@ -336,7 +340,12 @@ const ROLLUP_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set<string>();
  *   {none, EvaluatorType, Status}.
  */
 const ROLLUP_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
-  "evaluations.evaluator_type",
+  // eval5014-002: `evaluations.evaluator_type` is DELIBERATELY excluded.
+  // The rollup's map projection emits `evaluatorType: ''` on the two-event
+  // (scheduled → completed) path because it has no fold-state access to
+  // lift the identity — grouping by EvaluatorType on the rollup would pile
+  // every two-event evaluation into a phantom "unknown" bucket. Route
+  // EvaluatorType-grouped queries to slim/legacy instead.
   "evaluations.evaluation_status",
 ]);
 
@@ -706,51 +715,10 @@ function isBlocklisted(key: string): boolean {
   return false;
 }
 
-function hasAnyFilterValue(
-  value:
-    | string[]
-    | Record<string, string[]>
-    | Record<string, Record<string, string[]>>
-    | undefined,
-): boolean {
-  if (value === undefined) return false;
-  if (Array.isArray(value)) return value.length > 0;
-  if (typeof value !== "object") return false;
-  for (const inner of Object.values(value)) {
-    if (Array.isArray(inner)) {
-      if (inner.length > 0) return true;
-      continue;
-    }
-    if (typeof inner === "object" && inner !== null) {
-      for (const v of Object.values(inner)) {
-        if (Array.isArray(v) && v.length > 0) return true;
-      }
-    }
-  }
-  return false;
-}
-
-function collectStringValues(
-  value:
-    | string[]
-    | Record<string, string[]>
-    | Record<string, Record<string, string[]>>,
-): string[] {
-  if (Array.isArray(value)) return value;
-  const out: string[] = [];
-  for (const inner of Object.values(value)) {
-    if (Array.isArray(inner)) {
-      out.push(...inner);
-      continue;
-    }
-    if (typeof inner === "object" && inner !== null) {
-      for (const v of Object.values(inner)) {
-        if (Array.isArray(v)) out.push(...v);
-      }
-    }
-  }
-  return out;
-}
+// hasAnyFilterValue + collectStringValues moved to query-builders/_shared.ts
+// (used by both slim + rollup builders too). Aliased below to preserve
+// the local name at call sites.
+const hasAnyFilterValue = hasFilterValues;
 
 /** Test-only helper to export the per-source sets for inspection. */
 export const __testOnly__ = {

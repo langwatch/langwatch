@@ -1,4 +1,11 @@
-import { TRACE_STATUS_CLICKHOUSE_EXPRESSION } from "./derive-trace-status";
+import {
+  deriveTraceOrigin,
+  TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
+} from "./derive-trace-origin";
+import {
+  deriveTraceStatus,
+  TRACE_STATUS_CLICKHOUSE_EXPRESSION,
+} from "./derive-trace-status";
 import {
   EVALUATOR_FACET,
   EVENT_ATTRIBUTE_KEYS_FACET,
@@ -10,6 +17,8 @@ import {
   SPAN_STATUS_FACET,
   TRACE_METADATA_FACET,
 } from "./facets";
+import type { CategoricalRead, RangeRead } from "./filter-to-clickhouse/field-def";
+import { UNSUPPORTED } from "./filter-to-clickhouse/field-def";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
 export type FacetGroup =
@@ -48,6 +57,14 @@ interface BaseFacetDef {
 export interface ExpressionCategoricalDef extends BaseFacetDef {
   kind: "categorical";
   expression: string;
+  /**
+   * In-memory accessor mirroring `expression`, letting the filter compiler
+   * evaluate this field against fold state without a ClickHouse round-trip.
+   * Present on the auto-derived `trace_summaries` facets (cheap reads over
+   * `TraceSummaryData`); cross-table facets attach their per-collection read in
+   * `filter-to-clickhouse/build-handlers.ts` instead.
+   */
+  read?: CategoricalRead;
 }
 
 export interface QueryBuilderCategoricalDef extends BaseFacetDef {
@@ -67,6 +84,8 @@ export interface RangeFacetDef extends BaseFacetDef {
    * span count) — each flag adds one GROUP BY query to discovery.
    */
   isDiscrete?: boolean;
+  /** In-memory accessor mirroring `expression`. See {@link ExpressionCategoricalDef.read}. */
+  read?: RangeRead;
 }
 
 export interface DynamicKeysDef extends BaseFacetDef {
@@ -98,6 +117,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: TRACE_STATUS_CLICKHOUSE_EXPRESSION,
+    read: (t) => deriveTraceStatus(t.summary),
   },
   {
     key: "origin",
@@ -105,7 +125,8 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Origin",
     group: "trace",
     table: "trace_summaries",
-    expression: "Attributes['langwatch.origin']",
+    expression: TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
+    read: (t) => deriveTraceOrigin(t.summary.attributes),
   },
   {
     key: "service",
@@ -114,6 +135,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "Attributes['service.name']",
+    read: (t) => t.summary.attributes["service.name"] ?? "",
   },
   {
     key: "model",
@@ -130,6 +152,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "Attributes['langwatch.user_id']",
+    read: (t) => t.summary.attributes["langwatch.user_id"] ?? "",
   },
   {
     key: "conversation",
@@ -138,6 +161,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "Attributes['gen_ai.conversation.id']",
+    read: (t) => t.summary.attributes["gen_ai.conversation.id"] ?? "",
   },
   {
     // The same key the analytics layer aliases as `metadata.customer_id`.
@@ -149,6 +173,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "Attributes['langwatch.customer_id']",
+    read: (t) => t.summary.attributes["langwatch.customer_id"] ?? "",
   },
   {
     // Simulator-produced traces stamp the run id onto `Attributes` at
@@ -169,6 +194,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "TopicId",
+    read: (t) => t.summary.topicId,
   },
   {
     key: "subtopic",
@@ -177,6 +203,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "SubTopicId",
+    read: (t) => t.summary.subTopicId,
   },
   {
     key: "traceName",
@@ -185,6 +212,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "TraceName",
+    read: (t) => t.summary.traceName,
   },
   {
     key: "rootSpanType",
@@ -193,6 +221,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "RootSpanType",
+    read: (t) => t.summary.rootSpanType,
   },
   {
     key: "guardrail",
@@ -201,6 +230,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "if(BlockedByGuardrail, 'blocked', 'allowed')",
+    read: (t) => (t.summary.blockedByGuardrail ? "blocked" : "allowed"),
   },
   {
     key: "annotation",
@@ -208,7 +238,15 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Annotation",
     group: "trace",
     table: "trace_summaries",
-    expression: "if(HasAnnotation, 'annotated', 'unannotated')",
+    // `HasAnnotation` is `Nullable(Bool)` and is written as NULL for traces
+    // that were never annotated, so a bare `if(HasAnnotation, ...)` returns
+    // NULL — not `'unannotated'` — and those traces drop out of both the facet
+    // counts and the `annotation:unannotated` filter, while the `read` below
+    // calls them unannotated. Coalesce, matching the analytics filter's
+    // `HasAnnotation = false OR HasAnnotation IS NULL`.
+    expression: "if(ifNull(HasAnnotation, false), 'annotated', 'unannotated')",
+    read: (t) =>
+      t.summary.annotationIds.length > 0 ? "annotated" : "unannotated",
   },
   {
     key: "containsAi",
@@ -217,6 +255,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "if(ContainsAi, 'yes', 'no')",
+    read: (t) => (t.summary.containsAi ? "yes" : "no"),
   },
   {
     key: "errorMessage",
@@ -225,6 +264,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "ErrorMessage",
+    read: (t) => t.summary.errorMessage,
   },
   {
     key: "tokensEstimated",
@@ -233,6 +273,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "if(TokensEstimated, 'estimated', 'actual')",
+    read: (t) => (t.summary.tokensEstimated ? "estimated" : "actual"),
   },
 
   // trace_summaries: prompt facets (rolled up at ingest from span attributes)
@@ -243,6 +284,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "prompt",
     table: "trace_summaries",
     expression: "SelectedPromptId",
+    read: (t) => t.summary.selectedPromptId,
   },
   {
     key: "lastUsedPrompt",
@@ -251,6 +293,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "prompt",
     table: "trace_summaries",
     expression: "LastUsedPromptId",
+    read: (t) => t.summary.lastUsedPromptId,
   },
   {
     key: "promptVersion",
@@ -260,6 +303,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     table: "trace_summaries",
     expression: "LastUsedPromptVersionNumber",
     isDiscrete: true,
+    read: (t) => t.summary.lastUsedPromptVersionNumber,
   },
 
   // trace_summaries: queryBuilder facets
@@ -273,6 +317,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "TotalCost",
+    read: (t) => t.summary.totalCost,
   },
   {
     key: "duration",
@@ -283,6 +328,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "TotalDurationMs",
+    read: (t) => t.summary.totalDurationMs,
   },
   {
     key: "tokens",
@@ -291,6 +337,13 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "TotalPromptTokenCount + TotalCompletionTokenCount",
+    // Mirror the SQL sum's NULL propagation: a null operand makes the whole
+    // sum null (excluded), rather than silently defaulting to zero.
+    read: (t) => {
+      const prompt = t.summary.totalPromptTokenCount;
+      const completion = t.summary.totalCompletionTokenCount;
+      return prompt == null || completion == null ? null : prompt + completion;
+    },
   },
   {
     key: "ttft",
@@ -299,6 +352,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "TimeToFirstTokenMs",
+    read: (t) => t.summary.timeToFirstTokenMs,
   },
   {
     key: "ttlt",
@@ -307,6 +361,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "TimeToLastTokenMs",
+    read: (t) => t.summary.timeToLastTokenMs,
   },
   {
     key: "promptTokens",
@@ -315,6 +370,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "TotalPromptTokenCount",
+    read: (t) => t.summary.totalPromptTokenCount,
   },
   {
     key: "completionTokens",
@@ -323,6 +379,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "TotalCompletionTokenCount",
+    read: (t) => t.summary.totalCompletionTokenCount,
   },
   {
     key: "tokensPerSecond",
@@ -331,6 +388,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "TokensPerSecond",
+    read: (t) => t.summary.tokensPerSecond,
   },
   {
     key: "spans",
@@ -340,6 +398,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     table: "trace_summaries",
     expression: "SpanCount",
     isDiscrete: true,
+    read: (t) => t.summary.spanCount,
   },
   {
     // Stored payload size of the trace in bytes — the materialised
@@ -354,6 +413,9 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "_size_bytes",
+    // `_size_bytes` is a MATERIALIZED read-only column; `sizeBytes` is undefined
+    // on the fold state at dispatch, so it can't be evaluated in memory.
+    read: () => UNSUPPORTED,
   },
 
   // metadata: dynamic keys

@@ -15,6 +15,15 @@ import type {
  * misconfigured 0/negative interval cannot spin the loop.
  */
 const MIN_INTERVAL_MS = 1_000;
+/**
+ * Max time `stop()` waits for in-flight ticks before proceeding anyway
+ * (hb-shutdown-hang deep-review finding). A cooperative `decide` that
+ * honours `abortSignal` finishes in ms; a `decide` that ignores it must
+ * not hold up SIGTERM handling. Any orphan tick continues in the background
+ * and releases its lock naturally; TTL-reap on the next process handles the
+ * pathological case.
+ */
+const SHUTDOWN_MAX_WAIT_MS = 10_000;
 
 /**
  * Minimum Redis-lock TTL. The lock TTL is `max(intervalMs * 2, 30s)`
@@ -88,7 +97,13 @@ export class OutboxHeartbeatScheduler {
   private readonly logger: Logger;
   private readonly workerId = randomUUID();
   private readonly timers = new Map<string, NodeJS.Timeout>();
-  private readonly abortController = new AbortController();
+  /**
+   * Reset on every `start()` so a stop/start cycle produces a fresh
+   * signal (hb-001). Consumers must re-read `abortSignal` on each tick.
+   */
+  private abortController = new AbortController();
+  /** In-flight `runTick` promises awaited by `stop()` (hb-002). */
+  private readonly inFlightTicks = new Set<Promise<void>>();
   private started = false;
 
   constructor(deps: OutboxHeartbeatSchedulerDeps) {
@@ -116,6 +131,11 @@ export class OutboxHeartbeatScheduler {
     }
     if (this.started) return;
     this.started = true;
+    // hb-001: reset the abort controller so restart-after-stop produces a
+    // fresh signal (the previous stop() cycle aborted it).
+    if (this.abortController.signal.aborted) {
+      this.abortController = new AbortController();
+    }
 
     const heartbeats = this.registry.getAll();
     for (const heartbeat of heartbeats) {
@@ -139,6 +159,34 @@ export class OutboxHeartbeatScheduler {
       clearInterval(timer);
     }
     this.timers.clear();
+    // hb-002: wait for any in-flight tick to finish (lock release, logging,
+    // dispatch, etc.) so callers awaiting stop() can safely tear down Redis /
+    // logger / dispatcher afterwards. `allSettled` — a tick that rejects has
+    // already logged its error via the outer `.catch` in scheduleHeartbeat.
+    // hb-shutdown-hang (deep-review): bound the wait so a `decide` that
+    // ignores `abortSignal` can't hang shutdown forever. On timeout we log
+    // + return so the outer graceful-shutdown continues; the orphan tick
+    // will still eventually resolve and release its lock, and the next
+    // process's lock-TTL reap catches anything truly stuck (Consequences).
+    if (this.inFlightTicks.size > 0) {
+      const shutdownDeadline = SHUTDOWN_MAX_WAIT_MS;
+      const waited = await Promise.race([
+        Promise.allSettled(Array.from(this.inFlightTicks)).then(() => true),
+        new Promise<false>((resolve) =>
+          setTimeout(() => resolve(false), shutdownDeadline).unref(),
+        ),
+      ]);
+      if (!waited) {
+        this.logger.warn(
+          {
+            workerId: this.workerId,
+            pendingTicks: this.inFlightTicks.size,
+            timeoutMs: shutdownDeadline,
+          },
+          "OutboxHeartbeatScheduler.stop: in-flight ticks did not complete within timeout — proceeding anyway. Check consumer decide() honours abortSignal.",
+        );
+      }
+    }
     this.logger.info(
       { workerId: this.workerId },
       "OutboxHeartbeatScheduler stopped",
@@ -149,7 +197,8 @@ export class OutboxHeartbeatScheduler {
     const intervalMs = Math.max(MIN_INTERVAL_MS, heartbeat.intervalMs);
     const lockTtlMs = Math.max(MIN_LOCK_TTL_MS, intervalMs * 2);
     const timer = setInterval(() => {
-      void this.runTick({ heartbeat, lockTtlMs }).catch((error) => {
+      // hb-002: track the in-flight promise so stop() can await it.
+      const promise = this.runTick({ heartbeat, lockTtlMs }).catch((error) => {
         // Belt-and-braces: runTick already catches `decide`/dispatch
         // errors internally, so reaching here means the lock-acquire
         // path itself threw (Redis blip). Log + capture; the next tick
@@ -165,6 +214,8 @@ export class OutboxHeartbeatScheduler {
           extra: { heartbeat: heartbeat.name, phase: "tick-outer" },
         });
       });
+      this.inFlightTicks.add(promise);
+      void promise.finally(() => this.inFlightTicks.delete(promise));
     }, intervalMs);
     // `unref()` so the timer never holds the process open on shutdown.
     timer.unref();

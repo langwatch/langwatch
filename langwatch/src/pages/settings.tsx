@@ -377,7 +377,7 @@ function SettingsForm({
                   render={({ field }) => (
                     <Switch
                       checked={field.value}
-                      onChange={(e) => field.onChange(e.target.checked)}
+                      onCheckedChange={({ checked }) => field.onChange(checked)}
                       disabled={!hasPermission("organization:manage")}
                     />
                   )}
@@ -744,7 +744,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   checked={
                     field.value && (organization?.presenceEnabled ?? true)
                   }
-                  onChange={(e) => field.onChange(e.target.checked)}
+                  onCheckedChange={({ checked }) => field.onChange(checked)}
                   disabled={
                     !userIsAdmin || !(organization?.presenceEnabled ?? true)
                   }
@@ -771,7 +771,9 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               render={({ field }) => (
                 <Switch
                   checked={field.value}
-                  onChange={(e) => handleTraceSharingChange(e.target.checked)}
+                  onCheckedChange={({ checked }) =>
+                    handleTraceSharingChange(checked)
+                  }
                   disabled={!userIsAdmin}
                 />
               )}

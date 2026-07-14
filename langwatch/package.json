@@ -162,6 +162,7 @@
     "chakra-react-select": "^6.1.3",
     "clsx": "2.1.1",
     "cookie": "^2.0.1",
+    "croner": "^10.0.1",
     "date-fns": "^4.4.0",
     "debug": "^4.4.3",
     "deepmerge": "^4.3.1",
