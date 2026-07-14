@@ -108,3 +108,41 @@ describe("ReplayRedisRepository refreshLock", () => {
     });
   });
 });
+
+describe("ReplayRedisRepository releaseLock", () => {
+  describe("given a lock held by a run", () => {
+    describe("when the holder releases the lock", () => {
+      it("deletes the lock key", async () => {
+        await repository.acquireLock({
+          runId: HOLDER_RUN_ID,
+          ttlSeconds: INITIAL_TTL_SECONDS,
+        });
+
+        await repository.releaseLock({ runId: HOLDER_RUN_ID });
+
+        expect(await redis.exists(REPLAY_LOCK_KEY)).toBe(0);
+      });
+    });
+  });
+
+  describe("given a run's lock was lost and a successor acquired it", () => {
+    describe("when the original run releases its stale lock", () => {
+      it("does not delete the successor's lock", async () => {
+        await repository.acquireLock({
+          runId: HOLDER_RUN_ID,
+          ttlSeconds: INITIAL_TTL_SECONDS,
+        });
+        // Simulate the holder's lock expiring, then a successor acquiring it.
+        await redis.del(REPLAY_LOCK_KEY);
+        await repository.acquireLock({
+          runId: OTHER_RUN_ID,
+          ttlSeconds: INITIAL_TTL_SECONDS,
+        });
+
+        await repository.releaseLock({ runId: HOLDER_RUN_ID });
+
+        expect(await repository.getLockHolder()).toBe(OTHER_RUN_ID);
+      });
+    });
+  });
+});

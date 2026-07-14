@@ -73,7 +73,7 @@ export async function replayFoldProjection({
   for (const tenantId of discoveryTargets) {
     const discovery = await discoverProjectionAggregates({
       resolveClient: ctx.resolveClient,
-      projection,
+      eventTypes: projection.definition.eventTypes,
       since,
       tenantId,
     });
@@ -213,14 +213,18 @@ export async function replayFoldProjection({
           log,
         });
 
-        progress.batchErrors = batchErrors;
-        progress.firstError = firstError;
-        emit();
-
+        // Unpause BEFORE the emit below — cancellation can throw from
+        // onProgress (ReplayCancelledError), and the pause key is a no-TTL
+        // set member, so an emit-first order would leave live processing
+        // frozen forever. Mirrors the optimized path's per-batch finally.
         await unpauseProjection({
           redis,
           pauseKey: projection.pauseKey,
         }).catch(() => {});
+
+        progress.batchErrors = batchErrors;
+        progress.firstError = firstError;
+        emit();
 
         return {
           aggregatesReplayed: aggregatesCompleted - skippedCount,

@@ -389,6 +389,7 @@ describe("replayEventLoader", () => {
       });
 
       expect(occurredAtBounds).toEqual({ minMs: 1700000000000, maxMs: 1700000002000 });
+      expect(cutoffs.size).toBe(2);
       expect(cutoffs.get(`${tenantId}:test:agg-1`)).toEqual({
         timestamp: 1700000001000,
         eventId: "evt-002",
@@ -396,6 +397,69 @@ describe("replayEventLoader", () => {
       expect(cutoffs.get(`${tenantId}:test:agg-2`)).toEqual({
         timestamp: 1700000002000,
         eventId: "evt-003",
+      });
+    });
+
+    describe("when the batch mixes aggregates with and without events", () => {
+      it("bounds only the aggregates that exist and omits the rest from cutoffs", async () => {
+        const client = getTestClickHouseClient()!;
+        const { cutoffs, occurredAtBounds } = await getBoundedCutoffs({
+          client,
+          tenantId,
+          aggregateTypes: ["test"],
+          aggregateIds: ["agg-1", "nonexistent-agg"],
+          eventTypes: ["test.event"],
+        });
+
+        // Bounds come from agg-1's real events only (evt-001..evt-002).
+        expect(occurredAtBounds).toEqual({
+          minMs: 1700000000000,
+          maxMs: 1700000001000,
+        });
+        expect(cutoffs.size).toBe(1);
+        expect(cutoffs.get(`${tenantId}:test:agg-1`)).toEqual({
+          timestamp: 1700000001000,
+          eventId: "evt-002",
+        });
+      });
+    });
+
+    describe("when no events match the requested event types", () => {
+      it("returns defined bounds with empty cutoffs", async () => {
+        const client = getTestClickHouseClient()!;
+        const { cutoffs, occurredAtBounds } = await getBoundedCutoffs({
+          client,
+          tenantId,
+          aggregateTypes: ["test"],
+          aggregateIds: ["agg-1", "agg-2"],
+          eventTypes: ["other.event"],
+        });
+
+        // The bounds query deliberately has no event-type filter (full
+        // history), so it still finds the aggregates' range; the cutoff
+        // query filters by EventType and matches nothing.
+        expect(occurredAtBounds).toEqual({
+          minMs: 1700000000000,
+          maxMs: 1700000002000,
+        });
+        expect(cutoffs.size).toBe(0);
+      });
+    });
+
+    describe("when the aggregate type does not match", () => {
+      it("returns undefined bounds and empty cutoffs", async () => {
+        const client = getTestClickHouseClient()!;
+        const { cutoffs, occurredAtBounds } = await getBoundedCutoffs({
+          client,
+          tenantId,
+          aggregateTypes: ["other-type"],
+          aggregateIds: ["agg-1"],
+          eventTypes: ["test.event"],
+        });
+
+        // Fails if the AggregateType predicate is dropped from the bounds SQL.
+        expect(occurredAtBounds).toBeUndefined();
+        expect(cutoffs.size).toBe(0);
       });
     });
 
@@ -416,6 +480,11 @@ describe("replayEventLoader", () => {
           expect(cutoffs.size).toBe(0);
           // Only the bounds query ran — the unbounded cutoff query was skipped.
           expect(querySpy).toHaveBeenCalledTimes(1);
+          // And that one call is the BOUNDS query (min/max over
+          // EventOccurredAt), not the cutoff query (argMax over EventId).
+          const sql = querySpy.mock.calls[0]![0].query;
+          expect(sql).toContain("min(EventOccurredAt)");
+          expect(sql).not.toContain("argMax");
         } finally {
           querySpy.mockRestore();
         }

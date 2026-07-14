@@ -374,7 +374,10 @@ export async function replayOptimized({
       try {
         const client = await ctx.resolveClient(tenantId);
         for (const table of tables) {
-          await client.command({ query: `OPTIMIZE TABLE ${table}` });
+          await client.command({
+            query: "OPTIMIZE TABLE {table:Identifier}",
+            query_params: { table },
+          });
           log.write({ step: "optimize", table, tenant: tenantId });
         }
       } catch {
@@ -471,10 +474,10 @@ async function replayBatchOptimized({
   // queries can prune event_log's weekly partitions; see
   // getAggregateOccurredAtBounds for the safety argument.
   const allCutoffs = new Map<string, CutoffInfo>();
-  const boundsByTenant = new Map<string, OccurredAtBounds | undefined>();
-  await pMapLimited(
-    [...byTenant.entries()],
-    async ([tenantId, entries]) => {
+  const boundsByTenant = new Map<string, OccurredAtBounds>();
+  await pMapLimited({
+    items: [...byTenant.entries()],
+    fn: async ([tenantId, entries]) => {
       const client = await ctx.resolveClient(tenantId);
       const { cutoffs: tenantCutoffs, occurredAtBounds } = await getBoundedCutoffs({
         client,
@@ -495,7 +498,7 @@ async function replayBatchOptimized({
       }
     },
     concurrency,
-  );
+  });
 
   // Split into with/without cutoffs
   const withCutoffKeys: string[] = [];
@@ -553,9 +556,9 @@ async function replayBatchOptimized({
   // Load events grouped by tenant (one CH query per tenant, in parallel).
   const allEvents = new Map<string, ReplayEvent[]>();
 
-  await pMapLimited(
-    [...byTenant.entries()],
-    async ([tenantId, entries]) => {
+  await pMapLimited({
+    items: [...byTenant.entries()],
+    fn: async ([tenantId, entries]) => {
       const aggIds = entries
         .filter((e) => allCutoffs.has(e.key))
         .map((e) => e.aggregateId);
@@ -576,38 +579,42 @@ async function replayBatchOptimized({
       }
     },
     concurrency,
-  );
+  });
 
   // Apply all relevant projections per aggregate — with concurrency
   let eventsProcessed = 0;
   let aggregatesApplied = 0;
   const totalToApply = withCutoffKeys.length;
 
-  await pMapLimited(withCutoffKeys, async (aggKey) => {
-    const events = allEvents.get(aggKey) ?? [];
-    const entry = aggregateProjectionMap.get(aggKey)!;
+  await pMapLimited({
+    items: withCutoffKeys,
+    fn: async (aggKey) => {
+      const events = allEvents.get(aggKey) ?? [];
+      const entry = aggregateProjectionMap.get(aggKey)!;
 
-    for (const event of events) {
-      for (const projName of entry.projections) {
-        const foldAcc = foldAccumulators.get(projName);
-        if (foldAcc) foldAcc.apply(event);
+      for (const event of events) {
+        for (const projName of entry.projections) {
+          const foldAcc = foldAccumulators.get(projName);
+          if (foldAcc) foldAcc.apply(event);
 
-        const mapAcc = mapAccumulators.get(projName);
-        if (mapAcc) await mapAcc.apply(event);
+          const mapAcc = mapAccumulators.get(projName);
+          if (mapAcc) await mapAcc.apply(event);
+        }
+        eventsProcessed++;
       }
-      eventsProcessed++;
-    }
 
-    // Throttled progress: emit every N aggregates plus the batch's last —
-    // never once per aggregate (each emit persists status to Redis).
-    aggregatesApplied++;
-    if (
-      aggregatesApplied % PROGRESS_EMIT_EVERY_AGGREGATES === 0 ||
-      aggregatesApplied === totalToApply
-    ) {
-      onBatchPhase("replay", eventsProcessed);
-    }
-  }, concurrency);
+      // Throttled progress: emit every N aggregates plus the batch's last —
+      // never once per aggregate (each emit persists status to Redis).
+      aggregatesApplied++;
+      if (
+        aggregatesApplied % PROGRESS_EMIT_EVERY_AGGREGATES === 0 ||
+        aggregatesApplied === totalToApply
+      ) {
+        onBatchPhase("replay", eventsProcessed);
+      }
+    },
+    concurrency,
+  });
 
   // 4. WRITE — flush all accumulators (fold states + map records in bulk)
   onBatchPhase("write", eventsProcessed);

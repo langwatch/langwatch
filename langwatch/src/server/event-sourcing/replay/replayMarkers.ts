@@ -178,14 +178,9 @@ export async function removeInFlightMarkers({
 }
 
 /**
- * Best-effort marker cleanup for a batch that errored (or was abandoned by
- * cancellation) mid-flight. Its aggregates were never replayed, so their
- * pending/cutoff markers are removed — returning them to unconditional live
- * processing right away instead of deferring their live events until the
- * 7-day marker TTL lapses. Done markers and completed-set entries from
- * previously completed batches are left intact so an operator re-run still
- * skips completed aggregates. Never throws: a marker-cleanup failure must
- * not mask the original batch error.
+ * Best-effort wrapper around {@link removeInFlightMarkers} for a batch that
+ * errored (or was abandoned by cancellation) mid-flight. Never throws: a
+ * marker-cleanup failure is logged and must not mask the original batch error.
  */
 export async function clearFailedBatchMarkers({
   redis,

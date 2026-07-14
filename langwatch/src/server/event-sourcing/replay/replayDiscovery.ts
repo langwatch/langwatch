@@ -1,4 +1,4 @@
-import type { RegisteredFoldProjection, DiscoveryResult, ReplayContext } from "./types";
+import type { DiscoveryResult, ReplayContext } from "./types";
 import type { DiscoveredAggregate } from "./replayEventLoader";
 import {
   discoverAffectedAggregates,
@@ -7,17 +7,18 @@ import {
 
 /**
  * Discovers the aggregates (and total event count) a projection's replay must
- * cover — every aggregate with at least one of the projection's event types
- * since `since`, grouped per tenant.
+ * cover — every aggregate with at least one of the given event types since
+ * `since`, grouped per tenant. Takes the projection's `eventTypes` directly so
+ * fold and map projections share it without casts.
  */
 export async function discoverProjectionAggregates({
   resolveClient,
-  projection,
+  eventTypes,
   since,
   tenantId,
 }: {
   resolveClient: ReplayContext["resolveClient"];
-  projection: RegisteredFoldProjection;
+  eventTypes: readonly string[];
   since: string;
   tenantId?: string;
 }): Promise<DiscoveryResult> {
@@ -26,13 +27,13 @@ export async function discoverProjectionAggregates({
   const [aggregates, totalEvents] = await Promise.all([
     discoverAffectedAggregates({
       client,
-      eventTypes: projection.definition.eventTypes,
+      eventTypes,
       sinceMs,
       tenantId,
     }),
     countEventsForAggregates({
       client,
-      eventTypes: projection.definition.eventTypes,
+      eventTypes,
       sinceMs,
       tenantId,
     }),

@@ -51,7 +51,7 @@ export class ReplayService {
   }): Promise<DiscoveryResult> {
     return discoverProjectionAggregates({
       resolveClient: this.ctx.resolveClient,
-      projection,
+      eventTypes: projection.definition.eventTypes,
       since,
       tenantId,
     });
@@ -150,7 +150,10 @@ export class ReplayService {
         try {
           const client = await this.ctx.resolveClient(tenantId);
           for (const table of tables) {
-            await client.command({ query: `OPTIMIZE TABLE ${table}` });
+            await client.command({
+              query: "OPTIMIZE TABLE {table:Identifier}",
+              query_params: { table },
+            });
             callbacks?.log?.write({ step: "optimize", table, tenant: tenantId });
           }
         } catch {

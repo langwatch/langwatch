@@ -74,10 +74,19 @@ export class ReplayRedisRepository implements ReplayRepository {
   }
 
   async releaseLock(params: { runId: string }): Promise<void> {
-    const holder = await this.redis.get(REPLAY_LOCK_KEY);
-    if (holder === params.runId) {
-      await this.redis.del(REPLAY_LOCK_KEY);
-    }
+    // Atomic compare-and-delete: only the current holder may release. A
+    // GET-then-DEL would race — the lock could expire and be re-acquired by a
+    // successor run between the two calls, and we'd delete the successor's lock.
+    await this.redis.eval(
+      `if redis.call('get', KEYS[1]) == ARGV[1] then
+        return redis.call('del', KEYS[1])
+      else
+        return 0
+      end`,
+      1,
+      REPLAY_LOCK_KEY,
+      params.runId,
+    );
   }
 
   async getLockHolder(): Promise<string | null> {

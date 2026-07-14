@@ -103,7 +103,10 @@ export class ReplayService {
     if (status.state !== "running") {
       return { cancelled: false };
     }
-    await this.repo.setCancelled({ ttlSeconds: 60 });
+    // TTL matches the lock TTL so the flag cannot expire between polls
+    // during a long callback-silent batch phase — the heartbeat checks it
+    // every LOCK_REFRESH_INTERVAL_MS.
+    await this.repo.setCancelled({ ttlSeconds: REPLAY_LOCK_TTL_SECONDS });
     return { cancelled: true };
   }
 
@@ -162,7 +165,7 @@ export class ReplayService {
       let lastCancelCheck = Date.now();
       const CANCEL_CHECK_INTERVAL_MS = 3000;
 
-      const refreshLock = () => {
+      const heartbeatTick = () => {
         this.repo
           .refreshLock({
             runId: params.runId,
@@ -172,23 +175,36 @@ export class ReplayService {
             if (!stillHeld) {
               // Lock expired and another run took over — abort this stale
               // run via the existing cancellation path so it stops touching
-              // the shared projection pause keys.
+              // the shared projection pause keys. Warn once and stop the
+              // heartbeat: the lock is confirmed gone, so there is nothing
+              // left to refresh and no point re-warning every interval.
               logger.warn(
                 { runId: params.runId },
                 "Replay lock lost to another run; aborting stale replay",
               );
               cancelledFlag = true;
+              clearInterval(heartbeat);
             }
           })
           .catch((err) => {
             logger.warn({ error: err }, "Failed to refresh replay lock");
           });
+
+        // Poll the cancel flag from the heartbeat too, so a cancel request
+        // is picked up even during batch phases that emit no callbacks for
+        // longer than the progress-driven check interval.
+        this.repo
+          .isCancelled()
+          .then((cancelled) => {
+            if (cancelled) cancelledFlag = true;
+          })
+          .catch(() => {});
       };
 
       // Heartbeat: refresh the lock on a standalone timer for the duration
       // of the runtime call, so the lock survives runs longer than its TTL
       // even when a single batch phase emits no callbacks for that long.
-      const heartbeat = setInterval(refreshLock, LOCK_REFRESH_INTERVAL_MS);
+      const heartbeat = setInterval(heartbeatTick, LOCK_REFRESH_INTERVAL_MS);
       heartbeat.unref();
 
       let result;
@@ -233,8 +249,11 @@ export class ReplayService {
         clearInterval(heartbeat);
       }
 
+      // Mirror the catch-path guard: only a takeover by ANOTHER run skips
+      // finalization. A null holder (lock expired, no successor) still
+      // finalizes so a completed run is never left stuck in "running".
       const lockHolder = await this.repo.getLockHolder();
-      if (lockHolder !== params.runId) return;
+      if (lockHolder !== null && lockHolder !== params.runId) return;
 
       if (result.batchErrors > 0) {
         await this.finalizeWithError({

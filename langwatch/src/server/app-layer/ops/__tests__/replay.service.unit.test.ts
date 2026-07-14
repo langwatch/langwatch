@@ -23,6 +23,7 @@ const mockedCreateReplayRuntime = vi.mocked(createReplayRuntime);
 function createFakeRepo() {
   let status: ReplayStatus = { ...IDLE_STATUS };
   let lockHolder: string | null = null;
+  let cancelled = false;
   const history: ReplayHistoryEntry[] = [];
 
   const repo: ReplayRepository = {
@@ -42,9 +43,13 @@ function createFakeRepo() {
       if (lockHolder === params.runId) lockHolder = null;
     }),
     getLockHolder: vi.fn(async () => lockHolder),
-    isCancelled: vi.fn(async () => false),
-    setCancelled: vi.fn(async () => undefined),
-    clearCancelFlag: vi.fn(async () => undefined),
+    isCancelled: vi.fn(async () => cancelled),
+    setCancelled: vi.fn(async () => {
+      cancelled = true;
+    }),
+    clearCancelFlag: vi.fn(async () => {
+      cancelled = false;
+    }),
     pushToHistory: vi.fn(async (params: { entry: ReplayHistoryEntry }) => {
       history.push(params.entry);
     }),
@@ -202,6 +207,118 @@ describe("ops ReplayService", () => {
         }
       });
     });
+
+    describe("when a lock refresh rejects transiently", () => {
+      it("keeps the run alive and refreshes again on the next interval", async () => {
+        vi.useFakeTimers();
+        try {
+          const repo = createFakeRepo();
+          const service = new ReplayService(repo);
+
+          // First refresh fails (e.g. a Redis hiccup); later ones succeed
+          // via the fake's real implementation.
+          vi.mocked(repo.refreshLock).mockRejectedValueOnce(
+            new Error("redis hiccup"),
+          );
+
+          let finishRun!: () => void;
+          const runGate = new Promise<void>((resolve) => {
+            finishRun = resolve;
+          });
+
+          stubRuntime(async () => {
+            await runGate;
+            return { aggregatesReplayed: 1000, totalEvents: 5000, batchErrors: 0 };
+          });
+
+          await service.startReplay({
+            projectionNames: ["traceSummary"],
+            since: "2026-01-01",
+            tenantIds: [],
+            description: "unit",
+            userName: "tester",
+          });
+
+          await vi.advanceTimersByTimeAsync(0);
+
+          // First tick rejects — the run must survive it and stay running.
+          await vi.advanceTimersByTimeAsync(LOCK_REFRESH_INTERVAL_MS);
+          expect(repo.refreshLock).toHaveBeenCalledTimes(1);
+          expect((await service.getStatus()).state).toBe("running");
+
+          // Second tick refreshes normally.
+          await vi.advanceTimersByTimeAsync(LOCK_REFRESH_INTERVAL_MS);
+          expect(repo.refreshLock).toHaveBeenCalledTimes(2);
+
+          finishRun();
+          await vi.waitFor(async () => {
+            const status = await service.getStatus();
+            expect(status.state).toBe("completed");
+          });
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+  });
+
+  describe("given a cancel requested during a callback-silent batch phase", () => {
+    describe("when the heartbeat tick polls the cancel flag", () => {
+      it("picks up the cancellation and finalizes the run as cancelled", async () => {
+        vi.useFakeTimers();
+        try {
+          const repo = createFakeRepo();
+          const service = new ReplayService(repo);
+
+          let proceedToProgress!: () => void;
+          const progressGate = new Promise<void>((resolve) => {
+            proceedToProgress = resolve;
+          });
+
+          stubRuntime(async (_config, callbacks) => {
+            // Callback-silent phase: nothing emits until the gate opens.
+            await progressGate;
+            callbacks?.onProgress?.(buildProgress());
+            return { aggregatesReplayed: 1000, totalEvents: 5000, batchErrors: 0 };
+          });
+
+          await service.startReplay({
+            projectionNames: ["traceSummary"],
+            since: "2026-01-01",
+            tenantIds: [],
+            description: "unit",
+            userName: "tester",
+          });
+          await vi.advanceTimersByTimeAsync(0);
+
+          // Cancel lands while the batch phase emits no callbacks; the flag
+          // TTL matches the lock TTL so it cannot expire between polls.
+          await service.cancelReplay();
+          expect(repo.setCancelled).toHaveBeenCalledWith({
+            ttlSeconds: 3600,
+          });
+
+          // Only the heartbeat can observe the flag during the silent phase
+          // (one isCancelled call at start + one from the heartbeat tick).
+          await vi.advanceTimersByTimeAsync(LOCK_REFRESH_INTERVAL_MS);
+          expect(repo.isCancelled).toHaveBeenCalledTimes(2);
+
+          // The next (single) progress emit sees the flag synchronously and
+          // aborts — its own async cancel poll could not have resolved yet,
+          // so only the heartbeat's pickup explains the abort.
+          proceedToProgress();
+          await vi.waitFor(async () => {
+            const status = await service.getStatus();
+            expect(status.state).toBe("cancelled");
+          });
+          expect(repo.pushToHistory).toHaveBeenCalledWith({
+            entry: expect.objectContaining({ state: "cancelled" }),
+          });
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
   });
 
   describe("given a replay whose lock refresh reports the lock is no longer held", () => {
@@ -255,6 +372,62 @@ describe("ops ReplayService", () => {
           expect(repo.pushToHistory).toHaveBeenCalledWith({
             entry: expect.objectContaining({ state: "cancelled" }),
           });
+
+          // The runtime threw — the finally must have cleared the heartbeat,
+          // so further intervals never touch the lock again.
+          await vi.advanceTimersByTimeAsync(LOCK_REFRESH_INTERVAL_MS * 3);
+          expect(repo.refreshLock).toHaveBeenCalledTimes(1);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when further heartbeat intervals elapse after the lock is lost", () => {
+      it("stops the heartbeat after the first lost-lock detection", async () => {
+        vi.useFakeTimers();
+        try {
+          const repo = createFakeRepo();
+          const service = new ReplayService(repo);
+
+          let finishRun!: () => void;
+          const runGate = new Promise<void>((resolve) => {
+            finishRun = resolve;
+          });
+
+          stubRuntime(async () => {
+            // Lock expires with no successor while the run is in flight.
+            await repo.releaseLock({
+              runId: (await repo.getLockHolder())!,
+            });
+            await runGate;
+            return { aggregatesReplayed: 1, totalEvents: 1, batchErrors: 0 };
+          });
+
+          await service.startReplay({
+            projectionNames: ["traceSummary"],
+            since: "2026-01-01",
+            tenantIds: [],
+            description: "unit",
+            userName: "tester",
+          });
+          await vi.advanceTimersByTimeAsync(0);
+
+          // First tick detects the lost lock (warns once) and clears the
+          // interval itself.
+          await vi.advanceTimersByTimeAsync(LOCK_REFRESH_INTERVAL_MS);
+          expect(repo.refreshLock).toHaveBeenCalledTimes(1);
+
+          // Three more intervals: no further refresh attempts, hence no
+          // repeated lost-lock warnings.
+          await vi.advanceTimersByTimeAsync(LOCK_REFRESH_INTERVAL_MS * 3);
+          expect(repo.refreshLock).toHaveBeenCalledTimes(1);
+
+          finishRun();
+          await vi.waitFor(async () => {
+            const status = await service.getStatus();
+            expect(status.state).toBe("completed");
+          });
         } finally {
           vi.useRealTimers();
         }
@@ -269,9 +442,14 @@ describe("ops ReplayService", () => {
         const service = new ReplayService(repo);
 
         stubRuntime(async () => {
-          // Simulate the lock being lost mid-run (e.g. expiry + takeover).
+          // Simulate the lock being lost mid-run: it expires AND a new run
+          // acquires it — the successor now owns the status row.
           await repo.releaseLock({
             runId: (await repo.getLockHolder())!,
+          });
+          await repo.acquireLock({
+            runId: "successor-run",
+            ttlSeconds: 3600,
           });
           return { aggregatesReplayed: 1, totalEvents: 1, batchErrors: 0 };
         });
@@ -295,6 +473,41 @@ describe("ops ReplayService", () => {
         const status = await service.getStatus();
         expect(status.state).toBe("running");
         expect(repo.pushToHistory).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a replay whose lock expired with no successor", () => {
+    describe("when the run finishes successfully", () => {
+      it("still finalizes the run as completed", async () => {
+        const repo = createFakeRepo();
+        const service = new ReplayService(repo);
+
+        stubRuntime(async () => {
+          // Lock expired mid-run and nobody took over: holder is null.
+          await repo.releaseLock({
+            runId: (await repo.getLockHolder())!,
+          });
+          return { aggregatesReplayed: 1, totalEvents: 1, batchErrors: 0 };
+        });
+
+        await service.startReplay({
+          projectionNames: ["traceSummary"],
+          since: "2026-01-01",
+          tenantIds: [],
+          description: "unit",
+          userName: "tester",
+        });
+
+        // No successor owns the status row, so the run must not be left
+        // stuck in "running" — it finalizes as completed.
+        await vi.waitFor(async () => {
+          const status = await service.getStatus();
+          expect(status.state).toBe("completed");
+        });
+        expect(repo.pushToHistory).toHaveBeenCalledWith({
+          entry: expect.objectContaining({ state: "completed" }),
+        });
       });
     });
   });
