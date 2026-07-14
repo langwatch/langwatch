@@ -2,7 +2,6 @@ import { generate } from "@langwatch/ksuid";
 import {
   Prisma,
   type PrismaClient,
-  type Project,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
@@ -34,6 +33,7 @@ import {
   checkOrganizationPermission,
   checkProjectPermission,
   checkTeamPermission,
+  createShareAudienceViewer,
   hasProjectPermission,
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
@@ -45,42 +45,27 @@ export const projectRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), shareId: z.string() }))
     .use(skipPermissionCheck)
     .query(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
+      const result = await getApp().share.getPublicProjectForGrant({
+        shareId: input.shareId,
+        projectId: input.id,
+        grant: ctx.shareGrant,
+        viewer: createShareAudienceViewer(ctx),
+      });
 
-      // Validate the share link is still active (not expired, sharing enabled)
-      // This prevents anonymous access after a link expires or is disabled
-      const share = await getApp().share.getShareableById(input.shareId);
-
-      if (!share || share.projectId !== input.id) {
+      if (result.status === "not_found") {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Public share not found",
         });
       }
-
-      const project = await prisma.project.findUnique({
-        where: { id: input.id },
-      });
-
-      if (!project) {
+      if (result.status === "forbidden") {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
+          code: "UNAUTHORIZED",
+          message: "No valid share grant was presented for this project",
         });
       }
 
-      return {
-        id: project.id,
-        name: project.name,
-        slug: project.slug,
-        language: project.language,
-        framework: project.framework,
-        firstMessage: true,
-        apiKey: "",
-        teamId: "",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Project;
+      return result.project;
     }),
   create: protectedProcedure
     .input(

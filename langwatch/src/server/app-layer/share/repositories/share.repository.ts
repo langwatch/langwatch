@@ -1,7 +1,18 @@
-import type { ShareLink, ShareResourceType, ShareVisibility } from "@prisma/client";
+import type {
+  ShareResourceType as PrismaShareResourceType,
+  ShareLink,
+  ShareVisibility,
+} from "@prisma/client";
+
+export type ShareResourceType = PrismaShareResourceType;
 
 export interface ShareWithProject extends ShareLink {
   project: {
+    id: string;
+    name: string;
+    slug: string;
+    language: string;
+    framework: string;
     traceSharingEnabled: boolean;
     team: { organizationId: string };
   };

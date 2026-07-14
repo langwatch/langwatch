@@ -1,6 +1,8 @@
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import type { ShareGrantClaims } from "~/server/app-layer/share/shareGrant";
 import {
   checkOrganizationPermission,
   checkPermissionOrPubliclyShared,
@@ -11,15 +13,23 @@ import {
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
-  resolveProjectPermission,
-  resolveTeamPermission,
   type Permission,
   type PermissionResult,
+  resolveProjectPermission,
+  resolveTeamPermission,
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../rbac";
-import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
-import type { ShareGrantClaims } from "~/server/app-layer/share/shareGrant";
+
+const { mockValidateGrantForViewer } = vi.hoisted(() => ({
+  mockValidateGrantForViewer: vi.fn(),
+}));
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    share: { validateGrantForViewer: mockValidateGrantForViewer },
+  }),
+}));
 
 // Mock Prisma client
 const mockPrisma = {
@@ -62,6 +72,7 @@ const mockSession = {
 describe("RBAC Integration Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockValidateGrantForViewer.mockResolvedValue(true);
     // Default: no group memberships, no role bindings, no team user (falls through to denied)
     mockPrisma.groupMembership.findMany.mockResolvedValue([]);
     mockPrisma.roleBinding.findMany.mockResolvedValue([]);
@@ -919,6 +930,40 @@ describe("RBAC Integration Tests", () => {
             }),
           ).rejects.toThrow(TRPCError);
         });
+
+        it("denies a grant issued for a different resource type", async () => {
+          mockCtx.shareGrant = {
+            ...grantFor({
+              projectId: "project-123",
+              traceId: "trace-123",
+            }),
+            resource_type: "THREAD",
+          };
+
+          await expect(
+            middleware()({
+              ctx: mockCtx,
+              input: { projectId: "project-123", traceId: "trace-123" },
+              next: mockNext,
+            }),
+          ).rejects.toThrow(TRPCError);
+        });
+
+        it("denies a grant whose live share or audience is no longer valid", async () => {
+          mockCtx.shareGrant = grantFor({
+            projectId: "project-123",
+            traceId: "trace-123",
+          });
+          mockValidateGrantForViewer.mockResolvedValueOnce(false);
+
+          await expect(
+            middleware()({
+              ctx: mockCtx,
+              input: { projectId: "project-123", traceId: "trace-123" },
+              next: mockNext,
+            }),
+          ).rejects.toThrow(TRPCError);
+        });
       });
     });
 
@@ -941,7 +986,7 @@ describe("RBAC Integration Tests", () => {
           mockCtx.shareGrant = {
             share_id: "share-123",
             project_id: "project-123",
-            resource_type: "TRACE",
+            resource_type: "THREAD",
             resource_id: "trace-123",
             thread_id: null,
           };
@@ -961,7 +1006,7 @@ describe("RBAC Integration Tests", () => {
           mockCtx.shareGrant = {
             share_id: "share-123",
             project_id: "project-123",
-            resource_type: "TRACE",
+            resource_type: "THREAD",
             resource_id: "trace-123",
             thread_id: "conv-1",
           };
@@ -982,7 +1027,7 @@ describe("RBAC Integration Tests", () => {
           mockCtx.shareGrant = {
             share_id: "share-123",
             project_id: "project-123",
-            resource_type: "TRACE",
+            resource_type: "THREAD",
             resource_id: "trace-123",
             thread_id: "conv-1",
           };
@@ -1002,7 +1047,7 @@ describe("RBAC Integration Tests", () => {
           mockCtx.shareGrant = {
             share_id: "share-123",
             project_id: "project-a",
-            resource_type: "TRACE",
+            resource_type: "THREAD",
             resource_id: "trace-123",
             thread_id: "conv-1",
           };

@@ -6,7 +6,9 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
+import { getApp } from "~/server/app-layer/app";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import type { ShareAudienceViewer } from "~/server/app-layer/share/share.service";
 import type { ShareGrantClaims } from "~/server/app-layer/share/shareGrant";
 import type { Session } from "~/server/auth";
 import { isAdmin } from "../../../ee/admin/isAdmin";
@@ -1472,6 +1474,41 @@ export const authorizeInResolver = ({
 
 type PublicResourceTypes = "TRACE" | "THREAD";
 
+type ShareAuthorizationContext = {
+  prisma: PrismaClient;
+  session: Session | null;
+};
+
+export function createShareAudienceViewer(
+  ctx: ShareAuthorizationContext,
+): ShareAudienceViewer {
+  return {
+    isOrgMember: async (organizationId) =>
+      !!ctx.session?.user &&
+      hasOrganizationPermission(
+        { prisma: ctx.prisma, session: ctx.session },
+        organizationId,
+        "organization:view",
+      ),
+    isProjectMember: async (projectId) =>
+      hasProjectPermission(
+        { prisma: ctx.prisma, session: ctx.session },
+        projectId,
+        "traces:view",
+      ),
+  };
+}
+
+export async function isShareGrantActive(
+  ctx: ShareAuthorizationContext,
+  grant: ShareGrantClaims,
+): Promise<boolean> {
+  return getApp().share.validateGrantForViewer({
+    grant,
+    viewer: createShareAudienceViewer(ctx),
+  });
+}
+
 /**
  * Authorize a read either by the caller's own permission, or — for anonymous
  * share viewers — by possession of a valid share grant covering exactly this
@@ -1521,15 +1558,15 @@ export const checkPermissionOrPubliclyShared =
       const grant = ctx.shareGrant;
       // Resolve the expected resource type (could be a function for dynamic lookup)
       const expectedResourceType =
-        typeof resourceType === "function"
-          ? resourceType(input)
-          : resourceType;
+        typeof resourceType === "function" ? resourceType(input) : resourceType;
       const grantCoversResource =
         !!grant &&
         grant.project_id === input.projectId &&
         grant.resource_type === expectedResourceType &&
         grant.resource_id === input[resourceParam];
-      if (!grantCoversResource) {
+      const grantIsActive =
+        grantCoversResource && (await isShareGrantActive(ctx, grant));
+      if (!grantIsActive) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message:
@@ -1574,7 +1611,9 @@ export const checkPermissionOrSharedThread =
         grant.project_id === input.projectId &&
         !!grant.thread_id &&
         grant.thread_id === input.conversationId;
-      if (!grantCoversThread) {
+      const grantIsActive =
+        grantCoversThread && (await isShareGrantActive(ctx, grant));
+      if (!grantIsActive) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message:

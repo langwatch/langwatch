@@ -76,6 +76,31 @@ describe("share grant", () => {
 
       expect(verifyShareGrant(expired)).toBeNull();
     });
+
+    it("refuses to mint a grant for an expired share", () => {
+      expect(() => signShareGrant(claims, new Date())).toThrow(
+        "Cannot sign a share grant for an expired share",
+      );
+    });
+
+    it("refuses to mint a grant for an immediately expiring share", () => {
+      expect(() => signShareGrant(claims, new Date(Date.now() + 500))).toThrow(
+        "Cannot sign a share grant for an expired share",
+      );
+    });
+  });
+
+  describe("given a share that expires before the normal grant TTL", () => {
+    it("caps the grant expiry at the share expiry", () => {
+      const shareExpiresAt = new Date(Date.now() + 30_000);
+
+      const grant = signShareGrant(claims, shareExpiresAt);
+
+      expect(grant.expiresAt).toBeLessThanOrEqual(
+        Math.floor(shareExpiresAt.getTime() / 1000),
+      );
+      expect(grant.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
+    });
   });
 
   describe("given garbage input", () => {

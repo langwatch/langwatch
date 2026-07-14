@@ -9,6 +9,11 @@ import type {
 const projectInclude = {
   project: {
     select: {
+      id: true,
+      name: true,
+      slug: true,
+      language: true,
+      framework: true,
       traceSharingEnabled: true,
       team: { select: { organizationId: true } },
     },
@@ -110,15 +115,10 @@ export class PrismaShareRepository implements ShareRepository {
       where: {
         id,
         projectId,
-        // If maxViews is null, no limit — always allow
-        // If maxViews is set, only allow if viewCount < maxViews
-        ...(maxViews !== null
-          ? { viewCount: { lt: maxViews } }
-          : {}),
+        ...(maxViews !== null ? { viewCount: { lt: maxViews } } : {}),
       },
       data: { viewCount: { increment: 1 } },
     });
-    // count of updated rows: 1 means we consumed a view, 0 means exhausted or deleted
     return result.count > 0;
   }
 

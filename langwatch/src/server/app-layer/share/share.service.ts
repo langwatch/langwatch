@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ShareLink, ShareVisibility } from "@prisma/client";
+import type { Project, ShareLink, ShareVisibility } from "@prisma/client";
 import type { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
 import type {
   ShareRepository,
@@ -7,6 +7,7 @@ import type {
   ShareWithProject,
 } from "./repositories/share.repository";
 import { generateShareToken } from "./share.token";
+import type { ShareGrantClaims } from "./shareGrant";
 
 const logger = createLogger("langwatch:share-service");
 
@@ -39,6 +40,16 @@ export interface ShareViewer {
   isProjectMember: (projectId: string) => Promise<boolean>;
 }
 
+export type ShareAudienceViewer = Pick<
+  ShareViewer,
+  "isOrgMember" | "isProjectMember"
+>;
+
+export type PublicShareProjectResult =
+  | { status: "granted"; project: Project }
+  | { status: "not_found" }
+  | { status: "forbidden" };
+
 export class ShareService {
   constructor(
     private readonly repo: ShareRepository,
@@ -50,21 +61,6 @@ export class ShareService {
     if (share?.resourceType === "TRACE" && !share.project.traceSharingEnabled) {
       return null;
     }
-    return share;
-  }
-
-  /**
-   * Get a share link by its database id, validating it is still shareable
-   * (sharing enabled, not expired). Used by publicGetById to ensure the
-   * project chrome is only shown for active share links.
-   */
-  async getShareableById(id: string): Promise<ShareWithProject | null> {
-    const share = await this.repo.findById(id);
-    if (!share) return null;
-    if (share.resourceType === "TRACE" && !share.project.traceSharingEnabled) {
-      return null;
-    }
-    if (isShareExpired(share)) return null;
     return share;
   }
 
@@ -90,6 +86,95 @@ export class ShareService {
     }
     if (isShareExpired(share)) return null;
     return share;
+  }
+
+  /**
+   * Revalidate a signed grant against the live link and the viewer's current
+   * audience membership. View exhaustion is intentionally not checked here:
+   * issuing a grant may itself consume the link's final allowed view.
+   */
+  async validateGrantForViewer({
+    grant,
+    viewer,
+  }: {
+    grant: ShareGrantClaims;
+    viewer: ShareAudienceViewer;
+  }): Promise<boolean> {
+    const share = await this.repo.findById(grant.share_id);
+    if (!share) return false;
+
+    return this.validateGrantAgainstShare({ share, grant, viewer });
+  }
+
+  async getPublicProjectForGrant({
+    shareId,
+    projectId,
+    grant,
+    viewer,
+  }: {
+    shareId: string;
+    projectId: string;
+    grant: ShareGrantClaims | null | undefined;
+    viewer: ShareAudienceViewer;
+  }): Promise<PublicShareProjectResult> {
+    const share = await this.repo.findById(shareId);
+    if (
+      !share ||
+      share.projectId !== projectId ||
+      (share.resourceType === "TRACE" && !share.project.traceSharingEnabled) ||
+      isShareExpired(share)
+    ) {
+      return { status: "not_found" };
+    }
+
+    if (
+      !grant ||
+      grant.share_id !== shareId ||
+      grant.project_id !== projectId ||
+      !(await this.validateGrantAgainstShare({ share, grant, viewer }))
+    ) {
+      return { status: "forbidden" };
+    }
+
+    return {
+      status: "granted",
+      project: {
+        id: share.project.id,
+        name: share.project.name,
+        slug: share.project.slug,
+        language: share.project.language,
+        framework: share.project.framework,
+        firstMessage: true,
+        apiKey: "",
+        teamId: "",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as Project,
+    };
+  }
+
+  private async validateGrantAgainstShare({
+    share,
+    grant,
+    viewer,
+  }: {
+    share: ShareWithProject;
+    grant: ShareGrantClaims;
+    viewer: ShareAudienceViewer;
+  }): Promise<boolean> {
+    const claimsMatch =
+      share.projectId === grant.project_id &&
+      share.resourceType === grant.resource_type &&
+      share.resourceId === grant.resource_id &&
+      share.threadId === grant.thread_id;
+    if (!claimsMatch) return false;
+
+    if (share.resourceType === "TRACE" && !share.project.traceSharingEnabled) {
+      return false;
+    }
+    if (isShareExpired(share)) return false;
+
+    return this.checkAudience(share, viewer);
   }
 
   /**
@@ -125,17 +210,13 @@ export class ShareService {
       return { status: "granted", share, isConsumed: false };
     }
 
-    // Atomic consume: attempt to increment only if not exhausted.
-    // The service-level check is kept as a fast-path for the common case
-    // (no contention), but the repository does the authoritative atomic check.
     const isConsumed = await this.repo.incrementViewCount({
       id: share.id,
       projectId: share.projectId,
       maxViews: share.maxViews,
     });
-    
+
     if (!isConsumed) {
-      // Race condition: another resolve consumed the last view between our check and update
       return { status: "exhausted" };
     }
     return { status: "granted", share, isConsumed: true };
@@ -143,7 +224,7 @@ export class ShareService {
 
   private async checkAudience(
     share: ShareWithProject,
-    viewer: ShareViewer,
+    viewer: ShareAudienceViewer,
   ): Promise<boolean> {
     const visibility: ShareVisibility = share.visibility;
     switch (visibility) {
@@ -239,6 +320,18 @@ export class ShareService {
             { projectId, traceId: share.resourceId, error },
             "Failed to auto-unpin trace after revoking its last share",
           );
+        }
+
+        const replacementExists = await this.repo.hasActiveShareForResource({
+          projectId,
+          resourceType: "TRACE",
+          resourceId: share.resourceId,
+        });
+        if (replacementExists) {
+          await this.pinnedTraces.autoPin({
+            projectId,
+            traceId: share.resourceId,
+          });
         }
       }
     }

@@ -9,7 +9,9 @@ import { ShareService, type ShareViewer } from "../share.service";
 const ORG_ID = "org_1";
 const PROJECT_ID = "project_1";
 
-function buildShare(overrides: Partial<ShareWithProject> = {}): ShareWithProject {
+function buildShare(
+  overrides: Partial<ShareWithProject> = {},
+): ShareWithProject {
   return {
     id: "share_1",
     token: "tok_abc",
@@ -25,6 +27,11 @@ function buildShare(overrides: Partial<ShareWithProject> = {}): ShareWithProject
     createdAt: new Date(),
     updatedAt: new Date(),
     project: {
+      id: PROJECT_ID,
+      name: "Test project",
+      slug: "test-project",
+      language: "typescript",
+      framework: "nextjs",
       traceSharingEnabled: true,
       team: { organizationId: ORG_ID },
     },
@@ -66,6 +73,160 @@ describe("ShareService", () => {
     service = new ShareService(repo, pinnedTraces as PinnedTraceService);
   });
 
+  describe("when validating an existing grant", () => {
+    const grant = {
+      share_id: "share_1",
+      project_id: PROJECT_ID,
+      resource_type: "TRACE" as const,
+      resource_id: "trace_a",
+      thread_id: null,
+    };
+
+    it("accepts a live public link with matching claims", async () => {
+      vi.mocked(repo.findById).mockResolvedValue(buildShare());
+
+      const result = await service.validateGrantForViewer({
+        grant,
+        viewer: buildViewer(),
+      });
+
+      expect(result).toBe(true);
+    });
+
+    it("rejects a grant after its link is revoked", async () => {
+      vi.mocked(repo.findById).mockResolvedValue(null);
+
+      const result = await service.validateGrantForViewer({
+        grant,
+        viewer: buildViewer(),
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("rejects a grant after trace sharing is disabled", async () => {
+      vi.mocked(repo.findById).mockResolvedValue(
+        buildShare({
+          project: {
+            id: PROJECT_ID,
+            name: "Test project",
+            slug: "test-project",
+            language: "typescript",
+            framework: "nextjs",
+            traceSharingEnabled: false,
+            team: { organizationId: ORG_ID },
+          },
+        }),
+      );
+
+      const result = await service.validateGrantForViewer({
+        grant,
+        viewer: buildViewer(),
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("rejects a grant after its link expires", async () => {
+      vi.mocked(repo.findById).mockResolvedValue(
+        buildShare({ expiresAt: new Date(Date.now() - 1) }),
+      );
+
+      const result = await service.validateGrantForViewer({
+        grant,
+        viewer: buildViewer(),
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("rejects a scoped grant after audience membership is removed", async () => {
+      vi.mocked(repo.findById).mockResolvedValue(
+        buildShare({ visibility: "ORGANIZATION" }),
+      );
+
+      const result = await service.validateGrantForViewer({
+        grant,
+        viewer: buildViewer({ isOrgMember: vi.fn().mockResolvedValue(false) }),
+      });
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("when resolving project chrome for a share grant", () => {
+    const grant = {
+      share_id: "share_1",
+      project_id: PROJECT_ID,
+      resource_type: "TRACE" as const,
+      resource_id: "trace_a",
+      thread_id: null,
+    };
+
+    it("returns the sanitized project for a live matching grant", async () => {
+      vi.mocked(repo.findById).mockResolvedValue(buildShare());
+
+      const result = await service.getPublicProjectForGrant({
+        shareId: "share_1",
+        projectId: PROJECT_ID,
+        grant,
+        viewer: buildViewer(),
+      });
+
+      expect(result).toMatchObject({
+        status: "granted",
+        project: {
+          id: PROJECT_ID,
+          name: "Test project",
+          slug: "test-project",
+          apiKey: "",
+          teamId: "",
+        },
+      });
+    });
+
+    it("reports not_found after the share is revoked", async () => {
+      vi.mocked(repo.findById).mockResolvedValue(null);
+
+      const result = await service.getPublicProjectForGrant({
+        shareId: "share_1",
+        projectId: PROJECT_ID,
+        grant,
+        viewer: buildViewer(),
+      });
+
+      expect(result).toEqual({ status: "not_found" });
+    });
+
+    it("reports forbidden when the grant does not match the requested share", async () => {
+      vi.mocked(repo.findById).mockResolvedValue(buildShare());
+
+      const result = await service.getPublicProjectForGrant({
+        shareId: "share_1",
+        projectId: PROJECT_ID,
+        grant: { ...grant, share_id: "share_2" },
+        viewer: buildViewer(),
+      });
+
+      expect(result).toEqual({ status: "forbidden" });
+    });
+
+    it("reports forbidden when current audience membership is missing", async () => {
+      vi.mocked(repo.findById).mockResolvedValue(
+        buildShare({ visibility: "ORGANIZATION" }),
+      );
+
+      const result = await service.getPublicProjectForGrant({
+        shareId: "share_1",
+        projectId: PROJECT_ID,
+        grant,
+        viewer: buildViewer({ isOrgMember: vi.fn().mockResolvedValue(false) }),
+      });
+
+      expect(result).toEqual({ status: "forbidden" });
+    });
+  });
+
   describe("resolveForViewer", () => {
     describe("given no share matches the token", () => {
       it("reports not_found", async () => {
@@ -85,6 +246,11 @@ describe("ShareService", () => {
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({
             project: {
+              id: PROJECT_ID,
+              name: "Test project",
+              slug: "test-project",
+              language: "typescript",
+              framework: "nextjs",
               traceSharingEnabled: false,
               team: { organizationId: ORG_ID },
             },
@@ -143,7 +309,9 @@ describe("ShareService", () => {
 
         const result = await service.resolveForViewer({
           token: "tok_abc",
-          viewer: buildViewer({ isOrgMember: vi.fn().mockResolvedValue(false) }),
+          viewer: buildViewer({
+            isOrgMember: vi.fn().mockResolvedValue(false),
+          }),
         });
 
         expect(result.status).toBe("forbidden");
@@ -211,10 +379,11 @@ describe("ShareService", () => {
         expect(repo.incrementViewCount).toHaveBeenCalledOnce();
       });
 
-      it("reports exhausted once the view was already spent", async () => {
+      it("reports exhausted when the atomic consume finds no remaining view", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ maxViews: 1, viewCount: 1 }),
         );
+        vi.mocked(repo.incrementViewCount).mockResolvedValueOnce(false);
 
         const result = await service.resolveForViewer({
           token: "tok_abc",
@@ -222,7 +391,7 @@ describe("ShareService", () => {
         });
 
         expect(result.status).toBe("exhausted");
-        expect(repo.incrementViewCount).not.toHaveBeenCalled();
+        expect(repo.incrementViewCount).toHaveBeenCalledOnce();
       });
 
       describe("when the viewer already holds a grant for this share", () => {
@@ -249,7 +418,7 @@ describe("ShareService", () => {
     });
   });
 
-  describe("createShare", () => {
+  describe("when creating a share", () => {
     it("mints a high-entropy token and auto-pins the trace", async () => {
       vi.mocked(repo.create).mockImplementation(
         async (params) => ({ ...params, id: "share_1" }) as never,
@@ -312,6 +481,51 @@ describe("ShareService", () => {
         await service.revokeById({ id: "share_1", projectId: PROJECT_ID });
 
         expect(pinnedTraces.autoUnpin).toHaveBeenCalledWith({
+          projectId: PROJECT_ID,
+          traceId: "trace_a",
+        });
+      });
+    });
+
+    describe("when a replacement link is created during auto-unpin", () => {
+      it("restores the share pin after the concurrent create wins the race", async () => {
+        vi.mocked(repo.findById).mockResolvedValue(buildShare());
+        vi.mocked(repo.hasActiveShareForResource)
+          .mockResolvedValueOnce(false)
+          .mockResolvedValueOnce(true);
+        vi.mocked(repo.create).mockResolvedValue(
+          buildShare({ id: "share_2", token: "tok_replacement" }),
+        );
+
+        let markUnpinStarted!: () => void;
+        const unpinStarted = new Promise<void>((resolve) => {
+          markUnpinStarted = resolve;
+        });
+        let allowUnpinToFinish!: () => void;
+        const unpinMayFinish = new Promise<void>((resolve) => {
+          allowUnpinToFinish = resolve;
+        });
+        vi.mocked(pinnedTraces.autoUnpin).mockImplementationOnce(async () => {
+          markUnpinStarted();
+          await unpinMayFinish;
+        });
+
+        const revoke = service.revokeById({
+          id: "share_1",
+          projectId: PROJECT_ID,
+        });
+        await unpinStarted;
+
+        await service.createShare({
+          projectId: PROJECT_ID,
+          resourceType: "TRACE",
+          resourceId: "trace_a",
+        });
+        allowUnpinToFinish();
+        await revoke;
+
+        expect(pinnedTraces.autoPin).toHaveBeenCalledTimes(2);
+        expect(pinnedTraces.autoPin).toHaveBeenLastCalledWith({
           projectId: PROJECT_ID,
           traceId: "trace_a",
         });

@@ -44,22 +44,20 @@ export function signShareGrant(
   expiresAt: number;
 } {
   const secret = getSecret();
-  const now = Math.floor(Date.now() / 1000);
-  
-  // If the share has an expiry, cap the grant TTL to the share's remaining time
-  // (minimum 60 seconds to avoid tiny windows). This ensures grants don't outlive
-  // their parent share link.
+  const nowInMilliseconds = Date.now();
+  const now = Math.floor(nowInMilliseconds / 1000);
+
   let ttl = SHARE_GRANT_TTL_SECONDS;
   if (shareExpiresAt) {
     const shareExpiresInSeconds = Math.floor(
-      (shareExpiresAt.getTime() - Date.now()) / 1000,
+      (shareExpiresAt.getTime() - nowInMilliseconds) / 1000,
     );
-    ttl = Math.min(
-      SHARE_GRANT_TTL_SECONDS,
-      Math.max(shareExpiresInSeconds, 60), // minimum 60 seconds
-    );
+    if (shareExpiresInSeconds <= 0) {
+      throw new Error("Cannot sign a share grant for an expired share");
+    }
+    ttl = Math.min(SHARE_GRANT_TTL_SECONDS, shareExpiresInSeconds);
   }
-  
+
   const expiresAt = now + ttl;
   const signedJwt = jwt.sign(claims, secret, {
     algorithm: "HS256",

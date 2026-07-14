@@ -234,20 +234,29 @@ describe("traces router — #4991 AC2 public-share thread read", () => {
   const FULL_VALUE = "the full, de-offloaded conversation value";
 
   let publicCaller: ReturnType<typeof tracesRouter.createCaller>;
-  let mockFindMany: ReturnType<typeof vi.fn>;
-
   /** Builds a caller whose ctx is an anonymous public-share reader. */
-  function createPublicCaller() {
+  function createPublicCaller({
+    resourceId = "t2",
+    threadId = null,
+  }: {
+    resourceId?: string;
+    threadId?: string | null;
+  } = {}) {
     const ctx = createInnerTRPCContext({
       session: null,
       req: undefined,
       res: undefined,
       permissionChecked: true,
       publiclyShared: true,
+      shareGrant: {
+        share_id: "share-1",
+        project_id: "project_123",
+        resource_type: "TRACE",
+        resource_id: resourceId,
+        thread_id: threadId,
+      },
     });
-    ctx.prisma = {
-      publicShare: { findMany: mockFindMany },
-    } as unknown as PrismaClient;
+    ctx.prisma = {} as unknown as PrismaClient;
     return tracesRouter.createCaller(ctx);
   }
 
@@ -265,15 +274,12 @@ describe("traces router — #4991 AC2 public-share thread read", () => {
   }
 
   beforeEach(() => {
-    mockFindMany = vi.fn();
     mockGetTracesByThreadId.mockResolvedValue(previewTraces);
     publicCaller = createPublicCaller();
   });
 
-  describe("given only one trace in the thread is publicly shared", () => {
+  describe("given the grant covers one trace in the thread", () => {
     beforeEach(() => {
-      // Only t2 is shared; t1 and t3 are private siblings in the same thread.
-      mockFindMany.mockResolvedValue([{ resourceId: "t2" }]);
       // The resolved value is distinguishable from the preview, so a test that
       // claims to return "fully-resolved" traces can actually tell them apart.
       mockGetTracesWithSpans.mockResolvedValue([
@@ -332,59 +338,40 @@ describe("traces router — #4991 AC2 public-share thread read", () => {
     });
   });
 
-  describe("given several traces in the thread are publicly shared", () => {
+  describe("given the grant covers the whole thread", () => {
     beforeEach(() => {
-      // t1 and t3 shared; t2 sits BETWEEN them and is not.
-      mockFindMany.mockResolvedValue([
-        { resourceId: "t1" },
-        { resourceId: "t3" },
-      ]);
-      // getTracesWithSpans comes back in TRACE-ID order, not thread order — so
-      // hand it back deliberately scrambled. The router must not pass this
-      // through; it re-projects onto the thread's order.
-      mockGetTracesWithSpans.mockResolvedValue([
-        { trace_id: "t3", timestamps: { started_at: 300 } },
-        { trace_id: "t1", timestamps: { started_at: 100 } },
-      ]);
+      publicCaller = createPublicCaller({ threadId: "thread-1" });
     });
 
     describe("when the public caller reads the thread", () => {
-      // The load-bearing exclusion case: a partial-authorization regression that
-      // resolved ["t1","t2","t3"] would still return the right traces (the mock's
-      // return value doesn't depend on its args), so ONLY an assertion on the
-      // call args can catch the unauthorized sibling being de-offloaded.
-      it("excludes the unauthorized sibling from the resolution call", async () => {
-        await readThreadAsPublicCaller({ traceId: "t1" });
+      it("resolves the thread directly with full IO", async () => {
+        await readThreadAsPublicCaller();
 
-        expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
+        expect(mockGetTracesByThreadId).toHaveBeenCalledWith(
           "project_123",
-          ["t1", "t3"],
+          "thread-1",
           expect.any(Object),
-          undefined,
           { full: true },
         );
-        expect(mockGetTracesWithSpans).toHaveBeenCalledTimes(1);
+        expect(mockGetTracesWithSpans).not.toHaveBeenCalled();
       });
 
-      it("returns them in the thread's order, not the bulk read's order", async () => {
-        const result = await readThreadAsPublicCaller({ traceId: "t1" });
+      it("returns every trace in thread order", async () => {
+        const result = await readThreadAsPublicCaller();
 
-        expect(result.map((t: { trace_id: string }) => t.trace_id)).toEqual([
-          "t1",
-          "t3",
-        ]);
+        expect(result).toEqual(previewTraces);
       });
     });
   });
 
-  describe("given no trace in the thread is publicly shared", () => {
+  describe("given the granted trace is not in the requested thread", () => {
     beforeEach(() => {
-      mockFindMany.mockResolvedValue([]);
+      publicCaller = createPublicCaller({ resourceId: "missing" });
     });
 
     describe("when the public caller reads the thread", () => {
       it("returns empty and issues zero blob resolution", async () => {
-        const result = await readThreadAsPublicCaller();
+        const result = await readThreadAsPublicCaller({ traceId: "missing" });
 
         expect(result).toEqual([]);
         expect(mockGetTracesWithSpans).not.toHaveBeenCalled();

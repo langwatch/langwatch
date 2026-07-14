@@ -8,11 +8,11 @@ import {
 } from "~/server/api/trpc";
 
 import { getApp } from "~/server/app-layer/app";
+import type { ShareViewer } from "~/server/app-layer/share/share.service";
 import {
   buildShareGrantCookie,
   signShareGrant,
 } from "~/server/app-layer/share/shareGrant";
-import type { ShareViewer } from "~/server/app-layer/share/share.service";
 
 import {
   checkProjectPermission,
@@ -110,10 +110,10 @@ export const shareRouter = createTRPCRouter({
           };
         }
         default: {
-          const _exhaustive: never = result.status;
+          const _exhaustive: never = result;
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: `Unhandled share resolution status: ${_exhaustive}`,
+            message: `Unhandled share resolution result: ${JSON.stringify(_exhaustive)}`,
           });
         }
       }

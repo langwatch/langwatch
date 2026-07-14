@@ -4,8 +4,8 @@ import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-ru
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { ChipDef } from "./ChipBar";
 import { useIsReadOnlyTrace } from "../../context/TraceViewerContext";
+import type { ChipDef } from "./ChipBar";
 
 /**
  * Plain data describing the scenario run a trace belongs to. Returned by
@@ -51,19 +51,20 @@ export function useScenarioChipData(
 
   if (!scenarioRunId) return null;
 
-  const statusKey = data?.status;
+  const activeData = readOnly ? undefined : data;
+  const statusKey = activeData?.status;
   const status = statusKey ? SCENARIO_RUN_STATUS_CONFIG[statusKey] : undefined;
 
   return {
     scenarioRunId,
-    name: data?.name ?? null,
-    isLoading,
+    name: activeData?.name ?? null,
+    isLoading: readOnly ? false : isLoading,
     status,
     statusKey,
-    durationInMs: data?.durationInMs ?? null,
-    metCriteria: data?.results?.metCriteria ?? [],
-    unmetCriteria: data?.results?.unmetCriteria ?? [],
-    reasoning: data?.results?.reasoning ?? null,
+    durationInMs: activeData?.durationInMs ?? null,
+    metCriteria: activeData?.results?.metCriteria ?? [],
+    unmetCriteria: activeData?.results?.unmetCriteria ?? [],
+    reasoning: activeData?.results?.reasoning ?? null,
     openScenarioDrawer: readOnly
       ? undefined
       : () => openDrawer("scenarioRunDetail", { urlParams: { scenarioRunId } }),

@@ -233,28 +233,50 @@ export const tracesRouter = createTRPCRouter({
         buildTraceBlobResolutionDeps(),
       );
 
-      // An authorized caller owns the whole thread, so resolve it full up front.
-      // An anonymous public-share caller uses grant-based filtering.
-      const tracesGrouped = await traceService.getTracesByThreadId(
+      if (!ctx.publiclyShared) {
+        return traceService.getTracesByThreadId(
+          projectId,
+          threadId,
+          protections,
+          { full: true },
+        );
+      }
+
+      const grant = ctx.shareGrant;
+      if (grant?.thread_id && grant.thread_id === threadId) {
+        return traceService.getTracesByThreadId(
+          projectId,
+          threadId,
+          protections,
+          { full: true },
+        );
+      }
+
+      const preview = await traceService.getTracesByThreadId(
         projectId,
         threadId,
         protections,
+        { full: false },
+      );
+      const authorizedTraceIds = preview
+        .filter((trace) => trace.trace_id === grant?.resource_id)
+        .map((trace) => trace.trace_id);
+      if (authorizedTraceIds.length === 0) return [];
+
+      const resolved = await traceService.getTracesWithSpans(
+        projectId,
+        authorizedTraceIds,
+        protections,
+        undefined,
         { full: true },
       );
-
-      if (!ctx.publiclyShared) {
-        return tracesGrouped;
-      }
-
-      // A share grant scoped to the whole thread reveals the full conversation;
-      // a grant scoped to a single trace reveals only that trace within it.
-      const grant = ctx.shareGrant;
-      if (grant?.thread_id && grant.thread_id === threadId) {
-        return tracesGrouped;
-      }
-      return tracesGrouped.filter(
-        (trace) => trace.trace_id === grant?.resource_id,
+      const resolvedById = new Map(
+        resolved.map((trace) => [trace.trace_id, trace]),
       );
+      return authorizedTraceIds.flatMap((traceId) => {
+        const trace = resolvedById.get(traceId);
+        return trace ? [trace] : [];
+      });
     }),
 
   getTracesWithSpans: protectedProcedure
