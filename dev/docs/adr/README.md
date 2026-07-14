@@ -26,6 +26,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [038](./038-intent-forked-onboarding-governance-vs-llmops.md) | Onboarding forks on a first-class Organization intent | Accepted |
 | [039](./039-outbox-heartbeat.md) | Outbox heartbeat primitive | Accepted |
 | [030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
+| [045](./045-domain-errors-handled-boundary.md) | Domain errors as the handled-error boundary (TS `DomainError` ⇔ Go `herr`) | Accepted |
 
 ## When to Write an ADR
 
