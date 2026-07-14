@@ -16,13 +16,14 @@ import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 
 import { useTargetName } from "../../hooks/useTargetName";
+import type { ComparisonEvaluatorConfig, TargetConfig } from "../../types";
 import { balancedColumns } from "../../utils/balancedColumns";
-import type {
-  ComparisonEvaluatorConfig,
-  TargetConfig,
-} from "../../types";
 
 type Metric = "cost" | "duration";
+type VariantOutputOption = {
+  label: string;
+  path: string[];
+};
 
 /**
  * Default judge prompt when Has Golden Answer is ON — mirrors the langevals
@@ -99,13 +100,15 @@ export function ComparisonConfigForm({
 
   return (
     <VStack align="stretch" gap={3}>
-      <VariantsMultiSelect
-        draft={draft}
-        update={update}
-        targets={targets}
-      />
+      <VariantsMultiSelect draft={draft} update={update} targets={targets} />
 
       <GoldenAnswerSection
+        draft={draft}
+        update={update}
+        datasetColumns={datasetColumns}
+      />
+
+      <InputContextSection
         draft={draft}
         update={update}
         datasetColumns={datasetColumns}
@@ -229,7 +232,6 @@ function VariantsMultiSelect({
           )}
         </Menu.Content>
       </Menu.Root>
-
     </Field.Root>
   );
 }
@@ -265,8 +267,12 @@ function VariantCard({
   onRemove: () => void;
 }) {
   const name = useTargetName(target) ?? target.id;
-  const fields = target.outputs ?? [];
-  const selectedField = path?.[0];
+  const outputOptions = getVariantOutputOptions(target);
+  const selectedLabel =
+    outputOptions.find((option) => pathsEqual(option.path, path ?? []))
+      ?.label ??
+    path?.join(".") ??
+    "Whole output";
 
   return (
     <VStack
@@ -297,7 +303,7 @@ function VariantCard({
         </Button>
       </HStack>
 
-      {fields.length > 1 && (
+      {outputOptions.length > 1 && (
         <Menu.Root>
           <Menu.Trigger asChild>
             <Button
@@ -312,10 +318,10 @@ function VariantCard({
               <Text
                 fontSize="12px"
                 fontFamily="mono"
-                color={selectedField ? "fg" : "fg.subtle"}
+                color={path?.length ? "fg" : "fg.subtle"}
                 truncate
               >
-                {selectedField ?? "Whole output"}
+                {selectedLabel}
               </Text>
               <ChevronDown size={12} color="var(--chakra-colors-fg-muted)" />
             </Button>
@@ -330,15 +336,15 @@ function VariantCard({
                 Whole output
               </Text>
             </Menu.Item>
-            {fields.map((field) => (
+            {outputOptions.map((option) => (
               <Menu.Item
-                key={field.identifier}
-                value={field.identifier}
-                onClick={() => onPathChange([field.identifier])}
-                data-testid={`comparison-variant-output-${target.id}-option-${field.identifier}`}
+                key={option.label}
+                value={option.label}
+                onClick={() => onPathChange(option.path)}
+                data-testid={`comparison-variant-output-${target.id}-option-${option.label}`}
               >
                 <Text fontSize="12px" fontFamily="mono">
-                  {field.identifier}
+                  {option.label}
                 </Text>
               </Menu.Item>
             ))}
@@ -347,6 +353,56 @@ function VariantCard({
       )}
     </VStack>
   );
+}
+
+function pathsEqual(a: string[], b: string[]): boolean {
+  return (
+    a.length === b.length && a.every((segment, index) => segment === b[index])
+  );
+}
+
+function getObjectSchemaProperties(schema: unknown): string[] {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return [];
+  const properties = (schema as { properties?: unknown }).properties;
+  if (
+    !properties ||
+    typeof properties !== "object" ||
+    Array.isArray(properties)
+  ) {
+    return [];
+  }
+  return Object.keys(properties);
+}
+
+function getVariantOutputOptions(target: TargetConfig): VariantOutputOption[] {
+  const fields = target.outputs ?? [];
+  const singleOutput = fields.length === 1;
+
+  return fields.flatMap((field) => {
+    const properties =
+      field.type === "json_schema"
+        ? getObjectSchemaProperties(field.json_schema)
+        : [];
+
+    if (properties.length === 0) {
+      return [{ label: field.identifier, path: [field.identifier] }];
+    }
+
+    const nested = properties.map((property) => ({
+      label:
+        singleOutput && field.identifier === "output"
+          ? property
+          : `${field.identifier}.${property}`,
+      path:
+        singleOutput && field.identifier === "output"
+          ? [property]
+          : [field.identifier, property],
+    }));
+
+    return singleOutput
+      ? nested
+      : [{ label: field.identifier, path: [field.identifier] }, ...nested];
+  });
 }
 
 /**
@@ -428,10 +484,16 @@ function GoldenAnswerSection({
     if (typeof watchedPrompt !== "string") return;
     const shouldBeGoldenAware = watchedHasGoldenAnswer !== false;
     const nextPrompt = shouldBeGoldenAware
-      ? isDefaultPrompt({ value: watchedPrompt, target: GOLDEN_FREE_JUDGE_PROMPT })
+      ? isDefaultPrompt({
+          value: watchedPrompt,
+          target: GOLDEN_FREE_JUDGE_PROMPT,
+        })
         ? GOLDEN_AWARE_JUDGE_PROMPT
         : null
-      : isDefaultPrompt({ value: watchedPrompt, target: GOLDEN_AWARE_JUDGE_PROMPT })
+      : isDefaultPrompt({
+            value: watchedPrompt,
+            target: GOLDEN_AWARE_JUDGE_PROMPT,
+          })
         ? GOLDEN_FREE_JUDGE_PROMPT
         : null;
     if (nextPrompt && nextPrompt !== watchedPrompt) {
@@ -529,11 +591,7 @@ function GoldenAnswerSection({
                   />
                 </Button>
               </Menu.Trigger>
-              <Menu.Content
-                portalled={true}
-                maxHeight="240px"
-                overflowY="auto"
-              >
+              <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
                 {datasetColumns.length === 0 ? (
                   <Menu.Item value="__empty__" disabled>
                     <Text fontSize="13px" color="fg.subtle">
@@ -555,8 +613,7 @@ function GoldenAnswerSection({
               </Menu.Content>
             </Menu.Root>
             <Text fontSize="xs" color="fg.muted" marginTop={2}>
-              The dataset column that holds the ground-truth answer —
-              usually{" "}
+              The dataset column that holds the ground-truth answer — usually{" "}
               <Text as="span" fontFamily="mono">
                 expected_output
               </Text>
@@ -566,6 +623,77 @@ function GoldenAnswerSection({
           </Field.Root>
         </Box>
       )}
+    </Box>
+  );
+}
+
+function InputContextSection({
+  draft,
+  update,
+  datasetColumns,
+}: {
+  draft: ComparisonEvaluatorConfig;
+  update: (patch: Partial<ComparisonEvaluatorConfig>) => void;
+  datasetColumns: DatasetColumn[];
+}) {
+  return (
+    <Box>
+      <Field.Root flex="1">
+        <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+          Input field
+        </Field.Label>
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              variant="outline"
+              colorPalette="gray"
+              size="sm"
+              fontWeight="normal"
+              justifyContent="space-between"
+              width="full"
+              data-testid="comparison-input-field"
+            >
+              <Text
+                fontSize="13px"
+                color={draft.inputField ? "fg" : "fg.subtle"}
+                truncate
+              >
+                {draft.inputField || "Auto-detect input context"}
+              </Text>
+              <ChevronDown size={14} color="var(--chakra-colors-fg-muted)" />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
+            <Menu.Item
+              value="__auto__"
+              onClick={() => update({ inputField: undefined })}
+              data-testid="comparison-input-field-option-auto"
+            >
+              <Text fontSize="13px" color="fg.subtle">
+                Auto-detect input context
+              </Text>
+            </Menu.Item>
+            {datasetColumns.map((c) => (
+              <Menu.Item
+                key={c.id}
+                value={c.name}
+                onClick={() => update({ inputField: c.name })}
+                data-testid={`comparison-input-field-option-${c.name}`}
+              >
+                <Text fontSize="13px">{c.name}</Text>
+              </Menu.Item>
+            ))}
+          </Menu.Content>
+        </Menu.Root>
+        <Text fontSize="xs" color="fg.muted" marginTop={2}>
+          The dataset column that gives the judge task context. When left on
+          auto, Comparison uses an{" "}
+          <Text as="span" fontFamily="mono">
+            input
+          </Text>{" "}
+          column when one exists.
+        </Text>
+      </Field.Root>
     </Box>
   );
 }
@@ -681,7 +809,7 @@ function MetricsSection({
           letterSpacing="wide"
           color="fg.muted"
         >
-          Include metrics
+          Include metrics during judgment
         </Text>
         <FieldInfoTooltip
           testId="comparison-include-metrics-info"

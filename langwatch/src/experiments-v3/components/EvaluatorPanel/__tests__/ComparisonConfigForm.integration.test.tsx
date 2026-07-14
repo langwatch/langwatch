@@ -71,6 +71,24 @@ const structuredTarget = (id: string): TargetConfig => ({
   ],
 });
 
+const jsonSchemaTarget = (id: string): TargetConfig => ({
+  ...target(id),
+  outputs: [
+    {
+      identifier: "output",
+      type: "json_schema",
+      json_schema: {
+        type: "object",
+        properties: {
+          document_type: { type: "string" },
+          confidence: { type: "number" },
+          reasoning: { type: "string" },
+        },
+      },
+    },
+  ],
+});
+
 const renderForm = (
   props: Partial<React.ComponentProps<typeof ComparisonConfigForm>> = {},
 ) => {
@@ -99,17 +117,17 @@ describe("ComparisonConfigForm", () => {
   // drawer footer (EvaluatorEditorShared's isValid), not by an inline warning
   // the user can scroll past. The label carries the requirement.
   describe("given fewer than 2 variants selected", () => {
-    it.each([[[] as string[]], [["t1"]]])(
-      "states the requirement in the label rather than warning inline (%j)",
-      (variants) => {
-        renderForm({ value: baseConfig({ variants }) });
+    it.each([
+      [[] as string[]],
+      [["t1"]],
+    ])("states the requirement in the label rather than warning inline (%j)", (variants) => {
+      renderForm({ value: baseConfig({ variants }) });
 
-        expect(screen.getByText(/pick 2 or more/i)).toBeInTheDocument();
-        expect(
-          screen.queryByTestId("comparison-variants-insufficient"),
-        ).not.toBeInTheDocument();
-      },
-    );
+      expect(screen.getByText(/pick 2 or more/i)).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("comparison-variants-insufficient"),
+      ).not.toBeInTheDocument();
+    });
   });
 
   describe("when the user picks a variant", () => {
@@ -131,9 +149,7 @@ describe("ComparisonConfigForm", () => {
       const onChange = vi.fn();
       renderForm({ value: baseConfig({ variants: ["t1", "t2"] }), onChange });
 
-      await user.click(
-        screen.getByTestId("comparison-variant-chip-t1-remove"),
-      );
+      await user.click(screen.getByTestId("comparison-variant-chip-t1-remove"));
 
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({ variants: ["t2"] }),
@@ -166,9 +182,7 @@ describe("ComparisonConfigForm", () => {
     it("shows the golden field picker when on (the default)", () => {
       renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
 
-      expect(
-        screen.getByTestId("comparison-golden-field"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("comparison-golden-field")).toBeInTheDocument();
     });
 
     it("hides the golden field picker when the user turns it off", async () => {
@@ -180,9 +194,7 @@ describe("ComparisonConfigForm", () => {
       });
 
       // Picker visible before the toggle.
-      expect(
-        screen.getByTestId("comparison-golden-field"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("comparison-golden-field")).toBeInTheDocument();
 
       await user.click(screen.getByTestId("comparison-has-golden-answer"));
 
@@ -229,7 +241,10 @@ describe("ComparisonConfigForm", () => {
       render(
         <MismatchedFormWrapper>
           <ComparisonConfigForm
-            value={baseConfig({ hasGoldenAnswer: true, variants: ["t1", "t2"] })}
+            value={baseConfig({
+              hasGoldenAnswer: true,
+              variants: ["t1", "t2"],
+            })}
             onChange={onChange}
             targets={[target("t1"), target("t2")]}
             datasetColumns={[{ id: "col-1", name: "expected_output" }]}
@@ -335,9 +350,9 @@ describe("ComparisonConfigForm", () => {
           value: baseConfig({ variants: ["t1", "t2"] }),
         });
 
-        expect(screen.getByTestId("comparison-variant-output-t1")).toHaveTextContent(
-          "Whole output",
-        );
+        expect(
+          screen.getByTestId("comparison-variant-output-t1"),
+        ).toHaveTextContent("Whole output");
       });
 
       describe("when the user picks a field", () => {
@@ -410,6 +425,31 @@ describe("ComparisonConfigForm", () => {
       });
     });
 
+    describe("given a variant with one JSON-schema output", () => {
+      it("lets the user pick a structured field inside that output", async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        renderForm({
+          targets: [jsonSchemaTarget("t1"), target("t2")],
+          value: baseConfig({ variants: ["t1", "t2"] }),
+          onChange,
+        });
+
+        await user.click(screen.getByTestId("comparison-variant-output-t1"));
+        await user.click(
+          screen.getByTestId(
+            "comparison-variant-output-t1-option-document_type",
+          ),
+        );
+
+        expect(onChange).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variantOutputPaths: { t1: ["document_type"] },
+          }),
+        );
+      });
+    });
+
     describe("when a variant is removed", () => {
       it("drops its saved output path along with it", async () => {
         const user = userEvent.setup();
@@ -433,6 +473,30 @@ describe("ComparisonConfigForm", () => {
           }),
         );
       });
+    });
+  });
+
+  describe("the input context picker", () => {
+    it("stores an explicit dataset input field for the judge prompt", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      renderForm({
+        value: baseConfig({ variants: ["t1", "t2"] }),
+        datasetColumns: [
+          { id: "col-1", name: "question" },
+          { id: "col-2", name: "expected_output" },
+        ],
+        onChange,
+      });
+
+      await user.click(screen.getByTestId("comparison-input-field"));
+      await user.click(
+        screen.getByTestId("comparison-input-field-option-question"),
+      );
+
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ inputField: "question" }),
+      );
     });
   });
 
@@ -511,32 +575,28 @@ describe("ComparisonConfigForm", () => {
       });
     });
 
-    describe.each(infoTooltips)(
-      "when the $name (i) is hovered",
-      ({ testId, opensWith }) => {
-        it("reveals the explanation", async () => {
-          const user = userEvent.setup();
-          renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
+    describe.each(infoTooltips)("when the $name (i) is hovered", ({
+      testId,
+      opensWith,
+    }) => {
+      it("reveals the explanation", async () => {
+        const user = userEvent.setup();
+        renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
 
-          await user.hover(screen.getByTestId(testId));
+        await user.hover(screen.getByTestId(testId));
 
-          await waitFor(() =>
-            expect(screen.getByText(opensWith)).toBeVisible(),
-          );
-        });
+        await waitFor(() => expect(screen.getByText(opensWith)).toBeVisible());
+      });
 
-        // Touch and keyboard users never hover.
-        it("reveals the explanation on click too", async () => {
-          const user = userEvent.setup();
-          renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
+      // Touch and keyboard users never hover.
+      it("reveals the explanation on click too", async () => {
+        const user = userEvent.setup();
+        renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
 
-          await user.click(screen.getByTestId(testId));
+        await user.click(screen.getByTestId(testId));
 
-          await waitFor(() =>
-            expect(screen.getByText(opensWith)).toBeVisible(),
-          );
-        });
-      },
-    );
+        await waitFor(() => expect(screen.getByText(opensWith)).toBeVisible());
+      });
+    });
   });
 });

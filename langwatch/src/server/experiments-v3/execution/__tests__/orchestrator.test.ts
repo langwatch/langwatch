@@ -310,6 +310,79 @@ describe("orchestrator", () => {
       ]);
     });
 
+    it("does not rerun seeded comparison variants for a single comparison cell", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "comparison-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-select-best-evaluator",
+        inputs: [
+          { identifier: "input", type: "str" },
+          { identifier: "golden", type: "str" },
+        ],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        comparison: {
+          variants: ["target-1", "target-2"],
+          hasGoldenAnswer: true,
+          goldenField: "expected",
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      });
+      const datasetRows = createTestDataset(1);
+      const scope: ExecutionScope = {
+        type: "cell",
+        rowIndex: 0,
+        targetId: "comparison-target",
+      };
+
+      const cells = generateCells(state, datasetRows, scope, {
+        seedTargetOutputs: {
+          "0:target-1": { output: "variant 1" },
+          "0:target-2": { output: "variant 2" },
+        },
+      });
+
+      expect(cells).toHaveLength(0);
+    });
+
+    it("reruns only missing comparison variants for a single comparison cell", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "comparison-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-select-best-evaluator",
+        inputs: [
+          { identifier: "input", type: "str" },
+          { identifier: "golden", type: "str" },
+        ],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        comparison: {
+          variants: ["target-1", "target-2"],
+          hasGoldenAnswer: true,
+          goldenField: "expected",
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      });
+      const datasetRows = createTestDataset(1);
+      const scope: ExecutionScope = {
+        type: "cell",
+        rowIndex: 0,
+        targetId: "comparison-target",
+      };
+
+      const cells = generateCells(state, datasetRows, scope, {
+        seedTargetOutputs: {
+          "0:target-1": { output: "variant 1" },
+        },
+      });
+
+      expect(cells.map((cell) => cell.targetId)).toEqual(["target-2"]);
+    });
+
     describe("when an n-way evaluator is attached as a chip evaluator", () => {
       // Regression (#5101): phase 1 excluded `e.pairwise` but not
       // `e.selectBest`, so the n-way evaluator was attached to every
@@ -443,14 +516,8 @@ describe("orchestrator", () => {
       };
 
       const legacyCompletedTargetOutputs = new Map([
-        [
-          "0:target-1",
-          { output: "answer from A", cost: 0.01, duration: 120 },
-        ],
-        [
-          "0:target-2",
-          { output: "answer from B", cost: 0.02, duration: 150 },
-        ],
+        ["0:target-1", { output: "answer from A", cost: 0.01, duration: 120 }],
+        ["0:target-2", { output: "answer from B", cost: 0.02, duration: 150 }],
       ]);
 
       // The realistic DB state for any comparison column created before this
@@ -492,9 +559,9 @@ describe("orchestrator", () => {
           loadedEvaluators,
         );
 
-        const mappings = cells[0]?.evaluatorConfigs[0]?.mappings[
-          "dataset-1"
-        ]?.["pairwise-target"] as Record<string, { value: unknown }>;
+        const mappings = cells[0]?.evaluatorConfigs[0]?.mappings["dataset-1"]?.[
+          "pairwise-target"
+        ] as Record<string, { value: unknown }>;
 
         expect(mappings.candidate_a_id?.value).toBe("target-1");
         expect(mappings.candidate_a_output?.value).toBe("answer from A");
@@ -567,8 +634,18 @@ describe("orchestrator", () => {
           {},
         );
         expect(dispatchedInputs.candidates).toEqual([
-          { id: "target-1", output: "answer from A", cost: 0.01, duration: 120 },
-          { id: "target-2", output: "answer from B", cost: 0.02, duration: 150 },
+          {
+            id: "target-1",
+            output: "answer from A",
+            cost: 0.01,
+            duration: 120,
+          },
+          {
+            id: "target-2",
+            output: "answer from B",
+            cost: 0.02,
+            duration: 150,
+          },
         ]);
         expect(dispatchedInputs.candidate_a_id).toBeUndefined();
       });
@@ -661,11 +738,19 @@ describe("orchestrator", () => {
       const structuredOutputs = new Map([
         [
           "0:target-1",
-          { output: { answer: "from A", confidence: 0.9 }, cost: 0, duration: 1 },
+          {
+            output: { answer: "from A", confidence: 0.9 },
+            cost: 0,
+            duration: 1,
+          },
         ],
         [
           "0:target-2",
-          { output: { answer: "from B", confidence: 0.4 }, cost: 0, duration: 1 },
+          {
+            output: { answer: "from B", confidence: 0.4 },
+            cost: 0,
+            duration: 1,
+          },
         ],
       ]);
 

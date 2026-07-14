@@ -17,7 +17,8 @@ const HANDLE_BY_ID: Record<string, string> = {
   "target-b": "friendly-support",
 };
 vi.mock("../../hooks/useTargetName", () => ({
-  useTargetName: (target: { id: string }) => HANDLE_BY_ID[target.id] ?? target.id,
+  useTargetName: (target: { id: string }) =>
+    HANDLE_BY_ID[target.id] ?? target.id,
 }));
 
 // scrollToTargetColumn touches the DOM/layout; spy on it to assert the
@@ -26,6 +27,9 @@ const scrollSpy = vi.fn();
 vi.mock("../../hooks/useOpenTargetEditor", () => ({
   scrollToTargetColumn: (id: string) => scrollSpy(id),
 }));
+vi.mock("~/components/Markdown", () => ({
+  Markdown: ({ children }: { children: string }) => <div>{children}</div>,
+}));
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 
@@ -33,8 +37,22 @@ const wrap = (node: ReactNode) =>
   render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);
 
 const variantTargets: TargetConfig[] = [
-  { id: "target-a", type: "prompt", promptId: "p-a", inputs: [], outputs: [], mappings: {} },
-  { id: "target-b", type: "prompt", promptId: "p-b", inputs: [], outputs: [], mappings: {} },
+  {
+    id: "target-a",
+    type: "prompt",
+    promptId: "p-a",
+    inputs: [],
+    outputs: [],
+    mappings: {},
+  },
+  {
+    id: "target-b",
+    type: "prompt",
+    promptId: "p-b",
+    inputs: [],
+    outputs: [],
+    mappings: {},
+  },
 ];
 
 describe("ComparisonCell", () => {
@@ -46,7 +64,13 @@ describe("ComparisonCell", () => {
 
   describe("given the comparison is still running", () => {
     it("shows a comparing indicator", () => {
-      wrap(<ComparisonCell result={null} isLoading variantTargets={variantTargets} />);
+      wrap(
+        <ComparisonCell
+          result={null}
+          isLoading
+          variantTargets={variantTargets}
+        />,
+      );
       expect(screen.getByText(/comparing/i)).toBeInTheDocument();
     });
   });
@@ -62,11 +86,63 @@ describe("ComparisonCell", () => {
     it("surfaces a friendly headline", () => {
       wrap(
         <ComparisonCell
-          result={{ status: "error", details: "AuthenticationError: bad api key" }}
+          result={{
+            status: "error",
+            details: "AuthenticationError: bad api key",
+          }}
           variantTargets={variantTargets}
         />,
       );
       expect(screen.getByText(/model api key/i)).toBeInTheDocument();
+    });
+
+    describe("given the judge call failed auth (403)", () => {
+      it("uses the domain error to show a rich auth message", () => {
+        wrap(
+          <ComparisonCell
+            result={{
+              status: "error",
+              details: '403 {\n  "message": "Missing Authentication Token"\n}',
+              domainError: {
+                kind: "evaluator_execution_error",
+                meta: { httpStatus: 403 },
+                telemetry: {},
+                httpStatus: 502,
+                reasons: [],
+              },
+            }}
+            variantTargets={variantTargets}
+          />,
+        );
+
+        expect(
+          screen.getByText(/missing or invalid model api key/i),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/settings.*ai gateway/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/^403/).closest(".chakra-popover__body"),
+        ).not.toBeNull();
+      });
+    });
+  });
+
+  describe("given a row-level run callback", () => {
+    it("shows a per-row run action and calls it without selecting the cell", async () => {
+      const user = userEvent.setup();
+      const onRun = vi.fn();
+      wrap(
+        <ComparisonCell
+          result={null}
+          variantTargets={variantTargets}
+          onRun={onRun}
+        />,
+      );
+
+      await user.click(
+        screen.getByRole("button", { name: /run comparison for this row/i }),
+      );
+
+      expect(onRun).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -119,7 +195,10 @@ describe("ComparisonCell", () => {
   describe("given a legacy slot-letter verdict", () => {
     it("resolves the letter to the variant at that position", () => {
       wrap(
-        <ComparisonCell result={{ label: "A" }} variantTargets={variantTargets} />,
+        <ComparisonCell
+          result={{ label: "A" }}
+          variantTargets={variantTargets}
+        />,
       );
       const winners = screen.getAllByTestId("comparison-winner");
       expect(winners).toHaveLength(1);

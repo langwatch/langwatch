@@ -110,6 +110,7 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
         filterEvaluatorType: COMPARISON_EVALUATOR_TYPE,
         title: "Choose Comparison",
         createLabel: "New Comparison",
+        itemLabel: "comparison",
         onCreateNew: () =>
           openDrawer("evaluatorEditor", {
             evaluatorType: COMPARISON_EVALUATOR_TYPE,

@@ -25,14 +25,15 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
-import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
+import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
+import { DomainError } from "~/server/app-layer/domain-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { RecordTargetResultCommandData } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
@@ -114,6 +115,12 @@ export const generateCells = (
   >,
   datasetRows: Array<Record<string, unknown>>,
   scope: ExecutionScope,
+  options: {
+    seedTargetOutputs?: Record<
+      string,
+      { output: unknown; cost?: number; duration?: number }
+    >;
+  } = {},
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
   const datasetId =
@@ -244,6 +251,22 @@ export const generateCells = (
             ? expandComparisonDeps(scope.targetId)
             : [];
 
+  const scopedComparisonDeps =
+    scope.type === "target" || scope.type === "cell"
+      ? new Set(
+          (() => {
+            const scopedTarget = state.targets.find(
+              (target) => target.id === scope.targetId,
+            );
+            if (!scopedTarget) return [];
+
+            return (toComparisonConfig(scopedTarget)?.variants ?? []).filter(
+              (variant): variant is string => !!variant,
+            );
+          })(),
+        )
+      : new Set<string>();
+
   // Generate cells, skipping empty rows
   for (const rowIndex of rowIndices) {
     const datasetEntry = datasetRows[rowIndex];
@@ -256,6 +279,13 @@ export const generateCells = (
     }
 
     for (const targetId of targetIds) {
+      if (
+        scopedComparisonDeps.has(targetId) &&
+        options.seedTargetOutputs?.[`${rowIndex}:${targetId}`]
+      ) {
+        continue;
+      }
+
       const targetConfig = state.targets.find(
         (t: TargetConfig) => t.id === targetId,
       );
@@ -416,7 +446,10 @@ export const generateComparisonCells = (
    * serializing the output a second time itself — `toCandidateText` is the one
    * place that turns an output into judge-readable text, structured or not.
    */
-  const evaluatorScoresBlock = (rowIndex: number, variantId: string): string => {
+  const evaluatorScoresBlock = (
+    rowIndex: number,
+    variantId: string,
+  ): string => {
     const scores = completedTargetEvaluatorScores?.get(
       `${rowIndex}:${variantId}`,
     );
@@ -573,7 +606,9 @@ export const generateComparisonCells = (
    * (no `loadedEvaluators`, or the id isn't in it) — the safe default that
    * matches this function's pre-existing behavior.
    */
-  const isLegacyPairwiseBacked = (dbEvaluatorId: string | undefined): boolean => {
+  const isLegacyPairwiseBacked = (
+    dbEvaluatorId: string | undefined,
+  ): boolean => {
     if (!dbEvaluatorId) return false;
     const dbConfig = loadedEvaluators?.get(dbEvaluatorId)?.config as
       | { evaluatorType?: string }
@@ -593,7 +628,11 @@ export const generateComparisonCells = (
     variantIds: string[],
     rowIndex: number,
   ):
-    | { candidates: ExecutionCell["comparison"]; missing?: never; empty?: never }
+    | {
+        candidates: ExecutionCell["comparison"];
+        missing?: never;
+        empty?: never;
+      }
     | { candidates?: never; missing: string[]; empty?: never }
     | { candidates?: never; missing?: never; empty: string[] } => {
     const outputs = cfg.variants.map((id) =>
@@ -650,7 +689,12 @@ export const generateComparisonCells = (
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const built = buildCandidates(cfg, resolvedVariants, variantIds, rowIndex);
+      const built = buildCandidates(
+        cfg,
+        resolvedVariants,
+        variantIds,
+        rowIndex,
+      );
       if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
@@ -705,13 +749,19 @@ export const generateComparisonCells = (
     // isLegacyPairwiseBacked's JSDoc for why this can't just read
     // COMPARISON_EVALUATOR_TYPE off the target/cfg.
     const legacyPairwise =
-      isLegacyPairwiseBacked(target.targetEvaluatorId) && variantIds.length === 2;
+      isLegacyPairwiseBacked(target.targetEvaluatorId) &&
+      variantIds.length === 2;
 
     for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const built = buildCandidates(cfg, resolvedVariants, variantIds, rowIndex);
+      const built = buildCandidates(
+        cfg,
+        resolvedVariants,
+        variantIds,
+        rowIndex,
+      );
       if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
@@ -730,6 +780,7 @@ export const generateComparisonCells = (
       // log it so a silently-empty judge prompt is at least diagnosable
       // instead of indistinguishable from "row has no input, by design."
       const resolvedInput =
+        (cfg.inputField ? datasetEntry[cfg.inputField] : undefined) ??
         datasetEntry.input ??
         (cfg.goldenField ? datasetEntry[cfg.goldenField] : undefined);
       if (
@@ -1121,8 +1172,14 @@ export async function* executeCell(
             result: {
               status: "error",
               error_type: "EvaluatorError",
-              details: (evalError as Error).message,
+              details:
+                evalError instanceof Error
+                  ? evalError.message
+                  : "Evaluator execution failed",
               traceback: [],
+              ...(DomainError.isHandled(evalError)
+                ? { domainError: evalError.serialize() }
+                : {}),
             },
           };
         }
@@ -1642,7 +1699,9 @@ export async function* runOrchestrator(
   const runId = providedRunId ?? generateHumanReadableId();
 
   // Generate cells to execute
-  const cells = generateCells(state, datasetRows, scope);
+  const cells = generateCells(state, datasetRows, scope, {
+    seedTargetOutputs,
+  });
   // Phase-1 count only; grows by the Phase-2 (comparison) cell count once
   // those are generated after Phase 1 finishes, so the final summary's
   // completedCells (which counts both phases) never exceeds totalCells.

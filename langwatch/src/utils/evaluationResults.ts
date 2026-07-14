@@ -1,3 +1,5 @@
+import type { SerializedDomainError } from "~/server/app-layer/domain-error";
+
 /**
  * Parsed evaluation result with status information.
  * Used for rendering evaluation results in UI components.
@@ -23,7 +25,57 @@ export type ParsedEvaluationResult = {
   score?: number;
   label?: string;
   details?: string;
+  domainError?: SerializedDomainError;
 };
+
+function readSerializedDomainError(
+  candidate: unknown,
+): SerializedDomainError | undefined {
+  if (!candidate || typeof candidate !== "object") return undefined;
+
+  const value = candidate as {
+    kind?: unknown;
+    meta?: unknown;
+    telemetry?: unknown;
+    httpStatus?: unknown;
+    reasons?: unknown;
+  };
+
+  if (typeof value.kind !== "string") return undefined;
+  if (typeof value.httpStatus !== "number") return undefined;
+
+  return {
+    kind: value.kind,
+    httpStatus: value.httpStatus,
+    meta:
+      value.meta && typeof value.meta === "object"
+        ? (value.meta as Record<string, unknown>)
+        : {},
+    telemetry:
+      value.telemetry && typeof value.telemetry === "object"
+        ? {
+            traceId:
+              typeof (value.telemetry as { traceId?: unknown }).traceId ===
+              "string"
+                ? (value.telemetry as { traceId: string }).traceId
+                : undefined,
+            spanId:
+              typeof (value.telemetry as { spanId?: unknown }).spanId ===
+              "string"
+                ? (value.telemetry as { spanId: string }).spanId
+                : undefined,
+            traceUrl:
+              typeof (value.telemetry as { traceUrl?: unknown }).traceUrl ===
+              "string"
+                ? (value.telemetry as { traceUrl: string }).traceUrl
+                : undefined,
+          }
+        : { traceId: undefined, spanId: undefined },
+    reasons: Array.isArray(value.reasons)
+      ? (value.reasons as SerializedDomainError["reasons"])
+      : [],
+  };
+}
 
 /**
  * Parses an unknown evaluation result into a typed structure.
@@ -62,6 +114,7 @@ export const parseEvaluationResult = (
       parsed.status = "error";
       parsed.details =
         typeof obj.error === "string" ? obj.error : JSON.stringify(obj.error);
+      parsed.domainError = readSerializedDomainError(obj.domainError);
       return parsed;
     }
 
@@ -71,6 +124,7 @@ export const parseEvaluationResult = (
       if ("details" in obj && typeof obj.details === "string") {
         parsed.details = obj.details;
       }
+      parsed.domainError = readSerializedDomainError(obj.domainError);
       return parsed;
     }
 
@@ -290,7 +344,9 @@ function normalizeEvalStatus(
 
 /** Same score formatter used by the trace table EvalChip — share so the
  *  drawer chip never disagrees on rounding. */
-export function formatEvalScoreText(score: number | boolean | null | undefined): string | null {
+export function formatEvalScoreText(
+  score: number | boolean | null | undefined,
+): string | null {
   if (typeof score !== "number") return null;
   return score <= 1 ? score.toFixed(2) : score.toFixed(1);
 }
@@ -315,10 +371,8 @@ export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
   // pure boolean verdict (no numeric score to show in its place).
   let passLabel: EvalChipDisplay["passLabel"] = null;
   if (scoreText == null && !noVerdict) {
-    if (status === "passed")
-      passLabel = { text: "Pass", color: "green.fg" };
-    else if (status === "failed")
-      passLabel = { text: "Fail", color: "red.fg" };
+    if (status === "passed") passLabel = { text: "Pass", color: "green.fg" };
+    else if (status === "failed") passLabel = { text: "Fail", color: "red.fg" };
   }
 
   return {

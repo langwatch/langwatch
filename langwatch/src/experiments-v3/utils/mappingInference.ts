@@ -12,11 +12,11 @@
 
 import type { Field } from "~/optimization_studio/types/dsl";
 import type {
+  ComparisonEvaluatorConfig,
   DatasetColumn,
   DatasetReference,
   EvaluatorConfig,
   FieldMapping,
-  ComparisonEvaluatorConfig,
   TargetConfig,
 } from "../types";
 
@@ -524,10 +524,11 @@ export const deriveComparisonTargetMappings = (
   const mappings: Record<string, FieldMapping> = {};
   if (!dataset) return mappings;
 
-  // Auto-map "input" to the most likely dataset column so the user doesn't
-  // have to re-pick something obvious. Skips when there's no plausible match —
-  // `input` is an optional field on the comparison judge.
-  const inputColumn = findMatchingColumn("input", dataset.columns);
+  // Explicit input context wins; otherwise auto-map "input" to the most
+  // likely dataset column so the user doesn't have to re-pick something
+  // obvious. Skips when there's no plausible match — `input` is optional.
+  const inputColumn =
+    comparison.inputField ?? findMatchingColumn("input", dataset.columns);
   if (inputColumn) {
     mappings.input = {
       type: "source",
