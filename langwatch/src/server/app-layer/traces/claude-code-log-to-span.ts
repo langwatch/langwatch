@@ -199,9 +199,10 @@ export const CLAUDE_TRUNCATED_LOGS_ATTR = "langwatch.claude_code.truncated_logs"
  * Best-effort, not convergent: the reactor re-fires as the turn grows and
  * re-emits the root span with an identical StartTime, and the span table's
  * ReplacingMergeTree(StartTime) keeps an arbitrary version on a tie - so the
- * surviving count may lag the final total. The truncation FLAG is stable
- * (once over the cap, always over); only this count is imprecise. Treat it as
- * an incident magnitude indicator, not an exact ledger.
+ * surviving count may lag the final total. The same tie behavior makes the
+ * truncation FLAG best-effort too: the attribute is only written once the
+ * turn crosses the cap, and a surviving pre-cap version simply lacks it.
+ * Treat both as incident indicators, not an exact ledger.
  */
 export const CLAUDE_DROPPED_LOG_COUNT_ATTR =
   "langwatch.claude_code.dropped_log_count";
