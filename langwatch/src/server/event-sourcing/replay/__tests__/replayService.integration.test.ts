@@ -329,17 +329,17 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(result.aggregatesReplayed).toBe(2);
       expect(result.totalEvents).toBe(2);
 
-      // Records flushed via bulkAppend grouped by aggregate (one call per agg).
-      expect(bulkAppend).toHaveBeenCalledTimes(2);
+      // Records flushed via ONE tenant-scoped bulkAppend covering both
+      // aggregates — never one awaited call per aggregate (that per-trace
+      // grouping is what made span-storage replays take weeks).
+      expect(bulkAppend).toHaveBeenCalledTimes(1);
       const appendedRecords = bulkAppend.mock.calls.flatMap(([records]) => records as any[]);
       expect(appendedRecords.map((r) => r.src).sort()).toEqual(["trace-a1", "trace-a2"]);
       expect(appendedRecords.map((r) => r.doubled).sort((a, b) => a - b)).toEqual([2, 4]);
 
-      // Each bulkAppend call must carry the per-aggregate context (not a
-      // shared/generic context), so the store can route records correctly.
-      for (const [records, ctx] of bulkAppend.mock.calls as Array<[any[], any]>) {
+      // The bulk call carries the tenant-scoped context.
+      for (const [, ctx] of bulkAppend.mock.calls as Array<[any[], any]>) {
         expect(ctx.tenantId).toBe(tenantA);
-        expect(records.every((r) => r.src === ctx.aggregateId)).toBe(true);
       }
 
       // Pause was held active while records were being written.
@@ -491,13 +491,14 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         .sort();
       expect(foldedAggregates).toEqual(["trace-a1", "trace-a2"]);
 
-      // Map bulk-appended both aggregates, grouped per aggregate (preserving
-      // per-aggregate context is the bugfix this PR introduced — see
-      // 44d05f65f "preserve per-aggregate context on map projection bulkAppend").
-      expect(bulkAppend).toHaveBeenCalledTimes(2);
+      // Map bulk-appended both aggregates in a single tenant-scoped call.
+      expect(bulkAppend).toHaveBeenCalledTimes(1);
       for (const [records, ctx] of bulkAppend.mock.calls as Array<[any[], any]>) {
         expect(ctx.tenantId).toBe(tenantA);
-        expect(records.every((r) => r.src === ctx.aggregateId)).toBe(true);
+        expect((records as { src: string }[]).map((r) => r.src).sort()).toEqual([
+          "trace-a1",
+          "trace-a2",
+        ]);
       }
 
       // Fold projection was paused while its own WRITE phase ran. The map's
@@ -824,6 +825,119 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(bulkAppend).toHaveBeenCalled();
       expect(batchKinds).toEqual(["map"]);
       expect([...progressKinds]).toEqual(["map"]);
+    });
+  });
+
+  describe("replayOptimized batch pause windows", () => {
+    const pausedSetKey = "{event-sourcing/jobs}:gq:paused-jobs";
+
+    function createTrackedMapProjection({
+      name,
+      bulkAppend,
+    }: {
+      name: string;
+      bulkAppend: any;
+    }): RegisteredMapProjection {
+      return {
+        projectionName: name,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: `test_pipeline/handler/${name}`,
+        kind: "map",
+        definition: {
+          name,
+          eventTypes: ["trace.upserted"],
+          map: (event: any) => ({ src: event.aggregateId }),
+          store: { append: async () => undefined, bulkAppend },
+        },
+      };
+    }
+
+    describe("when a replay spans multiple batches", () => {
+      it("pauses only while a batch is replayed and resumes between batches", async () => {
+        const redis = getTestRedisConnection()!;
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optBatchPause_${suffix}`;
+        const mapPauseKey = `test_pipeline/handler/${mapName}`;
+
+        const pausedDuringWrite: number[] = [];
+        const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
+          pausedDuringWrite.push(await redis.sismember(pausedSetKey, mapPauseKey));
+        });
+        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const service = createServiceWithResolver();
+
+        const pausedAtBatchComplete: number[] = [];
+        const pendingChecks: Promise<void>[] = [];
+
+        // aggregateBatchSize 1 with tenant A's two trace aggregates → 2 batches.
+        const result = await service.replayOptimized(
+          {
+            projections: [],
+            mapProjections: [projection],
+            tenantIds: [tenantA],
+            since: "2023-11-01",
+            aggregateBatchSize: 1,
+          },
+          {
+            onBatchComplete: () => {
+              // The sismember is issued synchronously here (same Redis
+              // connection, ordered before the next batch's re-pause) but
+              // resolves async — collect it so assertions wait for it.
+              pendingChecks.push(
+                redis.sismember(pausedSetKey, mapPauseKey).then((paused) => {
+                  pausedAtBatchComplete.push(paused);
+                }),
+              );
+            },
+          },
+        );
+        await Promise.all(pendingChecks);
+
+        expect(result.batchErrors).toBe(0);
+        expect(result.aggregatesReplayed).toBe(2);
+
+        // One flush per batch — pause held while each batch's records land.
+        expect(bulkAppend).toHaveBeenCalledTimes(2);
+        expect(pausedDuringWrite).toEqual([1, 1]);
+
+        // Between batches (onBatchComplete fires after the batch's finally
+        // unpauses), live processing is running again — the freeze is
+        // per-batch, never for the whole run.
+        expect(pausedAtBatchComplete).toEqual([0, 0]);
+
+        // Unpaused at the end too.
+        expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
+      });
+    });
+
+    describe("when a batch fails", () => {
+      it("unpauses the projections instead of leaving live processing frozen", async () => {
+        const redis = getTestRedisConnection()!;
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optBatchFail_${suffix}`;
+        const mapPauseKey = `test_pipeline/handler/${mapName}`;
+
+        const bulkAppend = vi.fn(async () => {
+          throw new Error("bulk write boom");
+        });
+        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const service = createServiceWithResolver();
+
+        const result = await service.replayOptimized({
+          projections: [],
+          mapProjections: [projection],
+          tenantIds: [tenantA],
+          since: "2023-11-01",
+        });
+
+        expect(result.batchErrors).toBeGreaterThan(0);
+        expect(result.firstError).toMatch(/bulk write boom/);
+
+        // The per-batch finally unpaused despite the failure.
+        expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
+      });
     });
   });
 });

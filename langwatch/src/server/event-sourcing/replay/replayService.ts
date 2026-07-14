@@ -14,11 +14,13 @@ import type {
 } from "./types";
 import type { CutoffInfo, DiscoveredAggregate, ReplayEvent } from "./replayEventLoader";
 import { isAtOrBeforeCutoff } from "./replayConstants";
+import type { OccurredAtBounds } from "./replayEventLoader";
 import {
   discoverAffectedAggregates,
   countEventsForAggregates,
   batchGetCutoffEventIds,
   batchLoadAggregateEvents,
+  getAggregateOccurredAtBounds,
   loadEventsForAggregatesBulk,
 } from "./replayEventLoader";
 import {
@@ -44,6 +46,14 @@ export interface ReplayLogWriter {
 
 /** No-op log for when no logging is needed. */
 const nullLog: ReplayLogWriter = { write() {} };
+
+/**
+ * Emit replay-phase progress once per this many completed aggregates (plus
+ * once at the end of the batch). Every emit fans out to the progress callback
+ * — which the ops layer persists to Redis in multiple round trips — so
+ * per-aggregate emits (1000/batch) hammered Redis for no operator benefit.
+ */
+const PROGRESS_EMIT_EVERY_AGGREGATES = 100;
 
 export class ReplayService {
   constructor(private readonly deps: {
@@ -472,13 +482,23 @@ export class ReplayService {
     await waitForActiveJobs({ redis, aggregates: batch, projectionName, kind: "fold" });
     log.write({ step: "drain-batch", tenant: tenantId, count: batch.length, durationMs: Date.now() - drainStart });
 
-    // 4. CUTOFF
+    // 4. CUTOFF — occurred-at bounds first (over all events of the batch's
+    //    aggregates) so the cutoff + load queries prune event_log's weekly
+    //    partitions instead of scanning cold storage. See
+    //    getAggregateOccurredAtBounds for why this bound is safe.
     onBatchPhase("cutoff");
+    const occurredAtBounds =
+      (await getAggregateOccurredAtBounds({
+        client,
+        tenantId,
+        aggregateIds: batch.map((a) => a.aggregateId),
+      })) ?? undefined;
     const cutoffs = await batchGetCutoffEventIds({
       client,
       tenantId,
       aggregateIds: batch.map((a) => a.aggregateId),
       eventTypes: projection.definition.eventTypes,
+      occurredAtBounds,
     });
 
     const withCutoffKeys: string[] = [];
@@ -528,6 +548,7 @@ export class ReplayService {
         maxCutoffEventId,
         cursorEventId,
         batchSize,
+        occurredAtBounds,
       });
 
       if (events.length === 0) break;
@@ -823,13 +844,21 @@ export class ReplayService {
     await waitForActiveJobs({ redis, aggregates: batch, projectionName, kind: "map" });
     log.write({ step: "drain-batch", tenant: tenantId, count: batch.length, durationMs: Date.now() - drainStart, kind: "map" });
 
-    // 4. CUTOFF
+    // 4. CUTOFF — occurred-at bounds first, for partition pruning (see
+    //    replayBatch / getAggregateOccurredAtBounds).
     onBatchPhase("cutoff");
+    const occurredAtBounds =
+      (await getAggregateOccurredAtBounds({
+        client,
+        tenantId,
+        aggregateIds: batch.map((a) => a.aggregateId),
+      })) ?? undefined;
     const cutoffs = await batchGetCutoffEventIds({
       client,
       tenantId,
       aggregateIds: batch.map((a) => a.aggregateId),
       eventTypes: projection.definition.eventTypes,
+      occurredAtBounds,
     });
 
     const withCutoffKeys: string[] = [];
@@ -882,6 +911,7 @@ export class ReplayService {
         maxCutoffEventId,
         cursorEventId,
         batchSize,
+        occurredAtBounds,
       });
 
       if (events.length === 0) break;
@@ -1082,132 +1112,153 @@ export class ReplayService {
       return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0 };
     }
 
-    // 2. Pause ALL projections at once (fold + map)
+    // 2. Pause + drain happen PER BATCH inside the loop below (ADR-015: the
+    //    pause window is "seconds per batch", not the whole run — a full-run
+    //    pause froze live processing for as long as the replay took). The
+    //    replay marker protocol (pending/cutoff/done) keeps replayed
+    //    aggregates correct across the unpaused gaps between batches.
     const allProjectionsToPause = [...config.projections, ...mapProjections];
-    for (const p of allProjectionsToPause) {
-      await pauseProjection({
-        redis: this.deps.redis,
-        pauseKey: p.pauseKey,
-      });
-    }
-    log.write({ step: "pause-all", projections: allProjectionsToPause.map((p) => p.projectionName) });
+    const pausedProjectionEntries = allProjectionsToPause.map((p) => ({
+      projectionName: p.projectionName,
+      kind: p.kind,
+    }));
 
-    // 3. Drain ALL active jobs across all projections
-    const allDiscoveredAggregates: DiscoveredAggregate[] = remaining.map((key) => {
-      const entry = aggregateProjectionMap.get(key)!;
-      return { tenantId: entry.tenantId, aggregateType: entry.aggregateType, aggregateId: entry.aggregateId };
-    });
+    const runTenantCount = new Set(
+      remaining.map((key) => aggregateProjectionMap.get(key)!.tenantId),
+    ).size;
 
     const totalBatches = Math.ceil(remaining.length / aggregateBatchSize);
     let aggregatesCompleted = skippedCount;
 
-    try {
-      await waitForAllActiveJobs({
-        redis: this.deps.redis,
-        aggregates: allDiscoveredAggregates,
-        projections: allProjectionsToPause.map((p) => ({
-          projectionName: p.projectionName,
-          kind: p.kind,
-        })),
+    for (let i = 0; i < remaining.length; i += aggregateBatchSize) {
+      const batchKeys = remaining.slice(i, i + aggregateBatchSize);
+      const batchNum = Math.floor(i / aggregateBatchSize) + 1;
+      const batchStartTime = Date.now();
+
+      const batchAggregates: DiscoveredAggregate[] = batchKeys.map((key) => {
+        const entry = aggregateProjectionMap.get(key)!;
+        return {
+          tenantId: entry.tenantId,
+          aggregateType: entry.aggregateType,
+          aggregateId: entry.aggregateId,
+        };
       });
-      log.write({ step: "drain-all", aggregateCount: allDiscoveredAggregates.length });
 
-      for (let i = 0; i < remaining.length; i += aggregateBatchSize) {
-        const batchKeys = remaining.slice(i, i + aggregateBatchSize);
-        const batchNum = Math.floor(i / aggregateBatchSize) + 1;
-        const batchStartTime = Date.now();
+      const progress: ReplayProgress = {
+        phase: "replaying",
+        currentProjectionName: allProjectionNames.join("+"),
+        currentProjectionKind: runProjectionKind,
+        currentProjectionIndex: 0,
+        totalProjections: allProjectionNames.length,
+        totalAggregates: allAggregateKeys.length,
+        tenantCount: runTenantCount,
+        currentBatch: batchNum,
+        totalBatches,
+        batchAggregates: batchKeys.length,
+        batchPhase: "pause",
+        batchEventsProcessed: 0,
+        aggregatesCompleted,
+        totalEventsReplayed,
+        elapsedSec: (Date.now() - startTime) / 1000,
+        skippedCount,
+        batchErrors: totalBatchErrors,
+        firstError,
+      };
 
-        const progress: ReplayProgress = {
-          phase: "replaying",
-          currentProjectionName: allProjectionNames.join("+"),
-          currentProjectionKind: runProjectionKind,
-          currentProjectionIndex: 0,
-          totalProjections: allProjectionNames.length,
-          totalAggregates: allAggregateKeys.length,
-          tenantCount: new Set(allDiscoveredAggregates.map((a) => a.tenantId)).size,
-          currentBatch: batchNum,
-          totalBatches,
-          batchAggregates: batchKeys.length,
-          batchPhase: "mark",
-          batchEventsProcessed: 0,
-          aggregatesCompleted,
-          totalEventsReplayed,
-          elapsedSec: (Date.now() - startTime) / 1000,
-          skippedCount,
+      const emit = () => {
+        progress.elapsedSec = (Date.now() - startTime) / 1000;
+        callbacks?.onProgress?.({ ...progress });
+      };
+
+      emit();
+
+      // Pause only for this batch's window.
+      for (const p of allProjectionsToPause) {
+        await pauseProjection({
+          redis: this.deps.redis,
+          pauseKey: p.pauseKey,
+        });
+      }
+      log.write({
+        step: "pause-batch",
+        batch: batchNum,
+        projections: allProjectionNames,
+      });
+
+      let batchResult: { eventsReplayed: number };
+      try {
+        // Drain only THIS batch's aggregates — not every discovered aggregate.
+        progress.batchPhase = "drain";
+        emit();
+        await waitForAllActiveJobs({
+          redis: this.deps.redis,
+          aggregates: batchAggregates,
+          projections: pausedProjectionEntries,
+        });
+        log.write({ step: "drain-batch", batch: batchNum, aggregateCount: batchAggregates.length });
+
+        batchResult = await this.replayBatchOptimized({
+          batchKeys,
+          aggregateProjectionMap,
+          projectionByName,
+          mapProjectionByName,
+          aggregateBatchSize,
+          concurrency,
+          log,
+          onBatchPhase: (phase, eventsProcessed) => {
+            progress.batchPhase = phase;
+            if (eventsProcessed !== undefined) {
+              progress.batchEventsProcessed = eventsProcessed;
+              progress.totalEventsReplayed = totalEventsReplayed + eventsProcessed;
+            }
+            emit();
+          },
+        });
+      } catch (error) {
+        totalBatchErrors++;
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        if (!firstError) firstError = errorMsg;
+        log.write({ step: "error", batch: batchNum, error: errorMsg });
+
+        progress.batchErrors = totalBatchErrors;
+        progress.firstError = firstError;
+        emit();
+
+        return {
+          aggregatesReplayed: aggregatesCompleted - skippedCount,
+          totalEvents: totalEventsReplayed,
           batchErrors: totalBatchErrors,
           firstError,
         };
-
-        const emit = () => {
-          progress.elapsedSec = (Date.now() - startTime) / 1000;
-          callbacks?.onProgress?.({ ...progress });
-        };
-
-        emit();
-
-        try {
-          const batchResult = await this.replayBatchOptimized({
-            batchKeys,
-            aggregateProjectionMap,
-            projectionByName,
-            mapProjectionByName,
-            aggregateBatchSize,
-            concurrency,
-            log,
-            onBatchPhase: (phase, eventsProcessed) => {
-              progress.batchPhase = phase;
-              if (eventsProcessed !== undefined) {
-                progress.batchEventsProcessed = eventsProcessed;
-                progress.totalEventsReplayed = totalEventsReplayed + eventsProcessed;
-              }
-              emit();
-            },
-          });
-
-          totalEventsReplayed += batchResult.eventsReplayed;
-          aggregatesCompleted += batchKeys.length;
-
-          for (const key of batchKeys) {
-            const entry = aggregateProjectionMap.get(key)!;
-            touchedTenants.add(entry.tenantId);
-          }
-
-          callbacks?.onBatchComplete?.({
-            projectionName: allProjectionNames.join("+"),
-            projectionKind: runProjectionKind,
-            batchNum,
-            totalBatches,
-            aggregatesInBatch: batchKeys.length,
-            eventsInBatch: batchResult.eventsReplayed,
-            durationSec: (Date.now() - batchStartTime) / 1000,
-          });
-        } catch (error) {
-          totalBatchErrors++;
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          if (!firstError) firstError = errorMsg;
-          log.write({ step: "error", batch: batchNum, error: errorMsg });
-
-          progress.batchErrors = totalBatchErrors;
-          progress.firstError = firstError;
-          emit();
-
-          return {
-            aggregatesReplayed: aggregatesCompleted - skippedCount,
-            totalEvents: totalEventsReplayed,
-            batchErrors: totalBatchErrors,
-            firstError,
-          };
+      } finally {
+        // Unpause after EVERY batch — including the error return above — so
+        // a failed batch can never leave live processing frozen.
+        for (const p of allProjectionsToPause) {
+          await unpauseProjection({
+            redis: this.deps.redis,
+            pauseKey: p.pauseKey,
+          }).catch(() => {});
         }
+        log.write({ step: "unpause-batch", batch: batchNum, projections: allProjectionNames });
       }
-    } finally {
-      // 5. Unpause ALL projections — always runs, even on unexpected errors
-      for (const p of allProjectionsToPause) {
-        await unpauseProjection({
-          redis: this.deps.redis,
-          pauseKey: p.pauseKey,
-        }).catch(() => {});
+
+      totalEventsReplayed += batchResult.eventsReplayed;
+      aggregatesCompleted += batchKeys.length;
+
+      for (const key of batchKeys) {
+        const entry = aggregateProjectionMap.get(key)!;
+        touchedTenants.add(entry.tenantId);
       }
-      log.write({ step: "unpause-all", projections: allProjectionsToPause.map((p) => p.projectionName) });
+
+      callbacks?.onBatchComplete?.({
+        projectionName: allProjectionNames.join("+"),
+        projectionKind: runProjectionKind,
+        batchNum,
+        totalBatches,
+        aggregatesInBatch: batchKeys.length,
+        eventsInBatch: batchResult.eventsReplayed,
+        durationSec: (Date.now() - batchStartTime) / 1000,
+      });
     }
 
     // 6. Cleanup markers for all projections
@@ -1322,19 +1373,33 @@ export class ReplayService {
       }
     }
 
+    // Per-tenant queries are independent — run them in parallel instead of
+    // serially awaiting one tenant at a time. Each tenant first computes its
+    // occurred-at bounds (cheap, key-column-only) so the cutoff and load
+    // queries can prune event_log's weekly partitions; see
+    // getAggregateOccurredAtBounds for the safety argument.
     const allCutoffs = new Map<string, CutoffInfo>();
-    for (const [tenantId, entries] of byTenant) {
-      const client = await this.resolveClient(tenantId);
-      const tenantCutoffs = await batchGetCutoffEventIds({
-        client,
-        tenantId,
-        aggregateIds: entries.map((e) => e.aggregateId),
-        eventTypes: [...allEventTypes],
-      });
-      for (const [k, v] of tenantCutoffs) {
-        allCutoffs.set(k, v);
-      }
-    }
+    const boundsByTenant = new Map<string, OccurredAtBounds | undefined>();
+    await Promise.all(
+      [...byTenant.entries()].map(async ([tenantId, entries]) => {
+        const client = await this.resolveClient(tenantId);
+        const aggregateIds = entries.map((e) => e.aggregateId);
+        const occurredAtBounds =
+          (await getAggregateOccurredAtBounds({ client, tenantId, aggregateIds })) ??
+          undefined;
+        boundsByTenant.set(tenantId, occurredAtBounds);
+        const tenantCutoffs = await batchGetCutoffEventIds({
+          client,
+          tenantId,
+          aggregateIds,
+          eventTypes: [...allEventTypes],
+          occurredAtBounds,
+        });
+        for (const [k, v] of tenantCutoffs) {
+          allCutoffs.set(k, v);
+        }
+      }),
+    );
 
     // Split into with/without cutoffs
     const withCutoffKeys: string[] = [];
@@ -1389,31 +1454,36 @@ export class ReplayService {
       }
     }
 
-    // Load events grouped by tenant (one CH query per tenant)
+    // Load events grouped by tenant (one CH query per tenant, in parallel).
     const allEvents = new Map<string, ReplayEvent[]>();
 
-    for (const [tenantId, entries] of byTenant) {
-      const client = await this.resolveClient(tenantId);
-      const aggIds = entries
-        .filter((e) => allCutoffs.has(e.key))
-        .map((e) => e.aggregateId);
+    await Promise.all(
+      [...byTenant.entries()].map(async ([tenantId, entries]) => {
+        const aggIds = entries
+          .filter((e) => allCutoffs.has(e.key))
+          .map((e) => e.aggregateId);
 
-      if (aggIds.length === 0) continue;
+        if (aggIds.length === 0) return;
 
-      const tenantEvents = await loadEventsForAggregatesBulk({
-        client,
-        tenantId,
-        aggregateIds: aggIds,
-        cutoffs: allCutoffs,
-      });
+        const client = await this.resolveClient(tenantId);
+        const tenantEvents = await loadEventsForAggregatesBulk({
+          client,
+          tenantId,
+          aggregateIds: aggIds,
+          cutoffs: allCutoffs,
+          occurredAtBounds: boundsByTenant.get(tenantId),
+        });
 
-      for (const [aggKey, events] of tenantEvents) {
-        allEvents.set(aggKey, events);
-      }
-    }
+        for (const [aggKey, events] of tenantEvents) {
+          allEvents.set(aggKey, events);
+        }
+      }),
+    );
 
     // Apply all relevant projections per aggregate — with concurrency
     let eventsProcessed = 0;
+    let aggregatesApplied = 0;
+    const totalToApply = withCutoffKeys.length;
 
     await pMapLimited(withCutoffKeys, async (aggKey) => {
       const events = allEvents.get(aggKey) ?? [];
@@ -1430,7 +1500,15 @@ export class ReplayService {
         eventsProcessed++;
       }
 
-      onBatchPhase("replay", eventsProcessed);
+      // Throttled progress: emit every N aggregates plus the batch's last —
+      // never once per aggregate (each emit persists status to Redis).
+      aggregatesApplied++;
+      if (
+        aggregatesApplied % PROGRESS_EMIT_EVERY_AGGREGATES === 0 ||
+        aggregatesApplied === totalToApply
+      ) {
+        onBatchPhase("replay", eventsProcessed);
+      }
     }, concurrency);
 
     // 4. WRITE — flush all accumulators (fold states + map records in bulk)

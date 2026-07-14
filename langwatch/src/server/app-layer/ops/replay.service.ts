@@ -13,6 +13,14 @@ const logger = createLogger("langwatch:ops:replay-service");
 
 const REPLAY_LOCK_TTL_SECONDS = 3600;
 
+/**
+ * How often (at most) the running replay re-extends its lock from progress
+ * callbacks. Batch completions also refresh unconditionally — together they
+ * keep the lock alive for runs longer than REPLAY_LOCK_TTL_SECONDS, whose
+ * expiry used to silently stop status updates mid-run.
+ */
+const LOCK_REFRESH_INTERVAL_MS = 60_000;
+
 class ReplayCancelledError extends Error {
   constructor() {
     super("Replay cancelled");
@@ -153,6 +161,19 @@ export class ReplayService {
       let lastCancelCheck = Date.now();
       const CANCEL_CHECK_INTERVAL_MS = 3000;
 
+      let lastLockRefresh = Date.now();
+      const refreshLock = () => {
+        lastLockRefresh = Date.now();
+        this.repo
+          .refreshLock({
+            runId: params.runId,
+            ttlSeconds: REPLAY_LOCK_TTL_SECONDS,
+          })
+          .catch((err) => {
+            logger.warn({ error: err }, "Failed to refresh replay lock");
+          });
+      };
+
       const result = await runtime.service.replayOptimized(
         {
           projections: selectedProjections,
@@ -162,6 +183,11 @@ export class ReplayService {
           aggregateIds: params.aggregateIds,
         },
         {
+          // Heartbeat: refresh the lock at least once per completed batch so
+          // a run longer than the lock TTL never loses it mid-flight.
+          onBatchComplete: () => {
+            refreshLock();
+          },
           onProgress: (progress: ReplayProgress) => {
             this.updateProgress({ runId: params.runId, progress }).catch(
               (err) => {
@@ -181,6 +207,12 @@ export class ReplayService {
                   if (cancelled) cancelledFlag = true;
                 })
                 .catch(() => {});
+            }
+
+            // Also refresh from progress emits, time-gated — covers a single
+            // batch that runs longer than one lock refresh interval.
+            if (now - lastLockRefresh > LOCK_REFRESH_INTERVAL_MS) {
+              refreshLock();
             }
 
             if (cancelledFlag) {

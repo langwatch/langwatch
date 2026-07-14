@@ -44,3 +44,28 @@ Feature: Projection replay
     Then each projection's output is rebuilt from the same event history
     And live events for the affected aggregates are skipped or deferred for both projections
     And live processing for both projections resumes once the replay completes
+
+  Scenario: Only the batch being replayed pauses live processing
+    Given a replay of the "spanStorage" projection spanning multiple batches
+    When the replay works through its batches
+    Then live processing is paused only while a batch is being replayed
+    And live processing resumes between batches
+    And live processing is never paused for the whole run at once
+
+  Scenario: A batch failure resumes live processing
+    Given a replay of the "spanStorage" projection is in progress
+    When a batch fails partway through
+    Then the replay stops and reports the failure
+    And live processing for the affected projections resumes
+
+  Scenario: Rebuilt records are written in bulk
+    Given aggregates with existing event history across many traces
+    When the replay rebuilds the "spanStorage" projection
+    Then rebuilt records land in large batched writes per tenant
+    And the rebuild does not wait on one write per trace
+
+  Scenario: A long replay keeps reporting progress until it finishes
+    Given a replay is running for longer than its coordination lock's initial lifetime
+    When each batch completes
+    Then the replay's coordination lock is extended
+    And progress and cancellation keep working for the whole run

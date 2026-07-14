@@ -114,6 +114,49 @@ After all projections complete, the service runs `OPTIMIZE TABLE {table}` (witho
 - The CLI package still exists for the TUI experience but contains no business logic — it delegates entirely to the framework service
 - `OPTIMIZE TABLE` is best-effort — if it fails, eventual consistency handles it
 
+## Amendment (2026-07-14): Per-batch pause in the optimized replay + bulk write/query fixes
+
+The optimized multi-projection path (`replayOptimized`) had drifted from this
+ADR in ways that made production replays take weeks while freezing live
+processing for the entire run:
+
+1. **Pause/drain scope.** `replayOptimized` paused ALL selected projections
+   and drained ALL discovered aggregates once, up front, and only unpaused
+   after the last batch — a full-run freeze, contradicting the "seconds per
+   batch" pause window above. It now pauses, drains (only the current batch's
+   aggregates), replays, and unpauses **per batch**, exactly like the
+   non-optimized path, with the unpause in a per-batch `finally` so a batch
+   failure can never leave projections frozen. The marker protocol
+   (pending/cutoff/done) already guarantees correctness across the unpaused
+   gaps between batches.
+
+2. **Map-projection bulk writes.** The replay `MapAccumulator` grouped
+   buffered records per AGGREGATE and sequentially awaited one
+   `store.bulkAppend` per group. For `spanStorage` the aggregate is a single
+   trace, so each trace became its own awaited ClickHouse INSERT
+   (`wait_for_async_insert: 1`, ~200ms each). Records are now flushed in
+   chunks (default 5000) per TENANT; `AppendStore.bulkAppend` takes a
+   tenant-scoped `BulkAppendContext` (no `aggregateId` — records carry what
+   stores need per row). The live `append()` path is unchanged.
+
+3. **Partition pruning.** `event_log` is `PARTITION BY
+   toYearWeek(EventOccurredAt)`, but the cutoff/load queries filtered only on
+   TenantId/AggregateId, scanning every partition (including S3 cold storage)
+   once per batch. Each batch now first computes the `EventOccurredAt`
+   min/max over ALL events of its aggregates (`getAggregateOccurredAtBounds`,
+   a cheap key-column read) and passes that range to the cutoff and load
+   queries. The bound is provably safe — every event those queries must see
+   existed when the bounds were computed; later appends fall after the cutoff
+   and are handled live. (Bounding by the replay's `since` would be unsafe:
+   folds rebuild from `init()` and need history predating `since`.)
+
+4. **Per-tenant I/O and progress cadence.** Cutoff and load queries now run
+   in parallel across tenants within a batch; replay-phase progress emits are
+   throttled (every 100 aggregates) instead of per aggregate; and the ops
+   replay lock (1h TTL) is refreshed at least once per batch
+   (`ReplayRepository.refreshLock`), so long runs no longer silently lose
+   status updates when the lock expires mid-run.
+
 ## References
 
 - Related ADRs: None (first event-sourcing operational tooling ADR)

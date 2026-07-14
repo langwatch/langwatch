@@ -1,6 +1,9 @@
 import type { TenantId } from "../domain/tenantId";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
-import type { MapProjectionDefinition } from "../projections/mapProjection.types";
+import type {
+  BulkAppendContext,
+  MapProjectionDefinition,
+} from "../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../projections/projectionStoreContext";
 import type { ReplayEvent } from "./replayEventLoader";
 import type { Event } from "../domain/types";
@@ -157,9 +160,11 @@ export class FoldAccumulator {
  * Unlike FoldAccumulator (which merges state per aggregate), MapAccumulator
  * buffers one output record per event along with the originating event's
  * `ProjectionStoreContext`. Records are grouped by tenantId and flushed in
- * bulk via `store.bulkAppend()` (or sequential `store.append()` as fallback);
- * the per-event context is preserved on the fallback path so stores keying
- * off `context.aggregateId` behave the same as the non-optimized replay.
+ * per-tenant chunks via `store.bulkAppend()` (tenant-scoped context, records
+ * from many aggregates per call) or via sequential `store.append()` as a
+ * fallback; the per-event context is preserved on the fallback path so stores
+ * keying off `context.aggregateId` behave the same as the non-optimized
+ * replay.
  *
  * Map records are append-only and need no cross-page state, so `apply`
  * flushes incrementally: once the buffer reaches `writeBatchSize` the
@@ -250,27 +255,19 @@ export class MapAccumulator {
       const retentionPolicy = await this.resolveRetention(tenantId);
 
       if (store.bulkAppend) {
-        // Group by aggregateId so each `bulkAppend` call gets a real
-        // per-aggregate context. Stores that key off `context.aggregateId`
-        // (rather than reading it from the record) then see the same value
-        // they would on the non-optimized `append()` path.
-        const byAggregate = new Map<string, BufferedMapRecord[]>();
-        for (const entry of entries) {
-          const key = entry.context.aggregateId;
-          let list = byAggregate.get(key);
-          if (!list) {
-            list = [];
-            byAggregate.set(key, list);
-          }
-          list.push(entry);
-        }
-
-        for (const aggregateEntries of byAggregate.values()) {
-          const groupContext = { ...aggregateEntries[0]!.context, retentionPolicy };
-          for (let i = 0; i < aggregateEntries.length; i += writeBatchSize) {
-            const chunk = aggregateEntries.slice(i, i + writeBatchSize).map((e) => e.record);
-            await store.bulkAppend(chunk, groupContext);
-          }
+        // One bulk write per TENANT chunk — never per aggregate. For
+        // spanStorage-style projections the aggregate is a single trace, so
+        // per-aggregate grouping degenerated into one awaited ClickHouse
+        // INSERT per trace (~200ms each, sequential) and dominated replay
+        // time. `bulkAppend` takes a tenant-scoped BulkAppendContext; records
+        // carry everything stores need per row.
+        const context: BulkAppendContext = {
+          tenantId: tenantId as TenantId,
+          retentionPolicy,
+        };
+        for (let i = 0; i < entries.length; i += writeBatchSize) {
+          const chunk = entries.slice(i, i + writeBatchSize).map((e) => e.record);
+          await store.bulkAppend(chunk, context);
         }
       } else {
         // Sequential fallback: pass each record's original per-event context
