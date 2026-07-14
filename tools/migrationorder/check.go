@@ -90,9 +90,7 @@ func Check(in Input) []Finding {
 	// Suggested keys are handed out above everything in play — the newest on the
 	// base branch and anything this branch already numbered — so a suggestion
 	// never lands on a key that is itself taken, and two clashing migrations get
-	// two different answers where Render consumes the key. Prisma's date
-	// expansion resolves when the command runs, so its uniqueness comes from the
-	// clock instead.
+	// two different answers.
 	free := highest
 	for _, m := range added {
 		free = max(free, m.key)

@@ -92,7 +92,7 @@ func TestCheck(t *testing.T) {
 			}},
 		},
 		{
-			name: "a Prisma migration timestamped before one already merged is renamed to now",
+			name: "a Prisma migration timestamped before one already merged is renamed above it",
 			in: migrationorder.Input{
 				Set:       prisma,
 				BaseRef:   "origin/main",
@@ -106,8 +106,34 @@ func TestCheck(t *testing.T) {
 				Problem: "is numbered below 20260708150000, the newest migration on main, " +
 					"so it runs out of order or not at all",
 				Fix: "git mv langwatch/prisma/migrations/20260702090000_mine " +
-					"langwatch/prisma/migrations/$(date -u +%Y%m%d%H%M%S)_mine",
+					"langwatch/prisma/migrations/20260708150001_mine",
 			}},
+		},
+		{
+			name: "two Prisma migrations sharing a timestamp get distinct renames",
+			in: migrationorder.Input{
+				Set:       prisma,
+				BaseRef:   "origin/main",
+				Base:      []string{"20260101000000_old"},
+				MergeBase: []string{"20260101000000_old"},
+				Head:      []string{"20260101000000_old", "20260201000000_one", "20260201000000_two"},
+			},
+			want: []migrationorder.Finding{
+				{
+					Set:     "Prisma",
+					Entry:   "20260201000000_one",
+					Problem: "shares key 20260201000000 with another migration in this branch",
+					Fix: "git mv langwatch/prisma/migrations/20260201000000_one " +
+						"langwatch/prisma/migrations/20260201000001_one",
+				},
+				{
+					Set:     "Prisma",
+					Entry:   "20260201000000_two",
+					Problem: "shares key 20260201000000 with another migration in this branch",
+					Fix: "git mv langwatch/prisma/migrations/20260201000000_two " +
+						"langwatch/prisma/migrations/20260201000002_two",
+				},
+			},
 		},
 		{
 			name: "a merged migration that the branch edits is reported with a restore",

@@ -21,7 +21,6 @@ type Set struct {
 	// Format is the entry name shape, for error messages.
 	Format string
 	// Render turns a free key into the name fragment the suggested rename uses.
-	// Prisma keys are timestamps, so its rename is a shell expansion, not a literal.
 	Render func(key int64) string
 }
 
@@ -32,7 +31,10 @@ var Sets = []Set{
 		Directory: "langwatch/prisma/migrations",
 		Key:       regexp.MustCompile(`^(\d{14})_`),
 		Format:    "YYYYMMDDHHMMSS_name",
-		Render:    func(int64) string { return "$(date -u +%Y%m%d%H%M%S)" },
+		// A literal key rather than a $(date) expansion: free keys count up from
+		// the newest timestamp in play, so twins renamed from one comment get
+		// distinct names instead of colliding on the same second.
+		Render: func(key int64) string { return fmt.Sprintf("%014d", key) },
 	},
 	{
 		Name:      "ClickHouse",
