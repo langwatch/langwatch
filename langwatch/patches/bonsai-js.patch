@@ -1,0 +1,26 @@
+diff --git a/package.json b/package.json
+index 085d5c970cddf6efa74ba1ebbdc32fa01ec9bc2f..dc10cd3589bfb9ad57bb193eeaba30c4bb5db292 100644
+--- a/package.json
++++ b/package.json
+@@ -9,15 +9,18 @@
+   "exports": {
+     ".": {
+       "types": "./dist/index.d.mts",
+-      "import": "./dist/index.mjs"
++      "import": "./dist/index.mjs",
++      "require": "./dist/index.mjs"
+     },
+     "./stdlib": {
+       "types": "./dist/stdlib/index.d.mts",
+-      "import": "./dist/stdlib/index.mjs"
++      "import": "./dist/stdlib/index.mjs",
++      "require": "./dist/stdlib/index.mjs"
+     },
+     "./autocomplete": {
+       "types": "./dist/autocomplete/index.d.mts",
+-      "import": "./dist/autocomplete/index.mjs"
++      "import": "./dist/autocomplete/index.mjs",
++      "require": "./dist/autocomplete/index.mjs"
+     }
+   },
+   "files": [
