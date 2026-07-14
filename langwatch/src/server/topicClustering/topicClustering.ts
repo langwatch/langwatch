@@ -28,6 +28,34 @@ import type {
 
 const logger = createLogger("langwatch:topicClustering");
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Look-back for the batch-vs-incremental MODE decision
+ * (`fetchCountsFromClickHouse`). Deliberately wide: it answers "does this
+ * project already have a mature topic model?", which depends on the project's
+ * whole history, not just recent traffic. Narrowing it silently flips
+ * historically-mature-but-quiet projects out of incremental mode into the
+ * heavy full-batch re-cluster path — measured on prod, dropping this to 49d
+ * would flip 54 of 73 incremental projects to batch. This query reads only
+ * light key columns (no ComputedInput), so its scan stays cheap even across
+ * cold-tier partitions.
+ */
+const CLUSTERING_MODE_WINDOW_DAYS = 365;
+
+/**
+ * Look-back for the trace FETCH (`fetchTracesFromClickHouse`) that reads the
+ * heavy ComputedInput payload. Kept inside the ClickHouse hot tier (~90 days)
+ * so cursor-paging never walks the payload column back into S3 cold storage —
+ * the source of the multi-hundred-MB cold reads that stalled the worker event
+ * loop. 49 days matches the retention recovery floor and sits comfortably
+ * within hot. Trade-off: an unassigned trace older than 49 days is no longer
+ * retroactively clustered; for the 2-day batch cadence and hot-tier ingest
+ * this is negligible, and new/recent traffic (all within the window) is
+ * unaffected.
+ */
+const CLUSTERING_FETCH_WINDOW_DAYS = 49;
+
 export const clusterTopicsForProject = async (
   projectId: string,
   searchAfter?: [number, string],
@@ -190,7 +218,9 @@ export async function fetchCountsFromClickHouse({
   projectId: string;
 }): Promise<TraceCounts> {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  // Wide MODE window (kept at 365d): light-column scan that decides
+  // batch-vs-incremental, so it must reflect the project's whole history.
+  const twelveMonthsAgo = Date.now() - CLUSTERING_MODE_WINDOW_DAYS * DAY_MS;
 
   // trace_summaries is a ReplacingMergeTree, so we count one row per trace
   // (its latest version). Rather than the IN-tuple dedup pattern — which
@@ -249,7 +279,9 @@ export async function fetchTracesFromClickHouse(
   subtopicIds: string[],
   searchAfter?: [number, string],
 ): Promise<TraceSearchResult> {
-  const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  // Narrow FETCH window (49d, hot-tier only): bounds how far cursor-paging
+  // reads the heavy ComputedInput column, keeping it off S3 cold storage.
+  const fetchWindowStartMs = Date.now() - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS;
 
   // Page selection runs on the lightweight key columns only: it picks the
   // 2000 most-recent matching traces without ever reading ComputedInput.
@@ -320,7 +352,7 @@ export async function fetchTracesFromClickHouse(
         SELECT TraceId
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+          AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
           AND OccurredAt < now64(3)
         GROUP BY TenantId, TraceId
         ${pageHavingClause}
@@ -335,13 +367,13 @@ export async function fetchTracesFromClickHouse(
         toString(toUnixTimestamp64Milli(t.OccurredAt)) AS OccurredAtMs
       FROM trace_summaries t
       WHERE TenantId = {tenantId:String}
-        AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+        AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
         AND OccurredAt < now64(3)
         AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+            AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
             AND OccurredAt < now64(3)
             AND TraceId IN (SELECT TraceId FROM page)
           GROUP BY TenantId, TraceId
@@ -349,7 +381,7 @@ export async function fetchTracesFromClickHouse(
     `,
     query_params: {
       tenantId: projectId,
-      twelveMonthsAgo,
+      fetchWindowStartMs,
       topicIds: topicIds.length > 0 ? topicIds : ["__none__"],
       subtopicIds: subtopicIds.length > 0 ? subtopicIds : ["__none__"],
       ...(searchAfter
