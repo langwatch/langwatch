@@ -678,7 +678,13 @@ export function narrowSpanAttributesColumns(
     return columns;
   }
 
-  const keys = [...new Set(keyMatches.map((match) => match[1]))];
+  const keys = [
+    ...new Set(
+      keyMatches
+        .map((match) => match[1])
+        .filter((key): key is string => key !== undefined),
+    ),
+  ];
   const narrowed = new Set(columns);
   narrowed.delete("SpanAttributes");
   narrowed.add(spanAttributesNarrowProjection(keys));
