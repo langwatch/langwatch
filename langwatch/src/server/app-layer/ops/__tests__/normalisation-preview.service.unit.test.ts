@@ -1,5 +1,33 @@
 import { describe, expect, it, vi } from "vitest";
 
+// A deterministic fake registry: one fold projection that tracks the last
+// langwatch.input attribute it sees on span-received events.
+vi.mock("~/server/event-sourcing/pipelineRegistry", () => ({
+  getDejaViewProjections: () => [
+    {
+      projectionName: "fakeTraceSummary",
+      eventTypes: ["lw.obs.trace.span_received"],
+      init: () => ({ inputText: null as string | null, spanCount: 0 }),
+      apply: (
+        state: { inputText: string | null; spanCount: number },
+        event: {
+          data: { span?: { attributes?: Array<{ key: string; value: { stringValue?: string | null } }> } };
+        },
+      ) => {
+        const attrs = event.data.span?.attributes ?? [];
+        const input = attrs.find((a) => a.key === "langwatch.input");
+        return {
+          spanCount: state.spanCount + 1,
+          inputText: input?.value?.stringValue ?? state.inputText,
+        };
+      },
+    },
+  ],
+  getProjectionMetadata: () => [
+    { projectionName: "fakeTraceSummary", aggregateType: "trace" },
+  ],
+}));
+
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
@@ -197,6 +225,7 @@ describe("NormalisationPreviewService", () => {
 
   describe("given experimental mapping rules", () => {
     const vendorRule: MappingRule = {
+      kind: "map",
       match: {
         key: "vendor.payload",
         keyIsRegex: false,
@@ -230,6 +259,8 @@ describe("NormalisationPreviewService", () => {
         kind: "added",
         before: null,
         after: "Amsterdam",
+        sourceKey: "vendor.payload",
+        ruleIndex: 0,
       });
       expect(result.ruleStats).toEqual([
         { ruleIndex: 0, matchedSpanCount: 1 },
@@ -246,6 +277,7 @@ describe("NormalisationPreviewService", () => {
           tenantId: TENANT_ID,
           rules: [
             {
+              kind: "map",
               match: { key: "([", keyIsRegex: true },
               action: { type: "copy", targetKey: "t" },
             } as MappingRule,
@@ -253,6 +285,125 @@ describe("NormalisationPreviewService", () => {
         }),
       ).rejects.toThrowError(InvalidMappingRuleError);
       expect(repo.findEventsByAggregate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a specific event is selected", () => {
+    const twoSpanRows = () => [
+      spanEventRow(
+        spanReceivedPayload([
+          { key: "vendor.payload", value: { stringValue: '{"city":"Amsterdam"}' } },
+        ]),
+        "ev-1",
+      ),
+      spanEventRow(
+        spanReceivedPayload([
+          { key: "vendor.payload", value: { stringValue: '{"city":"Utrecht"}' } },
+        ]),
+        "ev-2",
+      ),
+    ];
+    const cityRule: MappingRule = {
+      kind: "map",
+      match: {
+        key: "vendor.payload",
+        keyIsRegex: false,
+        valuePattern: '"city":"([^"]+)"',
+      },
+      action: { type: "copy", targetKey: "langwatch.input" },
+    };
+
+    it("returns only that event's span", async () => {
+      const repo = makeRepo(twoSpanRows());
+      const service = new NormalisationPreviewService(repo, null);
+
+      const result = await service.previewAggregate({
+        aggregateId: TRACE_ID,
+        tenantId: TENANT_ID,
+        rules: [],
+        eventId: "ev-2",
+      });
+
+      expect(result.spans).toHaveLength(1);
+      expect(result.spans[0]!.eventId).toBe("ev-2");
+      expect(result.spanEventsFound).toBe(2);
+    });
+
+    it("still counts rule matches across all events", async () => {
+      const repo = makeRepo(twoSpanRows());
+      const service = new NormalisationPreviewService(repo, null);
+
+      const result = await service.previewAggregate({
+        aggregateId: TRACE_ID,
+        tenantId: TENANT_ID,
+        rules: [cityRule],
+        eventId: "ev-1",
+      });
+
+      expect(result.spans).toHaveLength(1);
+      expect(result.ruleStats).toEqual([{ ruleIndex: 0, matchedSpanCount: 2 }]);
+    });
+  });
+
+  describe("given rules and projections folding this aggregate", () => {
+    const cityRule: MappingRule = {
+      kind: "map",
+      match: {
+        key: "vendor.payload",
+        keyIsRegex: false,
+        valuePattern: '"city":"([^"]+)"',
+      },
+      action: { type: "copy", targetKey: "langwatch.input" },
+    };
+
+    it("reports how the rules change each projection's state", async () => {
+      const repo = makeRepo([
+        spanEventRow(
+          spanReceivedPayload([
+            { key: "vendor.payload", value: { stringValue: '{"city":"Amsterdam"}' } },
+          ]),
+        ),
+      ]);
+      const service = new NormalisationPreviewService(repo, null);
+
+      const result = await service.previewAggregate({
+        aggregateId: TRACE_ID,
+        tenantId: TENANT_ID,
+        rules: [cityRule],
+      });
+
+      expect(result.projections).toHaveLength(1);
+      const impact = result.projections[0]!;
+      expect(impact.projectionName).toBe("fakeTraceSummary");
+      expect(impact.aggregateType).toBe("trace");
+      expect(impact.appliedEventCount).toBe(1);
+      expect(impact.changes).toContainEqual({
+        key: "inputText",
+        kind: "changed",
+        before: "null",
+        after: "Amsterdam",
+      });
+      // spanCount folds identically on both sides — not in the diff
+      expect(impact.changes.map((c) => c.key)).not.toContain("spanCount");
+    });
+
+    it("computes no projection impact when no rules are supplied", async () => {
+      const repo = makeRepo([
+        spanEventRow(
+          spanReceivedPayload([
+            { key: "gen_ai.request.model", value: { stringValue: "m" } },
+          ]),
+        ),
+      ]);
+      const service = new NormalisationPreviewService(repo, null);
+
+      const result = await service.previewAggregate({
+        aggregateId: TRACE_ID,
+        tenantId: TENANT_ID,
+        rules: [],
+      });
+
+      expect(result.projections).toEqual([]);
     });
   });
 

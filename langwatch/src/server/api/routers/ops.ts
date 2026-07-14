@@ -377,6 +377,8 @@ export const opsRouter = createTRPCRouter({
         aggregateId: z.string().min(1),
         tenantId: z.string().min(1),
         rules: mappingRulesSchema,
+        /** When set, only this event's span is returned in `spans`. */
+        eventId: z.string().min(1).optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -386,6 +388,7 @@ export const opsRouter = createTRPCRouter({
           aggregateId: input.aggregateId,
           tenantId: input.tenantId,
           rules: input.rules,
+          eventId: input.eventId,
         });
       } catch (err) {
         if (err instanceof InvalidMappingRuleError) {

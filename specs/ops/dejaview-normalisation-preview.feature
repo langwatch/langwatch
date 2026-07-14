@@ -37,13 +37,53 @@ Feature: Deja View normalisation preview
     Given the operator adds a mapping rule from a vendor attribute to a canonical key
     When the operator runs the normalisation preview
     Then the preview shows the additional attributes the rule produced
+    And each produced attribute names the source key it came from
     And the preview reports how many spans each rule matched
 
-  Scenario: An invalid regex in a rule fails the run with a clear error
-    Given the operator adds a mapping rule with an invalid regex
+  Scenario: A single event can be previewed
+    Given the aggregate has several span-received events
+    When the operator selects one event and runs the preview
+    Then only that event's span is shown in the results
+    And the operator can step to the next event and preview it individually
+
+  Scenario: Rule building suggests known keys
+    Given the operator is adding a mapping rule
+    Then the source key suggests attribute keys present on the selected event
+    And the target key suggests known canonical attribute keys
+
+  Scenario: Rules show their impact on every projection
+    Given the operator adds a mapping rule
+    When the operator runs the normalisation preview
+    Then every projection that folds this aggregate's events is shown
+    And each projection shows how its state changes with the rules applied
+    # Rules apply across all span events when folding — projections
+    # accumulate state over the whole event stream, so a per-event
+    # projection fold is not meaningful.
+    And projections whose state is unaffected report no change
+
+  Scenario: Expression rules compute values over the span's attributes
+    Given the operator adds an expression rule reading an attribute and transforming it
+    When the operator runs the normalisation preview
+    Then the expression's result is written to the target key
+    And an expression can consume its source attribute like an extractor would
+
+  Scenario: An expression that fails on one span does not fail the run
+    Given an expression rule that only fits some spans' data
+    When the operator runs the normalisation preview
+    Then spans the expression fails on report the failure
+    And the remaining spans still show their results
+
+  Scenario: An invalid regex or unparseable expression fails the run with a clear error
+    Given the operator adds a mapping rule with an invalid regex or expression
     When the operator runs the normalisation preview
     Then the run is rejected naming the offending rule
     And no preview results are produced
+
+  Scenario: Expressions are edited with live assistance
+    Given the operator is writing an expression rule
+    Then unparseable expressions are flagged as they are typed
+    And completions suggest the selected event's attribute keys and available transforms
+    And example expressions can be inserted as starting points
 
   Scenario: Nothing is written
     When the operator runs the normalisation preview

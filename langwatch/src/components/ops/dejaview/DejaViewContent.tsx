@@ -360,6 +360,7 @@ export function DejaViewContent() {
           <NormalisationPreviewPanel
             aggregateId={selectedAggregate.aggregateId}
             tenantId={selectedAggregate.tenantId}
+            events={events}
           />
         ) : eventsQuery.isLoading ? (
           <Center flex={1}>
