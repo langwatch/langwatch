@@ -120,6 +120,7 @@ describe("ShareService", () => {
       expect(result).toBe(true);
     });
 
+    /** @scenario A revoked link stops resolving */
     it("rejects a grant after its link is revoked", async () => {
       vi.mocked(repo.findById).mockResolvedValue(null);
 
@@ -297,6 +298,7 @@ describe("ShareService", () => {
     });
 
     describe("given the link expired in the past", () => {
+      /** @scenario A timed link stops resolving after its expiry */
       it("reports expired and does not consume a view", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ expiresAt: new Date(Date.now() - 1000) }),
@@ -331,6 +333,7 @@ describe("ShareService", () => {
     });
 
     describe("given a public link", () => {
+      /** @scenario A public link resolves for an anonymous viewer */
       it("grants an anonymous viewer and consumes one view", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
 
@@ -369,6 +372,7 @@ describe("ShareService", () => {
         expect(repo.incrementViewCount).not.toHaveBeenCalled();
       });
 
+      /** @scenario An organization link requires a member of the same organization */
       it("grants a member of that organization", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ visibility: "ORGANIZATION" }),
@@ -386,6 +390,7 @@ describe("ShareService", () => {
     });
 
     describe("given a project-scoped link", () => {
+      /** @scenario A project link requires a member of the same project */
       it("grants a member of that project", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ visibility: "PROJECT" }),
@@ -445,12 +450,36 @@ describe("ShareService", () => {
         expect(repo.incrementViewCount).toHaveBeenCalledOnce();
       });
 
+      /** @scenario A single-view link resolves exactly once */
+      it("grants the first resolution and exhausts the second", async () => {
+        vi.mocked(repo.findByToken).mockResolvedValue(
+          buildShare({ maxViews: 1, viewCount: 0 }),
+        );
+        vi.mocked(repo.incrementViewCount)
+          .mockResolvedValueOnce(true)
+          .mockResolvedValueOnce(false);
+
+        const first = await service.resolveForViewer({
+          token: "tok_abc",
+          viewer: buildViewer(),
+        });
+        const second = await service.resolveForViewer({
+          token: "tok_abc",
+          viewer: buildViewer(),
+        });
+
+        expect(first.status).toBe("granted");
+        expect(second.status).toBe("exhausted");
+        expect(repo.incrementViewCount).toHaveBeenCalledTimes(2);
+      });
+
       describe("when the viewer already holds a grant for this share", () => {
         /**
          * One view == one grant issuance. A page load fires several data reads
          * and the viewer may refresh within the grant window; neither may
          * re-consume the single view, nor be denied as exhausted.
          */
+        /** @scenario One viewing session counts as a single view */
         it("re-grants without consuming another view", async () => {
           vi.mocked(repo.findByToken).mockResolvedValue(
             buildShare({ maxViews: 1, viewCount: 1 }),
@@ -467,9 +496,30 @@ describe("ShareService", () => {
         });
       });
     });
+
+    describe("given a link with no expiry or view cap", () => {
+      /** @scenario A link with no expiry and no view cap resolves indefinitely */
+      it("grants every resolution", async () => {
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
+
+        const first = await service.resolveForViewer({
+          token: "tok_abc",
+          viewer: buildViewer(),
+        });
+        const second = await service.resolveForViewer({
+          token: "tok_abc",
+          viewer: buildViewer(),
+        });
+
+        expect(first.status).toBe("granted");
+        expect(second.status).toBe("granted");
+        expect(repo.incrementViewCount).toHaveBeenCalledTimes(2);
+      });
+    });
   });
 
   describe("when creating a share", () => {
+    /** @scenario Creating a share link for a trace mints a high-entropy token */
     it("mints a high-entropy token and auto-pins the trace", async () => {
       vi.mocked(repo.create).mockImplementation(
         async (params) => ({ ...params, id: "share_1" }) as never,
@@ -487,6 +537,33 @@ describe("ShareService", () => {
         projectId: PROJECT_ID,
         traceId: "trace_a",
       });
+    });
+
+    /** @scenario The same trace can have multiple concurrent links */
+    it("creates independent links for the same trace", async () => {
+      let sequence = 0;
+      vi.mocked(repo.create).mockImplementation(async (params) => {
+        sequence += 1;
+        return { ...params, id: `share_${sequence}` } as never;
+      });
+
+      const first = await service.createShare({
+        projectId: PROJECT_ID,
+        resourceType: "TRACE",
+        resourceId: "trace_a",
+        visibility: "PUBLIC",
+      });
+      const second = await service.createShare({
+        projectId: PROJECT_ID,
+        resourceType: "TRACE",
+        resourceId: "trace_a",
+        visibility: "PROJECT",
+      });
+
+      expect(first.id).toBe("share_1");
+      expect(second.id).toBe("share_2");
+      expect(first.token).not.toBe(second.token);
+      expect(repo.create).toHaveBeenCalledTimes(2);
     });
 
     it("rolls the link back when auto-pinning fails", async () => {
@@ -636,6 +713,7 @@ describe("ShareService", () => {
        * runs `autoUnpin` first, so `source=share` pins disappeared with their
        * share — bulk did not, leaving orphaned share-sourced pins behind.
        */
+      /** @scenario Disabling trace sharing revokes all existing links */
       it("auto-unpins every trace share before deleting them", async () => {
         vi.mocked(repo.findAllTraceShareResourceIds).mockResolvedValue([
           "trace_a",

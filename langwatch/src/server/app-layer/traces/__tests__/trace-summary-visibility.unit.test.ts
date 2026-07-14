@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceSummaryService } from "../trace-summary.service";
-import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "../visibility-window.service";
+import {
+  TEASER_ELLIPSIS,
+  TEASER_MAX_CHARS,
+} from "../visibility-window.service";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -24,13 +27,18 @@ const makeService = (summary: unknown) =>
 
 describe("given a trace summary read with a visibility gate", () => {
   describe("when the summary is older than the cutoff", () => {
+    /** @scenario A shared view cannot see beyond the project's data-retention window */
     it("teases computed input, output, and error message", async () => {
       const service = makeService(makeSummary(20));
       const summary = await service.getByTraceId("project-1", "trace-1", {
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
-      expect(summary.computedInput).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
-      expect(summary.computedOutput).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(summary.computedInput).toHaveLength(
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
+      );
+      expect(summary.computedOutput).toHaveLength(
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
+      );
       expect(summary.errorMessage!.length).toBeLessThanOrEqual(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );

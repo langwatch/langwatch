@@ -887,6 +887,7 @@ describe("RBAC Integration Tests", () => {
          * share row exists for this resource", which let anyone who learned a
          * shared trace's id read it without the link. See ADR-039.
          */
+        /** @scenario Knowing a shared trace's id is not enough to read it */
         it("denies a caller who knows the trace id but presents no grant", async () => {
           await expect(
             middleware()({

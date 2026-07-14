@@ -51,6 +51,37 @@ const visibleToAll = {
 };
 
 describe("applyTraceProtections metadata preservation", () => {
+  describe("when the viewer's cost permission is applied", () => {
+    /** @scenario An anonymous viewer is never shown costs */
+    it("removes costs when the viewer has no cost permission", () => {
+      const result = applyTraceProtections(traceWithIO(), {
+        canSeeCapturedInput: true,
+        canSeeCapturedOutput: true,
+        canSeeCosts: false,
+      });
+
+      expect(result.metrics?.total_cost).toBeUndefined();
+      expect(result.metrics?.prompt_tokens).toBe(42);
+    });
+
+    /** @scenario A member resolving a scoped link sees costs only if they may in-app */
+    it("shows or removes costs according to the member's permission", () => {
+      const allowed = applyTraceProtections(traceWithIO(), {
+        canSeeCapturedInput: true,
+        canSeeCapturedOutput: true,
+        canSeeCosts: true,
+      });
+      const denied = applyTraceProtections(traceWithIO(), {
+        canSeeCapturedInput: true,
+        canSeeCapturedOutput: true,
+        canSeeCosts: false,
+      });
+
+      expect(allowed.metrics?.total_cost).toBe(0.0123);
+      expect(denied.metrics?.total_cost).toBeUndefined();
+    });
+  });
+
   describe("when input is restricted but the viewer keeps cost access", () => {
     /** @scenario Restricting content does not hide its metadata */
     it("hides the input while keeping token counts, cost, and latency", () => {

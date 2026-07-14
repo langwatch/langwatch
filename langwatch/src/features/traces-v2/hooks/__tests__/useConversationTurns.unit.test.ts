@@ -74,6 +74,7 @@ describe("useConversationTurns", () => {
   });
 
   describe("given a read-only share that includes the conversation", () => {
+    /** @scenario The conversation is revealed only when the link was created with its thread */
     it("uses the scoped conversation endpoint and masks list-only metadata", () => {
       const { result } = renderHook(() => useConversationTurns("conv-1"));
 

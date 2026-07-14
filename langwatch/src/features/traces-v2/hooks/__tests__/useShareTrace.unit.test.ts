@@ -39,6 +39,7 @@ describe("useShareTrace", () => {
   });
 
   describe("when creating a link with the conversation included", () => {
+    /** @scenario Sharing a trace together with its thread */
     it("keeps the trace as the resource and adds the explicit thread capability", () => {
       const { result } = renderHook(() =>
         useShareTrace({
