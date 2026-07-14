@@ -27,19 +27,19 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
+          cache-dependency-path: "sdks/typescript/pnpm-lock.yaml"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        working-directory: ./typescript-sdk
+        working-directory: ./sdks/typescript
         run: pnpm build
 
       - name: Run tests
-        working-directory: ./typescript-sdk
+        working-directory: ./sdks/typescript
         env:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           LANGWATCH_ENDPOINT: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_ENDPOINT }}
@@ -52,14 +52,14 @@ jobs:
       ## before publishing
       ## NOTE(afr): Disabled for now as prompts tests are broken
       # - name: Run e2e tests
-      #   working-directory: ./typescript-sdk
+      #   working-directory: ./sdks/typescript
       #   env:
       #     OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
       #     LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
       #   run: pnpm test:e2e
 
       - name: Publish to npm
-        working-directory: ./typescript-sdk
+        working-directory: ./sdks/typescript
         run: pnpm publish --provenance --access public --no-git-checks
 
       - name: Get version from tag or manifest
@@ -68,7 +68,7 @@ jobs:
           if [ "${{ github.event_name }}" = "release" ]; then
             VERSION=${GITHUB_REF#refs/tags/typescript-sdk@v}
           else
-            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."typescript-sdk"')
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."sdks/typescript"')
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -77,6 +77,6 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
         run: |
           bash .github/scripts/notify-slack-release.sh \
-            typescript-sdk/CHANGELOG.md \
+            sdks/typescript/CHANGELOG.md \
             "TypeScript SDK" \
             "${{ steps.get_version.outputs.version }}"

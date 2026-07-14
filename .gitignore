@@ -24,9 +24,9 @@ quickwit-*
 /store/
 /data/
 /metadata/
-/langwatch/store/
-/langwatch/data/
-/langwatch/metadata/
+/platform/app/store/
+/platform/app/data/
+/platform/app/metadata/
 __pycache__
 dist/
 
@@ -92,12 +92,12 @@ browser-tests/
 !.claude/PR-*.md
 
 # Playwright E2E tests
-agentic-e2e-tests/test-results/
-agentic-e2e-tests/playwright-report/
-agentic-e2e-tests/.auth/
-agentic-e2e-tests/debug-*.png
-agentic-e2e-tests/tests/seed.spec.ts
-agentic-e2e-tests/node_modules/
+tests/agentic-e2e/test-results/
+tests/agentic-e2e/playwright-report/
+tests/agentic-e2e/.auth/
+tests/agentic-e2e/debug-*.png
+tests/agentic-e2e/tests/seed.spec.ts
+tests/agentic-e2e/node_modules/
 seed.spec.ts
 .playwright-mcp/
 .mcp.local.json
@@ -125,10 +125,10 @@ uuid
 
 # PR-body screenshots live in the github.com/langwatch/pr-screenshots repo,
 # referenced by raw URL from the PR body — never committed to the product tree.
-langwatch/pr-screenshots/
+platform/app/pr-screenshots/
 
 # Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
-langwatch/e2e/langy/scenario-logs/
+platform/app/e2e/langy/scenario-logs/
 
 # Agent scratch + dogfood evidence (never track)
 **/.claude/dogfood-evidence/

@@ -17,8 +17,8 @@ name: gateway-matrix
 # Touches needing this matrix:
 #   - services/aigateway/**          (gateway data plane)
 #   - pkg/**                         (shared HTTP/health helpers)
-#   - langwatch/src/server/gateway/  (control plane)
-#   - langwatch/src/server/event-sourcing/pipelines/trace-processing/
+#   - platform/app/src/server/gateway/  (control plane)
+#   - platform/app/src/server/event-sourcing/pipelines/trace-processing/
 #     reactors/gatewayBudgetSync.reactor.ts
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
@@ -48,10 +48,10 @@ on:
       - 'cmd/**'
       - 'go.mod'
       - 'go.sum'
-      - 'langwatch/src/server/gateway/**'
-      - 'langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/gatewayBudgetSync.reactor.ts'
-      - 'langwatch/src/server/routes/gateway-internal.ts'
-      - 'charts/gateway/**'
+      - 'platform/app/src/server/gateway/**'
+      - 'platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/gatewayBudgetSync.reactor.ts'
+      - 'platform/app/src/server/routes/gateway-internal.ts'
+      - 'infra/charts/gateway/**'
       - '.github/workflows/gateway-matrix.yaml'
   schedule:
     # 04:00 UTC daily — quiet provider tier, runs while EMEA is asleep
@@ -157,20 +157,20 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-          cache-dependency-path: langwatch/pnpm-lock.yaml
+          cache-dependency-path: platform/app/pnpm-lock.yaml
 
       - name: Install langwatch deps
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm install --frozen-lockfile
 
       - name: Apply DB migrations
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
         run: pnpm prisma migrate deploy
 
       - name: Start control plane (background)
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
           REDIS_URL: redis://localhost:6379

@@ -50,4 +50,4 @@ Whatever OTLP body Cowork emits, `resource_spans` are walked, each span turns in
 langwatch ingest tail <sourceId> --follow
 ```
 
-You should see Cowork events landing as `tool.invocation` and `api.call`. If everything shows `agent.action`, the heuristic isn't matching Cowork's span names, file an issue with a sample span name and the [Cowork adapter](https://github.com/langwatch/langwatch/blob/main/langwatch/src/server/governance/activity-monitor/normalizers/otel.ts) heuristic will be tightened.
+You should see Cowork events landing as `tool.invocation` and `api.call`. If everything shows `agent.action`, the heuristic isn't matching Cowork's span names, file an issue with a sample span name and the [Cowork adapter](https://github.com/langwatch/langwatch/blob/main/platform/app/src/server/governance/activity-monitor/normalizers/otel.ts) heuristic will be tightened.

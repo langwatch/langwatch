@@ -97,7 +97,7 @@ type deps struct {
 func wire(logger *zap.Logger, isAgent bool) deps {
 	cwd, _ := os.Getwd()
 	worktree := gitTopLevel(cwd)
-	lwDir := filepath.Join(worktree, "langwatch")
+	lwDir := filepath.Join(worktree, "platform", "app")
 
 	naming := domain.DefaultNaming(os.Getenv("LANGWATCH_LOCAL_TLD"))
 	proxy := portlessproxy.New(naming, lwDir)

@@ -46,7 +46,7 @@ echo "__BASE_HOST=\${BASE_HOST:-}"
       stdio: ["pipe", "pipe", "pipe"],
       // Isolate the subprocess env. The helper reads APP_PORT / NEXTAUTH_URL /
       // BASE_HOST, so any of those present on the parent process (e.g. loaded
-      // from the developer's langwatch/.env) would leak in and make assertions
+      // from the developer's platform/app/.env) would leak in and make assertions
       // depend on the local machine. Start from a bare PATH and let each
       // test's own export/unset lines be the single source of truth.
       env: { PATH: process.env.PATH ?? "" },

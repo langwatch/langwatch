@@ -54,7 +54,7 @@ import {
 import { stagedLangevalsFetch } from "../stagedFetch";
 
 const E2E_ENABLED = process.env.LANGEVALS_E2E_ENABLED === "1";
-const LANGEVALS_DIR = resolve(__dirname, "../../../../../langevals");
+const LANGEVALS_DIR = resolve(__dirname, "../../../../../../services/langevals");
 
 interface Harness {
   port: number;

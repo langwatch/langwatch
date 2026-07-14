@@ -22,7 +22,7 @@ Feature: Prompt spans — unsaved/applied prompt version (draft) carries the bas
   #
   # Bindings:
   #   - Emission scenarios (1, 2, 3, 5, 6, 7): services/nlpgo/tests/integration/prompt_spans_unsaved_version_test.go
-  #   - Drawer "unsaved edits" label (4): langwatch/src/features/traces-v2/.../PromptAccordion.integration.test.ts
+  #   - Drawer "unsaved edits" label (4): platform/app/src/features/traces-v2/.../PromptAccordion.integration.test.ts
 
   Background:
     Given the nlpgo service is running and the project is on the Go-NLP execution path

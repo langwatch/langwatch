@@ -18,7 +18,7 @@ Feature: Invitation Approval Workflow
   # batch / non-admin / email-failure edge cases.
   #
   # The Playwright e2e specs under
-  # `agentic-e2e-tests/tests/members/*.spec.ts` remain `test.fixme()`
+  # `tests/agentic-e2e/tests/members/*.spec.ts` remain `test.fixme()`
   # for CI-flakiness reasons (#1811), so the four `@e2e` scenarios
   # below are still `@unimplemented`. The display-list scenarios
   # (admin/non-admin visibility, badges) need a JSDOM render harness

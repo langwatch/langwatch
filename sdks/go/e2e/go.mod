@@ -1,12 +1,12 @@
-module github.com/langwatch/langwatch/sdk-go/e2e
+module github.com/langwatch/langwatch/sdks/go/e2e
 
-replace github.com/langwatch/langwatch/sdk-go => ../
+replace github.com/langwatch/langwatch/sdks/go => ../
 
 go 1.25.0
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/langwatch/langwatch/sdk-go v0.0.0-00010101000000-000000000000
+	github.com/langwatch/langwatch/sdks/go v0.0.0-00010101000000-000000000000
 	github.com/muesli/termenv v0.16.0
 	github.com/openai/openai-go v1.4.0
 	go.opentelemetry.io/otel v1.43.0

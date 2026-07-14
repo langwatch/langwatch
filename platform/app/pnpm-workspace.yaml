@@ -1,7 +1,7 @@
 packages:
   - .
   - "packages/*"
-  - "../mcp-server"
+  - "../../mcp/typescript"
 
 minimumReleaseAge: 10080
 

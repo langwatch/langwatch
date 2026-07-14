@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/migrationorder"
 )
 
-const clickhouseDir = "langwatch/src/server/clickhouse/migrations"
+const clickhouseDir = "platform/app/src/server/clickhouse/migrations"
 
 func gitIn(t *testing.T, root string, args ...string) {
 	t.Helper()
@@ -105,30 +105,30 @@ func TestTopLevelEntries(t *testing.T) {
 		{
 			name: "prisma directories dedupe to one entry and the lock file is dropped",
 			paths: []string{
-				"langwatch/prisma/migrations/20260102000000_new/migration.sql",
-				"langwatch/prisma/migrations/20260102000000_new/README.md",
-				"langwatch/prisma/migrations/20260101000000_old/migration.sql",
-				"langwatch/prisma/migrations/migration_lock.toml",
+				"platform/app/prisma/migrations/20260102000000_new/migration.sql",
+				"platform/app/prisma/migrations/20260102000000_new/README.md",
+				"platform/app/prisma/migrations/20260101000000_old/migration.sql",
+				"platform/app/prisma/migrations/migration_lock.toml",
 			},
-			directory: "langwatch/prisma/migrations",
+			directory: "platform/app/prisma/migrations",
 			want:      []string{"20260101000000_old", "20260102000000_new"},
 		},
 		{
 			name: "clickhouse files are taken flat and sorted",
 			paths: []string{
-				"langwatch/src/server/clickhouse/migrations/00041_b.sql",
-				"langwatch/src/server/clickhouse/migrations/00040_a.sql",
+				"platform/app/src/server/clickhouse/migrations/00041_b.sql",
+				"platform/app/src/server/clickhouse/migrations/00040_a.sql",
 			},
-			directory: "langwatch/src/server/clickhouse/migrations",
+			directory: "platform/app/src/server/clickhouse/migrations",
 			want:      []string{"00040_a.sql", "00041_b.sql"},
 		},
 		{
 			name: "paths outside the directory are ignored, prefix-alikes included",
 			paths: []string{
-				"langwatch/prisma/migrations_archive/20260101000000_old/migration.sql",
-				"langwatch/prisma/schema.prisma",
+				"platform/app/prisma/migrations_archive/20260101000000_old/migration.sql",
+				"platform/app/prisma/schema.prisma",
 			},
-			directory: "langwatch/prisma/migrations",
+			directory: "platform/app/prisma/migrations",
 			want:      nil,
 		},
 	}

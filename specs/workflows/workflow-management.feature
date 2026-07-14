@@ -9,7 +9,7 @@ Feature: Workflow Management UI
   # `CascadeArchiveDialog.test.tsx` covers a different surface).
   # The behavioral piece (delete mutation success/failure) is covered
   # by the Workflow REST API tests in
-  # `langwatch/src/app/api/workflows/__tests__/`.
+  # `platform/app/src/app/api/workflows/__tests__/`.
 
   Background:
     Given I am authenticated as a project member

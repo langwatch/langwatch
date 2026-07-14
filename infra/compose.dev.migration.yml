@@ -5,7 +5,7 @@
 # internal access only); this overlay opens them up for the migration mode.
 #
 # Usage:
-#   docker compose -f compose.dev.yml -f compose.dev.migration.yml up postgres clickhouse
+#   docker compose -f infra/compose.dev.yml -f infra/compose.dev.migration.yml --project-directory . up postgres clickhouse
 #
 # scripts/dev.sh wires this together when "migration" mode is selected.
 

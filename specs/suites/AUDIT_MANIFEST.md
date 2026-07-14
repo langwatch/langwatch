@@ -12,7 +12,7 @@ Classes:
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
-| specs/suites/archived-scenario-exclusion.feature | "Run a suite that contains archived scenarios and targets" | KEEP | E2E flow for #1828 (`feat(suites): exclude archived scenarios and targets from suite runs`). Behavior is implemented in `langwatch/src/server/suites/suite.service.ts`; no e2e test bound. Phase 3 should add a Playwright run or convert to integration. |
+| specs/suites/archived-scenario-exclusion.feature | "Run a suite that contains archived scenarios and targets" | KEEP | E2E flow for #1828 (`feat(suites): exclude archived scenarios and targets from suite runs`). Behavior is implemented in `platform/app/src/server/suites/suite.service.ts`; no e2e test bound. Phase 3 should add a Playwright run or convert to integration. |
 | specs/suites/archived-scenario-exclusion.feature | "Suite run excludes archived scenarios from job scheduling" | KEEP | Behavior covered by `suite.service.unit.test.ts` "given a suite with mixed active and archived scenarios". Bind via `@scenario` JSDoc rather than write new test. |
 | specs/suites/archived-scenario-exclusion.feature | "Suite run fails when all scenarios are archived" | KEEP | Behavior covered by `suite.service.unit.test.ts` "given all scenarios in a suite are archived" (throws AllScenariosArchivedError). Bind via JSDoc. |
 | specs/suites/archived-scenario-exclusion.feature | "Deleted scenarios still cause validation errors" | KEEP | Behavior covered by `suite.service.unit.test.ts` "given a suite references a deleted scenario". Bind via JSDoc. |

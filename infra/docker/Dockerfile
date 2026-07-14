@@ -26,23 +26,23 @@ WORKDIR /app
 # Skip Prisma checksum verification for air-gapped builds
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
-# mcp-server is a workspace member — copy it early so pnpm install can link it.
-# Its build runs automatically as part of langwatch's `pnpm run build`
+# mcp/typescript is a workspace member — copy it early so pnpm install can link it.
+# Its build runs automatically as part of the app's `pnpm run build`
 # (via start:prepare:files → build:mcp-server).
-COPY mcp-server ./mcp-server
-COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+COPY mcp/typescript ./mcp/typescript
+COPY services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 
-COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
-COPY langwatch/vendor ./langwatch/vendor
+COPY platform/app/package.json platform/app/pnpm-lock.yaml platform/app/pnpm-workspace.yaml ./platform/app/
+COPY platform/app/vendor ./platform/app/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
-RUN cd langwatch && CI=true pnpm install --frozen-lockfile
-COPY langwatch ./langwatch
-RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
+RUN cd platform/app && CI=true pnpm install --frozen-lockfile
+COPY platform/app ./platform/app
+RUN cd platform/app && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 
 # Remove dev dependencies — not needed at runtime
-RUN cd langwatch && CI=true pnpm prune --prod
+RUN cd platform/app && CI=true pnpm prune --prod
 # Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
-RUN cd langwatch && pnpm prisma generate
+RUN cd platform/app && pnpm prisma generate
 
 # ── Stage 2: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
@@ -54,13 +54,13 @@ COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 WORKDIR /app
 
 # Copy built artifacts from builder.
-# mcp-server must be copied alongside langwatch because pnpm workspace
-# symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
-COPY --from=builder /app/langwatch ./langwatch
-COPY --from=builder /app/mcp-server ./mcp-server
-COPY --from=builder /app/typescript-sdk/package.json ./typescript-sdk/package.json
-COPY --from=builder /app/python-sdk/pyproject.toml ./python-sdk/pyproject.toml
-COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+# mcp/typescript must be copied alongside platform/app because pnpm workspace
+# symlinks platform/app/node_modules/@langwatch/mcp-server -> the mcp/typescript tree.
+COPY --from=builder /app/platform/app ./platform/app
+COPY --from=builder /app/mcp/typescript ./mcp/typescript
+COPY --from=builder /app/sdks/typescript/package.json ./sdks/typescript/package.json
+COPY --from=builder /app/sdks/python/pyproject.toml ./sdks/python/pyproject.toml
+COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 
 ENV NODE_ENV=production
 EXPOSE 5560
@@ -68,4 +68,4 @@ EXPOSE 5560
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-CMD cd langwatch && pnpm start
+CMD cd platform/app && pnpm start

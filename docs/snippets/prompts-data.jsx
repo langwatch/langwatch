@@ -3305,7 +3305,7 @@ langwatch docs evaluations/experiments/sdk         # Experiment SDK basics
 langwatch docs evaluations/evaluators/list         # Browse evaluator types
 \`\`\`
 
-For PDF evaluation specifically, reference the pattern from \`python-sdk/examples/pdf_parsing_evaluation.ipynb\`:
+For PDF evaluation specifically, reference the pattern from \`sdks/python/examples/pdf_parsing_evaluation.ipynb\`:
 
 - Download/load documents
 - Define extraction pipeline

@@ -4,7 +4,7 @@ Feature: Dataset TypeScript SDK
   So that I can programmatically manage datasets without using the REST API directly
 
   # 32 of 32 scenarios bound to integration/unit tests in
-  # typescript-sdk/src/client-sdk/services/datasets/__tests__/.
+  # sdks/typescript/src/client-sdk/services/datasets/__tests__/.
 
   Background:
     Given a LangWatch client initialized with a valid API key

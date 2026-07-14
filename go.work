@@ -1,0 +1,12 @@
+go 1.26.2
+
+// Monorepo Go workspace. Ties the root module together with the in-tree
+// SDK and the ClickHouse operator so local builds resolve them without
+// relying on the `replace` directives (which stay in go.mod for Docker /
+// non-workspace builds). Example/e2e modules under sdks/go keep their own
+// relative `replace => ../` and are intentionally left out of the workspace.
+use (
+	.
+	./infra/clickhouse-serverless
+	./sdks/go
+)

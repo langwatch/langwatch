@@ -11,7 +11,7 @@ Feature: Topic clustering runs on langevals
   # request/response shapes are unchanged.
 
   # All @unimplemented scenarios describe TS routing in
-  # langwatch/src/server/topicClustering/topicClustering.ts (always langevals,
+  # platform/app/src/server/topicClustering/topicClustering.ts (always langevals,
   # warn-and-skip when unconfigured, engine attribution log). Existing tests in
   # topicClustering.unit.test.ts + .integration.test.ts cover ClickHouse query
   # behavior. Aspirational pending dedicated routing tests.

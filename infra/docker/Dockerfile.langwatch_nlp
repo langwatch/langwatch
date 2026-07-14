@@ -14,16 +14,16 @@ WORKDIR /src
 RUN apk add --no-cache git ca-certificates
 ARG TARGETOS
 ARG TARGETARCH
-# Monorepo: sdk-go is in-tree, resolved via `replace ... => ./sdk-go` in the
+# Monorepo: sdks/go is in-tree, resolved via `replace ... => ./sdks/go` in the
 # root go.mod, so its go.mod must be present before `go mod download`.
 COPY go.mod go.sum ./
-COPY sdk-go/go.mod sdk-go/go.sum ./sdk-go/
+COPY sdks/go/go.mod sdks/go/go.sum ./sdks/go/
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     go mod download
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 COPY services/ services/
-COPY sdk-go/ sdk-go/
+COPY sdks/go/ sdks/go/
 ARG VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \

@@ -13,7 +13,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   # All scenarios are @unimplemented because services/nlpgo/ does not yet exist.
   # The TS feature-parity checker only scans TS test roots, so Go-side proxy
   # passthrough scenarios cannot be bound via @scenario JSDoc. TS-side routing
-  # logic is partially in langwatch/src/server/routes/playground.ts; Go-side
+  # logic is partially in platform/app/src/server/routes/playground.ts; Go-side
   # tests will live under services/nlpgo/. Aspirational pending nlpgo stand-up.
 
   Background:

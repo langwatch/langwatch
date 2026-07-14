@@ -7,7 +7,7 @@
  *
  * Usage:
  *   LW_API_KEY=sk-lw-... LW_ENDPOINT=http://localhost:5560 \
- *     npx tsx langwatch/scripts/dogfood/traces/error-trace.ts
+ *     npx tsx platform/app/scripts/dogfood/traces/error-trace.ts
  */
 import { randomBytes } from "node:crypto";
 

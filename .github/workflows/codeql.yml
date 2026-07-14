@@ -32,13 +32,13 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'langwatch/**'
+              - 'platform/app/**'
               - 'langwatch_server/**'
-              - 'python-sdk/**'
-              - 'typescript-sdk/**'
-              - 'mcp-server/**'
-              - 'langevals/**'
-              - 'sdk-go/**'
+              - 'sdks/python/**'
+              - 'sdks/typescript/**'
+              - 'mcp/typescript/**'
+              - 'services/langevals/**'
+              - 'sdks/go/**'
               - '.github/workflows/codeql.yml'
 
   analyze:

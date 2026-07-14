@@ -81,7 +81,7 @@ GITHUB_LANGY_CLIENT_ID="<Client ID from step 1>"
 GITHUB_LANGY_CLIENT_SECRET="<Client secret from step 1>"
 ```
 
-All three are optional in the schema (`langwatch/src/env-create.mjs`). When
+All three are optional in the schema (`platform/app/src/env-create.mjs`). When
 unset, the GitHub feature is silently off — the Connect card never appears
 and `langyGithubToken.getGithubTokenForUser` short-circuits to `null`. That
 keeps installs that don't want this feature clean.
@@ -102,7 +102,7 @@ time as the OAuth consent.
 
 ## 4. NetworkPolicy / egress
 
-The Langy agent's stock chart (`charts/langy-agent`) ships with
+The Langy agent's stock chart (`infra/charts/langy-agent`) ships with
 `networkPolicy.allowExternalHttps: true`, which allows `0.0.0.0/0:443` —
 `github.com`, `api.github.com`, and `codeload.github.com` work without
 further changes.

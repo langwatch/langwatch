@@ -7,7 +7,7 @@
 #
 # Hard invariant: credentials NEVER appear in the overlay. Only
 # non-rotating infrastructure shape (bucket / endpoint / region /
-# connection-host). Credentials live in langwatch/.env.
+# connection-host). Credentials live in platform/app/.env.
 
 SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 
@@ -78,7 +78,7 @@ teardown() {
 }
 
 @test "dev-storage overlay NEVER contains credentials (S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY / S3_SESSION_TOKEN)" {
-  # Credentials always come from langwatch/.env (rotated by refresh-dev-s3-env.sh).
+  # Credentials always come from platform/app/.env (rotated by refresh-dev-s3-env.sh).
   # The overlay leaking them would be both a security regression and a source
   # of state-staleness bugs.
   write_dev_overrides dev-storage "$OUT"
@@ -136,7 +136,7 @@ teardown() {
 }
 
 @test "dev-infra overlay NEVER contains S3 credentials" {
-  # Credentials always come from langwatch/.env, rotated by
+  # Credentials always come from platform/app/.env, rotated by
   # refresh-dev-s3-env.sh. Leaking them into the overlay would be both a
   # security regression and a source of state-staleness bugs.
   write_dev_overrides dev-infra "$OUT"
@@ -198,7 +198,7 @@ teardown() {
 
 # --- idempotency ---
 
-# @scenario "write_overrides replaces langwatch/.env.dev-up — does not append"
+# @scenario "write_overrides replaces platform/app/.env.dev-up — does not append"
 @test "second call replaces (not appends) the overlay file" {
   write_dev_overrides all-local "$OUT"
   write_dev_overrides frontend-only "$OUT"

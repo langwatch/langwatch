@@ -3,7 +3,7 @@
  * Organization, Team, Project, and a BetterAuth-credential admin User, plus a
  * private (full-access) and a public (ingestion-only) API token. haven
  * (tools/thuishaven) runs this on every `haven up`; sdk-javascript-ci.yml's
- * e2e job and charts/langwatch/tests/e2e-full-stack.sh run it against a fresh
+ * e2e job and infra/charts/langwatch/tests/e2e-full-stack.sh run it against a fresh
  * database per CI run.
  *
  * Every identity value below is a fixed, hardcoded constant — nothing here is

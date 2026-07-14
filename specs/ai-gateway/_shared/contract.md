@@ -11,7 +11,7 @@
 | Component | Repo | Path |
 |---|---|---|
 | Go gateway service (data plane) | `langwatch-saas` | `services/gateway/` (new standalone `go.mod`) |
-| Platform control-plane (VK CRUD, budgets, RBAC, provider-settings cohesion, drawers) | `langwatch` (open-source) | `langwatch/langwatch/src/...` |
+| Platform control-plane (VK CRUD, budgets, RBAC, provider-settings cohesion, drawers) | `langwatch` (open-source) | `langwatch/platform/app/src/...` |
 | BDD specs | `langwatch` | `specs/ai-gateway/` |
 | Docs | `langwatch` | `docs/docs/ai-gateway/` |
 | Helm chart (self-host) | `langwatch-saas` | `infrastructure/charts/` (existing chart, new `gateway` sub-chart) |

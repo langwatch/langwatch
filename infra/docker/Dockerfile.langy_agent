@@ -27,7 +27,7 @@ WORKDIR /src
 # Cache go module downloads in a layer that only invalidates when go.mod/
 # go.sum changes — the rest of the source tree is a churnier input.
 COPY go.mod go.sum ./
-COPY sdk-go ./sdk-go
+COPY sdks/go ./sdks/go
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go mod download

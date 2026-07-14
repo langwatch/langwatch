@@ -6,13 +6,13 @@ set -e
 # source of truth and the TypeScript types are inferred with z.infer. Copy the
 # module verbatim — the SDK reuses both the schemas and the types directly, so
 # there is no schema-generation (ts-to-zod) step anymore.
-cp ../langwatch/src/server/tracer/types.ts src/internal/generated/types/tracer.ts
+cp ../../platform/app/src/server/tracer/types.ts src/internal/generated/types/tracer.ts
 
 # Copy filter types (only filterFieldsEnum is needed by the SDK)
 mkdir -p src/internal/generated/filters
 node -e "
 const fs = require('fs');
-const src = fs.readFileSync('../langwatch/src/server/filters/types.ts', 'utf8');
+const src = fs.readFileSync('../../platform/app/src/server/filters/types.ts', 'utf8');
 // Extract only the zod import and filterFieldsEnum definition
 const lines = src.split('\n');
 const out = [];
@@ -28,11 +28,11 @@ fs.writeFileSync('src/internal/generated/filters/types.ts', out.join('\n') + '\n
 "
 
 # Evaluations types are already Zod-first (schemas defined with z.*); copy verbatim.
-cp ../langwatch/src/server/evaluations/types.ts src/internal/generated/types/evaluations.ts
+cp ../../platform/app/src/server/evaluations/types.ts src/internal/generated/types/evaluations.ts
 
 # Evaluator catalog + settings schemas are Zod-first (generated from langevals);
 # copy verbatim — no ts-to-zod step.
-cp ../langevals/ts-integration/evaluators.generated.ts src/internal/generated/types/evaluators.generated.ts
+cp ../../services/langevals/ts-integration/evaluators.generated.ts src/internal/generated/types/evaluators.generated.ts
 
 # Default prompt model — derive the newest plain `openai/gpt-<major>.<minor>`
 # flagship from the same llmModels.json the platform reads, so `langwatch
@@ -42,7 +42,7 @@ mkdir -p src/internal/generated/cli
 node -e "
 const fs = require('fs');
 const path = require('path');
-const registry = require('../langwatch/src/server/modelProviders/llmModels.json');
+const registry = require('../../platform/app/src/server/modelProviders/llmModels.json');
 const pattern = /^([a-z0-9_-]+)\/([a-z]+)-(\d+)\.(\d+)\$/;
 let best = null;
 let bestVersion = [-1, -1];

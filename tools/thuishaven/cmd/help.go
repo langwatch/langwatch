@@ -162,7 +162,7 @@ ENVIRONMENT
                                  worktree and agent authenticates with the same
                                  key. Same story for the rest of the seeded
                                  identity (admin login, PATs) — see
-                                 langwatch/prisma/seed.ts's header comment.
+                                 platform/app/prisma/seed.ts's header comment.
     LANGWATCH_HAVEN_OBS=0        Skip starting the observability stack on "up".
                                  On by default: it shares ClickHouse's colima VM,
                                  which is already paying for itself.

@@ -46,12 +46,12 @@ jobs:
           helm repo update
 
       - name: Build dependencies
-        run: helm dependency build charts/langwatch
+        run: helm dependency build infra/charts/langwatch
 
       - name: Package chart
         run: |
           mkdir -p .cr-release-packages
-          helm package charts/langwatch -d .cr-release-packages
+          helm package infra/charts/langwatch -d .cr-release-packages
 
       - name: Upload chart
         run: |

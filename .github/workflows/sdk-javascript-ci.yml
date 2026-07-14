@@ -33,7 +33,7 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'typescript-sdk/**'
+              - 'sdks/typescript/**'
               - '.github/workflows/sdk-javascript-ci.yml'
               - '.github/.release-please-manifest.json'
 
@@ -47,7 +47,7 @@ jobs:
     # Run lint, typecheck, tests, and build for TypeScript SDK
     defaults:
       run:
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
@@ -56,8 +56,8 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
-          install-dir: typescript-sdk
+          cache-dependency-path: "sdks/typescript/pnpm-lock.yaml"
+          install-dir: sdks/typescript
 
       - name: Install TypeScript Native Preview
         run: pnpm install -D @typescript/native-preview
@@ -147,7 +147,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
 
     steps:
       - name: Checkout
@@ -169,9 +169,9 @@ jobs:
           node-version: 24
           cache: "pnpm"
           cache-dependency-path: |
-            typescript-sdk/pnpm-lock.yaml
-            langwatch/pnpm-lock.yaml
-            mcp-server/pnpm-lock.yaml
+            sdks/typescript/pnpm-lock.yaml
+            platform/app/pnpm-lock.yaml
+            mcp/typescript/pnpm-lock.yaml
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With
@@ -182,23 +182,23 @@ jobs:
         run: npm install -g node-gyp@12.3.0
 
       - name: Build mcp-server
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         run: pnpm install --frozen-lockfile && pnpm run build
 
       - name: Install LangWatch app dependencies
-        working-directory: langwatch
+        working-directory: platform/app
         run: CI=true pnpm install --frozen-lockfile
 
       - name: Prepare LangWatch files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       - name: Setup database
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Seed test project
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:seed
 
       - name: Install goose
@@ -208,18 +208,18 @@ jobs:
         run: bash .github/scripts/install-goose.sh
 
       - name: Setup ClickHouse
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm clickhouse:migrate
 
       # Build the app so we can run a production server (dev mode is
       # unreliable in CI — turbopack JIT compilation can hang under
       # memory pressure, causing the server to become unresponsive).
       - name: Build LangWatch app
-        working-directory: langwatch
+        working-directory: platform/app
         run: NODE_ENV=test pnpm build
 
       - name: Start LangWatch server and worker
-        working-directory: langwatch
+        working-directory: platform/app
         run: |
           NODE_ENV=production pnpm run start &
           # Start the worker process so the event-sourcing pipeline

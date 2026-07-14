@@ -1,7 +1,7 @@
 package domain
 
 // Static local dev identity haven injects into every worktree, matching
-// langwatch/prisma/seed.ts exactly (keep the two in sync by hand — they
+// platform/app/prisma/seed.ts exactly (keep the two in sync by hand — they
 // intentionally can't share a constant across the Go/TS boundary). See that
 // file's header comment for the full rationale and how each value maps onto
 // this codebase's real Organization/Project/User/ApiKey model.

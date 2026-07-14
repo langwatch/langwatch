@@ -17,4 +17,4 @@ dependencies = [
 exclude-newer = "7 days"
 
 [tool.uv.sources]
-langwatch = { path = "../python-sdk", editable = true }
+langwatch = { path = "../../sdks/python", editable = true }

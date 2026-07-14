@@ -8,10 +8,10 @@ import type { LangwatchPaths } from "../shared/paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 
 /**
- * Ensure langwatch/node_modules exists + start:prepare:files has run, both of
+ * Ensure platform/app/node_modules exists + start:prepare:files has run, both of
  * which are prerequisites for `pnpm run prisma:migrate` and `pnpm run start:app`.
  *
- * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/langwatch/) — see
+ * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/platform/app/) — see
  * services/app-dir.ts for why we relocate out of node_modules.
  */
 export async function ensureLangwatchDeps(ctx: { paths: LangwatchPaths }, bus: EventBus): Promise<void> {
@@ -175,6 +175,6 @@ export async function resolvePnpm(paths?: LangwatchPaths): Promise<{ command: st
 export function locateLangwatchDir(): string | null {
   // appRoot() returns the relocated tree (LANGWATCH_HOME/app) once
   // ensureAppDir has run, or the dev workspace fallback otherwise.
-  const dir = join(appRoot(), "langwatch");
+  const dir = join(appRoot(), "platform", "app");
   return existsSync(join(dir, "package.json")) ? dir : null;
 }

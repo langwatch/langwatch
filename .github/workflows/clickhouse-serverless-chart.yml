@@ -3,14 +3,14 @@ name: clickhouse-serverless-chart
 on:
   pull_request:
     paths:
-      - "charts/clickhouse-serverless/**"
-      - "charts/lib/**"
+      - "infra/charts/clickhouse-serverless/**"
+      - "infra/charts/lib/**"
       - ".github/workflows/clickhouse-serverless-chart.yml"
   push:
     branches: [main]
     paths:
-      - "charts/clickhouse-serverless/**"
-      - "charts/lib/**"
+      - "infra/charts/clickhouse-serverless/**"
+      - "infra/charts/lib/**"
 
 permissions:
   contents: read
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: charts/clickhouse-serverless
+        working-directory: infra/charts/clickhouse-serverless
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
@@ -35,7 +35,7 @@ jobs:
     needs: lint
     defaults:
       run:
-        working-directory: charts/clickhouse-serverless
+        working-directory: infra/charts/clickhouse-serverless
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5

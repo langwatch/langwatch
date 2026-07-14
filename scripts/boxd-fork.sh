@@ -182,7 +182,7 @@ boxd_env_files() {
 # Default target: `<vm>.boxd.sh`.
 #
 # Output values are double-quoted for shell-safety, mirroring the format
-# in `langwatch/.env.example`.
+# in `platform/app/.env.example`.
 boxd_rewrite_env() {
   local vm="${1-}"
   if [ -z "$vm" ]; then
@@ -825,7 +825,7 @@ EOF
   if ! "$BOXD_BIN" exec "$vm" -- bash -c "
     set -euo pipefail
     cd langwatch
-    docker compose -f compose.dev.yml --profile full up -d --build
+    docker compose -f infra/compose.dev.yml --project-directory . --profile full up -d --build
   "; then
     echo "ERROR: 'docker compose up' failed inside $vm." >&2
     return 1
@@ -899,6 +899,6 @@ boxd_preview_status() {
   printf '==> docker compose ps:\n'
   "$BOXD_BIN" exec "$vm" -- bash -c "
     cd langwatch 2>/dev/null || exit 0
-    docker compose -f compose.dev.yml --profile full ps 2>/dev/null || echo '(compose not running)'
+    docker compose -f infra/compose.dev.yml --project-directory . --profile full ps 2>/dev/null || echo '(compose not running)'
   " 2>/dev/null | sed 's/^/    /' || true
 }

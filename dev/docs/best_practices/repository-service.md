@@ -50,7 +50,7 @@ Code is organized into three layers. The **domain layer** (Service + Repository)
 Thin wrapper over the database. No business logic.
 
 ```typescript
-// langwatch/src/server/datasets/dataset.repository.ts
+// platform/app/src/server/datasets/dataset.repository.ts
 export class DatasetRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -78,7 +78,7 @@ export class DatasetRepository {
 Business logic, orchestration, default resolution.
 
 ```typescript
-// langwatch/src/server/datasets/dataset.service.ts
+// platform/app/src/server/datasets/dataset.service.ts
 export class DatasetService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -113,7 +113,7 @@ export class DatasetService {
 Services throw framework-agnostic errors that routers map to HTTP/tRPC errors:
 
 ```typescript
-// langwatch/src/server/datasets/errors.ts
+// platform/app/src/server/datasets/errors.ts
 export class DatasetNotFoundError extends Error {
   constructor(message = "Dataset not found") {
     super(message);

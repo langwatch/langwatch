@@ -35,12 +35,12 @@ const SPECS_ROOT = resolve(REPO_ROOT, "specs");
  * is not required — any test in these roots can bind any scenario.
  */
 const DEFAULT_TEST_ROOTS: string[] = [
-  "langwatch/src",
-  "langwatch/ee",
-  "langwatch/scripts",
-  "mcp-server/src",
-  "typescript-sdk/src",
-  "python-sdk/src",
+  "platform/app/src",
+  "platform/app/ee",
+  "platform/app/scripts",
+  "mcp/typescript/src",
+  "sdks/typescript/src",
+  "sdks/python/src",
 ];
 
 /**
@@ -54,7 +54,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
  */
 const DEFAULT_BATS_TEST_ROOTS: string[] = [
   "scripts/__tests__",
-  "langwatch/scripts/__tests__",
+  "platform/app/scripts/__tests__",
 ];
 
 /**

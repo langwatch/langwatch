@@ -36,7 +36,7 @@ GET /healthz
 { "status": "ok", "version": "git-a1412a4", "uptime_s": 84.12 }
 ```
 
-Cheap by design. Never does network I/O. If this returns non-200 the kubelet kills the pod. Chart default ([`charts/gateway/templates/deployment.yaml`](https://github.com/langwatch/langwatch/blob/main/charts/gateway/templates/deployment.yaml)):
+Cheap by design. Never does network I/O. If this returns non-200 the kubelet kills the pod. Chart default ([`infra/charts/gateway/templates/deployment.yaml`](https://github.com/langwatch/langwatch/blob/main/infra/charts/gateway/templates/deployment.yaml)):
 
 ```yaml
 livenessProbe:

@@ -12,7 +12,7 @@
 set -e
 
 PROFILE="${1:-}"
-COMPOSE="docker compose -f compose.dev.yml"
+COMPOSE="docker compose -f infra/compose.dev.yml --project-directory ."
 
 # ---------------------------------------------------------------------------
 # Derive a stable, unique prefix from the repo directory path.
@@ -48,9 +48,9 @@ sanitize_localhost_dev_env
 # ---------------------------------------------------------------------------
 # Ensure .env files exist
 # ---------------------------------------------------------------------------
-if [ ! -f "langwatch/.env" ] && [ -f "langwatch/.env.example" ]; then
-  echo "Creating langwatch/.env from example..."
-  cp langwatch/.env.example langwatch/.env
+if [ ! -f "platform/app/.env" ] && [ -f "platform/app/.env.example" ]; then
+  echo "Creating platform/app/.env from example..."
+  cp platform/app/.env.example platform/app/.env
 fi
 
 # ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ fi
 # ---------------------------------------------------------------------------
 echo "Preparing host files..."
 (
-  cd langwatch
+  cd platform/app
   if [ ! -d node_modules ]; then
     echo "Installing host dependencies..."
     pnpm install
@@ -81,7 +81,7 @@ fi
 # ---------------------------------------------------------------------------
 echo "Starting LangWatch (project=${COMPOSE_PROJECT_NAME}, app_port=${APP_PORT})..."
 
-# Write URL overrides into langwatch/.env.dev-up. Same shared helper as
+# Write URL overrides into platform/app/.env.dev-up. Same shared helper as
 # scripts/dev.sh — only the URLs whose services actually start for this
 # profile are overridden (#3860 AC#6). The helper honors each service's
 # compose profile membership: langwatch_nlp runs under [nlp, scenarios,
@@ -99,7 +99,7 @@ case "${PROFILE:-}" in
   nlp)                       DEV_UP_PRESET="all-local-nlp" ;;
   full|scenarios|workers)    DEV_UP_PRESET="full-local" ;;
 esac
-write_dev_overrides "$DEV_UP_PRESET" langwatch/.env.dev-up
+write_dev_overrides "$DEV_UP_PRESET" platform/app/.env.dev-up
 
 $COMPOSE_CMD up -d
 
@@ -142,5 +142,5 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
 done
 
 echo "WARNING: App did not respond within ${TIMEOUT}s. Check logs with: make dev-logs"
-echo "  COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} VOLUME_PREFIX=${VOLUME_PREFIX} docker compose -f compose.dev.yml logs -f app"
+echo "  COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} VOLUME_PREFIX=${VOLUME_PREFIX} docker compose -f infra/compose.dev.yml --project-directory . logs -f app"
 exit 1

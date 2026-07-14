@@ -1238,7 +1238,7 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
 // ---------------------------------------------------------------------------
 // Ingestion templates + ingestion keys — device-session adapters.
 // ---------------------------------------------------------------------------
-// `langwatch <tool>` wrapper-mode (typescript-sdk/.../wrapper-mode.ts) calls
+// `langwatch <tool>` wrapper-mode (sdks/typescript/.../wrapper-mode.ts) calls
 // these from a device-session context (Bearer lw_at_*). The public REST at
 // /api/governance/ingestion-templates is mounted under createProjectApp and
 // rejects device tokens with 401; these adapter routes resolve

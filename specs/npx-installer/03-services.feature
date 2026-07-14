@@ -6,7 +6,7 @@ Feature: Service orchestration after pre-deps are installed
   See _shared/contract.md §4–§8 for paths, ports, secrets, supervision rules.
 
   Background:
-    Given pre-dependencies (uv, postgres, redis, clickhouse, ai-gateway) are installed under "~/.langwatch/bin/"
+    Given pre-dependencies (uv, postgres, redis, clickhouse, ai-gateway) are installed under "~/.platform/app/bin/"
     And every port in the services-tier (5560..5563) and infra-tier (6560..6563) is free
 
   # =========================================================================
@@ -14,9 +14,9 @@ Feature: Service orchestration after pre-deps are installed
   # =========================================================================
 
   Scenario: First run generates a fresh .env with random secrets
-    Given "~/.langwatch/.env" does not exist
+    Given "~/.platform/app/.env" does not exist
     When the CLI calls `runtime.scaffoldEnv(ctx)`
-    Then "~/.langwatch/.env" exists with mode 0600
+    Then "~/.platform/app/.env" exists with mode 0600
     And it contains a "NEXTAUTH_SECRET" value of 44 base64 chars
     And it contains a "CREDENTIALS_SECRET" value of 64 hex chars
     And it contains a "LW_GATEWAY_INTERNAL_SECRET" value of 64 hex chars
@@ -30,17 +30,17 @@ Feature: Service orchestration after pre-deps are installed
     And it contains "REDIS_URL=redis://localhost:6561/0"
 
   Scenario: Re-running preserves existing secrets
-    Given "~/.langwatch/.env" exists with "NEXTAUTH_SECRET=existing_value_xyz"
+    Given "~/.platform/app/.env" exists with "NEXTAUTH_SECRET=existing_value_xyz"
     When the CLI calls `runtime.scaffoldEnv(ctx)`
-    Then the call returns { written: false, path: "~/.langwatch/.env" }
-    And "~/.langwatch/.env" still contains "NEXTAUTH_SECRET=existing_value_xyz"
+    Then the call returns { written: false, path: "~/.platform/app/.env" }
+    And "~/.platform/app/.env" still contains "NEXTAUTH_SECRET=existing_value_xyz"
     And no secret is regenerated
 
   Scenario: User-provided OPENAI_API_KEY is propagated, not persisted
     Given the user has "OPENAI_API_KEY=sk-real-key-123" in their shell env
     When the CLI starts services
     Then the langwatch_nlp child process has "OPENAI_API_KEY=sk-real-key-123" in its env
-    But "~/.langwatch/.env" contains an empty "OPENAI_API_KEY=" line, not the user's value
+    But "~/.platform/app/.env" contains an empty "OPENAI_API_KEY=" line, not the user's value
 
   Scenario: Generated secrets are unique per install
     Given two separate machines each run `npx @langwatch/server` for the first time

@@ -32,9 +32,9 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'langwatch/**'
-              - 'python-sdk/**'
-              - 'agentic-e2e-tests/**'
+              - 'platform/app/**'
+              - 'sdks/python/**'
+              - 'tests/agentic-e2e/**'
               - '.github/workflows/e2e-ci.yml'
 
   e2e:
@@ -136,9 +136,9 @@ jobs:
           node-version: 24
           cache: "pnpm"
           cache-dependency-path: |
-            langwatch/pnpm-lock.yaml
-            agentic-e2e-tests/pnpm-lock.yaml
-            mcp-server/pnpm-lock.yaml
+            platform/app/pnpm-lock.yaml
+            tests/agentic-e2e/pnpm-lock.yaml
+            mcp/typescript/pnpm-lock.yaml
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With
@@ -149,23 +149,23 @@ jobs:
         run: npm install -g node-gyp@12.3.0
 
       - name: Build mcp-server
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         run: pnpm install --frozen-lockfile && pnpm run build
 
       - name: Install app dependencies
-        working-directory: langwatch
+        working-directory: platform/app
         run: CI=true pnpm install --frozen-lockfile
 
-      # `--ignore-workspace` because agentic-e2e-tests sits one level under
+      # `--ignore-workspace` because tests/agentic-e2e sits one level under
       # the repo-root pnpm-workspace.yaml introduced by the @langwatch/server
       # CLI in packages/. Without the flag, pnpm walks up, finds the root
       # workspace, scopes the install to `packages/*` only, and never lands
-      # @playwright/test in agentic-e2e-tests/node_modules — the next step
+      # @playwright/test in tests/agentic-e2e/node_modules — the next step
       # then fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command
-      # "playwright" not found`. agentic-e2e-tests is intentionally a
+      # "playwright" not found`. tests/agentic-e2e is intentionally a
       # standalone pnpm project (see its self-contained pnpm-lock.yaml).
       - name: Install E2E test dependencies
-        working-directory: agentic-e2e-tests
+        working-directory: tests/agentic-e2e
         run: pnpm install --frozen-lockfile --ignore-workspace
 
       # No Playwright browser/ffmpeg download: the tests launch the runner's
@@ -173,22 +173,22 @@ jobs:
       # video recording is off in CI, so no ffmpeg binary is needed.
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       - name: Install goose
         run: bash .github/scripts/install-goose.sh
 
       - name: Setup database
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Setup ClickHouse
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm clickhouse:migrate
 
       - name: Build app
-        working-directory: langwatch
+        working-directory: platform/app
         run: NODE_ENV=test pnpm build
 
       - name: Run E2E tests
@@ -200,14 +200,14 @@ jobs:
           E2E_BROWSER_CHANNEL: chrome
         run: |
           # Start the app in background
-          cd langwatch && PORT=5570 pnpm start &
+          cd platform/app && PORT=5570 pnpm start &
           APP_PID=$!
 
           # Wait for app to be ready (global-setup.ts also checks, but this ensures the process is up)
           sleep 5
 
           # Run tests from the self-contained e2e package
-          cd agentic-e2e-tests && pnpm test
+          cd tests/agentic-e2e && pnpm test
           TEST_EXIT=$?
 
           # Cleanup
@@ -219,7 +219,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
-          path: agentic-e2e-tests/playwright-report/
+          path: tests/agentic-e2e/playwright-report/
           retention-days: 7
 
       - name: Upload test artifacts
@@ -227,7 +227,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results
-          path: agentic-e2e-tests/test-results/
+          path: tests/agentic-e2e/test-results/
           retention-days: 7
 
       - name: Notify Slack on failure

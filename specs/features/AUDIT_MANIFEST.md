@@ -52,8 +52,8 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
-| specs/features/dataset-python-sdk.feature | "List datasets returns first page for the project" | KEEP | DatasetsFacade.list_datasets exists in python-sdk/src/langwatch/dataset/dataset_facade.py, integration test covers behavior unbound |
-| specs/features/dataset-python-sdk.feature | "List datasets with explicit pagination" | KEEP | list_datasets accepts page/limit; tests in python-sdk/tests/dataset/test_dataset_api_service_integration.py unbound |
+| specs/features/dataset-python-sdk.feature | "List datasets returns first page for the project" | KEEP | DatasetsFacade.list_datasets exists in sdks/python/src/langwatch/dataset/dataset_facade.py, integration test covers behavior unbound |
+| specs/features/dataset-python-sdk.feature | "List datasets with explicit pagination" | KEEP | list_datasets accepts page/limit; tests in sdks/python/tests/dataset/test_dataset_api_service_integration.py unbound |
 | specs/features/dataset-python-sdk.feature | "List datasets returns empty result when project has no datasets" | KEEP | Behavior covered by test_returns_empty_result_when_no_datasets, no @scenario binding |
 | specs/features/dataset-python-sdk.feature | "List datasets propagates authentication errors" | KEEP | DatasetApiError raised on 401 in dataset_api_service.py, test_raises_dataset_api_error_on_auth_failure exists |
 | specs/features/dataset-python-sdk.feature | "Create a dataset with name and column types" | KEEP | DatasetsFacade.create_dataset implemented; test_creates_dataset_with_name_and_columns covers it |
@@ -226,7 +226,7 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/dataset-file-upload-api.feature | "Upload to existing without API key returns 401" | KEEP | apiKeyAuth on /:slug/upload; integration test "returns 401 for upload to existing" exists |
 | specs/features/dataset-cli.feature | "Add records rejects non-array JSON" | KEEP | parseRecordsJson in records-add.ts:28; unit tests "throws for a JSON object/string/number" in records-add.unit.test.ts exist |
 | specs/features/dataset-cli.feature | "Add records rejects invalid JSON" | KEEP | parseRecordsJson try/catch; unit tests "throws for malformed JSON" and "throws for empty string" exist |
-| specs/features/customer-io-nurturing-integration.feature | "Identify call authenticates with Basic Auth using the configured API key" | KEEP | NurturingService.identifyUser tested at langwatch/ee/billing/nurturing/nurturing.service.unit.test.ts; not @scenario-bound |
+| specs/features/customer-io-nurturing-integration.feature | "Identify call authenticates with Basic Auth using the configured API key" | KEEP | NurturingService.identifyUser tested at platform/app/ee/billing/nurturing/nurturing.service.unit.test.ts; not @scenario-bound |
 | specs/features/customer-io-nurturing-integration.feature | "Identify call routes to EU endpoint when region is eu" | KEEP | EU endpoint test exists in nurturing.service.unit.test.ts; no JSDoc binding |
 | specs/features/customer-io-nurturing-integration.feature | "Track call sends event payload to Customer.io" | KEEP | trackEvent tested in nurturing.service.unit.test.ts; not bound |
 | specs/features/customer-io-nurturing-integration.feature | "Group call sends organization traits to Customer.io" | KEEP | groupUser tested in nurturing.service.unit.test.ts; not bound |
@@ -288,7 +288,7 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/customer-io-nurturing-integration.feature | "Signup with ref in URL sends lead_source trait and event property to Customer.io" | KEEP | leadSource->lead_source mapping tested in signupIdentification.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Signup forwards utm tuple to Customer.io" | KEEP | utm tuple snake_case mapping tested in signupIdentification.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Signup without attribution omits those fields from Customer.io traits" | KEEP | Empty-attribution branch tested in signupIdentification.unit.test.ts |
-| specs/features/beta-pill.feature | "Beta pill badge renders with default message" | KEEP | BetaPill component + integration tests at langwatch/src/components/ui/__tests__/BetaPill.integration.test.tsx |
+| specs/features/beta-pill.feature | "Beta pill badge renders with default message" | KEEP | BetaPill component + integration tests at platform/app/src/components/ui/__tests__/BetaPill.integration.test.tsx |
 | specs/features/beta-pill.feature | "Beta pill badge renders with custom message" | KEEP | Custom-message hover popover tested in BetaPill.integration.test.tsx |
 | specs/features/beta-pill.feature | "Popover renders styled text" | KEEP | Styled-text rendering tested in BetaPill.integration.test.tsx |
 | specs/features/beta-pill.feature | "Popover renders clickable links" | KEEP | Clickable link inside popover tested in BetaPill.integration.test.tsx |
@@ -307,7 +307,7 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/onboarding/welcome-screens.feature | "Proceed from welcome screen to scenario creation" | KEEP | Proceed-from-welcome path tested in useNewScenarioFlow.unit.test.ts |
 | specs/features/onboarding/welcome-screens.feature | "Skip welcome screen when scenarios already exist" | KEEP | Welcome-already-seen branch tested in useNewScenarioFlow.unit.test.ts |
 | specs/features/onboarding/welcome-screens.feature | "Scenario welcome screen content" | KEEP | ScenarioWelcomeScreen.integration.test.tsx covers title, description, capabilities, CTA |
-| specs/features/tag-management.feature | "Tags display as pills" | KEEP | TagPill component + TagList integration tests at langwatch/src/components/ui/__tests__/ |
+| specs/features/tag-management.feature | "Tags display as pills" | KEEP | TagPill component + TagList integration tests at platform/app/src/components/ui/__tests__/ |
 | specs/features/tag-management.feature | "Tags can be removed" | KEEP | TagList onRemove tested in TagList.integration.test.tsx |
 | specs/features/tag-management.feature | "Suite sidebar shows tags" | KEEP | SuiteSidebar.integration.test.tsx renders labels; no @scenario binding |
 | specs/features/tag-management.feature | "Suite detail panel shows tags" | UPDATE | SuiteDetailPanel test asserts labels NOT displayed; behavior diverged from scenario |
@@ -461,16 +461,16 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/remove-dead-cost-checker-code.feature | "UsageStatsService still reports current month cost on the dashboard" | KEEP | usage-stats.service still calls getCurrentMonthCost; no test asserts dashboard reports it
 | specs/features/remove-dead-cost-checker-code.feature | "EvaluationExecutionService unit tests remove cost-limit scenarios" | DELETE | Cleanup-of-tests assertion already satisfied by PR #2661
 | specs/features/remove-dead-cost-checker-code.feature | "topicClustering unit tests remove createCostChecker mock" | DELETE | Cleanup-of-tests assertion already satisfied by PR #2661
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "List all evaluators for a project" | KEEP | mcp-server/src/tools/list-evaluators.ts exists; integration test exists for tool but coverage of digest format unclear
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "Get evaluator details by ID or slug" | KEEP | mcp-server/src/tools/get-evaluator.ts exists; covered partially in evaluator-tools.unit.test.ts
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "Create a built-in evaluator" | KEEP | mcp-server/src/tools/create-evaluator.ts exists; behavior of generated ID/slug not explicitly asserted
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "Update an existing evaluator" | KEEP | mcp-server/src/tools/update-evaluator.ts exists; evaluatorType immutability assertion unclear
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "Discover evaluator types overview" | KEEP | mcp-server/src/tools/discover-evaluator-schema.ts exists; behavior partially in discover-evaluator-schema.unit.test.ts
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "List all evaluators for a project" | KEEP | mcp/typescript/src/tools/list-evaluators.ts exists; integration test exists for tool but coverage of digest format unclear
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "Get evaluator details by ID or slug" | KEEP | mcp/typescript/src/tools/get-evaluator.ts exists; covered partially in evaluator-tools.unit.test.ts
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "Create a built-in evaluator" | KEEP | mcp/typescript/src/tools/create-evaluator.ts exists; behavior of generated ID/slug not explicitly asserted
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "Update an existing evaluator" | KEEP | mcp/typescript/src/tools/update-evaluator.ts exists; evaluatorType immutability assertion unclear
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "Discover evaluator types overview" | KEEP | mcp/typescript/src/tools/discover-evaluator-schema.ts exists; behavior partially in discover-evaluator-schema.unit.test.ts
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "Discover specific evaluator type details" | KEEP | discover-schema tool supports evaluatorType param; specific type detail flow not explicitly tested
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "PUT /api/evaluators/:id updates an evaluator" | DUPLICATE | Covered by evaluators-api.integration.test.ts (PUT /:id route exists in app.v1.ts)
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "DELETE /api/evaluators/:id archives an evaluator" | DUPLICATE | Covered by evaluators-api.integration.test.ts (DELETE /:id route in app.v1.ts archives via archivedAt)
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "List all model providers for a project" | KEEP | mcp-server/src/tools/list-model-providers.ts exists; masked-keys assertion not explicit in unit tests
-| specs/features/platform-evaluator-and-model-provider-tools.feature | "Set or update a model provider" | KEEP | mcp-server/src/tools/set-model-provider.ts exists; key-never-returned assertion not in model-provider-tools.unit.test.ts
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "List all model providers for a project" | KEEP | mcp/typescript/src/tools/list-model-providers.ts exists; masked-keys assertion not explicit in unit tests
+| specs/features/platform-evaluator-and-model-provider-tools.feature | "Set or update a model provider" | KEEP | mcp/typescript/src/tools/set-model-provider.ts exists; key-never-returned assertion not in model-provider-tools.unit.test.ts
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "Update model provider without changing keys" | KEEP | set-model-provider supports partial updates; preserve-existing-keys behavior not asserted
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "GET /api/model-providers lists providers with masked keys" | DUPLICATE | Covered by model-providers-api.integration.test.ts (GET / route in app.v1.ts)
 | specs/features/platform-evaluator-and-model-provider-tools.feature | "PUT /api/model-providers/:provider upserts provider config" | DUPLICATE | Covered by model-providers-api.integration.test.ts (PUT /:provider upsert route in app.v1.ts)
@@ -531,8 +531,8 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/suites/rename-suites-to-runs.feature | "Sidebar displays \"Run Plans\" instead of \"Suites\"" | KEEP | featureIcons.ts has label "Run Plans"; no @e2e test bound yet |
 | specs/features/suites/rename-suites-to-runs.feature | "Sidebar displays \"Run History\" instead of \"Runs\"" | KEEP | routes.ts/featureIcons.ts use the new wording but no @e2e covers the sidebar item |
 | specs/features/suites/rename-suites-to-runs.feature | "Page header displays \"Run Plans\"" | KEEP | SimulationsPage uses Run Plans; no integration test asserts the heading |
-| specs/features/suites/rename-suites-to-runs.feature | "Route title is \"Run Plans\"" | DUPLICATE | bound by langwatch/src/utils/__tests__/routes.unit.test.ts (@scenario JSDoc) |
-| specs/features/suites/rename-suites-to-runs.feature | "Feature icon label for suites is \"Run Plans\"" | DUPLICATE | bound by langwatch/src/utils/__tests__/featureIcons.unit.test.ts (@scenario JSDoc) |
+| specs/features/suites/rename-suites-to-runs.feature | "Route title is \"Run Plans\"" | DUPLICATE | bound by platform/app/src/utils/__tests__/routes.unit.test.ts (@scenario JSDoc) |
+| specs/features/suites/rename-suites-to-runs.feature | "Feature icon label for suites is \"Run Plans\"" | DUPLICATE | bound by platform/app/src/utils/__tests__/featureIcons.unit.test.ts (@scenario JSDoc) |
 | specs/features/suites/rename-suites-to-runs.feature | "Route title for simulation runs is \"Run History\"" | KEEP | routes.ts has Run Plan/Run History titles but unit test only covers suites entry |
 | specs/features/suites/rename-suites-to-runs.feature | "Feature icon label for simulation runs is \"Run History\"" | KEEP | featureIcons.ts label updated; no unit test for simulation-runs entry yet |
 | specs/features/suites/rename-suites-to-runs.feature | "Form drawer title reads \"New Run Plan\" for creation" | DUPLICATE | covered by SuiteFormDrawer.integration.test.tsx "displays the 'New Run Plan' title" |

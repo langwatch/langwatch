@@ -28,7 +28,7 @@ type Set struct {
 var Sets = []Set{
 	{
 		Name:      "Prisma",
-		Directory: "langwatch/prisma/migrations",
+		Directory: "platform/app/prisma/migrations",
 		Key:       regexp.MustCompile(`^(\d{14})_`),
 		Format:    "YYYYMMDDHHMMSS_name",
 		// A literal key rather than a $(date) expansion: free keys count up from
@@ -38,7 +38,7 @@ var Sets = []Set{
 	},
 	{
 		Name:      "ClickHouse",
-		Directory: "langwatch/src/server/clickhouse/migrations",
+		Directory: "platform/app/src/server/clickhouse/migrations",
 		Key:       regexp.MustCompile(`^(\d{5})_.*\.sql$`),
 		Format:    "NNNNN_name.sql",
 		Render:    func(key int64) string { return fmt.Sprintf("%05d", key) },

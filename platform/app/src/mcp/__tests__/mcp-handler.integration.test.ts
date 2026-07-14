@@ -871,7 +871,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // from the main app (~/server/db, ~/server/redis, etc.)
       const fs = await import("node:fs");
       const path = await import("node:path");
-      const mcpServerDir = path.resolve(__dirname, "../../../../mcp-server/src");
+      const mcpServerDir = path.resolve(__dirname, "../../../../../mcp/typescript/src");
       const createMcpServerSrc = fs.readFileSync(
         path.join(mcpServerDir, "create-mcp-server.ts"),
         "utf-8"

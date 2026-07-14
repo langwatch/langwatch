@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/langwatch/langwatch/clickhouse-serverless/internal/config"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
 
 // renderDefaultPassword writes default-password.yaml with the SHA256-hashed password.

@@ -1,14 +1,14 @@
 # Development compose with profiles
 #
 # Setup:
-#   cp langwatch/.env.example langwatch/.env        # Add your keys
+#   cp platform/app/.env.example platform/app/.env        # Add your keys
 #
 # **Use `make quickstart` — not direct compose.** ADR-004 (2026-05, #3860)
 # established `make quickstart` as the single entry point for local dev. It
 # sets VOLUME_PREFIX via scripts/dev.sh so per-worktree volumes (goose_bin,
 # app_modules, mcp_server_modules, see the volumes block)
 # get isolated names; running
-# `docker compose -f compose.dev.yml up` directly collapses every worktree
+# `docker compose -f infra/compose.dev.yml --project-directory . up` directly collapses every worktree
 # onto the same volumes.
 #
 # Recommended:
@@ -34,22 +34,22 @@
 #
 # AI Gateway (Go data plane) — NOT in this compose:
 #   The Go gateway runs on the host via `make service svc=aigateway`,
-#   binding :5563. Sourced from langwatch/.env (same secrets as the app).
+#   binding :5563. Sourced from platform/app/.env (same secrets as the app).
 #   Start it in a second terminal alongside any compose profile above.
 #
 # Stop everything:
-#   docker compose -f compose.dev.yml --profile full down
+#   docker compose -f infra/compose.dev.yml --project-directory . --profile full down
 
 x-common-env: &common-env
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   NODE_ENV: development
   SKIP_TIKTOKEN: 'true'
-  # Prod-like dev: IS_SAAS=true (from langwatch/.env) requires SSRF blocking.
+  # Prod-like dev: IS_SAAS=true (from platform/app/.env) requires SSRF blocking.
   BLOCK_LOCAL_HTTP_CALLS: "true"
   # NOTE: infrastructure URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL,
   # LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are NOT set here. The
-  # contributor's `langwatch/.env` is the source of truth — `quickstart`
-  # writes a per-mode overlay at `langwatch/.env.dev-up` that overrides
+  # contributor's `platform/app/.env` is the source of truth — `quickstart`
+  # writes a per-mode overlay at `platform/app/.env.dev-up` that overrides
   # only the URLs whose services are starting locally for that mode
   # (#3860 AC#2 / AC#6).
 
@@ -143,14 +143,14 @@ services:
     image: node:24
     working_dir: /app
     volumes:
-      - ./langwatch:/app
+      - ./platform/app:/app
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
-      - ./mcp-server:/mcp-server
+      - ./mcp/typescript:/mcp-server
       - mcp_server_modules:/mcp-server/node_modules
-      - ./langevals:/langevals
-      - ./typescript-sdk:/typescript-sdk:ro
-      - ./python-sdk:/python-sdk:ro
+      - ./services/langevals:/langevals
+      - ./sdks/typescript:/typescript-sdk:ro
+      - ./sdks/python:/python-sdk:ro
       - app_modules:/app/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
       - goose_bin:/opt/goose-bin
@@ -186,14 +186,14 @@ services:
     restart: unless-stopped
     working_dir: /app
     volumes:
-      - ./langwatch:/app
+      - ./platform/app:/app
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
-      - ./mcp-server:/mcp-server
+      - ./mcp/typescript:/mcp-server
       - mcp_server_modules:/mcp-server/node_modules
-      - ./langevals:/langevals
-      - ./typescript-sdk:/typescript-sdk:ro
-      - ./python-sdk:/python-sdk:ro
+      - ./services/langevals:/langevals
+      - ./sdks/typescript:/typescript-sdk:ro
+      - ./sdks/python:/python-sdk:ro
       - app_modules:/app/node_modules
       - goose_bin:/opt/goose-bin:ro
     command: >
@@ -208,7 +208,7 @@ services:
       - "${APP_PORT:-5560}:5560"
     environment:
       <<: *common-env
-      # BASE_HOST/NEXTAUTH_URL intentionally override langwatch/.env so
+      # BASE_HOST/NEXTAUTH_URL intentionally override platform/app/.env so
       # worktree-isolated dev gets the correct dynamic APP_PORT (each
       # worktree picks a different free port). Set shell vars to point at
       # a proxied URL (e.g. BASE_HOST=https://langwatch-main.boxd.sh) —
@@ -221,8 +221,8 @@ services:
       # Use email login for dev (no Auth0 dependency)
       NEXTAUTH_PROVIDER: "email"
     env_file:
-      - langwatch/.env
-      - path: langwatch/.env.dev-up
+      - platform/app/.env
+      - path: platform/app/.env.dev-up
         required: false
     depends_on:
       init:
@@ -255,14 +255,14 @@ services:
     working_dir: /app
     profiles: [workers, scenarios, full]
     volumes:
-      - ./langwatch:/app
+      - ./platform/app:/app
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
-      - ./mcp-server:/mcp-server
+      - ./mcp/typescript:/mcp-server
       - mcp_server_modules:/mcp-server/node_modules
-      - ./langevals:/langevals
-      - ./typescript-sdk:/typescript-sdk:ro
-      - ./python-sdk:/python-sdk:ro
+      - ./services/langevals:/langevals
+      - ./sdks/typescript:/typescript-sdk:ro
+      - ./sdks/python:/python-sdk:ro
       - app_modules:/app/node_modules
       - goose_bin:/opt/goose-bin:ro
     command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm -w exec tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
@@ -276,8 +276,8 @@ services:
       PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
       # To enable verbose scenario SDK logging, add: SCENARIO_VERBOSE: "true"
     env_file:
-      - langwatch/.env
-      - path: langwatch/.env.dev-up
+      - platform/app/.env
+      - path: platform/app/.env.dev-up
         required: false
     depends_on:
       init:
@@ -305,7 +305,7 @@ services:
     # envelope) matches the code here. See #5151.
     build:
       context: .
-      dockerfile: Dockerfile.langwatch_nlp
+      dockerfile: infra/docker/Dockerfile.langwatch_nlp
     profiles: [nlp, scenarios, full]
     # No host port - accessed via docker network as "langwatch_nlp:5561"
     environment:
@@ -319,14 +319,14 @@ services:
           cpus: "0.5"
 
   langevals:
-    # Build from local ./langevals source (via Dockerfile.langevals) instead
+    # Build from local ./services/langevals source (via infra/docker/Dockerfile.langevals) instead
     # of the published langwatch/langevals:latest image, which lags the
     # source. Newer evaluators present in this checkout 404 against :latest;
     # building from source guarantees the container serves exactly the
     # evaluators in this checkout. See #5151.
     build:
       context: .
-      dockerfile: Dockerfile.langevals
+      dockerfile: infra/docker/Dockerfile.langevals
     profiles: [nlp, full]
     # No host port - accessed via docker network as "langevals:5562"
     environment:
@@ -336,7 +336,7 @@ services:
         limits:
           # langevals imports ragas/langchain at boot and OOM-kills at 256m
           # before it can serve a single request — even with preload disabled.
-          # Production (charts/langwatch) requests 6Gi/limits 8Gi; 4g is enough
+          # Production (infra/charts/langwatch) requests 6Gi/limits 8Gi; 4g is enough
           # for the dev import footprint plus LLM-judge evaluators.
           memory: 4g
           cpus: "0.5"
@@ -350,26 +350,26 @@ services:
     working_dir: /app
     profiles: [test, scenarios, full]
     volumes:
-      - ./langwatch:/app
+      - ./platform/app:/app
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
-      - ./mcp-server:/mcp-server
+      - ./mcp/typescript:/mcp-server
       - mcp_server_modules:/mcp-server/node_modules
-      - ./langevals:/langevals
-      - ./typescript-sdk:/typescript-sdk:ro
-      - ./python-sdk:/python-sdk:ro
+      - ./services/langevals:/langevals
+      - ./sdks/typescript:/typescript-sdk:ro
+      - ./sdks/python:/python-sdk:ro
       - app_modules:/app/node_modules
     command: sh -c "corepack enable && pnpm -w exec tsx scripts/ai-server.ts"
     ports:
       - "${AI_SERVER_PORT:-3456}:3456"
     environment:
       <<: *common-env
-      # LANGWATCH_API_KEY comes from langwatch/.env via env_file below
+      # LANGWATCH_API_KEY comes from platform/app/.env via env_file below
       PINO_CONSOLE_LEVEL: "debug"
       LOG_LEVEL: "debug"
     env_file:
-      - langwatch/.env
-      - path: langwatch/.env.dev-up
+      - platform/app/.env
+      - path: platform/app/.env.dev-up
         required: false
     depends_on:
       init:
@@ -405,7 +405,7 @@ volumes:
   app_modules:
     name: ${VOLUME_PREFIX:-langwatch}-app-modules
   # mcp-server is a standalone pnpm workspace whose install + build run in the
-  # `init` container against the `./mcp-server` bind mount. Without isolation
+  # `init` container against the `./mcp/typescript` bind mount. Without isolation
   # the container install writes container-shaped pnpm symlinks into the host
   # tree, which then dangle and break a host-side build (#5144). Isolating
   # node_modules in a named volume keeps the host tree untouched.

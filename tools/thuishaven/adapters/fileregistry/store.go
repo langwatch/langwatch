@@ -90,7 +90,7 @@ func (s *Store) WriteSlugCache(worktreeDir, slug string) error {
 	return os.WriteFile(filepath.Join(worktreeDir, ".langwatch-slug"), []byte(slug+"\n"), 0o644)
 }
 
-// WriteOverlay writes langwatch/.env.portless. Mode 0o600: it carries
+// WriteOverlay writes platform/app/.env.portless. Mode 0o600: it carries
 // LANGWATCH_API_KEY, so it must not be world-readable.
 func (s *Store) WriteOverlay(lwDir string, st domain.Stack) error {
 	return os.WriteFile(filepath.Join(lwDir, ".env.portless"), []byte(st.OverlayFile()), 0o600)

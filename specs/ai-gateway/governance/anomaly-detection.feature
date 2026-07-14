@@ -32,7 +32,7 @@ Feature: Anomaly detection — evaluate AnomalyRules + dispatch alerts (event-so
   Pairs with: anomaly-rules.feature (configuration entity)
               docs/ai-gateway/governance/architecture.md
               (Activity-monitor event sourcing section)
-  Backend: langwatch/src/server/event-sourcing/pipelines/activity-monitor-processing/
+  Backend: platform/app/src/server/event-sourcing/pipelines/activity-monitor-processing/
 
   Background:
     Given the org admin has authored at least one active AnomalyRule

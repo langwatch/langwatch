@@ -306,10 +306,10 @@ lingers as a stale reference. Acceptable given expected pin volume.
 
 - Related ADRs: ADR-023 (orphan-sweep reactor + chain — superseded),
   ADR-025 (orphan sweep removed), ADR-019 (repository-service layering)
-- Migration: `langwatch/src/server/clickhouse/migrations/00032_add_retention_and_size_columns.sql`
-- Code: `langwatch/src/server/data-retention/`,
-  `langwatch/src/server/clickhouse/ttlReconciler.ts`,
-  `langwatch/src/server/api/routers/dataRetention.ts`,
-  `langwatch/src/pages/settings/data-retention.tsx`
+- Migration: `platform/app/src/server/clickhouse/migrations/00032_add_retention_and_size_columns.sql`
+- Code: `platform/app/src/server/data-retention/`,
+  `platform/app/src/server/clickhouse/ttlReconciler.ts`,
+  `platform/app/src/server/api/routers/dataRetention.ts`,
+  `platform/app/src/pages/settings/data-retention.tsx`
 - Specs: `specs/data-retention/`
 - PR: #4147

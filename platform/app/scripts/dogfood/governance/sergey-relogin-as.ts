@@ -77,7 +77,7 @@ async function main() {
     LANGWATCH_BROWSER: "none",
   };
 
-  // Drive the locally-built CLI artifact (typescript-sdk/dist/cli/index.js)
+  // Drive the locally-built CLI artifact (sdks/typescript/dist/cli/index.js)
   // rather than whatever `langwatch` resolves to on PATH — the globally-
   // installed binary lags this PR's CLI surface (e.g. --device flag was
   // added recently and may be missing from the installed npm package).

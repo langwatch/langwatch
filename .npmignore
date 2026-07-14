@@ -1,6 +1,6 @@
 # What goes in the @langwatch/server tarball — anything not in `files` from
 # package.json gets dropped by default; this file trims further inside the
-# directories that ARE included (langwatch/, langwatch_nlp/, langevals/).
+# directories that ARE included (platform/app/, langwatch_nlp/, services/langevals/).
 #
 # The CLI bundle (packages/server/dist/cli.cjs) ships unmodified, and the
 # langwatch app's dist/ (vite client + scenario-child-process + mcp-server
@@ -11,11 +11,11 @@
 # Internal dev tooling — used only during langwatch development, never at
 # runtime by `npx @langwatch/server`. Keeping these out cuts the tarball
 # in half (deja-view alone is ~1MB).
-langwatch/packages/
+platform/app/packages/
 
 # Jupyter notebooks — exploration artifacts, not runtime code.
 langwatch_nlp/notebooks/
-langevals/notebooks/
+services/langevals/notebooks/
 
 # Tests, fixtures, and dev-only configs.
 **/tests/
@@ -35,8 +35,8 @@ langevals/notebooks/
 **/*.map
 **/*.tsbuildinfo
 
-# langwatch/ee/ used to be excluded as "saas-only" — it isn't, the langwatch
-# app's source has unconditional imports into it. langwatch/saas-src/ never
+# platform/app/ee/ used to be excluded as "saas-only" — it isn't, the langwatch
+# app's source has unconditional imports into it. platform/app/saas-src/ never
 # existed in the OSS tree, so no exclusion needed for either.
 
 # Editor + OS detritus.

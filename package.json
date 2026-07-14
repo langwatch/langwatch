@@ -33,10 +33,10 @@
   "files": [
     "packages/server/dist/",
     "packages/server/templates/",
-    "langwatch/",
-    "langevals/",
-    "python-sdk/",
-    "mcp-server/",
+    "platform/app/",
+    "services/langevals/",
+    "sdks/python/",
+    "mcp/typescript/",
     "scripts/",
     "README.md",
     "LICENSE.md"

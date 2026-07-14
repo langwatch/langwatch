@@ -48,7 +48,7 @@
 	],
 	"exclude": [
 		"node_modules",
-		"../mcp-server",
+		"../../mcp/typescript",
 		".next",
 		".next-saas",
 		"**/*.snippet.*",

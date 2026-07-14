@@ -30,7 +30,7 @@ func (s Stack) svc(name string) Service {
 }
 
 // OverlayEnv returns the KEY=VALUE lines that carry the resolved hostname URLs +
-// ports. These are (a) written to langwatch/.env.portless — the overlay every TS
+// ports. These are (a) written to platform/app/.env.portless — the overlay every TS
 // entry point loads last with override:true so it beats anything pinned in .env —
 // and (b) injected directly into each supervised child. Deriving them from the
 // Stack (which already holds every URL/port) keeps this the single source of

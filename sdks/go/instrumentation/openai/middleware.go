@@ -12,11 +12,11 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
 )
 
 const (
-	tracerName             = "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	tracerName             = "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	instrumentationVersion = "0.0.1"
 )
 

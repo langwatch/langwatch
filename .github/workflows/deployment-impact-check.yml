@@ -12,11 +12,11 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
     paths:
-      - "charts/**"
+      - "infra/charts/**"
       - "services/**"
       - "dev/docs/adr/**"
       - "dev/docs/best_practices/**"
-      - "langwatch/.env.example"
+      - "platform/app/.env.example"
       - "docs/self-hosting/**"
 
 permissions:

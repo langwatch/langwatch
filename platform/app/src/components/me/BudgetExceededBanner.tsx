@@ -8,7 +8,7 @@ import { Link } from "../ui/link";
 /**
  * Wire shape matches the 402 body that the gateway returns and
  * `services/cli/internal/wrapper/budget.go::CheckBudget` (now ported to
- * `typescript-sdk/src/cli/utils/governance/budget.ts`) consumes. The CLI
+ * `sdks/typescript/src/cli/utils/governance/budget.ts`) consumes. The CLI
  * renders a bordered ASCII box with these same fields; this component
  * renders the equivalent Chakra banner so the cross-surface UX is
  * consistent end-to-end.
