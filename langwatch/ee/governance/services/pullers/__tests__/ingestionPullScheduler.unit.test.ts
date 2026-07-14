@@ -18,7 +18,7 @@ import { computeNextDelayMs } from "../ingestionPullScheduler";
 describe("ingestionPullScheduler — in-process cron scheduling", () => {
   describe("given a source with pullSchedule '*/15 * * * *'", () => {
     describe("when the scheduler computes when the next pull should fire", () => {
-      /** @scenario "The cron schedule is parsed in-process and fired by event-sourcing, not Linux cron" */
+      /** scenario The cron schedule is parsed in-process and fired by event-sourcing, not Linux cron */
       it("returns a delay equal to the cron's next fire time minus now", () => {
         const nowMs = Date.parse("2026-06-19T10:07:00Z");
         const expectedNextMs = Date.parse("2026-06-19T10:15:00Z");
@@ -28,7 +28,7 @@ describe("ingestionPullScheduler — in-process cron scheduling", () => {
         expect(delayMs).toBe(expectedNextMs - nowMs);
       });
 
-      /** @scenario "The cron schedule is parsed in-process and fired by event-sourcing, not Linux cron" */
+      /** scenario The cron schedule is parsed in-process and fired by event-sourcing, not Linux cron */
       it("schedules in-process with cron-parser, never Linux cron or a BullMQ repeatable job", () => {
         const source = readFileSync(
           join(__dirname, "..", "ingestionPullScheduler.ts"),
@@ -63,7 +63,7 @@ describe("ingestionPullScheduler — in-process cron scheduling", () => {
         next: "2026-06-19T11:00:00Z",
       },
     ])("when now is $now and pullSchedule is $cron", ({ now, cron, next }) => {
-      /** @scenario "The next fire time is derived from the cron expression" */
+      /** scenario The next fire time is derived from the cron expression */
       it(`derives the next fire time as ${next}`, () => {
         const nowMs = Date.parse(now);
 
@@ -76,7 +76,7 @@ describe("ingestionPullScheduler — in-process cron scheduling", () => {
 
   describe("given a malformed pull schedule", () => {
     describe("when the scheduler computes the next pull", () => {
-      /** @scenario "Malformed schedules are rejected without stopping the existing recurrence" */
+      /** scenario Malformed schedules are rejected without stopping the existing recurrence */
       it("throws instead of manufacturing a delay", () => {
         expect(() =>
           computeNextDelayMs("definitely not cron", Date.now()),

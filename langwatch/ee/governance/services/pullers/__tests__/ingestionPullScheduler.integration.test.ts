@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { UNLIMITED_PLAN } from "@ee/licensing/constants";
-import type { Redis } from "ioredis";
-import { nanoid } from "nanoid";
+import { UNLIMITED_PLAN } from  *@ee/licensing/constants *;
+import type { Redis } from  *ioredis *;
+import { nanoid } from  *nanoid *;
 /**
  * Integration coverage for the event-sourced pull scheduler against a REAL
  * GroupQueue (Redis) + REAL Postgres. Proves seeding, idempotency, crash-safe
@@ -20,23 +20,23 @@ import {
   expect,
   it,
   vi,
-} from "vitest";
+} from  *vitest *;
 
-import { globalForApp, resetApp } from "~/server/app-layer/app";
-import { createTestApp } from "~/server/app-layer/presets";
-import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
-import { prisma } from "~/server/db";
-import { type AggregateType, definePipeline } from "~/server/event-sourcing";
+import { globalForApp, resetApp } from  *~/server/app-layer/app *;
+import { createTestApp } from  *~/server/app-layer/presets *;
+import { PlanProviderService } from  *~/server/app-layer/subscription/plan-provider *;
+import { prisma } from  *~/server/db *;
+import { type AggregateType, definePipeline } from  *~/server/event-sourcing *;
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
-import { EventStoreClickHouse } from "~/server/event-sourcing/stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
-import { IngestionSourceService } from "../../activity-monitor/ingestionSource.service";
+} from  *~/server/event-sourcing/__tests__/integration/testContainers *;
+import { EventSourcing } from  *~/server/event-sourcing/eventSourcing *;
+import { EventStoreClickHouse } from  *~/server/event-sourcing/stores/eventStoreClickHouse *;
+import { EventRepositoryClickHouse } from  *~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse *;
+import { IngestionSourceService } from  *../../activity-monitor/ingestionSource.service *;
 
 import {
   armIngestionPullForSource,
@@ -44,8 +44,8 @@ import {
   PULL_CONCURRENCY_LIMIT,
   registerIngestionPullJob,
   seedIngestionPullers,
-} from "../ingestionPullScheduler";
-import { type PullResult, pullerAdapterRegistry } from "../pullerAdapter";
+} from  *../ingestionPullScheduler *;
+import { type PullResult, pullerAdapterRegistry } from  *../pullerAdapter *;
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL ||
@@ -72,12 +72,12 @@ function freshControl(): FixtureControl {
     calls: 0,
     inFlight: 0,
     maxInFlight: 0,
-    cursor: "advanced",
+    cursor:  *advanced *,
     gate: null,
   };
 }
 
-const FIXTURE_ADAPTER_ID = "fixture_pull_scheduler";
+const FIXTURE_ADAPTER_ID =  *fixture_pull_scheduler *;
 
 class FixturePullerAdapter {
   readonly id = FIXTURE_ADAPTER_ID;
@@ -98,7 +98,7 @@ class FixturePullerAdapter {
 }
 
 describe.skipIf(!hasTestcontainers)(
-  "ingestionPullScheduler — event-sourced scheduling end-to-end",
+   *ingestionPullScheduler — event-sourced scheduling end-to-end *,
   () => {
     let redis: Redis;
     let eventSourcing: EventSourcing;
@@ -124,7 +124,7 @@ describe.skipIf(!hasTestcontainers)(
         ),
         clickhouse: async () => clickHouseClient,
         redis,
-        processRole: "worker",
+        processRole:  *worker *,
       });
 
       // A minimal pipeline just to obtain a service bound to the global queue,
@@ -133,7 +133,7 @@ describe.skipIf(!hasTestcontainers)(
       const registered = eventSourcing.register(
         definePipeline()
           .withName(`ingestion_pull_scheduler_test_${nanoid(6)}`)
-          .withAggregateType("trace" as AggregateType)
+          .withAggregateType( *trace *as AggregateType)
           .build(),
       );
       pullJob = registerIngestionPullJob(registered.service);
@@ -160,7 +160,7 @@ describe.skipIf(!hasTestcontainers)(
       });
       const actor = await prisma.user.create({
         data: {
-          name: "Pull scheduler test actor",
+          name:  *Pull scheduler test actor *,
           email: `pull-sched-${nanoid(8)}@example.com`,
         },
       });
@@ -207,14 +207,14 @@ describe.skipIf(!hasTestcontainers)(
       const source = await prisma.ingestionSource.create({
         data: {
           organizationId,
-          sourceType: "claude_compliance",
+          sourceType:  *claude_compliance *,
           name: `pull-sched-source-${nanoid(8)}`,
           ingestSecretHash: `hash-${nanoid(8)}`,
-          status: opts?.status ?? "active",
+          status: opts?.status ??  *active *,
           archivedAt: opts?.archivedAt ?? null,
           pullSchedule:
             opts?.pullSchedule === undefined
-              ? "*/15 * * * *"
+              ?  */15 * * * *
               : opts.pullSchedule,
           parserConfig: { adapter: FIXTURE_ADAPTER_ID },
         },
@@ -240,7 +240,7 @@ describe.skipIf(!hasTestcontainers)(
       const keys = await redis.keys(`*${sourceId}:jobs`);
       const scores: number[] = [];
       for (const key of keys) {
-        const values = await redis.zrange(key, 0, -1, "WITHSCORES");
+        const values = await redis.zrange(key, 0, -1,  *WITHSCORES *);
         for (let index = 1; index < values.length; index += 2) {
           scores.push(Number(values[index]));
         }
@@ -259,10 +259,10 @@ describe.skipIf(!hasTestcontainers)(
       return pullJob!.send(payload, { delay: options?.delay ?? 0 });
     }
 
-    describe("given an active pull-mode source at worker start", () => {
-      describe("when the seeder runs", () => {
-        /** @scenario "A pull-mode source is seeded onto the event-sourcing queue at worker start" */
-        it("stages exactly one ingestion-pull job for the source", async () => {
+    describe( *given an active pull-mode source at worker start *, () => {
+      describe( *when the seeder runs *, () => {
+        /** scenario A pull-mode source is seeded onto the event-sourcing queue at worker start */
+        it( *stages exactly one ingestion-pull job for the source *, async () => {
           const sourceId = await createSource();
 
           await seedIngestionPullers();
@@ -270,8 +270,8 @@ describe.skipIf(!hasTestcontainers)(
           expect(await pendingPullCount(sourceId)).toBe(1);
         });
 
-        /** @scenario "Seeding is idempotent across restarts and duplicate calls" */
-        it("keeps exactly one pending job when the seeder runs again", async () => {
+        /** scenario Seeding is idempotent across restarts and duplicate calls */
+        it( *keeps exactly one pending job when the seeder runs again *, async () => {
           const sourceId = await createSource();
 
           await seedIngestionPullers();
@@ -282,18 +282,18 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
-    describe("given a source created with a schedule", () => {
-      describe("when the create path arms the pull", () => {
-        /** @scenario "Saving a source with a schedule seeds it immediately" */
-        it("stages a pull without waiting for a worker restart", async () => {
+    describe( *given a source created with a schedule *, () => {
+      describe( *when the create path arms the pull *, () => {
+        /** scenario Saving a source with a schedule seeds it immediately */
+        it( *stages a pull without waiting for a worker restart *, async () => {
           const { source } = await IngestionSourceService.create(
             prisma,
           ).createSource({
             organizationId,
-            sourceType: "claude_compliance",
+            sourceType:  *claude_compliance *,
             name: `service-created-pull-source-${nanoid(8)}`,
             parserConfig: { adapter: FIXTURE_ADAPTER_ID },
-            pullSchedule: "*/10 * * * *",
+            pullSchedule:  */10 * * * * *,
             actorUserId,
           });
           createdSourceIds.push(source.id);
@@ -303,17 +303,17 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
-    describe("given an active source with a pending scheduled pull", () => {
-      describe("when its pull schedule is updated", () => {
-        /** @scenario "Updating an active source schedule replaces its pending pull" */
-        it("keeps one job and moves its dispatch score to the new cron", async () => {
+    describe( *given an active source with a pending scheduled pull *, () => {
+      describe( *when its pull schedule is updated *, () => {
+        /** scenario Updating an active source schedule replaces its pending pull */
+        it( *keeps one job and moves its dispatch score to the new cron *, async () => {
           const sourceId = await createSource({
-            pullSchedule: "0 0 1 1 *",
+            pullSchedule:  *0 0 1 1 * *,
           });
           await armIngestionPullForSource({
             source: {
               id: sourceId,
-              pullSchedule: "0 0 1 1 *",
+              pullSchedule:  *0 0 1 1 * *,
               organizationId,
             },
           });
@@ -324,11 +324,11 @@ describe.skipIf(!hasTestcontainers)(
           ).updateSource({
             id: sourceId,
             organizationId,
-            pullSchedule: "* * * * *",
+            pullSchedule:  ** * * * * *,
           });
 
           const newDispatchAtMs = await pendingPullDispatchAtMs(sourceId);
-          expect(source.pullSchedule).toBe("* * * * *");
+          expect(source.pullSchedule).toBe( ** * * * * *);
           expect(await pendingPullCount(sourceId)).toBe(1);
           expect(oldDispatchAtMs).not.toBeNull();
           expect(newDispatchAtMs).not.toBeNull();
@@ -336,10 +336,10 @@ describe.skipIf(!hasTestcontainers)(
         });
       });
 
-      describe("when an update supplies a malformed pull schedule", () => {
-        /** @scenario "Malformed schedules are rejected without stopping the existing recurrence" */
-        it("rejects the update and preserves the valid pending pull", async () => {
-          const validSchedule = "0 0 1 1 *";
+      describe( *when an update supplies a malformed pull schedule *, () => {
+        /** scenario Malformed schedules are rejected without stopping the existing recurrence */
+        it( *rejects the update and preserves the valid pending pull *, async () => {
+          const validSchedule =  *0 0 1 1 * *;
           const sourceId = await createSource({
             pullSchedule: validSchedule,
           });
@@ -356,9 +356,9 @@ describe.skipIf(!hasTestcontainers)(
             IngestionSourceService.create(prisma).updateSource({
               id: sourceId,
               organizationId,
-              pullSchedule: "definitely not cron",
+              pullSchedule:  *definitely not cron *,
             }),
-          ).rejects.toThrow("Invalid pullSchedule cron expression");
+          ).rejects.toThrow( *Invalid pullSchedule cron expression *);
 
           const source = await prisma.ingestionSource.findUniqueOrThrow({
             where: { id: sourceId },
@@ -370,10 +370,10 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
-    describe("given a due ingestion-pull job", () => {
-      describe("when it is processed", () => {
-        /** @scenario "Each pull re-arms the next pull at the cron expression's next fire time, before doing the work" */
-        it("stages the next pull before running the pull body", async () => {
+    describe( *given a due ingestion-pull job *, () => {
+      describe( *when it is processed *, () => {
+        /** scenario Each pull re-arms the next pull at the cron expression's next fire time, before doing the work */
+        it( *stages the next pull before running the pull body *, async () => {
           const sourceId = await createSource();
           let release!: () => void;
           control.gate = new Promise<void>((resolve) => {
@@ -399,7 +399,7 @@ describe.skipIf(!hasTestcontainers)(
                 where: { id: sourceId },
                 select: { pollerCursor: true },
               });
-              expect(row?.pollerCursor).toBe("advanced");
+              expect(row?.pollerCursor).toBe( *advanced *);
             },
             { timeout: 8000, interval: 50 },
           );
@@ -407,10 +407,10 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
-    describe("given a pull body slower than the gap to the next fire", () => {
-      describe("when a second pull becomes due while one is running", () => {
-        /** @scenario "Per-source serialization prevents overlapping pulls" */
-        it("runs the pulls one at a time for the same source", async () => {
+    describe( *given a pull body slower than the gap to the next fire *, () => {
+      describe( *when a second pull becomes due while one is running *, () => {
+        /** scenario Per-source serialization prevents overlapping pulls */
+        it( *runs the pulls one at a time for the same source *, async () => {
           const sourceId = await createSource();
           let release!: () => void;
           control.gate = new Promise<void>((resolve) => {
@@ -441,10 +441,10 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
-    describe("given an archived source", () => {
-      describe("when its in-flight ingestion-pull job is processed", () => {
-        /** @scenario "Archiving or disabling a source stops the recurrence" */
-        it("does not run the pull body and stages no follow-up", async () => {
+    describe( *given an archived source *, () => {
+      describe( *when its in-flight ingestion-pull job is processed *, () => {
+        /** scenario Archiving or disabling a source stops the recurrence */
+        it( *does not run the pull body and stages no follow-up *, async () => {
           const sourceId = await createSource({ archivedAt: new Date() });
 
           await send(sourceId, { delay: 0 });
@@ -462,16 +462,16 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
-    describe("given a disabled source whose recurrence has stopped", () => {
-      describe("when the source is re-enabled", () => {
-        /** @scenario "Re-enabling a disabled source restarts the recurrence" */
-        it("stages a new pull without waiting for a worker restart", async () => {
-          const sourceId = await createSource({ status: "disabled" });
+    describe( *given a disabled source whose recurrence has stopped *, () => {
+      describe( *when the source is re-enabled *, () => {
+        /** scenario Re-enabling a disabled source restarts the recurrence */
+        it( *stages a new pull without waiting for a worker restart *, async () => {
+          const sourceId = await createSource({ status:  *disabled *});
 
           await IngestionSourceService.create(prisma).updateSource({
             id: sourceId,
             organizationId,
-            status: "active",
+            status:  *active *,
           });
 
           expect(await pendingPullCount(sourceId)).toBe(1);
@@ -479,10 +479,10 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
-    describe("given a re-arm write that fails once", () => {
-      describe("when the ingestion-pull job is processed", () => {
-        /** @scenario "A failed re-arm retries the pull instead of silently ending the recurrence" */
-        it("retries on the event-sourcing queue and recovers without a worker restart", async () => {
+    describe( *given a re-arm write that fails once *, () => {
+      describe( *when the ingestion-pull job is processed *, () => {
+        /** scenario A failed re-arm retries the pull instead of silently ending the recurrence */
+        it( *retries on the event-sourcing queue and recovers without a worker restart *, async () => {
           const sourceId = await createSource();
 
           // Fail exactly the re-arm send. Send #1 is the initial enqueue below;
@@ -494,11 +494,11 @@ describe.skipIf(!hasTestcontainers)(
           const realSend = pullJob!.send.bind(pullJob);
           let sendCalls = 0;
           const sendSpy = vi
-            .spyOn(pullJob!, "send")
+            .spyOn(pullJob!,  *send *)
             .mockImplementation(async (payload, options) => {
               sendCalls += 1;
               if (sendCalls === 2) {
-                throw new Error("injected re-arm write failure");
+                throw new Error( *injected re-arm write failure *);
               }
               return realSend(payload, options);
             });
@@ -519,10 +519,10 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
-    describe("given more due pull-mode sources than the pull concurrency limit", () => {
-      describe("when their ingestion-pull jobs all become due at once", () => {
-        /** @scenario "Global pull concurrency is bounded across sources" */
-        it("runs no more than the limit of pull bodies at the same time", async () => {
+    describe( *given more due pull-mode sources than the pull concurrency limit *, () => {
+      describe( *when their ingestion-pull jobs all become due at once *, () => {
+        /** scenario Global pull concurrency is bounded across sources */
+        it( *runs no more than the limit of pull bodies at the same time *, async () => {
           const sourceCount = PULL_CONCURRENCY_LIMIT + 3;
           let release!: () => void;
           control.gate = new Promise<void>((resolve) => {

@@ -176,7 +176,7 @@ afterAll(async () => {
 });
 
 describe("PullerAdapter framework — end-to-end with real CH + real fetch", () => {
-  /** @scenario "A due pull runs the existing pull body and writes OCSF events" */
+  /** scenario A due pull runs the existing pull body and writes OCSF events" */
   it("fetches a paginated audit-log feed and lands one OCSF row per event", async () => {
     await runIngestionPullForSource({ ingestionSourceId });
 

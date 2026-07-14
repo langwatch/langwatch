@@ -18,6 +18,7 @@
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runIngestionPullForSource } from "../pullerWorker";
 
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();
@@ -129,7 +130,6 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         ),
       );
 
-      const { runIngestionPullForSource } = await import("../pullerWorker");
 
       await runIngestionPullForSource({ ingestionSourceId: sourceId });
 
@@ -163,7 +163,6 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
   describe("source lookup fails: bail without adapter dispatch", () => {
     it("logs + returns when IngestionSource is missing", async () => {
       sourceFindUnique.mockResolvedValueOnce(null);
-      const { runIngestionPullForSource } = await import("../pullerWorker");
       await runIngestionPullForSource({ ingestionSourceId: "missing-src" });
       expect(ocsfInsert).not.toHaveBeenCalled();
       expect(sourceUpdate).not.toHaveBeenCalled();
@@ -178,7 +177,6 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         parserConfig: HTTP_POLLING_CONFIG,
         pollerCursor: null,
       });
-      const { runIngestionPullForSource } = await import("../pullerWorker");
       await runIngestionPullForSource({ ingestionSourceId: "src-disabled" });
       expect(fetchStub).not.toHaveBeenCalled();
       expect(ocsfInsert).not.toHaveBeenCalled();
@@ -195,7 +193,6 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         parserConfig: { adapter: "definitely_not_registered" },
         pollerCursor: null,
       });
-      const { runIngestionPullForSource } = await import("../pullerWorker");
       await runIngestionPullForSource({ ingestionSourceId: "src-unknown" });
       expect(sourceUpdate).toHaveBeenCalledTimes(1);
       expect(sourceUpdate.mock.calls[0]![0].data).toEqual({
@@ -223,7 +220,6 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       fetchStub.mockResolvedValueOnce(r503());
       fetchStub.mockResolvedValueOnce(r503());
 
-      const { runIngestionPullForSource } = await import("../pullerWorker");
       await runIngestionPullForSource({ ingestionSourceId: "src-error" });
 
       expect(ocsfInsert).not.toHaveBeenCalled();
@@ -266,7 +262,6 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         ),
       );
 
-      const { runIngestionPullForSource } = await import("../pullerWorker");
       await runIngestionPullForSource({ ingestionSourceId: "src-idem" });
 
       const row = ocsfInsert.mock.calls[0]![0];

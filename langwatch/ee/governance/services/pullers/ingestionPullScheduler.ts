@@ -234,6 +234,21 @@ async function processIngestionPull(
 
   // Gate the pull body through the bounded bulkhead so a burst of same-minute
   // sources cannot fan out into unbounded upstream + ClickHouse load.
+  //
+  // This await holds a global GroupQueue worker slot while waiting. To avoid
+  // blocking unrelated event-sourcing work, check if we are already at or above
+  // the pull limit. If the bulkhead is saturated, return early to release the
+  // global slot; GroupQueue will retry this job, and by then a slot may be free.
+  const bulkheadLength = pullBulkhead.length();
+  const bulkheadRunning = pullBulkhead.running();
+  if (bulkheadLength + bulkheadRunning >= PULL_CONCURRENCY_LIMIT) {
+    logger.debug(
+      { ingestionSourceId: source.id, bulkheadLength, bulkheadRunning },
+      "pull bulkhead saturated; releasing global slot to allow unrelated jobs",
+    );
+    throw new Error("Pull bulkhead saturated; will retry");
+  }
+
   await pullBulkhead.push(source.id);
 }
 
