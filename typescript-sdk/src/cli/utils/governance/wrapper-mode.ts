@@ -419,7 +419,7 @@ export function telemetryEnvVarNames(tool: string): string[] {
   return Object.keys(buildOtelEnvBlock(tool, "", ""));
 }
 
-function buildOtelEnvBlock(
+export function buildOtelEnvBlock(
   tool: string,
   endpoint: string,
   token: string,

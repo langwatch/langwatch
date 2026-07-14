@@ -33,18 +33,18 @@ Feature: the login agent owns the Copilot app launch and injects capture env
 
   Rule: the agent injects the direct-OTLP capture env onto the app
 
-    @unit @unimplemented
+    @unit
     Scenario: The app process is pointed at the LangWatch OTLP endpoint
       When the login agent launches the Copilot app
       Then the app env sets OTEL_EXPORTER_OTLP_ENDPOINT to the LangWatch /api/otel base
       And the app env sets COPILOT_OTEL_ENABLED
 
-    @unit @unimplemented
+    @unit
     Scenario: The app process carries the ingest key as a bearer auth header
       When the login agent launches the Copilot app
       Then the app env sets OTEL_EXPORTER_OTLP_HEADERS to an Authorization Bearer of the ingest key
 
-    @unit @unimplemented
+    @unit
     Scenario: Content capture is enabled by default
       When the login agent launches the Copilot app
       Then the app env enables message-content capture
