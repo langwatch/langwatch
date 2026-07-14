@@ -55,6 +55,7 @@ interface ChatTurnRowProps {
    * marker and seeds the inline badge popover.
    */
   annotationItems?: AnnotationItem[];
+  readOnly?: boolean;
 }
 
 export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
@@ -69,6 +70,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   onSelect,
   layout = "bubbles",
   annotationItems = EMPTY_ANNOTATIONS,
+  readOnly = false,
 }) {
   const handleSelect = useCallback(
     () => onSelect(turn.traceId),
@@ -124,6 +126,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         // no "opposite side" to anchor the inline actions to — pin them right.
         assistantSide={layout === "thread" ? "right" : assistantSide}
         annotationItems={annotationItems}
+        readOnly={readOnly}
       />
 
       {userText ? (
@@ -135,7 +138,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           icon={<UserIcon />}
           text={userText}
           isSelected={isCurrent}
-          onClick={handleSelect}
+          onClick={readOnly ? undefined : handleSelect}
         />
       ) : turn.inputRedacted ? (
         // Input hidden by a privacy rule — show the shared "Redacted" marker on
@@ -161,7 +164,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           text={assistantText}
           reasoning={assistantReasoning}
           isSelected={isCurrent}
-          onClick={handleSelect}
+          onClick={readOnly ? undefined : handleSelect}
           annotation={annotationSummary}
         />
       ) : turn.error ? (
@@ -174,7 +177,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           text={turn.error}
           reasoning={assistantReasoning}
           isSelected={isCurrent}
-          onClick={handleSelect}
+          onClick={readOnly ? undefined : handleSelect}
           annotation={annotationSummary}
         />
       ) : assistantReasoning ? (
@@ -187,7 +190,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           text=""
           reasoning={assistantReasoning}
           isSelected={isCurrent}
-          onClick={handleSelect}
+          onClick={readOnly ? undefined : handleSelect}
           annotation={annotationSummary}
         />
       ) : turn.outputRedacted ? (
@@ -456,7 +459,16 @@ const TurnSeparator: React.FC<{
   onSelect: () => void;
   assistantSide: "left" | "right";
   annotationItems: AnnotationItem[];
-}> = ({ index, turn, isCurrent, onSelect, assistantSide, annotationItems }) => {
+  readOnly: boolean;
+}> = ({
+  index,
+  turn,
+  isCurrent,
+  onSelect,
+  assistantSide,
+  annotationItems,
+  readOnly,
+}) => {
   // Pick the bits worth showing per turn — model, duration, latency, token
   // load, cost, error state — so the separator reads as a per-turn ledger
   // rather than just "Turn N · Xs". Skips fields that don't apply (no cost
@@ -478,8 +490,8 @@ const TurnSeparator: React.FC<{
       position="relative"
       align="center"
       gap={2}
-      cursor="pointer"
-      onClick={onSelect}
+      cursor={readOnly ? "default" : "pointer"}
+      onClick={readOnly ? undefined : onSelect}
       role="group"
       _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
     >
@@ -570,21 +582,23 @@ const TurnSeparator: React.FC<{
           width, stopping the divider line short of the edge. Absolutely
           positioned, the lines now span the full width and the badge/actions
           overlay the end (badges only when present, actions on hover). */}
-      <HStack
-        position="absolute"
-        top="50%"
-        transform="translateY(-50%)"
-        gap={1}
-        {...(annotationsOnLeft ? { left: 0 } : { right: 0 })}
-        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-      >
-        <TurnAnnotationBadges
-          traceId={turn.traceId}
-          output={turn.output}
-          prefetchedItems={annotationItems}
-        />
-        <TurnActionRow traceId={turn.traceId} output={turn.output} />
-      </HStack>
+      {!readOnly && (
+        <HStack
+          position="absolute"
+          top="50%"
+          transform="translateY(-50%)"
+          gap={1}
+          {...(annotationsOnLeft ? { left: 0 } : { right: 0 })}
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        >
+          <TurnAnnotationBadges
+            traceId={turn.traceId}
+            output={turn.output}
+            prefetchedItems={annotationItems}
+          />
+          <TurnActionRow traceId={turn.traceId} output={turn.output} />
+        </HStack>
+      )}
     </Flex>
   );
 };

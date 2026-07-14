@@ -7,6 +7,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import { useTraceViewer } from "../../context/TraceViewerContext";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { BlurredContentGate } from "../BlurredContentGate";
 import { ConversationContext } from "./ConversationContext";
@@ -55,6 +56,7 @@ export function TraceDrawerContent({
   readOnly = false,
 }: TraceDrawerContentProps) {
   const { colorMode } = useColorMode();
+  const { sharedThreadId } = useTraceViewer();
   // One Shiki adapter for the whole surface. All `<RenderedMarkdown>`,
   // `<ShikiCodeBlock>`, and the JSON tokenizer consume this — without it,
   // each consumer spins up its own highlighter (theme + lang JSON +
@@ -74,6 +76,9 @@ export function TraceDrawerContent({
   // the Trace view and open the span. See
   // specs/traces-v2/span-reference-jump-to-trace.feature
   const openSpanInTrace = useDrawerStore((s) => s.openSpanInTrace);
+  const canViewConversation =
+    !!trace?.conversationId &&
+    (!readOnly || trace.conversationId === sharedThreadId);
 
   // Watch the actual rendered container so the layout decision reflects
   // whatever pixel width the surface has — not the abstract widthPx state.
@@ -140,14 +145,14 @@ export function TraceDrawerContent({
                   !!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
                 }
               >
-                {viewMode === "conversation" && trace.conversationId ? (
+                {viewMode === "conversation" && canViewConversation ? (
                   <IsolatedErrorBoundary
                     scope="Couldn't render conversation view"
                     resetKeys={[trace.conversationId, trace.traceId]}
                   >
                     <Box flex={1} minHeight={0} overflow="auto">
                       <ConversationView
-                        conversationId={trace.conversationId}
+                        conversationId={trace.conversationId!}
                         currentTraceId={trace.traceId}
                       />
                     </Box>

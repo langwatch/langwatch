@@ -28,6 +28,17 @@ describe("share grant", () => {
 
       expect(verifyShareGrant(token)).toEqual(claims);
     });
+
+    it("round-trips the conversation capability on a trace grant", () => {
+      const threadedClaims: ShareGrantClaims = {
+        ...claims,
+        thread_id: "conversation_1",
+      };
+
+      const { jwt: token } = signShareGrant(threadedClaims);
+
+      expect(verifyShareGrant(token)).toEqual(threadedClaims);
+    });
   });
 
   describe("given a tampered grant", () => {

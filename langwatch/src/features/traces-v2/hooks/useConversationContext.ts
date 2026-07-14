@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useTraceViewer } from "../context/TraceViewerContext";
 import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import type { TraceListItem } from "../types/trace";
 
@@ -58,6 +59,12 @@ export function useConversationContext(
   traceId: string | null | undefined,
 ): ConversationContextResult {
   const { project } = useOrganizationTeamProject();
+  const { readOnly, sharedThreadId } = useTraceViewer();
+  const canReadConversation =
+    !readOnly ||
+    (!!conversationId &&
+      sharedThreadId != null &&
+      conversationId === sharedThreadId);
 
   // Conversation context for preview-mode traces is seeded
   // directly into the cache by `useOpenTraceDrawer`. We disable
@@ -67,7 +74,8 @@ export function useConversationContext(
   // the cache; we just have to be careful not to short-circuit
   // *before* reading `query.data` below.
   const isPreview = !!traceId && isPreviewTraceId(traceId);
-  const fetchEnabled = !!project?.id && !!conversationId && !isPreview;
+  const fetchEnabled =
+    !!project?.id && !!conversationId && !isPreview && canReadConversation;
 
   const query = api.tracesV2.conversationContext.useQuery(
     {
@@ -84,7 +92,9 @@ export function useConversationContext(
   );
 
   return useMemo<ConversationContextResult>(() => {
-    if (!project?.id || !conversationId) return NULL_RESULT;
+    if (!project?.id || !conversationId || !canReadConversation) {
+      return NULL_RESULT;
+    }
     if (!query.data) {
       return {
         ...NULL_RESULT,
@@ -104,5 +114,12 @@ export function useConversationContext(
         idx >= 0 && idx < turns.length - 1 ? (turns[idx + 1] ?? null) : null,
       isLoading: false,
     };
-  }, [project?.id, query.data, query.isLoading, conversationId, traceId]);
+  }, [
+    project?.id,
+    query.data,
+    query.isLoading,
+    conversationId,
+    traceId,
+    canReadConversation,
+  ]);
 }

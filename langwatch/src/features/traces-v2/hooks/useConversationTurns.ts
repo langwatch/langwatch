@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { useIsReadOnlyTrace } from "../context/TraceViewerContext";
+import { api, type RouterOutputs } from "~/utils/api";
+import { useTraceViewer } from "../context/TraceViewerContext";
+import type { TraceListItem } from "../types/trace";
 
 const HOUR_MS = 60 * 60 * 1000;
 const WINDOW_DAYS = 90;
@@ -39,7 +40,12 @@ export function conversationTurnsWindow(nowMs: number): {
  */
 export function useConversationTurns(conversationId: string | null) {
   const { project } = useOrganizationTeamProject();
-  const readOnly = useIsReadOnlyTrace();
+  const { readOnly, sharedThreadId } = useTraceViewer();
+  const canReadSharedConversation =
+    readOnly &&
+    !!conversationId &&
+    sharedThreadId != null &&
+    conversationId === sharedThreadId;
 
   const timeRange = useMemo(
     () => conversationTurnsWindow(Date.now()),
@@ -49,7 +55,7 @@ export function useConversationTurns(conversationId: string | null) {
     [project?.id, conversationId],
   );
 
-  const query = api.tracesV2.list.useQuery(
+  const listQuery = api.tracesV2.list.useQuery(
     {
       projectId: project?.id ?? "",
       timeRange,
@@ -63,15 +69,76 @@ export function useConversationTurns(conversationId: string | null) {
         : "",
     },
     {
-      // Backed by `tracesV2.list`, which stays project-protected (it is the
-      // traces-table query with arbitrary filters). A share grant must never
-      // open it, so read-only viewers skip conversation turns entirely.
       enabled: !!project?.id && !!conversationId && !readOnly,
       staleTime: 30_000,
       keepPreviousData: true,
     },
   );
 
-  // Mask cached data in read-only mode
-  return readOnly ? { ...query, data: undefined } : query;
+  const sharedQuery = api.tracesV2.conversationContext.useQuery(
+    {
+      projectId: project?.id ?? "",
+      conversationId: conversationId ?? "",
+    },
+    {
+      enabled: !!project?.id && canReadSharedConversation,
+      staleTime: 30_000,
+      keepPreviousData: true,
+    },
+  );
+
+  if (readOnly) {
+    return {
+      data:
+        canReadSharedConversation && sharedQuery.data
+          ? { items: sharedQuery.data.turns.map(toSharedConversationTurn) }
+          : undefined,
+      isLoading: canReadSharedConversation && sharedQuery.isLoading,
+    };
+  }
+
+  return {
+    data: listQuery.data ? { items: listQuery.data.items } : undefined,
+    isLoading: listQuery.isLoading,
+  };
+}
+
+type SharedConversationTurn =
+  RouterOutputs["tracesV2"]["conversationContext"]["turns"][number];
+
+/**
+ * The public conversation endpoint intentionally returns only the fields the
+ * read-only transcript needs. Fill the table-only fields with inert values so
+ * the existing conversation renderer can be reused without exposing list-only
+ * metadata such as cost, tokens, annotations, or arbitrary attributes.
+ */
+export function toSharedConversationTurn(
+  turn: SharedConversationTurn,
+): TraceListItem {
+  return {
+    traceId: turn.traceId,
+    timestamp: turn.timestamp,
+    name: turn.name,
+    serviceName: "",
+    durationMs: 0,
+    totalCost: 0,
+    nonBilledCost: 0,
+    totalTokens: 0,
+    models: [],
+    labels: [],
+    status: turn.status,
+    spanCount: 0,
+    sizeBytes: 0,
+    input: turn.input ?? null,
+    output: turn.output ?? null,
+    inputRedacted: turn.inputRedacted,
+    outputRedacted: turn.outputRedacted,
+    inputVisibleTo: turn.inputVisibleTo,
+    outputVisibleTo: turn.outputVisibleTo,
+    conversationId: undefined,
+    origin: "application",
+    rootSpanType: turn.rootSpanType ?? null,
+    evaluations: [],
+    events: [],
+  };
 }

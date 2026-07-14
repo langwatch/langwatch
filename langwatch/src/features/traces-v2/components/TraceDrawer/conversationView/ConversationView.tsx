@@ -23,6 +23,7 @@ import {
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RouterOutputs } from "~/utils/api";
+import { useIsReadOnlyTrace } from "../../../context/TraceViewerContext";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
 import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
@@ -86,6 +87,7 @@ export const ConversationView = memo(function ConversationView({
   // "Expand all" seeds every message's local expand state; individual
   // Show more / Show less toggles override until the next expand-all flip.
   const [isExpandAllEnabled, setIsExpandAllEnabled] = useState(false);
+  const readOnly = useIsReadOnlyTrace();
   const query = useConversationTurns(conversationId);
 
   const turns =
@@ -96,18 +98,18 @@ export const ConversationView = memo(function ConversationView({
   const annotationsQuery = useAnnotationsByTraceIds({
     projectId: project?.id ?? "",
     traceIds,
-    enabled: !!project?.id && hasPermission("annotations:view"),
+    enabled: !!project?.id && hasPermission("annotations:view") && !readOnly,
     keepPreviousData: true,
   });
   const annotationsByTrace = useMemo<AnnotationsByTrace>(() => {
     const map: AnnotationsByTrace = new Map();
-    for (const a of annotationsQuery.data ?? []) {
+    for (const a of readOnly ? [] : (annotationsQuery.data ?? [])) {
       const list = map.get(a.traceId);
       if (list) list.push(a);
       else map.set(a.traceId, [a]);
     }
     return map;
-  }, [annotationsQuery.data]);
+  }, [annotationsQuery.data, readOnly]);
 
   // Single pass over `turns`: pre-parse the latest user message and the
   // wall-clock gap to the previous turn. Without this, every ChatTurnRow
@@ -145,6 +147,7 @@ export const ConversationView = memo(function ConversationView({
   }, [currentTraceId]);
   const handleSelectTurn = useCallback(
     (traceId: string) => {
+      if (readOnly) return;
       navigateToTrace({
         fromTraceId: currentTraceIdRef.current,
         fromViewMode: "conversation",
@@ -155,7 +158,7 @@ export const ConversationView = memo(function ConversationView({
         persistViewMode: false,
       });
     },
-    [navigateToTrace],
+    [navigateToTrace, readOnly],
   );
 
   // Build markdown at the parent so the result survives mode toggles. Stay
@@ -199,6 +202,7 @@ export const ConversationView = memo(function ConversationView({
         onModeChange={setMode}
         isExpandAllEnabled={isExpandAllEnabled}
         onToggleExpandAll={() => setIsExpandAllEnabled((v) => !v)}
+        readOnly={readOnly}
       />
       {mode === "thread" || mode === "bubbles" ? (
         <ConversationExpandContext.Provider
@@ -211,6 +215,7 @@ export const ConversationView = memo(function ConversationView({
             currentTraceId={currentTraceId}
             onSelectTurn={handleSelectTurn}
             annotationsByTrace={annotationsByTrace}
+            readOnly={readOnly}
           />
         </ConversationExpandContext.Provider>
       ) : mode === "annotations" ? (
@@ -347,6 +352,7 @@ const ConversationHeader: React.FC<{
   onModeChange: (m: Mode) => void;
   isExpandAllEnabled: boolean;
   onToggleExpandAll: () => void;
+  readOnly: boolean;
 }> = ({
   conversationId,
   turnCount,
@@ -354,6 +360,7 @@ const ConversationHeader: React.FC<{
   onModeChange,
   isExpandAllEnabled,
   onToggleExpandAll,
+  readOnly,
 }) => {
   // Expand-all only applies to the message layouts that truncate.
   const isExpandAllVisible = mode === "thread" || mode === "bubbles";
@@ -399,7 +406,11 @@ const ConversationHeader: React.FC<{
       <SegmentedToggle
         value={mode}
         onChange={(v) => onModeChange(v as Mode)}
-        options={["thread", "bubbles", "markdown", "annotations"]}
+        options={
+          readOnly
+            ? ["thread", "bubbles", "markdown"]
+            : ["thread", "bubbles", "markdown", "annotations"]
+        }
       />
     </HStack>
   );
@@ -419,6 +430,7 @@ const TurnsView: React.FC<{
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
   annotationsByTrace: AnnotationsByTrace;
+  readOnly: boolean;
 }> = ({
   layout,
   parsedTurns,
@@ -426,6 +438,7 @@ const TurnsView: React.FC<{
   currentTraceId,
   onSelectTurn,
   annotationsByTrace,
+  readOnly,
 }) => {
   const systemPrompt = useMemo(
     () => extractSystemText(systemPromptInput),
@@ -441,6 +454,7 @@ const TurnsView: React.FC<{
         currentTraceId={currentTraceId}
         onSelectTurn={onSelectTurn}
         annotationsByTrace={annotationsByTrace}
+        readOnly={readOnly}
       />
     );
   }
@@ -495,6 +509,7 @@ const TurnsView: React.FC<{
                   annotationsByTrace.get(p.turn.traceId) ??
                   EMPTY_ANNOTATION_ITEMS
                 }
+                readOnly={readOnly}
               />
             </Box>
           );
@@ -542,6 +557,7 @@ const VirtualizedTurnsView: React.FC<{
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
   annotationsByTrace: AnnotationsByTrace;
+  readOnly: boolean;
 }> = ({
   layout,
   parsedTurns,
@@ -549,6 +565,7 @@ const VirtualizedTurnsView: React.FC<{
   currentTraceId,
   onSelectTurn,
   annotationsByTrace,
+  readOnly,
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -618,6 +635,7 @@ const VirtualizedTurnsView: React.FC<{
                     annotationsByTrace.get(p.turn.traceId) ??
                     EMPTY_ANNOTATION_ITEMS
                   }
+                  readOnly={readOnly}
                 />
               </Box>
             );

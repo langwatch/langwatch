@@ -986,7 +986,7 @@ describe("RBAC Integration Tests", () => {
           mockCtx.shareGrant = {
             share_id: "share-123",
             project_id: "project-123",
-            resource_type: "THREAD",
+            resource_type: "TRACE",
             resource_id: "trace-123",
             thread_id: null,
           };
@@ -1006,7 +1006,7 @@ describe("RBAC Integration Tests", () => {
           mockCtx.shareGrant = {
             share_id: "share-123",
             project_id: "project-123",
-            resource_type: "THREAD",
+            resource_type: "TRACE",
             resource_id: "trace-123",
             thread_id: "conv-1",
           };
@@ -1027,7 +1027,7 @@ describe("RBAC Integration Tests", () => {
           mockCtx.shareGrant = {
             share_id: "share-123",
             project_id: "project-123",
-            resource_type: "THREAD",
+            resource_type: "TRACE",
             resource_id: "trace-123",
             thread_id: "conv-1",
           };
@@ -1047,7 +1047,7 @@ describe("RBAC Integration Tests", () => {
           mockCtx.shareGrant = {
             share_id: "share-123",
             project_id: "project-a",
-            resource_type: "THREAD",
+            resource_type: "TRACE",
             resource_id: "trace-123",
             thread_id: "conv-1",
           };

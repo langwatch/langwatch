@@ -1583,8 +1583,10 @@ export const checkPermissionOrPubliclyShared =
 /**
  * Sibling of `checkPermissionOrPubliclyShared` for reads keyed by conversation
  * rather than trace id. Only a share created *with* its surrounding thread
- * carries a `thread_id` claim, so a trace-scoped link cannot pull the whole
- * conversation. See ADR-039.
+ * carries a `thread_id` claim, so an ordinary trace link cannot pull the whole
+ * conversation. The link itself remains TRACE-scoped: its resource id selects
+ * the initial trace while `thread_id` is the explicit conversation capability.
+ * See ADR-039.
  */
 export const checkPermissionOrSharedThread =
   <InputType extends { projectId: string; conversationId: string }>(
@@ -1607,7 +1609,6 @@ export const checkPermissionOrSharedThread =
       const grant = ctx.shareGrant;
       const grantCoversThread =
         !!grant &&
-        grant.resource_type === "THREAD" &&
         grant.project_id === input.projectId &&
         !!grant.thread_id &&
         grant.thread_id === input.conversationId;

@@ -33,6 +33,7 @@ import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import { useTraceViewer } from "../../../context/TraceViewerContext";
 import { useConversationContext } from "../../../hooks/useConversationContext";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useSpanTree } from "../../../hooks/useSpanTree";
@@ -64,7 +65,6 @@ import { splitChipsForOverflow } from "../ChipBar";
 import { ExceptionsContent } from "../ExceptionsContent";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
-import { ShareTraceDialog } from "./ShareTraceDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
 import { EditableTraceName } from "./EditableTraceName";
 import { MetricPill } from "./MetricPill";
@@ -73,6 +73,7 @@ import {
   type PinCategory,
   renderPinPills,
 } from "./PinStrip";
+import { ShareTraceDialog } from "./ShareTraceDialog";
 import { ThreadProgressIndicator } from "./ThreadProgressIndicator";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
 import { useRetainedTraceHeader } from "./useRetainedTraceHeader";
@@ -487,6 +488,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   onClose,
   readOnly = false,
 }: DrawerHeaderProps) {
+  const { sharedThreadId } = useTraceViewer();
   // Retain attribute-derived fields across payload flaps (row-data seed →
   // full summary → refetch) so chips never vanish once shown for the same
   // traceId — see useRetainedTraceHeader for the root-cause writeup.
@@ -587,6 +589,9 @@ export const DrawerHeader = memo(function DrawerHeader({
     trace.conversationId ?? null,
     trace.traceId,
   );
+  const canViewConversation =
+    !!trace.conversationId &&
+    (!readOnly || trace.conversationId === sharedThreadId);
   const { pins, removePin } = usePinnedAttributes(project?.id);
   const toggleFacet = useFilterStore((s) => s.toggleFacet);
   // `applyQueryTextFromPin` is used by the auto-pinned metadata filter
@@ -1290,7 +1295,7 @@ export const DrawerHeader = memo(function DrawerHeader({
         <ModeSwitch
           viewMode={viewMode}
           onViewModeChange={setViewMode}
-          hasConversation={!!trace.conversationId}
+          hasConversation={canViewConversation}
           // `useConversationContext` returns `isLoading: true` while the
           // turns are in flight; combined with `turns.length === 0` it
           // means the conversation hasn't resolved yet. We only want the

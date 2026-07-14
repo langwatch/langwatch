@@ -136,7 +136,11 @@ export default function SharePage() {
 
   return (
     <DashboardLayout publicPage>
-      <TraceViewerProvider traceId={resolve.data.resourceId} readOnly>
+      <TraceViewerProvider
+        traceId={resolve.data.resourceId}
+        readOnly
+        sharedThreadId={resolve.data.threadId}
+      >
         <SharedTraceView traceId={resolve.data.resourceId} />
       </TraceViewerProvider>
     </DashboardLayout>

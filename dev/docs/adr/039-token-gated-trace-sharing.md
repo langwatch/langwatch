@@ -66,9 +66,9 @@ not via `res.setHeader` / `req.cookies`, both of which are silently absent there
 users pass on their own permission; otherwise the middleware requires a valid
 grant cookie whose claims cover the requested `projectId` + resource. The
 resource-existence lookup is removed entirely — this is what closes the
-trace-ID-guessing hole. `getTracesByThreadId` reads the grant's `thread_id`: a
-thread-scoped share reveals the whole conversation, a trace-scoped one reveals
-only the granted trace within it.
+trace-ID-guessing hole. Conversation reads check the grant's `thread_id`: a
+trace share created with its thread reveals that exact conversation, while an
+ordinary trace share reveals only the granted trace.
 
 **Single view.** One view = one grant issuance. `resolve` is idempotent within
 the grant's lifetime (a still-valid grant for the same share re-resolves without
@@ -97,10 +97,12 @@ disables the queries behind them (`pinnedTrace.getPin`, `share.listForResource`,
 concern, never a security boundary — the server authorizes every read against
 the grant.
 
-Conversation view is suppressed for read-only viewers because it is backed by
-`tracesV2.list`, the traces-table query with arbitrary filters, which must never
-open to a share grant. The summary pane's conversation-context strip still
-renders, since it is backed by the thread-gated `conversationContext`.
+Conversation view never opens `tracesV2.list`, the traces-table query with
+arbitrary filters, to a share grant. A link created with “Include the
+conversation” carries the exact conversation id in its `thread_id` claim and
+the read-only viewer reuses the narrowly scoped, thread-gated
+`conversationContext` endpoint. A trace-only link has no such claim, does not
+issue that query, and keeps the Conversation tab disabled.
 
 ## Rationale / Trade-offs
 
@@ -134,9 +136,8 @@ trivial legacy backfill) rather than an oversight.
   survives; the legacy trace-delete REST route still calls it.
 - `TraceDrawerContent` is now the seam any future full-page trace surface should
   reuse; the shell is chrome only.
-- Follow-ups: hash tokens at rest; a thread-gated `conversationTurns` endpoint so
-  shared conversations can render without opening `tracesV2.list`; offer "revoke
-  all links for this trace" in the management UI; the public page still mounts
+- Follow-ups: hash tokens at rest; offer "revoke all links for this trace" in
+  the management UI; the public page still mounts
   `DashboardLayout`, whose `featureFlag.isEnabled` / `ops.getScope` /
   `annotation.getPendingItemsCount` probes 401 for anonymous viewers (pre-existing).
 

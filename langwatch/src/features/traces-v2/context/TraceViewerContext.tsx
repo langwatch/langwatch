@@ -20,6 +20,13 @@ export interface TraceViewer {
   /** Overrides `drawerStore.traceId` when set. */
   traceId?: string;
   readOnly: boolean;
+  /**
+   * Conversation covered by the active share grant. Absent in the live drawer;
+   * null for a trace-only share. Read-only conversation queries must match this
+   * id before they run so an ordinary trace link never probes the surrounding
+   * thread.
+   */
+  sharedThreadId?: string | null;
 }
 
 const TraceViewerContext = createContext<TraceViewer>({ readOnly: false });
@@ -27,9 +34,13 @@ const TraceViewerContext = createContext<TraceViewer>({ readOnly: false });
 export function TraceViewerProvider({
   traceId,
   readOnly,
+  sharedThreadId,
   children,
 }: TraceViewer & { children: ReactNode }) {
-  const value = useMemo(() => ({ traceId, readOnly }), [traceId, readOnly]);
+  const value = useMemo(
+    () => ({ traceId, readOnly, sharedThreadId }),
+    [traceId, readOnly, sharedThreadId],
+  );
   return (
     <TraceViewerContext.Provider value={value}>
       {children}
