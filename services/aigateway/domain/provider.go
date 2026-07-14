@@ -74,16 +74,21 @@ func WithDeploymentSelfMap(cred Credential, bareModel string) Credential {
 	default:
 		return cred
 	}
-	if cred.DeploymentMap == nil {
-		cred.DeploymentMap = map[string]string{}
+	if _, present := cred.DeploymentMap[bareModel]; present {
+		return cred
 	}
-	if _, present := cred.DeploymentMap[bareModel]; !present {
-		deployment := bareModel
-		if explicit := cred.Extra["deployment"]; explicit != "" {
-			deployment = explicit
-		}
-		cred.DeploymentMap[bareModel] = deployment
+	deployment := bareModel
+	if explicit := cred.Extra["deployment"]; explicit != "" {
+		deployment = explicit
 	}
+	// Copy on write: cred arrives by value, but DeploymentMap is a reference, so
+	// writing through it would land in the caller's map.
+	next := make(map[string]string, len(cred.DeploymentMap)+1)
+	for model, target := range cred.DeploymentMap {
+		next[model] = target
+	}
+	next[bareModel] = deployment
+	cred.DeploymentMap = next
 	return cred
 }
 
