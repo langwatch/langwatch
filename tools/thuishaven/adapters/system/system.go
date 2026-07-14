@@ -89,6 +89,36 @@ func (System) SpawnDetached(argv []string, dir, logPath string) error {
 func (System) Now() time.Time { return time.Now() }
 func (System) Getpid() int    { return os.Getpid() }
 
+// GroupRSS sums the resident set of every process in pid's process group —
+// the closest cheap approximation of what a supervised stack costs in RAM
+// (the launcher spawns its children with Setpgid, so the group is the stack).
+// Returns 0 when the group can't be read.
+func (System) GroupRSS(pid int) uint64 {
+	out, err := exec.Command("ps", "-o", "pgid=", "-p", strconv.Itoa(pid)).Output()
+	if err != nil {
+		return 0
+	}
+	pgid := strings.TrimSpace(string(out))
+	if pgid == "" {
+		return 0
+	}
+	all, err := exec.Command("ps", "-ax", "-o", "pgid=,rss=").Output()
+	if err != nil {
+		return 0
+	}
+	var kb uint64
+	for _, line := range strings.Split(string(all), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 || fields[0] != pgid {
+			continue
+		}
+		if n, err := strconv.ParseUint(fields[1], 10, 64); err == nil {
+			kb += n
+		}
+	}
+	return kb * 1024
+}
+
 // TotalMemory returns the machine's physical RAM in bytes (0 if undetectable).
 // darwin: sysctl hw.memsize; linux: /proc/meminfo MemTotal.
 func (System) TotalMemory() uint64 {

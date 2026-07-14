@@ -80,10 +80,23 @@ COMMANDS
                   down. Runs as one resource-capped container on the same colima
                   VM as ClickHouse. Once it is up, every stack you start exports
                   to it automatically, tagged langwatch.worktree=<slug>. Alias: obs.
-    seed          Reseed this stack's database (fresh DB on demand).
+    seed          Reseed this stack's database (fresh DB on demand). Refuses
+                  when the worktree's effective DATABASE_URL/CLICKHOUSE_URL is
+                  not local dev (non-loopback host, wrong user, or a
+                  production-looking name).
+    git [target]  Open the embedded git TUI (moron) for a worktree: no target
+                  is this worktree; a stack slug, worktree name, or directory
+                  opens that one — inspect branches, diffs, and worktrees
+                  without cd-ing or checking anything out. --list prints a
+                  plain per-worktree overview (branch, dirty, up) instead of
+                  the TUI; agents always get that (--json for JSON).
+                  Alias: moron.
     prune [--yes] Reclaim regenerable disk (node_modules, dist, .vite, caches)
-                  from worktrees that are neither up nor dirty. Dry-run without
-                  --yes. Also prunes orphaned git worktree admin entries.
+                  from worktrees that are neither up nor dirty, and drop those
+                  worktrees' ClickHouse + Postgres databases (lingering
+                  connections are terminated; the standing lw_main database is
+                  always kept). Dry-run without --yes. Also prunes orphaned git
+                  worktree admin entries.
     typecheck     Run "pnpm typecheck" under a machine-wide slot so parallel tsgo
                   runs across worktrees don't exhaust RAM (args forwarded).
     hmr on|off    AI-gated HMR: "on [--ttl 30s]" defers Vite reloads while an
@@ -155,6 +168,7 @@ EXAMPLES
     pnpm dev:haven               # up, through haven, in this worktree
     pnpm dev:single:haven        # …with workers hosted in-process (one Node proc)
     haven pr 4913                # try PR #4913 locally in a fresh worktree
+    haven git                    # git TUI for this worktree (haven git <slug> for another)
     haven list --json            # machine-readable inventory of every stack
     haven doctor                 # is everything wired up?
     LANGWATCH_GO_WATCH=1 pnpm dev:haven # air hot-reload for gateway + nlp

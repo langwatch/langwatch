@@ -158,8 +158,13 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	}
 
 	return deps{
-		orch:     app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, logger),
-		dash:     dashboard.New(store.Stacks, sharedURL),
+		orch: app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, logger),
+		dash: dashboard.New(store.Stacks, sharedURL, dashboard.Probes{
+			PortInUse:    sys.PortInUse,
+			ProcessAlive: sys.ProcessAlive,
+			GroupRSS:     sys.GroupRSS,
+			TotalMemory:  sys.TotalMemory,
+		}),
 		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree)},
 		opts:     optionsFromEnv(worktree),
 		worktree: worktree,
@@ -213,11 +218,17 @@ var commands = map[string]command{
 	"observability": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.RunObservability(ctx, rest)
 	},
-	"hmr":  func(ctx context.Context, d deps, rest []string) error { return d.orch.RunHMR(ctx, d.lwDir, rest) },
-	"seed": func(ctx context.Context, d deps, _ []string) error { return d.orch.Seed(ctx, d.params) },
+	"hmr": func(ctx context.Context, d deps, rest []string) error { return d.orch.RunHMR(ctx, d.lwDir, rest) },
+	"seed": func(ctx context.Context, d deps, _ []string) error {
+		if err := guardSeedEnv(d.lwDir); err != nil {
+			return err
+		}
+		return d.orch.Seed(ctx, d.params)
+	},
 	"list": func(_ context.Context, d deps, rest []string) error {
 		return d.orch.List(d.isAgent || hasFlag(rest, "--json"))
 	},
+	"git":    runGitUI,
 	"doctor": func(_ context.Context, d deps, _ []string) error { return d.orch.Doctor() },
 }
 
@@ -229,6 +240,7 @@ var aliases = map[string]string{
 	"tc":     "typecheck",
 	"ls":     "list",
 	"status": "list",
+	"moron":  "git",
 }
 
 // observabilityEndpoints are fixed ports rather than ephemeral ones: the gcx CLI

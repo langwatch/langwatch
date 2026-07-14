@@ -60,10 +60,30 @@ haven            live TUI of all stacks (a terminal version of the dashboard)
 haven up         what `pnpm dev:haven` runs — resolve slug, register, supervise
 haven list       every stack: slug, branch, worktree, hostnames (--json too)
 haven doctor     proxy / daemon / observability / stack health
-haven seed       reseed this stack's database
+haven seed       reseed this stack's database (refuses non-local database URLs)
+haven git        embedded git TUI (moron) for any worktree — `haven git <slug>`
+                 inspects another stack's worktree without cd or checkout;
+                 `--list`/`--json` print the per-worktree overview instead
+haven prune      reclaim disk + drop pruned worktrees' databases (dry-run
+                 without --yes; the standing lw_main database is always kept)
 haven down       tear this worktree's routes + registry entry down
 haven help       exhaustive, copy-pasteable reference
 ```
+
+**Git across worktrees.** `haven git` opens [moron](https://github.com/0xdeafcafe/moron)
+in-process (a Go module dependency — nothing extra to install) for the current
+worktree; pass a stack slug, worktree name, or path to open another. Inside the
+TUI, Enter on a branch shows its diff against HEAD without checking it out, and
+Enter on a worktree re-targets the whole view at that worktree — the filesystem
+is never touched. The hub page (`langwatch.localhost`) shows the same fleet with
+live health, per-stack RAM, and database names.
+
+**Destructive-operation guards.** Database drops only ever run against the
+managed loopback servers, `seed` refuses when the worktree's effective
+`DATABASE_URL`/`CLICKHOUSE_URL` is non-local, uses the wrong dev user, or has a
+production-looking name, and bulk cleanup (`prune`, `drop --all`) always keeps
+`lw_main` — the standing database you fall back to when a worktree doesn't need
+its own data.
 
 **Agent mode.** `--agent` (or `HAVEN_AGENT=1`, `NO_COLOR`, or a non-TTY stdout)
 switches to plain, colourless, redraw-free output — zero token waste when an AI

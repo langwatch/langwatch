@@ -23,12 +23,22 @@ import (
 type Server struct {
 	stacks    func() []domain.Stack
 	sharedURL func(service string) string // builds langwatch/observability/telemetry URLs
+	probes    Probes
+}
+
+// Probes are the optional OS checks the page uses to show live health and
+// resource numbers. Any nil probe simply blanks the stat it feeds.
+type Probes struct {
+	PortInUse    func(port int) bool
+	ProcessAlive func(pid int) bool
+	GroupRSS     func(pid int) uint64
+	TotalMemory  func() uint64
 }
 
 // New builds a Server. stacks yields the live registry; sharedURL builds the
 // shared-surface URLs (dashboard root, observability, telemetry).
-func New(stacks func() []domain.Stack, sharedURL func(string) string) *Server {
-	return &Server{stacks: stacks, sharedURL: sharedURL}
+func New(stacks func() []domain.Stack, sharedURL func(string) string, probes Probes) *Server {
+	return &Server{stacks: stacks, sharedURL: sharedURL, probes: probes}
 }
 
 // Serve runs the HTTP surface until the context is cancelled.
@@ -57,7 +67,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = io.WriteString(w, renderHTML(s.stacks(), s.sharedURL))
+	_, _ = io.WriteString(w, renderHTML(s.stacks(), s.sharedURL, s.probes))
 }
 
 // registryStack mirrors domain.Stack for the unauthenticated /api/registry

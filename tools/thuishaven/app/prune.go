@@ -52,7 +52,8 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct boo
 				}
 			}
 		}
-		if len(hits) == 0 {
+		dropped := o.pruneDatabases(ctx, wt.Dir, shouldAct)
+		if len(hits) == 0 && len(dropped) == 0 {
 			continue
 		}
 		total += wtBytes
@@ -62,6 +63,13 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct boo
 			verb = "reclaimed    "
 		}
 		fmt.Printf("  %s %-30s %8s  %v\n", verb, filepath.Base(wt.Dir), humanBytes(wtBytes), hits)
+		if len(dropped) > 0 {
+			dbVerb := "would drop database"
+			if shouldAct {
+				dbVerb = "dropped database   "
+			}
+			fmt.Printf("  %s %-30s %v\n", dbVerb, filepath.Base(wt.Dir), dropped)
+		}
 	}
 
 	o.hyg.PruneGitWorktrees(repoRoot)
@@ -73,6 +81,61 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct boo
 		fmt.Printf("Would reclaim ~%s. Re-run with --yes to act.\n", humanBytes(total))
 	}
 	return nil
+}
+
+// pruneDatabases drops a pruned worktree's ClickHouse + Postgres databases —
+// a pruned worktree's data has no readers left, so lingering connections are
+// terminated rather than respected. It only touches databases haven itself
+// named: the worktree must have a cached slug (written by `up`), so a checkout
+// that never ran a stack is never guessed at. Returns what was (or would be)
+// dropped.
+func (o *Orchestrator) pruneDatabases(ctx context.Context, worktreeDir string, shouldAct bool) []string {
+	slug, ok := o.store.ReadSlugCache(worktreeDir)
+	if !ok || slug == "" {
+		return nil
+	}
+	db := domain.DatabaseForSlug(slug)
+	if domain.IsProtectedDatabase(db) {
+		return nil
+	}
+
+	var dropped []string
+	if o.ch != nil && o.cfg.ShouldManageClickHouse {
+		if dbs, err := o.ch.Databases(ctx); err == nil && contains(dbs, db) {
+			if shouldAct {
+				if err := o.ch.DropDatabase(ctx, db); err != nil {
+					o.log.Warn("prune: clickhouse drop failed", zapErr(err))
+				} else {
+					dropped = append(dropped, db+" (clickhouse)")
+				}
+			} else {
+				dropped = append(dropped, db+" (clickhouse)")
+			}
+		}
+	}
+	if o.pg != nil && o.cfg.ShouldManagePostgres {
+		if dbs, err := o.pg.Databases(ctx); err == nil && contains(dbs, db) {
+			if shouldAct {
+				if err := o.pg.DropDatabase(ctx, db); err != nil {
+					o.log.Warn("prune: postgres drop failed", zapErr(err))
+				} else {
+					dropped = append(dropped, db+" (postgres)")
+				}
+			} else {
+				dropped = append(dropped, db+" (postgres)")
+			}
+		}
+	}
+	return dropped
+}
+
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 // liveWorktreeDirs is the set of worktree dirs with a running stack.
