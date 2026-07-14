@@ -88,3 +88,9 @@ Feature: Trace Explorer is the default trace experience from every entry point
     Scenario: Notification links point at the Trace Explorer trace path
       When a trigger notification includes a link to a trace
       Then the link opens the Trace Explorer with that trace's drawer open
+
+    @integration
+    Scenario: A malformed trace link lands on not-found instead of a blank page
+      Given I received a trace link that is missing its project or trace id
+      When I open the link
+      Then I land on the not-found page
