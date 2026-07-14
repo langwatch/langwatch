@@ -59,10 +59,10 @@ export function tracerMiddleware(options?: { name?: string }) {
         },
         async (span) => {
           let requestError: unknown;
-          let finished = false;
+          let isFinished = false;
           const finishSpan = () => {
-            if (finished) return;
-            finished = true;
+            if (isFinished) return;
+            isFinished = true;
 
             const organizationId = c.get("organization")?.id;
             const projectId = c.get("project")?.id;
@@ -105,15 +105,13 @@ export function tracerMiddleware(options?: { name?: string }) {
               }
             }
 
-            const streamCompletion = getSSECompletion(c);
-            if (streamCompletion) {
-              void streamCompletion.then(finishSpan, (error) => {
+            runAfterSSECompletion({
+              c,
+              onSettled: finishSpan,
+              onStreamError: (error) => {
                 requestError = error;
-                finishSpan();
-              });
-            } else {
-              finishSpan();
-            }
+              },
+            });
           }
         },
       );
@@ -175,16 +173,35 @@ export function loggerMiddleware(options?: { name?: string }) {
           });
         };
 
-        const streamCompletion = getSSECompletion(c);
-        if (streamCompletion) {
-          void streamCompletion.then(logRequest, (streamError) => {
+        runAfterSSECompletion({
+          c,
+          onSettled: logRequest,
+          onStreamError: (streamError) => {
             error = streamError;
-            logRequest();
-          });
-        } else {
-          logRequest();
-        }
+          },
+        });
       }
     });
   };
+}
+
+function runAfterSSECompletion({
+  c,
+  onSettled,
+  onStreamError,
+}: {
+  c: Context;
+  onSettled: () => void;
+  onStreamError: (error: Error) => void;
+}): void {
+  const streamCompletion = getSSECompletion(c);
+  if (!streamCompletion) {
+    onSettled();
+    return;
+  }
+
+  void streamCompletion.then(({ error }) => {
+    if (error) onStreamError(error);
+    onSettled();
+  });
 }

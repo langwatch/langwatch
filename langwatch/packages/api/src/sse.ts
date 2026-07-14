@@ -4,7 +4,11 @@ import type { ZodType, z } from "zod";
 
 import type { EndpointConfig } from "./types.js";
 
-const completions = new WeakMap<Context, Promise<void>>();
+export interface SSECompletion {
+  error?: Error;
+}
+
+const completions = new WeakMap<Context, Promise<SSECompletion>>();
 
 // ---------------------------------------------------------------------------
 // SSE configuration
@@ -100,8 +104,8 @@ export function createSSEResponse<TEvents extends Record<string, ZodType>>({
   handler: (stream: TypedSSEStream<TEvents>) => void | Promise<void>;
   onError?: (error: Error) => void | Promise<void>;
 }): Response {
-  let finish!: () => void;
-  const completion = new Promise<void>((resolve) => {
+  let finish!: (result: SSECompletion) => void;
+  const completion = new Promise<SSECompletion>((resolve) => {
     finish = resolve;
   });
   completions.set(c, completion);
@@ -139,7 +143,7 @@ export function createSSEResponse<TEvents extends Record<string, ZodType>>({
 
       try {
         await handler(typedStream);
-        finish();
+        finish({});
       } catch (error) {
         throw error instanceof Error
           ? error
@@ -151,13 +155,15 @@ export function createSSEResponse<TEvents extends Record<string, ZodType>>({
       try {
         await onError?.(error);
       } finally {
-        finish();
+        finish({ error });
       }
     },
   ) as unknown as Response;
 }
 
 /** Returns the current SSE handler lifecycle for request instrumentation. */
-export function getSSECompletion(c: Context): Promise<void> | undefined {
+export function getSSECompletion(
+  c: Context,
+): Promise<SSECompletion> | undefined {
   return completions.get(c);
 }

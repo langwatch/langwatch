@@ -44,8 +44,8 @@ export function buildEndpointMiddlewareStack<TProject>(
     includeResourceLimit: true,
     serviceConfig: options.serviceConfig,
   });
-  appendOpenApiMiddleware(stack, ep.config);
-  appendValidationMiddleware(stack, ep);
+  appendOpenApiMiddleware({ stack, config: ep.config });
+  appendValidationMiddleware({ stack, ep });
   stack.push(providerMiddleware(options.providers));
   stack.push(handlerMiddleware(options));
 
@@ -128,10 +128,13 @@ function appendAccessMiddleware({
   if (config.middleware) stack.push(...config.middleware);
 }
 
-function appendOpenApiMiddleware(
-  stack: MiddlewareHandler[],
-  config: EndpointConfig,
-): void {
+function appendOpenApiMiddleware({
+  stack,
+  config,
+}: {
+  stack: MiddlewareHandler[];
+  config: EndpointConfig;
+}): void {
   if (!config.output && !config.description) return;
 
   const successStatus = String(config.status ?? 200);
@@ -153,10 +156,13 @@ function appendOpenApiMiddleware(
   );
 }
 
-function appendValidationMiddleware(
-  stack: MiddlewareHandler[],
-  ep: EndpointRegistration,
-): void {
+function appendValidationMiddleware({
+  stack,
+  ep,
+}: {
+  stack: MiddlewareHandler[];
+  ep: EndpointRegistration;
+}): void {
   const addValidator = (
     target: "param" | "query" | "json",
     schema: ZodType | undefined,
@@ -214,6 +220,10 @@ function handlerMiddleware<TProject>({
     const sseConfig = config as unknown as SSEConfig<Record<string, ZodType>>;
     return async (c) => {
       const query = config.query ? c.req.valid("query" as never) : undefined;
+
+      // The streaming response must reach the client before the producer can
+      // safely write. createSSEResponse registers its lifecycle synchronously;
+      // request logging and tracing defer finalization against that lifecycle.
       return createSSEResponse({
         c,
         events: sseConfig.events,
