@@ -328,7 +328,7 @@ describe("ops ReplayService", () => {
         try {
           const repo = createFakeRepo();
           const service = new ReplayService(repo);
-          let resumedAfterAbort = false;
+          let hasResumedAfterAbort = false;
 
           let proceedToProgress!: () => void;
           const progressGate = new Promise<void>((resolve) => {
@@ -341,7 +341,7 @@ describe("ops ReplayService", () => {
             // Wait until the heartbeat has refreshed against the lost lock.
             await progressGate;
             callbacks?.onProgress?.(buildProgress());
-            resumedAfterAbort = true;
+            hasResumedAfterAbort = true;
             return { aggregatesReplayed: 2000, totalEvents: 10000, batchErrors: 0 };
           });
 
@@ -368,7 +368,7 @@ describe("ops ReplayService", () => {
 
           // The throw from onProgress must have aborted the stale run before
           // it could keep replaying alongside the new lock holder.
-          expect(resumedAfterAbort).toBe(false);
+          expect(hasResumedAfterAbort).toBe(false);
           expect(repo.pushToHistory).toHaveBeenCalledWith({
             entry: expect.objectContaining({ state: "cancelled" }),
           });

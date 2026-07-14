@@ -56,11 +56,15 @@ export async function discoverProjectionAggregates({
  * empty/absent (full replay). The optimized path applies the same filter
  * against its aggregate→projection map.
  */
-export function filterDiscoveredByAggregateIds(
-  allAggregates: DiscoveredAggregate[],
-  byTenant: Map<string, DiscoveredAggregate[]>,
-  aggregateIds?: string[],
-): DiscoveredAggregate[] {
+export function filterDiscoveredByAggregateIds({
+  allAggregates,
+  byTenant,
+  aggregateIds,
+}: {
+  allAggregates: DiscoveredAggregate[];
+  byTenant: Map<string, DiscoveredAggregate[]>;
+  aggregateIds?: string[];
+}): DiscoveredAggregate[] {
   if (!aggregateIds || aggregateIds.length === 0) return allAggregates;
   const allowed = new Set(aggregateIds);
   for (const [tid, aggs] of byTenant) {

@@ -85,11 +85,11 @@ export async function replayFoldProjection({
   }
 
   // Scoped replay: keep only the requested aggregates (no-op for full replay).
-  allAggregates = filterDiscoveredByAggregateIds(
+  allAggregates = filterDiscoveredByAggregateIds({
     allAggregates,
     byTenant,
     aggregateIds,
-  );
+  });
 
   if (allAggregates.length === 0) {
     return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0, touchedTenants: [] };
@@ -220,7 +220,16 @@ export async function replayFoldProjection({
         await unpauseProjection({
           redis,
           pauseKey: projection.pauseKey,
-        }).catch(() => {});
+        }).catch((unpauseError) => {
+          // Log but don't rethrow: the original batch error must win, and the
+          // emit below still has to run.
+          log.write({
+            step: "error",
+            error: `unpause failed after batch error: ${
+              unpauseError instanceof Error ? unpauseError.message : String(unpauseError)
+            }`,
+          });
+        });
 
         progress.batchErrors = batchErrors;
         progress.firstError = firstError;

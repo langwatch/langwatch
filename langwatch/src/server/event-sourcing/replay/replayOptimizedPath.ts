@@ -329,7 +329,17 @@ export async function replayOptimized({
         await unpauseProjection({
           redis: ctx.redis,
           pauseKey: p.pauseKey,
-        }).catch(() => {});
+        }).catch((unpauseError) => {
+          // Log but don't rethrow: unpausing the remaining projections (and
+          // the batch's own error handling) must still proceed.
+          log.write({
+            step: "error",
+            batch: batchNum,
+            error: `unpause failed: ${
+              unpauseError instanceof Error ? unpauseError.message : String(unpauseError)
+            }`,
+          });
+        });
       }
       log.write({ step: "unpause-batch", batch: batchNum, projections: allProjectionNames });
     }
