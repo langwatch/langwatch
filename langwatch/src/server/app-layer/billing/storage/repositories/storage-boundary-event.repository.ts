@@ -40,6 +40,29 @@ export interface StoredBoundaryEvent {
  * makes it unrepresentable. A replayed event (same dedup identity) applies
  * nothing and reports `applied: false`.
  */
+export interface NonExitGroupSum {
+  category: string;
+  retentionDays: number;
+  /** Net of all non-EXIT events (entries, seeds, corrections), signed. */
+  totalBytes: bigint;
+}
+
+/**
+ * The net of ALL recorded events (exits included) for one slice-group — the
+ * bytes the gauge currently carries for it. A fully exited, fully reversed,
+ * or fully deleted group nets to zero and needs no further action; a nonzero
+ * net is exactly what a due exit mirrors (negated), what a deletion negates,
+ * and what a retention change re-books.
+ */
+export interface LiveNetGroup {
+  projectId: string;
+  category: string;
+  partitionKey: string;
+  sliceDate: Date;
+  retentionDays: number;
+  netBytes: bigint;
+}
+
 export interface StorageBoundaryEventRepository {
   append(input: AppendBoundaryEventInput): Promise<{ applied: boolean }>;
   findAllByOrganization(params: {
@@ -47,4 +70,24 @@ export interface StorageBoundaryEventRepository {
     /** Inclusive occurredAt upper bound — the fold-to-H replay cut. */
     upTo?: Date;
   }): Promise<StoredBoundaryEvent[]>;
+  /**
+   * Net recorded non-EXIT bytes per (category, retentionDays) for one
+   * project-partition — the "prior" side of the entry edge's
+   * cumulative-minus-prior delta.
+   */
+  sumNonExitByPartition(params: {
+    organizationId: string;
+    projectId: string;
+    partitionKey: string;
+  }): Promise<NonExitGroupSum[]>;
+  /** Events effective strictly after `after` — the steady-state sampling fast path's guard. */
+  countEventsAfter(params: {
+    organizationId: string;
+    after: Date;
+  }): Promise<number>;
+  /** Live net per slice-group (see LiveNetGroup), optionally scoped to a project. */
+  sumLiveNetGroups(params: {
+    organizationId: string;
+    projectId?: string;
+  }): Promise<LiveNetGroup[]>;
 }

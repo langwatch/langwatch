@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import type { OrganizationRepository } from "../repositories/organization.repository";
-import { OrganizationService } from "../organization.service";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { OrganizationService } from "../organization.service";
+import type { OrganizationRepository } from "../repositories/organization.repository";
 
 // Bypass the traced() proxy for unit tests
 vi.mock("../../tracing", () => ({
@@ -13,6 +13,7 @@ vi.mock("../../tracing", () => ({
 describe("OrganizationService", () => {
   const mockRepo: OrganizationRepository = {
     getOrganizationIdByTeamId: vi.fn(),
+    listBillableOrganizationIds: vi.fn(),
     getUserOrgRole: vi.fn(),
     getUserOrgRoleByTeamId: vi.fn(),
     getProjectIds: vi.fn(),
@@ -57,8 +58,7 @@ describe("OrganizationService", () => {
           "org-123",
         );
 
-        const result =
-          await service.getOrganizationIdByTeamId("team-456");
+        const result = await service.getOrganizationIdByTeamId("team-456");
 
         expect(result).toBe("org-123");
         expect(mockRepo.getOrganizationIdByTeamId).toHaveBeenCalledWith(
@@ -71,8 +71,7 @@ describe("OrganizationService", () => {
       it("returns null", async () => {
         vi.mocked(mockRepo.getOrganizationIdByTeamId).mockResolvedValue(null);
 
-        const result =
-          await service.getOrganizationIdByTeamId("nonexistent");
+        const result = await service.getOrganizationIdByTeamId("nonexistent");
 
         expect(result).toBeNull();
       });
@@ -81,10 +80,7 @@ describe("OrganizationService", () => {
 
   describe("getProjectIds", () => {
     it("returns project IDs for the organization", async () => {
-      vi.mocked(mockRepo.getProjectIds).mockResolvedValue([
-        "proj-1",
-        "proj-2",
-      ]);
+      vi.mocked(mockRepo.getProjectIds).mockResolvedValue(["proj-1", "proj-2"]);
 
       const result = await service.getProjectIds("org-123");
 
@@ -113,7 +109,11 @@ describe("OrganizationService", () => {
           service.updateMemberRole({
             ...baseParams,
             teamRoleUpdates: [
-              { teamId: "team-1", userId: "wrong-user", role: TeamUserRole.MEMBER },
+              {
+                teamId: "team-1",
+                userId: "wrong-user",
+                role: TeamUserRole.MEMBER,
+              },
             ],
           }),
         ).rejects.toThrow(TRPCError);
@@ -122,7 +122,11 @@ describe("OrganizationService", () => {
           service.updateMemberRole({
             ...baseParams,
             teamRoleUpdates: [
-              { teamId: "team-1", userId: "wrong-user", role: TeamUserRole.MEMBER },
+              {
+                teamId: "team-1",
+                userId: "wrong-user",
+                role: TeamUserRole.MEMBER,
+              },
             ],
           }),
         ).rejects.toMatchObject({ code: "BAD_REQUEST" });
@@ -135,7 +139,11 @@ describe("OrganizationService", () => {
           service.updateMemberRole({
             ...baseParams,
             teamRoleUpdates: [
-              { teamId: "team-outside", userId: "user-456", role: TeamUserRole.MEMBER },
+              {
+                teamId: "team-outside",
+                userId: "user-456",
+                role: TeamUserRole.MEMBER,
+              },
             ],
           }),
         ).rejects.toMatchObject({ code: "BAD_REQUEST" });
@@ -157,7 +165,10 @@ describe("OrganizationService", () => {
             userId: "user-456",
             role: OrganizationUserRole.MEMBER,
             effectiveTeamRoleUpdates: expect.arrayContaining([
-              expect.objectContaining({ teamId: "team-1", role: TeamUserRole.ADMIN }),
+              expect.objectContaining({
+                teamId: "team-1",
+                role: TeamUserRole.ADMIN,
+              }),
             ]),
           }),
         );

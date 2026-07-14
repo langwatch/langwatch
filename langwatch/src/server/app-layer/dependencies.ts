@@ -11,6 +11,7 @@ import type { RetroactiveUpdateService } from "../data-retention/retroactive/ret
 import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ExperimentService } from "../experiments/experiment.service";
+import type { StorageCorrectionService } from "./billing/storage/storageCorrection.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
@@ -47,6 +48,15 @@ export interface DataRetentionDependencies {
   pinning: PinnedTraceService;
   retroactive: RetroactiveUpdateService;
   metering: StorageMeterService;
+}
+
+/**
+ * ADR-039 storage billing. Only the correction emitters are exposed to
+ * routes (retention changes, deletion/erasure paths); the sweep itself is
+ * driven exclusively by the storageSweep reactor.
+ */
+export interface StorageBillingDependencies {
+  corrections: StorageCorrectionService;
 }
 
 export interface OpsDependencies {
@@ -105,6 +115,8 @@ export interface AppDependencies {
   usageLimits: UsageLimitService;
   retentionPolicyCache: RetentionPolicyCache;
   dataRetention: DataRetentionDependencies;
+  /** ADR-039 storage billing; absent in non-SaaS / test presets. */
+  storageBilling?: StorageBillingDependencies;
   share: ShareService;
   commands: AppCommands;
   ops?: OpsDependencies;

@@ -1902,7 +1902,7 @@ model StorageBoundaryEvent {
   organizationId String
   projectId      String
   category       String // retention category of the source tables ("traces" | "scenarios" | "experiments")
-  partitionKey   String // toYearWeek of the source partition, e.g. "202625"
+  partitionKey   String // week-partition label: ISO date of its Sunday start, e.g. "2026-06-21" (see partitionKeyFor — never sent to ClickHouse)
   sliceDate      DateTime // the day-slice this delta covers
   retentionDays  Int // _retention_days of the rows in this delta
   edge           String // ENTRY | EXIT | DELETION | SEED | REVERSAL
@@ -1964,9 +1964,13 @@ model StorageBillingCheckpoint {
 // dedup only squashes re-enqueues while a job is staged; this cursor is the
 // guarantee and survives redeploys, which a process-local guard cannot.
 model StorageSweepCursor {
-  id                  String   @id // singleton row
+  id                  String    @id // singleton row
   lastSweptSealedHour DateTime
-  updatedAt           DateTime @updatedAt
+  // Entry-transit measurement is day-grained (boundary calendar); this cursor
+  // makes it run once per UTC day instead of every hourly sweep. Missed days
+  // self-heal: entry deltas are cumulative-minus-prior.
+  lastEntrySweptDay   DateTime?
+  updatedAt           DateTime  @updatedAt
 }
 
 // ============================================================================
