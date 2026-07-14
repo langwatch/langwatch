@@ -1,0 +1,15 @@
+[project]
+name = "redteam-tests"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "langwatch-scenario",
+    "pytest",
+    "pytest-asyncio",
+    "openai",
+    "python-dotenv",
+    "httpx",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

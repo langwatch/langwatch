@@ -416,13 +416,13 @@ export function createSSRFValidator(config: SSRFConfig) {
       config,
     };
 
-    // Always validate metadata and cloud domains (critical security)
+    // Always block cloud metadata endpoints (never allowlistable)
     validateNotMetadataEndpoint(ctx);
-    validateNotBlockedCloudDomain(ctx);
 
     // Allowlist (literal hostname match, case-insensitive) — bypasses
-    // private-IP / localhost blocking. Cloud metadata was already rejected
-    // above, so it can never be allowlisted.
+    // private-IP / localhost blocking AND cloud-domain blocking, but NEVER
+    // bypasses cloud metadata endpoints (blocked above).
+    // This allows on-prem operators to reach internal .local domains.
     if (config.allowedHosts.length > 0) {
       const normalizedAllowed = config.allowedHosts.map((h) =>
         h.trim().toLowerCase(),
@@ -439,6 +439,9 @@ export function createSSRFValidator(config: SSRFConfig) {
         );
       }
     }
+
+    // Block cloud provider internal domains (after allowlist so on-prem .local hosts can be whitelisted)
+    validateNotBlockedCloudDomain(ctx);
 
     // Handle IP literals
     const ipVersion = isIP(hostname);
