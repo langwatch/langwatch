@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -34,9 +35,9 @@ func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch Cl
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).
 type UpParams struct {
-	WorktreeDir  string
-	LwDir        string
-	Branch       string
+	WorktreeDir      string
+	LwDir            string
+	Branch           string
 	ExplicitSlug     string // from LANGWATCH_SLUG; wins over the derived/cached slug
 	IsBaseline       bool   // this stack is the shared default others fall back to
 	IsLinkedWorktree bool   // a `git worktree add` checkout, not the primary clone
@@ -371,9 +372,58 @@ func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
 	})
 }
 
-// Seed reseeds the current stack's database — the "give me a fresh DB" affordance.
-func (o *Orchestrator) Seed(ctx context.Context, p UpParams) error {
-	return o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", nil)
+// SeedPresets are the seed variants beyond the plain static identity. "demo"
+// seeds the project as already past onboarding and ingests sample traces
+// through the running stack's collector, so the UI opens on real-looking data.
+var SeedPresets = []string{"demo"}
+
+// Seed reseeds the current stack's database — the "give me a fresh DB"
+// affordance. A preset layers a variant on top of the stable identity; the
+// empty preset is the unchanged default.
+func (o *Orchestrator) Seed(ctx context.Context, p UpParams, preset string) error {
+	if preset != "" && !contains(SeedPresets, preset) {
+		return fmt.Errorf("unknown seed preset %q — available: %s", preset, strings.Join(SeedPresets, ", "))
+	}
+	var env []string
+	if preset != "" {
+		env = append(env, "HAVEN_SEED_PRESET="+preset)
+	}
+	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
+		return err
+	}
+	if preset != "demo" {
+		return nil
+	}
+	return o.seedSampleTraces(ctx, p)
+}
+
+// seedSampleTraces ingests the deterministic demo traces through the running
+// stack's collector — the real pipeline, not a ClickHouse side door — so the
+// stack must be up. It talks to the app's loopback port over plain HTTP
+// (portless terminates TLS in front of it; Node does not trust the proxy's CA).
+func (o *Orchestrator) seedSampleTraces(ctx context.Context, p UpParams) error {
+	slug, err := o.resolveSlug(p)
+	if err != nil {
+		return err
+	}
+	st, ok := o.stackBySlug(slug)
+	if !ok || !o.sys.ProcessAlive(st.LauncherPID) {
+		return fmt.Errorf("stack %q is not running — sample traces go through the real collector, so start it (pnpm dev:haven) and re-run `haven seed --preset demo`", slug)
+	}
+	var appPort int
+	for _, svc := range st.Services {
+		if svc.Name == "app" && !svc.IsFallback {
+			appPort = svc.Port
+		}
+	}
+	if appPort == 0 || !o.sys.PortInUse(appPort) {
+		return fmt.Errorf("stack %q's app is not answering yet — wait for it to boot and re-run `haven seed --preset demo`", slug)
+	}
+	env := []string{
+		fmt.Sprintf("HAVEN_SEED_ENDPOINT=http://127.0.0.1:%d", appPort),
+		"HAVEN_SEED_LANGWATCH_API_KEY=" + o.cfg.LocalAPIKey,
+	}
+	return o.sup.RunOnce(ctx, "seed-traces", p.LwDir, "pnpm run seed:sample-traces", env)
 }
 
 // runsLocally reports whether this worktree runs the service itself (vs falling

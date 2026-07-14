@@ -60,8 +60,16 @@ COMMANDS
                   (this repo has a postinstall a fork could weaponise); --trusted
                   (or --allow-scripts) opts back in. Either way 'haven up' runs the
                   PR's own app code, so only try PRs you'd be willing to run locally.
-    watch         Live TUI of every running stack + service health (bare 'haven'
-                  in a terminal does the same). --agent gives a plain snapshot.
+    hub           Interactive TUI of every stack (bare 'haven' in a terminal
+                  opens it): health, branch, RAM footprint, and actions on the
+                  selected stack — enter/g opens its git view, d shuts it down
+                  (databases kept), x destroys the worktree entirely (stack
+                  stopped, databases dropped, directory deleted — confirmed by
+                  typing the stack's name; the primary checkout and the worktree
+                  you run haven from are never destroyable). Agents get the
+                  plain list. Aliases: ps, active.
+    watch         Passive live view of every running stack + service health
+                  (no actions). --agent gives a plain snapshot.
     down          Tear this worktree's routes + registry entry down, and drop this
                   stack's ClickHouse + Postgres databases (pass --keep-db to keep
                   them).
@@ -83,7 +91,10 @@ COMMANDS
     seed          Reseed this stack's database (fresh DB on demand). Refuses
                   when the worktree's effective DATABASE_URL/CLICKHOUSE_URL is
                   not local dev (non-loopback host, wrong user, or a
-                  production-looking name).
+                  production-looking name). --preset demo seeds the project as
+                  already past onboarding and ingests deterministic sample
+                  traces through the running stack's collector, so the UI opens
+                  on real-looking data (the stack must be up for the traces).
     git [target]  Open the embedded git TUI (moron) for a worktree: no target
                   is this worktree; a stack slug, worktree name, or directory
                   opens that one — inspect branches, diffs, and worktrees
@@ -143,6 +154,9 @@ ENVIRONMENT
     LANGWATCH_HAVEN_REDIS=0      Do not manage Redis (use .env REDIS_URL).
     HAVEN_REDIS_FORMULA=redis    brew formula to start if none is running.
     HAVEN_REDIS_PORT=6379        Port to expect/start Redis on.
+    HAVEN_REDIS_MAXMEMORY_MB=512 maxmemory ceiling applied to the managed Redis
+                                 (writes fail loudly at the cap instead of the
+                                 machine paging; 0 disables the cap).
     LANGWATCH_LOCAL_API_KEY      Stable local dev API key haven seeds + injects
                                  (default sk-lw-local-development-key) — every
                                  worktree and agent authenticates with the same
@@ -168,7 +182,9 @@ EXAMPLES
     pnpm dev:haven               # up, through haven, in this worktree
     pnpm dev:single:haven        # …with workers hosted in-process (one Node proc)
     haven pr 4913                # try PR #4913 locally in a fresh worktree
+    haven                        # the hub: every stack + actions (git/down/destroy)
     haven git                    # git TUI for this worktree (haven git <slug> for another)
+    haven seed --preset demo     # reseed past onboarding, with sample traces
     haven list --json            # machine-readable inventory of every stack
     haven doctor                 # is everything wired up?
     LANGWATCH_GO_WATCH=1 pnpm dev:haven # air hot-reload for gateway + nlp

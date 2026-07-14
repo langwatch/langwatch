@@ -147,8 +147,8 @@ func (s *Server) runArgs(ep endpoint) []string {
 		"-e", "MALLOC_CONF=background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0",
 		"-e", "CLICKHOUSE_PASSWORD=" + domain.ClickHousePassword,
 
-		"-v", s.dataDir()+":/var/lib/clickhouse",
-		"-v", s.configPath()+":/etc/clickhouse-server/config.d/"+domain.ClickHouseConfigFile+":ro",
+		"-v", s.dataDir() + ":/var/lib/clickhouse",
+		"-v", s.configPath() + ":/etc/clickhouse-server/config.d/" + domain.ClickHouseConfigFile + ":ro",
 
 		s.image,
 	}
@@ -280,7 +280,26 @@ func (s *Server) Health(ctx context.Context) (bool, string) {
 		return false, fmt.Sprintf("provisioned on :%d but not answering", ep.HTTPPort)
 	}
 	dbs, _ := s.Databases(ctx)
-	return true, fmt.Sprintf("up on :%d, %d stack database(s)", ep.HTTPPort, len(dbs))
+	detail := fmt.Sprintf("up on :%d, %d stack database(s)", ep.HTTPPort, len(dbs))
+	if mem := s.memoryUse(ctx); mem != "" {
+		detail += ", " + mem
+	}
+	return true, detail
+}
+
+// memoryUse reports the server's resident memory against its configured
+// ceiling ("" if it cannot be read) — the number that tells you whether the
+// shared ClickHouse is the thing eating the machine.
+func (s *Server) memoryUse(ctx context.Context) string {
+	body, err := s.query(ctx, "SELECT formatReadableSize(value) FROM system.asynchronous_metrics WHERE metric = 'MemoryResident' FORMAT TabSeparated")
+	if err != nil {
+		return ""
+	}
+	used := strings.TrimSpace(body)
+	if used == "" {
+		return ""
+	}
+	return fmt.Sprintf("memory %s of %dMB cap", used, s.limits.ContainerMemoryMB)
 }
 
 // Stop removes the container. Data is a host bind mount, so this loses nothing —

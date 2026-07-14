@@ -52,13 +52,14 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Bare `haven`: the TUI in a terminal, help when driven by an agent/pipe.
+	// Bare `haven`: the interactive hub in a terminal, help when driven by an
+	// agent/pipe.
 	if len(args) == 0 {
 		if isAgent {
 			fmt.Print(helpText)
 			return nil
 		}
-		return d.orch.Watch(ctx)
+		return runHub(ctx, d, nil)
 	}
 	return d.dispatch(ctx, args[0], args[1:])
 }
@@ -117,7 +118,11 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), domain.DefaultColimaLimits(ram, cpus))
 	ch := clickhousedocker.New(rt, havenHome(), envOr("HAVEN_CH_IMAGE", domain.ClickHouseImage), clickHouseLimits())
 	pg := postgresbrew.New(envOr("HAVEN_PG_FORMULA", domain.DefaultPostgresFormula), envInt("HAVEN_PG_PORT", domain.DefaultPostgresPort))
-	rds := redisbrew.New(envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula), envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort))
+	rds := redisbrew.New(
+		envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula),
+		envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort),
+		envInt("HAVEN_REDIS_MAXMEMORY_MB", domain.DefaultRedisMaxMemoryMB),
+	)
 	obs := otellgtm.New(
 		rt,
 		havenHome(),
@@ -219,16 +224,17 @@ var commands = map[string]command{
 		return d.orch.RunObservability(ctx, rest)
 	},
 	"hmr": func(ctx context.Context, d deps, rest []string) error { return d.orch.RunHMR(ctx, d.lwDir, rest) },
-	"seed": func(ctx context.Context, d deps, _ []string) error {
+	"seed": func(ctx context.Context, d deps, rest []string) error {
 		if err := guardSeedEnv(d.lwDir); err != nil {
 			return err
 		}
-		return d.orch.Seed(ctx, d.params)
+		return d.orch.Seed(ctx, d.params, flagValue(rest, "--preset"))
 	},
 	"list": func(_ context.Context, d deps, rest []string) error {
 		return d.orch.List(d.isAgent || hasFlag(rest, "--json"))
 	},
 	"git":    runGitUI,
+	"hub":    runHub,
 	"doctor": func(_ context.Context, d deps, _ []string) error { return d.orch.Doctor() },
 }
 
@@ -241,6 +247,8 @@ var aliases = map[string]string{
 	"ls":     "list",
 	"status": "list",
 	"moron":  "git",
+	"ps":     "hub",
+	"active": "hub",
 }
 
 // observabilityEndpoints are fixed ports rather than ephemeral ones: the gcx CLI
@@ -435,6 +443,20 @@ func stripFlag(args []string, flag string) ([]string, bool) {
 		out = append(out, a)
 	}
 	return out, found
+}
+
+// flagValue returns the value following --name (or embedded in --name=value),
+// "" when the flag is absent.
+func flagValue(args []string, name string) string {
+	for i, a := range args {
+		if a == name && i+1 < len(args) {
+			return args[i+1]
+		}
+		if v, ok := strings.CutPrefix(a, name+"="); ok {
+			return v
+		}
+	}
+	return ""
 }
 
 func hasFlag(args []string, flag string) bool {

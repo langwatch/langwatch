@@ -7,6 +7,7 @@ package hygiene
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -89,4 +90,15 @@ func (Hygiene) Remove(path string) error { return os.RemoveAll(path) }
 // gone (safe: it never touches an existing working tree).
 func (Hygiene) PruneGitWorktrees(repoRoot string) {
 	_ = exec.Command("git", "-C", repoRoot, "worktree", "prune").Run()
+}
+
+// RemoveWorktree deletes a linked worktree, forcing past uncommitted changes
+// (git requires --force twice for a dirty tree). The confirmation ceremony
+// lives in the app layer — by the time this runs, the decision is made.
+func (Hygiene) RemoveWorktree(repoRoot, dir string) error {
+	out, err := exec.Command("git", "-C", repoRoot, "worktree", "remove", "--force", "--force", dir).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git worktree remove: %s", strings.TrimSpace(string(out)))
+	}
+	return nil
 }

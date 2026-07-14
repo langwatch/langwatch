@@ -110,6 +110,12 @@ async function main() {
     `🌱 Seeding static local dev identity (ingestion key: ${apiKey.slice(0, 8)}…)`,
   );
 
+  // HAVEN_SEED_PRESET=demo seeds the project as already past onboarding
+  // (firstMessage/integrated set), so the UI opens on the real product instead
+  // of the "waiting for your first message" journey. `haven seed --preset demo`
+  // sets this and then ingests sample traces through the collector.
+  const isPastOnboarding = process.env.HAVEN_SEED_PRESET === "demo";
+
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },
     create: {
@@ -142,10 +148,12 @@ async function main() {
       teamId: team.id,
       language: "en",
       framework: "langchain",
-      firstMessage: false,
-      integrated: false,
+      firstMessage: isPastOnboarding,
+      integrated: isPastOnboarding,
     },
-    update: { apiKey },
+    update: isPastOnboarding
+      ? { apiKey, firstMessage: true, integrated: true }
+      : { apiKey },
   });
 
   // Admin user + BetterAuth credential (email/password) login.

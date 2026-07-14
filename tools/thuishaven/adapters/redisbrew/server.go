@@ -13,24 +13,28 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 )
 
 // Server is the brew-services-backed implementation of app.Redis.
 type Server struct {
-	formula string
-	port    int
+	formula     string
+	port        int
+	maxMemoryMB int
 }
 
-// New builds a Server for the given formula/port as-is; defaulting to
-// domain.DefaultRedisFormula / domain.DefaultRedisPort happens at the
-// composition root (cmd/root.go), not here.
-func New(formula string, port int) *Server {
-	return &Server{formula: formula, port: port}
+// New builds a Server for the given formula/port/cap as-is; defaulting to
+// domain.DefaultRedisFormula / domain.DefaultRedisPort /
+// domain.DefaultRedisMaxMemoryMB happens at the composition root
+// (cmd/root.go), not here. maxMemoryMB 0 means no cap.
+func New(formula string, port, maxMemoryMB int) *Server {
+	return &Server{formula: formula, port: port, maxMemoryMB: maxMemoryMB}
 }
 
 // Ensure starts the configured formula via `brew services start` unless a
-// redis is already running on the configured port, then returns that port.
+// redis is already running on the configured port, applies the maxmemory
+// ceiling, then returns that port.
 func (s *Server) Ensure(ctx context.Context) (int, error) {
 	if _, err := exec.LookPath("brew"); err != nil {
 		return 0, fmt.Errorf("brew is not installed — haven manages Redis via `brew services` (install: https://brew.sh)")
@@ -46,7 +50,21 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 	if err := s.waitReady(ctx, 15*time.Second); err != nil {
 		return 0, err
 	}
+	s.applyMemoryCap(ctx)
 	return s.port, nil
+}
+
+// applyMemoryCap sets maxmemory on the running server so a leaky stack fails
+// loudly at the ceiling instead of paging the machine. The eviction policy is
+// deliberately left alone: the default noeviction is the only policy safe for
+// BullMQ queues. Best-effort — a redis that refuses CONFIG SET (renamed
+// command, protected mode) still works, just uncapped.
+func (s *Server) applyMemoryCap(ctx context.Context) {
+	if s.maxMemoryMB <= 0 {
+		return
+	}
+	_ = exec.CommandContext(ctx, "redis-cli", "-h", "127.0.0.1", "-p", fmt.Sprint(s.port),
+		"config", "set", "maxmemory", fmt.Sprintf("%dmb", s.maxMemoryMB)).Run()
 }
 
 func (s *Server) waitReady(ctx context.Context, timeout time.Duration) error {
@@ -79,12 +97,41 @@ func (s *Server) Running() bool {
 	return s.ping(ctx)
 }
 
-// Health pings the server and returns a one-line status.
+// Health pings the server and returns a one-line status including its memory
+// footprint against the applied ceiling.
 func (s *Server) Health(ctx context.Context) (bool, string) {
 	if !s.ping(ctx) {
 		return false, fmt.Sprintf("not answering on :%d (brew services info %s)", s.port, s.formula)
 	}
-	return true, fmt.Sprintf("up on :%d (%s)", s.port, s.formula)
+	detail := fmt.Sprintf("up on :%d (%s)", s.port, s.formula)
+	if mem := s.memoryUse(ctx); mem != "" {
+		detail += ", " + mem
+	}
+	return true, detail
+}
+
+// memoryUse reports "used_memory / maxmemory" from INFO memory ("" if it
+// cannot be read). maxmemory 0 renders as "no cap".
+func (s *Server) memoryUse(ctx context.Context) string {
+	out, err := exec.CommandContext(ctx, "redis-cli", "-h", "127.0.0.1", "-p", fmt.Sprint(s.port), "info", "memory").Output()
+	if err != nil {
+		return ""
+	}
+	fields := map[string]string{}
+	for _, line := range strings.Split(string(out), "\n") {
+		if k, v, ok := strings.Cut(strings.TrimSpace(line), ":"); ok {
+			fields[k] = v
+		}
+	}
+	used := fields["used_memory_human"]
+	if used == "" {
+		return ""
+	}
+	cap_ := fields["maxmemory_human"]
+	if cap_ == "" || strings.HasPrefix(cap_, "0") {
+		cap_ = "no cap"
+	}
+	return fmt.Sprintf("memory %s of %s", used, cap_)
 }
 
 // Stop is deliberately a no-op — see the package doc.
