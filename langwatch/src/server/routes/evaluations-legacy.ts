@@ -74,6 +74,10 @@ import {
 } from "~/server/experiments/types";
 import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import { getPayloadSizeHistogram } from "~/server/metrics";
+import {
+  getResolvedDefaultForFeature,
+  type ReadCtx,
+} from "~/server/modelProviders/modelDefaults.read";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
@@ -196,15 +200,18 @@ secured
       }
 
       let body: Record<string, any>;
+      let payloadSize: number;
       try {
-        body = await c.req.json();
+        // Size comes from the wire bytes, not a re-serialisation of the parsed
+        // body — these payloads carry full dataset entries and LLM outputs.
+        const raw = await c.req.text();
+        payloadSize = Buffer.byteLength(raw, "utf8");
+        body = JSON.parse(raw);
       } catch {
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
-      getPayloadSizeHistogram("log_results").observe(
-        JSON.stringify(body).length,
-      );
+      getPayloadSizeHistogram("log_results").observe(payloadSize);
 
       let params: ESBatchEvaluationRESTParams;
       try {
@@ -654,6 +661,44 @@ export const getEvaluatorIncludingCustom = async (
   return availableEvaluators[checkType];
 };
 
+/**
+ * Resolves the project's cascade-configured DEFAULT and EMBEDDINGS models
+ * into the `{ defaultModel, embeddingsModel }` shape that
+ * `getEvaluatorDefaultSettings` consumes for its `model` / `embeddings_model`
+ * fields.
+ *
+ * Without this, the legacy REST route fell through to the hardcoded global
+ * `DEFAULT_MODEL` (`getLatestOpenAIChatFlagship()`), bypassing the project's
+ * model cascade entirely for every API-triggered evaluation (issue #5468).
+ *
+ * The feature keys match the server-side evaluator-create path in
+ * `app/api/evaluators/.../app.v1.ts` (`evaluator.create_default` for the LLM
+ * model, `analytics.topic_clustering_embeddings` for the embeddings model).
+ * When the cascade has nothing configured at any scope, the resolver returns
+ * `null` and `getEvaluatorDefaultSettings` keeps the global fallback — no
+ * regression for projects without a custom default.
+ */
+export const resolveEvaluatorSettingsDefaults = async (
+  projectId: string,
+): Promise<{ defaultModel: string | null; embeddingsModel: string | null }> => {
+  const ctx: ReadCtx = { prisma, session: null };
+  const [resolvedDefault, resolvedEmbeddings] = await Promise.all([
+    getResolvedDefaultForFeature(ctx, {
+      projectId,
+      featureKey: "evaluator.create_default",
+    }),
+    getResolvedDefaultForFeature(ctx, {
+      projectId,
+      featureKey: "analytics.topic_clustering_embeddings",
+    }),
+  ]);
+
+  return {
+    defaultModel: resolvedDefault?.model ?? null,
+    embeddingsModel: resolvedEmbeddings?.model ?? null,
+  };
+};
+
 // --- Evaluator call handler (used by evaluations + guardrails routes) ---
 
 async function handleEvaluatorCall(
@@ -829,7 +874,10 @@ async function handleEvaluatorCall(
   try {
     settings = evaluatorSettingSchema?.parse({
       ...(!workflowEvaluatorDef
-        ? getEvaluatorDefaultSettings(evaluatorDefinition as any)
+        ? getEvaluatorDefaultSettings(
+            evaluatorDefinition as any,
+            await resolveEvaluatorSettingsDefaults(project.id),
+          )
         : {}),
       ...(evaluatorSettings ?? (monitor ? (monitor.parameters as object) : {})),
       ...(params.settings ? params.settings : {}),

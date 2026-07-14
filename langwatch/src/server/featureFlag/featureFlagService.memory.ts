@@ -118,9 +118,6 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
    * Initialize flags with default values.
    */
   private initializeFlags(): void {
-    // Flags that should default to enabled in local dev (no PostHog)
-    this.flags["release_ui_sdk_radar_banner_card_enabled"] = true;
-
     this.logger.debug("Initialized in-memory feature flags");
   }
 

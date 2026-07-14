@@ -1,5 +1,7 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
 
+import { CachedLuaScript } from "./cachedLuaScript";
+
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import { BLOB_HOLDER_TTL_SECONDS } from "./blobConstants";
 import { blobHolderSetKey, redisBlobKey } from "./blobKeys";
@@ -58,6 +60,9 @@ if redis.call("SREM", KEYS[2], ARGV[2]) == 1 and redis.call("SCARD", KEYS[2]) ==
 end
 return 0
 `;
+
+const releaseScript = new CachedLuaScript(RELEASE_LUA);
+const transferScript = new CachedLuaScript(TRANSFER_LUA);
 
 export type ReleaseOutcome = "still-held" | "reclaimed-redis" | "reclaim-s3";
 
@@ -149,8 +154,8 @@ export class BlobHolders {
       tier === "redis"
         ? [this.holderKey(projectId, hash), this.blobKey(projectId, hash)]
         : [this.holderKey(projectId, hash)];
-    const result = (await this.redis.eval(
-      RELEASE_LUA,
+    const result = (await releaseScript.run(
+      this.redis,
       keys.length,
       ...keys,
       slotId,
@@ -191,8 +196,8 @@ export class BlobHolders {
       oldTier === "redis"
         ? [newHolderKey, oldHolderKey, this.blobKey(oldProjectId, oldHash)]
         : [newHolderKey, oldHolderKey];
-    const result = (await this.redis.eval(
-      TRANSFER_LUA,
+    const result = (await transferScript.run(
+      this.redis,
       keys.length,
       ...keys,
       newSlotId,

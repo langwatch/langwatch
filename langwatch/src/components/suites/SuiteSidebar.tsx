@@ -8,7 +8,9 @@
 
 import {
   Box,
+  Button,
   Center,
+  EmptyState,
   HStack,
   IconButton,
   Skeleton,
@@ -18,11 +20,13 @@ import {
 } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import {
+  FlaskConical,
   List,
   MoreVertical,
   PanelLeftOpen,
   PanelRightOpen,
   Play,
+  Plus,
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
@@ -56,6 +60,8 @@ type SuiteSidebarProps = {
   onSelectSuite: (slug: string | typeof ALL_RUNS_ID) => void;
   onRunSuite: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, suiteId: string) => void;
+  /** When set, the empty state offers a "New Run Plan" call to action. */
+  onNewSuite?: () => void;
   isLoading?: boolean;
 };
 
@@ -70,6 +76,7 @@ export function SuiteSidebar({
   onSelectSuite,
   onRunSuite,
   onContextMenu,
+  onNewSuite,
   isLoading = false,
 }: SuiteSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -183,15 +190,29 @@ export function SuiteSidebar({
         )}
 
         {!isLoading && !isCollapsed && hasNoResults && suites.length === 0 && externalSets.length === 0 && (
-          <Text
-            fontSize="sm"
-            color="fg.muted"
-            paddingX={2}
-            paddingY={4}
-            textAlign="center"
-          >
-            No run plans yet
-          </Text>
+          <EmptyState.Root size="sm" paddingY={6}>
+            <EmptyState.Content>
+              <EmptyState.Indicator>
+                <FlaskConical size={22} />
+              </EmptyState.Indicator>
+              <EmptyState.Title fontSize="sm">
+                No run plans yet
+              </EmptyState.Title>
+              <EmptyState.Description
+                fontSize="xs"
+                textAlign="center"
+                maxWidth="180px"
+              >
+                Group scenarios into a plan and run them together against your
+                agent.
+              </EmptyState.Description>
+              {onNewSuite && (
+                <Button size="xs" colorPalette="blue" onClick={onNewSuite}>
+                  <Plus size={14} /> New Run Plan
+                </Button>
+              )}
+            </EmptyState.Content>
+          </EmptyState.Root>
         )}
         {!isLoading && !isCollapsed && hasNoResults &&
           (suites.length > 0 || externalSets.length > 0) && (

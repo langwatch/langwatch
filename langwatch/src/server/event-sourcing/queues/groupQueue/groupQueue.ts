@@ -22,7 +22,10 @@ import {
   tenantIdFromGroupId,
 } from "../../../observability/tenantRateTracker";
 import { connection } from "../../../redis";
-import type { ProjectStorageDestination } from "../../../stored-objects/project-storage-destination";
+import {
+  redactStorageUrisInText,
+  type ProjectStorageDestination,
+} from "../../../stored-objects/project-storage-destination";
 import { isDispatchError } from "../../outbox/dispatchError";
 import type {
   DeduplicationConfig,
@@ -43,10 +46,12 @@ import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle";
 import {
   decodeJobEnvelope,
   encodeJobEnvelope,
+  PayloadTooLargeError,
   readEnvelopeBlobId,
 } from "./jobEnvelope";
 import {
   gqGroupsBlockedTotal,
+  gqGroupsPoisonParkedTotal,
   gqJobDelayMilliseconds,
   gqJobDurationMilliseconds,
   gqJobsCompletedTotal,
@@ -66,6 +71,7 @@ import {
   type DispatchResult,
   type DrainedJob,
   GroupStagingScripts,
+  readClaimStrikeThreshold,
 } from "./scripts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
 
@@ -403,7 +409,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       groupId,
     });
 
-    const { isNew, orphanedValue } = await this.scripts.stage({
+    const { isNew, orphanedValue, reclaimS3 } = await this.scripts.stage({
       stagedJobId,
       groupId,
       dispatchAfterMs,
@@ -415,20 +421,29 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       shouldSurviveDispatch,
     });
 
-    // Acquire this occupancy's hold BEFORE releasing any payload a dedup squash
-    // displaced, so a squash re-staging identical content never drops the shared
-    // blob to zero holders. Both are no-ops for inline/legacy values.
+    // Blob holds for a dedup squash move INSIDE the stage eval, atomic with
+    // the displacement — a post-eval transfer can reorder against a concurrent
+    // squash of the same dedup id and leave a phantom hold that pins the blob
+    // until its TTL (the 2026-07-09 leak). Two cases remain on this side:
+    //   - a squash whose displaced blob is s3-tier and newly unreferenced
+    //     (Lua can't reach s3, so the eval reports it for deletion here);
+    //   - a genuine new stage, whose hold the eval doesn't manage — acquire it
+    //     now. When the squash DISCARDED the new value instead (replace off,
+    //     or a post-dispatch survive-dispatch squash: orphanedValue equals
+    //     jobDataJson), it was never staged and gets no hold: a discarded GQ1
+    //     blob (uniquely owned by this value) was already UNLINKed directly
+    //     inside the eval, while a GQ2 blob is content-addressed and left to
+    //     the holders of staged jobs sharing its content, or to the TTL
+    //     backstop.
     if (orphanedValue) {
-      // Atomic hold transfer: a dedup squash moves the hold from the displaced
-      // value to the new one in one eval, so a partial failure can't reclaim a
-      // live blob (ADR-030 §4).
-      this.blobLifecycle.transfer({
-        newValue: jobDataJson,
-        oldValue: orphanedValue,
-        groupId,
-      });
+      if (reclaimS3) {
+        await this.blobLifecycle.reclaimOrphanedS3({
+          value: orphanedValue,
+          groupId,
+        });
+      }
     } else {
-      this.blobLifecycle.acquire(jobDataJson);
+      await this.blobLifecycle.acquire(jobDataJson);
     }
 
     if (isNew) {
@@ -548,26 +563,28 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }),
     );
 
-    const { newStagedCount, orphanedValues } =
+    const { newStagedCount, orphanedValues, reclaimS3Flags } =
       await this.scripts.stageBatch(jobsToStage);
 
-    // Atomically transfer the hold from any in-batch dedup-squashed value to the
-    // job that displaced it (orphanedValues is index-aligned with jobsToStage);
-    // otherwise just acquire. Matches send()'s atomic path, so a partial failure
-    // can't reclaim a live blob the way a separate acquire+release pair can
-    // (ADR-030 §4).
-    jobsToStage.forEach((job, i) => {
-      const orphan = orphanedValues[i];
-      if (orphan && orphan.length > 0) {
-        this.blobLifecycle.transfer({
-          newValue: job.jobDataJson,
-          oldValue: orphan,
-          groupId: job.groupId,
-        });
-      } else {
-        this.blobLifecycle.acquire(job.jobDataJson);
-      }
-    });
+    // Dedup-squash holds moved inside the stage eval (see send()); here we
+    // only delete s3 objects the eval reported newly unreferenced, and acquire
+    // holds for genuinely new stages. A squash that discarded the NEW value
+    // (orphan === the job's own value) staged nothing and gets no hold.
+    await Promise.all(
+      jobsToStage.map(async (job, i) => {
+        const orphan = orphanedValues[i];
+        if (orphan && orphan.length > 0) {
+          if (reclaimS3Flags[i]) {
+            await this.blobLifecycle.reclaimOrphanedS3({
+              value: orphan,
+              groupId: job.groupId,
+            });
+          }
+        } else {
+          await this.blobLifecycle.acquire(job.jobDataJson);
+        }
+      }),
+    );
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -685,10 +702,57 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
-   * fastq worker function: processes a dispatched job with retries, OTEL tracing,
-   * heartbeats, and error handling.
+   * fastq worker function: poison guard, then the real job processing.
+   *
+   * The guard records a claim strike BEFORE any decode/parse work and clears
+   * it on every code path where the process survives (the finally below -
+   * success, retry, exhausted-park, drop-to-replay, graceful drain all pass
+   * through it). A job that seizes the event loop never reaches the finally:
+   * the liveness probe kills the process, the strike stays behind, and after
+   * enough consecutive deaths the next claim parks the group instead of
+   * re-running the killer (specs/event-sourcing/poison-group-park-guard.feature).
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
+    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+
+    const strikeThreshold = readClaimStrikeThreshold();
+    if (strikeThreshold > 0) {
+      let strikes = 0;
+      try {
+        strikes = await this.scripts.recordClaimStrike(groupId);
+      } catch {
+        // Strike accounting is protective, never load-bearing: an unreadable
+        // counter must not stop the queue.
+      }
+      if (strikes > strikeThreshold) {
+        await this.parkPoisonGroup({
+          groupId,
+          stagedJobId,
+          jobDataJson,
+          originalScore,
+          reason: "claim_strikes",
+          errorMessage: `Poison guard: ${strikes - 1} consecutive worker deaths while this group was in flight (threshold ${strikeThreshold}). Inspect the staged jobs, then unblock the group to retry.`,
+        });
+        return;
+      }
+    }
+
+    try {
+      await this.processClaimedJob(dispatched);
+    } finally {
+      if (strikeThreshold > 0) {
+        this.scripts.clearClaimStrikes(groupId).catch(() => {
+          // The TTL on the strike key bounds the damage of a failed clear.
+        });
+      }
+    }
+  }
+
+  /**
+   * Processes a dispatched job with retries, OTEL tracing, heartbeats, and
+   * error handling.
+   */
+  private async processClaimedJob(dispatched: DispatchResult): Promise<void> {
     const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
 
     // Parse the stored job data
@@ -709,19 +773,36 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         });
         return;
       }
+      if (err instanceof PayloadTooLargeError) {
+        // Over the decode cap: parsing it would seize the event loop. Park the
+        // group with the value intact for inspection - do NOT drop to replay
+        // (replay would re-materialize the same value) and do NOT parse.
+        await this.parkPoisonGroup({
+          groupId,
+          stagedJobId,
+          jobDataJson,
+          originalScore,
+          reason: "oversized_payload",
+          errorMessage: `Poison guard: ${err.message}. The staged value was parked unparsed.`,
+        });
+        return;
+      }
       this.logger.error(
         {
           queueName: this.queueName,
           projectId: tenantIdFromGroupId(groupId),
           stagedJobId,
           groupId,
+          err: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
         },
         "Failed to parse staged job data",
       );
       // Missing blob or unparseable value: complete the slot so it's not stuck;
       // recover via event replay.
       await this.scripts.complete({ groupId, stagedJobId });
-      this.blobLifecycle.release({ values: [jobDataJson], groupId });
+      await this.blobLifecycle.release({ values: [jobDataJson], groupId });
       return;
     }
 
@@ -793,6 +874,26 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               stagedJobId,
               jobDataJson,
               err,
+            });
+            return;
+          }
+          if (err instanceof PayloadTooLargeError) {
+            // An oversized drained sibling can't be parsed (it would seize the
+            // event loop) and re-dispatch would only re-drain it. Mirror the
+            // dispatched-job oversized path: park the group so it stops running
+            // this batch until an operator intervenes. Re-stage the drained
+            // siblings first (same restage the transient path uses) so the
+            // other work, including the oversized value itself, is preserved
+            // in staging for inspection, not lost to replay. The dispatched
+            // job's value carries the park so the group moves to the blocked set.
+            await this.restageDrainedSiblings(groupId, drainedSiblings);
+            await this.parkPoisonGroup({
+              groupId,
+              stagedJobId,
+              jobDataJson,
+              originalScore,
+              reason: "oversized_payload",
+              errorMessage: `Poison guard: a coalesced sibling of this group is oversized (${err.message}). The batch was parked unparsed.`,
             });
             return;
           }
@@ -908,7 +1009,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // removed from staging during the drain, so completing the
               // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
-              this.blobLifecycle.release({
+              await this.blobLifecycle.release({
                 values: [
                   jobDataJson,
                   ...drainedSiblings.map((sibling) => sibling.jobDataJson),
@@ -966,7 +1067,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // can't proceed. Release the OLD hold explicitly and fall
                 // through to the non-retryable fail-safe (complete the slot,
                 // recover via event replay) — otherwise the old hold token
-                // stays in the holder set until the 3-day TTL backstop reclaims
+                // stays in the holder set until the 4-day TTL backstop reclaims
                 // it, leaking the blob for that whole window.
                 let retryJobData: string;
                 try {
@@ -992,7 +1093,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     },
                     "Retry re-encode failed; releasing old hold and falling through to fail-safe",
                   );
-                  this.blobLifecycle.release({
+                  await this.blobLifecycle.release({
                     values: [jobDataJson],
                     groupId,
                   });
@@ -1022,7 +1123,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // hash, so it's SADD+SREM on one holder set (the blob stays
                 // referenced); for a mixed/GQ1 value it falls back to ordered
                 // acquire+release. Drained siblings keep their ORIGINAL values.
-                this.blobLifecycle.transfer({
+                await this.blobLifecycle.transfer({
                   newValue: retryJobData,
                   oldValue: jobDataJson,
                   groupId,
@@ -1097,7 +1198,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                       }),
                   ),
                 );
-                this.blobLifecycle.release({ values: [jobDataJson], groupId });
+                await this.blobLifecycle.release({
+                  values: [jobDataJson],
+                  groupId,
+                });
               }
             }
           },
@@ -1178,11 +1282,20 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       if (err instanceof TransientBlobStoreError) {
         throw err;
       }
+      // An oversized sibling must NOT drop to replay either: replay would
+      // re-materialize the same over-cap value and parsing it would seize the
+      // event loop. Rethrow so the caller parks the group (reason
+      // oversized_payload) with the value intact for inspection, exactly as the
+      // dispatched job's own decode does, instead of silently dropping it.
+      if (err instanceof PayloadTooLargeError) {
+        throw err;
+      }
       this.logger.error(
         {
           queueName: this.queueName,
           groupId,
           stagedJobId: sibling.stagedJobId,
+          err: err instanceof Error ? err.message : String(err),
         },
         "Failed to parse drained sibling job data — dropping (recoverable via replay)",
       );
@@ -1212,7 +1325,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         });
         // Re-acquire the sibling's hold (idempotent: it kept its hold through
         // the drain, and its value — hence token — is unchanged).
-        this.blobLifecycle.acquire(sibling.jobDataJson);
+        await this.blobLifecycle.acquire(sibling.jobDataJson);
       } catch (err) {
         this.logger.error(
           {
@@ -1309,7 +1422,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     // Acquire the re-staged value's hold; the caller releases the dispatched
     // one after this returns (acquire-before-release keeps a GQ2 blob alive).
-    this.blobLifecycle.acquire(jobDataJson);
+    await this.blobLifecycle.acquire(jobDataJson);
 
     gqGroupsBlockedTotal.inc(routingLabels);
     gqJobsExhaustedTotal.inc(routingLabels);
@@ -1323,6 +1436,53 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         error: lastError?.message,
       },
       "Group blocked after exhausted retries, job re-staged",
+    );
+  }
+
+  /**
+   * Claim-side poison park (specs/event-sourcing/poison-group-park-guard.feature):
+   * re-stage the SAME staged value (no decode, no re-encode, hold token
+   * unchanged - the transient-decode rationale applies) and move the group to
+   * the blocked set with a stored error. The value stays inspectable via the
+   * ops peek path; operators recover with the existing unblock/drain surface.
+   */
+  private async parkPoisonGroup({
+    groupId,
+    stagedJobId,
+    jobDataJson,
+    originalScore,
+    reason,
+    errorMessage,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    jobDataJson: string;
+    originalScore: number;
+    reason: "claim_strikes" | "oversized_payload";
+    errorMessage: string;
+  }): Promise<void> {
+    const score =
+      typeof originalScore === "number" ? originalScore : Date.now();
+    await this.scripts.restageAndBlock({
+      groupId,
+      newStagedJobId: `${stagedJobId}/p/${Date.now()}`,
+      score,
+      jobDataJson,
+      errorMessage,
+    });
+    gqGroupsPoisonParkedTotal.inc({
+      queue_name: this.queueName,
+      reason,
+    });
+    this.logger.error(
+      {
+        queueName: this.queueName,
+        projectId: tenantIdFromGroupId(groupId),
+        groupId,
+        stagedJobId,
+        reason,
+      },
+      "Poison guard parked group into the blocked set",
     );
   }
 
@@ -1360,7 +1520,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Blob store unreachable after retries; completing slot to recover via replay",
       );
       await this.scripts.complete({ groupId, stagedJobId });
-      this.blobLifecycle.release({ values: [jobDataJson], groupId });
+      await this.blobLifecycle.release({ values: [jobDataJson], groupId });
       return;
     }
     const backoffMs = getBackoffMs(attempt);

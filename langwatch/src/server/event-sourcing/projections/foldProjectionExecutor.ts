@@ -76,6 +76,14 @@ function withOccurredAtHint(
  * history (event-log read lag), it is applied on top.
  */
 export class FoldProjectionExecutor {
+  /**
+   * @param refoldPageSize events per page for the streaming store-miss re-fold
+   *   (`streamRefoldUpToDelivered`). Bounds the working set; 1000 keeps the
+   *   per-page memory small while amortising the per-query round-trip. Injected
+   *   only so tests can force multi-page runs.
+   */
+  constructor(private readonly refoldPageSize = 1000) {}
+
   async execute<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
     event: E,
@@ -314,6 +322,24 @@ export class FoldProjectionExecutor {
       return e.id > latest.id ? e : latest;
     });
 
+    // Stream the re-fold page-by-page when the fold is order-insensitive and a
+    // paginated loader is wired. Bounds memory for a huge aggregate (a hot
+    // trace's 100k+ events never land in memory whole). Gated on
+    // refoldOnOutOfOrder: false because pages arrive in (timestamp, eventId)
+    // order, not occurredAt order — equivalent only for an order-insensitive
+    // fold.
+    if (
+      projection.eventLoaderUpToPaged &&
+      projection.options?.refoldOnOutOfOrder === false
+    ) {
+      return this.streamRefoldUpToDelivered(
+        projection,
+        delivered,
+        context,
+        upToEvent,
+      );
+    }
+
     const history = await projection.eventLoaderUpTo!({
       tenantId: context.tenantId,
       aggregateId: context.aggregateId,
@@ -347,6 +373,97 @@ export class FoldProjectionExecutor {
     for (const e of combined) {
       state = projection.apply(state, e);
     }
+    return state;
+  }
+
+  /**
+   * Streaming store-miss re-fold for order-insensitive folds: pages the
+   * aggregate's history via `eventLoaderUpToPaged`, folding each page and
+   * discarding it. At most one page of events (plus the fold state and a set of
+   * seen dedup keys) is held at once — the difference between a bounded working
+   * set and OOMing on a 100k-event aggregate, where the array path's single
+   * unbounded read materialises every EventPayload blob simultaneously.
+   *
+   * Parity with the array `refoldUpToDelivered`:
+   * - Dedup: the store returns each page raw (undeduplicated), so the last
+   *   row always matches what was actually read and the cursor never stalls.
+   *   This `seen` set (idempotencyKey ?? id) does the deduplication instead,
+   *   reproducing `deduplicateEvents`'s effect across page boundaries — which
+   *   the strict `>` cursor alone cannot (a retry can share an idempotencyKey
+   *   under a different EventId).
+   * - Order: immaterial — this path is gated on `refoldOnOutOfOrder: false`.
+   * - Missing delivered: any delivered event the history read did not return
+   *   (event-log read lag) is applied on top, as the array path does.
+   */
+  private async streamRefoldUpToDelivered<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    delivered: E[],
+    context: ProjectionStoreContext,
+    upToEvent: E,
+  ): Promise<State | null> {
+    const PAGE_SIZE = this.refoldPageSize;
+    // Safety net only: the paged loader's cursor is expected to strictly
+    // advance every call. If that contract is ever violated (e.g. a
+    // non-advancing cursor from a repository bug), this bounds the loop
+    // instead of hanging the fold worker for the aggregate indefinitely.
+    // 100k pages * 1000/page default covers a 100M-event aggregate.
+    const MAX_PAGES = 100_000;
+    const seen = new Set<string>();
+    let state = projection.init();
+    let after: { timestamp: number; eventId: string } | undefined;
+    let refoldEventCount = 0;
+    let pageCount = 0;
+
+    for (;;) {
+      if (++pageCount > MAX_PAGES) {
+        throw new Error(
+          `streamRefoldUpToDelivered exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
+        );
+      }
+      // biome-ignore lint/style/noNonNullAssertion: caller guards eventLoaderUpToPaged is set.
+      const page = await projection.eventLoaderUpToPaged!({
+        tenantId: context.tenantId,
+        aggregateId: context.aggregateId,
+        upToEvent,
+        after,
+        limit: PAGE_SIZE,
+      });
+      if (page.length === 0) break;
+
+      for (const event of page) {
+        const dedupKey = event.idempotencyKey || event.id;
+        if (seen.has(dedupKey)) continue;
+        seen.add(dedupKey);
+        state = projection.apply(state, event as E);
+        refoldEventCount++;
+      }
+
+      const last = page[page.length - 1]!;
+      after = { timestamp: last.createdAt, eventId: last.id };
+      if (page.length < PAGE_SIZE) break;
+    }
+
+    if (refoldEventCount === 0) return null;
+
+    logger.info(
+      {
+        projection: projection.name,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        deliveredCount: delivered.length,
+        refoldEventCount,
+        streamed: true,
+      },
+      "Store miss with refoldOnStoreMiss — streamed re-fold from the event log",
+    );
+
+    for (const event of delivered) {
+      const dedupKey = event.idempotencyKey || event.id;
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      state = projection.apply(state, event);
+    }
+
     return state;
   }
 }

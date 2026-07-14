@@ -82,13 +82,6 @@ export class SimulationRunService {
     return this.repository.getAllRunDataForScenarioSet(params);
   }
 
-  async getScenarioRunDataByScenarioId(params: {
-    projectId: string;
-    scenarioId: string;
-  }): Promise<ScenarioRunData[] | null> {
-    return this.repository.getScenarioRunDataByScenarioId(params);
-  }
-
   async getBatchRunCountForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
@@ -123,6 +116,21 @@ export class SimulationRunService {
     sinceTimestamp?: number;
   }) {
     return this.repository.getRunDataForAllSuites(params);
+  }
+
+  /**
+   * Cheap freshness signal for the run history views: the latest UpdatedAt
+   * (Unix ms) across the project's runs in the given window. The UI polls
+   * this instead of re-downloading run payloads, and only re-fetches the
+   * heavy run data when the value advances.
+   */
+  async getLastUpdatedAt(params: {
+    projectId: string;
+    scenarioSetId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<number> {
+    return this.repository.findLastUpdatedAt(params);
   }
 
   async getRunIdsForSet(params: {

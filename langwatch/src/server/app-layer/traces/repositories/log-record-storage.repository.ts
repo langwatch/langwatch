@@ -21,12 +21,28 @@ export interface LogRecordStorageRepository {
   /**
    * Read the claude_code logs of one trace (turn) that the receiver marked for
    * span synthesis. The span-sync reactor folds these into spans.
+   *
+   * `limit` bounds how many records are returned (in turn order); the reactor
+   * passes `cap + 1` so it can both convert the first `cap` and detect that the
+   * turn overflowed. Omitted returns the whole turn (historic behaviour).
    */
   getMarkedClaudeCodeLogsByTrace(
     tenantId: string,
     traceId: string,
     occurredAtMs?: number,
+    limit?: number,
   ): Promise<StoredLogRecordRow[]>;
+  /**
+   * Count the trace's (turn's) marked claude_code logs the same way
+   * {@link getMarkedClaudeCodeLogsByTrace} selects them, but uncapped. The
+   * span-sync reactor calls this only when a turn overflows the per-turn cap, so
+   * it can stamp the TRUE dropped-log count instead of the `cap + 1` lower bound.
+   */
+  countMarkedClaudeCodeLogsByTrace(
+    tenantId: string,
+    traceId: string,
+    occurredAtMs?: number,
+  ): Promise<number>;
 }
 
 export class NullLogRecordStorageRepository
@@ -38,7 +54,15 @@ export class NullLogRecordStorageRepository
     _tenantId: string,
     _traceId: string,
     _occurredAtMs?: number,
+    _limit?: number,
   ): Promise<StoredLogRecordRow[]> {
     return [];
+  }
+  async countMarkedClaudeCodeLogsByTrace(
+    _tenantId: string,
+    _traceId: string,
+    _occurredAtMs?: number,
+  ): Promise<number> {
+    return 0;
   }
 }

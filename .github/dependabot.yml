@@ -43,6 +43,12 @@ updates:
     open-pull-requests-limit: 50
     cooldown:
       default-days: 8
+    ignore:
+      # Pinned intentionally: langwatch needs @opentelemetry/otlp-transformer
+      # held at 0.55.0, and keeps a separate @opentelemetry/otlp-transformer-next
+      # alias for the newer line. Do not let dependabot bump the pinned one
+      # (this exact-name ignore does not affect the -next alias).
+      - dependency-name: "@opentelemetry/otlp-transformer"
     groups:
       ai-sdk:
         applies-to: version-updates

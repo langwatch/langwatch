@@ -131,34 +131,92 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
   });
 
-  describe("getScenarioRunDataByScenarioId()", () => {
-    describe("when rows have metadata", () => {
-      it("returns parsed metadata for each run", async () => {
-        const scenarioId = `scenario-byscid-${nanoid()}`;
-        const metadata1 = { env: "staging" };
-        const metadata2 = { env: "production" };
+  describe("findLastUpdatedAt()", () => {
+    describe("when runs exist with distinct UpdatedAt values", () => {
+      it("returns the max UpdatedAt, scoped to the set when requested", async () => {
+        const scenarioSetId = `set-freshness-${nanoid()}`;
+        const otherSetId = `set-freshness-other-${nanoid()}`;
+        const older = now - 60_000;
+        const newer = now - 1_000;
+        const newestElsewhere = now;
 
         await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-byscid-1-${nanoid()}`,
-          ScenarioId: scenarioId,
-          Metadata: JSON.stringify(metadata1),
+          ScenarioSetId: scenarioSetId,
+          UpdatedAt: new Date(older),
         }));
         await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-byscid-2-${nanoid()}`,
-          ScenarioId: scenarioId,
-          Metadata: JSON.stringify(metadata2),
+          ScenarioSetId: scenarioSetId,
+          UpdatedAt: new Date(newer),
+        }));
+        await insertRow(ch, makeInsertRow({
+          ScenarioSetId: otherSetId,
+          UpdatedAt: new Date(newestElsewhere),
         }));
 
-        const result = await repo.getScenarioRunDataByScenarioId({
+        const scoped = await repo.findLastUpdatedAt({
           projectId: tenantId,
-          scenarioId,
+          scenarioSetId,
+          startDate: now - 86_400_000,
         });
+        expect(scoped).toBe(newer);
 
-        expect(result).not.toBeNull();
-        expect(result).toHaveLength(2);
-        const metadatas = result!.map((r) => r.metadata);
-        expect(metadatas).toContainEqual(metadata1);
-        expect(metadatas).toContainEqual(metadata2);
+        const unscoped = await repo.findLastUpdatedAt({
+          projectId: tenantId,
+          startDate: now - 86_400_000,
+        });
+        expect(unscoped).toBeGreaterThanOrEqual(newestElsewhere);
+      });
+    });
+
+    describe("when no rows match the window", () => {
+      it("returns 0", async () => {
+        const result = await repo.findLastUpdatedAt({
+          projectId: tenantId,
+          scenarioSetId: `set-freshness-empty-${nanoid()}`,
+          startDate: now - 86_400_000,
+        });
+        expect(result).toBe(0);
+      });
+    });
+  });
+
+  describe("getRunDataForScenarioSet() list projection", () => {
+    describe("when a run carries detail-only payloads", () => {
+      it("strips Reasoning, Error, and TraceIds from list rows while keeping criteria", async () => {
+        const scenarioSetId = `set-slim-${nanoid()}`;
+        const scenarioRunId = `run-slim-${nanoid()}`;
+
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: scenarioRunId,
+          ScenarioSetId: scenarioSetId,
+          Reasoning: "Multi-paragraph judge rationale",
+          Error: JSON.stringify({ message: "boom" }),
+          TraceIds: ["trace-heavy-1"],
+          MetCriteria: ["criterion-1"],
+          UnmetCriteria: ["criterion-2"],
+        }));
+
+        const listResult = await repo.getRunDataForScenarioSet({
+          projectId: tenantId,
+          scenarioSetId,
+          limit: 10,
+        });
+        expect(listResult.runs).toHaveLength(1);
+        const listRun = listResult.runs[0]!;
+        expect(listRun.results?.reasoning).toBeUndefined();
+        expect(listRun.results?.error).toBeUndefined();
+        expect(listRun.messages.every((m) => !m.trace_id)).toBe(true);
+        expect(listRun.results?.metCriteria).toEqual(["criterion-1"]);
+        expect(listRun.results?.unmetCriteria).toEqual(["criterion-2"]);
+
+        const detailRun = await repo.getScenarioRunData({
+          projectId: tenantId,
+          scenarioRunId,
+        });
+        expect(detailRun?.results?.reasoning).toBe(
+          "Multi-paragraph judge rationale",
+        );
+        expect(detailRun?.messages.some((m) => m.trace_id)).toBe(true);
       });
     });
   });

@@ -13,11 +13,19 @@
 import { generate } from "@langwatch/ksuid";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type {
+  ComparisonEvaluatorConfig,
   EvaluationsV3State,
   EvaluatorConfig,
+  FieldMapping,
   TargetConfig,
 } from "~/experiments-v3/types";
-import { isGoldenFieldSatisfied } from "~/experiments-v3/types";
+import {
+  COMPARISON_EVALUATOR_TYPE,
+  isComparisonEvaluator,
+  isGoldenFieldSatisfied,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
+} from "~/experiments-v3/types";
+import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
@@ -120,7 +128,16 @@ export const generateCells = (
       (e) => e.id === scope.evaluatorId,
     );
 
-    if (!targetConfig || !evaluatorConfig) return cells;
+    // A comparison evaluator needs every variant's output, not one target's
+    // — the same reason Phase 1 skips it (see the comparison-skip comment
+    // below). Attaching it to a single-target cell here would silently
+    // produce an empty input object rather than a real comparison run.
+    if (
+      !targetConfig ||
+      !evaluatorConfig ||
+      isComparisonEvaluator(evaluatorConfig)
+    )
+      return cells;
 
     for (const [rowIndexStr, targetOutput] of Object.entries(
       scope.precomputedTargetOutputs,
@@ -156,7 +173,14 @@ export const generateCells = (
     );
     const datasetEntry = datasetRows[scope.rowIndex];
 
-    if (targetConfig && evaluatorConfig && datasetEntry) {
+    // See the matching guard in the evaluator-all-rows branch above — a
+    // comparison evaluator can't run against one target's precomputed output.
+    if (
+      targetConfig &&
+      evaluatorConfig &&
+      !isComparisonEvaluator(evaluatorConfig) &&
+      datasetEntry
+    ) {
       cells.push({
         rowIndex: scope.rowIndex,
         targetId: scope.targetId,
@@ -191,21 +215,21 @@ export const generateCells = (
 
   // Determine which targets to process.
   //
-  // For target-/cell-scoped runs against a pairwise column-target, the
-  // pairwise verdict needs both variants' outputs to exist before Phase 2
-  // can synthesize the comparison cell. If the user hits Play on the
-  // Pairwise Compare column without first running the variants, expand
-  // the scope to include variantA + variantB so Phase 1 produces what
-  // Phase 2 needs. Without this, only the pairwise target is dispatched,
-  // Phase 1 skips it (column-style pairwise is always Phase-2-only),
-  // and the run completes with 0 cells — visible to the user as a
-  // silent no-op with "No verdict yet" everywhere.
-  const expandPairwiseDeps = (id: string): string[] => {
+  // For target-/cell-scoped runs against a comparison column-target, the
+  // verdict needs every variant's output to exist before Phase 2 can
+  // synthesize the comparison cell. If the user hits Play on the Comparison
+  // column without first running the variants, expand the scope to include
+  // those variants so Phase 1 produces what Phase 2 needs. Without this, only
+  // the comparison target is dispatched, Phase 1 skips it (column-style
+  // comparisons are always Phase-2-only), and the run completes with 0 cells —
+  // visible to the user as a silent no-op with "No verdict yet" everywhere.
+  const expandComparisonDeps = (id: string): string[] => {
     const t = state.targets.find((tg: TargetConfig) => tg.id === id);
-    if (!t || t.type !== "evaluator" || !t.pairwise) return [id];
-    const deps = [t.pairwise.variantA, t.pairwise.variantB].filter(
+    if (!t || t.type !== "evaluator") return [id];
+    const deps = (toComparisonConfig(t)?.variants ?? []).filter(
       (v): v is string => !!v,
     );
+    if (deps.length === 0) return [id];
     return Array.from(new Set([...deps, id]));
   };
 
@@ -215,9 +239,9 @@ export const generateCells = (
       : scope.type === "rows"
         ? state.targets.map((t: TargetConfig) => t.id)
         : scope.type === "target"
-          ? expandPairwiseDeps(scope.targetId)
+          ? expandComparisonDeps(scope.targetId)
           : scope.type === "cell"
-            ? expandPairwiseDeps(scope.targetId)
+            ? expandComparisonDeps(scope.targetId)
             : [];
 
   // Generate cells, skipping empty rows
@@ -237,12 +261,14 @@ export const generateCells = (
       );
       if (!targetConfig) continue;
 
-      // Skip column-style pairwise targets (#5100) in Phase 1 — they need
-      // both variants' outputs which are not yet available in a single
-      // per-target cell. Picked up by generatePairwiseCells in Phase 2.
-      // Strictly additive: only triggered when target.pairwise is set,
-      // which only happens for column-style langevals/pairwise_compare.
-      if (targetConfig.type === "evaluator" && targetConfig.pairwise) {
+      // Skip column-style comparison targets (pairwise #5100, N-way #5101)
+      // in Phase 1 — they need every variant's output, which is not yet
+      // available in a single per-target cell. Picked up by
+      // generateComparisonCells in Phase 2.
+      if (
+        targetConfig.type === "evaluator" &&
+        isComparisonEvaluator(targetConfig)
+      ) {
         continue;
       }
 
@@ -250,10 +276,13 @@ export const generateCells = (
         rowIndex,
         targetId,
         targetConfig,
-        // Pairwise evaluators run in Phase 2 after both variants' outputs
-        // exist — they would crash here because candidate_b's output is not
-        // available within a single per-target cell. See generatePairwiseCells.
-        evaluatorConfigs: state.evaluators.filter((e) => !e.pairwise),
+        // Comparison evaluators (pairwise #5100, N-way #5101) run in Phase 2
+        // once every variant's output exists — they would crash here because
+        // the other candidates' outputs are not available within a single
+        // per-target cell. See generateComparisonCells.
+        evaluatorConfigs: state.evaluators.filter(
+          (e) => !isComparisonEvaluator(e),
+        ),
         datasetEntry: {
           _datasetId: datasetId,
           ...datasetEntry,
@@ -266,36 +295,57 @@ export const generateCells = (
 };
 
 /**
- * Phase 2 cell generator for pairwise evaluators (#5100).
+ * Phase 2 cell generator for comparison evaluators — the one column-vs-column
+ * judge, whether it compares two candidates or ten.
  *
- * Called AFTER Phase 1 (per-target) cells complete. For each pairwise
- * evaluator and each rowIndex where BOTH variantA and variantB outputs
- * exist in `completedTargetOutputs`, emit a synthetic cell whose
- * `pairwise` field carries both candidates. The cell's `targetId` points
- * at variantA so the workflow builder has a real TargetConfig to lean on;
- * `skipTarget` short-circuits target execution. `buildEvaluatorInputs`
- * branches on `cell.pairwise` to assemble the candidate_* + golden inputs.
+ * Called AFTER Phase 1 (per-target) cells complete. For each comparison and
+ * each rowIndex where EVERY configured variant produced an output, emit one
+ * synthetic cell whose `comparison` field carries the candidates list.
+ * `skipTarget` short-circuits target execution; `buildEvaluatorInputs` reads
+ * `cell.comparison` to assemble the candidates + golden inputs.
  *
- * Rows where one variant failed to produce an output are reported via
- * `skipReasons` (not silently dropped) so the caller can emit a synthetic
- * error event per row — otherwise the pairwise column sits at
- * "No verdict yet" with no indication that the upstream variant failed.
+ * Two carriers reach this generator and are treated identically apart from
+ * where the verdict is stored:
+ *   - chip evaluators (`evaluator.comparison`), whose verdict is stored under
+ *     the first variant's column, and
+ *   - column-style comparison targets (`target.comparison`), whose verdict is
+ *     stored under the comparison column itself.
+ *
+ * Rows where a variant produced no output are reported via `skipReasons`
+ * (never silently dropped) so the caller can emit a synthetic error event per
+ * row — otherwise the comparison column sits at "No verdict yet" with no
+ * indication that an upstream variant is the actual problem.
  */
-export type PairwiseSkipReason = {
+export type ComparisonSkipReason = {
   rowIndex: number;
-  /** TargetId under which the pairwise verdict would have been stored. */
+  /** TargetId under which the verdict would have been stored. */
   targetId: string;
-  /** The synthetic evaluator id whose cell would have run. */
+  /** The evaluator (or column-target) id whose cell would have run. */
   evaluatorId: string;
-  /** Display-friendly identifier of variantA. */
-  variantAName: string;
-  /** Display-friendly identifier of variantB. */
-  variantBName: string;
-  /** Which side(s) had no output for this row. */
-  missing: "A" | "B" | "both";
+  /**
+   * Why the row was skipped:
+   *  - "missing-output": a variant hasn't produced output yet — re-running the
+   *    upstream target fixes it.
+   *  - "empty-output": a variant ran but its comparison text came out empty —
+   *    the picked output field is gone (renamed schema) or the output was
+   *    empty/unserializable. Re-running the target will NOT help; the config or
+   *    the output is the problem.
+   */
+  kind: "missing-output" | "empty-output";
+  /** Display-friendly identifiers of the variants that triggered the skip. */
+  variantNames: string[];
 };
 
-export const generatePairwiseCells = (
+/**
+ * "a", "a and b", "a, b and c" — for the skip-reason message, which used to be
+ * able to assume exactly two variants.
+ */
+export const formatList = (names: string[]): string => {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+};
+
+export const generateComparisonCells = (
   state: Pick<
     EvaluationsV3State,
     "datasets" | "activeDatasetId" | "targets" | "evaluators"
@@ -310,24 +360,27 @@ export const generatePairwiseCells = (
     Array<{ name: string; score?: number; label?: string; passed?: boolean }>
   >,
   loadedPrompts?: Map<string, VersionedPrompt>,
-): { cells: ExecutionCell[]; skipReasons: PairwiseSkipReason[] } => {
+  /**
+   * DB evaluators, keyed by id — used to detect a column-target whose backing
+   * evaluator row is still the legacy `pairwise_compare` judge (see
+   * `isLegacyPairwiseBacked` below). Optional so every existing call
+   * site (including every test in this file) keeps compiling unchanged; when
+   * omitted, column-targets are treated as current-shape comparisons, same as
+   * before this parameter existed.
+   */
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
+): { cells: ExecutionCell[]; skipReasons: ComparisonSkipReason[] } => {
   const cells: ExecutionCell[] = [];
-  const skipReasons: PairwiseSkipReason[] = [];
+  const skipReasons: ComparisonSkipReason[] = [];
   const datasetId =
     state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
 
-  // Augment a candidate's output text with the variant's existing evaluator
-  // scores so the pairwise judge can factor them into the verdict. Skips
-  // silently when there are no scores, when the output isn't string-ish, or
-  // when the scores map isn't provided.
   /**
-   * Structured-output narrowing: when the pairwise config carries an
-   * `output_path` for this variant, dig into the candidate's output and
-   * return just that field. This is the fix for pairwise-vs-structured
-   * outputs — otherwise the judge sees the whole JSON blob (or a raw
-   * `[object Object]` in the score-appended path) instead of the single
-   * text the user actually wants to compare. An empty or missing path is
-   * a no-op so pre-existing single-field configs keep working.
+   * Structured-output narrowing: when the comparison config carries an output
+   * path for this variant, dig into the candidate's output and return just
+   * that field. Otherwise the judge sees the whole JSON blob instead of the
+   * single text the user actually wants compared. An empty or missing path is
+   * a no-op, so single-field configs keep working.
    */
   const pickOutputPath = (output: unknown, path?: string[]): unknown => {
     if (!path || path.length === 0) return output;
@@ -346,7 +399,7 @@ export const generatePairwiseCells = (
         // walk here would surface as "Variant outputs missing" for every
         // single-field prompt / agent. Return the scalar itself when the
         // remaining path is exactly one segment — this matches the runtime
-        // unwrap and keeps single-field targets usable in pairwise.
+        // unwrap and keeps single-field targets usable in a comparison.
         return path.length === 1 && path[0] === segment ? cursor : undefined;
       }
       cursor = (cursor as Record<string, unknown>)[segment];
@@ -354,16 +407,20 @@ export const generatePairwiseCells = (
     return cursor;
   };
 
-  const withEvaluatorScores = (
-    output: unknown,
-    rowIndex: number,
-    variantId: string,
-  ): unknown => {
-    if (!completedTargetEvaluatorScores) return output;
-    const scores = completedTargetEvaluatorScores.get(
+  /**
+   * A variant's existing evaluator scores, rendered as a block to append to its
+   * candidate text so the judge can factor them into the verdict. Empty when
+   * there are no scores, or when none of them carry a value.
+   *
+   * This appends to text the caller has already produced, rather than
+   * serializing the output a second time itself — `toCandidateText` is the one
+   * place that turns an output into judge-readable text, structured or not.
+   */
+  const evaluatorScoresBlock = (rowIndex: number, variantId: string): string => {
+    const scores = completedTargetEvaluatorScores?.get(
       `${rowIndex}:${variantId}`,
     );
-    if (!scores || scores.length === 0) return output;
+    if (!scores?.length) return "";
     const lines = scores
       .map((s) => {
         const parts: string[] = [];
@@ -374,31 +431,45 @@ export const generatePairwiseCells = (
         return `- ${s.name}: ${parts.join(", ")}`;
       })
       .filter((l): l is string => l !== null);
-    if (lines.length === 0) return output;
-    const block = `\n\n--- Existing evaluator scores ---\n${lines.join("\n")}`;
-    if (typeof output === "string") return output + block;
-    // For non-string outputs, try to serialize. If JSON.stringify throws
-    // (circular refs / BigInt) we skip the score block entirely and return
-    // the raw output unchanged — appending the block to "[object Object]"
-    // would just confuse the judge without giving it usable context.
+    if (lines.length === 0) return "";
+    return `\n\n--- Existing evaluator scores ---\n${lines.join("\n")}`;
+  };
+
+  /**
+   * Coerce a candidate's output to the string the judge reads.
+   *
+   * langevals types `CandidateInput.output` as `str` and pydantic will not
+   * coerce a dict, a list, or a number — the whole evaluation 422s. A target
+   * emitting a structured output therefore has to arrive here already
+   * flattened. `variantOutputPaths` is the precise way to do that (pick the
+   * `.answer` field), but a user who never opened the field picker still has
+   * an object in hand, and failing their run is the worse answer: the judge
+   * can reason about JSON perfectly well.
+   *
+   * `null` / `undefined` become the empty string, which the judge skips as an
+   * empty candidate rather than judging the text "null".
+   */
+  const toCandidateText = (output: unknown): string => {
+    if (typeof output === "string") return output;
+    if (output === null || output === undefined) return "";
     try {
-      const serialized = JSON.stringify(output);
-      if (serialized === undefined) return output;
-      return serialized + block;
+      return JSON.stringify(output) ?? "";
     } catch {
-      return output;
+      // Circular refs / BigInt. Nothing useful to send; treat as empty so the
+      // row is skipped with "fewer than 2 candidates" instead of 422ing.
+      return "";
     }
   };
 
   // Pick the most human-readable identifier we can derive from a TargetConfig.
-  // langevals echoes `candidate_a_id` / `candidate_b_id` back to us as the
-  // `label` on the verdict, and that label is what every programmatic consumer
-  // (REST, SDK, MCP) will read first — so prefer the prompt's HANDLE
-  // ("say-hi") when we can resolve it; otherwise fall back to the internal
-  // target id ("target_..."). We deliberately do NOT fall back to `promptId`
-  // (the KSUID like "prompt_6IFkbb..."): the aggregator's normalizer matches
-  // against (a) legacy A/B/tie, (b) target.id, or (c) the supplied handle —
-  // a raw promptId KSUID wouldn't normalize and the verdict would be dropped.
+  // langevals echoes each `candidate.id` back to us as the verdict `label`,
+  // and that label is what every programmatic consumer (REST, SDK, MCP) reads
+  // first — so prefer the prompt's HANDLE ("say-hi") when we can resolve it;
+  // otherwise fall back to the internal target id ("target_..."). We
+  // deliberately do NOT fall back to `promptId` (the KSUID like
+  // "prompt_6IFkbb..."): the aggregator's normalizer matches against (a)
+  // legacy A/B/tie, (b) target.id, or (c) the supplied handle — a raw promptId
+  // KSUID wouldn't normalize and the verdict would be dropped.
   const variantIdentifierFor = (t: TargetConfig): string => {
     if (t.type === "prompt" && t.promptId) {
       const handle = loadedPrompts?.get(t.promptId)?.handle;
@@ -407,163 +478,260 @@ export const generatePairwiseCells = (
     return t.id;
   };
 
-  const pairwiseEvaluators = state.evaluators.filter((e) => e.pairwise);
-  // Column-style pairwise targets (#5100): same Phase-2 treatment as chip
-  // evaluators, just with a synthetic EvaluatorConfig synthesized from the
-  // target's stored pairwise config. Keeping both paths in one generator
-  // keeps Phase 2 storage / progress accounting identical.
-  const pairwiseTargets = state.targets.filter(
-    (t) => t.type === "evaluator" && t.pairwise,
-  );
-  if (pairwiseEvaluators.length === 0 && pairwiseTargets.length === 0) {
-    return { cells, skipReasons };
-  }
+  /**
+   * Collision-safe candidate identifiers for a comparison's resolved variants.
+   *
+   * variantIdentifierFor prefers a prompt's HANDLE, which the judge echoes back
+   * as the winning label. But two variants can point at the SAME prompt (the
+   * "reuse the same prompt as two variants" case #5101 adds a spec for —
+   * comparing v1 vs v2, or one prompt with different model overrides) and so
+   * resolve to the SAME handle. The judge still picks a slot correctly, but it
+   * returns a label shared by two candidates, so every downstream consumer
+   * (scoreboard, win-rate chart, per-row winner) credits BOTH variants for the
+   * win and can never name the second as the sole winner.
+   *
+   * When a handle is shared by 2+ variants, fall back to the internal target id
+   * (always unique) for exactly the colliding entries. labelNamesVariant and
+   * detectComparisonColumns both accept target.id as a label, so it round-trips;
+   * the handle is still shown as the display name via useTargetName.
+   */
+  const buildVariantIdentifiers = (
+    resolvedVariants: TargetConfig[],
+  ): string[] => {
+    const raw = resolvedVariants.map(variantIdentifierFor);
+    const counts = new Map<string, number>();
+    for (const id of raw) counts.set(id, (counts.get(id) ?? 0) + 1);
+    return raw.map((id, i) =>
+      (counts.get(id) ?? 0) > 1 ? resolvedVariants[i]!.id : id,
+    );
+  };
 
-  for (const evaluator of pairwiseEvaluators) {
-    const cfg = evaluator.pairwise;
+  /**
+   * Resolve configured variant ids to their TargetConfigs, or null if
+   * unusable. Applies the same "is this comparison usable" gate to every
+   * comparison carrier — chip-style (evaluator.comparison) and column-style
+   * (target.comparison) alike — so a comparison missing its golden field
+   * (see isGoldenFieldSatisfied, #5378) is skipped consistently rather than
+   * running with an empty `golden` while its settings claim golden-aware.
+   */
+  const resolveVariants = (
+    cfg: ComparisonEvaluatorConfig,
+    ownerId: string,
+  ): TargetConfig[] | null => {
+    if (!cfg.variants || cfg.variants.length < 2) {
+      logger.warn(
+        { ownerId, variants: cfg.variants },
+        "Comparison skipped: fewer than 2 variants configured",
+      );
+      return null;
+    }
+    if (!isGoldenFieldSatisfied(cfg)) {
+      logger.debug(
+        {
+          ownerId,
+          variants: cfg.variants,
+          hasGoldenAnswer: cfg.hasGoldenAnswer,
+          goldenField: cfg.goldenField,
+        },
+        "Comparison skipped: golden field not configured",
+      );
+      return null;
+    }
+    const resolved = cfg.variants.map((id) =>
+      state.targets.find((t) => t.id === id),
+    );
+    if (resolved.some((t) => !t)) {
+      logger.warn(
+        { ownerId, variants: cfg.variants },
+        "Comparison skipped: one or more variant targets not found",
+      );
+      return null;
+    }
+    return resolved as TargetConfig[];
+  };
+
+  /**
+   * Whether a column-target's BACKING DB evaluator is still the legacy
+   * two-slot `langevals/pairwise_compare` judge, as opposed to the current
+   * N-way `langevals/select_best_compare` one.
+   *
+   * Column-target cells build a synthetic in-memory EvaluatorConfig (below)
+   * rather than reading one out of `state.targets`/`state.evaluators`, so
+   * unlike a chip-style comparison (whose `evaluator.evaluatorType` is
+   * whatever was actually persisted) the synthetic's type has to be resolved
+   * explicitly. Getting this wrong matters: workflowBuilder's
+   * `buildEvaluatorNode` always dispatches column-targets via
+   * `evaluators/{dbEvaluatorId}`, and that route resolves the judge that
+   * actually runs from the DB row's OWN persisted `config.evaluatorType`
+   * (see evaluations-legacy.ts), ignoring whatever type we hand it here. An
+   * experiment saved before the pairwise/N-way merge still has a DB row
+   * whose evaluatorType is the legacy judge — nothing in this PR migrates
+   * existing rows — so the payload shape built for this cell must match
+   * that row's real type, not the type the workbench would create today.
+   *
+   * Returns false (current-shape) when there's nothing to resolve against
+   * (no `loadedEvaluators`, or the id isn't in it) — the safe default that
+   * matches this function's pre-existing behavior.
+   */
+  const isLegacyPairwiseBacked = (dbEvaluatorId: string | undefined): boolean => {
+    if (!dbEvaluatorId) return false;
+    const dbConfig = loadedEvaluators?.get(dbEvaluatorId)?.config as
+      | { evaluatorType?: string }
+      | undefined;
+    return dbConfig?.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+  };
+
+  /**
+   * The candidate payload for one row, or the names of the variants that had
+   * no output. Applies structured-output narrowing and score augmentation in
+   * the config's variant order — that order is what the judge's deterministic
+   * shuffle is seeded against.
+   */
+  const buildCandidates = (
+    cfg: ComparisonEvaluatorConfig,
+    resolvedVariants: TargetConfig[],
+    variantIds: string[],
+    rowIndex: number,
+  ):
+    | { candidates: ExecutionCell["comparison"]; missing?: never; empty?: never }
+    | { candidates?: never; missing: string[]; empty?: never }
+    | { candidates?: never; missing?: never; empty: string[] } => {
+    const outputs = cfg.variants.map((id) =>
+      completedTargetOutputs.get(`${rowIndex}:${id}`),
+    );
+
+    const missing = variantIds.filter((_, i) => !outputs[i]);
+    if (missing.length > 0) return { missing };
+
+    const candidates = cfg.variants.map((variantId, i) => {
+      // Narrow to the chosen field first, serialize it, then append the
+      // scores. Appending the score block only when there IS text keeps an
+      // empty candidate empty: appending regardless produced a candidate that
+      // was nothing but scores, which langevals won't drop, so the judge scored
+      // a variant that had said nothing against ones that had.
+      const text = toCandidateText(
+        pickOutputPath(outputs[i]!.output, cfg.variantOutputPaths?.[variantId]),
+      );
+      return {
+        // Collision-safe id (handle, or target.id when a handle is shared) so
+        // the winning label always names exactly one variant — see
+        // buildVariantIdentifiers.
+        id: variantIds[i]!,
+        output: text ? text + evaluatorScoresBlock(rowIndex, variantId) : text,
+        cost: outputs[i]!.cost,
+        duration: outputs[i]!.duration,
+      };
+    });
+
+    // A candidate whose text is empty — the picked field is gone, or the output
+    // was empty/unserializable — can't be judged. langevals would drop it and
+    // skip the row silently; surface it as a skip reason instead, so a renamed
+    // output field doesn't turn into a verdict computed from one fewer
+    // candidate (or a bare "no verdict" for a two-way).
+    const empty = variantIds.filter((_, i) => candidates[i]!.output === "");
+    if (empty.length > 0) return { empty };
+
+    return { candidates: { candidates } };
+  };
+
+  // Chip-style comparison evaluators. The verdict is anchored on the first
+  // variant's column, which is where the table's comparison column reads it.
+  for (const evaluator of state.evaluators) {
+    const cfg = toComparisonConfig(evaluator);
     if (!cfg) continue;
 
-    const variantA = state.targets.find((t) => t.id === cfg.variantA);
-    const variantB = state.targets.find((t) => t.id === cfg.variantB);
-    if (!variantA || !variantB) {
-      logger.warn(
-        {
-          evaluatorId: evaluator.id,
-          variantA: cfg.variantA,
-          variantB: cfg.variantB,
-        },
-        "Pairwise evaluator skipped: variant target(s) not found",
-      );
-      continue;
-    }
+    const resolvedVariants = resolveVariants(cfg, evaluator.id);
+    if (!resolvedVariants) continue;
+
+    const variantIds = buildVariantIdentifiers(resolvedVariants);
+    const anchorVariant = resolvedVariants[0]!;
 
     for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const a = completedTargetOutputs.get(`${rowIndex}:${cfg.variantA}`);
-      const b = completedTargetOutputs.get(`${rowIndex}:${cfg.variantB}`);
-      if (!a || !b) {
+      const built = buildCandidates(cfg, resolvedVariants, variantIds, rowIndex);
+      if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
-          targetId: cfg.variantA,
+          targetId: anchorVariant.id,
           evaluatorId: evaluator.id,
-          variantAName: variantIdentifierFor(variantA),
-          variantBName: variantIdentifierFor(variantB),
-          missing: !a && !b ? "both" : !a ? "A" : "B",
+          kind: built.missing ? "missing-output" : "empty-output",
+          variantNames: built.missing ?? built.empty,
         });
         continue;
       }
 
       cells.push({
         rowIndex,
-        // Point at variantA so the workflow builder has a real TargetConfig.
-        // The target step itself is skipped via `skipTarget` below.
-        targetId: cfg.variantA,
-        targetConfig: variantA,
+        // Point at the first variant so the workflow builder has a real
+        // TargetConfig. The target step itself is skipped via `skipTarget`.
+        targetId: anchorVariant.id,
+        targetConfig: anchorVariant,
         evaluatorConfigs: [evaluator],
         datasetEntry: {
           _datasetId: datasetId,
           ...datasetEntry,
         },
         skipTarget: true,
-        precomputedTargetOutput: a.output,
-        pairwise: {
-          candidateA: {
-            id: variantIdentifierFor(variantA),
-            output: withEvaluatorScores(
-              pickOutputPath(a.output, cfg.variantAOutputPath),
-              rowIndex,
-              cfg.variantA,
-            ),
-            cost: a.cost,
-            duration: a.duration,
-          },
-          candidateB: {
-            id: variantIdentifierFor(variantB),
-            output: withEvaluatorScores(
-              pickOutputPath(b.output, cfg.variantBOutputPath),
-              rowIndex,
-              cfg.variantB,
-            ),
-            cost: b.cost,
-            duration: b.duration,
-          },
-        },
+        precomputedTargetOutput: built.candidates!.candidates[0]!.output,
+        comparison: built.candidates,
       });
     }
   }
 
-  // Column-style pairwise targets (#5100). Each is its own column whose
-  // verdict cell stores results under TargetId=column-target.id. A
-  // synthetic EvaluatorConfig (constructed from the target's pairwise
-  // config + dbEvaluatorId) gives buildEvaluatorInputs everything it
-  // needs to take the pairwise branch, and downstream storage records
-  // the verdict against the pairwise column rather than variantA.
-  for (const target of pairwiseTargets) {
-    const cfg = target.pairwise;
+  // Column-style comparison targets. Each is its own column whose verdict is
+  // stored under TargetId=column-target.id rather than under a variant. A
+  // synthetic EvaluatorConfig (from the target's comparison config +
+  // targetEvaluatorId) gives buildEvaluatorInputs everything it needs.
+  for (const target of state.targets) {
+    if (target.type !== "evaluator") continue;
+    const cfg = toComparisonConfig(target);
     if (!cfg || !target.targetEvaluatorId) continue;
 
-    // Skip column-style pairwise targets where the user hasn't finished
-    // configuring the form (see isGoldenFieldSatisfied for the golden-field
-    // rule, #5378). Without variantA/variantB (or golden when required) the
-    // judge endpoint would 400 with "<field> is required" and the cell would
-    // render that as a verdict-shaped error — confusing for users who
-    // haven't opened the drawer yet.
-    const goldenFieldMissing = !isGoldenFieldSatisfied(cfg);
-    if (!cfg.variantA || !cfg.variantB || goldenFieldMissing) {
-      logger.debug(
-        {
-          targetId: target.id,
-          variantA: cfg.variantA,
-          variantB: cfg.variantB,
-          hasGoldenAnswer: cfg.hasGoldenAnswer,
-          goldenField: cfg.goldenField,
-        },
-        "Pairwise column-target skipped: variants or golden field not configured",
-      );
-      continue;
-    }
+    // Variant-count and golden-field gating (#5378) now live in
+    // resolveVariants, shared with the chip-style loop above — a
+    // column-target the user hasn't finished configuring (fewer than two
+    // variants, or a golden field the settings claim but didn't pick) is
+    // skipped the same way a chip-style comparison would be, rather than
+    // hitting the judge endpoint and rendering a verdict-shaped 400 error.
+    const resolvedVariants = resolveVariants(cfg, target.id);
+    if (!resolvedVariants) continue;
 
-    const variantA = state.targets.find((t) => t.id === cfg.variantA);
-    const variantB = state.targets.find((t) => t.id === cfg.variantB);
-    if (!variantA || !variantB) {
-      logger.warn(
-        {
-          targetId: target.id,
-          variantA: cfg.variantA,
-          variantB: cfg.variantB,
-        },
-        "Pairwise column-target skipped: variant target(s) not found",
-      );
-      continue;
-    }
+    const variantIds = buildVariantIdentifiers(resolvedVariants);
+
+    // Resolved once per target (not per row): whether the DB evaluator this
+    // column dispatches to is still the legacy 2-slot judge. See
+    // isLegacyPairwiseBacked's JSDoc for why this can't just read
+    // COMPARISON_EVALUATOR_TYPE off the target/cfg.
+    const legacyPairwise =
+      isLegacyPairwiseBacked(target.targetEvaluatorId) && variantIds.length === 2;
 
     for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const a = completedTargetOutputs.get(`${rowIndex}:${cfg.variantA}`);
-      const b = completedTargetOutputs.get(`${rowIndex}:${cfg.variantB}`);
-      if (!a || !b) {
+      const built = buildCandidates(cfg, resolvedVariants, variantIds, rowIndex);
+      if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
           targetId: target.id,
           evaluatorId: target.id,
-          variantAName: variantIdentifierFor(variantA),
-          variantBName: variantIdentifierFor(variantB),
-          missing: !a && !b ? "both" : !a ? "A" : "B",
+          kind: built.missing ? "missing-output" : "empty-output",
+          variantNames: built.missing ?? built.empty,
         });
         continue;
       }
 
       // `input` falls back to the golden field for datasets with no literal
-      // "input" column — a pre-existing convention (#5100) that predates
-      // the golden-answer toggle. Since #5378 lets goldenField be "" when
+      // "input" column — a pre-existing convention (#5100) that predates the
+      // golden-answer toggle. Since #5378 lets goldenField be undefined when
       // hasGoldenAnswer is off, that fallback is now a no-op for such rows;
       // log it so a silently-empty judge prompt is at least diagnosable
       // instead of indistinguishable from "row has no input, by design."
-      const resolvedInput = datasetEntry.input ?? datasetEntry[cfg.goldenField];
+      const resolvedInput =
+        datasetEntry.input ??
+        (cfg.goldenField ? datasetEntry[cfg.goldenField] : undefined);
       if (
         resolvedInput === undefined &&
         !cfg.hasGoldenAnswer &&
@@ -571,96 +739,104 @@ export const generatePairwiseCells = (
       ) {
         logger.debug(
           { targetId: target.id },
-          "Pairwise column-target: no 'input' dataset column and no golden field to fall back on (has_golden_answer is off) — judge prompt will render an empty task/input",
+          "Comparison column-target: no 'input' dataset column and no golden field to fall back on (has_golden_answer is off) — judge prompt will render an empty task/input",
         );
       }
 
-      // Per-row synthetic evaluator with PRE-RESOLVED value mappings for
-      // every pairwise input field. Pre-fix (#5131) the synthetic was
-      // shared across rows with `mappings: {}`, leaving the candidate_*
-      // fields to be filled in by buildEvaluatorInputs's pairwise branch
-      // and propagated as manual inputs. That path silently dropped
-      // candidate_a_output / candidate_b_output (plus cost/duration) on
-      // the wire — the route's downstream `getEvaluatorDataForParams`
-      // rebuilt `data` from the legacy 6-field default schema, stripping
-      // everything not value-mapped at build time. Embedding the
-      // candidates as `value` mappings here means buildEvaluatorNode
-      // bakes them into the workflow node's static inputs (and the
-      // mapping-branch fallback in buildEvaluatorInputs sees them too)
-      // so the candidate fields always reach the judge regardless of
-      // which code path the dispatch ends up in.
+      // Same #5378 gate buildEvaluatorInputs applies at runtime
+      // (hasGoldenAnswer !== false && goldenField). Without it here too, a
+      // legacy pairwise config folded in with hasGoldenAnswer false but a
+      // stale non-empty goldenField (fromPairwise copies it verbatim) would
+      // still bake a golden reference into this synthetic's static value
+      // mapping while the runtime path correctly omits it — the two
+      // disagreeing on the same config.
+      const goldenValue =
+        cfg.hasGoldenAnswer !== false && cfg.goldenField
+          ? datasetEntry[cfg.goldenField]
+          : undefined;
+
+      // Per-row synthetic evaluator with PRE-RESOLVED value mappings for every
+      // judge input. Pre-fix (#5131) the synthetic was shared across rows with
+      // `mappings: {}`, leaving the candidate fields to be filled in by
+      // buildEvaluatorInputs and propagated as manual inputs. That path
+      // silently dropped them on the wire — the route's downstream
+      // `getEvaluatorDataForParams` rebuilt `data` from the default schema,
+      // stripping everything not value-mapped at build time. Embedding the
+      // candidates as `value` mappings here means buildEvaluatorNode bakes
+      // them into the workflow node's static inputs (and the mapping-branch
+      // fallback in buildEvaluatorInputs sees them too), so they always reach
+      // the judge regardless of which dispatch path is taken.
+      //
+      // The shape baked here must match whichever judge will ACTUALLY run —
+      // the legacy 2-slot `candidate_a_id/output` + `candidate_b_id/output`
+      // shape when `legacyPairwise`, or the N-way `candidates` shape
+      // otherwise. See isLegacyPairwiseBacked's JSDoc for why the DB row,
+      // not this cell's in-memory config, decides which judge runs.
+      const [candidateA, candidateB] = built.candidates!.candidates;
       const perRowMappings: Record<
         string,
         Record<string, Record<string, { type: "value"; value: unknown }>>
       > = {
         [datasetId]: {
-          [target.id]: {
-            candidate_a_id: {
-              type: "value",
-              value: variantIdentifierFor(variantA),
-            },
-            candidate_a_output: {
-              type: "value",
-              value: withEvaluatorScores(
-                pickOutputPath(a.output, cfg.variantAOutputPath),
-                rowIndex,
-                cfg.variantA,
-              ),
-            },
-            candidate_a_cost:
-              a.cost !== undefined
-                ? { type: "value", value: a.cost }
-                : { type: "value", value: undefined },
-            candidate_a_duration:
-              a.duration !== undefined
-                ? { type: "value", value: a.duration }
-                : { type: "value", value: undefined },
-            candidate_b_id: {
-              type: "value",
-              value: variantIdentifierFor(variantB),
-            },
-            candidate_b_output: {
-              type: "value",
-              value: withEvaluatorScores(
-                pickOutputPath(b.output, cfg.variantBOutputPath),
-                rowIndex,
-                cfg.variantB,
-              ),
-            },
-            candidate_b_cost:
-              b.cost !== undefined
-                ? { type: "value", value: b.cost }
-                : { type: "value", value: undefined },
-            candidate_b_duration:
-              b.duration !== undefined
-                ? { type: "value", value: b.duration }
-                : { type: "value", value: undefined },
-            input: {
-              type: "value",
-              value: resolvedInput,
-            },
-            golden: {
-              type: "value",
-              value: datasetEntry[cfg.goldenField],
-            },
-          },
+          [target.id]: legacyPairwise
+            ? {
+                candidate_a_id: { type: "value", value: variantIds[0] },
+                candidate_a_output: {
+                  type: "value",
+                  value: candidateA?.output,
+                },
+                candidate_a_cost: { type: "value", value: candidateA?.cost },
+                candidate_a_duration: {
+                  type: "value",
+                  value: candidateA?.duration,
+                },
+                candidate_b_id: { type: "value", value: variantIds[1] },
+                candidate_b_output: {
+                  type: "value",
+                  value: candidateB?.output,
+                },
+                candidate_b_cost: { type: "value", value: candidateB?.cost },
+                candidate_b_duration: {
+                  type: "value",
+                  value: candidateB?.duration,
+                },
+                input: { type: "value", value: resolvedInput },
+                golden: { type: "value", value: goldenValue },
+              }
+            : {
+                candidates: {
+                  type: "value",
+                  value: built.candidates!.candidates,
+                },
+                row_index: { type: "value", value: rowIndex },
+                input: { type: "value", value: resolvedInput },
+                golden: { type: "value", value: goldenValue },
+              },
         },
       };
 
       const syntheticEvaluator = {
         id: target.id,
         dbEvaluatorId: target.targetEvaluatorId,
-        evaluatorType: "langevals/pairwise_compare",
-        pairwise: cfg,
+        // Mirror the judge that will ACTUALLY run (see
+        // isLegacyPairwiseBacked), not what a freshly-created column would
+        // use — forcing COMPARISON_EVALUATOR_TYPE unconditionally here is
+        // what caused #5528's re-run regression for untouched legacy
+        // pairwise experiments (the payload above was always the N-way
+        // shape, dispatched to a judge that still expects the 2-slot one).
+        evaluatorType: legacyPairwise
+          ? LEGACY_PAIRWISE_EVALUATOR_TYPE
+          : COMPARISON_EVALUATOR_TYPE,
+        comparison: cfg,
         inputs: target.inputs,
         mappings: perRowMappings,
       } as unknown as EvaluatorConfig;
 
       cells.push({
         rowIndex,
-        // Use the column-target's id so the verdict lands in the pairwise
-        // column rather than under variantA's column. Differs from the
-        // chip-style path above where verdicts hang under variantA.
+        // Use the column-target's id so the verdict lands in the comparison
+        // column rather than under the first variant. Differs from the
+        // chip-style path above, where verdicts hang under that variant.
         targetId: target.id,
         targetConfig: target,
         evaluatorConfigs: [syntheticEvaluator],
@@ -669,29 +845,8 @@ export const generatePairwiseCells = (
           ...datasetEntry,
         },
         skipTarget: true,
-        precomputedTargetOutput: a.output,
-        pairwise: {
-          candidateA: {
-            id: variantIdentifierFor(variantA),
-            output: withEvaluatorScores(
-              pickOutputPath(a.output, cfg.variantAOutputPath),
-              rowIndex,
-              cfg.variantA,
-            ),
-            cost: a.cost,
-            duration: a.duration,
-          },
-          candidateB: {
-            id: variantIdentifierFor(variantB),
-            output: withEvaluatorScores(
-              pickOutputPath(b.output, cfg.variantBOutputPath),
-              rowIndex,
-              cfg.variantB,
-            ),
-            cost: b.cost,
-            duration: b.duration,
-          },
-        },
+        precomputedTargetOutput: built.candidates!.candidates[0]!.output,
+        comparison: built.candidates,
       });
     }
   }
@@ -1144,13 +1299,43 @@ export async function* executeWorkflowCell(
   }
 }
 
+// Shared by the pairwise (#5100) and select-best (#5101) branches:
+// resolve `inputs.input` from the variant's dataset mapping, or fall back
+// to the dataset's `input` column. Kept as a mutating helper (rather than
+// a return-then-assign) to preserve the original behavior of setting
+// `inputs.input = undefined` when a mapping matches a missing column,
+// which downstream consumers already tolerate.
+const assignMappedInput = ({
+  inputs,
+  mappings,
+  datasetEntry,
+}: {
+  inputs: Record<string, unknown>;
+  mappings: Record<string, FieldMapping>;
+  datasetEntry: Record<string, unknown>;
+}): void => {
+  const inputMapping = mappings.input;
+  if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
+    inputs.input = datasetEntry[inputMapping.sourceField];
+  } else if (datasetEntry.input !== undefined) {
+    inputs.input = datasetEntry.input;
+  }
+};
+
 /**
  * Builds the input values for an evaluator from target output and dataset entry.
  *
  * Note: Dataset entries are normalized to use column NAMES as keys at the API boundary,
  * so we can use mapping.sourceField directly without ID-to-name translation.
  */
-const buildEvaluatorInputs = (
+/**
+ * Exported (in addition to being used internally by executeCell) so it can be
+ * unit-tested directly: it is the one place that assembles the actual
+ * per-evaluator dispatch payload at runtime, and the comparison branch is
+ * where #5528's legacy-pairwise/N-way payload-shape bug lives. See the
+ * `evaluator.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE` branch below.
+ */
+export const buildEvaluatorInputs = (
   cell: ExecutionCell,
   evaluatorId: string,
   targetOutput: Record<string, unknown>,
@@ -1163,47 +1348,76 @@ const buildEvaluatorInputs = (
   const evaluator = cell.evaluatorConfigs.find((e) => e.id === evaluatorId);
   if (!evaluator) return inputs;
 
-  // Pairwise branch (#5100): synthetic inputs bypassing the per-target
-  // mapping system. We have explicit knowledge of where each field comes
-  // from (golden -> dataset[goldenField]; candidate_* -> cell.pairwise),
-  // so we assemble them directly. `input` still uses an existing mapping
-  // (variantA's) if configured, otherwise falls back to the dataset's
-  // `input` column.
-  if (evaluator.pairwise && cell.pairwise) {
-    const cfg = evaluator.pairwise;
-    const variantAMappings =
-      evaluator.mappings[datasetId]?.[cfg.variantA] ?? {};
-    const inputMapping = variantAMappings.input;
-    if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
-      inputs.input = cell.datasetEntry[inputMapping.sourceField];
-    } else if (cell.datasetEntry.input !== undefined) {
-      inputs.input = cell.datasetEntry.input;
+  // Comparison branch: synthetic inputs bypassing the per-target mapping
+  // system. We know explicitly where each field comes from (golden ->
+  // dataset[goldenField]; candidates -> cell.comparison), so we assemble them
+  // directly. `input` still reuses the first variant's existing mapping when
+  // one is configured, so dataset-side input renaming keeps working;
+  // otherwise it falls back to the dataset's `input` column.
+  const comparisonConfig = toComparisonConfig(evaluator);
+  if (comparisonConfig && cell.comparison) {
+    const firstVariantId = comparisonConfig.variants[0];
+    const firstVariantMappings = firstVariantId
+      ? (evaluator.mappings[datasetId]?.[firstVariantId] ?? {})
+      : {};
+    assignMappedInput({
+      inputs,
+      mappings: firstVariantMappings,
+      datasetEntry: cell.datasetEntry,
+    });
+
+    // Golden is optional (#5378). Only send it when the user opted into
+    // golden-answer comparison AND picked a column. Missing either → the
+    // judge sees no reference and compares candidates on their own merits.
+    if (
+      comparisonConfig.hasGoldenAnswer !== false &&
+      comparisonConfig.goldenField
+    ) {
+      inputs.golden = cell.datasetEntry[comparisonConfig.goldenField];
     }
 
-    inputs.golden = cell.datasetEntry[cfg.goldenField];
+    // The judge that ACTUALLY runs is resolved server-side from the DB
+    // evaluator row (workflowBuilder's buildEvaluatorNode always prefers
+    // `evaluators/{dbEvaluatorId}`, which ignores this in-memory
+    // evaluatorType — see evaluations-legacy.ts). For a column-target,
+    // generateComparisonCells resolves `evaluator.evaluatorType` from that
+    // same DB row (see isLegacyPairwiseBacked), so it's already accurate
+    // here; for a chip-style comparison, `evaluator` is the real persisted
+    // EvaluatorConfig, so its evaluatorType is accurate by construction.
+    // Either way: a legacy `pairwise_compare` judge expects the two-slot
+    // `candidate_a_id/output` + `candidate_b_id/output` shape, not
+    // `candidates` — sending the N-way shape 400s ("missing required field:
+    // candidate_a_id") on re-running an untouched legacy pairwise
+    // experiment.
+    if (evaluator.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE) {
+      const [candidateA, candidateB] = cell.comparison.candidates;
+      if (candidateA) {
+        inputs.candidate_a_id = candidateA.id;
+        inputs.candidate_a_output = candidateA.output;
+        inputs.candidate_a_cost = candidateA.cost;
+        inputs.candidate_a_duration = candidateA.duration;
+      }
+      if (candidateB) {
+        inputs.candidate_b_id = candidateB.id;
+        inputs.candidate_b_output = candidateB.output;
+        inputs.candidate_b_cost = candidateB.cost;
+        inputs.candidate_b_duration = candidateB.duration;
+      }
+    } else {
+      inputs.candidates = cell.comparison.candidates.map((c) => ({
+        id: c.id,
+        output: c.output,
+        cost: c.cost,
+        duration: c.duration,
+      }));
+      // Seeds the judge's deterministic candidate shuffle (randomize_order).
+      inputs.row_index = cell.rowIndex;
+    }
 
-    // Helper: only assign when defined, so JSON.stringify doesn't drop the
-    // key for the keep-defined receiver but also doesn't leak literal
-    // `undefined`s into the body.
-    const setIfDefined = (key: string, value: unknown): void => {
-      if (value !== undefined) inputs[key] = value;
-    };
-
-    setIfDefined("candidate_a_id", cell.pairwise.candidateA.id);
-    setIfDefined("candidate_a_output", cell.pairwise.candidateA.output);
-    setIfDefined("candidate_a_cost", cell.pairwise.candidateA.cost);
-    setIfDefined("candidate_a_duration", cell.pairwise.candidateA.duration);
-    setIfDefined("candidate_b_id", cell.pairwise.candidateB.id);
-    setIfDefined("candidate_b_output", cell.pairwise.candidateB.output);
-    setIfDefined("candidate_b_cost", cell.pairwise.candidateB.cost);
-    setIfDefined("candidate_b_duration", cell.pairwise.candidateB.duration);
-
-    // Defensive fallback: when generatePairwiseCells lost a candidate
-    // output between completedTargetOutputs.set and the cell push (eg.
-    // a stale reference), pull the value from the per-row synthetic
-    // mappings we now also populate at cell-creation time. Strictly
-    // additive — only fires when the primary cell.pairwise read came
-    // back undefined.
+    // Defensive fallback: if a candidate value was lost between cell creation
+    // and here, pull it from the per-row synthetic value mappings that
+    // generateComparisonCells bakes onto column-target cells (#5131). Strictly
+    // additive — only fires for fields the primary read left undefined.
     const cellMappings = evaluator.mappings[datasetId]?.[cell.targetId] ?? {};
     for (const [field, mapping] of Object.entries(cellMappings)) {
       if (
@@ -1429,7 +1643,10 @@ export async function* runOrchestrator(
 
   // Generate cells to execute
   const cells = generateCells(state, datasetRows, scope);
-  const totalCells = cells.length;
+  // Phase-1 count only; grows by the Phase-2 (comparison) cell count once
+  // those are generated after Phase 1 finishes, so the final summary's
+  // completedCells (which counts both phases) never exceeds totalCells.
+  let totalCells = cells.length;
 
   logger.info(
     {
@@ -1554,14 +1771,14 @@ export async function* runOrchestrator(
         (e) => e.id === event.evaluatorId,
       );
 
-      // Cache per-(row, target) evaluator scores so the Phase 2 pairwise judge
-      // can see what each variant already scored on its non-pairwise
-      // evaluators. Skip pairwise evaluators themselves (a pairwise judge
-      // reading another pairwise verdict is circular).
+      // Cache per-(row, target) evaluator scores so the Phase 2 comparison
+      // judge can see what each variant already scored on its per-row
+      // evaluators. Skip comparison evaluators themselves — a comparison judge
+      // reading another comparison's verdict is circular.
       if (
         evalResult.status === "processed" &&
         evaluatorConfig &&
-        !evaluatorConfig.pairwise
+        !isComparisonEvaluator(evaluatorConfig)
       ) {
         const dbEval = evaluatorConfig.dbEvaluatorId
           ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
@@ -1885,43 +2102,57 @@ export async function* runOrchestrator(
       // Wait for all Phase 1 cells to complete
       await Promise.all(activeCells);
 
-      // Phase 2: pairwise cells (#5100). Generated AFTER Phase 1 finishes,
-      // because each pairwise cell needs both variants' outputs to exist.
-      // We reuse the same semaphore + executeCell loop; the new cells get
-      // appended to totalCells dynamically so progress events stay honest.
+      // Phase 2: pairwise (#5100) + N-way select-best (#5101) cells.
+      // Generated AFTER Phase 1 finishes because each Phase 2 cell needs
+      // its variants' outputs to exist. We reuse the same semaphore +
+      // executeCell loop; the new cells get appended to totalCells
+      // dynamically so progress events stay honest. Pairwise and
+      // select-best are generated by independent sibling functions
+      // (they're two separate evaluators in the catalog) but share the
+      // same execution loop, since the loop is per-cell not per-mode.
       if (!aborted) {
-        const { cells: pairwiseCells, skipReasons: pairwiseSkipReasons } =
-          generatePairwiseCells(
-            state,
-            datasetRows,
-            completedTargetOutputs,
-            completedTargetEvaluatorScores,
-            loadedPrompts,
-          );
+        const { cells: phase2Cells, skipReasons } = generateComparisonCells(
+          state,
+          datasetRows,
+          completedTargetOutputs,
+          completedTargetEvaluatorScores,
+          loadedPrompts,
+          loadedEvaluators,
+        );
+
+        // Fold Phase-2 cells into the run total now that we know how many
+        // there are, so progress and the final summary stay consistent.
+        totalCells += phase2Cells.length;
 
         // Emit a synthetic evaluator_result error event for each row we had
-        // to skip because a variant didn't produce output. Without this the
-        // pairwise column would sit at "No verdict yet" indefinitely with
-        // no indication that the upstream prompt is the actual problem.
+        // to skip. Without this the comparison column would sit at "No verdict
+        // yet" indefinitely with no indication of what the real problem is.
         //
         // pushEvent feeds the SSE stream so the UI cell re-renders into the
         // friendlyError surface immediately; processEventForStorage also
         // writes it to ClickHouse for the historical record.
-        for (const reason of pairwiseSkipReasons) {
+        for (const reason of skipReasons) {
           // Respect user-triggered abort mid-loop; otherwise a long skip-reason
           // burst would keep writing to CH after the run was meant to stop.
           if (await abortManager.isAborted(runId)) {
             aborted = true;
             break;
           }
-          const which =
-            reason.missing === "both"
-              ? `${reason.variantAName} and ${reason.variantBName}`
-              : reason.missing === "A"
-                ? reason.variantAName
-                : reason.variantBName;
-          const noun = reason.missing === "both" ? "outputs" : "output";
-          const detail = `Waiting on ${which} — no ${noun} for this row yet. Run ${which} first, then re-run this comparison.`;
+          const which = formatList(reason.variantNames);
+          const { detail, errorType } =
+            reason.kind === "missing-output"
+              ? {
+                  detail: `Waiting on ${which} — no ${
+                    reason.variantNames.length > 1 ? "outputs" : "output"
+                  } for this row yet. Run ${which} first, then re-run this comparison.`,
+                  errorType: "MissingVariantOutput",
+                }
+              : {
+                  // Re-running won't help — the output is empty or the picked
+                  // field is gone. Point the user at the output-field config.
+                  detail: `${which} produced no text to compare for this row. Check the output field selected for ${which}.`,
+                  errorType: "EmptyVariantOutput",
+                };
           const skipEvent: EvaluationV3Event = {
             type: "evaluator_result",
             rowIndex: reason.rowIndex,
@@ -1930,20 +2161,20 @@ export async function* runOrchestrator(
             result: {
               status: "error",
               details: detail,
-              error_type: "MissingVariantOutput",
+              error_type: errorType,
             } as unknown as SingleEvaluationResult,
           };
           pushEvent(skipEvent);
           await processEventForStorage(skipEvent);
         }
 
-        if (pairwiseCells.length > 0) {
+        if (phase2Cells.length > 0) {
           logger.info(
-            { runId, count: pairwiseCells.length },
-            "Starting Phase 2 (pairwise) cells",
+            { runId, comparison: phase2Cells.length },
+            "Starting Phase 2 (comparison) cells",
           );
 
-          for (const cell of pairwiseCells) {
+          for (const cell of phase2Cells) {
             if (await abortManager.isAborted(runId)) {
               aborted = true;
               break;
@@ -1987,7 +2218,7 @@ export async function* runOrchestrator(
                 pushEvent({
                   type: "progress",
                   completed,
-                  total: totalCells + pairwiseCells.length,
+                  total: totalCells,
                 });
               } finally {
                 semaphore.release();

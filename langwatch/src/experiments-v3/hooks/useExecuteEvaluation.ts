@@ -14,6 +14,7 @@ import {
   computeExecutionCells,
   createExecutionCellSet,
 } from "../utils/executionScope";
+import { toComparisonConfig } from "../utils/normalizeComparison";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 // ============================================================================
@@ -398,10 +399,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       //       them without forcing a re-run.
       // The two cases coexist row-by-row: re-run rows that are missing,
       // seed rows that already have output.
-      const targetPairwiseDeps = (id: string): string[] => {
+      const targetComparisonDeps = (id: string): string[] => {
         const t = targets.find((tg) => tg.id === id);
-        if (!t || t.type !== "evaluator" || !t.pairwise) return [];
-        return [t.pairwise.variantA, t.pairwise.variantB].filter(
+        if (!t || t.type !== "evaluator") return [];
+        return (toComparisonConfig(t)?.variants ?? []).filter(
           (v): v is string => !!v,
         );
       };
@@ -415,7 +416,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       > = {};
       const expandedCells = [...baseExecutionCells];
       if (scope.type === "target" || scope.type === "cell") {
-        const deps = targetPairwiseDeps(scope.targetId);
+        const deps = targetComparisonDeps(scope.targetId);
         if (deps.length) {
           const rowsForExpansion =
             scope.type === "cell"
@@ -604,14 +605,17 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           mappings: t.mappings,
           localPromptConfig: t.localPromptConfig,
           localEvaluatorConfig: t.localEvaluatorConfig,
-          // Pairwise column-targets (#5100) need this on the wire so the
+          // Comparison column-targets need this on the wire so the
           // orchestrator can skip the column in Phase 1 and emit Phase 2
-          // synthetic cells with both variants' outputs baked in. Without
-          // it, the server falls through to a normal evaluator-target
-          // dispatch whose mappings have no per-row candidate outputs,
-          // and the judge endpoint 400s with "candidate_a_output is
-          // required".
-          pairwise: t.pairwise,
+          // synthetic cells with every variant's output baked in. Without it,
+          // the server falls through to a normal evaluator-target dispatch
+          // whose mappings have no per-row candidate outputs, and the judge
+          // endpoint rejects the empty payload.
+          //
+          // Normalized rather than passed through: a state loaded from a
+          // pre-merge experiment still carries the legacy `pairwise` shape
+          // here, and the server only understands `comparison`.
+          comparison: toComparisonConfig(t),
         })),
         evaluators: evaluators.map((e) => ({
           id: e.id,
@@ -620,6 +624,12 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           mappings: e.mappings,
           dbEvaluatorId: e.dbEvaluatorId,
           localEvaluatorConfig: e.localEvaluatorConfig,
+          // The comparison config must survive the wire. The orchestrator keys
+          // its whole Phase-1/Phase-2 split off this field: without it every
+          // comparison evaluator looks like a plain per-row evaluator, gets
+          // attached to each target cell in Phase 1, and dispatches an empty
+          // input payload (nlpgo: "Data required").
+          comparison: toComparisonConfig(e),
         })),
         scope,
         concurrency,

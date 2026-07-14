@@ -92,6 +92,20 @@ export const FEATURE_FLAGS = [
       "Skips the strict PII redaction pass that calls the external analysis service (Presidio via langevals). The native secrets and essential PII redaction in the ingestion pipeline are unaffected. Emergency operator override to shed analysis-service load.",
     family: "Collector",
   },
+  // Kill switch for the evaluation-inputs offload (ADR-040). The offload is ON
+  // by default: oversized evaluator inputs go to the durable stored-objects
+  // service and the event/row carry a bounded marker instead of the full
+  // payload. Flipping this ON keeps inputs inline (only the unconditional
+  // repository cap bounds the ClickHouse row). Operators flip it from
+  // /ops/feature-flags.
+  {
+    key: "ops_evaluation_payload_offload_disabled",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Disables the oversized evaluator-inputs offload to durable object storage (ADR-040). While on, inputs flow inline and only the unconditional 8 MiB repository cap bounds the ClickHouse row. Emergency operator override for object-storage trouble.",
+    family: "Event sourcing",
+  },
   // Per-span token estimation kill switches. Hardcoded raw keys before;
   // each `record_span` job was a PostHog /flags call for the global key
   // plus another for the project key (~5k calls/day in dogfood at modest
@@ -115,12 +129,6 @@ export const FEATURE_FLAGS = [
   },
 
   // ----- PRODUCT -----
-  {
-    key: "release_ui_sdk_radar_banner_card_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description: "Shows the SDK radar banner card on the home page.",
-  },
   {
     key: "release_ui_ai_gateway_menu_enabled",
     scope: "PRODUCT",

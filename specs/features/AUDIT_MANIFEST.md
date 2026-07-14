@@ -256,8 +256,6 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/customer-io-nurturing-integration.feature | "Subsequent evaluations fire evaluation_ran event" | KEEP | evaluation_ran event tested in eval sync reactor tests |
 | specs/features/customer-io-nurturing-integration.feature | "Subsequent evaluation updates are debounced per project" | KEEP | Per-project debounce confirmed in reactor implementation |
 | specs/features/customer-io-nurturing-integration.feature | "Evaluation sync reactor uses project-scoped job ID for debouncing" | UPDATE | Actual makeJobId returns cio-eval-sync-{projectId}-{evaluationId}; scenario says project only |
-| specs/features/customer-io-nurturing-integration.feature | "Daily usage fold pushes aggregated metrics to Customer.io" | KEEP | customerIoDailyUsageSync.reactor.unit.test.ts covers identify with trace_count fields |
-| specs/features/customer-io-nurturing-integration.feature | "Daily usage sync sends cumulative totals not reset counters" | KEEP | Cumulative total + ISO timestamp tests exist in daily usage reactor |
 | specs/features/customer-io-nurturing-integration.feature | "Team member invite updates member count and fires event" | KEEP | fireTeamMemberInvitedNurturing tested in featureAdoption.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Workflow creation updates workflow count and fires event" | KEEP | fireWorkflowCreatedNurturing tested in featureAdoption.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Scenario creation updates scenario count and fires event" | KEEP | fireScenarioCreatedNurturing tested in featureAdoption.unit.test.ts |

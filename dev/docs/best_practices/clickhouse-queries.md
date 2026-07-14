@@ -153,6 +153,23 @@ Keep both: the WHERE prunes partitions, the HAVING ensures exact filtering for t
 
 Every ClickHouse query MUST include `WHERE TenantId = {tenantId:String}`. No other ID (ScenarioRunId, BatchRunId, TraceId, etc.) is unique across tenants.
 
+### Carve-out: boot-time system sweeps
+
+A query may omit the `TenantId` filter **only** when every one of these holds:
+
+1. It runs from a system/background entrypoint (worker boot, cron, metering sweep) where there is genuinely **no tenant in context** — not a request path, not a tRPC/Hono handler.
+2. It runs on the **shared** ClickHouse client, and the code says so. Tenants on private instances (`CLICKHOUSE_URL__*`) are therefore out of its reach — state that limitation where the sweep is defined.
+3. It **SELECTs** `TenantId` rather than filtering on it, and every downstream write is re-scoped per row to that row's own `TenantId`. A sweep that reads cross-tenant and writes with a single tenant id is a data-corruption bug.
+4. The omission carries an inline comment explaining which of these applies, so a future "you forgot the tenant filter" fix does not silently narrow the sweep to one tenant.
+5. A test pins the cross-tenant behaviour — otherwise item 4's regression passes CI. Single-tenant fixtures cannot catch it.
+
+Current sweeps under this carve-out, both on worker boot:
+
+- `scenarios/scenario-orphan-reconciler.ts` — reconciles `QUEUED` orphans (#3365).
+- `scenarios/orphaned-run-reconciliation.clickhouse.ts` — reconciles `IN_PROGRESS` orphans (#3195).
+
+Anything else that wants to skip the filter should be a repository method taking a `tenantId`, not a sweep.
+
 ## Code Review Checklist
 
 When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service hitting ClickHouse, scan for:

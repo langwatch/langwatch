@@ -50,13 +50,22 @@ function getSharedTransport(): DestinationStream | null {
   }
 
   const otelLogsEnabled = process.env.PINO_OTEL_ENABLED === "true";
-  const consoleLevel = process.env.PINO_CONSOLE_LEVEL ?? "info";
-  const otelLevel = process.env.PINO_OTEL_LEVEL ?? "debug";
+  // Unified log-level env vars, shared with the Go services (pkg/clog) so one
+  // set in langwatch/.env configures both. PINO_* kept as fallback for compat.
+  const consoleLevel =
+    process.env.LOG_CONSOLE_LEVEL ?? process.env.PINO_CONSOLE_LEVEL ?? "info";
+  const otelLevel =
+    process.env.LOG_OTEL_LEVEL ?? process.env.PINO_OTEL_LEVEL ?? "debug";
+  // When the observability stack is up (haven sets PINO_OTEL_ENABLED), the full
+  // record is in Grafana, so the pretty console drops the heavy business-context
+  // fields and keeps only trace/span for correlation — see consoleIgnoreFields.
+  const otelExportOn = process.env.PINO_OTEL_ENABLED === "true";
 
   try {
     sharedTransport = buildTransport({
       isDevMode,
       otelLogsEnabled,
+      otelExportOn,
       consoleLevel,
       otelLevel,
     });
@@ -74,10 +83,12 @@ function getSharedTransport(): DestinationStream | null {
 /**
  * Creates a server-side logger with context injection and transports.
  *
- * Environment variables:
- * - PINO_CONSOLE_LEVEL: Console log level (default: "info")
- * - PINO_OTEL_ENABLED: Set to "true" to enable OTel log export
- * - PINO_OTEL_LEVEL: OTel export level (default: "debug")
+ * Environment variables (unified with the Go services — see pkg/clog):
+ * - LOG_CONSOLE_LEVEL (fallback PINO_CONSOLE_LEVEL): console level (default "info")
+ * - LOG_OTEL_LEVEL (fallback PINO_OTEL_LEVEL): collector export level (default "debug")
+ * - PINO_OTEL_ENABLED: "true" to export logs to the OTel collector
+ * Split-stream: set LOG_CONSOLE_LEVEL=warn + LOG_OTEL_LEVEL=debug so the console
+ * shows only warnings/errors while info/debug flow to the observability stack.
  */
 export const createLogger = (
   name: string,
@@ -110,13 +121,15 @@ export const createLogger = (
 function buildTransport(config: {
   isDevMode: boolean;
   otelLogsEnabled: boolean;
+  otelExportOn: boolean;
   consoleLevel: string;
   otelLevel: string;
 }) {
-  const { isDevMode, otelLogsEnabled, consoleLevel, otelLevel } = config;
+  const { isDevMode, otelLogsEnabled, otelExportOn, consoleLevel, otelLevel } =
+    config;
 
   const targets: pino.TransportTargetOptions[] = [
-    buildConsoleTransport(isDevMode, consoleLevel),
+    buildConsoleTransport(isDevMode, consoleLevel, otelExportOn),
   ];
 
   if (otelLogsEnabled) {
@@ -126,14 +139,40 @@ function buildTransport(config: {
   return pino.transport({ targets });
 }
 
+/**
+ * The context fields the pino mixin (getLogContext) stamps on every record. When
+ * the observability stack is up they are all in Grafana, so the pretty console
+ * drops the business-context ones — keeping only trace_id/span_id for
+ * correlation — to stop every line ballooning. With the stack down the console is
+ * the only place they exist, so they stay.
+ */
+const BASE_CONSOLE_IGNORE = "pid,hostname";
+const HEAVY_CONTEXT_FIELDS = ["organizationId", "projectId", "userId"];
+
+export function consoleIgnoreFields(otelExportOn: boolean): string {
+  return otelExportOn
+    ? [BASE_CONSOLE_IGNORE, ...HEAVY_CONTEXT_FIELDS].join(",")
+    : BASE_CONSOLE_IGNORE;
+}
+
 function buildConsoleTransport(
   isDevMode: boolean,
   level: string,
+  otelExportOn: boolean,
 ): pino.TransportTargetOptions {
   if (isDevMode) {
     return {
       target: "pino-pretty",
-      options: { colorize: true, minimumLevel: level },
+      options: {
+        colorize: true,
+        // One line per record — a compact console, not a multi-line object dump.
+        singleLine: true,
+        // Drop pid/hostname noise, and — when the observability stack is up —
+        // the heavy business-context fields too (they're in Grafana). See
+        // consoleIgnoreFields.
+        ignore: consoleIgnoreFields(otelExportOn),
+        minimumLevel: level,
+      },
       level,
     };
   }

@@ -98,10 +98,6 @@ const FeatureFlagsDrawer = lazyDefault({
   factory: () => import("./drawers/FeatureFlagsDrawer"),
   key: "FeatureFlagsDrawer",
 });
-const SdkRadarDrawer = lazyDefault({
-  factory: () => import("./drawers/SdkRadarDrawer"),
-  key: "SdkRadarDrawer",
-});
 const EditAutomationFilterDrawer = lazyDefault({
   factory: () => import("./EditAutomationFilterDrawer"),
   key: "EditAutomationFilterDrawer",
@@ -272,8 +268,6 @@ export const drawers = {
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,
-  // SDK Radar
-  sdkRadar: SdkRadarDrawer,
   // Dev tools
   featureFlags: FeatureFlagsDrawer,
   // Ops

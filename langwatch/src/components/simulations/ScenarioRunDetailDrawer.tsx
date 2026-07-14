@@ -1,4 +1,5 @@
 import {
+  Accordion,
   Box,
   Button,
   Heading,
@@ -7,10 +8,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
-import { MetadataTag } from "~/components/MetadataTag";
+import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
@@ -24,12 +25,18 @@ import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
+import { useRouter } from "~/utils/compat/next-router";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { formatCost, formatLatency } from "~/components/shared/formatters";
+import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { TraceDetails } from "../traces/TraceDetails";
-import { Link } from "../ui/link";
 import { hasNoResults } from "./scenario-run-status.utils";
+import { getRunStatePollInterval } from "./run-state-polling";
 import { Drawer } from "../ui/drawer";
+import { CopyIdChip } from "./CopyIdChip";
+import { RunCriteriaChip } from "./RunCriteriaChip";
+import { RunDetailSection } from "./RunDetailSection";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
@@ -41,11 +48,6 @@ export interface ScenarioRunDetailDrawerProps {
 
 function formatResultsForCopy(results: unknown): string {
   return JSON.stringify(results, null, 2);
-}
-
-function computeSuccessRate(met: number, unmet: number): string {
-  const total = met + unmet;
-  return total > 0 ? ((met / total) * 100).toFixed(1) : "0.0";
 }
 
 export function ScenarioRunDetailDrawer({
@@ -64,28 +66,32 @@ export function ScenarioRunDetailDrawer({
     tenantId: project?.id,
   });
 
-  const { data: scenarioState, error: runStateError, refetch } = api.scenarios.getRunState.useQuery(
+  const { streamingMessages, handleStreamingEvent, clearCompleted } =
+    useSimulationStreamingState(scenarioRunId ?? undefined);
+
+  // Live updates: matching SSE events selectively invalidate getRunState for
+  // this run, and streaming deltas flow through the streaming state above.
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project?.id && !!scenarioRunId && !!open,
+    debounceMs: 300,
+    filter: scenarioRunId ? { scenarioRunId } : undefined,
+    onStreamingEvent: handleStreamingEvent,
+  });
+
+  const { data: scenarioState, error: runStateError } = api.scenarios.getRunState.useQuery(
     {
       scenarioRunId: scenarioRunId ?? "",
       projectId: project?.id ?? "",
     },
     {
       enabled: !!project?.id && !!scenarioRunId && !!open,
-      refetchInterval: 3000,
+      // Finished runs never change — stop polling entirely. Live runs poll
+      // fast only while the event stream is down.
+      refetchInterval: (data) =>
+        getRunStatePollInterval({ status: data?.status, sseConnected }),
     },
   );
-
-  const { streamingMessages, handleStreamingEvent, clearCompleted } =
-    useSimulationStreamingState(scenarioRunId ?? undefined);
-
-  useSimulationUpdateListener({
-    projectId: project?.id ?? "",
-    refetch,
-    enabled: !!project?.id && !!scenarioRunId && !!open,
-    debounceMs: 300,
-    filter: scenarioRunId ? { scenarioRunId } : undefined,
-    onStreamingEvent: handleStreamingEvent,
-  });
 
   // Clear streaming messages once server data includes them
   useEffect(() => {
@@ -168,6 +174,17 @@ export function ScenarioRunDetailDrawer({
     return undefined;
   }, [scenarioState?.messages]);
 
+  // Whole-conversation view in Trace Explorer: every trace of this run
+  // carries the scenario.run_id attribute, so a scenarioRun:"<id>" search
+  // shows the full conversation. Same #<lens>?q= fragment contract as the
+  // command bar's trace links.
+  const router = useRouter();
+  const handleOpenInTraces = useCallback(() => {
+    if (!project?.slug || !scenarioRunId) return;
+    const query = encodeURIComponent(`scenarioRun:"${scenarioRunId}"`);
+    void router.push(`/${project.slug}/traces#all-traces?q=${query}`);
+  }, [project?.slug, scenarioRunId, router]);
+
   // Relative time that auto-updates every 30s while the drawer is open
   const [timeAgo, setTimeAgo] = useState<string | undefined>(undefined);
   useEffect(() => {
@@ -186,12 +203,34 @@ export function ScenarioRunDetailDrawer({
   const copyableIds = useMemo(() => {
     if (!scenarioId || !batchRunId || !scenarioRunId) return undefined;
     return [
-      { label: "Scenario ID", value: scenarioId },
-      { label: "Batch Run ID", value: batchRunId },
-      { label: "Run ID", value: scenarioRunId },
-      ...(suiteId ? [{ label: "Run Plan ID", value: suiteId }] : []),
+      { label: "Scenario", value: scenarioId },
+      { label: "Batch", value: batchRunId },
+      { label: "Run", value: scenarioRunId },
+      ...(suiteId ? [{ label: "Run plan", value: suiteId }] : []),
     ];
   }, [scenarioId, batchRunId, scenarioRunId, suiteId]);
+
+  const criteria = useMemo(() => {
+    if (!scenarioState?.results) return null;
+    const met = scenarioState.results.metCriteria?.length ?? 0;
+    const unmet = scenarioState.results.unmetCriteria?.length ?? 0;
+    return { met, total: met + unmet };
+  }, [scenarioState?.results]);
+
+  const hasConversation =
+    (scenarioState?.messages ?? []).length > 0 ||
+    (streamingMessages ?? []).length > 0;
+  const conversationCount =
+    (scenarioState?.messages ?? []).length + (streamingMessages ?? []).length;
+
+  const [openSections, setOpenSections] = useState<string[]>([
+    "conversation",
+    "results",
+  ]);
+
+  // Long messages truncate by default; this seeds every bubble's expand
+  // state via the shared conversation-expand context (Traces V2 mechanism).
+  const [expandAllMessages, setExpandAllMessages] = useState(false);
 
   return (
     <>
@@ -201,9 +240,18 @@ export function ScenarioRunDetailDrawer({
         placement="end"
         size="lg"
       >
-        <Drawer.Content bg="bg" paddingX={0} maxWidth="720px" overflow="hidden">
+        {/* Transparent at the Content level so the header band below can run
+            its own translucent + backdrop-blur fill over the drawer's
+            scrolling content — same recipe as the Traces V2 drawer shell. */}
+        <Drawer.Content
+          bg="transparent"
+          paddingX={0}
+          maxWidth="720px"
+          overflow="hidden"
+          borderRadius="lg"
+        >
           {!scenarioState && open && (
-            <Drawer.Body>
+            <Drawer.Body bg={{ base: "bg.surface", _dark: "bg.panel" }}>
               {runStateError ? (
                 runStateError.data?.code === "NOT_FOUND" ? (
                   <VStack gap={2} align="start" w="100%" pt={4}>
@@ -235,201 +283,186 @@ export function ScenarioRunDetailDrawer({
                 display="flex"
                 flexDirection="column"
                 width="full"
+                bg={{ base: "bg.surface", _dark: "bg.panel" }}
               >
-              {/* Sticky header — inside scroll container for correct sticky behavior */}
+              {/* Sticky header — inside scroll container for correct sticky
+                  behavior. Translucent fill + backdrop blur matches the
+                  Traces V2 drawer header band. */}
               <VStack
+                align="stretch"
                 w="100%"
-                gap={0}
+                gap={2}
+                paddingX={4}
+                paddingTop={3}
+                paddingBottom={3}
                 position="sticky"
                 top={0}
                 zIndex={2}
-                background="bg.panel/75"
-                backdropFilter="blur(8px)"
+                background="bg.panel/70"
+                backdropFilter="blur(20px) saturate(150%)"
                 borderTopRadius="lg"
+                borderBottomWidth="1px"
+                borderColor="border"
               >
                 <HStack
                   w="100%"
-                  paddingTop={2}
-                  paddingBottom={4}
-                  paddingLeft={6}
-                  paddingRight={12}
                   justify="space-between"
+                  gap={2.5}
+                  minWidth={0}
+                  paddingEnd={8}
                 >
-                  <HStack gap={3}>
+                  <HStack gap={3} flex={1} minWidth={0}>
                     <ScenarioRunStatusIcon status={scenarioState.status} />
-                    <Heading size="md">{displayTitle}</Heading>
+                    <Heading size="md" truncate title={displayTitle}>
+                      {displayTitle}
+                    </Heading>
                   </HStack>
-                  <HStack gap={2}>
+                  <HStack gap={1} flexShrink={0}>
                     <ScenarioRunActions
                       scenario={scenarioData}
                       isRunning={isRunning}
                       onRunAgain={handleRunAgainClick}
                       onEditScenario={() => setScenarioEditorOpen(true)}
+                      onOpenThread={
+                        firstTraceId && !hasNoResults(scenarioState.status)
+                          ? () => setTraceDrawerTraceId(firstTraceId)
+                          : null
+                      }
+                      onOpenInTraces={
+                        firstTraceId && !hasNoResults(scenarioState.status)
+                          ? handleOpenInTraces
+                          : null
+                      }
+                      dejaViewHref={dejaView.href ?? null}
                     />
-                    {firstTraceId && !hasNoResults(scenarioState.status) && (
-                      <Button
-                        colorPalette="gray"
-                        size="sm"
-                        onClick={() => setTraceDrawerTraceId(firstTraceId)}
-                      >
-                        <ExternalLink size={14} />
-                        Open Thread
-                      </Button>
-                    )}
-                    {dejaView.href && (
-                      <Link href={dejaView.href}>
-                        <Button colorPalette="gray" size="sm">
-                          DejaView
-                        </Button>
-                      </Link>
-                    )}
                     <Drawer.CloseTrigger />
                   </HStack>
                 </HStack>
 
-                {/* Metrics summary — trace details style */}
-                {scenarioState.results && !hasNoResults(scenarioState.status) && (
-                  <HStack
-                    paddingX={4}
-                    borderBottomWidth={1}
-                    borderColor="border.emphasized"
-                    w="100%"
-                    align="stretch"
-                    gap={4}
-                  >
-                    <VStack
-                      borderRightWidth="1px"
-                      borderRightColor="border"
-                      alignItems="flex-start"
-                      paddingRight={4}
-                      paddingLeft={4}
-                      paddingY={3}
-                    >
-                      <b>Success Criteria</b>
-                      <Text color="fg">
-                        {scenarioState.results.metCriteria?.length ?? 0}/
-                        {(scenarioState.results.metCriteria?.length ?? 0) +
-                          (scenarioState.results.unmetCriteria?.length ?? 0)}
-                      </Text>
-                    </VStack>
-                    <VStack
-                      borderRightWidth="1px"
-                      borderRightColor="border"
-                      alignItems="flex-start"
-                      paddingRight={4}
-                      paddingY={3}
-                    >
-                      <b>Success Rate</b>
-                      <Text color="fg">
-                        {computeSuccessRate(
-                          scenarioState.results.metCriteria?.length ?? 0,
-                          scenarioState.results.unmetCriteria?.length ?? 0,
-                        )}%
-                      </Text>
-                    </VStack>
-                    {scenarioState.durationInMs && (
-                      <VStack
-                        borderRightWidth="1px"
-                        borderRightColor="border"
-                        alignItems="flex-start"
-                        paddingRight={4}
-                        paddingY={3}
-                      >
-                        <b>Duration</b>
-                        <Text color="fg">
-                          {(scenarioState.durationInMs / 1000).toFixed(2)}s
-                        </Text>
-                      </VStack>
-                    )}
-                    {timeAgo && (
-                      <VStack
-                        alignItems="flex-start"
-                        paddingRight={4}
-                        paddingY={3}
-                      >
-                        <b>Ran</b>
-                        <Text color="fg">{timeAgo}</Text>
-                      </VStack>
-                    )}
-                  </HStack>
-                )}
-
-                {/* Copyable IDs — MetadataTag chips (same as trace details) */}
-                {copyableIds && (
-                  <HStack
-                    w="100%"
-                    paddingX={6}
-                    paddingY={3}
-                    gap={3}
-                    flexWrap="wrap"
-                  >
-                    {copyableIds.map((id) => (
-                      <MetadataTag
-                        key={id.label}
-                        label={id.label}
-                        value={id.value}
-                        copyable
+                {/* Chip strip — metrics + copyable ids, one visual language
+                    with the Traces V2 drawer header */}
+                <HStack w="100%" gap={1.5} flexWrap="wrap">
+                  {scenarioState.results &&
+                    !hasNoResults(scenarioState.status) && (
+                      <RunCriteriaChip
+                        metCriteria={scenarioState.results.metCriteria ?? []}
+                        unmetCriteria={
+                          scenarioState.results.unmetCriteria ?? []
+                        }
                       />
-                    ))}
-                  </HStack>
-                )}
+                    )}
+                  {scenarioState.durationInMs > 0 && (
+                    <Chip
+                      label="Duration"
+                      value={formatLatency(scenarioState.durationInMs)}
+                    />
+                  )}
+                  {scenarioState.totalCost != null && (
+                    <Chip
+                      label="Cost"
+                      value={formatCost(scenarioState.totalCost)}
+                    />
+                  )}
+                  {timeAgo && <Chip label="Ran" value={timeAgo} />}
+                  {scenarioData?.archivedAt && (
+                    <Chip value="Archived" tone="yellow" />
+                  )}
+                  {copyableIds?.map((id) => (
+                    <CopyIdChip
+                      key={id.label}
+                      label={id.label}
+                      value={id.value}
+                    />
+                  ))}
+                </HStack>
               </VStack>
 
-              {/* Body — conversation on top, results on bottom */}
-              {/* Conversation — hidden when empty (e.g. stalled runs) */}
-              {((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) && (
-                <Box
-                  paddingX={6}
-                  paddingY={6}
-                  background="bg.muted"
-                >
-                  <Box borderRadius="md" overflow="hidden">
-                    <ScenarioMessageRenderer
-                      messages={scenarioState.messages ?? []}
-                      streamingMessages={streamingMessages}
-                      variant="drawer"
-                      projectId={project?.id ?? ""}
-                    />
-                  </Box>
-                </Box>
-              )}
-
-              {/* Results */}
-              <Box
-                flex={1}
-                width="full"
-                borderTop={((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) ? "1px" : undefined}
-                borderColor="border.muted"
-                position="relative"
-                className="group"
-                css={{
-                  "& > div:first-of-type": { borderRadius: 0, minHeight: "100%", height: "100%" },
-                }}
+              {/* Body — accordion sections, Traces V2 drawer language */}
+              <Accordion.Root
+                multiple
+                value={openSections}
+                onValueChange={(e) => setOpenSections(e.value)}
               >
-                <SimulationConsole
-                  results={scenarioState.results}
-                  scenarioName={scenarioState.name ?? undefined}
-                  status={scenarioState.status}
-                  durationInMs={scenarioState.durationInMs}
-                />
-                {scenarioState.results && (
-                  <Box
-                    position="absolute"
-                    top={2}
-                    right={2}
-                    opacity={0}
-                    _groupHover={{ opacity: 1 }}
-                    transition="opacity 0.2s"
+                {/* Conversation — hidden when empty (e.g. stalled runs) */}
+                {hasConversation && (
+                  <RunDetailSection
+                    value="conversation"
+                    title="Conversation"
+                    count={conversationCount}
+                    isFirst
+                    actions={
+                      <Button
+                        size="2xs"
+                        variant="ghost"
+                        color="fg.muted"
+                        _hover={{ color: "fg" }}
+                        onClick={() => setExpandAllMessages((v) => !v)}
+                        aria-label={
+                          expandAllMessages
+                            ? "Collapse all messages"
+                            : "Expand all messages"
+                        }
+                      >
+                        {expandAllMessages ? (
+                          <ChevronsDownUp size={12} />
+                        ) : (
+                          <ChevronsUpDown size={12} />
+                        )}
+                        <Text textStyle="2xs" fontWeight="500">
+                          {expandAllMessages ? "Collapse all" : "Expand all"}
+                        </Text>
+                      </Button>
+                    }
                   >
-                    <CopyButton
-                      value={formatResultsForCopy(
-                        scenarioState.results,
-                      )}
-                      label="Results"
+                    <ConversationExpandContext.Provider
+                      value={{
+                        isExpandable: true,
+                        shouldExpandAll: expandAllMessages,
+                      }}
+                    >
+                      <ScenarioMessageRenderer
+                        messages={scenarioState.messages ?? []}
+                        streamingMessages={streamingMessages}
+                        variant="drawer"
+                        projectId={project?.id ?? ""}
+                      />
+                    </ConversationExpandContext.Provider>
+                  </RunDetailSection>
+                )}
+
+                <RunDetailSection
+                  value="results"
+                  title="Results"
+                  count={criteria?.total}
+                  isFirst={!hasConversation}
+                >
+                  <Box
+                    borderRadius="xl"
+                    overflow="hidden"
+                    borderWidth="1px"
+                    borderColor="border.muted"
+                    boxShadow="sm"
+                  >
+                    <SimulationConsole
+                      results={scenarioState.results}
+                      scenarioName={scenarioState.name ?? undefined}
+                      status={scenarioState.status}
+                      durationInMs={scenarioState.durationInMs}
+                      titleBarActions={
+                        scenarioState.results ? (
+                          <CopyButton
+                            value={formatResultsForCopy(scenarioState.results)}
+                            label="Results"
+                            size="2xs"
+                            color="gray.500"
+                            _hover={{ color: "gray.200", bg: "gray.800" }}
+                          />
+                        ) : undefined
+                      }
                     />
                   </Box>
-                )}
-              </Box>
+                </RunDetailSection>
+              </Accordion.Root>
               </Drawer.Body>
           )}
         </Drawer.Content>

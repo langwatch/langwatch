@@ -1,11 +1,35 @@
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { resolveInputsMarker } from "~/server/app-layer/evaluations/evaluation-inputs-offload";
+import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
 import { safeJsonParse } from "~/utils/safeJsonParse";
 import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
 import type { TraceEvaluation } from "./evaluation-run.types";
+
+/**
+ * Resolves an offloaded-inputs marker (ADR-040) back to the full inputs at the
+ * read boundary. The production default builds a per-project stored-objects
+ * service and streams the durable object; a plain (non-marker) object passes
+ * through unchanged. Injected so tests can supply a stub without standing up
+ * object storage.
+ */
+export type ResolveEvaluationInputsMarker = (args: {
+  projectId: string;
+  inputs: Record<string, unknown> | null;
+}) => Promise<Record<string, unknown> | null>;
+
+const defaultResolveInputsMarker: ResolveEvaluationInputsMarker = ({
+  projectId,
+  inputs,
+}) =>
+  resolveInputsMarker({
+    projectId,
+    inputs,
+    storedObjects: createStoredObjectsService({ projectId }),
+  });
 
 /**
  * Columns the evaluation mapper actually reads, minus the heavy `Inputs`
@@ -57,6 +81,11 @@ function isMemoryLimitError(error: unknown): boolean {
 export class EvaluationService {
   private readonly logger = createLogger("langwatch:evaluations:service");
   private readonly tracer = getLangWatchTracer("langwatch.evaluations.service");
+  private readonly resolveInputsMarker: ResolveEvaluationInputsMarker;
+
+  constructor(resolveInputsMarkerFn: ResolveEvaluationInputsMarker = defaultResolveInputsMarker) {
+    this.resolveInputsMarker = resolveInputsMarkerFn;
+  }
 
   static create(): EvaluationService {
     return new EvaluationService();
@@ -237,9 +266,15 @@ export class EvaluationService {
           });
           const rows = (await result.json()) as { Inputs: string | null }[];
           const parsed = safeJsonParse(rows[0]?.Inputs ?? null);
-          return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-            ? (parsed as Record<string, unknown>)
-            : null;
+          const inputs =
+            parsed && typeof parsed === "object" && !Array.isArray(parsed)
+              ? (parsed as Record<string, unknown>)
+              : null;
+          // ADR-040: when inputs were offloaded, `parsed` is a stored-object
+          // marker. Resolve it to the full inputs here - the natural lazy seam
+          // the UI already fetches through - so the caller cannot tell whether
+          // the inputs were inline or offloaded. Non-markers pass through.
+          return this.resolveInputsMarker({ projectId, inputs });
         } catch (error) {
           if (isMemoryLimitError(error)) {
             this.logger.warn(
