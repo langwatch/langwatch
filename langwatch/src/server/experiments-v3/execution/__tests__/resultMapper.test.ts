@@ -346,6 +346,7 @@ describe("resultMapper", () => {
     });
 
     describe("given the evaluator failed with provider auth", () => {
+      /** @scenario Judge auth failures are serialized as domain errors */
       it("serializes a domain error for raw 403 responses", () => {
         const result = mapEvaluatorResult("target-1.eval-1", 0, {
           status: "error",

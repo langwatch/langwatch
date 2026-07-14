@@ -97,6 +97,7 @@ describe("ComparisonCell", () => {
     });
 
     describe("given the judge call failed auth (403)", () => {
+      /** @scenario The Comparison cell renders a friendly auth failure */
       it("uses the domain error to show a rich auth message", () => {
         wrap(
           <ComparisonCell
