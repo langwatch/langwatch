@@ -24,7 +24,7 @@ Feature: `langwatch copilot-app connect` provisions app capture
 
   Rule: connect mints a copilot_app ingest key distinct from the CLI key
 
-    @integration @unimplemented
+    @integration
     Scenario: Connecting the app mints a personal ingest key for sourceType copilot_app
       When the user runs `langwatch copilot-app connect`
       Then a personal ingest key of sourceType "copilot_app" is minted for org "acme"
@@ -35,7 +35,7 @@ Feature: `langwatch copilot-app connect` provisions app capture
       When the user runs `langwatch copilot-app connect`
       Then the minted "copilot_app" key is a different key from the "copilot_cli" key
 
-    @unit @unimplemented
+    @unit
     Scenario: Connect refuses when the app is not installed
       Given the GitHub Copilot app is not installed
       When the user runs `langwatch copilot-app connect`
@@ -44,12 +44,12 @@ Feature: `langwatch copilot-app connect` provisions app capture
 
   Rule: connect installs the login agent that captures the app
 
-    @integration @unimplemented
+    @integration
     Scenario: Connecting installs a login agent for the current operating system
       When the user runs `langwatch copilot-app connect`
       Then a user-level login agent for capturing the app is installed
 
-    @integration @unimplemented
+    @integration
     Scenario: Connect confirms where the captured traces will appear
       When the user runs `langwatch copilot-app connect`
       Then the command reports the project the app's usage will be tracked into
@@ -63,7 +63,7 @@ Feature: `langwatch copilot-app connect` provisions app capture
       Then the previous "copilot_app" key is revoked
       And the login agent is re-pointed at the new key
 
-    @integration @unimplemented
+    @integration
     Scenario: Re-running connect never installs a second agent
       Given the user has already connected the app
       When the user runs `langwatch copilot-app connect` again

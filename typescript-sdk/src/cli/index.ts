@@ -293,6 +293,23 @@ program
     }
   });
 
+const copilotAppCmd = program
+  .command("copilot-app")
+  .description(
+    "Manage LangWatch capture for the standalone GitHub Copilot app (ADR-039).",
+  );
+
+copilotAppCmd
+  .command("connect")
+  .description(
+    "Connect the GitHub Copilot app: mint an ingest key and install a login agent that captures every session automatically.",
+  )
+  .option("--tokens-only", "Capture usage without prompt/response content")
+  .action(async (options: { tokensOnly?: boolean }) => {
+    const { copilotAppConnectCommand } = await import("./commands/copilot-app.js");
+    await copilotAppConnectCommand(options);
+  });
+
 program
   .command("cursor", { hidden: true })
   .description("Run `cursor` routed through the LangWatch gateway.")

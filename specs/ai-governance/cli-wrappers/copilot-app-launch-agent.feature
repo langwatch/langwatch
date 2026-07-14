@@ -49,7 +49,7 @@ Feature: the login agent owns the Copilot app launch and injects capture env
       When the login agent launches the Copilot app
       Then the app env enables message-content capture
 
-    @unit @unimplemented
+    @unit
     Scenario: An explicit opt-out yields a loud tokens-only notice, never silent
       Given the user opted out of content capture for the app
       When the login agent launches the Copilot app
@@ -58,19 +58,19 @@ Feature: the login agent owns the Copilot app launch and injects capture env
 
   Rule: the agent uses the right host for each operating system
 
-    @unit @unimplemented
+    @unit
     Scenario: On macOS the agent is a launchd login item
       Given the operating system is macOS
       When the capture login agent is installed
       Then the agent is registered as a launchd login item
 
-    @unit @unimplemented
+    @unit
     Scenario: On Linux the agent is a systemd --user unit
       Given the operating system is Linux
       When the capture login agent is installed
       Then the agent is registered as a systemd --user unit
 
-    @unit @unimplemented
+    @unit
     Scenario: On Windows the agent is a Task Scheduler logon task
       Given the operating system is Windows
       When the capture login agent is installed
@@ -91,7 +91,7 @@ Feature: the login agent owns the Copilot app launch and injects capture env
 
   Rule: logout tears the capture down
 
-    @integration @unimplemented
+    @integration
     Scenario: Logout removes the capture login agent
       Given the capture login agent is installed
       When the user runs `langwatch logout`

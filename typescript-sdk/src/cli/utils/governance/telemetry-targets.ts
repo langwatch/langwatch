@@ -38,6 +38,11 @@ import {
   removeAppEnvVars,
 } from "./app-settings";
 import {
+  copilotAppAgentPath,
+  isCopilotAppAgentInstalled,
+  removeCopilotAppAgent,
+} from "./copilot-app-agent";
+import {
   type DetectedShell,
   GATEWAY_RC_MARKERS,
   rcHasLangwatchBlock,
@@ -82,6 +87,27 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
       present: appEnvHasAnyVar(claudeTarget, keys),
       remove: () => removeAppEnvVars(claudeTarget, keys),
     });
+  }
+
+  // copilot app — the login agent that owns the app launch (ADR-039
+  // §Extension). Present when its descriptor is on disk; removing it
+  // unregisters from the OS service manager and deletes the descriptor.
+  {
+    const appPlatform = os.platform();
+    if (
+      appPlatform === "darwin" ||
+      appPlatform === "linux" ||
+      appPlatform === "win32"
+    ) {
+      const home = os.homedir();
+      targets.push({
+        label: `copilot app capture agent (${tildify(
+          copilotAppAgentPath(appPlatform, home),
+        )})`,
+        present: isCopilotAppAgentInstalled(appPlatform, home),
+        remove: () => removeCopilotAppAgent(appPlatform, home),
+      });
+    }
   }
 
   // codex — [otel] + gateway marker blocks in config.toml + the profile file.
