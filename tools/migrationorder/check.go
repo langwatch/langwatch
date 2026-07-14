@@ -3,6 +3,7 @@ package migrationorder
 import (
 	"cmp"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -32,7 +33,8 @@ type Finding struct {
 	Entry string `json:"entry"`
 	// Problem is one plain sentence.
 	Problem string `json:"problem"`
-	// Fix is the shell command that resolves it.
+	// Fix is the shell command that resolves it, empty when the fix is a naming
+	// decision only the author can make.
 	Fix string `json:"fix"`
 }
 
@@ -57,12 +59,15 @@ func Check(in Input) []Finding {
 				Set:     in.Set.Name,
 				Entry:   entry,
 				Problem: "already merged, and migrations that have run somewhere cannot change",
-				Fix:     fmt.Sprintf("git checkout %s -- %s/%s", in.BaseRef, in.Set.Directory, entry),
+				Fix:     fmt.Sprintf("git checkout %s -- %s", in.BaseRef, shellArg(in.Set.Directory+"/"+entry)),
 			})
 		}
 	}
 
-	taken, highest := keysOf(in.Base, in.Set)
+	// Keys are taken by everything ever seen on either ref: a migration deleted
+	// from the base branch after this branch forked has still run somewhere, so
+	// its key is not free to reuse.
+	taken, highest := keysOf(slices.Concat(in.Base, in.MergeBase), in.Set)
 
 	var added []migration
 	for _, entry := range slices.Sorted(slices.Values(in.Head)) {
@@ -85,7 +90,9 @@ func Check(in Input) []Finding {
 	// Suggested keys are handed out above everything in play — the newest on the
 	// base branch and anything this branch already numbered — so a suggestion
 	// never lands on a key that is itself taken, and two clashing migrations get
-	// two different answers.
+	// two different answers where Render consumes the key. Prisma's date
+	// expansion resolves when the command runs, so its uniqueness comes from the
+	// clock instead.
 	free := highest
 	for _, m := range added {
 		free = max(free, m.key)
@@ -93,8 +100,9 @@ func Check(in Input) []Finding {
 	suggest := func(entry string) string {
 		free++
 		_, suffix, _ := strings.Cut(entry, "_")
-		return fmt.Sprintf("git mv %s/%s %s/%s_%s",
-			in.Set.Directory, entry, in.Set.Directory, in.Set.Render(free), suffix)
+		return fmt.Sprintf("git mv %s %s%s%s",
+			shellArg(in.Set.Directory+"/"+entry),
+			shellArg(in.Set.Directory+"/"), in.Set.Render(free), shellArg("_"+suffix))
 	}
 
 	for _, m := range added {
@@ -133,6 +141,18 @@ func Check(in Input) []Finding {
 type migration struct {
 	entry string
 	key   int64
+}
+
+var plainArg = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+
+// shellArg single-quotes s unless it needs no quoting. Entry names are chosen
+// by the PR under review, and the findings end up in a bot comment as commands
+// to copy-paste — a hostile name must not smuggle an expansion into them.
+func shellArg(s string) string {
+	if plainArg.MatchString(s) {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func keyOf(entry string, set Set) (int64, bool) {

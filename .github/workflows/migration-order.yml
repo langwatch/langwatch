@@ -10,6 +10,15 @@ name: migration-order
 # merge ahead of it, which is why the comparison is against the *tip* of the base
 # branch and not the merge base.
 #
+# This workflow executes `go run` on code checked out from the PR head, so the
+# trigger must stay `pull_request` — never `pull_request_target`, whose writable
+# token and secrets would turn that into a pwn request. Fork PRs run with a
+# read-only token, which is why the comment step is skipped for them.
+#
+# The check runs on head pushes only: when the base branch moves, an open PR
+# keeps its last verdict until it next syncs. Requiring branches to be up to
+# date before merging into main is what closes that window.
+#
 # Spec: specs/ci/migration-order.feature
 
 on:
@@ -66,7 +75,20 @@ jobs:
             const { readFileSync } = require("node:fs");
 
             const MARKER = "<!-- migration-order -->";
-            const findings = JSON.parse(readFileSync("findings.json", "utf8"));
+            const raw = JSON.parse(readFileSync("findings.json", "utf8"));
+            if (!Array.isArray(raw)) throw new Error("findings.json is not an array");
+
+            // Entry names are chosen by the PR under review: strip backticks so
+            // they cannot break out of the markdown, and flatten the fix to one
+            // line so it cannot close its own fence.
+            const text = (value) => String(value ?? "").replaceAll("`", "'");
+            const line = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+            const findings = raw.map((f) => ({
+              set: text(f.set),
+              entry: text(f.entry),
+              problem: text(f.problem),
+              fix: line(f.fix),
+            }));
 
             const pr = context.payload.pull_request;
             const { owner, repo } = context.repo;
@@ -78,7 +100,7 @@ jobs:
               per_page: 100,
             });
             const existing = comments.find(
-              (c) => c.user?.login === "github-actions[bot]" && c.body?.includes(MARKER)
+              (c) => c.user?.login === "github-actions[bot]" && c.body?.startsWith(MARKER)
             );
 
             // Fixed. Take the comment down rather than leave a stale warning.
@@ -94,7 +116,7 @@ jobs:
               `### Migrations are out of order with \`${pr.base.ref}\``,
               "",
               ...findings.flatMap((f) => [
-                `**${f.entry}** ${f.problem}`,
+                `**${f.set}: ${f.entry}** ${f.problem}`,
                 ...(f.fix ? ["", "```bash", f.fix, "```"] : []),
                 "",
               ]),

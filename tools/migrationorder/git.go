@@ -2,6 +2,7 @@ package migrationorder
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"slices"
@@ -18,8 +19,8 @@ type Repo struct {
 // Ordering is judged against the tip of baseRef rather than the merge base: a
 // branch is stale exactly when the base branch has moved ahead of it, so the
 // merge base would be blind to the failure this check exists to catch.
-func (r Repo) Inputs(baseRef string) ([]Input, error) {
-	mergeBase, err := r.git("merge-base", baseRef, "HEAD")
+func (r Repo) Inputs(ctx context.Context, baseRef string) ([]Input, error) {
+	mergeBase, err := r.git(ctx, "merge-base", baseRef, "HEAD")
 	if err != nil {
 		return nil, err
 	}
@@ -27,19 +28,19 @@ func (r Repo) Inputs(baseRef string) ([]Input, error) {
 
 	inputs := make([]Input, 0, len(Sets))
 	for _, set := range Sets {
-		base, err := r.entriesAt(baseRef, set.Directory)
+		base, err := r.entriesAt(ctx, baseRef, set.Directory)
 		if err != nil {
 			return nil, err
 		}
-		head, err := r.entriesAt("HEAD", set.Directory)
+		head, err := r.entriesAt(ctx, "HEAD", set.Directory)
 		if err != nil {
 			return nil, err
 		}
-		forked, err := r.entriesAt(mergeBase, set.Directory)
+		forked, err := r.entriesAt(ctx, mergeBase, set.Directory)
 		if err != nil {
 			return nil, err
 		}
-		touched, err := r.touchedSince(baseRef, set.Directory)
+		touched, err := r.touchedSince(ctx, baseRef, set.Directory)
 		if err != nil {
 			return nil, err
 		}
@@ -55,24 +56,27 @@ func (r Repo) Inputs(baseRef string) ([]Input, error) {
 	return inputs, nil
 }
 
-func (r Repo) entriesAt(ref, directory string) ([]string, error) {
-	out, err := r.git("ls-tree", "-r", "--name-only", ref, "--", directory)
+func (r Repo) entriesAt(ctx context.Context, ref, directory string) ([]string, error) {
+	out, err := r.git(ctx, "ls-tree", "-r", "--name-only", ref, "--", directory)
 	if err != nil {
 		return nil, err
 	}
 	return TopLevelEntries(lines(out), directory), nil
 }
 
-func (r Repo) touchedSince(baseRef, directory string) ([]string, error) {
-	out, err := r.git("diff", "--name-only", "--diff-filter=MDR", baseRef+"...HEAD", "--", directory)
+func (r Repo) touchedSince(ctx context.Context, baseRef, directory string) ([]string, error) {
+	// --no-renames: rename detection would report only the destination path,
+	// letting a renamed merged migration slip past the immutability guard. As
+	// delete-plus-add, the merged name stays visible here.
+	out, err := r.git(ctx, "diff", "--name-only", "--no-renames", "--diff-filter=MDR", baseRef+"...HEAD", "--", directory)
 	if err != nil {
 		return nil, err
 	}
 	return TopLevelEntries(lines(out), directory), nil
 }
 
-func (r Repo) git(args ...string) (string, error) {
-	cmd := exec.Command("git", append([]string{"-C", r.Root}, args...)...)
+func (r Repo) git(ctx context.Context, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", r.Root}, args...)...) //nolint:gosec // argv array, no shell; fixed git subcommands with CI-controlled refs
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

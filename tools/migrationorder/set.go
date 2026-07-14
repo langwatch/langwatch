@@ -15,7 +15,9 @@ import (
 type Set struct {
 	Name      string
 	Directory string
-	Key       *regexp.Regexp
+	// Key extracts the numeric ordering key from an entry name; its first
+	// capture group must be the digits the entries sort by.
+	Key *regexp.Regexp
 	// Format is the entry name shape, for error messages.
 	Format string
 	// Render turns a free key into the name fragment the suggested rename uses.
@@ -35,7 +37,7 @@ var Sets = []Set{
 	{
 		Name:      "ClickHouse",
 		Directory: "langwatch/src/server/clickhouse/migrations",
-		Key:       regexp.MustCompile(`^(\d{5})_`),
+		Key:       regexp.MustCompile(`^(\d{5})_.*\.sql$`),
 		Format:    "NNNNN_name.sql",
 		Render:    func(key int64) string { return fmt.Sprintf("%05d", key) },
 	},

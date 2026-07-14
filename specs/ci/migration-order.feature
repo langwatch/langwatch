@@ -3,6 +3,13 @@ Feature: Migration order check
   I want a PR to fail when its migrations are numbered below ones already on main
   So that a migration I wrote cannot merge in an order that stops it ever running
 
+  # The comment lifecycle deliberately differs from pr-impact-map.feature: an
+  # impact map is informational, so it stays up and forks skip it silently; an
+  # ordering finding is a defect, so the comment is deleted once fixed and the
+  # check fails forks even though they get no comment.
+  #
+  # Immutability here keys on merged, stricter than the "never modify deployed
+  # migrations" convention: once merged, a migration may have run somewhere.
   Background:
     Given migrations run in the order their keys sort
     And Prisma migrations are keyed by timestamp and ClickHouse migrations by sequence number
@@ -62,6 +69,6 @@ Feature: Migration order check
 
   Scenario: A fork PR still fails, without a comment
     Given a PR is opened from a fork
-    And its token cannot write comments
-    Then the comment step is skipped
+    When the migration-order workflow runs
+    Then no comment is attempted
     And the check still fails with the reason in the job log

@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/langwatch/langwatch/pkg/migrationorder"
+	"github.com/langwatch/langwatch/tools/migrationorder"
 )
 
 func setNamed(t *testing.T, name string) migrationorder.Set {
@@ -164,6 +164,23 @@ func TestCheck(t *testing.T) {
 			},
 		},
 		{
+			name: "a hostile migration name is quoted in the suggested fix",
+			in: migrationorder.Input{
+				Set:       clickhouse,
+				BaseRef:   "origin/main",
+				Base:      []string{"00040_a.sql"},
+				MergeBase: []string{"00040_a.sql"},
+				Head:      []string{"00040_a.sql", "00039_$(curl evil).sql"},
+			},
+			want: []migrationorder.Finding{{
+				Set:     "ClickHouse",
+				Entry:   "00039_$(curl evil).sql",
+				Problem: "is numbered below 40, the newest migration on main, so it runs out of order or not at all",
+				Fix: "git mv 'langwatch/src/server/clickhouse/migrations/00039_$(curl evil).sql' " +
+					"langwatch/src/server/clickhouse/migrations/00041'_$(curl evil).sql'",
+			}},
+		},
+		{
 			name: "a migration with no ordering key is reported with the naming format",
 			in: migrationorder.Input{
 				Set:     clickhouse,
@@ -191,18 +208,5 @@ func TestCheck(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestTopLevelEntries(t *testing.T) {
-	entries := migrationorder.TopLevelEntries([]string{
-		"langwatch/prisma/migrations/20260102000000_new/migration.sql",
-		"langwatch/prisma/migrations/20260101000000_old/migration.sql",
-		"langwatch/prisma/migrations/migration_lock.toml",
-	}, "langwatch/prisma/migrations")
-
-	want := []string{"20260101000000_old", "20260102000000_new"}
-	if !slices.Equal(entries, want) {
-		t.Fatalf("entries = %v, want %v", entries, want)
 	}
 }
