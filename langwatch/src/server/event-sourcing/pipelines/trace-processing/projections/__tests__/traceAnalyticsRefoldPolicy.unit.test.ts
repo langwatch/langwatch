@@ -41,7 +41,11 @@ function stateWithSpanCount(spanCount: number): TraceAnalyticsData {
   };
 }
 
-/** Past the cap the fold never reads `data`, so the span stays minimal. */
+/**
+ * Minimal but decodable span: the fold normalizes every span (no processing
+ * cap), so the fixture carries the OTLP time/status fields decode requires.
+ * Mirrors traceSummaryRefoldPolicy.unit.test.ts.
+ */
 function spanEventAt(occurredAt: number, id: string): TraceProcessingEvent {
   return {
     id,
@@ -52,7 +56,21 @@ function spanEventAt(occurredAt: number, id: string): TraceProcessingEvent {
     occurredAt,
     createdAt: occurredAt,
     version: "2025-12-17",
-    data: { span: { name: "child", spanId: id, traceId: TRACE_ID } },
+    data: {
+      span: {
+        name: "child",
+        spanId: id,
+        traceId: TRACE_ID,
+        startTimeUnixNano: String(occurredAt * 1_000_000),
+        endTimeUnixNano: String((occurredAt + 10) * 1_000_000),
+        status: { code: 0 },
+        attributes: [],
+        events: [],
+        links: [],
+      },
+      resource: {},
+      instrumentationScope: { name: "test", version: null },
+    },
   } as unknown as TraceProcessingEvent;
 }
 
