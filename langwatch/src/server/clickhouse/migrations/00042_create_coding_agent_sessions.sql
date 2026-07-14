@@ -2,7 +2,7 @@
 -- +goose ENVSUB ON
 
 -- ============================================================================
--- coding_agent_sessions — ADR-040.
+-- coding_agent_sessions — ADR-041.
 --
 -- One row per coding-agent SESSION, folded from that session's spans, logs AND
 -- metrics. A fold projection writes it (latest version wins) into a

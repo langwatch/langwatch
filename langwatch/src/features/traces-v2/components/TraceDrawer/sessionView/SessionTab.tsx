@@ -19,7 +19,7 @@ interface SessionTabProps {
 /**
  * The Session tab's data boundary.
  *
- * A point read of the pre-folded row(s) (ADR-040) for every trace in this
+ * A point read of the pre-folded row(s) (ADR-041) for every trace in this
  * session, merged. The aggregation WITHIN a trace already happened at
  * ingest, which is the whole reason the projection exists — the alternative
  * is every reader (the app, the CLI, the MCP server) re-walking hundreds of

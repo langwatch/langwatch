@@ -324,10 +324,15 @@ const groupByExpressions: Partial<
   }),
 
   "evaluations.evaluation_passed": (groupByKey) => ({
+    // Score-only evaluators (issue #2674): when filtered to a specific evaluator via
+    // groupByKey, rows that ran successfully (Status='processed') but have Passed IS NULL
+    // (a numeric score, no pass/fail threshold) are bucketed as 'unknown' instead of being
+    // dropped by `HAVING group_key IS NOT NULL`. Foreign-evaluator rows still hit ELSE NULL.
     column: groupByKey
       ? `CASE
         WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL AND ${tableAliases.evaluation_runs}.Passed = 1 THEN 'passed'
         WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL AND ${tableAliases.evaluation_runs}.Passed = 0 THEN 'failed'
+        WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NULL THEN 'unknown'
         ELSE NULL
       END`
       : `CASE

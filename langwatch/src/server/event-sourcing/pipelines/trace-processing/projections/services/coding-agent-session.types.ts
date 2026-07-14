@@ -1,5 +1,5 @@
 /**
- * The shape of a coding-agent session summary (ADR-040).
+ * The shape of a coding-agent session summary (ADR-041).
  *
  * ## Light by construction
  *

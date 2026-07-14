@@ -13,7 +13,7 @@ const logger = createLogger(
 );
 
 /**
- * ClickHouse persistence for the coding-agent session rollup (ADR-040,
+ * ClickHouse persistence for the coding-agent session rollup (ADR-041,
  * migration 00042).
  *
  * The UInt64 columns are serialised as STRINGS in the JSONEachRow body: JSON

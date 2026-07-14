@@ -43,6 +43,23 @@ COMMANDS
                   CA. Idempotent — safe to re-run. (Run it via make haven setup.)
     up            Resolve this worktree's slug, allocate ports, register the
                   hostnames, start + supervise the stack. (What pnpm dev:haven runs.)
+    pr <ref>      Try a GitHub PR locally in seconds: clone it into a worktree,
+                  install deps, and bring its stack up on a hostname. <ref> is a
+                  PR number or URL (works for fork PRs too). A reused worktree is
+                  fetched + reset to the PR's current head, so you always try the
+                  latest push — any uncommitted edits there are autostashed first
+                  (restore with the 'git stash apply <sha>' it prints) so nothing
+                  is lost. Flags: --dry-run (resolve + print the plan, create
+                  nothing), --no-install, --force (a non-open PR), --trusted (run
+                  install lifecycle scripts for a fork — see below; --allow-scripts
+                  is an alias), --discard-local-changes (overwrite those edits
+                  instead of stashing them). Shares the
+                  managed Postgres/ClickHouse/Redis for now — per-PR isolation is
+                  the follow-up in specs/setup/haven-try-pr-plan.md.
+                  TRUST: a fork PR's install runs with --ignore-scripts by default
+                  (this repo has a postinstall a fork could weaponise); --trusted
+                  (or --allow-scripts) opts back in. Either way 'haven up' runs the
+                  PR's own app code, so only try PRs you'd be willing to run locally.
     watch         Live TUI of every running stack + service health (bare 'haven'
                   in a terminal does the same). --agent gives a plain snapshot.
     down          Tear this worktree's routes + registry entry down, and drop this
@@ -99,6 +116,8 @@ ENVIRONMENT
                                  dev:single:haven sets).
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
+    HAVEN_WORKTREE_DIR=<dir>     Where haven pr creates PR worktrees (default: the
+                                 sibling worktrees/ dir next to the checkout).
     LANGWATCH_HAVEN_CH=0         Do not manage ClickHouse (use .env CLICKHOUSE_URL).
     LANGWATCH_HAVEN_CH_STOP_IDLE=1  Daemon stops the CH container when no stacks run.
     LANGWATCH_HAVEN_CH_MEMORY_MB    CH container memory ceiling in MB (default 1536).
@@ -135,6 +154,7 @@ EXAMPLES
     haven setup                  # one-time: install/verify portless, trust the CA
     pnpm dev:haven               # up, through haven, in this worktree
     pnpm dev:single:haven        # …with workers hosted in-process (one Node proc)
+    haven pr 4913                # try PR #4913 locally in a fresh worktree
     haven list --json            # machine-readable inventory of every stack
     haven doctor                 # is everything wired up?
     LANGWATCH_GO_WATCH=1 pnpm dev:haven # air hot-reload for gateway + nlp

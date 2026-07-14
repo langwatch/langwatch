@@ -51,7 +51,7 @@ export function TerminalTab({
   );
   // The version/model/repo Claude Code itself would print above the prompt.
   // Sourced from the resource attributes rather than the coding-agent-session
-  // fold: that fold is a bounded aggregate (ADR-040) and deliberately doesn't
+  // fold: that fold is a bounded aggregate (ADR-041) and deliberately doesn't
   // carry identity strings the drawer already has a dedicated read for.
   const resourceQuery = api.tracesV2.resourceInfo.useQuery(
     { projectId, traceId, occurredAtMs },

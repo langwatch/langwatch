@@ -1,5 +1,5 @@
 /**
- * The coding-agent session derivation (ADR-040, specs/trace-processing/
+ * The coding-agent session derivation (ADR-041, specs/trace-processing/
  * coding-agent-session.feature).
  *
  * A coding agent's trace IS the session, its facts are split across spans AND

@@ -1,4 +1,4 @@
-# ADR-040: A coding-agent session projection
+# ADR-041: A coding-agent session projection
 
 - Status: Proposed
 - Date: 2026-07-11

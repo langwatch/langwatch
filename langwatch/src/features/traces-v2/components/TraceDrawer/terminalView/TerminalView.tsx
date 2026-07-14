@@ -17,12 +17,16 @@ import {
 } from "../../../utils/formatters";
 import { findCacheRebuilds } from "../sessionView/tokenTimeline";
 import { toolResultBodyToString } from "../transcript";
-import { CLAUDE_MARK_GRADIENT, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./palette";
+import {
+  CLAUDE_MARK_GRADIENT,
+  TERMINAL_FONT_STACK,
+  TERMINAL_TOKENS,
+} from "./palette";
 import { SyntaxHighlightedCode } from "./SyntaxHighlightedCode";
+import type { SessionBanner } from "./sessionBanner";
 import { TerminalDiff } from "./TerminalDiff";
 import { TerminalOutput } from "./TerminalOutput";
 import { TerminalPatch } from "./TerminalPatch";
-import type { SessionBanner } from "./sessionBanner";
 import {
   buildEntryTimeline,
   extractDiffFromToolInput,
@@ -85,13 +89,26 @@ const CONTEXT_HEAT_BANDS = [
 function contextHeatBand(
   contextTokens: number,
 ): (typeof CONTEXT_HEAT_BANDS)[number] | null {
-  return CONTEXT_HEAT_BANDS.find((band) => contextTokens >= band.minTokens) ?? null;
+  return (
+    CONTEXT_HEAT_BANDS.find((band) => contextTokens >= band.minTokens) ?? null
+  );
 }
 
 /** A note inserted into the transcript at a model call, not a beat of its own. */
 type ContextMarker =
-  | { kind: "heat"; atMs: number; contextTokens: number; color: string; label: string }
-  | { kind: "deadSite"; atMs: number; cacheCreationTokens: number; previousContextTokens: number };
+  | {
+      kind: "heat";
+      atMs: number;
+      contextTokens: number;
+      color: string;
+      label: string;
+    }
+  | {
+      kind: "deadSite";
+      atMs: number;
+      cacheCreationTokens: number;
+      previousContextTokens: number;
+    };
 
 /**
  * Where the context grew into a new size band, and where a cache rebuild
@@ -213,13 +230,17 @@ export const TerminalView = memo(function TerminalView({
 
   const screenRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const setRowRef = useCallback((fullIndex: number, node: HTMLDivElement | null) => {
-    if (node) rowRefs.current.set(fullIndex, node);
-    else rowRefs.current.delete(fullIndex);
-  }, []);
+  const setRowRef = useCallback(
+    (fullIndex: number, node: HTMLDivElement | null) => {
+      if (node) rowRefs.current.set(fullIndex, node);
+      else rowRefs.current.delete(fullIndex);
+    },
+    [],
+  );
 
   const [atBottom, setAtBottom] = useState(true);
-  const [trackedFullIndex, setTrackedFullIndex] = useState(lastVisibleFullIndex);
+  const [trackedFullIndex, setTrackedFullIndex] =
+    useState(lastVisibleFullIndex);
 
   // Re-derive which beat is "at the bottom of the viewport" from the DOM —
   // rows are laid out in order, so the last one whose top hasn't scrolled
@@ -289,7 +310,13 @@ export const TerminalView = memo(function TerminalView({
   }
 
   return (
-    <VStack align="stretch" gap={0} height="full" minHeight={0} position="relative">
+    <VStack
+      align="stretch"
+      gap={0}
+      height="full"
+      minHeight={0}
+      position="relative"
+    >
       <Box
         ref={screenRef}
         flex={1}
@@ -306,9 +333,16 @@ export const TerminalView = memo(function TerminalView({
           {visibleIndices.map((fullIndex) => (
             <Fragment key={fullIndex}>
               {contextMarkers.get(fullIndex)?.map((marker, i) => (
-                <ContextMarkerLine key={`${fullIndex}-marker-${i}`} marker={marker} />
+                <ContextMarkerLine
+                  key={`${fullIndex}-marker-${i}`}
+                  marker={marker}
+                />
               ))}
-              <Box ref={(node) => setRowRef(fullIndex, node)}>
+              <Box
+                ref={(node: HTMLDivElement | null) =>
+                  setRowRef(fullIndex, node)
+                }
+              >
                 <EntryLine entry={entries[fullIndex]!} toolSpans={toolSpans} />
               </Box>
             </Fragment>
@@ -349,7 +383,13 @@ function modelAt(entries: TranscriptEntry[], fullIndex: number): string | null {
  */
 function JumpToBottomPill({ onClick }: { onClick: () => void }) {
   return (
-    <Box position="absolute" bottom="44px" left="50%" transform="translateX(-50%)" zIndex={1}>
+    <Box
+      position="absolute"
+      bottom="44px"
+      left="50%"
+      transform="translateX(-50%)"
+      zIndex={1}
+    >
       <Text
         as="button"
         onClick={onClick}
@@ -395,7 +435,13 @@ function TerminalBanner({ banner }: { banner?: SessionBanner }) {
 /** The startup mark, shaded left-to-right rather than drawn in one flat colour. */
 function ClaudeMark() {
   return (
-    <VStack align="flex-start" gap={0} flexShrink={0} aria-hidden userSelect="none">
+    <VStack
+      align="flex-start"
+      gap={0}
+      flexShrink={0}
+      aria-hidden
+      userSelect="none"
+    >
       {MARK_ROWS.map((row, rowIndex) => (
         <Text key={rowIndex} {...CELL} lineHeight="1.15" whiteSpace="pre">
           {[...row].map((char, charIndex) => (
@@ -431,7 +477,9 @@ function EntryLine({
     case "assistant_message":
       return <AssistantLine text={entry.text} />;
     case "tool":
-      return <ToolCall entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />;
+      return (
+        <ToolCall entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />
+      );
     case "tool_rejected":
       return <RejectedLine name={entry.name} reason={entry.reason} />;
     case "note":
@@ -508,7 +556,9 @@ function ToolCall({
   // the tool's own `old_string` → `new_string` when that patch isn't there.
   const patch = parsePatchHunks(ran?.diff ?? null);
   const synthesizedDiff =
-    patch === null && isDiffTool(name) ? extractDiffFromToolInput(entry.input) : null;
+    patch === null && isDiffTool(name)
+      ? extractDiffFromToolInput(entry.input)
+      : null;
 
   // Bash stdout / a file's content, as it actually came back — not the capped
   // echo the model was handed. Falls back to the transcript's own output.
@@ -521,7 +571,10 @@ function ToolCall({
   return (
     <VStack align="stretch" gap={0.5}>
       <HStack align="flex-start" gap={2}>
-        <Glyph char={GLYPH.bullet} color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.faint} />
+        <Glyph
+          char={GLYPH.bullet}
+          color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.faint}
+        />
         {/* One flowing block, not nested spans with their own box — nesting
             `fontWeight="bold"` on an inline child was giving a wrapped
             second line extra indent from its own inline-block layout. */}
@@ -608,11 +661,24 @@ function NoteLine({
   text: string;
 }) {
   const color =
-    level === "error" ? TERMINAL_TOKENS.red : level === "warning" ? TERMINAL_TOKENS.yellow : TERMINAL_TOKENS.faint;
+    level === "error"
+      ? TERMINAL_TOKENS.red
+      : level === "warning"
+        ? TERMINAL_TOKENS.yellow
+        : TERMINAL_TOKENS.faint;
   return (
     <HStack align="flex-start" gap={2}>
-      <Glyph char={level === "error" ? GLYPH.bullet : GLYPH.note} color={color} />
-      <Text {...CELL} color={color} flex={1} minWidth={0} wordBreak="break-word">
+      <Glyph
+        char={level === "error" ? GLYPH.bullet : GLYPH.note}
+        color={color}
+      />
+      <Text
+        {...CELL}
+        color={color}
+        flex={1}
+        minWidth={0}
+        wordBreak="break-word"
+      >
         {text}
       </Text>
     </HStack>
@@ -632,11 +698,20 @@ function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
           TERMINAL_TOKENS.red,
           `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tok re-sent instead of reusing ${formatTokens(marker.previousContextTokens)} tok cached`,
         ]
-      : [marker.color, `Context ${marker.label}: ${formatTokens(marker.contextTokens)} tok`];
+      : [
+          marker.color,
+          `Context ${marker.label}: ${formatTokens(marker.contextTokens)} tok`,
+        ];
   return (
     <HStack align="flex-start" gap={2}>
       <Glyph char={GLYPH.note} color={color} />
-      <Text {...CELL} color={color} flex={1} minWidth={0} wordBreak="break-word">
+      <Text
+        {...CELL}
+        color={color}
+        flex={1}
+        minWidth={0}
+        wordBreak="break-word"
+      >
         {text}
       </Text>
     </HStack>
@@ -652,7 +727,13 @@ function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
 function ResultLine({ children }: { children: React.ReactNode }) {
   return (
     <HStack align="flex-start" gap={2}>
-      <Text {...CELL} whiteSpace="pre" flexShrink={0} userSelect="none" aria-hidden>
+      <Text
+        {...CELL}
+        whiteSpace="pre"
+        flexShrink={0}
+        userSelect="none"
+        aria-hidden
+      >
         {"  "}
       </Text>
       <Glyph char={GLYPH.elbow} color={TERMINAL_TOKENS.faint} />
@@ -702,23 +783,55 @@ function AsciiBox({ children }: { children: React.ReactNode }) {
   return (
     <VStack align="stretch" gap={0} color={TERMINAL_TOKENS.border}>
       <HStack gap={0} overflow="hidden">
-        <Text {...CELL} flexShrink={0} aria-hidden>╭</Text>
-        <Text {...CELL} overflow="hidden" whiteSpace="nowrap" flex={1} aria-hidden>{rule}</Text>
-        <Text {...CELL} flexShrink={0} aria-hidden>╮</Text>
+        <Text {...CELL} flexShrink={0} aria-hidden>
+          ╭
+        </Text>
+        <Text
+          {...CELL}
+          overflow="hidden"
+          whiteSpace="nowrap"
+          flex={1}
+          aria-hidden
+        >
+          {rule}
+        </Text>
+        <Text {...CELL} flexShrink={0} aria-hidden>
+          ╮
+        </Text>
       </HStack>
       <HStack gap={0} align="stretch">
-        <Text {...CELL} flexShrink={0} aria-hidden>│</Text>
-        <Text {...CELL} whiteSpace="pre" flexShrink={0} aria-hidden> </Text>
+        <Text {...CELL} flexShrink={0} aria-hidden>
+          │
+        </Text>
+        <Text {...CELL} whiteSpace="pre" flexShrink={0} aria-hidden>
+          {" "}
+        </Text>
         <Box flex={1} minWidth={0} color={TERMINAL_TOKENS.screenFg}>
           {children}
         </Box>
-        <Text {...CELL} whiteSpace="pre" flexShrink={0} aria-hidden> </Text>
-        <Text {...CELL} flexShrink={0} aria-hidden>│</Text>
+        <Text {...CELL} whiteSpace="pre" flexShrink={0} aria-hidden>
+          {" "}
+        </Text>
+        <Text {...CELL} flexShrink={0} aria-hidden>
+          │
+        </Text>
       </HStack>
       <HStack gap={0} overflow="hidden">
-        <Text {...CELL} flexShrink={0} aria-hidden>╰</Text>
-        <Text {...CELL} overflow="hidden" whiteSpace="nowrap" flex={1} aria-hidden>{rule}</Text>
-        <Text {...CELL} flexShrink={0} aria-hidden>╯</Text>
+        <Text {...CELL} flexShrink={0} aria-hidden>
+          ╰
+        </Text>
+        <Text
+          {...CELL}
+          overflow="hidden"
+          whiteSpace="nowrap"
+          flex={1}
+          aria-hidden
+        >
+          {rule}
+        </Text>
+        <Text {...CELL} flexShrink={0} aria-hidden>
+          ╯
+        </Text>
       </HStack>
     </VStack>
   );
@@ -763,10 +876,22 @@ function StatusLine({
     >
       <AsciiBox>
         <HStack gap={2}>
-          <Text {...CELL} color={TERMINAL_TOKENS.blue} fontWeight="bold" flexShrink={0} aria-hidden>
+          <Text
+            {...CELL}
+            color={TERMINAL_TOKENS.blue}
+            fontWeight="bold"
+            flexShrink={0}
+            aria-hidden
+          >
             ❯
           </Text>
-          <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate minWidth={0} flex={1}>
+          <Text
+            {...CELL}
+            color={TERMINAL_TOKENS.faint}
+            truncate
+            minWidth={0}
+            flex={1}
+          >
             {sessionName ?? "Untitled session"}
           </Text>
         </HStack>
@@ -774,7 +899,12 @@ function StatusLine({
 
       <HStack gap={2} justify="space-between" flexWrap="wrap">
         <HStack gap={2} minWidth={0}>
-          <Text {...CELL} color={TERMINAL_TOKENS.accent} flexShrink={0} aria-hidden>
+          <Text
+            {...CELL}
+            color={TERMINAL_TOKENS.accent}
+            flexShrink={0}
+            aria-hidden
+          >
             ⏵⏵
           </Text>
           <Text {...CELL} color={TERMINAL_TOKENS.faint} flexShrink={0}>

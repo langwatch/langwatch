@@ -411,6 +411,85 @@ Feature: Externalize event byte content to stored_objects
     Then the AG-UI schema rejects it as invalid
 
   # ---------------------------------------------------------------
+  # Ingest — image and file attachment wire acceptance (AC41)
+  # ---------------------------------------------------------------
+  #
+  # The documented multimodal shapes (scenario docs: multimodal-images,
+  # multimodal-files) must pass the route validator so the snapshot reaches
+  # the extractor. Same failure mode as the voice wire leg above: the
+  # typescript scenario SDK stopped JSON-stringifying array content, so
+  # AI-SDK image parts and OpenAI-shaped file parts arrive as raw arrays
+  # and were 400-rejected before extraction ever ran, leaving runs with
+  # zero conversation turns in the simulations UI.
+
+  @integration
+  Scenario: A simulated user message with an image attachment shows the image in the run conversation
+    Given a scenario run whose user turn attaches an inline image, as documented on the multimodal-images page
+    When the SDK reports the conversation snapshot
+    Then the run conversation keeps the user turn with its image attachment
+    And the image is available for display in the run
+
+  @integration
+  Scenario: A simulated user message with a document attachment stays available under its original filename
+    Given a scenario run whose user turn attaches an inline PDF document, as documented on the multimodal-files page
+    When the SDK reports the conversation snapshot
+    Then the run conversation keeps the user turn with its document attachment
+    And the document stays available under its original filename
+
+  @integration
+  Scenario: A document attachment renders as a labeled chip that opens the file in a new tab
+    Given a run conversation carrying a stored document attachment named "document.pdf"
+    When the conversation renders
+    Then the attachment shows a file icon and its filename
+    And activating it opens the stored document in a new browser tab
+    And downloading from the opened document keeps the original filename
+
+  @unit
+  Scenario: Documented image and file attachment shapes validate on the wire
+    Given message content carrying an AI-SDK image part with inline image data
+    And message content carrying an OpenAI file part with inline document data
+    When the wire validator parses the snapshots
+    Then both parse successfully
+    And the inline payloads survive validation intact for the extractor
+
+  @unit
+  Scenario: AI-SDK file parts with a document mediaType validate on the wire
+    Given a MESSAGE_SNAPSHOT whose message content includes {type:"file", mediaType:"application/pdf", data:"<base64>"}
+    When the wire validator parses the event
+    Then the parse succeeds
+    And the part survives with its data intact for the extractor
+
+  @unit
+  Scenario: AI-SDK image parts with http(s) URLs validate and pass through unchanged
+    Given a message content part {type:"image", image:"https://example.com/cat.png"}
+    When the wire validator parses the event and the extractor processes the part
+    Then the parse succeeds
+    And no stored_objects row is created
+    And the part passes through unchanged
+
+  @unit
+  Scenario: Raw-base64 audio file payloads resolve a playable audio type from the filename
+    Given an OpenAI file part whose file_data is raw base64 with filename "recording.wav"
+    When the extractor processes the part
+    Then the payload routes through the input_audio externalization path
+    And the stored object carries an audio media type so playback works
+
+  @unit
+  Scenario: Post-extraction image and file rewrites still validate on the wire
+    Given an image part rewritten to {type:"image", image:"/api/files/<projectId>/<id>"}
+    And a file part rewritten to {type:"binary", mimeType, url, id, filename}
+    When the wire validator parses a MESSAGE_SNAPSHOT carrying them
+    Then the parse succeeds
+
+  @unit
+  Scenario: OpenAI file parts carrying only a provider file_id pass through unchanged
+    Given a message content part {type:"file", file:{file_id:"file-abc123"}}
+    When the wire validator parses the event and the extractor processes the part
+    Then the parse succeeds
+    And no stored_objects row is created
+    And the part passes through unchanged
+
+  # ---------------------------------------------------------------
   # S3 client credential mode handling (AC40)
   # ---------------------------------------------------------------
   #
@@ -695,3 +774,18 @@ Feature: Externalize event byte content to stored_objects
   # AC37 "Azure Blob support — DEFERRED in this PR"                          -> Scenario: Stored-objects writes do not mint azure-blob URIs in this PR
   # AC38 "Project-delete cascade removes rows AND bytes"                     -> Scenario: When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes
   # AC39 "MediaPart playback contract (onLoadedData / non-zero duration)"    -> Scenario: MediaPart audio playback reports a non-zero duration once the browser has decoded the media
+  # AC40 "S3 client supports every production credential mode"               -> Scenario: S3 client uses explicit credentials when env keys are present
+  #                                                                          -> Scenario: S3 client forwards sessionToken when set so SSO/STS credentials work
+  #                                                                          -> Scenario: S3 client omits credentials so the SDK default provider chain handles IRSA and instance profiles
+  #                                                                          -> Scenario: S3 client honors S3_REGION env for real AWS deployments instead of the R2/MinIO 'auto' default
+  #                                                                          -> Scenario: S3 client defaults region to 'auto' for R2 and MinIO compatibility
+  #                                                                          -> Scenario: S3 client falls back to default chain when credentials are partial — prevents misleading 'empty string credentials' bug
+  # AC41 "Documented image/file attachment shapes accepted and externalized" -> Scenario: A simulated user message with an image attachment shows the image in the run conversation
+  #                                                                          -> Scenario: A simulated user message with a document attachment stays available under its original filename
+  #                                                                          -> Scenario: A document attachment renders as a labeled chip that opens the file in a new tab
+  #                                                                          -> Scenario: Documented image and file attachment shapes validate on the wire
+  #                                                                          -> Scenario: AI-SDK file parts with a document mediaType validate on the wire
+  #                                                                          -> Scenario: AI-SDK image parts with http(s) URLs validate and pass through unchanged
+  #                                                                          -> Scenario: Raw-base64 audio file payloads resolve a playable audio type from the filename
+  #                                                                          -> Scenario: Post-extraction image and file rewrites still validate on the wire
+  #                                                                          -> Scenario: OpenAI file parts carrying only a provider file_id pass through unchanged

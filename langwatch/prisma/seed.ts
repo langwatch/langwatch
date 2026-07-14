@@ -98,8 +98,17 @@ const PUBLIC_TOKEN_ROLE_NAME = "local-dev-public-ingestion";
 const MODEL_DEFAULT_CONFIG_ID = "local-dev-model-default-config";
 
 async function main() {
-  const apiKey = process.env.LANGWATCH_API_KEY ?? DEFAULT_INGESTION_KEY;
-  console.log(`🌱 Seeding static local dev identity (ingestion key: ${apiKey})`);
+  // Prefer the haven-injected local credential (HAVEN_SEED_LANGWATCH_API_KEY); the
+  // platform never carries LANGWATCH_API_KEY anymore, but keep it as a fallback for
+  // non-haven flows that still pass one explicitly.
+  const apiKey =
+    process.env.HAVEN_SEED_LANGWATCH_API_KEY ??
+    process.env.LANGWATCH_API_KEY ??
+    DEFAULT_INGESTION_KEY;
+  // Redact — in non-haven flows apiKey may be a real credential, and logs get shipped.
+  console.log(
+    `🌱 Seeding static local dev identity (ingestion key: ${apiKey.slice(0, 8)}…)`,
+  );
 
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },

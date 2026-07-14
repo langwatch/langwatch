@@ -56,11 +56,16 @@ function getSharedTransport(): DestinationStream | null {
     process.env.LOG_CONSOLE_LEVEL ?? process.env.PINO_CONSOLE_LEVEL ?? "info";
   const otelLevel =
     process.env.LOG_OTEL_LEVEL ?? process.env.PINO_OTEL_LEVEL ?? "debug";
+  // When the observability stack is up (haven sets PINO_OTEL_ENABLED), the full
+  // record is in Grafana, so the pretty console drops the heavy business-context
+  // fields and keeps only trace/span for correlation — see consoleIgnoreFields.
+  const otelExportOn = process.env.PINO_OTEL_ENABLED === "true";
 
   try {
     sharedTransport = buildTransport({
       isDevMode,
       otelLogsEnabled,
+      otelExportOn,
       consoleLevel,
       otelLevel,
     });
@@ -116,13 +121,15 @@ export const createLogger = (
 function buildTransport(config: {
   isDevMode: boolean;
   otelLogsEnabled: boolean;
+  otelExportOn: boolean;
   consoleLevel: string;
   otelLevel: string;
 }) {
-  const { isDevMode, otelLogsEnabled, consoleLevel, otelLevel } = config;
+  const { isDevMode, otelLogsEnabled, otelExportOn, consoleLevel, otelLevel } =
+    config;
 
   const targets: pino.TransportTargetOptions[] = [
-    buildConsoleTransport(isDevMode, consoleLevel),
+    buildConsoleTransport(isDevMode, consoleLevel, otelExportOn),
   ];
 
   if (otelLogsEnabled) {
@@ -132,14 +139,40 @@ function buildTransport(config: {
   return pino.transport({ targets });
 }
 
+/**
+ * The context fields the pino mixin (getLogContext) stamps on every record. When
+ * the observability stack is up they are all in Grafana, so the pretty console
+ * drops the business-context ones — keeping only trace_id/span_id for
+ * correlation — to stop every line ballooning. With the stack down the console is
+ * the only place they exist, so they stay.
+ */
+const BASE_CONSOLE_IGNORE = "pid,hostname";
+const HEAVY_CONTEXT_FIELDS = ["organizationId", "projectId", "userId"];
+
+export function consoleIgnoreFields(otelExportOn: boolean): string {
+  return otelExportOn
+    ? [BASE_CONSOLE_IGNORE, ...HEAVY_CONTEXT_FIELDS].join(",")
+    : BASE_CONSOLE_IGNORE;
+}
+
 function buildConsoleTransport(
   isDevMode: boolean,
   level: string,
+  otelExportOn: boolean,
 ): pino.TransportTargetOptions {
   if (isDevMode) {
     return {
       target: "pino-pretty",
-      options: { colorize: true, minimumLevel: level },
+      options: {
+        colorize: true,
+        // One line per record — a compact console, not a multi-line object dump.
+        singleLine: true,
+        // Drop pid/hostname noise, and — when the observability stack is up —
+        // the heavy business-context fields too (they're in Grafana). See
+        // consoleIgnoreFields.
+        ignore: consoleIgnoreFields(otelExportOn),
+        minimumLevel: level,
+      },
       level,
     };
   }

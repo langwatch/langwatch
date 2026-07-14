@@ -24,6 +24,8 @@ import {
 } from "~/server/datasets/dataset-normalize.job";
 import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
+import { featureFlagService } from "~/server/featureFlag";
+import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
@@ -33,13 +35,14 @@ import type { BroadcastService } from "../app-layer/broadcast/broadcast.service"
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
+import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-inputs-offload";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
-import type { CodingAgentSessionRepository } from "../app-layer/traces/repositories/coding-agent-session.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
+import type { CodingAgentSessionRepository } from "../app-layer/traces/repositories/coding-agent-session.repository";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
@@ -97,16 +100,17 @@ import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processi
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
+import { resolveLogCommandShardCount } from "./pipelines/trace-processing/commands/logCommandGroupKey";
 import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
+import type { CodingAgentSessionState } from "./pipelines/trace-processing/projections/codingAgentSession.foldProjection";
+import { CodingAgentSessionStore } from "./pipelines/trace-processing/projections/codingAgentSession.store";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
-import { CodingAgentSessionStore } from "./pipelines/trace-processing/projections/codingAgentSession.store";
-import type { CodingAgentSessionState } from "./pipelines/trace-processing/projections/codingAgentSession.foldProjection";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
@@ -199,7 +203,7 @@ export interface PipelineRepositories {
   evaluationAnalyticsRollup: EvaluationAnalyticsRollupRepository;
   /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
   evaluationAnalytics: EvaluationAnalyticsRepository;
-  /** ADR-040: per-session coding-agent rollup repository. */
+  /** ADR-041: per-session coding-agent rollup repository. */
   codingAgentSession: CodingAgentSessionRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
 }
@@ -314,6 +318,49 @@ export class PipelineRegistry {
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
+      // ADR-040: offload oversized evaluator inputs to durable object storage
+      // before the event is built. ON by default (this bounds the fat-payload
+      // class behind the 2026-07-10 outage); the SYSTEM flag
+      // ops_evaluation_payload_offload_disabled is the operator kill switch.
+      // A flag-store error keeps the DEFAULT (offload runs): the kill switch
+      // failing to read must not silently drop the protection. Storage errors
+      // are handled INSIDE offloadInputsIfOversized, which degrades to a
+      // bounded preview-only marker so the event stays lean even when S3 is
+      // down. The catch below is the wiring-level fail-open for unexpected
+      // errors only (service construction, serialization); there the inputs
+      // stay inline and the unconditional repository belt-and-braces cap
+      // keeps the ClickHouse row merge-safe.
+      offloadInputs: async ({ projectId, evaluationId, inputs }) => {
+        try {
+          let disabled = false;
+          try {
+            disabled = await featureFlagService.isEnabled(
+              "ops_evaluation_payload_offload_disabled",
+              { distinctId: "evaluation-inputs-offload", defaultValue: false },
+            );
+          } catch {
+            // Unreadable kill switch: stay on the default (offload enabled).
+          }
+          if (disabled) return inputs;
+          const { inputs: maybeOffloaded } = await offloadInputsIfOversized({
+            inputs,
+            projectId,
+            evaluationId,
+            storedObjects: createStoredObjectsService({ projectId }),
+          });
+          return maybeOffloaded;
+        } catch (error) {
+          createLogger("langwatch:evaluations:inputs-offload-fail-open").warn(
+            {
+              projectId,
+              evaluationId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Evaluation inputs offload gate failed; keeping inputs inline (fail-open)",
+          );
+          return inputs;
+        }
+      },
     });
 
     // ADR-035: the persist branch is now an outbox reactor that only
@@ -501,7 +548,7 @@ export class PipelineRegistry {
           new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
           "trace_analytics",
         ),
-        // ADR-040. Same shape as the slim fold above: the row is an aggregate,
+        // ADR-041. Same shape as the slim fold above: the row is an aggregate,
         // not a copy, so its store's get() returns null and the Redis cache is
         // the only warm read path. On a miss the fold's refoldOnStoreMiss
         // rebuilds from the event log — without this wrapper every event would
@@ -539,6 +586,14 @@ export class PipelineRegistry {
         // parallel across `traceId:<shard>` GroupQueue groups; fold stays per-trace.
         spanCommandShardCount: resolveSpanCommandShardCount(
           process.env.TRACE_SPAN_PROCESSING_SHARDS,
+        ),
+        // Log-command sharding fan-out, ON by default (4 lanes; env
+        // TRACE_LOG_PROCESSING_SHARDS tunes it, 1 disables). Lets one Claude
+        // Code turn's recordLog commands drain in parallel across
+        // `traceId:<shard>` GroupQueue groups; the fold and the
+        // claude-span-sync reactor stay per-trace.
+        logCommandShardCount: resolveLogCommandShardCount(
+          process.env.TRACE_LOG_PROCESSING_SHARDS,
         ),
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,
@@ -903,24 +958,28 @@ function getDefinitions(): ReadonlyArray<
 export function getProjectionMetadata(): ProjectionMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    const folds = Array.from(def.foldProjections.values()).map(({ definition }) => ({
-      projectionName: definition.name,
-      pipelineName,
-      aggregateType,
-      source: "pipeline" as const,
-      pauseKey: `${pipelineName}/projection/${definition.name}`,
-      kind: "fold" as const,
-    }));
-    const maps = Array.from(def.mapProjections.values()).map(({ definition }) => ({
-      projectionName: definition.name,
-      pipelineName,
-      aggregateType,
-      source: "pipeline" as const,
-      // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
-      // entry must use the `handler` segment to match the dispatcher's Lua check.
-      pauseKey: `${pipelineName}/handler/${definition.name}`,
-      kind: "map" as const,
-    }));
+    const folds = Array.from(def.foldProjections.values()).map(
+      ({ definition }) => ({
+        projectionName: definition.name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline" as const,
+        pauseKey: `${pipelineName}/projection/${definition.name}`,
+        kind: "fold" as const,
+      }),
+    );
+    const maps = Array.from(def.mapProjections.values()).map(
+      ({ definition }) => ({
+        projectionName: definition.name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline" as const,
+        // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
+        // entry must use the `handler` segment to match the dispatcher's Lua check.
+        pauseKey: `${pipelineName}/handler/${definition.name}`,
+        kind: "map" as const,
+      }),
+    );
     return [...folds, ...maps];
   });
 }

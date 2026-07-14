@@ -10,7 +10,7 @@ import {
 import { isCodingAgentSession } from "./services/coding-agent-session.derivation";
 
 /**
- * FoldProjectionStore adapter for the coding-agent session fold (ADR-040).
+ * FoldProjectionStore adapter for the coding-agent session fold (ADR-041).
  *
  * The gate matters: a trace that is not a coding-agent session never reaches the
  * table. Every trace in the project flows through this fold, so without the

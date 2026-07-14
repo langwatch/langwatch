@@ -19,6 +19,7 @@ import {
 } from "~/server/app-layer/traces/claude-code-log-enrichment";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
+import { resolveOffloadedTracesBatch } from "./resolve-offloaded-traces-batch";
 
 /**
  * Minimum prefix length we will attempt to resolve. Shorter strings fall
@@ -144,6 +145,25 @@ class OffloadedSpanResolver {
         logger: this.logger,
       });
   }
+
+  /**
+   * Returns the bulk-resolution callback compatible with ClickHouseTraceService's
+   * `resolveTraceSpansBatchFn` parameter. Resolves a whole result set in one
+   * bounded-concurrency pass over event_log (#4991 AC6).
+   */
+  toBatchResolverFn(): (
+    projectId: string,
+    spansPerTrace: NormalizedSpan[][],
+  ) => ReturnType<typeof resolveOffloadedTracesBatch> {
+    return (projectId, spansPerTrace) =>
+      resolveOffloadedTracesBatch({
+        projectId,
+        spansPerTrace,
+        blobStore: this.deps.blobStore,
+        ioExtractionService: this.deps.ioExtractionService,
+        logger: this.logger,
+      });
+  }
 }
 
 /**
@@ -169,21 +189,22 @@ export class TraceService {
     blobResolutionDeps?: BlobResolutionDeps,
     logRecordStorage?: LogRecordStorageService,
   ) {
-    // Build the per-trace resolver callback when deps are present.
-    // The callback is passed to ClickHouseTraceService so resolution happens
-    // at the NormalizedSpan level (before mapping to legacy Span), which is
-    // the only level where spanAttributes carry the eventref keys.
-    const resolveTraceSpansFn =
+    // Build the resolver callbacks when deps are present. They are passed to
+    // ClickHouseTraceService so resolution happens at the NormalizedSpan level
+    // (before mapping to legacy Span), the only level where spanAttributes
+    // carry the eventref keys. The per-trace fn serves single-trace detail
+    // reads (#4888); the batch fn serves bulk reads in one bounded pass (#4991).
+    const offloadedSpanResolver =
       blobResolutionDeps !== undefined
-        ? new OffloadedSpanResolver(
-            blobResolutionDeps,
-            this.logger,
-          ).toResolverFn()
+        ? new OffloadedSpanResolver(blobResolutionDeps, this.logger)
         : undefined;
+    const resolveTraceSpansFn = offloadedSpanResolver?.toResolverFn();
+    const resolveTraceSpansBatchFn = offloadedSpanResolver?.toBatchResolverFn();
 
     this.clickHouseService = ClickHouseTraceService.create(
       prisma,
       resolveTraceSpansFn,
+      resolveTraceSpansBatchFn,
     );
     this.evaluationService = EvaluationService.create();
     // Injected store for the read-time Claude Code content enrichment; the
@@ -400,12 +421,16 @@ export class TraceService {
    * @param projectId - The project ID
    * @param threadId - The thread ID to group by
    * @param protections - Field redaction protections
+   * @param opts.full - When true AND blob-resolution deps are present, resolves
+   *   offloaded eventref pointers so thread-detail IO reads back full (#4991).
+   *   Default (undefined/false) returns the ≤64 KB preview.
    * @returns Array of traces in the thread
    */
   async getTracesByThreadId(
     projectId: string,
     threadId: string,
     protections: Protections,
+    opts?: { full?: boolean },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesByThreadId",
@@ -415,6 +440,7 @@ export class TraceService {
           projectId,
           threadId,
           protections,
+          { resolveBlobs: opts?.full },
         );
         return this.enrichCodingAgentTraces(projectId, traces);
       },
@@ -514,10 +540,11 @@ export class TraceService {
    * @param threadIds - Array of thread IDs
    * @param protections - Field redaction protections
    * @param opts.full - When true AND blob-resolution deps are present, resolves
-   *   offloaded eventref pointers so thread IO reads back full. Used by the
-   *   eval path (which needs full values for thread-mapped evaluators) — the
-   *   eval-path TraceService carries deps. Customer thread views pass nothing
-   *   and carry no deps, so they stay on the ≤64 KB preview (#4888 / ADR-022).
+   *   offloaded eventref pointers so thread IO reads back full (#4991). Opted
+   *   into per call: the eval path (thread-mapped evaluators) and the
+   *   content-consuming thread tRPC both pass `{ full: true }` with deps. A
+   *   caller that omits it — or a deps-free TraceService — stays on the ≤64 KB
+   *   preview and issues zero event_log reads (#4888 / ADR-022).
    * @returns Array of traces
    */
   async getTracesWithSpansByThreadIds(

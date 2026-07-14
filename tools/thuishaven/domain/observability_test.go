@@ -40,15 +40,37 @@ func TestObservabilityEnvTagsTelemetryWithTheSlug(t *testing.T) {
 	}
 }
 
-// Muting someone's terminal is not haven's call — the overlay overrides .env, so
-// emitting LOG_CONSOLE_LEVEL here would silently win over their own setting.
-func TestObservabilityEnvNeverSetsTheConsoleLogLevel(t *testing.T) {
-	st := Stack{Slug: "portless", ObservabilityOTLPPort: 4318}
-	if got := valueOf(st.OverlayEnv(), "LOG_CONSOLE_LEVEL"); got != "" {
-		t.Errorf("LOG_CONSOLE_LEVEL must be left to .env; got %q", got)
+// With the stack up, haven mutes the console to the configured floor (warn) — the
+// full stream is in Grafana — but only when a level is set. An empty level is the
+// opt-out (LW_OBS_CONSOLE_LEVEL="off"), leaving the console to .env. Either way the
+// OTel floor stays at debug, so nothing is lost, just relocated.
+func TestObservabilityEnvMutesTheConsoleOnlyWhenAskedTo(t *testing.T) {
+	optedOut := Stack{Slug: "portless", ObservabilityOTLPPort: 4318}
+	if got := valueOf(optedOut.OverlayEnv(), "LOG_CONSOLE_LEVEL"); got != "" {
+		t.Errorf("with no console level set, LOG_CONSOLE_LEVEL must be left to .env; got %q", got)
 	}
-	if got := valueOf(st.OverlayEnv(), "LOG_OTEL_LEVEL"); got != "debug" {
+
+	muted := Stack{Slug: "portless", ObservabilityOTLPPort: 4318, ObservabilityConsoleLevel: "warn"}
+	if got, want := valueOf(muted.OverlayEnv(), "LOG_CONSOLE_LEVEL"), "warn"; got != want {
+		t.Errorf("LOG_CONSOLE_LEVEL = %q, want %q", got, want)
+	}
+	if got := valueOf(muted.OverlayEnv(), "LOG_OTEL_LEVEL"); got != "debug" {
 		t.Errorf("LOG_OTEL_LEVEL = %q, want debug (full detail reaches Grafana)", got)
+	}
+}
+
+// The Grafana base URL is published only once the stack is up, so the app can turn
+// a trace/span id into a clickable deep link. Loopback, for the developer's own
+// browser on this machine.
+func TestObservabilityEnvPublishesTheGrafanaLink(t *testing.T) {
+	st := Stack{Slug: "portless", ObservabilityOTLPPort: 4318}
+	if got := valueOf(st.OverlayEnv(), "GRAFANA_BASE_URL"); got != "" {
+		t.Errorf("without a Grafana port, GRAFANA_BASE_URL must be unset; got %q", got)
+	}
+
+	st.ObservabilityGrafanaPort = 3000
+	if got, want := valueOf(st.OverlayEnv(), "GRAFANA_BASE_URL"), "http://127.0.0.1:3000"; got != want {
+		t.Errorf("GRAFANA_BASE_URL = %q, want %q", got, want)
 	}
 }
 

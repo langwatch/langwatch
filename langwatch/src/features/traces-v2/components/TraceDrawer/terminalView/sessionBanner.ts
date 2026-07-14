@@ -4,7 +4,7 @@ import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
  * The handful of facts Claude Code itself prints above the prompt when a
  * session starts: its own version, the model, and where it's running. Sourced
  * straight from the OTel resource/span attributes rather than the
- * `coding_agent_sessions` fold — the fold is a bounded aggregate (ADR-040) and
+ * `coding_agent_sessions` fold — the fold is a bounded aggregate (ADR-041) and
  * deliberately doesn't carry identity strings the drawer already has spans for.
  */
 export interface SessionBanner {

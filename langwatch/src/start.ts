@@ -77,7 +77,11 @@ import {
   initializeWebApp,
 } from "./server/app-layer/presets";
 import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
-import { getWorkerMetricsPort, isMetricsAuthorized } from "./server/metrics";
+import {
+  getWorkerMetricsPort,
+  isMetricsAuthorized,
+  normalizeMetricsPath,
+} from "./server/metrics";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
 import { serveStaticOrFallback } from "./server/static-handler";
@@ -105,7 +109,7 @@ export const metricsMiddleware = promBundle({
   },
   normalizePath: (req) => {
     if (req.url?.includes("/assets/")) return "/assets/*";
-    return req.url?.split("?")[0] ?? req.url;
+    return normalizeMetricsPath(req.url?.split("?")[0] ?? "/");
   },
 });
 

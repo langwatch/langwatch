@@ -16,6 +16,10 @@ import {
 } from "./commands/annotationCommands";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { ChangeTraceNameCommand } from "./commands/changeTraceNameCommand";
+import {
+  clampLogShardCount,
+  logCommandGroupKey,
+} from "./commands/logCommandGroupKey";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import {
@@ -39,7 +43,10 @@ import {
   type TraceAnalyticsRollupRow,
 } from "./projections/traceAnalyticsRollup.mapProjection";
 import { TraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
-import type { RecordSpanCommandData } from "./schemas/commands";
+import type {
+  RecordLogCommandData,
+  RecordSpanCommandData,
+} from "./schemas/commands";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedLogRecord } from "./schemas/logRecords";
 import type { NormalizedMetricRecord } from "./schemas/metricRecords";
@@ -131,6 +138,15 @@ export interface TraceProcessingPipelineDeps {
    * spanCommandGroupKey.ts.
    */
   spanCommandShardCount?: number;
+  /**
+   * Number of GroupQueue shards for `recordLog` commands. `1` (default) keeps
+   * the historic per-trace group key; `> 1` spreads one Claude Code turn's log
+   * records across `traceId:<shard>` groups so a turn that streams thousands of
+   * log records drains in parallel instead of FIFO'ing behind one worker. The
+   * trace-summary fold and the claude-span-sync reactor are unaffected - both
+   * run on their own aggregate-keyed queue. See logCommandGroupKey.ts.
+   */
+  logCommandShardCount?: number;
   governanceKpisSyncReactor?: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
@@ -170,7 +186,7 @@ export function createTraceProcessingPipeline(
         store: deps.traceAnalyticsStore,
       }),
     )
-    // ADR-040. Folds spans, logs AND metrics into one row per coding-agent
+    // ADR-041. Folds spans, logs AND metrics into one row per coding-agent
     // session. Every trace flows through it, but only a coding agent's writes a
     // row — the store gates on the fold having actually seen a model call or a
     // tool run, so an ordinary LLM trace costs a name comparison and nothing more.
@@ -320,6 +336,34 @@ export function createTraceProcessingPipeline(
     };
   }
 
+  // Log-command sharding: when the shard count is > 1, install a getGroupKey
+  // that spreads a trace's recordLog commands across `traceId:<shard>`
+  // GroupQueue groups so one Claude Code turn that streams thousands of log
+  // records drains in parallel instead of FIFO'ing behind one worker. When
+  // disabled (the default), install NO getGroupKey - the command falls back to
+  // getAggregateId, byte-identical to the historic per-trace key. The count is
+  // clamped defensively so a caller constructing the pipeline directly can't
+  // explode the number of groups. The command handler reads no trace state and
+  // the emitted log_record_received event still carries aggregateId = traceId,
+  // so the trace-summary fold and the claude-span-sync reactor (each on its own
+  // aggregate-keyed queue) are unaffected and the turn's tool-output join stays
+  // intact. See logCommandGroupKey.ts and
+  // specs/claude/telemetry-turn-bounding.feature.
+  const logCommandShardCount = clampLogShardCount(
+    deps.logCommandShardCount ?? 1,
+  );
+  const recordLogOptions: {
+    getGroupKey?: (payload: RecordLogCommandData) => string;
+  } = {};
+  if (logCommandShardCount > 1) {
+    recordLogOptions.getGroupKey = (payload) =>
+      logCommandGroupKey({
+        traceId: payload.traceId,
+        spanId: payload.spanId,
+        shardCount: logCommandShardCount,
+      });
+  }
+
   // ADR-022: When blobStore is provided, inject it into a pre-constructed
   // RecordSpanCommand instance so the worker can reconstitute oversized commands
   // (S3 spool fetch + best-effort delete). Falls back to zero-arg construction
@@ -336,7 +380,7 @@ export function createTraceProcessingPipeline(
 
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
-    .withCommand("recordLog", RecordLogCommand)
+    .withCommand("recordLog", RecordLogCommand, recordLogOptions)
     .withCommand("recordMetric", RecordMetricCommand)
     .withCommand("resolveOrigin", ResolveOriginCommand)
     .withCommand("addAnnotation", AddAnnotationCommand)

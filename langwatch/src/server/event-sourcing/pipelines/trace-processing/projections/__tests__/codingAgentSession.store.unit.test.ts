@@ -1,5 +1,5 @@
 /**
- * The coding-agent session store (ADR-040).
+ * The coding-agent session store (ADR-041).
  *
  * The gate is the whole point: EVERY trace in the project flows through this
  * fold, so without it an ordinary chat trace would write an empty row for itself

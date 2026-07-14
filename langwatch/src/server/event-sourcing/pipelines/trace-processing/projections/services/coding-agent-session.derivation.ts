@@ -16,7 +16,7 @@ import type {
 
 /**
  * Derive a coding-agent SESSION from its spans, its logs AND its metrics
- * (ADR-040, specs/trace-processing/coding-agent-session.feature).
+ * (ADR-041, specs/trace-processing/coding-agent-session.feature).
  *
  * All three signals are needed, because the agent splits the story across them:
  *

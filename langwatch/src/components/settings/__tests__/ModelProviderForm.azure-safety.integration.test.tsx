@@ -25,12 +25,17 @@ import type { MaybeStoredModelProvider } from "../../../server/modelProviders/re
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockUseModelProviderForm, mockUseModelProvidersSettings } = vi.hoisted(
-  () => ({
-    mockUseModelProviderForm: vi.fn(),
-    mockUseModelProvidersSettings: vi.fn(),
-  }),
-);
+const {
+  mockUseModelProviderForm,
+  mockUseModelProvidersSettings,
+  mockListAllForOrgQuery,
+  mockListAllForProjectQuery,
+} = vi.hoisted(() => ({
+  mockUseModelProviderForm: vi.fn(),
+  mockUseModelProvidersSettings: vi.fn(),
+  mockListAllForOrgQuery: vi.fn(),
+  mockListAllForProjectQuery: vi.fn(),
+}));
 
 vi.mock("../../../hooks/useModelProviderForm", () => ({
   useModelProviderForm: (...args: unknown[]) =>
@@ -77,6 +82,12 @@ vi.mock("../../../utils/api", () => ({
       isManagedProvider: {
         useQuery: () => ({ data: { managed: false } }),
       },
+      // EditModelProviderForm resolves its edit target from the flat
+      // (uncollapsed) provider list via useAllModelProvidersList (#5380).
+      // primeHooksForProvider seeds both with the same fixture the
+      // collapsed-record mock below uses.
+      listAllForOrganizationForFrontend: { useQuery: mockListAllForOrgQuery },
+      listAllForProjectForFrontend: { useQuery: mockListAllForProjectQuery },
     },
   },
 }));
@@ -178,6 +189,17 @@ function primeHooksForProvider({
     refetch: vi.fn(),
     hasEnabledProviders: false,
   });
+  // Flat-list counterpart of the collapsed record above.
+  mockListAllForOrgQuery.mockReturnValue({
+    data: { providers: [provider], modelMetadata: {} },
+    isLoading: false,
+    refetch: vi.fn(),
+  });
+  mockListAllForProjectQuery.mockReturnValue({
+    data: { providers: [provider], modelMetadata: {} },
+    isLoading: false,
+    refetch: vi.fn(),
+  });
   mockUseModelProviderForm.mockReturnValue([
     buildState({ displayKeys }),
     buildActions(),
@@ -220,9 +242,7 @@ describe("Feature: Azure Safety model provider form rendering", () => {
       });
 
       it("renders the AZURE_CONTENT_SAFETY_ENDPOINT credential field", () => {
-        expect(
-          screen.getByText("AZURE_CONTENT_SAFETY_ENDPOINT"),
-        ).toBeTruthy();
+        expect(screen.getByText("AZURE_CONTENT_SAFETY_ENDPOINT")).toBeTruthy();
       });
 
       it("renders the AZURE_CONTENT_SAFETY_KEY credential field", () => {
@@ -244,9 +264,7 @@ describe("Feature: Azure Safety model provider form rendering", () => {
       });
 
       it("renders the Save button", () => {
-        expect(
-          screen.getByRole("button", { name: /save/i }),
-        ).toBeTruthy();
+        expect(screen.getByRole("button", { name: /save/i })).toBeTruthy();
       });
     });
   });

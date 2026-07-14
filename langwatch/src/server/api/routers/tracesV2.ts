@@ -1653,7 +1653,7 @@ export const tracesV2Router = createTRPCRouter({
     }),
 
   /**
-   * The pre-folded coding-agent session rollup for one trace (ADR-040).
+   * The pre-folded coding-agent session rollup for one trace (ADR-041).
    *
    * Returns null for an ordinary LLM trace — the fold writes no row for those,
    * so null is the normal answer rather than an error, and the caller simply

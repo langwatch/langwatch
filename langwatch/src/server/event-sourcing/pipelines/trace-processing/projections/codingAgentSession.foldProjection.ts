@@ -28,7 +28,7 @@ import {
 import type { CodingAgentSessionData } from "./services/coding-agent-session.types";
 
 /**
- * The coding-agent session fold (ADR-040).
+ * The coding-agent session fold (ADR-041).
  *
  * One row per SESSION, folded from that session's spans, logs AND metrics — all
  * three, because the agent splits the story across them. See the derivation for

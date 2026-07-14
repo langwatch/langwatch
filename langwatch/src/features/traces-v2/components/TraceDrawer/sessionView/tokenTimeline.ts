@@ -3,7 +3,7 @@ import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-tra
 /**
  * One model call's token composition, in the order it happened.
  *
- * The session fold (ADR-040) only ever carries the SUM across a whole
+ * The session fold (ADR-041) only ever carries the SUM across a whole
  * session — `cacheReadTokens`, `cacheCreationTokens` as two scalars. That
  * answers "how much did this session reuse vs rebuild in total", but not
  * "where" — which call, at what point in the conversation, spent the money.

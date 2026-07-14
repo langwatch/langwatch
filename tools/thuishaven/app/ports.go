@@ -76,6 +76,10 @@ type Child struct {
 	Shell string
 	Env   []string
 	Color string
+	// ReadyProbeURL, if set, holds this child's start until an HTTP GET to the URL
+	// gets a non-5xx response — so a lane that depends on another (the web/app on
+	// the API) never starts before what it needs is serving. Empty = start now.
+	ReadyProbeURL string
 }
 
 // System is the set of OS facts the app needs, behind a port so it can be faked.

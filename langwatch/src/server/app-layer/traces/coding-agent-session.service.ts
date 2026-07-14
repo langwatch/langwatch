@@ -1,8 +1,8 @@
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/codingAgentSession.foldProjection";
 import {
-  mergeCodingAgentSessionRows,
   type CodingAgentSession,
-} from "../coding-agent-session-merge";
+  mergeCodingAgentSessionRows,
+} from "./coding-agent-session-merge";
 import type { CodingAgentSessionRepository } from "./repositories/coding-agent-session.repository";
 
 /** One other trace to check for a coding-agent session row. */
@@ -12,7 +12,7 @@ export interface ConversationTraceRef {
 }
 
 /**
- * Read side of the coding-agent session rollup (ADR-040).
+ * Read side of the coding-agent session rollup (ADR-041).
  *
  * A point read of one pre-folded row per trace. There is no aggregation
  * WITHIN a trace on purpose: the fold already did it at ingest, which is the
@@ -97,7 +97,9 @@ export class CodingAgentSessionService {
         }),
       ),
     );
-    const found = rows.filter((row): row is CodingAgentSessionRow => row !== null);
+    const found = rows.filter(
+      (row): row is CodingAgentSessionRow => row !== null,
+    );
     return found.length > 0 ? mergeCodingAgentSessionRows(found) : null;
   }
 }

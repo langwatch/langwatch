@@ -46,10 +46,12 @@ import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle";
 import {
   decodeJobEnvelope,
   encodeJobEnvelope,
+  PayloadTooLargeError,
   readEnvelopeBlobId,
 } from "./jobEnvelope";
 import {
   gqGroupsBlockedTotal,
+  gqGroupsPoisonParkedTotal,
   gqJobDelayMilliseconds,
   gqJobDurationMilliseconds,
   gqJobsCompletedTotal,
@@ -69,6 +71,7 @@ import {
   type DispatchResult,
   type DrainedJob,
   GroupStagingScripts,
+  readClaimStrikeThreshold,
 } from "./scripts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
 
@@ -699,10 +702,57 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
-   * fastq worker function: processes a dispatched job with retries, OTEL tracing,
-   * heartbeats, and error handling.
+   * fastq worker function: poison guard, then the real job processing.
+   *
+   * The guard records a claim strike BEFORE any decode/parse work and clears
+   * it on every code path where the process survives (the finally below -
+   * success, retry, exhausted-park, drop-to-replay, graceful drain all pass
+   * through it). A job that seizes the event loop never reaches the finally:
+   * the liveness probe kills the process, the strike stays behind, and after
+   * enough consecutive deaths the next claim parks the group instead of
+   * re-running the killer (specs/event-sourcing/poison-group-park-guard.feature).
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
+    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+
+    const strikeThreshold = readClaimStrikeThreshold();
+    if (strikeThreshold > 0) {
+      let strikes = 0;
+      try {
+        strikes = await this.scripts.recordClaimStrike(groupId);
+      } catch {
+        // Strike accounting is protective, never load-bearing: an unreadable
+        // counter must not stop the queue.
+      }
+      if (strikes > strikeThreshold) {
+        await this.parkPoisonGroup({
+          groupId,
+          stagedJobId,
+          jobDataJson,
+          originalScore,
+          reason: "claim_strikes",
+          errorMessage: `Poison guard: ${strikes - 1} consecutive worker deaths while this group was in flight (threshold ${strikeThreshold}). Inspect the staged jobs, then unblock the group to retry.`,
+        });
+        return;
+      }
+    }
+
+    try {
+      await this.processClaimedJob(dispatched);
+    } finally {
+      if (strikeThreshold > 0) {
+        this.scripts.clearClaimStrikes(groupId).catch(() => {
+          // The TTL on the strike key bounds the damage of a failed clear.
+        });
+      }
+    }
+  }
+
+  /**
+   * Processes a dispatched job with retries, OTEL tracing, heartbeats, and
+   * error handling.
+   */
+  private async processClaimedJob(dispatched: DispatchResult): Promise<void> {
     const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
 
     // Parse the stored job data
@@ -720,6 +770,20 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           stagedJobId,
           jobDataJson,
           err,
+        });
+        return;
+      }
+      if (err instanceof PayloadTooLargeError) {
+        // Over the decode cap: parsing it would seize the event loop. Park the
+        // group with the value intact for inspection - do NOT drop to replay
+        // (replay would re-materialize the same value) and do NOT parse.
+        await this.parkPoisonGroup({
+          groupId,
+          stagedJobId,
+          jobDataJson,
+          originalScore,
+          reason: "oversized_payload",
+          errorMessage: `Poison guard: ${err.message}. The staged value was parked unparsed.`,
         });
         return;
       }
@@ -810,6 +874,26 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               stagedJobId,
               jobDataJson,
               err,
+            });
+            return;
+          }
+          if (err instanceof PayloadTooLargeError) {
+            // An oversized drained sibling can't be parsed (it would seize the
+            // event loop) and re-dispatch would only re-drain it. Mirror the
+            // dispatched-job oversized path: park the group so it stops running
+            // this batch until an operator intervenes. Re-stage the drained
+            // siblings first (same restage the transient path uses) so the
+            // other work, including the oversized value itself, is preserved
+            // in staging for inspection, not lost to replay. The dispatched
+            // job's value carries the park so the group moves to the blocked set.
+            await this.restageDrainedSiblings(groupId, drainedSiblings);
+            await this.parkPoisonGroup({
+              groupId,
+              stagedJobId,
+              jobDataJson,
+              originalScore,
+              reason: "oversized_payload",
+              errorMessage: `Poison guard: a coalesced sibling of this group is oversized (${err.message}). The batch was parked unparsed.`,
             });
             return;
           }
@@ -1198,6 +1282,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       if (err instanceof TransientBlobStoreError) {
         throw err;
       }
+      // An oversized sibling must NOT drop to replay either: replay would
+      // re-materialize the same over-cap value and parsing it would seize the
+      // event loop. Rethrow so the caller parks the group (reason
+      // oversized_payload) with the value intact for inspection, exactly as the
+      // dispatched job's own decode does, instead of silently dropping it.
+      if (err instanceof PayloadTooLargeError) {
+        throw err;
+      }
       this.logger.error(
         {
           queueName: this.queueName,
@@ -1344,6 +1436,53 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         error: lastError?.message,
       },
       "Group blocked after exhausted retries, job re-staged",
+    );
+  }
+
+  /**
+   * Claim-side poison park (specs/event-sourcing/poison-group-park-guard.feature):
+   * re-stage the SAME staged value (no decode, no re-encode, hold token
+   * unchanged - the transient-decode rationale applies) and move the group to
+   * the blocked set with a stored error. The value stays inspectable via the
+   * ops peek path; operators recover with the existing unblock/drain surface.
+   */
+  private async parkPoisonGroup({
+    groupId,
+    stagedJobId,
+    jobDataJson,
+    originalScore,
+    reason,
+    errorMessage,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    jobDataJson: string;
+    originalScore: number;
+    reason: "claim_strikes" | "oversized_payload";
+    errorMessage: string;
+  }): Promise<void> {
+    const score =
+      typeof originalScore === "number" ? originalScore : Date.now();
+    await this.scripts.restageAndBlock({
+      groupId,
+      newStagedJobId: `${stagedJobId}/p/${Date.now()}`,
+      score,
+      jobDataJson,
+      errorMessage,
+    });
+    gqGroupsPoisonParkedTotal.inc({
+      queue_name: this.queueName,
+      reason,
+    });
+    this.logger.error(
+      {
+        queueName: this.queueName,
+        projectId: tenantIdFromGroupId(groupId),
+        groupId,
+        stagedJobId,
+        reason,
+      },
+      "Poison guard parked group into the blocked set",
     );
   }
 

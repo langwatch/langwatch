@@ -785,7 +785,7 @@ export function initializeDefaultApp(options?: {
     summary: traceSummary,
     list: traceList,
     spans: spanStorage,
-    // Reads the row the coding-agent fold already wrote (ADR-040) — same
+    // Reads the row the coding-agent fold already wrote (ADR-041) — same
     // repository instance the projection writes through, so the read side
     // cannot drift onto a different table than the write side. Conversation
     // membership (a session can span more than one trace) is answered by

@@ -63,9 +63,13 @@ func (s Stack) OverlayEnv() []string {
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
 	}
 	// A stable local API key so the seed always mints the same credential and any
-	// agent can authenticate without rediscovering it per worktree.
+	// agent can authenticate without rediscovering it per worktree. Emitted as
+	// HAVEN_SEED_LANGWATCH_API_KEY, never LANGWATCH_API_KEY: the latter is the langwatch
+	// SDK trigger, and a platform process that had it set would self-instrument into
+	// its own trace ingest. The TS + Go platform entry points panic if LANGWATCH_API_KEY
+	// is ever set; domain_test.go pins that this overlay never emits it.
 	if s.LocalAPIKey != "" {
-		env = append(env, "LANGWATCH_API_KEY="+s.LocalAPIKey)
+		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+s.LocalAPIKey)
 	}
 	// The rest of the static seeded identity (see prisma/seed.ts's header comment
 	// for the full rationale) — same story: fixed values so any worktree or agent
@@ -122,16 +126,18 @@ func (s Stack) OverlayEnv() []string {
 // logs, traces and metrics, even with a dozen worktrees sharing the collector.
 //
 // Emitted only when the stack is actually up, so a contributor who never starts
-// it exports nothing and pays nothing. Console log level is deliberately NOT set
-// here: the overlay overrides .env, and silently muting someone's terminal is not
-// a decision haven gets to make. Set LOG_CONSOLE_LEVEL=warn in .env to get the
-// quiet-terminal, full-detail-in-Grafana split.
+// it exports nothing and pays nothing. While it IS up, haven also mutes the
+// console to warn+ (ObservabilityConsoleLevel) because the full info/debug stream
+// is now in Grafana — the terminal only needs what wants a human. That is the one
+// place the overlay deliberately overrides .env; it is opt-outable
+// (LW_OBS_CONSOLE_LEVEL="off"), and the OTel floor stays at debug so nothing is
+// lost, just relocated.
 func (s Stack) observabilityEnv() []string {
 	if s.ObservabilityOTLPPort == 0 {
 		return nil
 	}
 	otlp := fmt.Sprintf("http://127.0.0.1:%d", s.ObservabilityOTLPPort)
-	return []string{
+	env := []string{
 		"OTEL_EXPORTER_OTLP_ENDPOINT=" + otlp,   // TS: traces + logs + metrics
 		"OTEL_DEBUG_COLLECTOR_ENDPOINT=" + otlp, // Go: dual-export, additive to the product trace path
 		"PINO_OTEL_ENABLED=true",
@@ -139,6 +145,16 @@ func (s Stack) observabilityEnv() []string {
 		"LOG_OTEL_LEVEL=debug",
 		"OTEL_RESOURCE_ATTRIBUTES=" + ObservabilityWorktreeAttr + "=" + s.Slug,
 	}
+	// The Grafana base URL, so the app can build clickable trace/log deep links.
+	// Loopback: the link is followed by the developer's own browser on this machine.
+	if s.ObservabilityGrafanaPort != 0 {
+		env = append(env, fmt.Sprintf("GRAFANA_BASE_URL=http://127.0.0.1:%d", s.ObservabilityGrafanaPort))
+	}
+	// Quiet the console to warn+ (the full stream is in Grafana). Empty = opt-out.
+	if s.ObservabilityConsoleLevel != "" {
+		env = append(env, "LOG_CONSOLE_LEVEL="+s.ObservabilityConsoleLevel)
+	}
+	return env
 }
 
 // OverlayFile renders the .env.portless file body (header + OverlayEnv).
