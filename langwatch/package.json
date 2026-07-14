@@ -294,7 +294,7 @@
     "@types/sanitize-html": "^2.16.1",
     "@types/semver": "^7.7.1",
     "@types/ws": "^8.18.1",
-    "@typescript/native-preview": "7.0.0-dev.20260703.1",
+    "@typescript/native-preview": "7.0.0-dev.20260705.1",
     "@vitest/browser": "^4.1.9",
     "@vitest/browser-playwright": "^4.1.9",
     "@vitest/coverage-v8": "^4.1.9",
