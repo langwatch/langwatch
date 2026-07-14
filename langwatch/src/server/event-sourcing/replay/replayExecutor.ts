@@ -155,7 +155,7 @@ export class FoldAccumulator {
 }
 
 interface BufferedMapRecord {
-  record: any;
+  record: unknown;
   context: ProjectionStoreContext;
 }
 
