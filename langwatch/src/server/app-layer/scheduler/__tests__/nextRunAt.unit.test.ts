@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeNextRunAt } from "../nextRunAt";
+import { computeCatchUp, computeNextRunAt } from "../nextRunAt";
 
 describe("computeNextRunAt", () => {
   describe("given a weekly cron '0 9 * * 1' (Mondays 09:00)", () => {
@@ -58,6 +58,76 @@ describe("computeNextRunAt", () => {
           }),
         ).toThrow();
       });
+    });
+  });
+});
+
+describe("computeCatchUp (runLatest catch-up)", () => {
+  const CRON = "0 9 * * *"; // daily 09:00
+  const TZ = "UTC";
+
+  describe("given an on-time fire (the slot is the only one due)", () => {
+    it("collapses to the slot itself and advances to the next instant — the fast path is unchanged", () => {
+      const slot = new Date("2026-07-13T09:00:00.000Z");
+      // now is shortly after the slot, before the next daily instant.
+      const now = new Date("2026-07-13T09:03:00.000Z");
+      const { catchUpSlot, nextRunAt } = computeCatchUp({
+        cron: CRON,
+        timezone: TZ,
+        slot,
+        now,
+      });
+      expect(catchUpSlot.toISOString()).toBe(slot.toISOString());
+      expect(nextRunAt.toISOString()).toBe("2026-07-14T09:00:00.000Z");
+    });
+  });
+
+  describe("given a backlog of several missed slots after an outage", () => {
+    it("returns the NEWEST missed slot as the catch-up and fast-forwards past now", () => {
+      // Oldest un-fired slot is 4 days stale; now is mid-day on the 13th, after
+      // that day's 09:00 instant.
+      const slot = new Date("2026-07-09T09:00:00.000Z");
+      const now = new Date("2026-07-13T12:00:00.000Z");
+      const { catchUpSlot, nextRunAt } = computeCatchUp({
+        cron: CRON,
+        timezone: TZ,
+        slot,
+        now,
+      });
+      // The single catch-up is the most recent slot <= now (the 13th 09:00),
+      // NOT the 4-day-old oldest slot.
+      expect(catchUpSlot.toISOString()).toBe("2026-07-13T09:00:00.000Z");
+      // The calendar resumes in the future — the first instant strictly after now.
+      expect(nextRunAt.toISOString()).toBe("2026-07-14T09:00:00.000Z");
+      expect(nextRunAt.getTime()).toBeGreaterThan(now.getTime());
+    });
+  });
+
+  describe("given a backlog where now is BEFORE today's instant", () => {
+    it("catches up to yesterday's slot and points nextRunAt at today's instant", () => {
+      const slot = new Date("2026-07-09T09:00:00.000Z");
+      const now = new Date("2026-07-13T06:00:00.000Z"); // before 09:00 on the 13th
+      const { catchUpSlot, nextRunAt } = computeCatchUp({
+        cron: CRON,
+        timezone: TZ,
+        slot,
+        now,
+      });
+      expect(catchUpSlot.toISOString()).toBe("2026-07-12T09:00:00.000Z");
+      expect(nextRunAt.toISOString()).toBe("2026-07-13T09:00:00.000Z");
+    });
+  });
+
+  describe("given a poison cron with no reachable run", () => {
+    it("throws rather than persisting a bogus marker", () => {
+      expect(() =>
+        computeCatchUp({
+          cron: "0 9 30 2 *", // Feb 30 never occurs
+          timezone: TZ,
+          slot: new Date("2026-01-01T00:00:00.000Z"),
+          now: new Date("2026-01-02T00:00:00.000Z"),
+        }),
+      ).toThrow();
     });
   });
 });

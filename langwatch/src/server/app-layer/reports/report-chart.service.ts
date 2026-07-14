@@ -62,6 +62,44 @@ function chartTypeOf(graphType: CustomGraphInput["graphType"]): ReportChart["typ
 const MAX_SERIES = 5;
 const MAX_SEGMENTS = 8;
 
+/**
+ * Max panels a single report queries at once (ADR-044 §5 "Load & scale"). Each
+ * panel is one heavy, cold-cache `getTimeseries` GROUP-BY; a large dashboard has
+ * dozens, and at a shared schedule boundary several reports on several workers
+ * fire together. An unbounded `Promise.all` would fan every panel out at once
+ * and a burst of these can exhaust ClickHouse concurrency/memory for interactive
+ * traffic. Bounding the per-report fan-out — composed with the worker firing
+ * reports one at a time and the fleet's worker count — keeps the burst small
+ * while still overlapping enough panels that a dashboard render stays prompt.
+ */
+export const REPORT_CHART_QUERY_CONCURRENCY = 3;
+
+/**
+ * Map `fn` over `items` with at most `concurrency` calls in flight, preserving
+ * input order in the result. A rejected `fn` rejects the whole map (matching the
+ * previous `Promise.all` all-or-nothing contract — a report either renders every
+ * panel or fails and retries via the scheduler's lease).
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index]!, index);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+  );
+  return results;
+}
+
 /** Minutes per bucket at or above which a bucket is a whole day. */
 const DAY_SCALE_MINUTES = 1440;
 
@@ -103,10 +141,11 @@ export async function loadReportCharts({
   to: number;
 }): Promise<ReportChart[]> {
   const graphs = await loadGraphs({ deps, source, projectId });
-  // Panels are independent queries; a dashboard with eight of them should not
-  // take eight round-trips in series.
-  return Promise.all(
-    graphs.map((graph) => buildChart({ deps, graph, projectId, from, to })),
+  // Panels are independent queries, so overlap them rather than paying eight
+  // round-trips in series — but under a concurrency cap (ADR-044 §5) so a large
+  // dashboard doesn't fire every panel's heavy ClickHouse query at once.
+  return mapWithConcurrency(graphs, REPORT_CHART_QUERY_CONCURRENCY, (graph) =>
+    buildChart({ deps, graph, projectId, from, to }),
   );
 }
 

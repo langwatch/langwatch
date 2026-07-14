@@ -330,6 +330,154 @@ describe("SchedulerService lease-and-retry (ADR-044 P1)", () => {
     });
   });
 
+  describe("given a fresh job several intervals behind after an outage (runLatest)", () => {
+    /**
+     * A STATEFUL repo that faithfully re-serves the row whenever it is still due
+     * and mutates it on claim/settle — so a bug that advanced `nextRunAt` to a
+     * still-past slot would be re-served and re-fired every cycle. This is the
+     * regression for the ADR-044 catch-up P1: outage recovery must fire ONE
+     * catch-up and fast-forward, never replay every missed slot.
+     */
+    function makeStatefulRepo(initial: ScheduledJobRecord): {
+      repo: ScheduledJobRepository;
+      getJob: () => ScheduledJobRecord;
+    } {
+      let job = { ...initial };
+      const repo: ScheduledJobRepository = {
+        findDue: vi.fn(async ({ now }: { now: Date }) =>
+          job.active && job.nextRunAt.getTime() <= now.getTime()
+            ? [{ ...job }]
+            : [],
+        ),
+        earliestActiveNextRunAt: vi.fn(async () =>
+          job.active ? job.nextRunAt : null,
+        ),
+        claim: vi.fn(
+          async ({
+            expectedNextRunAt,
+            slot,
+            leaseUntil,
+          }: {
+            expectedNextRunAt: Date;
+            slot: Date;
+            leaseUntil: Date;
+          }) => {
+            if (job.nextRunAt.getTime() !== expectedNextRunAt.getTime()) {
+              return false;
+            }
+            job = {
+              ...job,
+              nextRunAt: leaseUntil,
+              currentSlot: job.currentSlot ?? slot,
+            };
+            return true;
+          },
+        ),
+        settleClaim: vi.fn(
+          async ({
+            expectedLease,
+            nextRunAt,
+            lastSlot,
+            currentSlot,
+            attempts,
+            lastError,
+          }: {
+            expectedLease: Date;
+            nextRunAt: Date;
+            lastSlot: Date | null;
+            currentSlot: Date | null;
+            attempts: number;
+            lastError: string | null;
+          }) => {
+            if (job.nextRunAt.getTime() !== expectedLease.getTime()) {
+              return false;
+            }
+            job = {
+              ...job,
+              nextRunAt,
+              lastSlot,
+              currentSlot,
+              attempts,
+              lastError,
+            };
+            return true;
+          },
+        ),
+        upsertForTarget: vi.fn(async () => undefined),
+        deactivateForTarget: vi.fn(async () => undefined),
+        findAllForProject: vi.fn(async () => []),
+        listForOps: vi.fn(async () => []),
+      };
+      return { repo, getJob: () => job };
+    }
+
+    describe("when the loop fires the backlog", () => {
+      it("delivers exactly ONE catch-up (the newest missed slot) and fast-forwards nextRunAt into the future", async () => {
+        const { logger } = makeLogger();
+        const DAY_MS = 24 * 60 * 60_000;
+        const now = Date.now();
+        // A daily 09:00 report whose oldest un-fired slot is ~8 days stale — an
+        // outage backlog of several slots.
+        const DAILY_CRON = "0 9 * * *";
+        const oldest = new Date(now - 8 * DAY_MS);
+        oldest.setUTCHours(9, 0, 0, 0);
+        const job = makeJob({
+          cron: DAILY_CRON,
+          nextRunAt: oldest,
+          currentSlot: null,
+          lastSlot: null,
+          attempts: 0,
+        });
+
+        const { repo, getJob } = makeStatefulRepo(job);
+        const registry = new SchedulerRegistry();
+        const fires: { slot: Date }[] = [];
+        registry.register({
+          targetType: job.targetType,
+          handler: async (fire) => {
+            fires.push(fire);
+          },
+        });
+        const svc = new SchedulerService({
+          repo,
+          registry,
+          processRole: "worker",
+          logger,
+          maxSleepMs: 50, // re-poll quickly, so a replay bug would fire again
+        });
+        svc.start();
+        try {
+          await waitFor(() => fires.length >= 1);
+          // Give the loop several more poll cycles: a replay bug (nextRunAt left
+          // in the past) would re-serve + re-fire the row here.
+          await new Promise((r) => setTimeout(r, 250));
+        } finally {
+          await svc.stop();
+        }
+
+        // Exactly one delivery — the backlog did NOT replay.
+        expect(fires).toHaveLength(1);
+
+        const fired = fires[0]!.slot;
+        // The single catch-up is the NEWEST missed slot (a 09:00 UTC instant
+        // within the last day), not the 8-day-old oldest slot.
+        expect(fired.getUTCHours()).toBe(9);
+        expect(fired.getUTCMinutes()).toBe(0);
+        expect(fired.getTime()).toBeGreaterThan(oldest.getTime());
+        expect(fired.getTime()).toBeLessThanOrEqual(now);
+        expect(fired.getTime()).toBeGreaterThan(now - DAY_MS);
+
+        // The calendar resumed in the FUTURE (delivered slot stamped, no backlog
+        // left to re-serve).
+        const settled = getJob();
+        expect(settled.lastSlot?.getTime()).toBe(fired.getTime());
+        expect(settled.currentSlot).toBeNull();
+        expect(settled.nextRunAt.getTime()).toBeGreaterThan(now);
+        expect(settled.nextRunAt.getTime()).toBeLessThanOrEqual(now + DAY_MS);
+      });
+    });
+  });
+
   describe("given a slot whose targetType has no registered handler", () => {
     describe("when the loop fires it", () => {
       it("releases the lease to the next cron instant without advancing lastSlot", async () => {

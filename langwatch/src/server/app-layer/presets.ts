@@ -826,6 +826,29 @@ export function initializeDefaultApp(options?: {
           fire,
         }),
     });
+
+    // ADR-044 durable self-heal: the report upsert route writes the Trigger row
+    // and its ScheduledJob in two non-atomic steps, so a crash between them can
+    // leave an active report with no schedule. Repair any such gaps at boot
+    // (create-if-missing, race-safe on every worker). Fire-and-forget so boot is
+    // never blocked; a failure is logged, not fatal (the next boot retries).
+    const reconcileLogger = createLogger("langwatch:app-layer:scheduler");
+    void triggers
+      .reconcileReportSchedules()
+      .then(({ repaired }) => {
+        if (repaired > 0) {
+          reconcileLogger.info(
+            { repaired },
+            "Reconciled report schedules missing a ScheduledJob at boot",
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        reconcileLogger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Report-schedule reconciliation failed at boot (will retry next boot)",
+        );
+      });
   }
 
   const registry = new PipelineRegistry({

@@ -113,10 +113,19 @@ export interface ScheduledJobRepository {
     id: string;
     projectId: string;
     expectedNextRunAt: Date;
+    /**
+     * The calendar instant this claim pins as the in-flight slot (COALESCE'd
+     * into `currentSlot`). Distinct from `expectedNextRunAt` (the WHERE guard,
+     * = the row's current wake instant): on a `runLatest` catch-up the guard is
+     * the OLDEST missed slot the row still carries, but the slot we actually
+     * fire — and must pin so retries re-fire it — is the newest missed slot.
+     * On an on-time fire the two coincide.
+     */
+    slot: Date;
     leaseUntil: Date;
   }): Promise<boolean>;
-  // (claim also stamps `currentSlot` via COALESCE: the FIRST claim of a slot
-  // records the calendar instant it read as due; retry/lease re-claims — whose
+  // (claim stamps `currentSlot` via COALESCE with `slot`: the FIRST claim of a
+  // slot records the calendar instant being fired; retry/lease re-claims — whose
   // `expectedNextRunAt` is a backoff or lease instant — preserve it.)
 
   /**

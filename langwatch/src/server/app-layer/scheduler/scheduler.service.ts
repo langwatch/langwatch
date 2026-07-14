@@ -3,7 +3,7 @@ import type { Cluster, Redis } from "ioredis";
 import { type ProcessRole, roleRunsWorkers } from "../config";
 import type { Logger } from "@langwatch/observability";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { computeNextRunAt } from "./nextRunAt";
+import { computeCatchUp, computeNextRunAt } from "./nextRunAt";
 import type { SchedulerRegistry } from "./scheduler.registry";
 import type {
   ScheduledJobRecord,
@@ -327,31 +327,50 @@ export class SchedulerService {
     job: ScheduledJobRecord;
     now: Date;
   }): Promise<void> {
-    // The calendar instant being fired. On a fresh slot this is `nextRunAt`;
-    // on a RETRY wake or a crash-refire, `nextRunAt` is a backoff/lease
-    // instant, and the real slot identity lives in `currentSlot` (pinned by
-    // the first claim). Without this split a retried daily report would hand
-    // its handler the backoff instant and `reportWindowMs` would collapse the
-    // report window to minutes.
-    const slot = job.currentSlot ?? job.nextRunAt;
     // The lease is still conditioned on the row's CURRENT wake instant — that
     // is what `findDue` read and what a racing worker would also condition on.
     const claimAt = job.nextRunAt;
 
-    // The next cron instant strictly after the DELIVERED slot, in the job's own
-    // zone (DST-correct). Computed up front for TWO jobs: (a) it detects a
-    // poison cron/tz (deactivate + bail *before* leasing so a bad row can't
-    // wedge the loop), and (b) it is the value we advance to on success or on
-    // abandon. `after: slot` (not `after: now`) keeps the calendar honest —
-    // each delivered slot hands off to the next cron instant after itself, so a
-    // late delivery doesn't skip the intermediate slots.
+    // Derive the slot to fire and the next calendar marker (both DST-correct in
+    // the job's own zone). Computed up front so a poison cron/tz deactivates the
+    // row *before* leasing (a bad row can't wedge the loop).
+    //
+    //  - RETRY / crash-refire (`currentSlot` pinned): re-fire that EXACT slot —
+    //    catch-up must not move a slot already in flight. Advance honestly to
+    //    the next instant after it, only fast-forwarding past `now` if a long
+    //    retry sequence outran a whole cron period (so a completed retry never
+    //    re-arms in the past).
+    //  - FRESH fire: apply the ADR-044 `runLatest` catch-up. On time this is a
+    //    no-op (fire `nextRunAt`, advance to the next instant); after an outage
+    //    it fires ONE catch-up for the newest missed slot and fast-forwards to
+    //    the first future instant, instead of replaying every missed slot.
+    let slot: Date;
     let nextSlot: Date;
     try {
-      nextSlot = computeNextRunAt({
-        cron: job.cron,
-        timezone: job.timezone,
-        after: slot,
-      });
+      if (job.currentSlot) {
+        slot = job.currentSlot;
+        nextSlot = computeNextRunAt({
+          cron: job.cron,
+          timezone: job.timezone,
+          after: slot,
+        });
+        if (nextSlot.getTime() <= now.getTime()) {
+          nextSlot = computeNextRunAt({
+            cron: job.cron,
+            timezone: job.timezone,
+            after: now,
+          });
+        }
+      } else {
+        const catchUp = computeCatchUp({
+          cron: job.cron,
+          timezone: job.timezone,
+          slot: job.nextRunAt,
+          now,
+        });
+        slot = catchUp.catchUpSlot;
+        nextSlot = catchUp.nextRunAt;
+      }
     } catch (error) {
       this.logger.error(
         {
@@ -386,6 +405,9 @@ export class SchedulerService {
       id: job.id,
       projectId: job.projectId,
       expectedNextRunAt: claimAt,
+      // Pin the slot we actually fire (the catch-up slot on a backlog), NOT the
+      // WHERE-guard instant — so a retry re-fires this exact slot.
+      slot,
       leaseUntil,
     });
     if (!won) {

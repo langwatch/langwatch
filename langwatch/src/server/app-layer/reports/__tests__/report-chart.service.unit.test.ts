@@ -5,6 +5,7 @@ import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_time
 import type { ReportSource } from "~/server/app-layer/triggers/report.builder";
 import {
   loadReportCharts,
+  REPORT_CHART_QUERY_CONCURRENCY,
   type ReportChartDeps,
 } from "../report-chart.service";
 
@@ -213,6 +214,50 @@ describe("loadReportCharts", () => {
         projectId: "proj-1",
         dashboardId: "dash-1",
       });
+    });
+  });
+
+  describe("given a dashboard with more panels than the query concurrency cap", () => {
+    it("bounds concurrent getTimeseries queries and still returns every chart in order", async () => {
+      // Regression for the ADR-044 §5 finding: an unbounded Promise.all fanned
+      // every panel's heavy ClickHouse query out at once. A large dashboard must
+      // cap in-flight queries so a burst can't exhaust ClickHouse.
+      const PANELS = REPORT_CHART_QUERY_CONCURRENCY * 3;
+      const graphs = Array.from({ length: PANELS }, (_, i) =>
+        makeGraph({ id: `graph-${i}`, name: `Panel ${i}` }),
+      );
+
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const deps: ReportChartDeps = {
+        loadCustomGraph: vi.fn(async () => null),
+        loadDashboardGraphs: vi.fn(async () => graphs),
+        getTimeseries: vi.fn(async () => {
+          inFlight++;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          // Hold the slot briefly so overlapping queries actually coincide.
+          await new Promise((r) => setTimeout(r, 5));
+          inFlight--;
+          return {
+            previousPeriod: [],
+            currentPeriod: [{ date: "2026-07-11T09:00:00Z", [COUNT_KEY]: 1 }],
+          };
+        }),
+      };
+
+      const charts = await run({
+        deps,
+        source: { kind: "dashboard", dashboardId: "dash-1" },
+      });
+
+      // Every panel is rendered, in dashboard order (the cap must not drop or
+      // reorder panels).
+      expect(charts).toHaveLength(PANELS);
+      expect(charts.map((c) => c.title)).toEqual(graphs.map((g) => g.name));
+
+      // Never more than the cap in flight, yet genuinely overlapped (not serial).
+      expect(maxInFlight).toBeLessThanOrEqual(REPORT_CHART_QUERY_CONCURRENCY);
+      expect(maxInFlight).toBeGreaterThan(1);
     });
   });
 

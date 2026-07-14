@@ -8,6 +8,7 @@ import {
   graphAlertIncidentKey,
   type GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
+  type ReportScheduleTarget,
   type TriggerRepository,
   type TriggerSummary,
 } from "./trigger.repository";
@@ -59,6 +60,22 @@ export class PrismaTriggerRepository implements TriggerRepository {
         },
       }),
     );
+  }
+
+  async findActiveReportTargets(): Promise<ReportScheduleTarget[]> {
+    // Cross-tenant sweep (one scheduler serves every project), so it opts out of
+    // the multitenancy guard via the sanctioned `-- @tenancy:` marker — like the
+    // scheduler's own due-scan. Only id/projectId/actionParams are needed: the
+    // caller re-derives the cron/timezone from actionParams and writes back only
+    // project-scoped ScheduledJob rows. `triggerKind` is an enum column; Postgres
+    // casts the 'REPORT' text literal to it. `actionParams` is jsonb — Prisma
+    // returns it already parsed.
+    return this.prisma.$queryRaw<ReportScheduleTarget[]>`
+      SELECT "id", "projectId", "actionParams"
+      FROM "Trigger"
+      WHERE "triggerKind" = 'REPORT' AND "active" = true AND "deleted" = false
+      -- @tenancy: report-schedule reconciliation cross-tenant sweep (worker boot)
+    `;
   }
 
   async claimSend({

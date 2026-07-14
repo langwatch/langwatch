@@ -1,6 +1,7 @@
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it } from "vitest";
 import type {
+  ReportScheduleTarget,
   TriggerRepository,
   TriggerSummary,
 } from "../repositories/trigger.repository";
@@ -53,6 +54,10 @@ class FakeTriggerRepository implements TriggerRepository {
   async findActiveForProject(projectId: string): Promise<TriggerSummary[]> {
     this.findActiveCalls++;
     return this.rowsByProject.get(projectId) ?? [];
+  }
+
+  async findActiveReportTargets(): Promise<ReportScheduleTarget[]> {
+    return [];
   }
 
   async claimSend(params: {

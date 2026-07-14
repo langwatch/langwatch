@@ -36,8 +36,28 @@ export interface TriggerSummary {
   };
 }
 
+/**
+ * The minimum a report needs to (re)build its calendar schedule: the trigger
+ * identity plus its raw `actionParams` (the cron/timezone live inside, parsed
+ * by `extractReportFromTriggerRow`). Returned by the cross-tenant reconciliation
+ * read.
+ */
+export interface ReportScheduleTarget {
+  id: string;
+  projectId: string;
+  actionParams: unknown;
+}
+
 export interface TriggerRepository {
   findActiveForProject(projectId: string): Promise<TriggerSummary[]>;
+
+  /**
+   * Every active, non-deleted REPORT trigger across all projects — the input to
+   * the boot-time report-schedule reconciliation (ADR-044). Cross-tenant by
+   * design (one scheduler serves every project); the caller only writes back
+   * project-scoped `ScheduledJob` rows, so tenancy is preserved on the writes.
+   */
+  findActiveReportTargets(): Promise<ReportScheduleTarget[]>;
 
   /**
    * Atomically claim ownership of (triggerId, traceId). Inserts a
@@ -192,6 +212,10 @@ export interface GraphTriggerSentRepository {
 
 export class NullTriggerRepository implements TriggerRepository {
   async findActiveForProject(_projectId: string): Promise<TriggerSummary[]> {
+    return [];
+  }
+
+  async findActiveReportTargets(): Promise<ReportScheduleTarget[]> {
     return [];
   }
 

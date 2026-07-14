@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type {
   ScheduledJobRecord,
   ScheduledJobRepository,
@@ -74,11 +74,13 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     id,
     projectId,
     expectedNextRunAt,
+    slot,
     leaseUntil,
   }: {
     id: string;
     projectId: string;
     expectedNextRunAt: Date;
+    slot: Date;
     leaseUntil: Date;
   }): Promise<boolean> {
     // The correctness core (ADR-044 §4): a CONDITIONAL update guarded on the
@@ -111,14 +113,16 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     // EvalPlanQual pick exactly one winner (verified: 3 concurrent claims →
     // 1 winner). The `"projectId"` predicate also satisfies the multitenancy
     // guard's raw-query tenancy check; it always equals the row's own project.
-    // `currentSlot` is stamped with COALESCE: the FIRST claim of a slot reads
-    // the calendar instant out of `nextRunAt` and pins it; a retry wake (whose
-    // `nextRunAt` is a backoff instant) or a crash-refire (lease instant)
+    // `currentSlot` is stamped with COALESCE from the caller-supplied `slot`:
+    // the FIRST claim of a slot pins the calendar instant being fired (which on
+    // a `runLatest` catch-up is the newest missed slot, NOT the `expectedNextRunAt`
+    // WHERE guard = the oldest missed slot the row still carries); a retry wake
+    // (whose `nextRunAt` is a backoff instant) or a crash-refire (lease instant)
     // re-claims WITHOUT overwriting the pinned slot. Settle clears it.
     const affected = await this.prisma.$executeRaw`
       UPDATE "ScheduledJob"
       SET "nextRunAt" = ${toPgTimestampUtc(leaseUntil)}::timestamp,
-          "currentSlot" = COALESCE("currentSlot", ${toPgTimestampUtc(expectedNextRunAt)}::timestamp),
+          "currentSlot" = COALESCE("currentSlot", ${toPgTimestampUtc(slot)}::timestamp),
           "updatedAt" = now()
       WHERE "id" = ${id}
         AND "projectId" = ${projectId}
@@ -197,17 +201,34 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
       data: { cron, timezone, nextRunAt, active: true, currentSlot: null },
     });
     if (count === 0) {
-      await this.prisma.scheduledJob.create({
-        data: {
-          projectId,
-          targetType,
-          targetId,
-          cron,
-          timezone,
-          nextRunAt,
-          active: true,
-        },
-      });
+      try {
+        await this.prisma.scheduledJob.create({
+          data: {
+            projectId,
+            targetType,
+            targetId,
+            cron,
+            timezone,
+            nextRunAt,
+            active: true,
+          },
+        });
+      } catch (error) {
+        // The (targetType, targetId) unique makes create-if-absent race-safe:
+        // when two callers see the row missing at once (e.g. the boot-time
+        // report-schedule reconciliation runs on every worker, ADR-044), one
+        // create wins and the other hits P2002. Both wanted the same row to
+        // exist, so treat the loser as a success rather than surfacing a spurious
+        // boot error. Any other failure still throws.
+        if (
+          !(
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2002"
+          )
+        ) {
+          throw error;
+        }
+      }
     }
   }
 

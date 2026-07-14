@@ -4,7 +4,10 @@ import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
 import { SchedulerService } from "~/server/app-layer/scheduler/scheduler.service";
 import type { ScheduledJobRepository } from "~/server/app-layer/scheduler/scheduler.types";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { REPORT_SCHEDULER_TARGET_TYPE } from "./report.builder";
+import {
+  extractReportFromTriggerRow,
+  REPORT_SCHEDULER_TARGET_TYPE,
+} from "./report.builder";
 import type {
   TriggerRepository,
   TriggerSummary,
@@ -150,6 +153,55 @@ export class TriggerService {
       nextRunAt,
     });
     SchedulerService.publishWake(this.redis);
+  }
+
+  /**
+   * Repair report schedules that never got written (ADR-044 durable self-heal).
+   * The upsert route writes the REPORT `Trigger` row and its `ScheduledJob` in
+   * two separate, non-atomic steps; a crash/timeout between them leaves an active
+   * report with NO schedule, so it silently never runs. This pass — run at worker
+   * boot — finds every active report lacking a `ScheduledJob` and creates it, so
+   * an interrupted save is corrected without the user re-saving.
+   *
+   * Create-if-MISSING only: a report that already has a schedule row is left
+   * untouched, including a PAUSED one (inactive row present) — reconciliation
+   * must never resurrect a schedule the user paused, nor reset a live calendar.
+   * Safe to run on every worker: the create is race-hardened on the
+   * `(targetType, targetId)` unique (`upsertForTarget`). No-op without a
+   * scheduler repository (null/test wiring). Returns the repair count.
+   */
+  async reconcileReportSchedules(): Promise<{ repaired: number }> {
+    if (!this.scheduledJobs) return { repaired: 0 };
+    const reports = await this.repo.findActiveReportTargets();
+    if (reports.length === 0) return { repaired: 0 };
+
+    // Target ids that already own a ScheduledJob (active OR paused), gathered
+    // per distinct project so a paused report is recognised and skipped.
+    const scheduledTargetIds = new Set<string>();
+    for (const projectId of new Set(reports.map((r) => r.projectId))) {
+      const jobs = await this.scheduledJobs.findAllForProject({
+        projectId,
+        targetType: REPORT_SCHEDULER_TARGET_TYPE,
+      });
+      for (const job of jobs) scheduledTargetIds.add(job.targetId);
+    }
+
+    let repaired = 0;
+    for (const report of reports) {
+      if (scheduledTargetIds.has(report.id)) continue;
+      const parsed = extractReportFromTriggerRow(report.actionParams);
+      // Unparseable actionParams (legacy/corrupt) have no schedule to build —
+      // the report handler already skips such rows, so leave them unscheduled.
+      if (!parsed) continue;
+      await this.syncReportSchedule({
+        projectId: report.projectId,
+        triggerId: report.id,
+        cron: parsed.schedule.cron,
+        timezone: parsed.schedule.timezone,
+      });
+      repaired++;
+    }
+    return { repaired };
   }
 
   /** Deactivate a report's schedule so the scheduler due-scan skips it. */

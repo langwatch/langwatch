@@ -251,12 +251,14 @@ describe("SchedulerService (real Postgres, no Redis)", () => {
             id: created.id,
             projectId,
             expectedNextRunAt: slot,
+            slot,
             leaseUntil: new Date(Date.now() + 60_000),
           }),
           repo.claim({
             id: created.id,
             projectId,
             expectedNextRunAt: slot,
+            slot,
             leaseUntil: new Date(Date.now() + 120_000),
           }),
         ]);

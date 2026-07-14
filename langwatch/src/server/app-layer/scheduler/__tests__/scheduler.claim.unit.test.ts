@@ -26,12 +26,16 @@ describe("PrismaScheduledJobRepository.claim (lease)", () => {
         } as unknown as PrismaClient;
         const repo = new PrismaScheduledJobRepository(prisma);
 
-        const expected = new Date("2026-07-13T09:00:00.000Z");
+        const expected = new Date("2026-07-06T09:00:00.000Z"); // the WHERE guard
+        // The catch-up slot we actually fire — DISTINCT from the guard, so we can
+        // prove currentSlot is COALESCE'd from `slot`, not from the guard.
+        const slot = new Date("2026-07-13T09:00:00.000Z");
         const leaseUntil = new Date("2026-07-13T09:10:00.000Z");
         const won = await repo.claim({
           id: "job-1",
           projectId: "project-1",
           expectedNextRunAt: expected,
+          slot,
           leaseUntil,
         });
 
@@ -44,6 +48,7 @@ describe("PrismaScheduledJobRepository.claim (lease)", () => {
         expect(args).toContain("job-1");
         expect(args).toContain("project-1");
         expect(args).toContain(toPg(expected)); // the `nextRunAt = expected` guard
+        expect(args).toContain(toPg(slot)); // currentSlot pins the fired slot
         expect(args).toContain(toPg(leaseUntil)); // the lease
       });
     });
@@ -62,6 +67,7 @@ describe("PrismaScheduledJobRepository.claim (lease)", () => {
           id: "job-1",
           projectId: "project-1",
           expectedNextRunAt: new Date("2026-07-13T09:00:00.000Z"),
+          slot: new Date("2026-07-13T09:00:00.000Z"),
           leaseUntil: new Date("2026-07-13T09:10:00.000Z"),
         });
 
