@@ -54,6 +54,25 @@ export class ReplayRedisRepository implements ReplayRepository {
     return result !== null;
   }
 
+  async refreshLock(params: {
+    runId: string;
+    ttlSeconds: number;
+  }): Promise<boolean> {
+    // Atomic check-and-extend: only the current holder may push the TTL out.
+    const result = await this.redis.eval(
+      `if redis.call('get', KEYS[1]) == ARGV[1] then
+        return redis.call('expire', KEYS[1], ARGV[2])
+      else
+        return 0
+      end`,
+      1,
+      REPLAY_LOCK_KEY,
+      params.runId,
+      String(params.ttlSeconds),
+    );
+    return result === 1;
+  }
+
   async releaseLock(params: { runId: string }): Promise<void> {
     const holder = await this.redis.get(REPLAY_LOCK_KEY);
     if (holder === params.runId) {
