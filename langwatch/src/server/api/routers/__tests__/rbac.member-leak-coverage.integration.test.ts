@@ -109,7 +109,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       ),
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
-      }),
+      }, { isSaaS: true }),
     });
 
     // Org + 2 users + 1 regular team + 2 personal-workspace teams.

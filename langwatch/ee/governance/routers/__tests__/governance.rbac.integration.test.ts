@@ -69,7 +69,7 @@ describe("governance routers — RBAC enforcement", () => {
       globalForApp.__langwatch_app = createTestApp({
         planProvider: PlanProviderService.create({
           getActivePlan: async () => enterprisePlan,
-        }),
+        }, { isSaaS: true }),
       });
 
       const organization = await prisma.organization.create({

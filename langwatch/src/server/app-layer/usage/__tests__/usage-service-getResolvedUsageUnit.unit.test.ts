@@ -5,7 +5,6 @@ import type { OrganizationService } from "../../organizations/organization.servi
 import { UsageService } from "../usage.service";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
-import { PricingModel } from "@prisma/client";
 
 vi.mock("~/env.mjs", () => ({
   env: { IS_SAAS: true },
@@ -51,7 +50,7 @@ describe("UsageService.getResolvedUsageUnit", () => {
     getCurrentMonthCount: vi.fn(),
   };
   const mockOrgRepo = {
-    getPricingModel: vi.fn().mockResolvedValue(null),
+    hasActiveSeatEventSubscription: vi.fn().mockResolvedValue(false),
   };
   const mockPlanResolver = vi.fn() as unknown as PlanResolver;
 
@@ -59,7 +58,7 @@ describe("UsageService.getResolvedUsageUnit", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockOrgRepo.getPricingModel.mockResolvedValue(PricingModel.TIERED);
+    mockOrgRepo.hasActiveSeatEventSubscription.mockResolvedValue(false);
     service = Object.create(UsageService.prototype);
     Object.assign(service, {
       organizationService: mockOrgService,
@@ -97,6 +96,22 @@ describe("UsageService.getResolvedUsageUnit", () => {
       });
 
       expect(unit).toBe("traces");
+    });
+  });
+
+  describe("when the pricingModel column drifted against an active seat subscription", () => {
+    /** @scenario Meter unit comes from the resolved billing profile, not the pricingModel column */
+    it("returns events derived from the subscription fact", async () => {
+      mockOrgRepo.hasActiveSeatEventSubscription.mockResolvedValue(true);
+      (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ...PAID_TIERED_PLAN,
+      });
+
+      const unit = await service.getResolvedUsageUnit({
+        organizationId: "org-drifted",
+      });
+
+      expect(unit).toBe("events");
     });
   });
 

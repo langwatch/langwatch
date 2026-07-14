@@ -83,7 +83,7 @@ describe.skip("organizationRouter member role validation", () => {
           maxMembersLite: 100,
           overrideAddingLimitations: true,
         }),
-      } as any),
+      } as any, { isSaaS: true }),
     });
 
     txMock = {

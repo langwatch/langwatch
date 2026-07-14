@@ -44,6 +44,10 @@ export const LicenseDataSchema = z.object({
   issuedAt: z.string(), // ISO 8601 date string
   expiresAt: z.string(), // ISO 8601 date string
   plan: LicensePlanLimitsSchema,
+  // ADR-039 Decision 8: only trial licenses are auto-cleared when a Stripe
+  // subscription activates. Optional for backward compatibility with existing
+  // signed licenses — absent means non-trial (never auto-deleted).
+  isTrial: z.boolean().optional(),
 });
 
 export type LicenseData = z.infer<typeof LicenseDataSchema>;

@@ -84,7 +84,7 @@ describe.skipIf(isTestcontainersOnly)("Langy API key provisioning", () => {
           maxProjects: 50,
           overrideAddingLimitations: true,
         }) as PlanProvider["getActivePlan"],
-      }),
+      }, { isSaaS: true }),
       usageLimits: {
         notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
         checkAndSendWarning: vi.fn().mockResolvedValue(undefined),

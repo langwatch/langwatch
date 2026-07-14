@@ -286,6 +286,15 @@ export class UsageService {
     });
   }
 
+  /**
+   * Drops the cached meter decision for an organization so the next check
+   * recomputes it from the resolved plan. Called by the pricingModel
+   * self-heal (ADR-039 Decision 3) when billing state converges.
+   */
+  async invalidateMeterDecision(organizationId: string): Promise<void> {
+    await this.decisionCache.delete(organizationId);
+  }
+
   private async getCachedMeterDecision(
     organizationId: string,
     plan?: PlanInfo,
@@ -302,14 +311,17 @@ export class UsageService {
     organizationId: string,
     resolvedPlan?: PlanInfo,
   ): Promise<MeterDecision> {
-    const pricingModel =
-      (await this.organizationRepository?.getPricingModel(organizationId)) ??
-      null;
+    // ADR-039: seat-event billing derives from the active subscription plan,
+    // never from the pricingModel display cache (which can drift).
+    const isSeatEvent =
+      (await this.organizationRepository?.hasActiveSeatEventSubscription(
+        organizationId,
+      )) ?? false;
     const plan = resolvedPlan ?? (await this.planResolver(organizationId));
     const hasValidLicenseOverride = plan.planSource === "license";
 
     const decision = resolveUsageMeter({
-      pricingModel,
+      isSeatEvent,
       licenseUsageUnit: plan.usageUnit,
       hasValidLicenseOverride,
       isFree: plan.free,

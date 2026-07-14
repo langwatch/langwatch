@@ -131,7 +131,7 @@ describe.skipIf(isTestcontainersOnly)(
       globalForApp.__langwatch_app = createTestApp({
         planProvider: PlanProviderService.create({
           getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-        }),
+        }, { isSaaS: true }),
       });
 
       // Guarantee target user starts as MEMBER with built-in MEMBER team role

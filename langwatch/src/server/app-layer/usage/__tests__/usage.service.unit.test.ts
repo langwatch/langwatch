@@ -1,4 +1,3 @@
-import { PricingModel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { UNLIMITED_MESSAGES } from "../../../../../ee/billing/planLimits";
@@ -92,7 +91,7 @@ describe("UsageService", () => {
   };
 
   const mockOrgRepo = {
-    getPricingModel: vi.fn().mockResolvedValue(null),
+    hasActiveSeatEventSubscription: vi.fn().mockResolvedValue(false),
   };
 
   const mockPlanResolver = vi.fn() as unknown as PlanResolver;
@@ -105,7 +104,7 @@ describe("UsageService", () => {
     for (const key of Object.keys(mockEnv)) {
       delete mockEnv[key];
     }
-    mockOrgRepo.getPricingModel.mockResolvedValue(null);
+    mockOrgRepo.hasActiveSeatEventSubscription.mockResolvedValue(false);
     (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
       ...FREE_PLAN,
       maxMessagesPerMonth: 1000,
@@ -589,7 +588,7 @@ describe("UsageService", () => {
   describe("getCurrentMonthCountForDisplay", () => {
     describe("given a seat-based plan with no message cap (metered events)", () => {
       beforeEach(() => {
-        mockOrgRepo.getPricingModel.mockResolvedValue(PricingModel.SEAT_EVENT);
+        mockOrgRepo.hasActiveSeatEventSubscription.mockResolvedValue(true);
         (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...SEAT_UNLIMITED_PLAN,
         });

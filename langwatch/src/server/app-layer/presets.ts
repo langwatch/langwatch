@@ -136,6 +136,7 @@ import { ShareService } from "./share/share.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
+import { createPricingModelSelfHeal } from "./subscription/pricing-model-heal";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
 import { NullTopicRepository } from "./topics/null-topic.repository";
@@ -348,11 +349,9 @@ export function initializeDefaultApp(options?: {
     ExperimentService.create(prisma),
     "ExperimentService",
   );
+  const appOrgRepo = new PrismaOrganizationRepository(prisma);
   const organizations = traced(
-    new OrganizationService(
-      new PrismaOrganizationRepository(prisma),
-      new PromptTagRepository(prisma),
-    ),
+    new OrganizationService(appOrgRepo, new PromptTagRepository(prisma)),
     "OrganizationService",
   );
   const traceService = TraceService.create(prisma, {
@@ -415,6 +414,30 @@ export function initializeDefaultApp(options?: {
     simulationReads,
   );
 
+  const pricingModelSelfHeal = createPricingModelSelfHeal({
+    hasActiveSeatEventSubscription: (organizationId) =>
+      orgRepo.hasActiveSeatEventSubscription(organizationId),
+    getPricingModel: (organizationId) =>
+      orgRepo.getPricingModel(organizationId),
+    setPricingModel: ({ organizationId, pricingModel }) =>
+      orgRepo.setPricingModel({ organizationId, pricingModel }),
+    invalidateMeterDecision: (organizationId) =>
+      usage.invalidateMeterDecision(organizationId),
+    notifyLicenseSubscriptionConflict: async ({
+      organizationId,
+      licensePlanType,
+    }) => {
+      const org = await appOrgRepo.findNameById(organizationId);
+      await getApp().notifications.sendSlackLicenseConflictAlert({
+        organizationId,
+        organizationName: org?.name ?? organizationId,
+        licensePlanType,
+        subscriptionPlan: "GROWTH_SEAT_*",
+        reason: "license outranks an active seat subscription at resolution",
+      });
+    },
+  });
+
   const planProvider = config.isSaas
     ? PlanProviderService.create(
         createCompositePlanProvider({
@@ -427,6 +450,7 @@ export function initializeDefaultApp(options?: {
               getLicenseHandler().getActivePlan(organizationId),
           },
         }),
+        { isSaaS: true, selfHeal: pricingModelSelfHeal },
       )
     : PlanProviderService.create({
         getActivePlan: async ({ organizationId }) => {
@@ -436,7 +460,7 @@ export function initializeDefaultApp(options?: {
             planSource: plan.free ? ("free" as const) : ("license" as const),
           };
         },
-      });
+      }, { isSaaS: false });
 
   let subscription: SubscriptionService | undefined;
   let usageReportingService: StripeUsageReportingService | undefined;
@@ -1055,9 +1079,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       null,
       SimulationRunService.create(null),
     ),
-    planProvider: PlanProviderService.create({
-      getActivePlan: async () => FREE_PLAN,
-    }),
+    planProvider: PlanProviderService.create(
+      { getActivePlan: async () => FREE_PLAN },
+      { isSaaS: false },
+    ),
     subscription: undefined,
     notifications: NotificationService.createNull(),
     nurturing: undefined,

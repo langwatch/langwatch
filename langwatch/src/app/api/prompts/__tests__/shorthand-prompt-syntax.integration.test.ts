@@ -38,7 +38,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
         getActivePlan: vi
           .fn()
           .mockResolvedValue(FREE_PLAN) as PlanProvider["getActivePlan"],
-      }),
+      }, { isSaaS: true }),
       usageLimits: {
         notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
         checkAndSendWarning: vi.fn().mockResolvedValue(undefined),

@@ -111,7 +111,7 @@ async function configureApp(plan: PlanInfo) {
   globalForApp.__langwatch_app = createTestApp({
     planProvider: PlanProviderService.create({
       getActivePlan: async () => plan,
-    }),
+    }, { isSaaS: true }),
   });
 }
 

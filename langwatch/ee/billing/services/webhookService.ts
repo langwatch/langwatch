@@ -9,10 +9,12 @@ import type {
   SubscriptionWithOrg,
 } from "../../../src/server/app-layer/subscription/subscription.repository";
 import { traced } from "../../../src/server/app-layer/tracing";
+import { TtlCache } from "../../../src/server/utils/ttlCache";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
+import { parseLicenseKey } from "../../licensing/validation";
 import { createLogger } from "../../../src/utils/logger";
 import { SubscriptionRecordNotFoundError } from "../errors";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
@@ -31,6 +33,14 @@ import type {
 const logger = createLogger("langwatch:billing:webhookService");
 
 const VALID_CURRENCIES_FOR_CHECKOUT = new Set<string>(Object.values(Currency));
+
+// handleSubscriptionUpdated fires on every Stripe subscription update, so a
+// non-trial license coexisting with a subscription would re-alert on each
+// event. One alert per org per window, atomic across pods via Redis SET NX.
+export const licenseConflictAlertCooldown = new TtlCache<true>(
+  24 * 60 * 60 * 1000,
+  "ttlcache:billing:licenseConflictAlert:",
+);
 const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
 type ItemCalculator = {
@@ -937,11 +947,44 @@ export class EEWebhookService implements WebhookService {
     }
   }
 
+  /**
+   * ADR-039 Decision 8: only licenses explicitly marked `isTrial` are cleared
+   * when a subscription activates. A non-trial license (including every
+   * license issued before the flag existed) is never auto-deleted — deleting
+   * a paid license is the worse failure — so the conflict is surfaced to ops
+   * instead.
+   */
   private async clearTrialLicenseIfPresent(
     updatedSubscription: SubscriptionWithOrg,
     reason: string,
   ) {
-    if (!updatedSubscription.organization.license) return;
+    const licenseKey = updatedSubscription.organization.license;
+    if (!licenseKey) return;
+
+    const parsed = parseLicenseKey(licenseKey);
+    const isTrial = parsed?.data.isTrial === true;
+
+    if (!isTrial) {
+      logger.warn(
+        { organizationId: updatedSubscription.organizationId },
+        `[stripeWebhook] Non-trial license coexists with an activating subscription — keeping license, alerting ops (${reason})`,
+      );
+      const claimed = await licenseConflictAlertCooldown.claim(
+        updatedSubscription.organizationId,
+        true,
+      );
+      if (claimed) {
+        await getApp().notifications.sendSlackLicenseConflictAlert({
+          organizationId: updatedSubscription.organizationId,
+          organizationName: updatedSubscription.organization.name,
+          licensePlanType: parsed?.data.plan.type ?? "unparseable",
+          subscriptionPlan: updatedSubscription.plan,
+          reason,
+        });
+      }
+      return;
+    }
+
     logger.info(
       { organizationId: updatedSubscription.organizationId },
       `[stripeWebhook] Clearing trial license — ${reason}`,

@@ -90,6 +90,37 @@ describe("createSaaSPlanProvider", () => {
         expect(plan.maxMembers).toBe(PLAN_LIMITS[PlanTypes.FREE].maxMembers);
       });
 
+      describe("when the only subscription is not ACTIVE", () => {
+        /** @scenario A PENDING subscription does not win plan resolution */
+        it("queries only ACTIVE subscriptions so a PENDING one resolves free", async () => {
+          const db = createMockDb();
+          const provider = createSaaSPlanProvider(db);
+
+          const plan = await provider.getActivePlan("org_1");
+
+          expect(plan.type).toBe(PlanTypes.FREE);
+          expect(db.subscription.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+              where: expect.objectContaining({
+                status: { in: ["active".toUpperCase()] },
+              }),
+            }),
+          );
+        });
+
+        /** @scenario A FAILED subscription does not win plan resolution */
+        it("resolves free when no ACTIVE subscription matches the filter", async () => {
+          // The provider's WHERE restricts to ACTIVE, so a FAILED-only org
+          // yields findFirst → null and falls through to the free plan.
+          const db = createMockDb({ findFirstResult: null });
+          const provider = createSaaSPlanProvider(db);
+
+          const plan = await provider.getActivePlan("org_1");
+
+          expect(plan.free).toBe(true);
+        });
+      });
+
       describe("when organization has SEAT_EVENT pricing model", () => {
         /** @scenario 'SEAT_EVENT organization on FREE plan gets 50,000 events per month' */
         it("returns FREE with 50,000 messages per month", async () => {

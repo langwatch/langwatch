@@ -1,4 +1,5 @@
 import type { PricingModel, PrismaClient } from "@prisma/client";
+import { GROWTH_SEAT_PLAN_TYPES } from "../../../ee/billing/utils/growthSeatEvent";
 
 /**
  * Repository for organization-related data access
@@ -37,6 +38,42 @@ export class OrganizationRepository {
       select: { pricingModel: true },
     });
     return org?.pricingModel ?? null;
+  }
+
+  /**
+   * Whether the organization holds an ACTIVE seat-event (GROWTH_SEAT_*)
+   * subscription. Seat-billing decisions derive from this subscription fact
+   * (ADR-039) — never from the pricingModel display cache, which can drift.
+   */
+  async hasActiveSeatEventSubscription(
+    organizationId: string,
+  ): Promise<boolean> {
+    const subscription = await this.prisma.subscription.findFirst({
+      where: {
+        organizationId,
+        status: "ACTIVE",
+        plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
+      },
+      select: { id: true },
+    });
+    return subscription !== null;
+  }
+
+  /**
+   * Converges the pricingModel display cache (ADR-039 Decision 3). Only the
+   * self-heal writes through this — decisions never read the column.
+   */
+  async setPricingModel({
+    organizationId,
+    pricingModel,
+  }: {
+    organizationId: string;
+    pricingModel: PricingModel;
+  }): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { pricingModel },
+    });
   }
 
   /**

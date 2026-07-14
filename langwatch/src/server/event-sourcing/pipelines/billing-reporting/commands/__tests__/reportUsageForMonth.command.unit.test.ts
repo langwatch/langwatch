@@ -284,6 +284,56 @@ describe("ReportUsageForMonthCommand", () => {
     });
   });
 
+  describe("given a checkpoint seeded at metering cutover", () => {
+    /** @scenario A seeded checkpoint bills only post-cutover events */
+    it("reports only events beyond the seeded total", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
+      mockBillingCheckpoints.getCheckpoint.mockResolvedValue({
+        lastReportedTotal: 10_000,
+        pendingReportedTotal: null,
+        consecutiveFailures: 0,
+      });
+      mockQueryBillableEventsTotal.mockResolvedValue(10_500);
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
+      mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
+      mockSelfDispatch.mockResolvedValue(undefined);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({ value: 500 }),
+          ]),
+        }),
+      );
+    });
+
+    /** @scenario An unseeded newly-metered organization would bill the full month-to-date */
+    it("reports the entire month-to-date when no checkpoint exists", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
+      mockBillingCheckpoints.getCheckpoint.mockResolvedValue(null);
+      mockQueryBillableEventsTotal.mockResolvedValue(10_500);
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
+      mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
+      mockSelfDispatch.mockResolvedValue(undefined);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({ value: 10_500 }),
+          ]),
+        }),
+      );
+    });
+  });
+
   describe("given first run for new org (no checkpoint)", () => {
     it("creates checkpoint at reported total", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());

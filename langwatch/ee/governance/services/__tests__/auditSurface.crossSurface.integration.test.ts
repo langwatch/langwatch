@@ -84,7 +84,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
       planProvider: PlanProviderService.create({
         getActivePlan: vi.fn().mockResolvedValue(FREE_PLAN) as unknown as
           PlanProvider["getActivePlan"],
-      }),
+      }, { isSaaS: true }),
       usageLimits: {
         notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
         checkAndSendWarning: vi.fn().mockResolvedValue(undefined),

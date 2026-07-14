@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+const mockSendSlackLicenseConflictAlert = vi.fn().mockResolvedValue(undefined);
 const mockSetForScope = vi.fn().mockResolvedValue(undefined);
 const mockRemoveForScope = vi.fn().mockResolvedValue(undefined);
 // Seat provisioning is create-if-absent: it reads the org's current rules and
@@ -12,6 +13,7 @@ vi.mock("../../../src/server/app-layer/app", () => ({
   getApp: () => ({
     notifications: {
       sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
+      sendSlackLicenseConflictAlert: mockSendSlackLicenseConflictAlert,
     },
     dataRetention: {
       policy: {
@@ -33,7 +35,10 @@ import {
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
 import { SubscriptionStatus } from "../planTypes";
-import { EEWebhookService } from "../services/webhookService";
+import {
+  EEWebhookService,
+  licenseConflictAlertCooldown,
+} from "../services/webhookService";
 
 const createMockSubscriptionRepository = () => ({
   findLastNonCancelled: vi.fn(),
@@ -128,6 +133,32 @@ const makeSubscriptionWithOrg = (
   } as unknown as SubscriptionWithOrg;
 };
 
+/** Builds an encodable license key whose payload parseLicenseKey accepts. */
+const makeLicenseKey = ({ isTrial }: { isTrial?: boolean } = {}): string => {
+  const signedLicense = {
+    data: {
+      licenseId: "lic_test_1",
+      version: 1,
+      organizationName: "Acme",
+      email: "admin@acme.test",
+      issuedAt: "2026-01-01T00:00:00.000Z",
+      expiresAt: "2027-01-01T00:00:00.000Z",
+      plan: {
+        type: "ENTERPRISE",
+        name: "Enterprise",
+        maxMembers: 100,
+        maxProjects: 500,
+        maxMessagesPerMonth: 10000000,
+        maxWorkflows: 1000,
+        canPublish: true,
+      },
+      ...(isTrial !== undefined && { isTrial }),
+    },
+    signature: "test-signature",
+  };
+  return Buffer.from(JSON.stringify(signedLicense)).toString("base64");
+};
+
 const createMockStripe = (overrides: Record<string, unknown> = {}) => ({
   subscriptions: {
     retrieve: vi
@@ -145,9 +176,10 @@ describe("webhookService", () => {
   let mockStripeInstance: ReturnType<typeof createMockStripe>;
   let service: EEWebhookService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    await licenseConflictAlertCooldown.delete("org_123");
     subRepo = createMockSubscriptionRepository();
     orgRepo = createMockOrganizationRepository();
     itemCalculator = createMockItemCalculator();
@@ -355,7 +387,7 @@ describe("webhookService", () => {
         subRepo.activate.mockResolvedValue(
           makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
-            organization: { name: "Acme", license: "trial-license-key" },
+            organization: { name: "Acme", license: makeLicenseKey({ isTrial: true }) },
           }),
         );
 
@@ -377,6 +409,114 @@ describe("webhookService", () => {
             organizationId: "org_123",
           }),
         );
+      });
+
+      /** @scenario Subscription activation clears a trial license */
+      it("clears a license explicitly marked as trial", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            organization: {
+              name: "Acme",
+              license: makeLicenseKey({ isTrial: true }),
+            },
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(orgRepo.clearTrialLicense).toHaveBeenCalledWith("org_123");
+        expect(mockSendSlackLicenseConflictAlert).not.toHaveBeenCalled();
+      });
+
+      /** @scenario Subscription activation preserves a non-trial license and alerts ops */
+      it("keeps a non-trial license and alerts ops", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            organization: {
+              name: "Acme",
+              license: makeLicenseKey({ isTrial: false }),
+            },
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(orgRepo.clearTrialLicense).not.toHaveBeenCalled();
+        expect(mockSendSlackLicenseConflictAlert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org_123",
+            licensePlanType: "ENTERPRISE",
+          }),
+        );
+      });
+
+      it("does not re-alert for the same org within the cooldown window", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            organization: {
+              name: "Acme",
+              license: makeLicenseKey({ isTrial: false }),
+            },
+          }),
+        );
+
+        const first = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await first;
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        const second = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await second;
+
+        expect(mockSendSlackLicenseConflictAlert).toHaveBeenCalledTimes(1);
+      });
+
+      it("treats a pre-flag license (no isTrial field) as non-trial", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            organization: { name: "Acme", license: makeLicenseKey() },
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(orgRepo.clearTrialLicense).not.toHaveBeenCalled();
+        expect(mockSendSlackLicenseConflictAlert).toHaveBeenCalled();
       });
     });
 

@@ -411,6 +411,28 @@ export class NotificationService {
   }
 
   /**
+   * Sends a Slack alert when a non-trial license coexists with an active
+   * Stripe subscription (ADR-039 Decisions 8 & 11). The license is never
+   * auto-deleted and the subscription is never auto-cancelled — a human
+   * resolves which source should remain.
+   */
+  async sendSlackLicenseConflictAlert(context: {
+    organizationId: string;
+    organizationName: string;
+    licensePlanType: string;
+    subscriptionPlan: string;
+    reason: string;
+  }): Promise<void> {
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackPlanLimitChannel,
+      body: {
+        text: `License/subscription conflict: ${context.organizationName} holds a non-trial ${context.licensePlanType} license AND an active ${context.subscriptionPlan} subscription (${context.reason}). Neither was touched — manual resolution needed. ${this.getAdminLink(context.organizationId)}`,
+      },
+      errorLog: "Failed to send Slack license-conflict notification",
+    });
+  }
+
+  /**
    * Sends a Slack notification for subscription events (prospective or confirmed).
    */
   async sendSlackSubscriptionEvent(

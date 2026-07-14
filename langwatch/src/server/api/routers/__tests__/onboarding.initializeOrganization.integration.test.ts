@@ -68,7 +68,7 @@ describe("onboarding.initializeOrganization integration", () => {
       } as any,
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
-      }),
+      }, { isSaaS: true }),
     });
 
     const ctx = createInnerTRPCContext({
@@ -100,7 +100,7 @@ describe("onboarding.initializeOrganization integration", () => {
       } as any,
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
-      }),
+      }, { isSaaS: true }),
     });
 
     if (createdOrganizationIds.length > 0) {

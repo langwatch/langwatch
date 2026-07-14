@@ -13,7 +13,7 @@ describe("PlanProvider wiring patterns", () => {
       const planProvider = PlanProviderService.create({
         getActivePlan: ({ organizationId, user }) =>
           mockSaasProvider.getActivePlan(organizationId, user),
-      });
+      }, { isSaaS: true });
 
       const user = { id: "u1", email: "a@b.com" };
       const result = await planProvider.getActivePlan({
@@ -21,7 +21,7 @@ describe("PlanProvider wiring patterns", () => {
         user,
       });
 
-      expect(result).toBe(FREE_PLAN);
+      expect(result).toMatchObject(FREE_PLAN);
       expect(mockSaasProvider.getActivePlan).toHaveBeenCalledWith("org_1", user);
     });
 
@@ -32,7 +32,7 @@ describe("PlanProvider wiring patterns", () => {
       const planProvider = PlanProviderService.create({
         getActivePlan: ({ organizationId, user }) =>
           mockSaasProvider.getActivePlan(organizationId, user),
-      });
+      }, { isSaaS: true });
 
       const user = {
         id: "u1",
@@ -54,14 +54,14 @@ describe("PlanProvider wiring patterns", () => {
       const planProvider = PlanProviderService.create({
         getActivePlan: ({ organizationId }) =>
           mockLicenseHandler.getActivePlan(organizationId),
-      });
+      }, { isSaaS: true });
 
       const result = await planProvider.getActivePlan({
         organizationId: "org_1",
         user: { id: "u1" },
       });
 
-      expect(result).toBe(FREE_PLAN);
+      expect(result).toMatchObject(FREE_PLAN);
       expect(mockLicenseHandler.getActivePlan).toHaveBeenCalledWith("org_1");
     });
   });
@@ -76,13 +76,13 @@ describe("PlanProvider wiring patterns", () => {
       };
       const planProvider = PlanProviderService.create({
         getActivePlan: async () => customPlan,
-      });
+      }, { isSaaS: true });
 
       const result = await planProvider.getActivePlan({
         organizationId: "org_1",
       });
 
-      expect(result).toBe(customPlan);
+      expect(result).toMatchObject(customPlan);
     });
   });
 
@@ -93,7 +93,7 @@ describe("PlanProvider wiring patterns", () => {
         getActivePlan: ({ organizationId, user }) => {
           throw error;
         },
-      });
+      }, { isSaaS: true });
 
       await expect(
         planProvider.getActivePlan({ organizationId: "org_1" })
@@ -106,7 +106,7 @@ describe("PlanProvider wiring patterns", () => {
         getActivePlan: ({ organizationId }) => {
           throw error;
         },
-      });
+      }, { isSaaS: true });
 
       await expect(
         planProvider.getActivePlan({ organizationId: "org_1" })

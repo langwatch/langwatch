@@ -49,7 +49,7 @@ describe("Feature: Agent REST API", () => {
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-      }),
+      }, { isSaaS: true }),
       usageLimits: {
         notifyPlanLimitReached: mockNotifyPlanLimitReached,
         checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
