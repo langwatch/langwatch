@@ -117,6 +117,15 @@ export default function SharePage() {
   }
 
   if (!resolve.isSuccess) {
+    // In-flight token exchange: show loading state
+    if (resolve.isLoading) {
+      return (
+        <Center height="100vh" padding={8}>
+          <Text color="fg.muted">Loading share...</Text>
+        </Center>
+      );
+    }
+    // Not started or other non-success state
     return null;
   }
 

@@ -109,6 +109,13 @@ export const shareRouter = createTRPCRouter({
             threadId: share.threadId,
           };
         }
+        default: {
+          const _exhaustive: never = result.status;
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Unhandled share resolution status: ${_exhaustive}`,
+          });
+        }
       }
     }),
 

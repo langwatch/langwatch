@@ -24,7 +24,7 @@ export interface ScenarioChipData {
   metCriteria: string[];
   unmetCriteria: string[];
   reasoning: string | null;
-  openScenarioDrawer: () => void;
+  openScenarioDrawer: (() => void) | undefined;
 }
 
 /**
@@ -64,8 +64,9 @@ export function useScenarioChipData(
     metCriteria: data?.results?.metCriteria ?? [],
     unmetCriteria: data?.results?.unmetCriteria ?? [],
     reasoning: data?.results?.reasoning ?? null,
-    openScenarioDrawer: () =>
-      openDrawer("scenarioRunDetail", { urlParams: { scenarioRunId } }),
+    openScenarioDrawer: readOnly
+      ? undefined
+      : () => openDrawer("scenarioRunDetail", { urlParams: { scenarioRunId } }),
   };
 }
 

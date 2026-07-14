@@ -30,11 +30,13 @@ interface TraceOverflowMenuProps {
   dejaViewHref: string | null;
   onOpenRawJson: () => void;
   onShowShortcuts: () => void;
-  /** Opens the share dialog. Rendered by the header so the menu returns no JSX. */
+  /** Opens the share dialog. The header renders the share dialog. */
   onShare: () => void;
   /** Current dock state. When true the drawer stays open on outside clicks. */
   pinned: boolean;
   onTogglePinned: () => void;
+  /** Whether the viewer is in read-only mode (shared trace view). */
+  readOnly?: boolean;
 }
 
 /**
@@ -54,10 +56,11 @@ export function TraceOverflowMenu({
   onShare,
   pinned,
   onTogglePinned,
+  readOnly = false,
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
   const { project, hasPermission } = useOrganizationTeamProject();
-  const canShare = hasPermission("traces:share");
+  const canShare = !readOnly && hasPermission("traces:share");
 
   const utils = api.useUtils();
   const pinQuery = api.pinnedTrace.getPin.useQuery(

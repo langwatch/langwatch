@@ -50,10 +50,11 @@ export function useEvalInputs({
   );
 
   return useMemo(() => {
-    const inputs = listInputs ?? query.data ?? null;
+    // Mask cached query results in read-only mode
+    const inputs = readOnly ? listInputs ?? null : listInputs ?? query.data ?? null;
     return {
       inputEntries: inputs ? Object.entries(inputs) : [],
       isLoading: needLazy && query.isLoading,
     };
-  }, [listInputs, query.data, needLazy, query.isLoading]);
+  }, [listInputs, query.data, needLazy, query.isLoading, readOnly]);
 }

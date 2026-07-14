@@ -40,7 +40,14 @@ CREATE UNIQUE INDEX "ShareLink_token_key" ON "ShareLink"("token");
 -- Resource lookups are now non-unique.
 CREATE INDEX "ShareLink_projectId_resourceType_resourceId_idx" ON "ShareLink"("projectId", "resourceType", "resourceId");
 
--- To roll back, uncomment and run manually:
+-- IRREVERSIBLE: This migration allows multiple ShareLink rows for a single
+-- resource (by dropping the unique constraint on (projectId, resourceType, resourceId)).
+-- Once this is used in production, the rollback cannot be safely automated because
+-- recreating the unique PublicShare_projectId_resourceType_resourceId_key index
+-- would fail on duplicate rows. Manual rollback would require first collapsing
+-- or deleting duplicate links before recreating the constraint.
+--
+-- Manual rollback steps (not safe for production after multiple links exist):
 -- DROP INDEX "ShareLink_projectId_resourceType_resourceId_idx";
 -- DROP INDEX "ShareLink_token_key";
 -- ALTER TABLE "ShareLink" DROP COLUMN "viewCount";
