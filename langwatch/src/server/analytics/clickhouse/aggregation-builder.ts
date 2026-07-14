@@ -15,6 +15,8 @@ import {
   extractReferencedEvaluationColumns,
   extractReferencedSpanColumns,
   extractReferencedTraceColumns,
+  narrowSpanAttributesColumns,
+  spanAttributesNarrowProjection,
   TRACE_ANALYTICS_COLUMNS,
   TRACE_IDENTITY_COLUMNS,
   tableAliases,
@@ -44,7 +46,10 @@ function resolveRequiredColumns(
 ): ReadonlySet<string> | undefined {
   switch (table) {
     case "stored_spans":
-      return extractReferencedSpanColumns(expressions);
+      return narrowSpanAttributesColumns(
+        extractReferencedSpanColumns(expressions),
+        expressions,
+      );
     case "evaluation_runs":
       return extractReferencedEvaluationColumns(expressions);
     default:
@@ -2488,7 +2493,9 @@ export function buildDataForFilterQuery(
     case "spans.model":
       joins = buildJoinClause({
         table: "stored_spans",
-        requiredColumns: new Set(["SpanAttributes"]),
+        requiredColumns: new Set([
+          spanAttributesNarrowProjection(["gen_ai.request.model"]),
+        ]),
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
       });
       sql = `
@@ -2514,7 +2521,9 @@ export function buildDataForFilterQuery(
     case "spans.type":
       joins = buildJoinClause({
         table: "stored_spans",
-        requiredColumns: new Set(["SpanAttributes"]),
+        requiredColumns: new Set([
+          spanAttributesNarrowProjection(["langwatch.span.type"]),
+        ]),
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
       });
       sql = `

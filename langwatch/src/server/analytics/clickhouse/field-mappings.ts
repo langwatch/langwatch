@@ -629,6 +629,63 @@ export function extractReferencedSpanColumns(
 }
 
 /**
+ * Build a JOIN-subquery projection that materializes only the referenced keys
+ * of `SpanAttributes` as a narrow reconstructed map, e.g.
+ * `map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes`.
+ *
+ * `SpanAttributes` is a `Map(String, String)` whose values can be multi-megabyte
+ * (RAG contexts, full input/output IO). Selecting the whole column into a JOIN
+ * subquery buffers every value on the join side even when the outer query only
+ * reads one small key (e.g. the span type), which drove a per-query 3.5 GiB
+ * MEMORY_LIMIT_EXCEEDED in prod. The reconstructed map keeps the column name and
+ * type identical, so outer `ss.SpanAttributes['key']` accesses are unchanged.
+ */
+export function spanAttributesNarrowProjection(
+  keys: readonly string[],
+): string {
+  const entries = keys
+    .map((key) => `'${key}', SpanAttributes['${key}']`)
+    .join(", ");
+  return `map(${entries}) AS SpanAttributes`;
+}
+
+/**
+ * Narrow the `SpanAttributes` entry of a stored_spans required-column set to a
+ * reconstructed map of only the referenced keys, when it is safe to do so.
+ *
+ * Safe means every `SpanAttributes` mention in the expressions is a plain
+ * single-quoted key access (`SpanAttributes['key']`) with no generic use of the
+ * whole map (e.g. `mapKeys(SpanAttributes)`). If any mention cannot be reduced to
+ * a known key, the whole map is kept so no referenced value is dropped. Returns
+ * the input set unchanged when SpanAttributes is not selected or cannot be
+ * narrowed.
+ */
+export function narrowSpanAttributesColumns(
+  columns: ReadonlySet<string>,
+  expressions: string[],
+): ReadonlySet<string> {
+  if (!columns.has("SpanAttributes")) {
+    return columns;
+  }
+
+  const joined = expressions.join(" ");
+  const allRefs = joined.match(/SpanAttributes/g) ?? [];
+  const keyMatches = [...joined.matchAll(/SpanAttributes\['([^'\]]+)'\]/g)];
+
+  // Only narrow when EVERY SpanAttributes reference is a clean keyed access;
+  // any generic or unparseable use means we cannot know which values are needed.
+  if (keyMatches.length === 0 || allRefs.length !== keyMatches.length) {
+    return columns;
+  }
+
+  const keys = [...new Set(keyMatches.map((match) => match[1]))];
+  const narrowed = new Set(columns);
+  narrowed.delete("SpanAttributes");
+  narrowed.add(spanAttributesNarrowProjection(keys));
+  return narrowed;
+}
+
+/**
  * Extract which evaluation_runs columns are referenced in a set of SQL expressions.
  */
 export function extractReferencedEvaluationColumns(

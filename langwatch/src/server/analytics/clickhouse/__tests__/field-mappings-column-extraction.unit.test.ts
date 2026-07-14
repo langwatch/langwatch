@@ -3,6 +3,8 @@ import {
   extractReferencedSpanColumns,
   extractReferencedEvaluationColumns,
   extractReferencedTraceColumns,
+  narrowSpanAttributesColumns,
+  spanAttributesNarrowProjection,
 } from "../field-mappings";
 
 describe("extractReferencedSpanColumns", () => {
@@ -234,6 +236,85 @@ describe("extractReferencedTraceColumns", () => {
         "1=1",
       ]);
       expect(result.size).toBe(0);
+    });
+  });
+});
+
+describe("spanAttributesNarrowProjection", () => {
+  it("reconstructs a single-key map aliased as SpanAttributes", () => {
+    expect(spanAttributesNarrowProjection(["langwatch.span.type"])).toBe(
+      "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
+    );
+  });
+
+  it("reconstructs a multi-key map preserving each referenced key", () => {
+    expect(
+      spanAttributesNarrowProjection([
+        "langwatch.span.type",
+        "gen_ai.request.model",
+      ]),
+    ).toBe(
+      "map('langwatch.span.type', SpanAttributes['langwatch.span.type'], 'gen_ai.request.model', SpanAttributes['gen_ai.request.model']) AS SpanAttributes",
+    );
+  });
+});
+
+describe("narrowSpanAttributesColumns", () => {
+  describe("when SpanAttributes is not selected", () => {
+    it("returns the column set unchanged", () => {
+      const columns = new Set(["DurationMs", "StatusCode"]);
+      const result = narrowSpanAttributesColumns(columns, ["ss.DurationMs > 0"]);
+      expect(result).toBe(columns);
+    });
+  });
+
+  describe("when every SpanAttributes use is a clean keyed access", () => {
+    it("replaces the whole map with a narrow reconstructed map", () => {
+      const result = narrowSpanAttributesColumns(new Set(["SpanAttributes"]), [
+        "ss.SpanAttributes['langwatch.span.type']",
+      ]);
+      expect(result).toContain(
+        "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
+      );
+      expect(result.has("SpanAttributes")).toBe(false);
+    });
+
+    it("dedupes repeated keys across expressions", () => {
+      const result = narrowSpanAttributesColumns(new Set(["SpanAttributes"]), [
+        "ss.SpanAttributes['langwatch.span.type'] AS field",
+        "ss.SpanAttributes['langwatch.span.type'] != ''",
+      ]);
+      const narrow = [...result].find((c) => c.includes("map("));
+      expect(narrow).toBe(
+        "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
+      );
+    });
+
+    it("keeps sibling identity columns alongside the narrow map", () => {
+      const result = narrowSpanAttributesColumns(
+        new Set(["TraceId", "SpanAttributes"]),
+        ["ss.SpanAttributes['gen_ai.request.model']"],
+      );
+      expect(result.has("TraceId")).toBe(true);
+      expect(result.has("SpanAttributes")).toBe(false);
+    });
+  });
+
+  describe("when a SpanAttributes use cannot be reduced to a known key", () => {
+    it("keeps the whole map for a generic map reference", () => {
+      const columns = new Set(["SpanAttributes"]);
+      const result = narrowSpanAttributesColumns(columns, [
+        "mapKeys(ss.SpanAttributes)",
+        "ss.SpanAttributes['langwatch.span.type']",
+      ]);
+      expect(result.has("SpanAttributes")).toBe(true);
+      expect([...result].some((c) => c.includes("map("))).toBe(false);
+    });
+
+    it("keeps the whole map when SpanAttributes is selected but never keyed", () => {
+      const columns = new Set(["SpanAttributes"]);
+      const result = narrowSpanAttributesColumns(columns, ["1=1"]);
+      expect(result.has("SpanAttributes")).toBe(true);
     });
   });
 });
