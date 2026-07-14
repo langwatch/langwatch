@@ -1,5 +1,5 @@
 import { Badge, Box, Button, HStack, Text } from "@chakra-ui/react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FlaskConical } from "lucide-react";
 
 export function ReplayHeader({
   aggregateId,
@@ -7,12 +7,16 @@ export function ReplayHeader({
   eventCursor,
   eventCount,
   onBack,
+  previewActive,
+  onTogglePreview,
 }: {
   aggregateId: string;
   tenantId: string;
   eventCursor: number;
   eventCount: number;
   onBack: () => void;
+  previewActive: boolean;
+  onTogglePreview: () => void;
 }) {
   return (
     <HStack
@@ -48,6 +52,15 @@ export function ReplayHeader({
         </Badge>
       </HStack>
       <Box flex={1} />
+      <Button
+        size="xs"
+        variant={previewActive ? "solid" : "outline"}
+        colorPalette={previewActive ? "blue" : "gray"}
+        onClick={onTogglePreview}
+      >
+        <FlaskConical size={13} />
+        Normalisation preview
+      </Button>
       <Badge size="sm" variant="outline" colorPalette="blue">
         Event {eventCount > 0 ? eventCursor + 1 : 0} / {eventCount}
       </Badge>

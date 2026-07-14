@@ -18,6 +18,7 @@ import { EventTimeline } from "./EventTimeline";
 import { buildFragment, parseFragment } from "./fragment";
 import { KeyboardHints } from "./KeyboardHints";
 import { LeftPanel } from "./LeftPanel";
+import { NormalisationPreviewPanel } from "./NormalisationPreviewPanel";
 import { ReplayHeader } from "./ReplayHeader";
 import { RightPanel } from "./RightPanel";
 import { SearchHeader } from "./SearchHeader";
@@ -61,6 +62,8 @@ export function DejaViewContent() {
   const [selectedProjection, setSelectedProjection] = useState<string | null>(
     initialState.proj ?? null,
   );
+  const [showNormalisationPreview, setShowNormalisationPreview] =
+    useState(false);
   const [showEventDetail, setShowEventDetail] = useState(
     initialState.detail ?? false,
   );
@@ -349,9 +352,16 @@ export function DejaViewContent() {
           eventCursor={eventCursor}
           eventCount={events.length}
           onBack={handleBack}
+          previewActive={showNormalisationPreview}
+          onTogglePreview={() => setShowNormalisationPreview((s) => !s)}
         />
 
-        {eventsQuery.isLoading ? (
+        {showNormalisationPreview ? (
+          <NormalisationPreviewPanel
+            aggregateId={selectedAggregate.aggregateId}
+            tenantId={selectedAggregate.tenantId}
+          />
+        ) : eventsQuery.isLoading ? (
           <Center flex={1}>
             <Spinner size="lg" />
           </Center>

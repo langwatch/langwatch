@@ -36,6 +36,26 @@ export class SpanNormalizationPipelineService {
     otlpResource: OtlpResource | null,
     otlpInstrumentationScope: OtlpInstrumentationScope | null,
   ): NormalizedSpan {
+    return this.normalizeSpanReceivedWithDiagnostics(
+      tenantId,
+      otlpSpan,
+      otlpResource,
+      otlpInstrumentationScope,
+    ).span;
+  }
+
+  /**
+   * Same pipeline as normalizeSpanReceived, but also surfaces which
+   * canonicalisation rules fired. Applied rules are otherwise only
+   * emitted as telemetry — the Deja View normalisation preview needs
+   * them as data.
+   */
+  normalizeSpanReceivedWithDiagnostics(
+    tenantId: string,
+    otlpSpan: OtlpSpan,
+    otlpResource: OtlpResource | null,
+    otlpInstrumentationScope: OtlpInstrumentationScope | null,
+  ): { span: NormalizedSpan; appliedRules: string[] } {
     return this.tracer.withActiveSpan(
       "SpanNormalizationPipelineService.normalizeSpanReceived",
       {
@@ -78,7 +98,10 @@ export class SpanNormalizationPipelineService {
         normalizedSpan.spanAttributes = canonicalizedResult.attributes;
         normalizedSpan.events = canonicalizedResult.events;
 
-        return normalizedSpan;
+        return {
+          span: normalizedSpan,
+          appliedRules: canonicalizedResult.appliedRules,
+        };
       },
     );
   }
@@ -195,6 +218,7 @@ export class SpanNormalizationPipelineService {
   private canonicalizeSpanAttributes(normalizedSpan: NormalizedSpan): {
     attributes: NormalizedAttributes;
     events: NormalizedEvent[];
+    appliedRules: string[];
   } {
     const result = this.tracer.withActiveSpan(
       "SpanNormalizationPipelineService.canonicalizeSpanAttributes",
@@ -228,6 +252,7 @@ export class SpanNormalizationPipelineService {
     return {
       attributes: result.attributes,
       events: result.events,
+      appliedRules: result.appliedRules,
     };
   }
 }

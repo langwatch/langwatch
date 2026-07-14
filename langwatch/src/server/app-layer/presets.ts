@@ -113,6 +113,7 @@ import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluati
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
+import { NormalisationPreviewService } from "./ops/normalisation-preview.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
 import { ReplayService } from "./ops/replay.service";
@@ -864,6 +865,10 @@ export function initializeDefaultApp(options?: {
   const ops = {
     queues: new QueueService(queueRepo),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
+    normalisationPreview: new NormalisationPreviewService(
+      eventExplorerRepo,
+      spanStorage,
+    ),
     replay: new ReplayService(replayRepo),
     metricsCollector: redis
       ? getOpsMetricsCollector({ redis, queueRepo })
@@ -1066,6 +1071,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       queues: new QueueService(new NullQueueRepository()),
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
+      ),
+      normalisationPreview: new NormalisationPreviewService(
+        new NullEventExplorerRepository(),
+        null,
       ),
       replay: new ReplayService(new NullReplayRepository()),
       metricsCollector: null,

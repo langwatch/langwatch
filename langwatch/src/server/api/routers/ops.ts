@@ -5,6 +5,10 @@ import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
+import {
+  InvalidMappingRuleError,
+  mappingRulesSchema,
+} from "~/server/app-layer/ops/normalisation-preview.rules";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import {
   resolveHotDays,
@@ -356,6 +360,39 @@ export const opsRouter = createTRPCRouter({
         projectionNames: input.projectionNames,
         sampleSize: input.sampleSize,
       };
+    }),
+
+  /**
+   * Deja View normalisation preview — replays an aggregate's stored
+   * span-received events through the CURRENT canonicalisation code and
+   * returns replayed attributes + fired rules + drift vs stored spans.
+   * Optional experimental mapping rules run on top. Read-only, so
+   * ops:view suffices; a mutation only because it's an explicit
+   * "run"-button action with a non-trivial input payload.
+   */
+  previewNormalisation: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        aggregateId: z.string().min(1),
+        tenantId: z.string().min(1),
+        rules: mappingRulesSchema,
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const ops = requireOps();
+      try {
+        return await ops.normalisationPreview.previewAggregate({
+          aggregateId: input.aggregateId,
+          tenantId: input.tenantId,
+          rules: input.rules,
+        });
+      } catch (err) {
+        if (err instanceof InvalidMappingRuleError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: err.message });
+        }
+        throw err;
+      }
     }),
 
   getReplayHistory: protectedProcedure

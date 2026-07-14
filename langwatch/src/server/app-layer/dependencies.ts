@@ -17,6 +17,7 @@ import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { EventExplorerService } from "./ops/event-explorer.service";
+import type { NormalisationPreviewService } from "./ops/normalisation-preview.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
 import type { ReplayService } from "./ops/replay.service";
@@ -52,6 +53,7 @@ export interface DataRetentionDependencies {
 export interface OpsDependencies {
   queues: QueueService;
   eventExplorer: EventExplorerService;
+  normalisationPreview: NormalisationPreviewService;
   replay: ReplayService;
   metricsCollector: OpsMetricsCollector | null;
 }
