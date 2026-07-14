@@ -31,7 +31,7 @@ type BatchTargetCellProps = {
     evaluatorId: string,
   ) => BatchEvaluatorResult | undefined;
   /**
-   * Evaluator ids we shouldn't render generic score chips for — pairwise
+   * Evaluator ids we shouldn't render generic score chips for — comparison
    * evaluators surface via the dedicated Winner column (#5100 follow-up),
    * so their raw `label`+`score` chip (e.g. `target_XYZ 1.00`) reads as
    * duplicate noise and confused users during dogfooding. The Set is the

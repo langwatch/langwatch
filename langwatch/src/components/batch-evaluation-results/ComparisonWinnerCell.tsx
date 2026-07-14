@@ -1,13 +1,17 @@
 /**
- * BatchPairwiseWinnerCell - Renders the per-row pairwise verdict in the
- * pairwise column-target's cell (#5100 follow-up).
+ * ComparisonWinnerCell - Renders the per-row comparison verdict in the
+ * comparison column-target's cell (#5100 follow-up, generalized to N
+ * candidates in #5101).
  *
  * Each row shows THREE things — the biggest-value framing per dogfood
  * ("what was right, and why"):
- *   1. `Winner: <variant name>` badge (green / purple / gray for tie).
+ *   1. `Winner: <variant name>` badge (per-variant color, gray for tie).
  *   2. The winning variant's actual output text ("What was right") in a
  *      bordered-left callout.
  *   3. The judge's reasoning text ("Why") in muted color.
+ *
+ * The cell names only the winner. With ten candidates an "A vs B vs C" chain
+ * buries the one name the reader is looking for.
  *
  * The whole cell renders in a collapsed view by default (fixed max-height
  * + fade overlay at the bottom) with a Portal-based "expand to read all"
@@ -24,40 +28,45 @@ import { useCallback, useRef, useState } from "react";
 
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 
-import type { BatchPairwiseColumn, BatchPairwiseVerdict } from "./types";
-
-type WinnerVisual = {
-  label: string;
-  colorPalette: "green" | "purple" | "gray";
-};
+import type { BatchComparisonColumn, BatchComparisonVerdict } from "./types";
 
 /** Collapsed cell height cap. Long reasoning is faded out beyond this. */
 const CELL_MAX_HEIGHT = 140;
 
+type WinnerVisual = {
+  label: string;
+  /** Green for any winner: a win is a win, and the name says which. */
+  colorPalette: "green" | "gray";
+};
+
 const resolveWinner = (
-  column: BatchPairwiseColumn,
-  verdict: BatchPairwiseVerdict,
+  column: BatchComparisonColumn,
+  verdict: BatchComparisonVerdict,
 ): WinnerVisual => {
-  if (verdict.label === "tie") {
+  if (verdict.winnerId === null) {
     return { label: "Tie", colorPalette: "gray" };
   }
-  const name =
-    verdict.label === "A" ? column.variantAName : column.variantBName;
-  // Green-vs-purple split (not green-vs-red) so both winners read as "the
-  // picked one" — a red loser side would code as failure, which the loser
-  // in a pairwise run isn't.
+  const variant = column.variants.find((v) => v.id === verdict.winnerId);
+  // A winner this snapshot can't place (variant removed since the run). Show
+  // the raw identifier rather than pretending the row had no verdict.
   return {
-    label: name,
-    colorPalette: verdict.label === "A" ? "green" : "purple",
+    label: variant?.name ?? verdict.winnerId,
+    colorPalette: variant ? "green" : "gray",
   };
 };
 
-export function BatchPairwiseWinnerCell({
+export function ComparisonWinnerCell({
   column,
   verdict,
+  targetColors,
 }: {
-  column: BatchPairwiseColumn;
-  verdict: BatchPairwiseVerdict | undefined;
+  column: BatchComparisonColumn;
+  verdict: BatchComparisonVerdict | undefined;
+  /**
+   * Per-target colours shared with the target column dots and the win-rate
+   * chart bars, so a variant is one colour everywhere on the page.
+   */
+  targetColors?: Record<string, string>;
 }) {
   const cellRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -88,28 +97,39 @@ export function BatchPairwiseWinnerCell({
 
   if (!verdict) {
     return (
-      <Text
-        fontSize="13px"
-        color="fg.subtle"
-        data-testid="pairwise-winner-none"
-      >
+      <Text fontSize="13px" color="fg.subtle" data-testid="comparison-winner-none">
         -
       </Text>
     );
   }
 
+  const isTie = verdict.winnerId === null;
   const winner = resolveWinner(column, verdict);
   const reasoning = verdict.reasoning?.trim();
   const winnerOutput = verdict.winnerOutput?.trim();
+  const winnerColor = verdict.winnerId
+    ? targetColors?.[verdict.winnerId]
+    : undefined;
 
   const badge = (
     <Badge
       colorPalette={winner.colorPalette}
       size="sm"
       variant="subtle"
-      data-testid={`pairwise-winner-badge-${verdict.label}`}
+      data-testid={`comparison-winner-badge-${verdict.winnerId ?? "tie"}`}
     >
-      {verdict.label === "tie" ? "Tie" : `Winner: ${winner.label}`}
+      {/* Same colour square the target column header uses, so the reader can
+          trace the winner back to its column and its win-rate bar. */}
+      {winnerColor && (
+        <Box
+          width="8px"
+          height="8px"
+          borderRadius="sm"
+          bg={winnerColor}
+          flexShrink={0}
+        />
+      )}
+      {isTie ? "Tie" : `Winner: ${winner.label}`}
     </Badge>
   );
 
@@ -118,9 +138,8 @@ export function BatchPairwiseWinnerCell({
   const combinedTextLength =
     (winnerOutput?.length ?? 0) + (reasoning?.length ?? 0);
   const isLikelyOverflowing =
-    isTextLikelyOverflowing(
-      `${winnerOutput ?? ""}\n\n${reasoning ?? ""}`,
-    ) || combinedTextLength > 400;
+    isTextLikelyOverflowing(`${winnerOutput ?? ""}\n\n${reasoning ?? ""}`) ||
+    combinedTextLength > 400;
 
   const renderBody = (expanded: boolean) => (
     <VStack align="start" gap={2}>
@@ -129,7 +148,7 @@ export function BatchPairwiseWinnerCell({
         <Box
           borderLeftWidth="3px"
           borderLeftColor={
-            verdict.label === "A" ? "green.subtle" : "purple.subtle"
+            winnerColor ?? (isTie ? "gray.subtle" : "green.subtle")
           }
           paddingLeft={2}
           paddingY={1}
@@ -140,7 +159,7 @@ export function BatchPairwiseWinnerCell({
             color="fg"
             whiteSpace="pre-wrap"
             wordBreak="break-word"
-            data-testid="pairwise-winner-output"
+            data-testid="comparison-winner-output"
           >
             {winnerOutput}
           </Text>
@@ -152,7 +171,7 @@ export function BatchPairwiseWinnerCell({
           color="fg.muted"
           whiteSpace="pre-wrap"
           wordBreak="break-word"
-          data-testid="pairwise-winner-reasoning"
+          data-testid="comparison-winner-reasoning"
         >
           {reasoning}
         </Text>
@@ -167,12 +186,7 @@ export function BatchPairwiseWinnerCell({
 
   return (
     <>
-      <VStack
-        ref={cellRef}
-        position="relative"
-        align="stretch"
-        gap={0}
-      >
+      <VStack ref={cellRef} position="relative" align="stretch" gap={0}>
         <Box
           maxHeight={`${CELL_MAX_HEIGHT}px`}
           overflow="hidden"
@@ -196,7 +210,7 @@ export function BatchPairwiseWinnerCell({
             cursor="pointer"
             onClick={handleExpand}
             className="cell-fade-overlay"
-            data-testid="pairwise-winner-expand"
+            data-testid="comparison-winner-expand"
             css={{
               background:
                 "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
@@ -216,7 +230,7 @@ export function BatchPairwiseWinnerCell({
             inset={0}
             zIndex={1000}
             onClick={handleCollapse}
-            data-testid="pairwise-winner-backdrop"
+            data-testid="comparison-winner-backdrop"
           />
           <Box
             position="fixed"
