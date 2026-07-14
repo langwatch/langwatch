@@ -110,7 +110,7 @@ Second argument to `v.get()`, `v.post()`, etc:
   query: z.object({ limit: z.number() }), // Query string
   description: "...",               // OpenAPI description
   status: 201,                      // HTTP status (default 200)
-  auth: "none",                     // Skip auth for this endpoint
+  auth: "none",                     // Skip auth and legacy org resolution
   resourceLimit: "scenarios",       // Enforce resource limits
   middleware: [rateLimiter()],       // Extra per-endpoint middleware
 }
@@ -152,7 +152,7 @@ The first path segment is reserved when it is `latest`, `preview`, or a date-sha
 
 ## Providers
 
-`.provide()` injects services into handlers via `app.*`. Factories receive the base context and resolve concurrently, so there are no cross-provider dependencies. Provider factories run after auth and organization middleware, with the resolved request context available to logging. The `project` and `_legacy` names are reserved for the base context.
+`.provide()` injects services into handlers via `app.*`. Factories receive the base context and resolve concurrently, so there are no cross-provider dependencies. Provider factories run after any enabled auth and organization middleware, with the resolved request context available to logging. Endpoints using `auth: "none"` skip both the service auth and legacy organization middleware. The `project` and `_legacy` names are reserved for the base context.
 
 ```ts
 .provide({

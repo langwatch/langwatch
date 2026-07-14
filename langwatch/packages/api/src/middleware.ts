@@ -16,6 +16,8 @@ import {
   updateCurrentContext,
 } from "@langwatch/observability/context";
 
+import { getSSECompletion } from "./sse.js";
+
 // ---------------------------------------------------------------------------
 // Tracer middleware
 // ---------------------------------------------------------------------------
@@ -56,17 +58,15 @@ export function tracerMiddleware(options?: { name?: string }) {
             : undefined,
         },
         async (span) => {
-          try {
-            const spanCtx = span.spanContext();
-            c.set("traceId", spanCtx.traceId);
-            c.set("spanId", spanCtx.spanId);
-
-            await next();
+          let requestError: unknown;
+          let finished = false;
+          const finishSpan = () => {
+            if (finished) return;
+            finished = true;
 
             const organizationId = c.get("organization")?.id;
             const projectId = c.get("project")?.id;
             const userId = c.get("user")?.id;
-
             if (organizationId) {
               span.setAttribute("organization.id", organizationId);
             }
@@ -76,9 +76,23 @@ export function tracerMiddleware(options?: { name?: string }) {
             if (userId) {
               span.setAttribute("user.id", userId);
             }
+
+            const error = requestError ?? c.error;
+            if (error) {
+              span.recordException(error as Error);
+              span.setStatus({ code: SpanStatusCode.ERROR });
+            }
+            span.end();
+          };
+
+          try {
+            const spanCtx = span.spanContext();
+            c.set("traceId", spanCtx.traceId);
+            c.set("spanId", spanCtx.spanId);
+
+            await next();
           } catch (err) {
-            span.recordException(err as Error);
-            span.setStatus({ code: SpanStatusCode.ERROR });
+            requestError = err;
             throw err;
           } finally {
             const carrier: Record<string, string> = {};
@@ -90,7 +104,16 @@ export function tracerMiddleware(options?: { name?: string }) {
                 // ignore if response headers are not available
               }
             }
-            span.end();
+
+            const streamCompletion = getSSECompletion(c);
+            if (streamCompletion) {
+              void streamCompletion.then(finishSpan, (error) => {
+                requestError = error;
+                finishSpan();
+              });
+            } else {
+              finishSpan();
+            }
           }
         },
       );
@@ -135,17 +158,32 @@ export function loggerMiddleware(options?: { name?: string }) {
         error = err;
         throw err;
       } finally {
-        const duration = Date.now() - start;
-        const statusCode = error ? getStatusCodeFromError(error) : c.res.status;
+        const logRequest = () => {
+          const requestError = error || c.error;
+          const duration = Date.now() - start;
+          const statusCode = requestError
+            ? getStatusCodeFromError(requestError)
+            : c.res.status;
 
-        logHttpRequest(logger, {
-          method: c.req.method,
-          url: c.req.url,
-          statusCode,
-          duration,
-          userAgent: c.req.header("user-agent") ?? null,
-          error: error || c.error,
-        });
+          logHttpRequest(logger, {
+            method: c.req.method,
+            url: c.req.path,
+            statusCode,
+            duration,
+            userAgent: c.req.header("user-agent") ?? null,
+            error: requestError,
+          });
+        };
+
+        const streamCompletion = getSSECompletion(c);
+        if (streamCompletion) {
+          void streamCompletion.then(logRequest, (streamError) => {
+            error = streamError;
+            logRequest();
+          });
+        } else {
+          logRequest();
+        }
       }
     });
   };

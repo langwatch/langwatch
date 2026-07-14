@@ -1,5 +1,11 @@
-import type { EndpointRegistration, HttpMethod } from "./types.js";
+import type {
+  EndpointRegistration,
+  HttpMethod,
+  VersionStatus,
+} from "./types.js";
 import { isDateVersion, VERSION_LATEST, VERSION_PREVIEW } from "./types.js";
+
+export { VERSION_LATEST, VERSION_PREVIEW } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Version registration input (collected by the builder)
@@ -34,6 +40,26 @@ function endpointKey(method: string, path: string): string {
   const normalized = method === "sse" ? "get" : method;
   const normalizedPath = path === "" ? "/" : path;
   return `${normalized}:${normalizedPath}`;
+}
+
+function applyRegistrations(
+  target: Map<string, ResolvedEndpoint>,
+  endpoints: EndpointRegistration[],
+): void {
+  for (const ep of endpoints) {
+    const key = endpointKey(ep.method, ep.path);
+    if (ep.withdrawn) {
+      const inherited = target.get(key);
+      target.set(key, {
+        method: ep.method,
+        path: ep.path,
+        config: inherited?.config ?? ep.config,
+        withdrawn: true,
+      });
+    } else {
+      target.set(key, { ...ep, withdrawn: false });
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -82,22 +108,7 @@ export function resolveVersions(
   for (const def of dated) {
     // Start with a copy of the previous version
     const currentMap = new Map(previousMap);
-
-    for (const ep of def.endpoints) {
-      const key = endpointKey(ep.method, ep.path);
-
-      if (ep.withdrawn) {
-        const inherited = currentMap.get(key);
-        currentMap.set(key, {
-          method: ep.method,
-          path: ep.path,
-          config: inherited?.config ?? ep.config,
-          withdrawn: true,
-        });
-      } else {
-        currentMap.set(key, { ...ep, withdrawn: false });
-      }
-    }
+    applyRegistrations(currentMap, def.endpoints);
 
     result.set(def.version, Array.from(currentMap.values()));
     previousMap = currentMap;
@@ -113,20 +124,7 @@ export function resolveVersions(
   // `preview` endpoints are separate
   if (previewEndpoints.length > 0) {
     const previewMap = new Map<string, ResolvedEndpoint>();
-    for (const ep of previewEndpoints) {
-      const key = endpointKey(ep.method, ep.path);
-      if (ep.withdrawn) {
-        const inherited = previewMap.get(key);
-        previewMap.set(key, {
-          method: ep.method,
-          path: ep.path,
-          config: inherited?.config ?? ep.config,
-          withdrawn: true,
-        });
-      } else {
-        previewMap.set(key, { ...ep, withdrawn: false });
-      }
-    }
+    applyRegistrations(previewMap, previewEndpoints);
     result.set(VERSION_PREVIEW, Array.from(previewMap.values()));
   }
 
@@ -141,7 +139,7 @@ export type ResolvedVersion =
   | {
       found: true;
       version: string;
-      status: "stable" | "latest" | "preview" | "unversioned";
+      status: VersionStatus;
       endpoints: ResolvedEndpoint[];
     }
   | { found: false };

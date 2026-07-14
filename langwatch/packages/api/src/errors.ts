@@ -99,10 +99,13 @@ interface ErrorResponseBody {
  *   Versioned requests get the new format only; unversioned get a union
  *   format that includes the legacy `error` field.
  */
-function formatError(
-  err: unknown,
-  isVersioned: boolean,
-): { status: ContentfulStatusCode; body: ErrorResponseBody } {
+function formatError({
+  err,
+  isVersioned,
+}: {
+  err: unknown;
+  isVersioned: boolean;
+}): { status: ContentfulStatusCode; body: ErrorResponseBody } {
   // 1. DomainError-like errors
   if (isDomainErrorLike(err)) {
     const serialized = err.serialize();
@@ -181,7 +184,7 @@ export function createErrorHandler(): (
 ) => Response | Promise<Response> {
   return (err: Error, c: Context) => {
     const isVersioned = c.get("isVersionedRequest") === true;
-    const { status, body } = formatError(err, isVersioned);
+    const { status, body } = formatError({ err, isVersioned });
     return c.json(body, status);
   };
 }

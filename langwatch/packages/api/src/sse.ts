@@ -4,6 +4,8 @@ import type { ZodType, z } from "zod";
 
 import type { EndpointConfig } from "./types.js";
 
+const completions = new WeakMap<Context, Promise<void>>();
+
 // ---------------------------------------------------------------------------
 // SSE configuration
 // ---------------------------------------------------------------------------
@@ -85,45 +87,77 @@ export type SSEHandler<
 /**
  * Creates a Hono response that streams SSE events with typed validation.
  *
- * @param c       - Hono context
- * @param events  - Map of event names to Zod schemas (for validation)
- * @param handler - Callback that receives the typed stream
  * @returns A streaming Response
  */
-export function createSSEResponse<TEvents extends Record<string, ZodType>>(
-  c: Context,
-  events: TEvents,
-  handler: (stream: TypedSSEStream<TEvents>) => void | Promise<void>,
-): Response {
-  return streamSSE(c, async (sseStream) => {
-    const typedStream: TypedSSEStream<TEvents> = {
-      async emit(event, data) {
-        const schema = events[event];
-        if (schema) {
-          const result = schema.safeParse(data);
-          if (!result.success) {
-            await sseStream.writeSSE({
-              event: "error",
-              data: JSON.stringify({
-                message: `Validation failed for event "${String(event)}"`,
-                issues: result.error.issues,
-              }),
-            });
-            throw result.error;
+export function createSSEResponse<TEvents extends Record<string, ZodType>>({
+  c,
+  events,
+  handler,
+  onError,
+}: {
+  c: Context;
+  events: TEvents;
+  handler: (stream: TypedSSEStream<TEvents>) => void | Promise<void>;
+  onError?: (error: Error) => void | Promise<void>;
+}): Response {
+  let finish!: () => void;
+  const completion = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  completions.set(c, completion);
+
+  return streamSSE(
+    c,
+    async (sseStream) => {
+      const typedStream: TypedSSEStream<TEvents> = {
+        async emit(event, data) {
+          const schema = events[event];
+          if (schema) {
+            const result = schema.safeParse(data);
+            if (!result.success) {
+              await sseStream.writeSSE({
+                event: "error",
+                data: JSON.stringify({
+                  message: `Validation failed for event "${String(event)}"`,
+                  issues: result.error.issues,
+                }),
+              });
+              throw result.error;
+            }
+
+            data = result.data;
           }
+          await sseStream.writeSSE({
+            event: String(event),
+            data: JSON.stringify(data),
+          });
+        },
+        close() {
+          sseStream.close();
+        },
+      };
 
-          data = result.data;
-        }
-        await sseStream.writeSSE({
-          event: String(event),
-          data: JSON.stringify(data),
-        });
-      },
-      close() {
-        sseStream.close();
-      },
-    };
+      try {
+        await handler(typedStream);
+        finish();
+      } catch (error) {
+        throw error instanceof Error
+          ? error
+          : new Error("SSE handler failed", { cause: error });
+      }
+    },
+    async (error) => {
+      c.error = error;
+      try {
+        await onError?.(error);
+      } finally {
+        finish();
+      }
+    },
+  ) as unknown as Response;
+}
 
-    await handler(typedStream);
-  }) as unknown as Response;
+/** Returns the current SSE handler lifecycle for request instrumentation. */
+export function getSSECompletion(c: Context): Promise<void> | undefined {
+  return completions.get(c);
 }

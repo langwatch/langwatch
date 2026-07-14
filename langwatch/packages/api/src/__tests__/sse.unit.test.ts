@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ZodError, z } from "zod";
 
 import { createService } from "../builder.js";
@@ -176,6 +176,40 @@ describe("SSE endpoints", () => {
       expect(events).toEqual([
         { event: "ready", data: { channel: "updates" } },
       ]);
+    });
+  });
+
+  describe("when an SSE handler throws", () => {
+    it("reports the error through the configured framework error handler", async () => {
+      const onError = vi.fn((error: Error, c) =>
+        c.json({ message: error.message }, 500),
+      );
+      const app = createService({
+        name: "test",
+        basePath: "/api/test",
+        logger: false,
+        tracer: false,
+        onError,
+      })
+        .version("2025-03-15", (v) => {
+          v.sse(
+            "/stream",
+            { events: { result: z.object({ score: z.number() }) } },
+            async () => {
+              throw new Error("stream failed");
+            },
+          );
+        })
+        .build();
+
+      const response = await app.request("/api/test/2025-03-15/stream");
+      const events = parseSSEEvents(await collectSSE(response));
+
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "stream failed" }),
+        expect.anything(),
+      );
+      expect(events).toContainEqual({ event: "error", data: "stream failed" });
     });
   });
 });

@@ -123,6 +123,21 @@ describe("createService", () => {
         }),
       ).toThrow(/Endpoint path must start/);
     });
+
+    it("rejects endpoints in the reserved version namespace", () => {
+      for (const path of [
+        "/latest",
+        "/preview/items",
+        "/2025-03-15/items",
+        "/2025-02-30/items",
+      ]) {
+        expect(() =>
+          buildTestService().version("2025-03-15", (v) => {
+            v.get(path, {}, async (c) => c.body(null, 204));
+          }),
+        ).toThrow(/reserved API version namespace/);
+      }
+    });
   });
 
   describe("when a version namespace misses a route", () => {
@@ -477,6 +492,41 @@ describe("per-endpoint auth option", () => {
       // Private endpoint -- auth SHOULD be called
       await makeRequest(app, "/api/test/2025-03-15/private");
       expect(authMiddleware).toHaveBeenCalled();
+    });
+
+    it("skips legacy organization resolution that depends on auth", async () => {
+      const authMiddleware: MiddlewareHandler = vi.fn(async (c, next) => {
+        c.set("project", { id: "project-1" });
+        await next();
+      });
+      const organizationMiddleware: MiddlewareHandler = vi.fn(
+        async (c, next) => {
+          if (!c.get("project")) {
+            return c.json({ error: "without project" }, 500);
+          }
+          await next();
+        },
+      );
+
+      const app = createService({
+        name: "test",
+        basePath: "/api/test",
+        auth: authMiddleware,
+        _legacy: { organizationMiddleware },
+      })
+        .version("2025-03-15", (v) => {
+          v.get(
+            "/public",
+            { auth: "none", output: z.object({ open: z.boolean() }) },
+            async () => ({ open: true }),
+          );
+        })
+        .build();
+
+      const response = await makeRequest(app, "/api/test/2025-03-15/public");
+      expect(response.status).toBe(200);
+      expect(authMiddleware).not.toHaveBeenCalled();
+      expect(organizationMiddleware).not.toHaveBeenCalled();
     });
   });
 });

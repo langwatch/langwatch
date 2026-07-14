@@ -97,7 +97,7 @@ describe("formatError", () => {
           meta: { id: "abc" },
         });
 
-        const { status, body } = formatError(err, true);
+        const { status, body } = formatError({ err, isVersioned: true });
 
         expect(status).toBe(404);
         expect(body.kind).toBe("not_found");
@@ -115,7 +115,7 @@ describe("formatError", () => {
           httpStatus: 404,
         });
 
-        const { status, body } = formatError(err, false);
+        const { status, body } = formatError({ err, isVersioned: false });
 
         expect(status).toBe(404);
         expect(body.kind).toBe("not_found");
@@ -143,7 +143,10 @@ describe("formatError", () => {
         zodError = err as ZodError;
       }
 
-      const { status, body } = formatError(zodError!, true);
+      const { status, body } = formatError({
+        err: zodError!,
+        isVersioned: true,
+      });
 
       expect(status).toBe(422);
       expect(body.kind).toBe("validation_error");
@@ -176,7 +179,10 @@ describe("formatError", () => {
           zodError = err as ZodError;
         }
 
-        const { body } = formatError(zodError!, false);
+        const { body } = formatError({
+          err: zodError!,
+          isVersioned: false,
+        });
         expect(body.error).toBe("Unprocessable Entity");
       });
     });
@@ -189,7 +195,7 @@ describe("formatError", () => {
   describe("when given an Error with a status property", () => {
     it("uses the status as the HTTP code", () => {
       const err = Object.assign(new Error("Forbidden"), { status: 403 });
-      const { status, body } = formatError(err, true);
+      const { status, body } = formatError({ err, isVersioned: true });
 
       expect(status).toBe(403);
       expect(body.kind).toBe("http_error");
@@ -207,7 +213,7 @@ describe("formatError", () => {
       process.env["NODE_ENV"] = "production";
       try {
         const err = new Error("secret internal details");
-        const { status, body } = formatError(err, true);
+        const { status, body } = formatError({ err, isVersioned: true });
 
         expect(status).toBe(500);
         expect(body.kind).toBe("internal_error");
@@ -222,7 +228,7 @@ describe("formatError", () => {
       process.env["NODE_ENV"] = "development";
       try {
         const err = new Error("secret internal details");
-        const { status, body } = formatError(err, true);
+        const { status, body } = formatError({ err, isVersioned: true });
 
         expect(status).toBe(500);
         expect(body.kind).toBe("internal_error");
@@ -235,7 +241,7 @@ describe("formatError", () => {
     describe("when the request is unversioned", () => {
       it("includes the error field", () => {
         const err = new Error("oops");
-        const { body } = formatError(err, false);
+        const { body } = formatError({ err, isVersioned: false });
         expect(body.error).toBe("Internal Server Error");
       });
     });
