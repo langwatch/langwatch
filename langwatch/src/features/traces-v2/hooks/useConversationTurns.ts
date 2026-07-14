@@ -49,7 +49,7 @@ export function useConversationTurns(conversationId: string | null) {
     [project?.id, conversationId],
   );
 
-  return api.tracesV2.list.useQuery(
+  const query = api.tracesV2.list.useQuery(
     {
       projectId: project?.id ?? "",
       timeRange,
@@ -71,4 +71,7 @@ export function useConversationTurns(conversationId: string | null) {
       keepPreviousData: true,
     },
   );
+
+  // Mask cached data in read-only mode
+  return readOnly ? { ...query, data: undefined } : query;
 }

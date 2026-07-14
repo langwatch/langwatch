@@ -23,13 +23,18 @@ export function usePromptByHandle(handle: string | null | undefined) {
       retry: false,
     },
   );
+
+  // Mask cached data in read-only mode
+  const data = readOnly ? undefined : lookup.data;
+
   return {
     ...lookup,
-    latestVersion: lookup.data?.version ?? null,
+    data,
+    latestVersion: data?.version ?? null,
     // Friendly human-readable handle (e.g. "pizza-prompt") when the SDK
     // emitted the opaque slug-id form (`prompt_xxx`). Null when the prompt
     // never had a handle or the lookup hasn't resolved yet.
-    resolvedHandle: lookup.data?.handle ?? null,
+    resolvedHandle: data?.handle ?? null,
     missing: !!handle && lookup.isError,
   };
 }

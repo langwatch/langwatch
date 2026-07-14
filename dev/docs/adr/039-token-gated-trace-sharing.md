@@ -108,7 +108,7 @@ A cookie-carried grant was chosen over threading the token as an input param on
 every anonymous endpoint because it closes the guessing hole *and* enforces
 real single-view (the raw token alone cannot fetch data — only a grant can, and
 a grant requires a view-consuming `resolve`) while touching no frontend data
-code. The cost is one new small JWT helper and a few lines in
+code. The cost is one small new JWT helper and a few lines in
 `createTRPCContext` to read the cookie. A single active share-view per browser is
 accepted (opening share B overwrites share A's grant cookie); simultaneous
 shares in separate tabs is an accepted edge case.

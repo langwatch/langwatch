@@ -126,10 +126,11 @@ describe("ShareService", () => {
         });
 
         expect(result.status).toBe("granted");
-        expect(result).toMatchObject({ consumed: true });
+        expect(result).toMatchObject({ isConsumed: true });
         expect(repo.incrementViewCount).toHaveBeenCalledWith({
           id: "share_1",
           projectId: PROJECT_ID,
+          maxViews: null,
         });
       });
     });
@@ -241,7 +242,7 @@ describe("ShareService", () => {
           });
 
           expect(result.status).toBe("granted");
-          expect(result).toMatchObject({ consumed: false });
+          expect(result).toMatchObject({ isConsumed: false });
           expect(repo.incrementViewCount).not.toHaveBeenCalled();
         });
       });
@@ -249,7 +250,7 @@ describe("ShareService", () => {
   });
 
   describe("createShare", () => {
-    it("mints a prefixed high-entropy token and auto-pins the trace", async () => {
+    it("mints a high-entropy token and auto-pins the trace", async () => {
       vi.mocked(repo.create).mockImplementation(
         async (params) => ({ ...params, id: "share_1" }) as never,
       );

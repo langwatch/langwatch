@@ -936,81 +936,85 @@ describe("RBAC Integration Tests", () => {
         mockCtx.publiclyShared = false;
       });
 
-      /**
-       * Only a share created *with* its thread carries a thread_id claim, so a
-       * trace-scoped link must not unlock the whole conversation.
-       */
-      it("denies a trace-scoped grant (no thread claim)", async () => {
-        mockCtx.shareGrant = {
-          share_id: "share-123",
-          project_id: "project-123",
-          resource_type: "TRACE",
-          resource_id: "trace-123",
-          thread_id: null,
-        };
+      describe("when the grant carries no thread_id claim", () => {
+        it("denies access", async () => {
+          mockCtx.shareGrant = {
+            share_id: "share-123",
+            project_id: "project-123",
+            resource_type: "TRACE",
+            resource_id: "trace-123",
+            thread_id: null,
+          };
 
-        await expect(
-          threadMiddleware()({
+          await expect(
+            threadMiddleware()({
+              ctx: mockCtx,
+              input: { projectId: "project-123", conversationId: "conv-1" },
+              next: mockNext,
+            }),
+          ).rejects.toThrow(TRPCError);
+        });
+      });
+
+      describe("when the grant's thread_id matches the requested conversation", () => {
+        it("authorizes access", async () => {
+          mockCtx.shareGrant = {
+            share_id: "share-123",
+            project_id: "project-123",
+            resource_type: "TRACE",
+            resource_id: "trace-123",
+            thread_id: "conv-1",
+          };
+
+          const result = await threadMiddleware()({
             ctx: mockCtx,
             input: { projectId: "project-123", conversationId: "conv-1" },
             next: mockNext,
-          }),
-        ).rejects.toThrow(TRPCError);
-      });
+          });
 
-      it("authorizes a grant whose thread matches the conversation", async () => {
-        mockCtx.shareGrant = {
-          share_id: "share-123",
-          project_id: "project-123",
-          resource_type: "TRACE",
-          resource_id: "trace-123",
-          thread_id: "conv-1",
-        };
-
-        const result = await threadMiddleware()({
-          ctx: mockCtx,
-          input: { projectId: "project-123", conversationId: "conv-1" },
-          next: mockNext,
+          expect(result).toBe("success");
+          expect(mockCtx.publiclyShared).toBe(true);
         });
-
-        expect(result).toBe("success");
-        expect(mockCtx.publiclyShared).toBe(true);
       });
 
-      it("denies a grant whose thread is a different conversation", async () => {
-        mockCtx.shareGrant = {
-          share_id: "share-123",
-          project_id: "project-123",
-          resource_type: "TRACE",
-          resource_id: "trace-123",
-          thread_id: "conv-1",
-        };
+      describe("when the grant's thread_id is a different conversation", () => {
+        it("denies access", async () => {
+          mockCtx.shareGrant = {
+            share_id: "share-123",
+            project_id: "project-123",
+            resource_type: "TRACE",
+            resource_id: "trace-123",
+            thread_id: "conv-1",
+          };
 
-        await expect(
-          threadMiddleware()({
-            ctx: mockCtx,
-            input: { projectId: "project-123", conversationId: "conv-2" },
-            next: mockNext,
-          }),
-        ).rejects.toThrow(TRPCError);
+          await expect(
+            threadMiddleware()({
+              ctx: mockCtx,
+              input: { projectId: "project-123", conversationId: "conv-2" },
+              next: mockNext,
+            }),
+          ).rejects.toThrow(TRPCError);
+        });
       });
 
-      it("denies a thread grant issued for another project", async () => {
-        mockCtx.shareGrant = {
-          share_id: "share-123",
-          project_id: "project-a",
-          resource_type: "TRACE",
-          resource_id: "trace-123",
-          thread_id: "conv-1",
-        };
+      describe("when the grant is for a different project", () => {
+        it("denies access", async () => {
+          mockCtx.shareGrant = {
+            share_id: "share-123",
+            project_id: "project-a",
+            resource_type: "TRACE",
+            resource_id: "trace-123",
+            thread_id: "conv-1",
+          };
 
-        await expect(
-          threadMiddleware()({
-            ctx: mockCtx,
-            input: { projectId: "project-b", conversationId: "conv-1" },
-            next: mockNext,
-          }),
-        ).rejects.toThrow(TRPCError);
+          await expect(
+            threadMiddleware()({
+              ctx: mockCtx,
+              input: { projectId: "project-b", conversationId: "conv-1" },
+              next: mockNext,
+            }),
+          ).rejects.toThrow(TRPCError);
+        });
       });
     });
   });

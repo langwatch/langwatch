@@ -25,7 +25,7 @@ export function isShareViewExhausted(
 
 /** Outcome of resolving a share token for a specific viewer. */
 export type ShareResolveResult =
-  | { status: "granted"; share: ShareWithProject; consumed: boolean }
+  | { status: "granted"; share: ShareWithProject; isConsumed: boolean }
   | { status: "not_found" }
   | { status: "sharing_disabled" }
   | { status: "expired" }
@@ -115,30 +115,30 @@ export class ShareService {
 
     if (isShareExpired(share)) return { status: "expired" };
 
-    const audienceOk = await this.checkAudience(share, viewer);
-    if (!audienceOk) return { status: "forbidden" };
+    const isAudienceAllowed = await this.checkAudience(share, viewer);
+    if (!isAudienceAllowed) return { status: "forbidden" };
 
     // In-window refresh: the viewer already spent their view for this share, so
     // the page's several data calls and reloads within the grant window don't
     // re-consume. One view == one grant issuance.
     if (viewer.grantedShareId === share.id) {
-      return { status: "granted", share, consumed: false };
+      return { status: "granted", share, isConsumed: false };
     }
 
     // Atomic consume: attempt to increment only if not exhausted.
     // The service-level check is kept as a fast-path for the common case
     // (no contention), but the repository does the authoritative atomic check.
-    const consumed = await this.repo.incrementViewCount({
+    const isConsumed = await this.repo.incrementViewCount({
       id: share.id,
       projectId: share.projectId,
       maxViews: share.maxViews,
     });
     
-    if (!consumed) {
+    if (!isConsumed) {
       // Race condition: another resolve consumed the last view between our check and update
       return { status: "exhausted" };
     }
-    return { status: "granted", share, consumed: true };
+    return { status: "granted", share, isConsumed: true };
   }
 
   private async checkAudience(
@@ -221,12 +221,12 @@ export class ShareService {
     await this.repo.deleteById({ id, projectId });
 
     if (share.resourceType === "TRACE") {
-      const stillShared = await this.repo.hasActiveShareForResource({
+      const isStillShared = await this.repo.hasActiveShareForResource({
         projectId,
         resourceType: "TRACE",
         resourceId: share.resourceId,
       });
-      if (!stillShared) {
+      if (!isStillShared) {
         // Best-effort: the link is already revoked (the user's intent); a
         // failed unpin only leaves an orphan pin annotation, which is logged.
         try {

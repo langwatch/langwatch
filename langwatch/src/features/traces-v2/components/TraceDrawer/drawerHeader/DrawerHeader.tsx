@@ -1005,7 +1005,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             <ThreadProgressIndicator
               position={conversationContext.position}
               total={conversationContext.total}
-              conversationId={trace.conversationId}
+              conversationId={trace.conversationId ?? null}
               onFilterByConversation={
                 trace.conversationId
                   ? () => {
@@ -1090,7 +1090,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           </Tooltip>
           <TraceOverflowMenu
             traceId={trace.traceId}
-            conversationId={trace.conversationId}
+            conversationId={trace.conversationId ?? null}
             onCopyTraceId={handleCopyTraceId}
             onFindSimilar={findSimilarQuery ? handleFindSimilar : null}
             dejaViewHref={dejaView.href ?? null}
@@ -1099,6 +1099,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             onShare={() => setShareOpen(true)}
             pinned={pinned}
             onTogglePinned={togglePinned}
+            readOnly={readOnly}
           />
           <Box
             width="1px"
@@ -1354,7 +1355,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           onClose={() => setShareOpen(false)}
           projectId={project?.id}
           traceId={trace.traceId}
-          conversationId={trace.conversationId}
+          conversationId={trace.conversationId ?? null}
         />
       )}
     </VStack>
