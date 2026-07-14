@@ -67,6 +67,12 @@ Feature: Event-sourced scheduling for pull-mode ingestion sources
     And no follow-up ingestion-pull job is staged for the source
 
   @integration
+  Scenario: Re-enabling a disabled source restarts the recurrence
+    Given a pull-mode source whose recurrence stopped while it was disabled
+    When the source is re-enabled
+    Then an ingestion-pull job is staged without waiting for a worker restart
+
+  @integration
   Scenario: Saving a source with a schedule seeds it immediately
     Given a new pull-mode source is created with `pullSchedule = "*/10 * * * *"`
     When the create mutation succeeds

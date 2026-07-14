@@ -13,10 +13,9 @@
  * @see specs/background/redis-cluster-compatibility.feature
  */
 import { describe, expect, it } from "vitest";
-
-import { makeQueueName } from "../makeQueueName";
 import { SCENARIO_QUEUE } from "~/server/scenarios/scenario.constants";
 import { TOPIC_CLUSTERING_QUEUE } from "~/server/topicClustering/topicClusteringQueue.constants";
+import { makeQueueName } from "../makeQueueName";
 
 /**
  * A queue name is Redis Cluster compatible when it contains a hash tag:

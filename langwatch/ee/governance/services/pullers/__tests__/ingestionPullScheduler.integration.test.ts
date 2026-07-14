@@ -32,6 +32,7 @@ import {
 import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
 import { EventStoreClickHouse } from "~/server/event-sourcing/stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
+import { IngestionSourceService } from "../../activity-monitor/ingestionSource.service";
 
 import {
   armIngestionPullForSource,
@@ -334,6 +335,23 @@ describe.skipIf(!hasTestcontainers)(
 
           expect(control.calls).toBe(0);
           expect(await pendingPullCount(sourceId)).toBe(0);
+        });
+      });
+    });
+
+    describe("given a disabled source whose recurrence has stopped", () => {
+      describe("when the source is re-enabled", () => {
+        /** @scenario "Re-enabling a disabled source restarts the recurrence" */
+        it("stages a new pull without waiting for a worker restart", async () => {
+          const sourceId = await createSource({ status: "disabled" });
+
+          await IngestionSourceService.create(prisma).updateSource({
+            id: sourceId,
+            organizationId,
+            status: "active",
+          });
+
+          expect(await pendingPullCount(sourceId)).toBe(1);
         });
       });
     });

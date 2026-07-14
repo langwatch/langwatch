@@ -272,10 +272,25 @@ export class IngestionSourceService {
         ? { connect: { id: input.teamId } }
         : { disconnect: true };
     }
-    return this.prisma.ingestionSource.update({
+    const source = await this.prisma.ingestionSource.update({
       where: { id: existing.id },
       data,
     });
+
+    // A disabled source has no recurring job after its pending pull observes
+    // that state. Re-arm it when an update makes it schedulable again.
+    if (
+      source.status === "active" ||
+      source.status === "awaiting_first_event"
+    ) {
+      await armIngestionPullForSource({
+        id: source.id,
+        pullSchedule: source.pullSchedule,
+        organizationId: source.organizationId,
+      });
+    }
+
+    return source;
   }
 
   /**
