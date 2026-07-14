@@ -293,25 +293,39 @@ func TestHubBusyGate(t *testing.T) {
 			}
 		})
 
-		t.Run("when q is pressed, the hub still quits", func(t *testing.T) {
+		t.Run("when q is pressed, the quit drains: no immediate exit, but the hub exits once the action completes", func(t *testing.T) {
 			m, _ := setup(t)
-			_, cmd := m.Update(key("q"))
+			next, cmd := m.Update(key("q"))
+			m = next.(model)
+			if cmd != nil {
+				t.Fatal("q while busy must not quit immediately — the in-flight action would be abandoned half-way")
+			}
+			if !m.quitting {
+				t.Fatal("q while busy should arm the drain")
+			}
+			next, cmd = m.Update(actionDoneMsg{verb: "down", slug: "alpha"})
+			m = next.(model)
 			if cmd == nil {
-				t.Fatal("q should quit even while busy")
+				t.Fatal("the armed drain should quit once the action completes")
 			}
 			if _, ok := cmd().(tea.QuitMsg); !ok {
-				t.Error("q while busy should return tea.Quit")
+				t.Error("action completion with a drain armed should return tea.Quit")
 			}
 		})
 
-		t.Run("when ctrl+c is pressed, the hub still quits", func(t *testing.T) {
+		t.Run("when ctrl+c is pressed twice, the second force-quits a hung action", func(t *testing.T) {
 			m, _ := setup(t)
-			_, cmd := m.Update(key("ctrl+c"))
+			next, cmd := m.Update(key("ctrl+c"))
+			m = next.(model)
+			if cmd != nil {
+				t.Fatal("first ctrl+c while busy should only arm the drain")
+			}
+			_, cmd = m.Update(key("ctrl+c"))
 			if cmd == nil {
-				t.Fatal("ctrl+c should quit even while busy")
+				t.Fatal("second ctrl+c should force-quit")
 			}
 			if _, ok := cmd().(tea.QuitMsg); !ok {
-				t.Error("ctrl+c while busy should return tea.Quit")
+				t.Error("second ctrl+c while busy should return tea.Quit")
 			}
 		})
 	})

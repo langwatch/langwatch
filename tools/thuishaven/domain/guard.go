@@ -121,16 +121,20 @@ func ReadEnvFile(path string, env map[string]string) {
 			continue
 		}
 		value = strings.TrimSpace(value)
-		// Strip a trailing inline comment (" #…") from an unquoted value, so
-		// `DATABASE_URL=postgres://localhost/db # note` does not parse the comment
-		// into the URL and refuse a perfectly local target. A quoted value keeps
-		// everything up to its closing quote.
-		if !strings.HasPrefix(value, `"`) && !strings.HasPrefix(value, `'`) {
-			if i := strings.Index(value, " #"); i >= 0 {
-				value = strings.TrimSpace(value[:i])
+		// A quoted value keeps only what sits between the quotes, discarding
+		// anything after the closing quote (including a trailing comment). An
+		// unquoted value is cut at " #" so `DATABASE_URL=postgres://localhost/db
+		// # note` does not parse the comment into the URL and refuse a perfectly
+		// local target.
+		if len(value) > 0 && (value[0] == '"' || value[0] == '\'') {
+			if end := strings.IndexByte(value[1:], value[0]); end >= 0 {
+				value = value[1 : end+1]
+			} else {
+				value = value[1:]
 			}
+		} else if i := strings.Index(value, " #"); i >= 0 {
+			value = strings.TrimSpace(value[:i])
 		}
-		value = strings.Trim(value, `"'`)
 		env[strings.TrimSpace(key)] = value
 	}
 }

@@ -156,6 +156,26 @@ func TestReadEnvFile(t *testing.T) {
 		})
 	})
 
+	t.Run("given a quoted value with a trailing inline comment", func(t *testing.T) {
+		t.Run("when read, only the content between the quotes is kept", func(t *testing.T) {
+			env := map[string]string{}
+			ReadEnvFile(write(t, "TOKEN=\"secret\" # comment\n"), env)
+			if got := env["TOKEN"]; got != "secret" {
+				t.Errorf("value = %q, want just the quoted content", got)
+			}
+		})
+	})
+
+	t.Run("given a quoted value missing its closing quote", func(t *testing.T) {
+		t.Run("when read, the opening quote is dropped and the rest kept", func(t *testing.T) {
+			env := map[string]string{}
+			ReadEnvFile(write(t, "TOKEN=\"secret\n"), env)
+			if got := env["TOKEN"]; got != "secret" {
+				t.Errorf("value = %q, want secret", got)
+			}
+		})
+	})
+
 	t.Run("given an export-prefixed line", func(t *testing.T) {
 		t.Run("when read, the export prefix is dropped", func(t *testing.T) {
 			env := map[string]string{}

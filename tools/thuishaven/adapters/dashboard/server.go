@@ -184,7 +184,12 @@ func (s *Server) handleTelemetry(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "telemetry body too large", http.StatusRequestEntityTooLarge)
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, "telemetry body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "reading telemetry body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	prefix := os.Getenv("LANGWATCH_OTLP_FORWARD_PREFIX")
