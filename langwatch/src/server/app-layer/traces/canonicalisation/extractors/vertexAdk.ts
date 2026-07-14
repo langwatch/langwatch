@@ -98,7 +98,15 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
    * bag too in production, but the explicit guard keeps the behaviour
    * self-contained and unit-testable.)
    */
-  private setIfMissing(ctx: ExtractorContext, key: string, value: unknown) {
+  private setIfMissing({
+    ctx,
+    key,
+    value,
+  }: {
+    ctx: ExtractorContext;
+    key: string;
+    value: unknown;
+  }) {
     if (ctx.bag.attrs.has(key) || ctx.out[key] !== undefined) return false;
     ctx.setAttr(key, value);
     return true;
@@ -134,7 +142,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     // Model (standard gen_ai.request.model usually present; fallback only)
     if (
       isNonEmptyString(request.model) &&
-      this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_REQUEST_MODEL, request.model)
+      this.setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_REQUEST_MODEL, value: request.model })
     ) {
       ctx.recordRule(`${this.id}:llm_request.model->gen_ai.request.model`);
     }
@@ -146,7 +154,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
       Array.isArray(request.contents)
     ) {
       const messages = request.contents.flatMap((content) =>
-        convertGeminiContent(content, "user"),
+        convertGeminiContent({ content, defaultRole: "user" }),
       );
       if (messages.length > 0) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, messages);
@@ -162,11 +170,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     const sysInstruction = systemInstructionText(config.system_instruction);
     if (
       sysInstruction !== null &&
-      this.setIfMissing(
-        ctx,
-        ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-        sysInstruction,
-      )
+      this.setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, value: sysInstruction, })
     ) {
       ctx.recordRule(`${this.id}:system_instruction`);
     }
@@ -174,7 +178,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     // Tool definitions
     if (Array.isArray(config.tools) && config.tools.length > 0) {
       if (
-        this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS, config.tools)
+        this.setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS, value: config.tools })
       ) {
         ctx.recordRule(`${this.id}:tools->gen_ai.tool.definitions`);
       }
@@ -190,7 +194,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     let hasExtractedParams = false;
     for (const [key, raw] of paramMap) {
       const value = asNumber(raw);
-      if (value !== null && this.setIfMissing(ctx, key, value)) {
+      if (value !== null && this.setIfMissing({ ctx, key: key, value: value })) {
         hasExtractedParams = true;
       }
     }
@@ -214,12 +218,15 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     ) {
       const messages: unknown[] = [];
       if (isRecord(response.content)) {
-        messages.push(...convertGeminiContent(response.content, "assistant"));
+        messages.push(...convertGeminiContent({ content: response.content, defaultRole: "assistant" }));
       } else if (Array.isArray(response.candidates)) {
         for (const candidate of response.candidates) {
           if (isRecord(candidate) && isRecord(candidate.content)) {
             messages.push(
-              ...convertGeminiContent(candidate.content, "assistant"),
+              ...convertGeminiContent({
+                content: candidate.content,
+                defaultRole: "assistant",
+              }),
             );
           }
         }
@@ -248,7 +255,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
       let hasExtractedUsage = false;
       for (const [key, raw] of usageMap) {
         const value = asNumber(raw);
-        if (value !== null && this.setIfMissing(ctx, key, value)) {
+        if (value !== null && this.setIfMissing({ ctx, key: key, value: value })) {
           hasExtractedUsage = true;
         }
       }
@@ -260,9 +267,9 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     // Finish reason
     if (isNonEmptyString(response.finish_reason)) {
       if (
-        this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS, [
+        this.setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS, value: [
           response.finish_reason,
-        ])
+        ] })
       ) {
         ctx.recordRule(`${this.id}:finish_reason`);
       }
@@ -284,8 +291,8 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     if (args !== null) {
       attrs.take(VERTEX_ADK_KEYS.TOOL_CALL_ARGS);
       const hasSetArgs = [
-        this.setIfMissing(ctx, ATTR_KEYS.LANGWATCH_INPUT, args),
-        this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS, args),
+        this.setIfMissing({ ctx, key: ATTR_KEYS.LANGWATCH_INPUT, value: args }),
+        this.setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS, value: args }),
       ].some(Boolean);
       if (hasSetArgs) {
         ctx.recordRule(`${this.id}:tool_call_args->input`);
@@ -298,8 +305,8 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     if (result !== null) {
       attrs.take(VERTEX_ADK_KEYS.TOOL_RESPONSE);
       const hasSetResult = [
-        this.setIfMissing(ctx, ATTR_KEYS.LANGWATCH_OUTPUT, result),
-        this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT, result),
+        this.setIfMissing({ ctx, key: ATTR_KEYS.LANGWATCH_OUTPUT, value: result }),
+        this.setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT, value: result }),
       ].some(Boolean);
       if (hasSetResult) {
         ctx.recordRule(`${this.id}:tool_response->output`);
@@ -317,7 +324,7 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     const sessionId = ctx.bag.attrs.get(VERTEX_ADK_KEYS.SESSION_ID);
     if (
       isNonEmptyString(sessionId) &&
-      this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId)
+      this.setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_CONVERSATION_ID, value: sessionId })
     ) {
       ctx.recordRule(`${this.id}:session_id->gen_ai.conversation.id`);
     }

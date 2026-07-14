@@ -22,7 +22,13 @@ export const safeStringify = (value: unknown): string | null => {
  * Gemini content roles are "user" | "model"; chat messages use
  * "user" | "assistant".
  */
-const geminiRoleToChatRole = (role: unknown, defaultRole: string): string => {
+const geminiRoleToChatRole = ({
+  role,
+  defaultRole,
+}: {
+  role: unknown;
+  defaultRole: string;
+}): string => {
   if (role === "model") return "assistant";
   return isNonEmptyString(role) ? role : defaultRole;
 };
@@ -34,13 +40,16 @@ const geminiRoleToChatRole = (role: unknown, defaultRole: string): string => {
  * parts become separate tool-role messages, matching chat semantics —
  * ADK wraps tool results in a user-role content.
  */
-export const convertGeminiContent = (
-  content: unknown,
-  defaultRole: string,
-): unknown[] => {
+export const convertGeminiContent = ({
+  content,
+  defaultRole,
+}: {
+  content: unknown;
+  defaultRole: string;
+}): unknown[] => {
   if (!isRecord(content)) return [];
 
-  const role = geminiRoleToChatRole(content.role, defaultRole);
+  const role = geminiRoleToChatRole({ role: content.role, defaultRole });
   const parts = Array.isArray(content.parts) ? content.parts : [];
 
   const messages: unknown[] = [];
