@@ -14,10 +14,11 @@ const logger = createLogger("langwatch:ops:replay-service");
 const REPLAY_LOCK_TTL_SECONDS = 3600;
 
 /**
- * How often (at most) the running replay re-extends its lock from progress
- * callbacks. Batch completions also refresh unconditionally — together they
- * keep the lock alive for runs longer than REPLAY_LOCK_TTL_SECONDS, whose
- * expiry used to silently stop status updates mid-run.
+ * How often the running replay re-extends its lock on a standalone heartbeat
+ * timer. Running independently of progress/batch callbacks keeps the lock
+ * alive even when a single batch phase (a huge tenant's drain wait, a slow
+ * ClickHouse load) emits nothing for longer than REPLAY_LOCK_TTL_SECONDS,
+ * whose expiry used to silently stop status updates mid-run.
  */
 export const LOCK_REFRESH_INTERVAL_MS = 60_000;
 
@@ -161,9 +162,7 @@ export class ReplayService {
       let lastCancelCheck = Date.now();
       const CANCEL_CHECK_INTERVAL_MS = 3000;
 
-      let lastLockRefresh = Date.now();
       const refreshLock = () => {
-        lastLockRefresh = Date.now();
         this.repo
           .refreshLock({
             runId: params.runId,
@@ -186,53 +185,53 @@ export class ReplayService {
           });
       };
 
-      const result = await runtime.service.replayOptimized(
-        {
-          projections: selectedProjections,
-          mapProjections: selectedMapProjections,
-          tenantIds: params.tenantIds,
-          since: params.since,
-          aggregateIds: params.aggregateIds,
-        },
-        {
-          // Heartbeat: refresh the lock at least once per completed batch so
-          // a run longer than the lock TTL never loses it mid-flight.
-          onBatchComplete: () => {
-            refreshLock();
+      // Heartbeat: refresh the lock on a standalone timer for the duration
+      // of the runtime call, so the lock survives runs longer than its TTL
+      // even when a single batch phase emits no callbacks for that long.
+      const heartbeat = setInterval(refreshLock, LOCK_REFRESH_INTERVAL_MS);
+      heartbeat.unref();
+
+      let result;
+      try {
+        result = await runtime.service.replayOptimized(
+          {
+            projections: selectedProjections,
+            mapProjections: selectedMapProjections,
+            tenantIds: params.tenantIds,
+            since: params.since,
+            aggregateIds: params.aggregateIds,
           },
-          onProgress: (progress: ReplayProgress) => {
-            this.updateProgress({ runId: params.runId, progress }).catch(
-              (err) => {
-                logger.warn(
-                  { error: err },
-                  "Failed to update replay progress",
-                );
-              },
-            );
+          {
+            onProgress: (progress: ReplayProgress) => {
+              this.updateProgress({ runId: params.runId, progress }).catch(
+                (err) => {
+                  logger.warn(
+                    { error: err },
+                    "Failed to update replay progress",
+                  );
+                },
+              );
 
-            const now = Date.now();
-            if (now - lastCancelCheck > CANCEL_CHECK_INTERVAL_MS) {
-              lastCancelCheck = now;
-              this.repo
-                .isCancelled()
-                .then((cancelled) => {
-                  if (cancelled) cancelledFlag = true;
-                })
-                .catch(() => {});
-            }
+              const now = Date.now();
+              if (now - lastCancelCheck > CANCEL_CHECK_INTERVAL_MS) {
+                lastCancelCheck = now;
+                this.repo
+                  .isCancelled()
+                  .then((cancelled) => {
+                    if (cancelled) cancelledFlag = true;
+                  })
+                  .catch(() => {});
+              }
 
-            // Also refresh from progress emits, time-gated — covers a single
-            // batch that runs longer than one lock refresh interval.
-            if (now - lastLockRefresh > LOCK_REFRESH_INTERVAL_MS) {
-              refreshLock();
-            }
-
-            if (cancelledFlag) {
-              throw new ReplayCancelledError();
-            }
+              if (cancelledFlag) {
+                throw new ReplayCancelledError();
+              }
+            },
           },
-        },
-      );
+        );
+      } finally {
+        clearInterval(heartbeat);
+      }
 
       const lockHolder = await this.repo.getLockHolder();
       if (lockHolder !== params.runId) return;
