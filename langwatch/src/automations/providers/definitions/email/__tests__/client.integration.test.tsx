@@ -200,10 +200,14 @@ describe("EmailConfigForm default wording", () => {
       expect(body).toHaveValue(TRACE_TRIGGER_DEFAULTS.emailBody);
     });
 
-    it("keeps the cadence switch — a trace automation can digest", () => {
+    it("renders no cadence switch — timing moved to the drawer's Cadence section", () => {
+      // The digest/immediate choice lives in CadenceSection now (drawer UX
+      // rework); the config form owns only recipients and wording. The
+      // trace-can-digest behavior is covered by
+      // CadenceSection.integration.test.tsx.
       renderForm(makeCtx());
 
-      expect(screen.getByText(/cadence/i)).toBeInTheDocument();
+      expect(screen.queryByText(/cadence/i)).not.toBeInTheDocument();
     });
   });
 });

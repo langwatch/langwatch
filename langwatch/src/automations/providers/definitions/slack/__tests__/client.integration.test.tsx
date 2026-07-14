@@ -219,13 +219,18 @@ describe("SlackConfigForm authoring tiers", () => {
     });
   });
 
-  describe("when the author opens edit as code", () => {
-    it("reveals the raw Block Kit editor", () => {
+  describe("when the author switches to the Code tab", () => {
+    it("reveals the raw Block Kit editor", async () => {
+      const user = userEvent.setup();
       renderForm();
 
-      fireEvent.click(screen.getByRole("button", { name: /edit as code/i }));
+      // "Code" is a segmented-control tab beside "Template", not a buried
+      // "edit as code" disclosure (the drawer UX rework).
+      await user.click(screen.getByRole("radio", { name: "Code" }));
 
-      expect(screen.getByTestId("slack-code-editor")).toBeInTheDocument();
+      expect(
+        await screen.findByTestId("slack-code-editor"),
+      ).toBeInTheDocument();
     });
   });
 
