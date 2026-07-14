@@ -33,6 +33,9 @@ export const onboardingRouter = createTRPCRouter({
         orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
         signUpData: signUpDataSchema.optional(),
+        // ADR-038: declared signup intent. Optional for rolling-deploy
+        // tolerance; absent means NULL, the safe legacy default.
+        primaryIntent: z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]).optional(),
 
         // Project details
         projectName: z.string().optional(),
@@ -49,6 +52,7 @@ export const onboardingRouter = createTRPCRouter({
           orgName: input.orgName,
           phoneNumber: input.phoneNumber,
           signUpData: input.signUpData,
+          primaryIntent: input.primaryIntent,
         });
         if (!orgResult.success) {
           throw new TRPCError({
@@ -57,21 +61,28 @@ export const onboardingRouter = createTRPCRouter({
           });
         }
 
-        // Create project under the organization
-        const projectName = input.projectName ?? orgResult.team.name;
-        const projectCaller = projectRouter.createCaller(ctx);
-        const projectResult = await projectCaller.create({
-          organizationId: orgResult.organization.id,
-          teamId: orgResult.team.id,
-          name: projectName,
-          language: input.language,
-          framework: input.framework,
-        });
-        if (!projectResult.success) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to create project",
+        // Create project under the organization. Governance-intent signups
+        // skip it (ADR-038 v6): their users live on /me (personal workspaces
+        // are provisioned lazily at CLI login) and a project is only created
+        // when the org later flips to LLMOps in settings.
+        let projectSlug: string | null = null;
+        if (input.primaryIntent !== "AGENT_GOVERNANCE") {
+          const projectName = input.projectName ?? orgResult.team.name;
+          const projectCaller = projectRouter.createCaller(ctx);
+          const projectResult = await projectCaller.create({
+            organizationId: orgResult.organization.id,
+            teamId: orgResult.team.id,
+            name: projectName,
+            language: input.language,
+            framework: input.framework,
           });
+          if (!projectResult.success) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to create project",
+            });
+          }
+          projectSlug = projectResult.projectSlug;
         }
 
         try {
@@ -101,16 +112,18 @@ export const onboardingRouter = createTRPCRouter({
           organizationId: orgResult.organization.id,
           organizationName: orgResult.organization.name,
           signUpData: input.signUpData,
+          primaryIntent: input.primaryIntent,
         });
 
         // Return success response with team and project slugs
+        // (projectSlug is null for governance-intent signups)
         return {
           success: true,
           teamSlug: orgResult.team.slug,
           teamName: orgResult.team.name,
           teamId: orgResult.team.id,
           organizationId: orgResult.organization.id,
-          projectSlug: projectResult.projectSlug,
+          projectSlug,
         };
       } catch (error) {
         captureException(

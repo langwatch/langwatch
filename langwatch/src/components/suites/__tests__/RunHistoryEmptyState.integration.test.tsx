@@ -16,10 +16,15 @@ const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      scenarios: { getScenarioSetBatchHistory: { invalidate: vi.fn() } },
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
+        getScenarioSetBatchHistory: { invalidate: vi.fn() },
+      },
     }),
     scenarios: {
       getSuiteRunData: { useQuery: mockGetSuiteRunData },
+      getSuiteRunFreshness: { useQuery: vi.fn(() => ({ data: undefined })) },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
       cancelJob: {
         useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
@@ -38,7 +43,16 @@ vi.mock("~/utils/api", () => ({
 }));
 
 vi.mock("~/hooks/useSSESubscription", () => ({
-  useSSESubscription: vi.fn(),
+  useSSESubscription: vi.fn(() => ({
+    connectionState: "disconnected",
+    isConnected: false,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: true,
+    retryCount: 0,
+    lastData: undefined,
+    lastError: undefined,
+  })),
 }));
 
 vi.mock("~/hooks/usePageVisibility", () => ({
@@ -63,14 +77,6 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
   }),
-}));
-
-vi.mock("~/hooks/useSSESubscription", () => ({
-  useSSESubscription: vi.fn(),
-}));
-
-vi.mock("~/hooks/usePageVisibility", () => ({
-  usePageVisibility: () => true,
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

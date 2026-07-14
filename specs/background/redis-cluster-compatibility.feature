@@ -11,14 +11,23 @@ Feature: BullMQ Redis Cluster Compatibility
   # Wrapping queue names in {braces} forces Redis to hash only the braced
   # portion, guaranteeing all keys for a queue land on the same slot.
 
-  @integration
+  # The @integration scenarios below were previously bound to
+  # background/__tests__/redis-cluster.integration.test.ts (a testcontainers
+  # 6-node cluster), which was deleted with the background stack in the
+  # Elasticsearch/background removal. They remain valid requirements for the
+  # surviving BullMQ queues (topic clustering, ingestion puller, scenarios)
+  # but are unbound until a cluster testbed is wired up again. The @unit
+  # scenario at the bottom is live — see
+  # src/server/queues/__tests__/makeQueueName.unit.test.ts.
+
+  @integration @unimplemented
   Scenario: Adding a job to a queue without a hash tag fails on Redis Cluster
     Given a Redis Cluster is running
     And a BullMQ queue named "no-hash-tag"
     When a job is added to the queue
     Then the operation fails with a CROSSSLOT error
 
-  @integration
+  @integration @unimplemented
   Scenario: Adding and processing a job succeeds when the queue name has a hash tag
     Given a Redis Cluster is running
     And a BullMQ queue named "{with_hash_tag}"
@@ -26,7 +35,7 @@ Feature: BullMQ Redis Cluster Compatibility
     When a job is added to the queue
     Then the job is processed successfully without errors
 
-  @integration
+  @integration @unimplemented
   Scenario: Background worker queues operate on Redis Cluster
     Given a Redis Cluster is running
     And the background worker queue names are loaded from configuration
@@ -39,7 +48,7 @@ Feature: BullMQ Redis Cluster Compatibility
   # rather than from a static constant. Asserting their names contain
   # a hash tag would require constructing the service with mocks and
   # inspecting each registered queue — feasible but not yet wired up.
-  # Static queue constants are covered by the bound scenarios above.
+  # Static queue constants are covered by the scenarios above.
   @integration @unimplemented
   Scenario: Event sourcing maintenance worker queue operates on Redis Cluster
     Given a Redis Cluster is running

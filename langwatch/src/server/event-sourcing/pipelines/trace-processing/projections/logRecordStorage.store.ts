@@ -15,4 +15,14 @@ export class LogRecordAppendStore implements AppendStore<NormalizedLogRecord> {
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
     await this.repo.insertLogRecord(record, retentionDays);
   }
+
+  async bulkAppend(
+    records: NormalizedLogRecord[],
+    context: ProjectionStoreContext,
+  ): Promise<void> {
+    if (records.length === 0) return;
+    const retentionDays =
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+    await this.repo.insertLogRecords(records, retentionDays);
+  }
 }

@@ -5,10 +5,12 @@ import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
 import {
   type ClickHouseClientResolver,
+  clearCustomClientCache,
   getClickHouseClientForProject,
   getSharedClickHouseClient,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
+import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -16,7 +18,9 @@ import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
 import { createLogger } from "~/utils/logger/server";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
@@ -42,8 +46,11 @@ import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRete
 import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
+import { dispatchOutboxEnqueues } from "../event-sourcing/outbox/dispatchOutboxEnqueues";
+import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
+import { OutboxHeartbeatScheduler } from "../event-sourcing/outbox/heartbeat/heartbeat.scheduler";
+import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
@@ -84,6 +91,7 @@ import {
   type AppConfig,
   createAppConfigFromEnv,
   type ProcessRole,
+  roleRunsWorkers,
 } from "./config";
 import type {
   AppDependencies,
@@ -96,6 +104,10 @@ import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.reco
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
 import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import { EvaluationRunService } from "./evaluations/evaluation-run.service";
+import { EvaluationAnalyticsClickHouseRepository } from "./evaluations/repositories/evaluation-analytics.clickhouse.repository";
+import { NullEvaluationAnalyticsRepository } from "./evaluations/repositories/evaluation-analytics.repository";
+import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
+import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorService } from "./monitors/monitor.service";
@@ -140,6 +152,10 @@ import { MetricRecordStorageClickHouseRepository } from "./traces/repositories/m
 import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-record-storage.repository";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
+import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
+import { NullTraceAnalyticsRepository } from "./traces/repositories/trace-analytics.repository";
+import { TraceAnalyticsRollupClickHouseRepository } from "./traces/repositories/trace-analytics-rollup.clickhouse.repository";
+import { NullTraceAnalyticsRollupRepository } from "./traces/repositories/trace-analytics-rollup.repository";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
@@ -154,9 +170,23 @@ import {
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
+import { EmailSuppressionService } from "./triggers/emailSuppression.service";
+import {
+  defaultGraphTriggerHeartbeatDeps,
+  registerGraphTriggerHeartbeat,
+} from "./triggers/graph-trigger-heartbeat";
+import {
+  PrismaEmailSuppressionNameLookupRepository,
+  PrismaEmailSuppressionRepository,
+} from "./triggers/repositories/emailSuppression.prisma.repository";
+import {
+  NullEmailSuppressionNameLookupRepository,
+  NullEmailSuppressionRepository,
+} from "./triggers/repositories/emailSuppression.repository";
 import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
 import { TriggerService } from "./triggers/trigger.service";
+import { TriggerTemplateService } from "./triggers/trigger-template.service";
 import { UsageService } from "./usage/usage.service";
 
 /**
@@ -173,6 +203,17 @@ export function initializeWebApp(): App {
 
 export function initializeWorkerApp(): App {
   return initializeDefaultApp({ processRole: "worker" });
+}
+
+/**
+ * Dev-only single-process mode: the web server also hosts the worker stack
+ * in-process (opt-in via WORKERS_IN_PROCESS=1). Boots the App with the "all"
+ * role so the outbox consumer, drainer, and heartbeat scheduler wire up
+ * exactly as they do on a dedicated worker. Prod never calls this — it runs
+ * web and worker as separate deployments.
+ */
+export function initializeInProcessApp(): App {
+  return initializeDefaultApp({ processRole: "all" });
 }
 
 export function initializeDefaultApp(options?: {
@@ -249,10 +290,9 @@ export function initializeDefaultApp(options?: {
   );
   // ADR-022: construct blob/IO deps before SpanStorageService so the v2 read
   // path (spansFull / spanDetail) can resolve offloaded eventref pointers.
-  // Built via the shared factory (#4888) so the request layer and this
-  // composition root construct these deps from one definition. We pass the
-  // composition-root ClickHouse decision/resolver so the eval-path deps stay
-  // byte-identical to the pre-#4888 wiring.
+  // #4888: the same factory backs the customer-facing full=true read path; the
+  // composition root passes its own ClickHouse decision/resolver so the
+  // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
   const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
     clickhouseEnabled,
     resolveClickHouseClient,
@@ -373,7 +413,6 @@ export function initializeDefaultApp(options?: {
     planResolver,
     orgRepo,
     simulationReads,
-    clickhouseEnabled,
   );
 
   const planProvider = config.isSaas
@@ -439,6 +478,14 @@ export function initializeDefaultApp(options?: {
     "MonitorService",
   );
   const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
+  const emailSuppressions = new EmailSuppressionService(
+    new PrismaEmailSuppressionRepository(prisma),
+    new PrismaEmailSuppressionNameLookupRepository(prisma),
+  );
+  const triggerTemplates = new TriggerTemplateService({
+    baseHost: config.baseHost ?? env.BASE_HOST,
+    notifier: liveTriggerNotifier,
+  });
   const tokenizer = new TokenizerService(
     config.disableTokenization
       ? new NullTokenizerClient()
@@ -493,15 +540,6 @@ export function initializeDefaultApp(options?: {
     "ShareService",
   );
 
-  const es = new EventSourcing({
-    clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
-    redis,
-    enabled: true,
-    isSaas: config.isSaas,
-    processRole: config.processRole,
-    retentionPolicyResolver: retentionPolicyCache,
-  });
-
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
     suiteRunState: clickhouseEnabled
@@ -522,6 +560,20 @@ export function initializeDefaultApp(options?: {
     metricRecordStorage: clickhouseEnabled
       ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient)
       : new NullMetricRecordStorageRepository(),
+    traceAnalyticsRollup: clickhouseEnabled
+      ? new TraceAnalyticsRollupClickHouseRepository(resolveClickHouseClient)
+      : new NullTraceAnalyticsRollupRepository(),
+    traceAnalytics: clickhouseEnabled
+      ? new TraceAnalyticsClickHouseRepository(resolveClickHouseClient)
+      : new NullTraceAnalyticsRepository(),
+    evaluationAnalyticsRollup: clickhouseEnabled
+      ? new EvaluationAnalyticsRollupClickHouseRepository(
+          resolveClickHouseClient,
+        )
+      : new NullEvaluationAnalyticsRollupRepository(),
+    evaluationAnalytics: clickhouseEnabled
+      ? new EvaluationAnalyticsClickHouseRepository(resolveClickHouseClient)
+      : new NullEvaluationAnalyticsRepository(),
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
@@ -552,6 +604,82 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
+  // Outbox stack: the consumer loop for roles where roleRunsWorkers() is true
+  // ("worker" and the in-process dev "all" role). The send-side handle is
+  // wired into the EventSourcing runtime below (passed to `new
+  // EventSourcing`), so its `.withOutbox` reactors can enqueue settle
+  // payloads. Web processes don't build this (no settle traffic; no consumer
+  // to drain).
+  const outbox =
+    roleRunsWorkers(config.processRole)
+      ? buildOutboxRuntime({
+          prisma,
+          redis: redis ?? null,
+          triggers,
+          emailSuppressions,
+          projects,
+          evaluations: { runs: evaluations.runs },
+          traces: { spans: spanStorage },
+          traceSummaryRepository: repositories.traceSummaryFold,
+        })
+      : undefined;
+
+  // EventSourcing must be constructed AFTER `outbox` and be given it here: the
+  // reactor adapter (`.withOutbox` → enqueueSettle) and the global queue's
+  // settle/cadence routing + audit adapter all read `this._outbox`, set once at
+  // construction. Passing `outbox` anywhere else (e.g. only to the registry)
+  // leaves every outbox reactor on the silent drop path — the trigger dispatch
+  // regression fixed here. See presets.outboxWiring.integration.test.ts.
+  const es = new EventSourcing({
+    clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
+    redis,
+    enabled: true,
+    isSaas: config.isSaas,
+    processRole: config.processRole,
+    retentionPolicyResolver: retentionPolicyCache,
+    outbox,
+  });
+
+  // Heartbeat scheduler (ADR-034 Phase 4): for roles where roleRunsWorkers()
+  // is true, a periodic source of outbox enqueues for the cases the
+  // event-driven outbox path STRUCTURALLY cannot reach (no-data detection,
+  // resolve-when-traffic-stops).
+  // Registrations live in `outboxHeartbeatRegistry` (process-singleton);
+  // the scheduler routes every tick's `decide` result through the same
+  // `dispatchOutboxEnqueues` helper `adaptOutboxReactor` uses, so one
+  // dispatch path serves both event-sourced and tick-sourced enqueues.
+  // Constructed only when both a worker role AND an outbox runtime AND a
+  // Redis client are present — the lock is the leader-election primitive
+  // so a missing Redis means no scheduler.
+  const outboxHeartbeatScheduler =
+    roleRunsWorkers(config.processRole) && outbox && redis
+      ? new OutboxHeartbeatScheduler({
+          registry: outboxHeartbeatRegistry,
+          redis,
+          dispatchOutboxEnqueues: ({ requests, sourceName }) =>
+            dispatchOutboxEnqueues({
+              requests,
+              outbox,
+              sourceName,
+              logger: createLogger("langwatch:event-sourcing:outbox-heartbeat"),
+            }),
+          processRole: config.processRole,
+          logger: createLogger("langwatch:event-sourcing:outbox-heartbeat"),
+        })
+      : undefined;
+  // ADR-034 Phase 5: register the graph-trigger heartbeat BEFORE the
+  // scheduler starts. Registration is passive data (the registry is a
+  // process-singleton) so this is safe on every role; the scheduler
+  // itself is worker-only and ignores non-worker processes. We only
+  // register when an outbox runtime is present — without it there's no
+  // dispatch target.
+  if (outbox) {
+    registerGraphTriggerHeartbeat(
+      defaultGraphTriggerHeartbeatDeps({ triggers, prisma }),
+    );
+  }
+  outboxHeartbeatScheduler?.start();
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
@@ -564,7 +692,6 @@ export function initializeDefaultApp(options?: {
     organizations,
     traces: { summary: traceSummary, spans: spanStorage },
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
-    esSync: { esClient, traceIndex: TRACE_INDEX, traceIndexId, prisma },
     costRecorder: new PrismaEvaluationCostRecorder(prisma),
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
@@ -665,10 +792,6 @@ export function initializeDefaultApp(options?: {
     close: () => Promise<void>;
   }> = [];
   if (clickhouseEnabled) {
-    const {
-      clearCustomClientCache,
-    } = require("~/server/clickhouse/clickhouseClient");
-    const { closeClickHouseClient } = require("~/server/clickhouse/client");
     gracefulCloseables.push({
       name: "clickhouse",
       close: async () => {
@@ -691,6 +814,17 @@ export function initializeDefaultApp(options?: {
       await broadcast.close();
     },
   });
+  // The outbox runtime piggy-backs on the main event-sourcing queue
+  // (ADR-030 revision 3), so there's nothing outbox-specific to close —
+  // the event-sourcing queue's own close registration covers it.
+  if (outboxHeartbeatScheduler) {
+    gracefulCloseables.push({
+      name: "outbox-heartbeat-scheduler",
+      close: async () => {
+        await outboxHeartbeatScheduler.stop();
+      },
+    });
+  }
   gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),
@@ -744,6 +878,8 @@ export function initializeDefaultApp(options?: {
     evaluations,
     experiments,
     triggers,
+    triggerTemplates,
+    emailSuppressions,
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
@@ -885,6 +1021,21 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
     triggers: new TriggerService(new NullTriggerRepository()),
+    emailSuppressions: new EmailSuppressionService(
+      new NullEmailSuppressionRepository(),
+      new NullEmailSuppressionNameLookupRepository(),
+    ),
+    triggerTemplates: new TriggerTemplateService({
+      baseHost: config.baseHost ?? env.BASE_HOST,
+      notifier: {
+        sendEmail: async () => {
+          /* test no-op */
+        },
+        sendSlack: async () => {
+          /* test no-op */
+        },
+      },
+    }),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: {
       runs: SuiteRunService.create({
@@ -903,7 +1054,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       async () => FREE_PLAN,
       null,
       SimulationRunService.create(null),
-      false,
     ),
     planProvider: PlanProviderService.create({
       getActivePlan: async () => FREE_PLAN,

@@ -95,4 +95,24 @@ describe("safeTruncate", () => {
     const result = safeTruncate(circular) as Record<string, unknown>;
     expect(result).toEqual(circular);
   });
+
+  it("measures a key-sensitive toJSON in its real property-key context, not standalone", () => {
+    // JSON.stringify(value) alone always calls value.toJSON("") — a toJSON
+    // that returns something small for key "" but large for its real key
+    // would be under-measured if the drop-keys pass serialized it standalone,
+    // letting an oversized entry slip past maxTotalLength. An own-property
+    // toJSON (rather than a prototype method) survives truncateRecursive's
+    // plain-object rebuild, so this is reachable with real input shapes.
+    function makeKeySensitive(): Record<string, unknown> {
+      return {
+        toJSON: (key: string) => (key === "" ? "x" : "y".repeat(2 * 1024)),
+      };
+    }
+
+    const input = { evil: makeKeySensitive(), other: "small" };
+    const result = safeTruncate(input, 512) as Record<string, unknown>;
+
+    expect(JSON.stringify(result).length).toBeLessThanOrEqual(512);
+    expect(result.evil).toBeUndefined();
+  });
 });

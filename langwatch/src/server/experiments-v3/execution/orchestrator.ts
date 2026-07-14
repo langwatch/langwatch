@@ -17,6 +17,7 @@ import type {
   EvaluatorConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
+import { isGoldenFieldSatisfied } from "~/experiments-v3/types";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
@@ -24,13 +25,14 @@ import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import type { RecordTargetResultCommandData } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
+import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import {
   estimateCost,
   getMatchingLLMModelCost,
-} from "~/server/background/workers/collector/cost";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
-import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+} from "~/server/tracer/collector/cost";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
@@ -318,6 +320,40 @@ export const generatePairwiseCells = (
   // scores so the pairwise judge can factor them into the verdict. Skips
   // silently when there are no scores, when the output isn't string-ish, or
   // when the scores map isn't provided.
+  /**
+   * Structured-output narrowing: when the pairwise config carries an
+   * `output_path` for this variant, dig into the candidate's output and
+   * return just that field. This is the fix for pairwise-vs-structured
+   * outputs — otherwise the judge sees the whole JSON blob (or a raw
+   * `[object Object]` in the score-appended path) instead of the single
+   * text the user actually wants to compare. An empty or missing path is
+   * a no-op so pre-existing single-field configs keep working.
+   */
+  const pickOutputPath = (output: unknown, path?: string[]): unknown => {
+    if (!path || path.length === 0) return output;
+    let cursor: unknown = output;
+    for (const segment of path) {
+      if (
+        cursor === null ||
+        typeof cursor !== "object" ||
+        Array.isArray(cursor)
+      ) {
+        // LangWatch's runtime unwraps a single-output-field target's dict
+        // back to a scalar at storage time, so a target declared with one
+        // `output` field ends up stored as the plain string value. The
+        // mappings picker still records the path as `["output"]` in that
+        // case (it's the only field to point at), so a strict object-only
+        // walk here would surface as "Variant outputs missing" for every
+        // single-field prompt / agent. Return the scalar itself when the
+        // remaining path is exactly one segment — this matches the runtime
+        // unwrap and keeps single-field targets usable in pairwise.
+        return path.length === 1 && path[0] === segment ? cursor : undefined;
+      }
+      cursor = (cursor as Record<string, unknown>)[segment];
+    }
+    return cursor;
+  };
+
   const withEvaluatorScores = (
     output: unknown,
     rowIndex: number,
@@ -435,13 +471,21 @@ export const generatePairwiseCells = (
         pairwise: {
           candidateA: {
             id: variantIdentifierFor(variantA),
-            output: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
+            output: withEvaluatorScores(
+              pickOutputPath(a.output, cfg.variantAOutputPath),
+              rowIndex,
+              cfg.variantA,
+            ),
             cost: a.cost,
             duration: a.duration,
           },
           candidateB: {
             id: variantIdentifierFor(variantB),
-            output: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
+            output: withEvaluatorScores(
+              pickOutputPath(b.output, cfg.variantBOutputPath),
+              rowIndex,
+              cfg.variantB,
+            ),
             cost: b.cost,
             duration: b.duration,
           },
@@ -461,16 +505,19 @@ export const generatePairwiseCells = (
     if (!cfg || !target.targetEvaluatorId) continue;
 
     // Skip column-style pairwise targets where the user hasn't finished
-    // configuring the form. Without all three the judge endpoint would
-    // 400 with "<field> is required" and the cell would render that as
-    // a verdict-shaped error — confusing for users who haven't opened
-    // the drawer yet.
-    if (!cfg.variantA || !cfg.variantB || !cfg.goldenField) {
+    // configuring the form (see isGoldenFieldSatisfied for the golden-field
+    // rule, #5378). Without variantA/variantB (or golden when required) the
+    // judge endpoint would 400 with "<field> is required" and the cell would
+    // render that as a verdict-shaped error — confusing for users who
+    // haven't opened the drawer yet.
+    const goldenFieldMissing = !isGoldenFieldSatisfied(cfg);
+    if (!cfg.variantA || !cfg.variantB || goldenFieldMissing) {
       logger.debug(
         {
           targetId: target.id,
           variantA: cfg.variantA,
           variantB: cfg.variantB,
+          hasGoldenAnswer: cfg.hasGoldenAnswer,
           goldenField: cfg.goldenField,
         },
         "Pairwise column-target skipped: variants or golden field not configured",
@@ -510,6 +557,24 @@ export const generatePairwiseCells = (
         continue;
       }
 
+      // `input` falls back to the golden field for datasets with no literal
+      // "input" column — a pre-existing convention (#5100) that predates
+      // the golden-answer toggle. Since #5378 lets goldenField be "" when
+      // hasGoldenAnswer is off, that fallback is now a no-op for such rows;
+      // log it so a silently-empty judge prompt is at least diagnosable
+      // instead of indistinguishable from "row has no input, by design."
+      const resolvedInput = datasetEntry.input ?? datasetEntry[cfg.goldenField];
+      if (
+        resolvedInput === undefined &&
+        !cfg.hasGoldenAnswer &&
+        rowIndex === 0
+      ) {
+        logger.debug(
+          { targetId: target.id },
+          "Pairwise column-target: no 'input' dataset column and no golden field to fall back on (has_golden_answer is off) — judge prompt will render an empty task/input",
+        );
+      }
+
       // Per-row synthetic evaluator with PRE-RESOLVED value mappings for
       // every pairwise input field. Pre-fix (#5131) the synthetic was
       // shared across rows with `mappings: {}`, leaving the candidate_*
@@ -536,7 +601,11 @@ export const generatePairwiseCells = (
             },
             candidate_a_output: {
               type: "value",
-              value: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
+              value: withEvaluatorScores(
+                pickOutputPath(a.output, cfg.variantAOutputPath),
+                rowIndex,
+                cfg.variantA,
+              ),
             },
             candidate_a_cost:
               a.cost !== undefined
@@ -552,7 +621,11 @@ export const generatePairwiseCells = (
             },
             candidate_b_output: {
               type: "value",
-              value: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
+              value: withEvaluatorScores(
+                pickOutputPath(b.output, cfg.variantBOutputPath),
+                rowIndex,
+                cfg.variantB,
+              ),
             },
             candidate_b_cost:
               b.cost !== undefined
@@ -564,7 +637,7 @@ export const generatePairwiseCells = (
                 : { type: "value", value: undefined },
             input: {
               type: "value",
-              value: datasetEntry.input ?? datasetEntry[cfg.goldenField],
+              value: resolvedInput,
             },
             golden: {
               type: "value",
@@ -600,13 +673,21 @@ export const generatePairwiseCells = (
         pairwise: {
           candidateA: {
             id: variantIdentifierFor(variantA),
-            output: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
+            output: withEvaluatorScores(
+              pickOutputPath(a.output, cfg.variantAOutputPath),
+              rowIndex,
+              cfg.variantA,
+            ),
             cost: a.cost,
             duration: a.duration,
           },
           candidateB: {
             id: variantIdentifierFor(variantB),
-            output: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
+            output: withEvaluatorScores(
+              pickOutputPath(b.output, cfg.variantBOutputPath),
+              rowIndex,
+              cfg.variantB,
+            ),
             cost: b.cost,
             duration: b.duration,
           },
@@ -1186,6 +1267,137 @@ const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
 };
 
 /**
+ * Build the per-target metadata stored with a run (startExperimentRun's
+ * `targets` payload).
+ *
+ * Model attribution: `localPromptConfig.llm.model` wins (edited prompts),
+ * falling back to the loaded prompt's model for saved prompts. Name comes
+ * from the loaded entity (prompt, agent, evaluator, or workflow), falling
+ * back to the target id. Exported for unit testing — a regression here
+ * blanks the model column on every stored run.
+ */
+export const buildTargetMetadata = ({
+  targets,
+  loadedPrompts,
+  loadedAgents,
+  loadedEvaluators,
+  loadedWorkflows,
+}: {
+  targets: EvaluationsV3State["targets"];
+  loadedPrompts: Map<string, VersionedPrompt>;
+  loadedAgents: Map<string, TypedAgent>;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  loadedWorkflows?: Map<string, LoadedWorkflow>;
+}): ESBatchEvaluationTarget[] =>
+  targets.map((t) => {
+    let model: string | null = null;
+    let name: string | null = null;
+
+    // First check local prompt config (for edited prompts)
+    if (t.localPromptConfig?.llm?.model) {
+      model = t.localPromptConfig.llm.model;
+    }
+    // Otherwise, check loaded prompts (for saved prompts)
+    else if (t.type === "prompt" && t.promptId) {
+      const loadedPrompt = loadedPrompts.get(t.promptId);
+      if (loadedPrompt?.model) {
+        model = loadedPrompt.model;
+      }
+    }
+
+    // Get name from loaded entity
+    if (t.type === "prompt" && t.promptId) {
+      name = loadedPrompts.get(t.promptId)?.name ?? null;
+    } else if (t.type === "agent" && t.dbAgentId) {
+      name = loadedAgents.get(t.dbAgentId)?.name ?? null;
+    } else if (t.type === "evaluator" && t.targetEvaluatorId) {
+      name = loadedEvaluators?.get(t.targetEvaluatorId)?.name ?? null;
+    } else if (t.type === "workflow" && t.workflowId) {
+      name = loadedWorkflows?.get(workflowLoadKey(t))?.name ?? null;
+    }
+
+    return {
+      id: t.id,
+      name: name ?? t.id,
+      type: t.type,
+      prompt_id: t.promptId ?? null,
+      prompt_version: t.promptVersionNumber ?? null,
+      agent_id: t.dbAgentId ?? null,
+      evaluator_id: t.targetEvaluatorId ?? null,
+      model,
+    };
+  });
+
+/**
+ * Build the recordTargetResult dispatch payload for a `target_result` or
+ * cell-level `error` event. Returns null for events that don't record a
+ * target result.
+ *
+ * Exported for unit testing — two regression-prone behaviours live here:
+ * falsy target outputs (`false`, `0`, `""`) must persist as
+ * `{ output: value }` (only null/undefined become a null `predicted`), and
+ * error events must land as predicted-null rows carrying the error message.
+ */
+export const buildTargetResultDispatch = ({
+  tenantId,
+  runId,
+  experimentId,
+  event,
+  datasetEntry,
+  occurredAt,
+}: {
+  tenantId: string;
+  runId: string;
+  experimentId: string;
+  event: EvaluationV3Event;
+  datasetEntry: Record<string, unknown>;
+  occurredAt: number;
+}): RecordTargetResultCommandData | null => {
+  if (event.type === "target_result") {
+    return {
+      tenantId,
+      runId,
+      experimentId,
+      index: event.rowIndex,
+      targetId: event.targetId,
+      entry: datasetEntry,
+      predicted:
+        event.output === null || event.output === undefined
+          ? null
+          : { output: event.output },
+      cost: event.cost ?? null,
+      duration: event.duration ?? null,
+      error: event.error ?? null,
+      traceId: event.traceId ?? null,
+      occurredAt,
+    };
+  }
+
+  if (
+    event.type === "error" &&
+    event.rowIndex !== undefined &&
+    event.targetId
+  ) {
+    return {
+      tenantId,
+      runId,
+      experimentId,
+      index: event.rowIndex,
+      targetId: event.targetId,
+      entry: datasetEntry,
+      predicted: null,
+      cost: null,
+      duration: null,
+      error: event.message,
+      traceId: null,
+      occurredAt,
+    };
+  }
+
+  return null;
+};
+
+/**
  * Main orchestrator - executes all cells and yields SSE events.
  * Uses parallel execution with semaphore-based rate limiting.
  */
@@ -1275,46 +1487,14 @@ export async function* runOrchestrator(
     }
   }
 
-  // Build target metadata for storage
-  // For model: first check localPromptConfig, then fall back to loadedPrompts
-  // For name: get from loaded entity (prompt, agent, or evaluator)
-  const targetMetadata: ESBatchEvaluationTarget[] = state.targets.map((t) => {
-    let model: string | null = null;
-    let name: string | null = null;
-
-    // First check local prompt config (for edited prompts)
-    if (t.localPromptConfig?.llm?.model) {
-      model = t.localPromptConfig.llm.model;
-    }
-    // Otherwise, check loaded prompts (for saved prompts)
-    else if (t.type === "prompt" && t.promptId) {
-      const loadedPrompt = loadedPrompts.get(t.promptId);
-      if (loadedPrompt?.model) {
-        model = loadedPrompt.model;
-      }
-    }
-
-    // Get name from loaded entity
-    if (t.type === "prompt" && t.promptId) {
-      name = loadedPrompts.get(t.promptId)?.name ?? null;
-    } else if (t.type === "agent" && t.dbAgentId) {
-      name = loadedAgents.get(t.dbAgentId)?.name ?? null;
-    } else if (t.type === "evaluator" && t.targetEvaluatorId) {
-      name = loadedEvaluators?.get(t.targetEvaluatorId)?.name ?? null;
-    } else if (t.type === "workflow" && t.workflowId) {
-      name = loadedWorkflows?.get(workflowLoadKey(t))?.name ?? null;
-    }
-
-    return {
-      id: t.id,
-      name: name ?? t.id,
-      type: t.type,
-      prompt_id: t.promptId ?? null,
-      prompt_version: t.promptVersionNumber ?? null,
-      agent_id: t.dbAgentId ?? null,
-      evaluator_id: t.targetEvaluatorId ?? null,
-      model,
-    };
+  // Build target metadata for storage (model + name attribution — see
+  // buildTargetMetadata's JSDoc).
+  const targetMetadata: ESBatchEvaluationTarget[] = buildTargetMetadata({
+    targets: state.targets,
+    loadedPrompts,
+    loadedAgents,
+    loadedEvaluators,
+    loadedWorkflows,
   });
 
   // Build config for result mapper - determines which evaluators have scores stripped
@@ -1447,63 +1627,30 @@ export async function* runOrchestrator(
 
     // Dispatch events to ClickHouse.
     if (experimentId) {
-      if (event.type === "target_result") {
-        const datasetEntry = datasetRows[event.rowIndex] ?? {};
+      const targetResultDispatch =
+        event.type === "target_result" || event.type === "error"
+          ? buildTargetResultDispatch({
+              tenantId: projectId,
+              runId,
+              experimentId,
+              event,
+              datasetEntry:
+                event.rowIndex !== undefined
+                  ? (datasetRows[event.rowIndex] ?? {})
+                  : {},
+              occurredAt: Date.now(),
+            })
+          : null;
+
+      if (targetResultDispatch) {
         chDispatchTotal++;
-        await commands
-          .recordTargetResult({
-            tenantId: projectId,
-            runId,
-            experimentId,
-            index: event.rowIndex,
-            targetId: event.targetId,
-            entry: datasetEntry,
-            predicted:
-              event.output === null || event.output === undefined
-                ? null
-                : { output: event.output },
-            cost: event.cost ?? null,
-            duration: event.duration ?? null,
-            error: event.error ?? null,
-            traceId: event.traceId ?? null,
-            occurredAt: Date.now(),
-          })
-          .catch((err) => {
-            chDispatchFailures++;
-            logger.warn(
-              { err, runId },
-              "Failed to dispatch recordTargetResult to CH",
-            );
-          });
-      } else if (
-        event.type === "error" &&
-        event.rowIndex !== undefined &&
-        event.targetId
-      ) {
-        const datasetEntry = datasetRows[event.rowIndex] ?? {};
-        chDispatchTotal++;
-        await commands
-          .recordTargetResult({
-            tenantId: projectId,
-            runId,
-            experimentId,
-            index: event.rowIndex,
-            targetId: event.targetId,
-            entry: datasetEntry,
-            predicted: null,
-            cost: null,
-            duration: null,
-            error: event.message,
-            traceId: null,
-            occurredAt: Date.now(),
-          })
-          .catch((err) => {
-            chDispatchFailures++;
-            logger.warn(
-              { err, runId },
-              "Failed to dispatch recordTargetResult to CH",
-            );
-          });
+        await commands.recordTargetResult(targetResultDispatch).catch((err) => {
+          chDispatchFailures++;
+          logger.warn(
+            { err, runId },
+            "Failed to dispatch recordTargetResult to CH",
+          );
+        });
       } else if (event.type === "evaluator_result") {
         const result = event.result as SingleEvaluationResult;
         const evaluatorConfig = state.evaluators.find(

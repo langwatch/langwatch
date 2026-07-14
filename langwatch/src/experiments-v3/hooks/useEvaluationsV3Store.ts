@@ -957,6 +957,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
   },
 
+  setHighlightedVariantTargetId: (targetId) => {
+    set({
+      ui: {
+        ...get().ui,
+        highlightedVariantTargetId: targetId,
+      },
+    });
+  },
+
   toggleRowSelection: (row) => {
     set((state) => {
       const newSelected = new Set(state.ui.selectedRows);

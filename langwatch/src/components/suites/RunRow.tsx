@@ -64,8 +64,10 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           paddingY={3}
           gap={3}
           flexWrap="nowrap"
-          bg="bg.subtle/50"
-          backdropFilter="blur(4px)"
+          bg="bg.panel/70"
+          backdropFilter="blur(12px) saturate(140%)"
+          borderWidth="1px"
+          borderColor="border.muted"
           data-testid="run-row-header"
           borderRadius="lg"
           boxShadow="xs"
@@ -152,8 +154,12 @@ function RunRowData({
           className="group"
           aria-expanded={isExpanded}
           aria-label={`Run from ${timeAgo ?? "unknown time"}`}
-          bg="bg.subtle/50"
-          backdropFilter="blur(4px)"
+          bg="bg.panel/70"
+          backdropFilter="blur(12px) saturate(140%)"
+          borderWidth="1px"
+          borderColor="border.muted"
+          transition="border-color 0.15s ease"
+          _hover={{ borderColor: "border.emphasized" }}
           data-testid="run-row-header"
           borderRadius="lg"
           boxShadow="xs"
@@ -191,13 +197,13 @@ function RunRowData({
               paddingY={0.5}
               borderRadius="md"
               border="1px solid"
-              borderColor="gray.300"
+              borderColor="border"
               fontSize="xs"
-              color="fg.default"
+              color="fg"
               cursor={isCancellingBatch ? "default" : "pointer"}
               flexShrink={0}
               opacity={isCancellingBatch ? 0.6 : 1}
-              _hover={isCancellingBatch ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
+              _hover={isCancellingBatch ? undefined : { bg: "bg.muted", borderColor: "border.emphasized" }}
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 if (!isCancellingBatch) setIsCancelAllDialogOpen(true);

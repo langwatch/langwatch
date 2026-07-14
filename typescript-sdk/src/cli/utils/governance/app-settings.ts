@@ -73,6 +73,19 @@ export function appEnvHasAllVars(
 }
 
 /**
+ * Whether the target's `env` map contains ANY of `keys`. Used by the
+ * logout scan to decide whether a claude telemetry block is present to
+ * offer for removal.
+ */
+export function appEnvHasAnyVar(
+  target: AppSettingsTarget,
+  keys: string[],
+): boolean {
+  const current = readEnvMap(target.path);
+  return keys.some((k) => k in current);
+}
+
+/**
  * Merge `vars` into the target's top-level `env` map, creating
  * parent directories and the file itself when missing. Preserves
  * every other user-authored top-level key verbatim. Values in
@@ -96,6 +109,56 @@ export function installAppEnv(
   settings.env = nextEnv;
 
   fs.writeFileSync(target.path, JSON.stringify(settings, null, 2) + "\n");
+}
+
+/**
+ * Remove `keys` from the target's top-level `env` map. Every other env
+ * entry and every other top-level settings key is preserved verbatim.
+ * When `env` becomes empty as a result, the `env` key is dropped entirely
+ * (no `"env": {}` residue). Returns true when the file changed, false when
+ * the file was absent, malformed, or carried none of the keys — so it is
+ * safe to call unconditionally (idempotent). A malformed file is left
+ * untouched rather than rewritten, so we never clobber user config we
+ * can't parse.
+ */
+export function removeAppEnvVars(
+  target: AppSettingsTarget,
+  keys: string[],
+): boolean {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(target.path, "utf8");
+  } catch {
+    return false; // ENOENT
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return false; // malformed — do not touch
+  }
+  if (!isPlainObject(parsed)) return false;
+  const settings: Record<string, unknown> = { ...parsed };
+  const env = settings.env;
+  if (!isPlainObject(env)) return false;
+
+  const nextEnv: Record<string, unknown> = { ...env };
+  let removed = false;
+  for (const k of keys) {
+    if (k in nextEnv) {
+      delete nextEnv[k];
+      removed = true;
+    }
+  }
+  if (!removed) return false;
+
+  if (Object.keys(nextEnv).length === 0) {
+    delete settings.env;
+  } else {
+    settings.env = nextEnv;
+  }
+  fs.writeFileSync(target.path, JSON.stringify(settings, null, 2) + "\n");
+  return true;
 }
 
 function readSettings(filePath: string): Record<string, unknown> {

@@ -182,6 +182,13 @@ export class SpanNormalizationPipelineService {
       droppedAttributesCount: 0,
       droppedEventsCount: 0,
       droppedLinksCount: 0,
+
+      // Cost is derived later (in the span-storage projection) from this span's
+      // tokens × pricing — normalization has no pricing context. Initialise to
+      // null so the span is schema-valid the moment it's built; the projection
+      // overwrites both before the span is stored.
+      cost: null,
+      nonBilledCost: null,
     };
   }
 

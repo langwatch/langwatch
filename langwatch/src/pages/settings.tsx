@@ -2,6 +2,7 @@ import {
   Badge,
   Button,
   Card,
+  createListCollection,
   Field,
   Heading,
   HStack,
@@ -11,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { OrganizationIntent, Project } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
 import { Lock } from "react-feather";
@@ -31,6 +32,8 @@ import { Select } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
+import { useDrawer } from "../hooks/useDrawer";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
@@ -41,19 +44,50 @@ type OrganizationFormData = {
   s3Endpoint: string;
   s3AccessKeyId: string;
   s3SecretAccessKey: string;
-  elasticsearchNodeUrl: string;
-  elasticsearchApiKey: string;
   s3Bucket: string;
   presenceEnabled: boolean;
   supportContact: string;
+  primaryIntent: "" | OrganizationIntent;
 };
+
+/**
+ * ADR-038 "Primary use": decides where "/" lands for everyone in the org.
+ * "Not set" keeps the pre-fork behavior (legacy resolver).
+ */
+const primaryUseCollection = createListCollection({
+  items: [
+    { label: "Not set", value: "" },
+    { label: "Track AI coding agents", value: "AGENT_GOVERNANCE" },
+    { label: "Monitor & evaluate LLM apps", value: "LLM_OPS" },
+  ],
+});
+
+/** "Admin only" lock badge for settings a non-manager can see but not change. */
+function AdminOnlyBadge() {
+  return (
+    <Badge colorPalette="blue" variant="surface" size={"xs"}>
+      <Tooltip content="Contact your admin to change this setting">
+        <HStack>
+          <Lock size={10} />
+          <Text>Admin only</Text>
+        </HStack>
+      </Tooltip>
+    </Badge>
+  );
+}
 
 function Settings() {
   const { organization, project } = useOrganizationTeamProject();
 
-  if (!organization || !project) return null;
+  // Project is optional: a governance-intent org has none by design
+  // (ADR-038 v6) and still needs its organization settings. A personal
+  // workspace project counts as absent here — org settings must never
+  // surface (or offer to "set up") someone's personal workspace.
+  const sharedProject = project && !project.isPersonal ? project : undefined;
 
-  return <SettingsForm organization={organization} project={project} />;
+  if (!organization) return null;
+
+  return <SettingsForm organization={organization} project={sharedProject} />;
 }
 
 export default withPermissionGuard("organization:view", {
@@ -65,33 +99,43 @@ function SettingsForm({
   project,
 }: {
   organization: FullyLoadedOrganization;
-  project: Project;
+  project: Project | undefined;
 }) {
   const { hasPermission } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
+  const { openDrawer } = useDrawer();
+  // ADR-038 ships dark: the Primary use setting only exists where the
+  // governance surface it routes to is reachable.
+  const { enabled: governanceEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    { organizationId: organization.id },
+  );
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
     s3Endpoint: organization.s3Endpoint ?? "",
     s3AccessKeyId: organization.s3AccessKeyId ?? "",
     s3SecretAccessKey: organization.s3SecretAccessKey ?? "",
-    elasticsearchNodeUrl: organization.elasticsearchNodeUrl ?? "",
-    elasticsearchApiKey: organization.elasticsearchApiKey ?? "",
     s3Bucket: organization.s3Bucket ?? "",
     presenceEnabled: organization.presenceEnabled,
     supportContact:
       (organization as { supportContact?: string | null }).supportContact ?? "",
+    primaryIntent: organization.primaryIntent ?? "",
   });
   const { register, handleSubmit, getFieldState, control } = useForm({
     defaultValues,
   });
   const updateOrganization = api.organization.update.useMutation();
   const apiContext = api.useContext();
+  const [showLlmOpsSetupDialog, setShowLlmOpsSetupDialog] = useState(false);
+  const [showCreateProjectDialog, setShowCreateProjectDialog] =
+    useState(false);
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData,
   ) => {
     if (isEqual(data, defaultValues)) return;
 
+    const previousIntent = defaultValues.primaryIntent;
     setDefaultValues(data);
 
     updateOrganization.mutate(
@@ -101,15 +145,35 @@ function SettingsForm({
         s3Endpoint: data.s3Endpoint,
         s3AccessKeyId: data.s3AccessKeyId,
         s3SecretAccessKey: data.s3SecretAccessKey,
-        elasticsearchNodeUrl: data.elasticsearchNodeUrl,
-        elasticsearchApiKey: data.elasticsearchApiKey,
         s3Bucket: data.s3Bucket,
         presenceEnabled: data.presenceEnabled,
         supportContact: data.supportContact.trim() || null,
+        primaryIntent: data.primaryIntent === "" ? null : data.primaryIntent,
       },
       {
         onSuccess: () => {
           void apiContext.organization.getAll.refetch();
+          void apiContext.governance.resolveHome.invalidate();
+          // ADR-038 F9/v6: switching to LLMOps points "/" at the project
+          // home, so the change is checked for what's missing — and the
+          // user is only interrupted when something actually is. The save
+          // itself always goes through first.
+          if (
+            data.primaryIntent === "LLM_OPS" &&
+            previousIntent !== "LLM_OPS"
+          ) {
+            if (!project) {
+              // No project at all (governance orgs skip it at signup):
+              // alert, then offer to create it.
+              setShowCreateProjectDialog(true);
+            } else if (
+              previousIntent === "AGENT_GOVERNANCE" &&
+              !project.firstMessage
+            ) {
+              // Project exists but never received data: offer its setup.
+              setShowLlmOpsSetupDialog(true);
+            }
+          }
           toaster.create({
             title: "Organization updated",
             description: "Your organization settings have been saved",
@@ -123,7 +187,7 @@ function SettingsForm({
           toaster.create({
             title: "Failed to update organization",
             description:
-              "Please make sure you have filled out all fields related to either S3 or Elasticsearch",
+              "Your changes could not be saved. Please try again.",
             type: "error",
             meta: {
               closable: true,
@@ -184,12 +248,19 @@ function SettingsForm({
                   <Text>{organization.slug}</Text>
                 )}
               </HorizontalFormControl>
-              <HorizontalFormControl
-                label="Project ID"
-                helper="Use this ID when authenticating with API Keys"
-              >
-                <Input width="full" disabled type="text" value={project.id} />
-              </HorizontalFormControl>
+              {project && (
+                <HorizontalFormControl
+                  label="Project ID"
+                  helper="Use this ID when authenticating with API Keys"
+                >
+                  <Input
+                    width="full"
+                    disabled
+                    type="text"
+                    value={project.id}
+                  />
+                </HorizontalFormControl>
+              )}
 
               <HorizontalFormControl
                 label="Support contact"
@@ -219,6 +290,71 @@ function SettingsForm({
                 )}
               </HorizontalFormControl>
 
+              {governanceEnabled && (
+              <HorizontalFormControl
+                label="Primary use"
+                helper={
+                  <VStack align="start" gap={1}>
+                    <Text>
+                      What this organization mainly uses LangWatch for. Decides
+                      where everyone lands when opening the app: coding-agent
+                      tracking opens the personal usage page, LLM apps open the
+                      project home. &quot;Not set&quot; keeps the current
+                      behavior.
+                    </Text>
+                    {!hasPermission("organization:manage") && (
+                      <AdminOnlyBadge />
+                    )}
+                  </VStack>
+                }
+              >
+                {hasPermission("organization:manage") ? (
+                  <Controller
+                    control={control}
+                    name="primaryIntent"
+                    render={({ field }) => (
+                      <Select.Root
+                        collection={primaryUseCollection}
+                        value={[field.value]}
+                        width="full"
+                        onValueChange={(d) =>
+                          field.onChange(
+                            (d.value[0] ?? "") as "" | OrganizationIntent,
+                          )
+                        }
+                      >
+                        <Select.Trigger
+                          background="bg"
+                          aria-label="Primary use"
+                        >
+                          <Select.ValueText />
+                        </Select.Trigger>
+                        <Select.Content>
+                          {primaryUseCollection.items.map((item) => (
+                            <Select.Item key={item.value} item={item}>
+                              {item.label}
+                            </Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select.Root>
+                    )}
+                  />
+                ) : (
+                  <Text>
+                    {organization.primaryIntent ? (
+                      primaryUseCollection.items.find(
+                        (item) => item.value === organization.primaryIntent,
+                      )?.label
+                    ) : (
+                      <Text as="span" color="fg.subtle">
+                        Not set
+                      </Text>
+                    )}
+                  </Text>
+                )}
+              </HorizontalFormControl>
+              )}
+
               <HorizontalFormControl
                 label="Live presence"
                 helper={
@@ -230,14 +366,7 @@ function SettingsForm({
                       organization.
                     </Text>
                     {!hasPermission("organization:manage") && (
-                      <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                        <Tooltip content="Contact your admin to change this setting">
-                          <HStack>
-                            <Lock size={10} />
-                            <Text>Admin only</Text>
-                          </HStack>
-                        </Tooltip>
-                      </Badge>
+                      <AdminOnlyBadge />
                     )}
                   </VStack>
                 }
@@ -295,35 +424,6 @@ function SettingsForm({
                   )}
                 </HorizontalFormControl>
               )}
-
-              {organization.useCustomElasticsearch && (
-                <HorizontalFormControl
-                  label="Elasticsearch"
-                  helper="Configure your Elasticsearch instance for advanced search capabilities"
-                >
-                  {hasPermission("organization:manage") ? (
-                    <VStack width="full" align="start" gap={3}>
-                      <Input
-                        width="full"
-                        type="text"
-                        placeholder="Elasticsearch Node URL"
-                        {...register("elasticsearchNodeUrl")}
-                      />
-                      <Input
-                        width="full"
-                        type="password"
-                        placeholder="Elasticsearch API Key"
-                        {...register("elasticsearchApiKey")}
-                      />
-                    </VStack>
-                  ) : (
-                    <Text>
-                      Elasticsearch configuration is only visible to
-                      organization managers
-                    </Text>
-                  )}
-                </HorizontalFormControl>
-              )}
             </VStack>
 
             {!isLiteMember && (
@@ -340,10 +440,94 @@ function SettingsForm({
           </VStack>
         </form>
 
-        {hasPermission("project:update") && (
+        {project && hasPermission("project:update") && (
           <ProjectSettingsForm project={project} />
         )}
       </VStack>
+
+      {/* ADR-038 v6: governance -> LLMOps flip on a project-less org — the
+          user must know a project is required before the drawer opens */}
+      <Dialog.Root
+        open={showCreateProjectDialog}
+        onOpenChange={({ open }) => setShowCreateProjectDialog(open)}
+      >
+        <Dialog.Content bg="bg">
+          <Dialog.Header>
+            <Dialog.Title>A project is needed</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <Text>
+              Your changes are saved. Monitoring LLM apps happens inside a
+              project, and this organization doesn&apos;t have one yet —
+              create your first project so everyone has somewhere to land.
+            </Text>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack gap={2}>
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateProjectDialog(false)}
+              >
+                Later
+              </Button>
+              <Button
+                colorPalette="orange"
+                onClick={() => {
+                  setShowCreateProjectDialog(false);
+                  openDrawer("createProject", {
+                    navigateOnCreate: true,
+                    organizationId: organization.id,
+                    defaultTeamId: organization.teams.find(
+                      (t) => !t.isPersonal,
+                    )?.id,
+                  });
+                }}
+              >
+                Set up project
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* ADR-038 F9: governance -> LLMOps flip offers the project setup */}
+      <Dialog.Root
+        open={showLlmOpsSetupDialog && !!project}
+        onOpenChange={({ open }) => setShowLlmOpsSetupDialog(open)}
+      >
+        <Dialog.Content bg="bg">
+          <Dialog.Header>
+            <Dialog.Title>Set up your project</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <Text>
+              Everyone in this organization will now land on the project home,
+              but the project hasn&apos;t received any data yet. Walk through
+              the project setup so there&apos;s something to see when they
+              arrive.
+            </Text>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack gap={2}>
+              <Button
+                variant="outline"
+                onClick={() => setShowLlmOpsSetupDialog(false)}
+              >
+                Later
+              </Button>
+              <Button
+                colorPalette="orange"
+                onClick={() => {
+                  // Dialog only opens when a project exists (see open guard).
+                  window.location.href = `/onboarding/product?projectSlug=${project?.slug ?? ""}`;
+                }}
+              >
+                Set up the project
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
     </SettingsLayout>
   );
 }
@@ -453,7 +637,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           toaster.create({
             title: "Failed to update project",
             description:
-              "Please make sure you have filled out all fields related to S3",
+              "Your changes could not be saved. Please try again.",
             type: "error",
             meta: {
               closable: true,
@@ -546,14 +730,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                     : "Disable to turn presence off for this project only."}
                 </Text>
                 {!userIsAdmin && (
-                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                    <Tooltip content="Contact your admin to change this setting">
-                      <HStack>
-                        <Lock size={10} />
-                        <Text>Admin only</Text>
-                      </HStack>
-                    </Tooltip>
-                  </Badge>
+                  <AdminOnlyBadge />
                 )}
               </VStack>
             }
@@ -582,14 +759,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               <VStack align="start" gap={1}>
                 <Text>Allow users to share traces with public links</Text>
                 {!userIsAdmin && (
-                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                    <Tooltip content="Contact your admin to change this setting">
-                      <HStack>
-                        <Lock size={10} />
-                        <Text>Admin only</Text>
-                      </HStack>
-                    </Tooltip>
-                  </Badge>
+                  <AdminOnlyBadge />
                 )}
               </VStack>
             }

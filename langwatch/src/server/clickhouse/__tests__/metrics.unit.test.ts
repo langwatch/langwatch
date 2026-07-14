@@ -432,42 +432,71 @@ describe("ClickHouse metrics", () => {
         return typeof arg === "string" && arg.includes(needle);
       }).length;
 
-    describe("when system.backup_log fails repeatedly", () => {
-      it("emits exactly one warn for repeated failures until recovery", async () => {
+    describe("when running in production", () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      beforeEach(() => {
+        process.env.NODE_ENV = "production";
+      });
+      afterEach(() => {
+        process.env.NODE_ENV = originalNodeEnv;
+      });
+
+      describe("when system.backup_log fails repeatedly", () => {
+        it("emits exactly one warn for repeated failures until recovery", async () => {
+          const client = buildMockClient(() => true);
+
+          await metrics.collectStorageStats(client);
+          await metrics.collectStorageStats(client);
+          await metrics.collectStorageStats(client);
+
+          // logger.warn signature is (obj, msg). First failure warns;
+          // subsequent failures fall through to debug.
+          expect(
+            countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
+          ).toBe(1);
+        });
+      });
+
+      describe("when system.backup_log recovers then fails again", () => {
+        it("warns again on a fresh failure after recovering", async () => {
+          let shouldFail = true;
+          const client = buildMockClient(() => shouldFail);
+
+          await metrics.collectStorageStats(client); // fail → warn (#1)
+          await metrics.collectStorageStats(client); // fail → debug (suppressed)
+          shouldFail = false;
+          await metrics.collectStorageStats(client); // recover → info
+          shouldFail = true;
+          await metrics.collectStorageStats(client); // fail → warn (#2)
+
+          expect(
+            countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
+          ).toBe(2);
+          // logger.info("ClickHouse backup stats collection recovered ...")
+          // is called with the message as the first arg.
+          expect(
+            countCallsMatching(loggerMocks.info.mock.calls, 0, "recovered"),
+          ).toBe(1);
+        });
+      });
+    });
+
+    describe("when not in production (local dev)", () => {
+      // NODE_ENV is "test" here, exercising the off-prod path: local dev has no
+      // system.backup_log, so the repeated failure must never reach the console.
+      it("never warns and keeps backup-log failures at debug", async () => {
         const client = buildMockClient(() => true);
 
         await metrics.collectStorageStats(client);
         await metrics.collectStorageStats(client);
         await metrics.collectStorageStats(client);
 
-        // logger.warn signature is (obj, msg). First failure warns;
-        // subsequent failures fall through to debug.
         expect(
           countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
-        ).toBe(1);
-      });
-    });
-
-    describe("when system.backup_log recovers then fails again", () => {
-      it("warns again on a fresh failure after recovering", async () => {
-        let shouldFail = true;
-        const client = buildMockClient(() => shouldFail);
-
-        await metrics.collectStorageStats(client); // fail → warn (#1)
-        await metrics.collectStorageStats(client); // fail → debug (suppressed)
-        shouldFail = false;
-        await metrics.collectStorageStats(client); // recover → info
-        shouldFail = true;
-        await metrics.collectStorageStats(client); // fail → warn (#2)
-
+        ).toBe(0);
         expect(
-          countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
-        ).toBe(2);
-        // logger.info("ClickHouse backup stats collection recovered ...")
-        // is called with the message as the first arg.
-        expect(
-          countCallsMatching(loggerMocks.info.mock.calls, 0, "recovered"),
-        ).toBe(1);
+          countCallsMatching(loggerMocks.debug.mock.calls, 1, "system.backup_log"),
+        ).toBeGreaterThanOrEqual(1);
       });
     });
   });

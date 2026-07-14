@@ -1,10 +1,11 @@
 import dotenv from "dotenv";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Plugin, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
 import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
+import { havenHmrGate } from "./vite/havenHmrGate";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -13,8 +14,11 @@ import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawe
 // the same way; doing it here keeps both processes reading from one
 // source of truth.
 dotenv.config({ path: path.resolve(__dirname, ".env") });
+// Portless (haven) overlay wins: loaded after .env with override so the
+// resolved app port + api hostname take effect. Absent in non-portless runs.
+dotenv.config({ path: path.resolve(__dirname, ".env.portless"), override: true });
 
-const FRONTEND_PORT = parseInt(process.env.PORT ?? "5560");
+const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
 
 // When `LANGWATCH_DEV_HTTP2=1` is set, Vite serves the SPA over
@@ -24,6 +28,15 @@ const API_PORT = FRONTEND_PORT + 1000;
 // asks to trust the cert once for the whole local stack.
 const USE_HTTP2 = process.env.LANGWATCH_DEV_HTTP2 === "1";
 const API_PROTOCOL = USE_HTTP2 ? "https" : "http";
+// In portless (haven) mode the app and its API are ONE origin
+// (app.<slug>.langwatch.localhost): the SPA is served here and /api/* is proxied
+// straight to the API backend on loopback. Proxying to loopback (not the app's
+// own public hostname) avoids a self-proxy loop and needs no TLS/CA. Outside
+// portless we keep the legacy PORT+1000 target (or an explicit LANGWATCH_API_URL).
+const API_TARGET =
+  process.env.LANGWATCH_PORTLESS === "1"
+    ? `http://127.0.0.1:${process.env.LANGWATCH_API_PORT ?? API_PORT}`
+    : (process.env.LANGWATCH_API_URL ?? `${API_PROTOCOL}://localhost:${API_PORT}`);
 
 /**
  * Load (and lazily generate) the dev TLS credentials. Mirrors
@@ -32,9 +45,9 @@ const API_PROTOCOL = USE_HTTP2 ? "https" : "http";
  * the race benign — whichever loses the race overwrites with the same
  * effective contents, and subsequent reads find a valid pair.
  */
-function loadDevHttpsCredentials():
-  | { cert: Buffer; key: Buffer }
-  | null {
+async function loadDevHttpsCredentials(): Promise<
+  { cert: Buffer; key: Buffer } | null
+> {
   if (!USE_HTTP2) return null;
 
   if (process.env.DEV_HTTPS_CERT && process.env.DEV_HTTPS_KEY) {
@@ -54,10 +67,13 @@ function loadDevHttpsCredentials():
     return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
   }
 
-  const pems = generateSelfsigned(
+  // selfsigned v5 dropped the `days` option; use an explicit not-after date.
+  const notAfterDate = new Date();
+  notAfterDate.setDate(notAfterDate.getDate() + 825);
+  const pems = await generateSelfsigned(
     [{ name: "commonName", value: "localhost" }],
     {
-      days: 825,
+      notAfterDate,
       keySize: 2048,
       extensions: [
         {
@@ -76,23 +92,6 @@ function loadDevHttpsCredentials():
   writeFileSync(certPath, pems.cert);
   writeFileSync(keyPath, pems.private);
   return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
-}
-
-const devHttpsCredentials = loadDevHttpsCredentials();
-
-// Diagnostic: when Vite hot-restarts on a config change, the https block is
-// re-evaluated but in-process TLS state can land in a broken pair (server
-// listening, TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`). This log
-// makes the post-restart scheme observable in `server.log`, so a "blank
-// page after editing config" failure mode is easy to diagnose without
-// digging into TLS errors. Drop in `pnpm dev:clean` to reset both the Vite
-// module graph and `.dev-certs/` if the cert pair is suspected.
-if (USE_HTTP2) {
-  console.log(
-    `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
-  );
-} else {
-  console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
 }
 
 // object-inspect's index.js does `var inspectCustom = require('./util.inspect')`
@@ -122,8 +121,26 @@ function patchObjectInspectBrowserStub(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), patchObjectInspectBrowserStub()],
+export default defineConfig(async (): Promise<UserConfig> => {
+  const devHttpsCredentials = await loadDevHttpsCredentials();
+
+  // Diagnostic: when Vite hot-restarts on a config change, the https block is
+  // re-evaluated but in-process TLS state can land in a broken pair (server
+  // listening, TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`). This log
+  // makes the post-restart scheme observable in `server.log`, so a "blank
+  // page after editing config" failure mode is easy to diagnose without
+  // digging into TLS errors. Drop in `pnpm dev:clean` to reset both the Vite
+  // module graph and `.dev-certs/` if the cert pair is suspected.
+  if (USE_HTTP2) {
+    console.log(
+      `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
+    );
+  } else {
+    console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
+  }
+
+  return {
+  plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
   resolve: {
     alias: {
       // Path aliases (matching tsconfig paths)
@@ -194,6 +211,14 @@ export default defineConfig({
         "**/coverage/**",
         "**/server.log",
       ],
+      // Docker-on-macOS bind mounts don't surface inotify events reliably,
+      // so Vite's default fs.watch sits silent on edits made from the host.
+      // Polling at 250ms is the standard workaround and HMR fires
+      // immediately. Native macOS / Linux hosts opt out via
+      // `LANGWATCH_VITE_NO_POLLING=1` to dodge the CPU tax.
+      ...(process.env.LANGWATCH_VITE_NO_POLLING === "1"
+        ? {}
+        : { usePolling: true, interval: 250 }),
     },
     // Frontend port (default 5560, configurable via PORT env var)
     host: true,
@@ -224,7 +249,7 @@ export default defineConfig({
     // splitting is dev-only.
     proxy: {
       "/api": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         ws: true,
         // Self-signed dev cert — don't fail the proxy on cert verification.
@@ -232,35 +257,36 @@ export default defineConfig({
         secure: false,
       },
       "/mcp": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/sse": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/messages": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/oauth": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/.well-known/oauth-protected-resource": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/.well-known/oauth-authorization-server": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
     },
   },
+  };
 });

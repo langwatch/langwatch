@@ -7,9 +7,10 @@
  *
  * Uses testcontainers ClickHouse to exercise real SQL against the production schema.
  */
+
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   startTestContainers,
   stopTestContainers,
@@ -175,7 +176,9 @@ beforeAll(async () => {
 
   // Import the mocked prisma and build the shared service instance
   const { prisma } = await import("~/server/db");
-  service = new ClickHouseTraceService(prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]);
+  service = new ClickHouseTraceService(
+    prisma as ConstructorParameters<typeof ClickHouseTraceService>[0],
+  );
 }, 60_000);
 
 afterAll(async () => {
@@ -258,7 +261,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("preserves heavy ComputedInput/ComputedOutput columns", async () => {
-
         const result = await service.getAllTracesForProject(
           makeQueryInput(),
           openProtections,
@@ -313,7 +315,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns both traces without duplication", async () => {
-
         const result = await service.getAllTracesForProject(
           makeQueryInput(),
           openProtections,
@@ -361,8 +362,7 @@ describe("ClickHouse trace dedup (integration)", () => {
             TraceId: traceId,
             ComputedInput: JSON.stringify({
               type: "text",
-              value:
-                "latest input with heavy payload - " + "q".repeat(500),
+              value: "latest input with heavy payload - " + "q".repeat(500),
             }),
             ComputedOutput: JSON.stringify({
               type: "text",
@@ -404,7 +404,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns only the latest trace summary version", async () => {
-
         const traces = await service.getTracesWithSpans(
           tenantId,
           [traceId],
@@ -420,7 +419,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns only the latest span version", async () => {
-
         const traces = await service.getTracesWithSpans(
           tenantId,
           [traceId],
@@ -436,7 +434,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("preserves heavy SpanAttributes in the result", async () => {
-
         const traces = await service.getTracesWithSpans(
           tenantId,
           [traceId],
@@ -448,14 +445,13 @@ describe("ClickHouse trace dedup (integration)", () => {
         expect(span.params).toBeDefined();
         const params = span.params as Record<string, unknown>;
         // Dot-notation keys get unflattened: "llm.model" -> { llm: { model: "gpt-5-mini" } }
-        expect(
-          (params["llm"] as Record<string, string>)?.["model"],
-        ).toBe("gpt-5-mini");
-        expect(params["payload"]).toContain("a".repeat(100));
+        expect((params.llm as Record<string, string>)?.model).toBe(
+          "gpt-5-mini",
+        );
+        expect(params.payload).toContain("a".repeat(100));
       });
 
       it("preserves heavy ComputedInput/ComputedOutput from the latest trace version", async () => {
-
         const traces = await service.getTracesWithSpans(
           tenantId,
           [traceId],
@@ -469,9 +465,7 @@ describe("ClickHouse trace dedup (integration)", () => {
           typeof trace.input === "string"
             ? JSON.parse(trace.input)
             : trace.input;
-        expect(parsedInput.value).toContain(
-          "latest input with heavy payload",
-        );
+        expect(parsedInput.value).toContain("latest input with heavy payload");
 
         expect(trace.output).not.toBeNull();
         const parsedOutput =
@@ -498,6 +492,86 @@ describe("ClickHouse trace dedup (integration)", () => {
           // Latest span version, deduped under the bounded read.
           expect(trace.spans).toHaveLength(1);
           expect(trace.spans[0]!.name).toBe("latest-span-version");
+        });
+      });
+
+      describe("when no occurredAt window is supplied (thread-view path)", () => {
+        function recordingClient(): {
+          client: ClickHouseClient;
+          queries: string[];
+        } {
+          const queries: string[] = [];
+          const client = new Proxy(ch, {
+            get(target, prop, receiver) {
+              if (prop === "query") {
+                return (args: { query: string; query_params?: unknown }) => {
+                  if (
+                    typeof args?.query === "string" &&
+                    args.query.includes("trace_summaries")
+                  ) {
+                    queries.push(args.query);
+                  }
+                  return (target as ClickHouseClient).query(args as never);
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          }) as ClickHouseClient;
+          return { client, queries };
+        }
+
+        it("resolves the OccurredAt span and bounds the heavy summary read", async () => {
+          const { client, queries } = recordingClient();
+          getClickHouseClientForProject.mockResolvedValue(client);
+          try {
+            const traces = await service.getTracesWithSpans(
+              tenantId,
+              [traceId],
+              openProtections,
+            );
+            // Correctness is unchanged: still the latest summary + span version.
+            expect(traces).toHaveLength(1);
+            expect(traces![0]!.trace_id).toBe(traceId);
+            expect(traces![0]!.metrics?.total_time_ms).toBe(300);
+          } finally {
+            getClickHouseClientForProject.mockResolvedValue(ch);
+          }
+
+          // A cheap resolve (min/max OccurredAt) runs, then the heavy summary
+          // read (ts_ComputedInput columns) is partition-bounded on OccurredAt
+          // instead of scanning every weekly part.
+          const resolveQuery = queries.find((q) =>
+            q.includes("min(OccurredAt)"),
+          );
+          const heavyQuery = queries.find((q) =>
+            q.includes("ts_ComputedInput"),
+          );
+          expect(resolveQuery).toBeDefined();
+          expect(heavyQuery).toBeDefined();
+          expect(heavyQuery!).toContain("OccurredAt >=");
+        });
+
+        it("stays unbounded when the trace ids resolve to no rows", async () => {
+          const { client, queries } = recordingClient();
+          getClickHouseClientForProject.mockResolvedValue(client);
+          try {
+            const traces = await service.getTracesWithSpans(
+              tenantId,
+              [`missing-${nanoid()}`],
+              openProtections,
+            );
+            expect(traces ?? []).toHaveLength(0);
+          } finally {
+            getClickHouseClientForProject.mockResolvedValue(ch);
+          }
+
+          // Resolve found nothing (epoch default), so the heavy summary read
+          // keeps its previous unbounded behaviour rather than guessing.
+          const heavyQuery = queries.find((q) =>
+            q.includes("ts_ComputedInput"),
+          );
+          expect(heavyQuery).toBeDefined();
+          expect(heavyQuery!).not.toContain("OccurredAt >=");
         });
       });
     });
@@ -599,7 +673,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("deduplicates spans per trace correctly", async () => {
-
         const traces = await service.getTracesWithSpans(
           tenantId,
           [traceX, traceY],

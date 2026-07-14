@@ -78,6 +78,7 @@ override-dependencies = [
     # 0.316.0 is API-compatible with Phoenix and is the version Phoenix itself moved
     # to in 16.4.0.
     "strawberry-graphql>=0.316.0",
+    "pydantic-settings>=2.14.2",  # security: pydantic-settings advisory (#1517)
 ]
 
 [tool.uv.workspace]

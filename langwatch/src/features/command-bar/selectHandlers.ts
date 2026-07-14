@@ -96,12 +96,12 @@ export function handleCommandSelect(
       ctx.close();
       openDrawer("addOrEditDataset");
       break;
+    case "action-new-automation":
+      ctx.close();
+      openDrawer("automation", {});
+      break;
     case "action-new-scenario":
       navigate(`/${projectSlug}/simulations/scenarios`);
-      break;
-    case "action-sdk-radar":
-      ctx.close();
-      openDrawer("sdkRadar");
       break;
     case "action-send-trace":
       ctx.close();

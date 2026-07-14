@@ -9,7 +9,7 @@ import {
 const { mockGetTimeseries } = vi.hoisted(() => ({
   mockGetTimeseries: vi.fn(),
 }));
-vi.mock("~/server/analytics/analytics.service", () => ({
+vi.mock("~/server/app-layer/analytics/analytics.service", () => ({
   getAnalyticsService: () => ({
     getTimeseries: mockGetTimeseries,
   }),

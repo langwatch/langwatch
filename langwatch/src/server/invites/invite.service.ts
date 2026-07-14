@@ -34,10 +34,10 @@ export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
 
 import { env } from "~/env.mjs";
 import {
-  isViewOnlyCustomRole,
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
 } from "../license-enforcement/license-enforcement.repository";
+import { isViewOnlyCustomRole } from "../license-enforcement/member-classification";
 import { sendInviteEmail } from "../mailer/inviteEmail";
 import { TeamUserRole } from "@prisma/client";
 import type { Session } from "~/server/auth";

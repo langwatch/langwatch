@@ -39,12 +39,6 @@ import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
-import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluationNameAutoslug";
-import { extractChunkTextualContent } from "~/server/background/workers/collector/rag";
-import {
-  type DataForEvaluation,
-  runEvaluation,
-} from "~/server/background/workers/evaluationsWorker";
 import { prisma } from "~/server/db";
 import {
   AVAILABLE_EVALUATORS,
@@ -55,6 +49,10 @@ import {
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import {
+  type DataForEvaluation,
+  runEvaluation,
+} from "~/server/evaluations/runEvaluation";
 import {
   type EvaluationRESTParams,
   type EvaluationRESTResult,
@@ -76,6 +74,8 @@ import {
 } from "~/server/experiments/types";
 import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import { getPayloadSizeHistogram } from "~/server/metrics";
+import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
+import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -196,15 +196,18 @@ secured
       }
 
       let body: Record<string, any>;
+      let payloadSize: number;
       try {
-        body = await c.req.json();
+        // Size comes from the wire bytes, not a re-serialisation of the parsed
+        // body — these payloads carry full dataset entries and LLM outputs.
+        const raw = await c.req.text();
+        payloadSize = Buffer.byteLength(raw, "utf8");
+        body = JSON.parse(raw);
       } catch {
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
-      getPayloadSizeHistogram("log_results").observe(
-        JSON.stringify(body).length,
-      );
+      getPayloadSizeHistogram("log_results").observe(payloadSize);
 
       let params: ESBatchEvaluationRESTParams;
       try {
@@ -1100,7 +1103,7 @@ const processBatchEvaluation = async (
   project: Project,
   param: ESBatchEvaluationRESTParams,
 ) => {
-  const { run_id, experiment_id, experiment_slug } = param;
+  const { experiment_id, experiment_slug } = param;
 
   const experiment = await findOrCreateExperiment({
     project,

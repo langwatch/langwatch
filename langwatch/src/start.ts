@@ -37,10 +37,14 @@ async function loadDevHttpsCredentials(
   }
 
   const { generate } = await import("selfsigned");
-  const pems = generate(
+  // Apple's max accepted lifetime for trusted certs. selfsigned v5 dropped the
+  // `days` option in favour of explicit not-before/not-after dates.
+  const notAfterDate = new Date();
+  notAfterDate.setDate(notAfterDate.getDate() + 825);
+  const pems = await generate(
     [{ name: "commonName", value: "localhost" }],
     {
-      days: 825, // Apple's max accepted lifetime for trusted certs.
+      notAfterDate,
       keySize: 2048,
       extensions: [
         {
@@ -68,13 +72,21 @@ import { register } from "prom-client";
 import { createMcpHandler } from "./mcp/handler";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
-import { initializeWebApp } from "./server/app-layer/presets";
-import { getWorkerMetricsPort } from "./server/background/config";
+import {
+  initializeInProcessApp,
+  initializeWebApp,
+} from "./server/app-layer/presets";
 import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
+import {
+  getWorkerMetricsPort,
+  isMetricsAuthorized,
+  normalizeMetricsPath,
+} from "./server/metrics";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
+import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 import { createLogger } from "./utils/logger/server";
 
 const logger = createLogger("langwatch:start");
@@ -97,28 +109,37 @@ export const metricsMiddleware = promBundle({
   },
   normalizePath: (req) => {
     if (req.url?.includes("/assets/")) return "/assets/*";
-    return req.url?.split("?")[0] ?? req.url;
+    return normalizeMetricsPath(req.url?.split("?")[0] ?? "/");
   },
 });
-
-const isMetricsAuthorized = (req: IncomingMessage): boolean => {
-  const authHeader = req.headers.authorization;
-  if (process.env.NODE_ENV === "production" && !process.env.METRICS_API_KEY) {
-    throw new Error("METRICS_API_KEY is not set");
-  }
-  return (
-    !process.env.METRICS_API_KEY ||
-    authHeader === `Bearer ${process.env.METRICS_API_KEY}`
-  );
-};
 
 export const startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
 
+  // Dev-only single-process mode: host the background worker stack inside this
+  // web process instead of a separate `pnpm run start:workers` process. Opt-in
+  // via WORKERS_IN_PROCESS=1 (see scripts/start.sh + `pnpm dev:single`). Never
+  // honoured in production — prod runs web and worker as separate deployments.
+  //
+  // Gate on NODE_ENV === "development" exactly (not `dev`, which is
+  // `!== "production"`) so this matches scripts/start.sh's lane-skip predicate.
+  // If they disagreed, an exotic NODE_ENV (e.g. "staging") would spawn BOTH the
+  // standalone workers lane AND the in-process stack — duplicate consumers.
+  const isInProcessWorkerModeEnabled =
+    process.env.NODE_ENV === "development" &&
+    (process.env.WORKERS_IN_PROCESS === "1" ||
+      process.env.WORKERS_IN_PROCESS === "true");
+
   // Initialize the app-layer (services, repositories, event sourcing, etc.)
-  // This was previously done by Next.js instrumentation hook.
-  initializeWebApp();
+  // This was previously done by Next.js instrumentation hook. In-process mode
+  // boots with the "all" role so the outbox consumer / drainer / heartbeat
+  // scheduler wire up exactly as on a dedicated worker.
+  if (isInProcessWorkerModeEnabled) {
+    initializeInProcessApp();
+  } else {
+    initializeWebApp();
+  }
 
   // Fail fast if Redis is unreachable — better-auth uses it as secondary
   // session store, and without it every request ends in a "Redirecting to
@@ -150,7 +171,14 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   //      Vite dev server runs separately on PORT (default 5560) and proxies /api/* here.
   // Prod: Single server on PORT (default 5560) serves API routes + static files.
   const basePort = parseInt(process.env.PORT ?? "5560");
-  const port = dev ? basePort + 1000 : basePort;
+  // In portless (haven) mode the API binds an ephemeral loopback port that
+  // Vite proxies `/api` to under the app origin (`app.<slug>.../api`);
+  // otherwise PORT+1000.
+  const port = process.env.LANGWATCH_API_PORT
+    ? parseInt(process.env.LANGWATCH_API_PORT)
+    : dev
+      ? basePort + 1000
+      : basePort;
 
   const mcpHandler = createMcpHandler();
   const honoApp = createApiRouter();
@@ -231,14 +259,25 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
           res.end("Unauthorized");
           return;
         }
-        if (pathname === "/metrics") {
+        if (pathname === "/metrics" || isInProcessWorkerModeEnabled) {
+          // /metrics, or /workers/metrics in single-process mode: the workers
+          // share this process's prom-client registry (no separate listener),
+          // so both paths serve the same registry.
           res.setHeader("Content-Type", register.contentType);
           res.end(await register.metrics());
         } else {
+          // Forward the caller's bearer token — the worker's metrics
+          // listener enforces the same isMetricsAuthorized gate, so a
+          // credential-less internal fetch would get a 401 in production.
+          const authorization = req.headers.authorization;
           const workersMetricsRes = await fetch(
-            `http://0.0.0.0:${getWorkerMetricsPort()}/metrics`
+            `http://0.0.0.0:${getWorkerMetricsPort()}/metrics`,
+            authorization ? { headers: { authorization } } : undefined,
           );
-          res.setHeader("Content-Type", register.contentType);
+          res.statusCode = workersMetricsRes.status;
+          if (workersMetricsRes.ok) {
+            res.setHeader("Content-Type", register.contentType);
+          }
           res.end(await workersMetricsRes.text());
         }
         return;
@@ -329,6 +368,13 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     );
   });
 
+  // Assigned by the in-process worker boot below. Declared here so the
+  // shutdown handler can drain it, and so the boot can run *after* the signal
+  // handlers are installed (a SIGTERM while workers are still booting hits
+  // `workerHandle?.shutdown()` as a no-op — the process still exits cleanly,
+  // it just doesn't wait for the still-booting workers to drain).
+  let workerHandle: WorkerHandle | undefined;
+
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info({ signal }, "Received signal, shutting down...");
@@ -349,6 +395,13 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     server.close();
     if ("closeAllConnections" in server) server.closeAllConnections();
     mcpHandler.closeAllSessions();
+    // Drain in-process workers (if any) before closing the shared App below,
+    // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go away.
+    try {
+      await workerHandle?.shutdown();
+    } catch (error) {
+      logger.error({ error }, "error shutting down in-process workers");
+    }
     try {
       await Promise.all([getApp().close(), shutdownPostHog()]);
     } catch (error) {
@@ -371,6 +424,29 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       "unhandled rejection detected"
     );
   });
+
+  // In-process worker stack (dev opt-in via WORKERS_IN_PROCESS=1). Booted last —
+  // after the server is listening AND the shutdown handlers are installed — so
+  // the UI comes up even if the workers are slow to start. `workerHandle` isn't
+  // assigned until this await resolves, so a SIGTERM during the boot still lets
+  // the process exit cleanly; it just won't drain workers that are still
+  // mid-boot. A boot failure is logged and the web server keeps running (only
+  // the background jobs won't run).
+  if (isInProcessWorkerModeEnabled) {
+    logger.info("WORKERS_IN_PROCESS=1 — hosting the worker stack in-process");
+    try {
+      // shouldStartMetricsServer: false — in one process the worker prom
+      // registry is this process's registry, already served at /metrics; no
+      // second listener.
+      workerHandle = await startWorkers({ shouldStartMetricsServer: false });
+      logger.info("in-process workers ready");
+    } catch (error) {
+      logger.error(
+        { error },
+        "in-process workers failed to start — web server continues, background jobs will not run",
+      );
+    }
+  }
 };
 
 // Exported for the langwatch#5219 regression test, which drives the

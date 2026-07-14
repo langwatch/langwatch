@@ -29,7 +29,16 @@ manager:
   port: 8080
   maxWorkers: 20
   workerIdleMs: 600000        # 10 min — idle workers are reaped
-  readinessTimeoutMs: 15000   # how long to wait for a worker's opencode to bind
+  # How long to wait for a freshly-spawned worker's opencode to bind before
+  # aborting the spawn. Under gVisor (runsc), process/syscall startup is
+  # materially slower than runc: a cold opencode boot on the dev gVisor node
+  # measured ~28s (2026-07-07), so the previous 15s default aborted the FIRST
+  # message of every conversation (and every message after workerIdleMs) with
+  # "context deadline exceeded", surfacing as an empty reply. 60s gives gVisor
+  # cold-boot comfortable headroom. Warm workers are unaffected (this only
+  # gates the spawn). A true fix for first-message latency is a warm pool /
+  # spawn-on-panel-open — tracked separately.
+  readinessTimeoutMs: 60000
 
 service:
   type: ClusterIP
@@ -79,11 +88,13 @@ workspaceVolume: {}
 ## and steal worker B's project API key + GitHub token (PR #4913 review).
 ##
 ## Mitigations that keep the blast radius small even with root in the pod:
-##   - Drop ALL caps and add back ONLY what's strictly required: the four
-##     per-UID-handoff caps (SETUID/SETGID/CHOWN/DAC_OVERRIDE) plus
-##     NET_ADMIN for the iptables OUTPUT-OWNER drop on loopback that
-##     closes the worker→worker exfil hole at the kernel layer (see
-##     services/langy-agent/iptables.go). No SYS_*.
+##   - Drop ALL caps and add back ONLY what's strictly required: the five
+##     per-UID-handoff caps (SETUID/SETGID/CHOWN/DAC_OVERRIDE/FOWNER —
+##     FOWNER lets root chmod a per-worker dir it has already chowned away
+##     to the worker UID). NET_ADMIN was dropped alongside the iptables
+##     lockdown it existed for — the worker→worker exfil hole it guarded is
+##     now closed by opencode's own per-worker password (ADR-033 Fix A′),
+##     which needs no netfilter. No SYS_*.
 ##   - allowPrivilegeEscalation: false → no_new_privs is set, so children
 ##     cannot regain caps via setuid binaries.
 ##   - readOnlyRootFilesystem stays on so a worker can't pivot through
@@ -108,19 +119,24 @@ containerSecurityContext:
     # chown per-session dirs to a unique UID, write 0600 config blobs as
     # that UID, and spawn the OpenCode subprocess directly into it.
     #
-    # NET_ADMIN was added on 2026-06-30 so the manager can install an
-    # iptables OUTPUT rule at startup that drops loopback-TCP packets
-    # from non-root UIDs to the locked opencode internal port range
-    # (40000-49999). Without that rule, a prompt-injected worker scans
-    # /proc/net/tcp, connects to a sibling worker's unauthenticated
-    # opencode TCP as the victim's UID, and `env` exfiltrates the
-    # victim's LANGWATCH_API_KEY / GH_TOKEN / OPENAI_API_KEY out of the
-    # victim's own process. See services/langy-agent/iptables.go for
-    # the exact rule and Sergio's P1 review on PR #4913 for the threat.
+    # FOWNER is required because setupWorkerHome (worker.go) chowns the
+    # per-worker home to the worker UID and THEN chmods it 0700. Once the
+    # dir is owned by the worker UID, root (UID 0) can only chmod it with
+    # CAP_FOWNER — DAC_OVERRIDE does not cover the chmod ownership check.
+    # Without FOWNER every spawn dies with "chmod home: operation not
+    # permitted" (verified live on the dev gVisor node 2026-07-07). Not
+    # gVisor-specific: the same EPERM occurs on runc under drop-ALL.
+    #
+    # NET_ADMIN was previously added (2026-06-30) for an iptables OUTPUT rule
+    # dropping loopback-TCP from non-root UIDs to the opencode internal port
+    # range. That rule (services/langy-agent/iptables.go) is deleted in this
+    # change — dead under gVisor (no netfilter) and superseded by the
+    # per-worker OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′) — so NET_ADMIN is
+    # dropped here too. Nothing else in the manager touches the network stack.
     #
     # Any addition beyond this needs to be justified in the
     # SecurityContext header above.
-    add: ["CHOWN", "DAC_OVERRIDE", "SETUID", "SETGID", "NET_ADMIN"]
+    add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID"]
 
 # Sandboxed container runtime for this pod. The agent runs LLM-driven
 # arbitrary code (opencode workers shell out to git/npm/gh), so the headline

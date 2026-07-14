@@ -161,7 +161,7 @@ Payloads of different sizes land in different places, picked at encode time. You
 |---|---|---|
 | **≤ 1 KiB** | Inline raw JSON in the staged value | nothing — the cheap path |
 | **1 KiB to ≤ 4 KiB** | Inline gzip+base64 (if smaller than raw) | nothing |
-| **4 KiB to ≤ 256 KiB** | Standalone Redis key, ref in envelope. Reclaimed on job completion via the holder set, 3-day TTL backstop. | Redis memory growth in the `{queue}:gq:blob:*` keyspace — usually a runaway-fan-out signal |
+| **4 KiB to ≤ 256 KiB** | Standalone Redis key, ref in envelope. Reclaimed on job completion via the holder set, 4-day TTL backstop. | Redis memory growth in the `{queue}:gq:blob:*` keyspace — usually a runaway-fan-out signal |
 | **> 256 KiB, ≤ 50 MiB** | Object store (S3 / file / azure-blob — projectId-scoped to the BYOC bucket) | Object-store request rate; bucket lifecycle policy as backstop for missed reclaims |
 | **> 50 MiB** | Rejected at encode — `PayloadTooLargeError` | Hit by a product bug or a runaway loop — fix upstream rather than raise the cap |
 
@@ -177,7 +177,7 @@ GQ2 (content-addressed) writes are gated behind `GROUP_QUEUE_ENVELOPE_WRITES_ENA
 
 - **Queue name must be hash-tagged.** A non-`{...}` name passes the type checker but fails at runtime in Redis Cluster mode (CROSSSLOT). The `hasRedisHashTag` guard catches this on construction.
 - **The `__*` namespace is reserved.** User payloads must not carry `__custom` or similar — they'll be rejected at `send`-time. The three caller-set routing fields (`__pipelineName`, `__jobType`, `__jobName`) are the only `__*` keys the queue accepts from outside; everything else is queue-internal machinery.
-- **Holders TTL is a backstop, not the primary reclaim.** The happy path reclaims a blob the moment its last holder drops, atomically inside the release Lua. The 3-day TTL is for genuinely-orphaned blobs (mid-completion crash leaves a holder leaked). Don't tune the TTL down without understanding which path is doing the work in your traffic.
+- **Holders TTL is a backstop, not the primary reclaim.** The happy path reclaims a blob the moment its last holder drops, atomically inside the release Lua. The 4-day TTL is for genuinely-orphaned blobs (mid-completion crash leaves a holder leaked). Don't tune the TTL down without understanding which path is doing the work in your traffic.
 - **Cluster mode requires same-slot keys.** Holder Lua touches multiple keys; the hash tag is what makes that safe. If you add new keys to the staging layer, they MUST share the queue's hash tag.
 - **Memory queue is for tests / dev.** It processes jobs in-process with no Lua, no Redis, no tiered storage. Don't reach for it in production code paths; it exists so unit tests don't need a docker-compose dependency.
 - **Holders are per-queue, blobs are per-tenant.** Two queues that stage byte-identical content for the same project will reference the SAME stored blob (at the s3 tier), each with their own holder set. The blob is reclaimed only when both holder sets are empty.

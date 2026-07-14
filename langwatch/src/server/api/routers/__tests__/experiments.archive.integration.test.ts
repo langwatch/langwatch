@@ -362,11 +362,10 @@ describe("experiments.deleteExperiment", () => {
     });
   });
 
-  // The archive path used to issue three side-effect calls that the feature
+  // The archive path used to issue side-effect calls that the feature
   // file forbids: a ClickHouse mass-delete (lightweight-delete masks on
-  // cold-tier S3 parts), an Elasticsearch deleteByQuery on the
-  // batch_evaluation index, and an in-process DSpy step cleanup. All three
-  // were removed by deleting the corresponding imports from the router.
+  // cold-tier S3 parts) and an in-process DSpy step cleanup. Both were
+  // removed by deleting the corresponding imports from the router.
   // The most reliable proof is a source-level check: with the imports gone
   // there is no path by which the archive procedure can reach those
   // services. Runtime fail-on-call mocks were considered but rejected
@@ -380,15 +379,6 @@ describe("experiments.deleteExperiment", () => {
         fs.readFile(require.resolve("../experiments.ts"), "utf8"),
       );
       expect(src).not.toMatch(/getClickHouseClientForProject/);
-    });
-
-    /** @scenario The delete-experiment code path does NOT contact Elasticsearch */
-    it("does not import the Elasticsearch client or the batch_evaluation index", async () => {
-      const src = await import("node:fs/promises").then((fs) =>
-        fs.readFile(require.resolve("../experiments.ts"), "utf8"),
-      );
-      expect(src).not.toMatch(/from\s+["'][^"']*server\/elasticsearch["']/);
-      expect(src).not.toMatch(/BATCH_EVALUATION_INDEX/);
     });
 
     /** @scenario The delete-experiment code path does NOT call the DSpy step cleanup */

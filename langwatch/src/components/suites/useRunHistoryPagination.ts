@@ -10,6 +10,7 @@ import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 
 type PageData = {
   runs: ScenarioRunData[];
@@ -21,11 +22,14 @@ type PageData = {
 interface UseRunHistoryPaginationOptions {
   scenarioSetId?: string;
   startDateMs: number;
+  /** While the SSE stream is connected, fallback freshness polling stops. */
+  sseConnected?: boolean;
 }
 
 export function useRunHistoryPagination({
   scenarioSetId,
   startDateMs,
+  sseConnected = false,
 }: UseRunHistoryPaginationOptions) {
   const { project } = useOrganizationTeamProject();
   const [cursor, setCursor] = useState<string | undefined>(undefined);
@@ -53,14 +57,15 @@ export function useRunHistoryPagination({
     },
     {
       enabled: !!project,
-      refetchInterval: pages.length <= 1 ? 30_000 : undefined,
+      // No timer on the heavy query: SSE invalidations and the freshness
+      // probe below drive refetches, so quiet sets never re-download runs.
       trpc: { context: { skipBatch: true } },
     },
   );
 
   // Accumulate pages as data arrives
   useEffect(() => {
-    if (!runDataResult || !runDataResult.changed) return;
+    if (!runDataResult?.changed) return;
 
     if (cursor === undefined) {
       setPages([runDataResult]);
@@ -86,6 +91,17 @@ export function useRunHistoryPagination({
       return run;
     });
   }, [pages]);
+
+  // Cheap freshness probe replaces the old 30s heavy re-fetch. Matches the
+  // previous auto-refresh scope: only while the user hasn't paginated deeper
+  // (accumulated pages beyond the first are not auto-refreshed).
+  useSuiteRunFreshness({
+    scenarioSetId,
+    startDateMs,
+    runs: allRuns,
+    enabled: pages.length <= 1,
+    sseConnected,
+  });
 
   const allScenarioSetIds = useMemo(() => {
     const merged: Record<string, string> = {};

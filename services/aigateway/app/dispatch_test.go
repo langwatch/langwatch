@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -445,7 +444,7 @@ func TestHandleChat_TerminatesOnUpstream400(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, 1, callCount)
 	var ue *domain.UpstreamError
-	require.True(t, errors.As(err, &ue))
+	require.ErrorAs(t, err, &ue)
 	assert.Equal(t, 400, ue.StatusCode)
 }
 

@@ -58,6 +58,7 @@ import type {
   TableRowData,
   TargetConfig,
 } from "../types";
+import { isGoldenFieldSatisfied } from "../types";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
@@ -102,6 +103,17 @@ type EvaluatorDbConfig = {
   evaluatorType?: EvaluatorTypes;
   settings?: Record<string, unknown>;
 };
+
+// A pairwise evaluator is ready to render its own result column once both
+// variants are picked and the golden-field requirement is satisfied (see
+// isGoldenFieldSatisfied). Exported so it can be unit-tested directly
+// instead of only through a full table render.
+export const isPairwiseConfigured = (e: EvaluatorConfig) =>
+  e.evaluatorType === "langevals/pairwise_compare" &&
+  !!e.pairwise?.variantA &&
+  !!e.pairwise?.variantB &&
+  !!e.pairwise &&
+  isGoldenFieldSatisfied(e.pairwise);
 
 // ============================================================================
 // Main Component
@@ -299,6 +311,7 @@ export function EvaluationsV3Table({
   const pendingPairwiseRef = useRef<{
     variantA: string;
     variantB: string;
+    hasGoldenAnswer: boolean;
     goldenField: string;
     includeMetrics: ("cost" | "duration")[];
   } | null>(null);
@@ -416,6 +429,7 @@ export function EvaluationsV3Table({
           pairwise: pendingPairwiseRef.current ?? {
             variantA: "",
             variantB: "",
+            hasGoldenAnswer: true,
             goldenField: "",
             includeMetrics: [],
           },
@@ -533,9 +547,15 @@ export function EvaluationsV3Table({
         (e) => e.dbEvaluatorId === evaluator.id,
       );
 
-      // If already exists, no need to add again (it applies to all targets)
+      // If already exists, reuse it instead of silently no-op'ing. The
+      // pre-existing behavior (return null) made the drawer close with no
+      // visible feedback, which trained users to fall back to "New Evaluator"
+      // and pile up duplicate rows in the DB (Rogerio dogfood report — the
+      // "why do I have 3 Pairwise Compare evaluators" thread). Returning the
+      // existing config's id lets `guideOrCloseAfterAdd` route to the editor
+      // just like a fresh add would, so the click has an observable effect.
       if (existingEvaluator) {
-        return null;
+        return existingEvaluator.id;
       }
 
       // Create a new EvaluatorConfig from the evaluator
@@ -1076,6 +1096,15 @@ export function EvaluationsV3Table({
     getCellValue: state.getCellValue,
   }));
 
+  // Which target column's header cell should glow — set by clicking a
+  // variant name in a pairwise verdict (customer feedback, 2026-07-08).
+  // Applied to the whole `<th>` box, not just the component rendered
+  // inside it, so the highlight reads as "this column" rather than a
+  // border around one label.
+  const highlightedVariantTargetId = useEvaluationsV3Store(
+    (state) => state.ui.highlightedVariantTargetId,
+  );
+
   // Build row data from active dataset records (works for both inline and saved)
   // Note: We include activeDataset in dependencies to ensure re-render when cell values change
   const rowData = useMemo((): TableRowData[] => {
@@ -1190,27 +1219,15 @@ export function EvaluationsV3Table({
     [datasetColumnsKey],
   );
 
-  // Stabilize pairwise evaluators — only those with both variants configured.
-  // Only recreate columns when the set of configured pairwise evaluators changes.
+  // Stabilize pairwise evaluators — only those considered configured (see
+  // isPairwiseConfigured above). Only recreate columns when the set of
+  // configured pairwise evaluators changes.
   const pairwiseEvaluatorsKey = evaluators
-    .filter(
-      (e) =>
-        e.evaluatorType === "langevals/pairwise_compare" &&
-        e.pairwise?.variantA &&
-        e.pairwise?.variantB &&
-        e.pairwise?.goldenField,
-    )
+    .filter(isPairwiseConfigured)
     .map((e) => `${e.id}:${e.pairwise?.variantA}:${e.pairwise?.variantB}`)
     .join(",");
   const stablePairwiseEvaluators = useMemo(
-    () =>
-      evaluators.filter(
-        (e) =>
-          e.evaluatorType === "langevals/pairwise_compare" &&
-          e.pairwise?.variantA &&
-          e.pairwise?.variantB &&
-          e.pairwise?.goldenField,
-      ),
+    () => evaluators.filter(isPairwiseConfigured),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pairwiseEvaluatorsKey],
   );
@@ -1815,6 +1832,9 @@ export function EvaluationsV3Table({
                 const columnType = meta?.columnType ?? "unknown";
                 const isFixedWidth = meta?.isFixedWidth ?? false;
 
+                const isHighlightedColumn =
+                  !!targetId && targetId === highlightedVariantTargetId;
+
                 return (
                   <th
                     key={header.id}
@@ -1824,6 +1844,11 @@ export function EvaluationsV3Table({
                         columnType,
                         isFixedWidth,
                       ),
+                      ...(isHighlightedColumn && {
+                        boxShadow:
+                          "inset 0 0 0 2px var(--chakra-colors-blue-400)",
+                        background: "var(--chakra-colors-blue-subtle)",
+                      }),
                     }}
                     // Add data attribute for target columns to enable scroll-to behavior
                     {...(targetId && { "data-target-column": targetId })}

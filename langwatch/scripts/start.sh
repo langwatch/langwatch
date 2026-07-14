@@ -85,8 +85,16 @@ fi
 
 START_APP_COMMAND="pnpm run start:app"
 
+# Dev-only single-process mode: WORKERS_IN_PROCESS=1 hosts the worker stack
+# inside `start:app` (the app boots with the "all" role) instead of a separate
+# concurrently lane. When it's set we skip the standalone workers command below
+# and let start:app inherit the flag from the environment. Production never sets
+# this — it runs web and worker as separate deployments.
 START_WORKERS_COMMAND=""
-if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
+if [[ "$NODE_ENV" = "development" && ( "$WORKERS_IN_PROCESS" = "true" || "$WORKERS_IN_PROCESS" = "1" ) ]]; then
+  export WORKERS_IN_PROCESS
+  echo "  ✓ workers: in-process (WORKERS_IN_PROCESS=1) — no separate worker lane"
+elif [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
   START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
 fi
 

@@ -1,3 +1,4 @@
+import type { IncomingMessage } from "node:http";
 import { performance } from "node:perf_hooks";
 import {
   Counter,
@@ -11,6 +12,68 @@ import {
 if (!register.getSingleMetric("process_cpu_user_seconds_total")) {
   collectDefaultMetrics({ register });
 }
+
+/**
+ * Bearer-token gate shared by the web `/metrics` + `/workers/metrics` proxy
+ * (start.ts) and the worker process's own `/metrics` listener (workers.ts), so
+ * the two can't drift. Fail-closed in production when METRICS_API_KEY is unset;
+ * in non-prod an unset key allows access for dev convenience.
+ */
+export const isMetricsAuthorized = (req: IncomingMessage): boolean => {
+  const authHeader = req.headers.authorization;
+  if (process.env.NODE_ENV === "production" && !process.env.METRICS_API_KEY) {
+    throw new Error("METRICS_API_KEY is not set");
+  }
+  return (
+    !process.env.METRICS_API_KEY ||
+    authHeader === `Bearer ${process.env.METRICS_API_KEY}`
+  );
+};
+
+/**
+ * Collapses ID-shaped path segments to `{id}` so the `path` label on the HTTP
+ * request histogram stays low-cardinality (route template, not raw URL).
+ *
+ * Every distinct label value is a permanent series in this process's registry
+ * AND in Prometheus's head, held for the lifetime of the process. The
+ * Next.js → Hono migration (#3170) dropped the route-template normalization
+ * the original middleware had, so raw URLs — `/api/traces/trace_<nanoid>` and
+ * friends — accumulate one series per entity ever requested and grow the
+ * registry without bound. A path label must never contain per-entity IDs.
+ */
+export const normalizeMetricsPath = (path: string): string => {
+  const segments = path.replace(/\/{2,}/g, "/").split("/");
+  const normalized = segments.map((segment) => {
+    if (segment === "") return segment;
+    // percent-encoded leftovers (`abc%3D%3D`) are never route words
+    if (segment.includes("%")) return "{id}";
+    // purely numeric
+    if (/^\d+$/.test(segment)) return "{id}";
+    // uuid
+    if (
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        segment,
+      )
+    )
+      return "{id}";
+    // bare hex ids (trace ids are 16/32 hex chars)
+    if (/^[0-9a-f]{8,}$/i.test(segment)) return "{id}";
+    // prefixed entity ids: trace_…, project_…, prompt_…, eval_… — the tail of
+    // a generated id always carries a digit or uppercase, which route words
+    // (`batch_clustering`) never do
+    if (/^[a-z]+_[A-Za-z0-9_-]{6,}$/.test(segment) && /[A-Z0-9]/.test(segment))
+      return "{id}";
+    // long unprefixed tokens (nanoid, base64ish) — a digit or an uppercase
+    // letter marks a generated token; route words are lowercase-only
+    if (
+      /^[A-Za-z0-9_-]{16,}$/.test(segment) &&
+      (/\d/.test(segment) || /[A-Z]/.test(segment))
+    )
+      return "{id}";
+    return segment;
+  });
+  return normalized.join("/") || "/";
+};
 
 type Endpoint =
   | "collector"
@@ -357,6 +420,43 @@ export const observeEsFoldProjectionDuration = (
     .labels(pipelineName, projectionName)
     .observe(durationMs);
 
+register.removeSingleMetric("es_fold_refold_total");
+const esFoldRefoldTotal = new Counter({
+  name: "es_fold_refold_total",
+  help: "Out-of-order fold re-folds, by whether the aggregate's history was replayed from the event log",
+  labelNames: ["projection_name", "outcome"] as const,
+});
+
+/**
+ * `performed` — the aggregate's full history was re-read and replayed.
+ * `declined` — the projection set `refoldOnOutOfOrder: false`, so the batch was
+ * applied on top instead (the events are never lost; only the replay is skipped).
+ * `unavailable` — no eventLoader was wired, so a re-fold was impossible.
+ */
+export const incrementEsFoldRefoldTotal = (
+  projectionName: string,
+  outcome: "performed" | "declined" | "unavailable",
+) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
+
+register.removeSingleMetric("es_reactor_collapsed_total");
+const esReactorCollapsedTotal = new Counter({
+  name: "es_reactor_collapsed_total",
+  help: "Reactor dispatches skipped by collapsing a coalesced batch to one send per deduplication id",
+  labelNames: ["pipeline_name", "reactor_name"] as const,
+});
+
+/**
+ * Counts the sends a coalesced batch did NOT make. Each one would have
+ * serialized, gzipped and blobbed `{event, foldState}` only for the queue's
+ * dedup to discard it, so this is the direct measure of the churn the collapse
+ * removes (2026-07-09 incident).
+ */
+export const incrementEsReactorCollapsedTotal = (
+  pipelineName: string,
+  reactorName: string,
+  skipped: number,
+) => esReactorCollapsedTotal.labels(pipelineName, reactorName).inc(skipped);
+
 // --- Map projection metrics ---
 register.removeSingleMetric("es_map_projection_total");
 const esMapProjectionTotal = new Counter({
@@ -564,3 +664,41 @@ export async function withMetrics<T>({
     throw error;
   }
 }
+
+// =============================================================================
+// Worker metrics HTTP listener port
+// =============================================================================
+
+/**
+ * Worker metrics port follows PORT so non-default PORT slots (5570, 5580...)
+ * don't all collide on 2999. PORT=5560 → 2999 (back-compat).
+ */
+const WORKER_METRICS_PORT_OFFSET = 2561;
+
+export const DEFAULT_WORKER_METRICS_PORT = 2999;
+
+const getDefaultWorkerMetricsPort = (): number => {
+  const portString = process.env.PORT;
+  if (portString === undefined || portString === "") {
+    return DEFAULT_WORKER_METRICS_PORT;
+  }
+  const basePort = parseInt(portString, 10);
+  if (Number.isNaN(basePort)) {
+    return DEFAULT_WORKER_METRICS_PORT;
+  }
+  return basePort - WORKER_METRICS_PORT_OFFSET;
+};
+
+export const getWorkerMetricsPort = (): number => {
+  const portString =
+    process.env.WORKER_METRICS_PORT ?? String(getDefaultWorkerMetricsPort());
+  const port = parseInt(portString, 10);
+
+  if (Number.isNaN(port) || port < 1 || port > 65535) {
+    throw new Error(
+      `Invalid WORKER_METRICS_PORT: "${portString}". Must be a number between 1 and 65535.`,
+    );
+  }
+
+  return port;
+};

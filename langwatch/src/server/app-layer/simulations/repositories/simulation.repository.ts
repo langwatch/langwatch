@@ -20,6 +20,8 @@ export type AllSuitesRunDataResult =
 export interface SimulationRepository {
   getScenarioSetsData(params: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ScenarioSetData[]>;
 
   getScenarioRunData(params: {
@@ -32,6 +34,8 @@ export interface SimulationRepository {
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<BatchHistoryResult>;
 
   getRunDataForBatchRun(params: {
@@ -59,14 +63,11 @@ export interface SimulationRepository {
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]>;
 
-  getScenarioRunDataByScenarioId(params: {
-    projectId: string;
-    scenarioId: string;
-  }): Promise<ScenarioRunData[] | null>;
-
   getBatchRunCountForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<number>;
 
   getExternalSetSummaries(params: {
@@ -89,6 +90,19 @@ export interface SimulationRepository {
     endDate?: number;
     sinceTimestamp?: number;
   }): Promise<AllSuitesRunDataResult>;
+
+  /**
+   * Returns the latest UpdatedAt (Unix ms) across the project's runs in the
+   * given window — a cheap freshness signal the UI polls instead of re-reading
+   * run payloads. Includes archived rows on purpose: archiving bumps UpdatedAt,
+   * and the list must refresh to drop the archived run.
+   */
+  findLastUpdatedAt(params: {
+    projectId: string;
+    scenarioSetId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<number>;
 
   /**
    * Returns the run ids for a SPECIFIC scenario set — never the whole project.
@@ -139,10 +153,6 @@ export class NullSimulationRepository implements SimulationRepository {
     return [];
   }
 
-  async getScenarioRunDataByScenarioId(): Promise<ScenarioRunData[] | null> {
-    return null;
-  }
-
   async getBatchRunCountForScenarioSet(): Promise<number> {
     return 0;
   }
@@ -163,6 +173,10 @@ export class NullSimulationRepository implements SimulationRepository {
       scenarioSetIds: {},
       hasMore: false,
     };
+  }
+
+  async findLastUpdatedAt(): Promise<number> {
+    return 0;
   }
 
   async findAllRunIdsForSet(): Promise<{

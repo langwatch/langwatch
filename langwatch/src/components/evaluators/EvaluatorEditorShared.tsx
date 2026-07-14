@@ -64,6 +64,7 @@ import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 const EMPTY_PAIRWISE_CONFIG: PairwiseEvaluatorConfig = {
   variantA: "",
   variantB: "",
+  hasGoldenAnswer: true,
   goldenField: "",
   includeMetrics: [],
 };
@@ -726,11 +727,14 @@ export function EvaluatorEditorBody({
             prefix="settings"
             errors={form.formState.errors.settings}
             variant="default"
-            // Pairwise renders include_metrics as inline Switches in
-            // PairwiseConfigForm; suppress the generic array-of-literals
-            // renderer here so the user doesn't see two competing UIs
-            // for the same field.
-            skipFields={isPairwise ? ["include_metrics"] : undefined}
+            // Pairwise renders include_metrics and has_golden_answer as
+            // inline controls in PairwiseConfigForm (the latter sits right
+            // next to the Golden field picker it toggles, #5378); suppress
+            // the generic renderers here so the user doesn't see two
+            // competing UIs for the same fields.
+            skipFields={
+              isPairwise ? ["include_metrics", "has_golden_answer"] : undefined
+            }
           />
         )}
 

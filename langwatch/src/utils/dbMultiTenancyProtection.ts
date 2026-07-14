@@ -2,6 +2,29 @@ import type { Prisma } from "@prisma/client";
 
 import { ORG_BEARING_MODEL_NAMES } from "./dbOrganizationIdProtection";
 
+// Looks for `projectId`, `organizationId`, or `tenantId` anywhere in
+// the SQL string. The legacy outbox drainer carries an explicit
+// identifier; the advisory-lock helper opts out via the `-- @tenancy:`
+// marker below. Only a genuinely scope-less query would miss both.
+const RAW_TENANCY_PREDICATE_RE = /"?(projectId|organizationId|tenantId)"?/i;
+
+// Opt-out marker for the rare query that intentionally scans across
+// tenants (e.g. a global recovery sweep, a deploy-time migration helper).
+// `-- @tenancy: <reason>` is grep-able and surfaces in code review.
+const RAW_TENANCY_OPTOUT_RE = /--\s*@tenancy\s*:/i;
+
+function extractRawSql(args: unknown): string | null {
+  if (!args || typeof args !== "object") return null;
+  const a = args as Record<string, unknown>;
+  // Prisma's $queryRaw / $executeRaw middleware exposes the SQL on
+  // either `query` (string) or `strings` (the TemplateStringsArray
+  // joined with the parameter placeholders). Both shapes appear
+  // depending on Prisma version and call site.
+  if (typeof a.query === "string") return a.query;
+  if (Array.isArray(a.strings)) return a.strings.join(" ? ");
+  return null;
+}
+
 /**
  * Genuinely global / cross-cutting models with no tenancy column at all: the
  * NextAuth identity tables, the top-level tenancy entities themselves (queried
@@ -132,9 +155,7 @@ const hasScopePredicate = (where: any): boolean => {
       some.OR.length > 0 &&
       some.OR.every(
         (o: any) =>
-          o &&
-          typeof o.scopeType === "string" &&
-          isScopeIdValue(o.scopeId),
+          o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId),
       )
     ) {
       return true;
@@ -350,9 +371,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.virtualKeyId && Array.isArray(c.virtualKeyId.in)) ||
           hasScopePredicate(c),
       );
-      return ok
-        ? null
-        : "requires a row id, virtualKeyId, or scope predicate";
+      return ok ? null : "requires a row id, virtualKeyId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -371,7 +390,8 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   },
   ModelDefaultConfig: {
     validateWhere: (where) => {
-      if (!where) return "requires a row id, organizationId, or scope predicate";
+      if (!where)
+        return "requires a row id, organizationId, or scope predicate";
       const ok = validateRecursive(
         where,
         (c) =>
@@ -407,9 +427,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.configId && Array.isArray(c.configId.in)) ||
           hasScopePredicate(c),
       );
-      return ok
-        ? null
-        : "requires a row id, configId, or scope predicate";
+      return ok ? null : "requires a row id, configId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -566,13 +584,36 @@ const EXEMPT_MODELS = new Set<string>([
 ]);
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
-  // Raw operations ($queryRaw / $executeRaw) have no model — they are not
-  // project-scoped and cannot be auto-guarded (the SQL author owns tenancy).
-  // Mirrors the sibling guardOrganizationId, which already exempts no-model ops.
-  if (!params.model) return;
-  if (params.model && EXEMPT_MODELS.has(params.model)) return;
-
   const action = params.action;
+
+  // Raw queries (`$queryRaw`, `$executeRaw`) carry their tenancy scope
+  // inside the SQL string itself, where the structural guard cannot see
+  // it. Two cheap structural defences still apply: require the SQL text
+  // to mention a tenancy column, or accept an explicit grep-able
+  // `-- @tenancy: <reason>` opt-out for genuinely cross-tenant queries.
+  // This must run BEFORE the no-model exemption below: raw ops have no
+  // `params.model`, so an earlier `!params.model` return would skip it.
+  if (action === "queryRaw" || action === "executeRaw") {
+    const sql = extractRawSql(params.args);
+    if (!sql) return;
+    if (RAW_TENANCY_OPTOUT_RE.test(sql)) return;
+    if (!RAW_TENANCY_PREDICATE_RE.test(sql)) {
+      throw new Error(
+        "The raw query is missing a tenancy predicate. Include `projectId`, " +
+          "`organizationId`, or `tenantId` in the SQL — or opt out with a " +
+          "`-- @tenancy: <reason>` comment if the query intentionally scans " +
+          "across tenants.",
+      );
+    }
+    return;
+  }
+
+  // Other model-less operations (e.g. $transaction bookkeeping) are not
+  // project-scoped and cannot be auto-guarded. Mirrors the sibling
+  // guardOrganizationId, which already exempts no-model ops.
+  if (!params.model) return;
+  if (EXEMPT_MODELS.has(params.model)) return;
+
   const model = params.model;
 
   // Scoped models opt in to a stricter check than EXEMPT_MODELS:
@@ -584,10 +625,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   if (model && SCOPED_MODELS[model]) {
     const config = SCOPED_MODELS[model];
     if (action === "create" || action === "createMany") {
-      const data =
-        action === "create"
-          ? params.args?.data
-          : params.args?.data;
+      const data = action === "create" ? params.args?.data : params.args?.data;
       const err = config.validateCreateData(data);
       if (err) {
         throw new Error(`The ${action} action on the ${model} model ${err}.`);

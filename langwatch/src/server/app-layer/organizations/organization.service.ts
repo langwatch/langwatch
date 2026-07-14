@@ -1,11 +1,20 @@
-import { PricingModel, RoleBindingScopeType, type OrganizationUserRole, type TeamUserRole } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { generate } from "@langwatch/ksuid";
-import { slugify } from "~/utils/slugify";
+import type { User } from "@prisma/client";
+import {
+  type OrganizationIntent,
+  type OrganizationUserRole,
+  PricingModel,
+  RoleBindingScopeType,
+  type TeamUserRole,
+} from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
+import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { type TeamRoleValue } from "~/utils/memberRoleConstraints";
-import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
+import type { TeamRoleValue } from "~/utils/memberRoleConstraints";
+import { slugify } from "~/utils/slugify";
 import { isCustomRole } from "../../api/enterprise";
+import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
 import type {
   AuditLogFilters,
   CreateAndAssignResult,
@@ -20,9 +29,6 @@ import type {
   UpdateOrganizationInput,
   UpdateTeamMemberRoleInput,
 } from "./repositories/organization.repository";
-import type { User } from "@prisma/client";
-import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
-import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 
 /**
  * Pure function that returns a team enriched with a synthesized member entry
@@ -127,6 +133,16 @@ export class OrganizationService {
     return this.repo.getProjectIds(organizationId);
   }
 
+  /**
+   * The org's declared primary intent (ADR-038); null = intent unset
+   * (legacy org). Consumed by the home resolver to pin the "/" landing.
+   */
+  async getPrimaryIntent(
+    organizationId: string,
+  ): Promise<OrganizationIntent | null> {
+    return this.repo.findPrimaryIntentById(organizationId);
+  }
+
   async findWithAdmins(
     organizationId: string,
   ): Promise<OrganizationWithAdmins | null> {
@@ -161,6 +177,7 @@ export class OrganizationService {
     orgName?: string;
     phoneNumber?: string;
     signUpData?: Record<string, unknown>;
+    primaryIntent?: OrganizationIntent | null;
     userDisplayName?: string | null;
   }): Promise<CreateAndAssignResult> {
     const orgName =
@@ -186,6 +203,7 @@ export class OrganizationService {
       teamSlug,
       phoneNumber: params.phoneNumber,
       signUpData: params.signUpData,
+      primaryIntent: params.primaryIntent,
       pricingModel: PricingModel.SEAT_EVENT,
     });
 
@@ -243,7 +261,6 @@ export class OrganizationService {
 
   /**
    * Persists updated organization settings. Encryption is applied in the repository.
-   * The router triggers elasticsearch migration after calling this method.
    */
   async update(input: UpdateOrganizationInput): Promise<void> {
     return this.repo.update(input);
@@ -377,5 +394,4 @@ export class OrganizationService {
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     return this.repo.getAuditLogs(filters);
   }
-
 }

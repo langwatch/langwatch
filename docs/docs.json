@@ -112,7 +112,8 @@
                     "group": "Via UI",
                     "pages": [
                       "evaluations/experiments/ui/answer-correctness",
-                      "evaluations/experiments/ui/llm-as-a-judge"
+                      "evaluations/experiments/ui/llm-as-a-judge",
+                      "evaluations/experiments/ui/pairwise-compare"
                     ]
                   },
                   "evaluations/experiments/ci-cd",
@@ -786,7 +787,8 @@
               "self-hosting/security",
               "self-hosting/compliance",
               "self-hosting/upgrade",
-              "self-hosting/upgrade-v3"
+              "self-hosting/upgrade-v3",
+              "self-hosting/upgrade-dataset-storage"
             ]
           },
           {
@@ -1242,7 +1244,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1783187830",
+      "source": "/ci/cache/busted/1783524031",
       "destination": "/"
     },
     {

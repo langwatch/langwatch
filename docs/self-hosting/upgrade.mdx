@@ -96,6 +96,12 @@ docker compose up -d
 
 ## Breaking Changes
 
+### Dataset Object Storage (Helm)
+
+Datasets moved from PostgreSQL to object storage, with a one-time automatic migration on upgrade. Helm deployments running more than one worker replica with the default local storage must either scale workers to 1 or configure S3-compatible storage before upgrading.
+
+See the **[dataset storage migration guide](/self-hosting/upgrade-dataset-storage)** for the upgrade checklist, storage options, and rollback notes.
+
 ### v1.x, v2.x to v3: ClickHouse Migration
 
 LangWatch v3 replaces Elasticsearch/OpenSearch with ClickHouse as the primary data store. This is a zero-downtime migration, Elasticsearch and ClickHouse run side-by-side while you migrate historical data.

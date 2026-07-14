@@ -39,7 +39,7 @@ describe("mergeRunData()", () => {
       }),
     ];
 
-    /** @scenario "Service merges BullMQ jobs and ES scenario events into a unified list" */
+    /** @scenario "Service returns queued and completed runs in a unified list" */
     it("returns both entries", () => {
       const result = mergeRunData({ esRuns, queuedRuns });
       expect(result).toHaveLength(2);
@@ -62,7 +62,7 @@ describe("mergeRunData()", () => {
       status: ScenarioRunStatus.QUEUED,
     });
 
-    /** @scenario "ES data takes precedence over BullMQ job data" */
+    /** @scenario "A scenario run shows its latest state" */
     it("returns only the stored version", () => {
       const result = mergeRunData({ esRuns: [esRun], queuedRuns: [queuedRun] });
       expect(result).toHaveLength(1);
@@ -77,7 +77,7 @@ describe("mergeRunData()", () => {
       makeRunData({ scenarioRunId: "scenariorun_bbb" }),
     ];
 
-    /** @scenario "Returns only ES data when no jobs are queued" */
+    /** @scenario "Returns only completed rows when no runs are queued" */
     it("returns only stored data", () => {
       const result = mergeRunData({ esRuns, queuedRuns: [] });
       expect(result).toHaveLength(2);
@@ -97,7 +97,7 @@ describe("mergeRunData()", () => {
       }),
     ];
 
-    /** @scenario "Returns only queued rows when no ES events exist yet" */
+    /** @scenario "Returns only queued rows when no runs have completed yet" */
     it("returns only queued job rows", () => {
       const result = mergeRunData({ esRuns: [], queuedRuns });
       expect(result).toHaveLength(2);
@@ -124,7 +124,7 @@ describe("mergeRunData()", () => {
       }),
     ];
 
-    /** @scenario "Deduplication removes BullMQ entries that have matching ES entries" */
+    /** @scenario "Deduplication keeps a single row per scenario execution" */
     it("preserves non-overlapping entries from both sources", () => {
       const result = mergeRunData({ esRuns, queuedRuns });
       expect(result).toHaveLength(3);

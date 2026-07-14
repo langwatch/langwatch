@@ -1,51 +1,50 @@
 /**
  * Hono routes for cron jobs.
- *
- * Replaces:
- * - src/pages/api/cron/old_lambdas_cleanup.ts
- * - src/pages/api/cron/scenario_analytics.ts
- * - src/pages/api/cron/schedule_topic_clustering.ts
- * - src/pages/api/cron/trace_analytics.ts
- * - src/pages/api/cron/traces_retention_period_cleanup.ts
- * - src/pages/api/cron/triggers/index.ts
  */
-import type { Prisma, Project, Trigger } from "@prisma/client";
+import type { Project, Trigger } from "@prisma/client";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
-import {
-  createServiceApp,
-  internalSecret,
-} from "~/server/api/security";
-import { validateInternalSecret } from "./_lib/internal-secret";
+import { processCustomGraphTrigger } from "~/pages/api/cron/triggers/customGraphTrigger";
+import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { createScenarioAnalyticsQueriesForAllEventTypes } from "~/server/scenario-analytics";
-import { deleteTracesRetentionPolicy } from "~/tasks/deleteTracesRetentionPolicy";
-import { COLD_STORAGE_AGE_DAYS } from "~/server/elasticsearch";
-import { cleanupOrphanedTraces } from "~/tasks/cold/cleanupOrphanedHotTraces";
-import { migrateToColdStorage } from "~/tasks/cold/moveTracesToColdStorage";
-import { scheduleTopicClustering } from "~/server/background/queues/topicClusteringQueue";
+import { featureFlagService } from "~/server/featureFlag";
+import { scheduleTopicClustering } from "~/server/topicClustering/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
-import { processCustomGraphTrigger } from "~/pages/api/cron/triggers/customGraphTrigger";
+import { createLogger } from "~/utils/logger/server";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   reportHasFailures,
   type SeedRunReport,
 } from "../../../scripts/dogfood/governance/_lib/seedRunner";
 import { runSeedDemo } from "../../../scripts/dogfood/governance/seed-demo";
-import { ANALYTICS_KEYS } from "~/types";
-import { createLogger } from "~/utils/logger/server";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
+import {
+  isInternalSecretValid,
+  validateInternalSecret,
+} from "./_lib/internal-secret";
 
 const logger = createLogger("langwatch:cron");
 
-const secured = createServiceApp({ basePath: "/api" });
+// Builder-enforced secret gate: every route registered on this app passes
+// through the shared-secret check before its handler runs, so a future cron
+// route whose author forgets the in-handler validateCronKey call still ships
+// authenticated. The per-handler checks below stay as belt-and-braces.
+const secured = createServiceApp({
+  basePath: "/api",
+  verifySecret: async (c, next) => {
+    if (!isInternalSecretValid(c.req.header("authorization"))) {
+      return c.body(null, 401);
+    }
+    await next();
+  },
+});
 
 type CronContext = Context;
 
 const cronPolicy = () =>
   internalSecret(
-    "cron shared secret validated in-handler via validateInternalSecret",
+    "cron shared secret enforced by the builder-level verifySecret middleware " +
+      "(and re-checked in-handler via validateInternalSecret)",
   );
 
 /** Validates the cron shared secret. See validateInternalSecret (fail-closed + constant-time). */
@@ -72,177 +71,42 @@ const oldLambdasCleanupHandler = async (c: CronContext) => {
     );
   }
 };
-secured.access(cronPolicy()).get("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
-secured.access(cronPolicy()).post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
-
-// ---------- GET /api/cron/scenario_analytics ----------
-secured.access(cronPolicy()).get("/cron/scenario_analytics", async (c) => {
-  if (!validateCronKey(c)) {
-    return c.body(null, 401);
-  }
-
-  try {
-    const result = await processScenarioAnalytics();
-    return c.json({
-      success: true,
-      projectsProcessed: result.projectsProcessed,
-      analyticsCreated: result.analyticsCreated,
-    });
-  } catch (error) {
-    logger.error({ error }, "[Scenario Analytics] Error");
-    return c.json(
-      { success: false, error: "Failed to process scenario analytics" },
-      500,
-    );
-  }
-});
+secured
+  .access(cronPolicy())
+  .get("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
+secured
+  .access(cronPolicy())
+  .post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
 
 // ---------- GET|POST /api/cron/schedule_topic_clustering ----------
 const scheduleTopicClusteringHandler = async (c: CronContext) => {
   if (!validateCronKey(c)) {
     return c.body(null, 401);
   }
-
   try {
     await scheduleTopicClustering();
     return c.json({ message: "Topic clustering scheduled" });
   } catch (error: any) {
     return c.json(
       {
-        message: "Error starting worker",
+        message: "Error scheduling topic clustering",
         error: error?.message ? error?.message.toString() : `${error}`,
       },
       500,
     );
   }
 };
-secured.access(cronPolicy()).get("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
-secured.access(cronPolicy()).post("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
+secured
+  .access(cronPolicy())
+  .get("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
+secured
+  .access(cronPolicy())
+  .post("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
 
 // ---------- GET /api/cron/trace_analytics ----------
 secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
   if (!validateCronKey(c)) {
     return c.body(null, 401);
-  }
-
-  const projects = await prisma.project.findMany({
-    select: { id: true },
-  });
-
-  const client = await esClient({ test: true });
-
-  const yesterday = new Date();
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  yesterday.setUTCHours(0, 0, 0, 0);
-  const yesterdayEnd = new Date(yesterday);
-  yesterdayEnd.setUTCDate(yesterdayEnd.getUTCDate() + 1);
-
-  const startTimestamp = Date.UTC(
-    yesterday.getUTCFullYear(),
-    yesterday.getUTCMonth(),
-    yesterday.getUTCDate(),
-    0, 0, 0, 0,
-  );
-  const endTimestamp = Date.UTC(
-    yesterdayEnd.getUTCFullYear(),
-    yesterdayEnd.getUTCMonth(),
-    yesterdayEnd.getUTCDate(),
-    0, 0, 0, 0,
-  );
-
-  const msearchBody = projects.flatMap((project) => [
-    { index: TRACE_INDEX.alias },
-    {
-      size: 1,
-      sort: [{ "timestamps.started_at": "desc" }],
-      query: {
-        bool: {
-          must: [
-            {
-              bool: {
-                should: [
-                  { term: { "metadata.project_id": project.id } },
-                  { term: { project_id: project.id } },
-                ],
-                minimum_should_match: 1,
-              },
-            },
-            {
-              range: {
-                "timestamps.started_at": {
-                  gte: startTimestamp,
-                  lt: endTimestamp,
-                },
-              },
-            },
-          ],
-        },
-      },
-    },
-  ]);
-
-  try {
-    const msearchResult = await client.msearch({ body: msearchBody });
-
-    const analyticsToCreate = msearchResult.responses
-      .map((response: any, index: number) => {
-        const traceCount = response?.hits?.total?.value ?? 0;
-        if (traceCount === 0) return null;
-        return {
-          projectId: projects[index]?.id,
-          key: ANALYTICS_KEYS.PROJECT_TRACE_COUNT_PER_DAY,
-          numericValue: traceCount,
-          createdAt: yesterday,
-        } as Prisma.AnalyticsCreateManyInput;
-      })
-      .filter(
-        (entry): entry is Prisma.AnalyticsCreateManyInput => entry !== null,
-      );
-
-    if (analyticsToCreate.length > 0) {
-      const existingEntries = await prisma.analytics.findMany({
-        where: {
-          projectId: {
-            in: analyticsToCreate.map((entry) => entry.projectId),
-          },
-          key: ANALYTICS_KEYS.PROJECT_TRACE_COUNT_PER_DAY,
-          createdAt: { gte: yesterday, lt: yesterdayEnd },
-        },
-      });
-
-      const newAnalyticsToCreate = analyticsToCreate.filter(
-        (entry) =>
-          !existingEntries.some(
-            (existing) => existing.projectId === entry.projectId,
-          ),
-      );
-
-      if (newAnalyticsToCreate.length > 0) {
-        await prisma.analytics.createMany({
-          data: newAnalyticsToCreate,
-          skipDuplicates: true,
-        });
-        logger.info(
-          {
-            count: newAnalyticsToCreate.length,
-            date: yesterday.toISOString().split("T")[0],
-          },
-          "created trace analytics entries",
-        );
-      } else {
-        logger.info(
-          { date: yesterday.toISOString().split("T")[0] },
-          "all trace analytics entries already exist",
-        );
-      }
-    } else {
-      logger.info(
-        { date: yesterday.toISOString().split("T")[0] },
-        "no traces found for date",
-      );
-    }
-  } catch (error) {
-    logger.error({ error }, "trace analytics error");
   }
 
   // Check usage limits for all organizations (SaaS only)
@@ -256,9 +120,7 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
 
       for (const org of organizations) {
         try {
-          const projectIds = await getApp().organizations.getProjectIds(
-            org.id,
-          );
+          const projectIds = await getApp().organizations.getProjectIds(org.id);
           if (projectIds.length === 0) {
             logger.debug(
               { organizationId: org.id },
@@ -266,10 +128,9 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
             );
             continue;
           }
-          const currentMonthCount =
-            await usageService.getCurrentMonthCount({
-              organizationId: org.id,
-            });
+          const currentMonthCount = await usageService.getCurrentMonthCount({
+            organizationId: org.id,
+          });
 
           if (currentMonthCount === "unlimited") {
             logger.debug(
@@ -340,52 +201,6 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
   return c.json({ success: true });
 });
 
-// ---------- GET|POST /api/cron/traces_retention_period_cleanup ----------
-const tracesRetentionPeriodCleanupHandler = async (c: CronContext) => {
-  if (!validateCronKey(c)) {
-    return c.body(null, 401);
-  }
-
-  try {
-    const projectId = c.req.query("projectId") as string | undefined;
-    const organizationId = projectId
-      ? (
-          await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { team: { select: { organizationId: true } } },
-          })
-        )?.team?.organizationId
-      : undefined;
-    const cleanedUpOrphanedTraces = await cleanupOrphanedTraces(
-      COLD_STORAGE_AGE_DAYS,
-      organizationId,
-    );
-    const movedToColdStorage = await migrateToColdStorage(
-      COLD_STORAGE_AGE_DAYS,
-      organizationId,
-    );
-    const totalDeleted = await deleteTracesRetentionPolicy(projectId);
-
-    return c.json({
-      message:
-        "Traces retention period maintenance completed successfully",
-      totalDeleted,
-      movedToColdStorage: movedToColdStorage?.migrated,
-      cleanedUpOrphanedTraces: cleanedUpOrphanedTraces?.deleted,
-    });
-  } catch (error: any) {
-    return c.json(
-      {
-        message: "Error deleting old traces",
-        error: error?.message ? error.message.toString() : `${error}`,
-      },
-      500,
-    );
-  }
-};
-secured.access(cronPolicy()).get("/cron/traces_retention_period_cleanup", tracesRetentionPeriodCleanupHandler);
-secured.access(cronPolicy()).post("/cron/traces_retention_period_cleanup", tracesRetentionPeriodCleanupHandler);
-
 // ---------- GET /api/cron/triggers ----------
 secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
   if (!validateCronKey(c)) {
@@ -420,10 +235,50 @@ secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
   // reactively by the alertTrigger reactor on the trace-processing pipeline.
   const graphTriggers = triggers.filter((t) => t.customGraphId);
 
+  // ADR-034 Phase 5: skip triggers whose project has flipped onto the
+  // event-sourced graph-trigger path (real-time outbox reactor + 30s
+  // heartbeat handle them there). The flag is a PROJECT-level decision;
+  // resolve it once per distinct projectId per tick instead of once per
+  // trigger — N graph triggers in the same project would otherwise fan
+  // out to N flag lookups, all with the same answer. Cache-warm case is
+  // in-process; cold case is one Redis GET per project either way.
+  const distinctProjectIds = Array.from(
+    new Set(graphTriggers.map((t) => t.projectId)),
+  );
+  const esFlaggedProjectIds = new Set<string>();
+  await Promise.all(
+    distinctProjectIds.map(async (projectId) => {
+      try {
+        const onEsPath = await featureFlagService.isEnabled(
+          "release_es_graph_triggers_firing",
+          { distinctId: projectId, projectId },
+        );
+        if (onEsPath) esFlaggedProjectIds.add(projectId);
+      } catch (error) {
+        // A flag lookup failing (Redis blip) must not reject the whole
+        // Promise.all — that would abort this tick for EVERY project, not
+        // just this one. Leave the project unflagged so the cron keeps
+        // evaluating it: a duplicate notification is deduped by TriggerSent,
+        // whereas skipping it would silently drop the alert.
+        logger.error(
+          { projectId, error },
+          "[graph-trigger] flag lookup failed; leaving project on the cron path",
+        );
+      }
+    }),
+  );
+
   const results = [];
 
   for (const trigger of graphTriggers) {
     try {
+      if (esFlaggedProjectIds.has(trigger.projectId)) {
+        logger.info(
+          { triggerId: trigger.id, projectId: trigger.projectId },
+          "[graph-trigger] skipping in cron — project on event-sourced path",
+        );
+        continue;
+      }
       const result = await processCustomGraphTrigger(trigger, projects);
       results.push(result);
     } catch (error) {
@@ -434,8 +289,7 @@ secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
       results.push({
         triggerId: trigger.id,
         status: "error",
-        message:
-          error instanceof Error ? error.message : "Unknown error",
+        message: error instanceof Error ? error.message : "Unknown error",
         type: "customGraph",
       });
     }
@@ -477,165 +331,5 @@ const seedDemoHandler = async (c: CronContext) => {
 };
 secured.access(cronPolicy()).get("/cron/seed_demo", seedDemoHandler);
 secured.access(cronPolicy()).post("/cron/seed_demo", seedDemoHandler);
-
-// --- Scenario analytics helper functions ---
-
-function getYesterdayDateRange() {
-  const yesterdayStart = new Date();
-  yesterdayStart.setUTCDate(yesterdayStart.getUTCDate() - 1);
-  yesterdayStart.setUTCHours(0, 0, 0, 0);
-  const yesterdayEnd = new Date(yesterdayStart);
-  yesterdayEnd.setUTCDate(yesterdayEnd.getUTCDate() + 1);
-  return { yesterdayStart, yesterdayEnd };
-}
-
-function getHitCount(msearchResult: any, index: number): number {
-  const response = msearchResult.responses[index];
-  if (
-    response &&
-    "hits" in response &&
-    response.hits &&
-    "total" in response.hits
-  ) {
-    return typeof response.hits.total === "object" &&
-      "value" in response.hits.total
-      ? response.hits.total.value
-      : 0;
-  }
-  return 0;
-}
-
-async function processScenarioAnalytics() {
-  const projects = await prisma.project.findMany({
-    select: { id: true },
-  });
-  const client = await esClient({ test: true });
-  const dateRange = getYesterdayDateRange();
-
-  const msearchBody = projects.flatMap((project) =>
-    createScenarioAnalyticsQueriesForAllEventTypes({
-      projectId: project.id,
-      startTime: dateRange.yesterdayStart.getTime(),
-      endTime: dateRange.yesterdayEnd.getTime(),
-      includeDateHistogram: true,
-      dateHistogramOptions: {
-        calendarInterval: "day",
-        format: "yyyy-MM-dd",
-        timeZone: "UTC",
-      },
-    }),
-  );
-
-  const msearchResult = await client.msearch({ body: msearchBody });
-
-  const analyticsToCreate: Prisma.AnalyticsCreateManyInput[] = [];
-
-  for (let i = 0; i < projects.length; i++) {
-    const project = projects[i];
-    if (!project) continue;
-    const baseIndex = i * 3;
-
-    const messageSnapshotCount = getHitCount(msearchResult, baseIndex);
-    const runStartedCount = getHitCount(msearchResult, baseIndex + 1);
-    const runFinishedCount = getHitCount(msearchResult, baseIndex + 2);
-    const totalCount =
-      messageSnapshotCount + runStartedCount + runFinishedCount;
-
-    if (messageSnapshotCount > 0) {
-      analyticsToCreate.push({
-        projectId: project.id,
-        key: ANALYTICS_KEYS.SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY,
-        numericValue: messageSnapshotCount,
-        createdAt: dateRange.yesterdayStart,
-      });
-    }
-    if (runStartedCount > 0) {
-      analyticsToCreate.push({
-        projectId: project.id,
-        key: ANALYTICS_KEYS.SCENARIO_RUN_STARTED_COUNT_PER_DAY,
-        numericValue: runStartedCount,
-        createdAt: dateRange.yesterdayStart,
-      });
-    }
-    if (runFinishedCount > 0) {
-      analyticsToCreate.push({
-        projectId: project.id,
-        key: ANALYTICS_KEYS.SCENARIO_RUN_FINISHED_COUNT_PER_DAY,
-        numericValue: runFinishedCount,
-        createdAt: dateRange.yesterdayStart,
-      });
-    }
-    if (totalCount > 0) {
-      analyticsToCreate.push({
-        projectId: project.id,
-        key: ANALYTICS_KEYS.SCENARIO_EVENT_COUNT_PER_DAY,
-        numericValue: totalCount,
-        createdAt: dateRange.yesterdayStart,
-      });
-    }
-  }
-
-  if (analyticsToCreate.length > 0) {
-    const existingEntries = await prisma.analytics.findMany({
-      where: {
-        projectId: {
-          in: analyticsToCreate.map((entry) => entry.projectId),
-        },
-        key: {
-          in: [
-            ANALYTICS_KEYS.SCENARIO_EVENT_COUNT_PER_DAY,
-            ANALYTICS_KEYS.SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY,
-            ANALYTICS_KEYS.SCENARIO_RUN_STARTED_COUNT_PER_DAY,
-            ANALYTICS_KEYS.SCENARIO_RUN_FINISHED_COUNT_PER_DAY,
-          ],
-        },
-        createdAt: {
-          gte: dateRange.yesterdayStart,
-          lt: dateRange.yesterdayEnd,
-        },
-      },
-    });
-
-    const newAnalyticsToCreate = analyticsToCreate.filter(
-      (entry) =>
-        !existingEntries.some(
-          (existing) =>
-            existing.projectId === entry.projectId &&
-            existing.key === entry.key,
-        ),
-    );
-
-    if (newAnalyticsToCreate.length > 0) {
-      await prisma.analytics.createMany({
-        data: newAnalyticsToCreate,
-        skipDuplicates: true,
-      });
-      logger.info(
-        {
-          count: newAnalyticsToCreate.length,
-          date: dateRange.yesterdayStart.toISOString().split("T")[0],
-        },
-        "created scenario analytics entries",
-      );
-    } else {
-      logger.info(
-        {
-          date: dateRange.yesterdayStart.toISOString().split("T")[0],
-        },
-        "all scenario analytics entries already exist",
-      );
-    }
-  } else {
-    logger.info(
-      { date: dateRange.yesterdayStart.toISOString().split("T")[0] },
-      "no scenario events found",
-    );
-  }
-
-  return {
-    projectsProcessed: projects.length,
-    analyticsCreated: analyticsToCreate.length,
-  };
-}
 
 export const app = secured.hono;

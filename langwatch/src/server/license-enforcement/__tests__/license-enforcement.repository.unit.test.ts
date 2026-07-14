@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LicenseEnforcementRepository } from "../license-enforcement.repository";
 
 /**
@@ -10,9 +10,9 @@ import { LicenseEnforcementRepository } from "../license-enforcement.repository"
  * - Confirms archivedAt: null filtering for workflows/evaluators
  * - Validates query structure for all 8 Prisma-based methods
  *
- * Note: Message/trace counting is NOT tested here because it uses
- * Elasticsearch via TraceUsageService, not Prisma. That's tested
- * in the UsageStatsService tests.
+ * Note: Message/trace counting is NOT tested here because it lives in
+ * TraceUsageService (ClickHouse, not Prisma). See
+ * src/server/traces/__tests__/trace-usage.service.unit.test.ts.
  *
  * Note: Classification function tests (isViewOnlyPermission, isViewOnlyCustomRole,
  * classifyMemberType, isFullMember, isLiteMember) are in member-classification.unit.test.ts
@@ -724,6 +724,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getCurrentMonthCost", () => {
+    /** @scenario "getCurrentMonthCost remains available in the repository" */
     it("fetches project IDs and aggregates cost for current month", async () => {
       mockPrisma.project.findMany.mockResolvedValue([
         { id: "proj-1" },
@@ -835,4 +836,3 @@ describe("LicenseEnforcementRepository", () => {
     });
   });
 });
-

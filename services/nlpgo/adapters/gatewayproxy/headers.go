@@ -74,7 +74,9 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 
 	//nolint:exhaustive // playground credential header extraction only models the provider shapes that ship credentials inline today; unmapped providers (e.g. ProviderVoyage) fall through with empty Extra.
 	switch provider {
-	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini:
+	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini,
+		domain.ProviderXAI, domain.ProviderGroq, domain.ProviderCerebras,
+		domain.ProviderDeepSeek:
 		cred.APIKey = h.Get(headerAPIKey)
 		if base := h.Get(headerAPIBase); base != "" {
 			cred.Extra["api_base"] = base
@@ -135,35 +137,25 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 // figure out which provider should serve a request.
 var ErrMissingProvider = errors.New("gatewayproxy: missing provider — supply x-litellm-model with provider prefix or x-litellm-custom_llm_provider")
 
-// inferProvider derives the provider id from the model header (e.g.
-// "openai/gpt-5-mini" → "openai") falling back to the explicit
-// custom_llm_provider header. Returns false when neither resolves.
+// inferProvider derives the provider id from the explicit
+// custom_llm_provider header, falling back to the model header's
+// prefix (e.g. "openai/gpt-5-mini" → "openai"). Returns false when
+// neither resolves.
 func inferProvider(model, customProvider string) (domain.ProviderID, bool) {
 	if customProvider != "" {
-		switch customProvider {
-		case "openai":
-			return domain.ProviderOpenAI, true
-		case "anthropic":
-			return domain.ProviderAnthropic, true
-		case "azure", "azure_ai":
-			return domain.ProviderAzure, true
-		case "bedrock":
-			return domain.ProviderBedrock, true
-		case "vertex_ai", "vertex":
-			return domain.ProviderVertex, true
-		case "gemini", "google":
-			return domain.ProviderGemini, true
+		if p, ok := providerForPrefix(customProvider); ok {
+			return p, true
 		}
 	}
 	if i := strings.IndexByte(model, '/'); i > 0 {
-		prefix := strings.ToLower(model[:i])
-		if p, ok := providerForPrefix(prefix); ok {
-			return p, true
-		}
+		return providerForPrefix(strings.ToLower(model[:i]))
 	}
 	return "", false
 }
 
+// providerForPrefix maps a TS-registry provider name (as it appears in
+// model-id prefixes and the custom_llm_provider header, aliases
+// included) to a routable domain provider.
 func providerForPrefix(prefix string) (domain.ProviderID, bool) {
 	switch prefix {
 	case "openai":
@@ -176,8 +168,16 @@ func providerForPrefix(prefix string) (domain.ProviderID, bool) {
 		return domain.ProviderBedrock, true
 	case "vertex_ai", "vertex":
 		return domain.ProviderVertex, true
-	case "gemini":
+	case "gemini", "google":
 		return domain.ProviderGemini, true
+	case "xai":
+		return domain.ProviderXAI, true
+	case "groq":
+		return domain.ProviderGroq, true
+	case "cerebras":
+		return domain.ProviderCerebras, true
+	case "deepseek":
+		return domain.ProviderDeepSeek, true
 	}
 	return "", false
 }

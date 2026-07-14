@@ -6,8 +6,7 @@
 # explicitly. The .gitignore would otherwise drop:
 #   - /dist               (we ship the prebuilt vite client + scenario bundle)
 #   - *.generated.ts      (start:prepare:files outputs, imported at runtime)
-#   - src/server/sdk-radar/sdk-versions.json (same)
-# All three are required for `pnpm run start:app` to boot.
+# Both are required for `pnpm run start:app` to boot.
 
 # Heavy non-runtime trees.
 node_modules/

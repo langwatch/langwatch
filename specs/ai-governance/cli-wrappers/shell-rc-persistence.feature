@@ -9,13 +9,21 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
   prefix) inherits the exporter env and captures telemetry automatically
   on every subsequent session.
 
-  For tools with a native app-scoped env block (currently: `claude` →
-  `~/.claude/settings.json`'s `env` object) the wrapper writes there rather
-  than the profile-root shell rc — Claude Code reads the block on every
-  invocation, so a plain `claude` picks it up without editing `.zshrc` and
-  leaking the vars into every other shell child. For tools with no such
-  block (codex, cursor, gemini, opencode) the offer falls back to the
-  detected shell rc file.
+  For tools with a native app-scoped telemetry target the wrapper writes
+  there rather than the profile-root shell rc, so a plain `<tool>` picks it
+  up without editing `.zshrc` and leaking the vars into every other shell
+  child:
+    - `claude` → `~/.claude/settings.json`'s `env` object (read on every
+      invocation).
+    - `codex` → `~/.codex/config.toml`'s `[otel.trace_exporter.otlp-http]`
+      block, which takes an inline `headers` field, so the ingest token
+      lives beside the endpoint in one 0600 file.
+  Tools with no config-file env target (`gemini`, `opencode`) instead get a
+  shell function installed in the rc that sets the telemetry env ONLY for that
+  tool's invocations, since their OTEL vars use generic names a global
+  `export` would otherwise leak into every shell child. `cursor` is
+  gateway-only (`allow_otel_direct=false`), so Path B ingestion never resolves
+  for it and it never persists a telemetry env block.
 
   As a developer running `langwatch claude` over a subscription (Path B),
   I want to optionally install the telemetry exports once, idempotently,
@@ -102,19 +110,80 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
       Then the file's `env` object reflects the LATEST OTEL values verbatim
       And no duplicate keys or stale entries survive
 
-  Rule: Other wrappers still fall back to the shell rc
+  Rule: `langwatch codex` persists to ~/.codex/config.toml (native [otel] block)
 
-    Scenario Outline: Tools without an app-scoped env block use the shell rc
-      Given the user runs `langwatch <tool>` and it resolves to ingestion mode
+    Scenario: Persist target for codex is the Codex config file
+      Given `langwatch codex` resolves to ingestion mode
+      And ~/.codex/config.toml does not yet carry the OTLP Authorization header
       When the wrapper offers to persist telemetry exports
-      Then the prompt names the detected shell rc file as the target
+      Then the prompt names "~/.codex/config.toml" as the target
+      And the prompt does NOT name ~/.zshrc, ~/.bashrc, or the fish config
+      # Rationale: codex reads its [otel] block from config.toml on every run,
+      # and the otlp-http trace exporter takes an inline `headers` field, so
+      # the ingest token scopes to `codex` runs only instead of leaking into
+      # every shell child via the profile rc.
+
+    Scenario: Accept Y — write the Authorization header into the [otel] block
+      Given ~/.codex/config.toml already carries the langwatch [otel] endpoint
+        block written when the wrapper set up (endpoint + protocol, no header)
+      When the user types "y" at the persistence prompt
+      Then the [otel.trace_exporter.otlp-http] block gains a `headers` entry
+        carrying `Authorization = "Bearer <ingest-token>"`
+      And any config the user authored outside the langwatch marker pair
+        is preserved verbatim
+      And running a plain `codex` captures telemetry with no shell edits
+
+    Scenario: The wrapper's unconditional [otel] write preserves a persisted header
+      Given a previous run persisted the Authorization header into config.toml
+      When `langwatch codex` sets up again and rewrites the [otel] block
+      Then the persisted `headers` entry survives the rewrite
+      And the persistence prompt does NOT re-appear
+
+    Scenario: Skip the prompt when config.toml already carries the header
+      Given ~/.codex/config.toml's [otel.trace_exporter.otlp-http] block
+        already carries the Authorization header
+      When `langwatch codex` resolves to ingestion mode
+      Then the CLI does NOT prompt to persist
+
+  Rule: Tools without a config-file env target install a scoped shell function
+
+    Scenario Outline: Accept Y — write a scoped `<tool>` wrapper function
+      Given `langwatch <tool>` resolves to ingestion mode
+      When the user types "y" at the persistence prompt
+      Then the shell rc gains a marker-bracketed `<tool>()` function (or a
+        fish `function <tool>`) that sets the OTEL_EXPORTER_OTLP_* env and
+        then runs `command <tool>`
+      And the OTEL vars are NOT written as bare top-level `export`s
+      And running a plain `<tool>` captures telemetry, while other shell
+        children do not inherit the OTEL env
+      # Rationale: these tools' OTEL vars are generic OpenTelemetry names, so a
+      # global export would capture telemetry from every OTEL-aware process in
+      # the shell. The wrapper scopes them to `<tool>` runs only.
 
       Examples:
-        | tool      |
-        | codex     |
-        | cursor    |
-        | gemini    |
-        | opencode  |
+        | tool     |
+        | gemini   |
+        | opencode |
+
+    Scenario: Each tool's scoped wrapper lands under its own marker pair
+      Given ~/.zshrc already carries a scoped `gemini` wrapper from a prior run
+      When the user types "y" at the `opencode` persistence prompt
+      Then the `opencode` wrapper lands under its own marker pair
+      And the prior `gemini` wrapper is left intact
+
+    Scenario: Skip the prompt when the scoped wrapper already targets this endpoint
+      Given ~/.zshrc already carries the `<tool>` wrapper for the current
+        OTLP endpoint
+      When `langwatch <tool>` resolves to ingestion mode
+      Then the CLI does NOT prompt to persist
+
+  Rule: cursor never persists telemetry env (gateway-only)
+
+    Scenario: cursor resolves to the gateway path, so no persist prompt fires
+      Given cursor's policy has `allow_otel_direct=false`
+      When the user runs `langwatch cursor`
+      Then it resolves to the gateway path (Path A)
+      And the CLI does NOT prompt to persist a telemetry env block
 
   Rule: The prompt is Y / n / never
 
@@ -140,7 +209,7 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
 
     Scenario Outline: Pick the right rc file per detected shell (fallback tools)
       Given the user's $SHELL is "<shell>"
-      And the user runs `langwatch codex` in ingestion mode
+      And the user runs `langwatch gemini` in ingestion mode
       When the user types "y" at the persistence prompt
       Then the langwatch block is written to "<rc_path>"
 
@@ -160,5 +229,5 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
     Scenario: Unsupported shells skip silently (for shell-rc fallback tools)
       Given the user's $SHELL points at an unsupported shell
         (cmd, powershell, nushell, etc.)
-      And the user runs `langwatch codex` in ingestion mode
+      And the user runs `langwatch gemini` in ingestion mode
       Then the persistence flow is skipped entirely with no error

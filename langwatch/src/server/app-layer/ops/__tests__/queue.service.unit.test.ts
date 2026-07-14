@@ -465,13 +465,13 @@ describe("QueueService", () => {
         await service.drainTenant({
           queueName: "q1",
           tenantId: "project_X",
-          groupIdContains: "/fold/projectDailySdkUsage/",
+          groupIdContains: "/fold/traceSummary/",
         });
 
         expect(repo.drainTenant).toHaveBeenCalledWith({
           queueName: "q1",
           tenantId: "project_X",
-          groupIdContains: "/fold/projectDailySdkUsage/",
+          groupIdContains: "/fold/traceSummary/",
         });
       });
     });

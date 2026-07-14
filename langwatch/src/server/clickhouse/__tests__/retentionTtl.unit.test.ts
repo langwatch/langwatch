@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { RETENTION_MANAGED_TABLES } from "../../data-retention/retentionPolicy.schema";
 import {
   buildRetentionTTLExpression,
   hasRetentionTTL,
   TABLE_TTL_CONFIG,
 } from "../ttlReconciler";
-import { RETENTION_MANAGED_TABLES } from "../../data-retention/retentionPolicy.schema";
 
 describe("buildRetentionTTLExpression", () => {
   // The IF(_retention_days > 0, ...) guard is a safety net, not a normal path:
@@ -35,7 +35,9 @@ describe("buildRetentionTTLExpression", () => {
     // BAD_TTL_EXPRESSION (code 450). The anchor must be UpdatedAt — non-null
     // and partition-aligned with `toYearWeek(UpdatedAt)`.
     it("evaluation_runs anchors retention on the non-null partition key", () => {
-      const config = TABLE_TTL_CONFIG.find((c) => c.table === "evaluation_runs")!;
+      const config = TABLE_TTL_CONFIG.find(
+        (c) => c.table === "evaluation_runs",
+      )!;
       expect(config.retentionTTLColumn).toBe("UpdatedAt");
       const expr = buildRetentionTTLExpression(config);
       expect(expr).toBe(
@@ -58,7 +60,7 @@ describe("buildRetentionTTLExpression", () => {
 describe("hasRetentionTTL", () => {
   it("detects retention TTL in engine metadata", () => {
     const engineFull =
-      'ReplacingMergeTree(UpdatedAt) TTL toDateTime(OccurredAt) + toIntervalDay(49) TO VOLUME \'cold\', IF(_retention_days > 0, ...) DELETE';
+      "ReplacingMergeTree(UpdatedAt) TTL toDateTime(OccurredAt) + toIntervalDay(49) TO VOLUME 'cold', IF(_retention_days > 0, ...) DELETE";
     expect(hasRetentionTTL(engineFull)).toBe(true);
   });
 
@@ -70,11 +72,19 @@ describe("hasRetentionTTL", () => {
 });
 
 describe("RETENTION_MANAGED_TABLES", () => {
-  it("includes all 11 retention-managed tables", () => {
-    expect(RETENTION_MANAGED_TABLES).toHaveLength(11);
+  it("includes all 15 retention-managed tables", () => {
+    expect(RETENTION_MANAGED_TABLES).toHaveLength(15);
     expect(RETENTION_MANAGED_TABLES).toContain("stored_spans");
     expect(RETENTION_MANAGED_TABLES).toContain("event_log");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_summaries");
+    // ADR-034 Phase 2 (slim) + Phase 1 (rollup) — both derive from trace events
+    // and age on the same per-project retention policy as trace_summaries.
+    expect(RETENTION_MANAGED_TABLES).toContain("trace_analytics");
+    expect(RETENTION_MANAGED_TABLES).toContain("trace_analytics_rollup");
+    // ADR-034 Phase 6 — eval mirrors; age with the eval-pipeline retention
+    // (currently categorised "traces" until eval split-out lands).
+    expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics");
+    expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics_rollup");
     expect(RETENTION_MANAGED_TABLES).toContain("simulation_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("suite_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("experiment_runs");

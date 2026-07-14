@@ -4,12 +4,13 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useEvaluationsV3Store } from "../../../hooks/useEvaluationsV3Store";
+import { useTargetName } from "../../../hooks/useTargetName";
 import {
   createInitialResults,
   createInitialUIState,
   type TargetConfig,
 } from "../../../types";
-import { useEvaluationsV3Store } from "../../../hooks/useEvaluationsV3Store";
 import { TargetHeader } from "../../TargetSection/TargetHeader";
 
 // Mock next/router
@@ -34,9 +35,11 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
-// Mock name hooks to avoid tRPC queries
+// Mock name hooks to avoid tRPC queries. Wrapped in vi.fn() so individual
+// tests (e.g. the pairwise same-name-variant scoreboard tests) can override
+// the implementation for just their own targets.
 vi.mock("../../../hooks/useTargetName", () => ({
-  useTargetName: (target: { id: string }) => target.id,
+  useTargetName: vi.fn((target: { id: string }) => target.id),
 }));
 vi.mock("../../../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
@@ -564,6 +567,149 @@ describe("TargetHeader", () => {
       // The summary should still be visible, showing latency, pass rate, etc.
       // Even though savedRecords hasn't loaded yet, we have results so we know the row count
       expect(screen.getByTestId("target-summary")).toBeInTheDocument();
+    });
+  });
+
+  describe("given variant A and variant B share the same display name", () => {
+    const variantATarget: TargetConfig = {
+      id: "variant-a-target",
+      type: "prompt",
+      promptId: "prompt-a",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+    const variantBTarget: TargetConfig = {
+      id: "variant-b-target",
+      type: "prompt",
+      promptId: "prompt-b",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+    const pairwiseColumnTarget: TargetConfig = {
+      id: "pairwise-col",
+      type: "evaluator",
+      pairwise: {
+        variantA: "variant-a-target",
+        variantB: "variant-b-target",
+        hasGoldenAnswer: true,
+        goldenField: "expected",
+        includeMetrics: [],
+      },
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+
+    beforeEach(() => {
+      // Both variants resolve to the same name ("Bot") — only the mocked
+      // model differs between them.
+      vi.mocked(useTargetName).mockImplementation((target: { id: string }) =>
+        target.id === "variant-a-target" || target.id === "variant-b-target"
+          ? "Bot"
+          : target.id,
+      );
+
+      useEvaluationsV3Store.setState({
+        name: "Test Evaluation",
+        datasets: [],
+        activeDatasetId: undefined,
+        evaluators: [],
+        targets: [variantATarget, variantBTarget, pairwiseColumnTarget],
+        results: {
+          ...createInitialResults(),
+          // Fallback row-count path: one persisted output row for the
+          // pairwise column target.
+          targetOutputs: { "pairwise-col": ["n/a"] },
+          evaluatorResults: {
+            "pairwise-col": {
+              // Variant A wins the only row.
+              "pairwise-col": [{ label: "variant-a-target" }],
+            },
+          },
+        },
+        pendingSavedChanges: {},
+        ui: createInitialUIState(),
+      });
+    });
+
+    afterEach(() => {
+      vi.mocked(useTargetName).mockImplementation(
+        (target: { id: string }) => target.id,
+      );
+      useEvaluationsV3Store.getState().reset?.();
+    });
+
+    /** @scenario Same-name variants fall back to numbering */
+    it("shows numbered names instead of two identical labels", () => {
+      renderWithProviders(
+        <TargetHeader
+          target={pairwiseColumnTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(screen.getByText("Bot (1) wins")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a variant target is highlighted via a pairwise verdict click", () => {
+    const promptTarget: TargetConfig = {
+      id: "highlighted-target",
+      type: "prompt",
+      promptId: "prompt-123",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+
+    afterEach(() => {
+      useEvaluationsV3Store.getState().reset?.();
+    });
+
+    /** @scenario Clicking a variant name highlights its source column */
+    it("glows the header when this target is the highlighted variant", () => {
+      useEvaluationsV3Store.setState({
+        ui: {
+          ...createInitialUIState(),
+          highlightedVariantTargetId: "highlighted-target",
+        },
+      });
+
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(
+        screen.getByTestId("target-header-highlighted"),
+      ).toBeInTheDocument();
+    });
+
+    it("does not glow the header when a different target is highlighted", () => {
+      useEvaluationsV3Store.setState({
+        ui: {
+          ...createInitialUIState(),
+          highlightedVariantTargetId: "some-other-target",
+        },
+      });
+
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("target-header-highlighted"),
+      ).not.toBeInTheDocument();
     });
   });
 });

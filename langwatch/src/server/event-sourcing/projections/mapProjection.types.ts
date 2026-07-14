@@ -44,6 +44,21 @@ export interface MapProjectionDefinition<
 
   /** Optional processing behavior configuration. */
   options?: MapProjectionOptions;
+
+  /**
+   * Loads the aggregate's events up to AND INCLUDING `upToEvent` in log
+   * order, sorted by occurredAt ASC, with the store's idempotency-key dedup
+   * applied (first occurrence per key wins). Used by the executor for
+   * `options.dedupeByIdempotencyKey`.
+   *
+   * Auto-wired by EventSourcingService at registration time, like the fold
+   * projections' `eventLoaderUpTo`.
+   */
+  eventLoaderUpTo?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    upToEvent: Event;
+  }) => Promise<Event[]>;
 }
 
 /**
@@ -61,6 +76,30 @@ export interface MapProjectionOptions {
 
   /** Custom group key function for queue routing. Enables per-item parallelism instead of per-aggregate serialization. */
   groupKeyFn?: (event: any) => string;
+
+  /**
+   * Skip events that are DUPLICATE deliveries of an earlier event with the
+   * same `idempotencyKey`.
+   *
+   * The event log is append-only and at-least-once: a client re-report
+   * (deterministic ids, SDK retries) appends a SECOND event row with the
+   * same idempotency key. Fold projections are immune (read-time dedup
+   * collapses the duplicates before re-folding), but a map projection is
+   * invoked once per appended event — for an additive sink (an
+   * AggregatingMergeTree rollup) that means the increment lands twice,
+   * SYSTEMATICALLY for write paths designed around retries.
+   *
+   * With this option, the executor checks the aggregate's event history
+   * before mapping: if an EARLIER event holds this event's idempotency key,
+   * the delivery is a duplicate and is skipped. Fail-open — when the
+   * history read cannot see the key holder (event-log read lag), the event
+   * is mapped, so the worst case remains the rare transient over-count the
+   * projection already tolerates, never an undercount.
+   *
+   * Costs one event-log read per mapped event carrying an idempotency key;
+   * only enable on low-volume streams (evaluations — not spans).
+   */
+  dedupeByIdempotencyKey?: boolean;
 }
 
 /**
@@ -70,4 +109,7 @@ export interface MapProjectionOptions {
 export interface AppendStore<Record> {
   /** Appends a single record to the store. */
   append(record: Record, context: ProjectionStoreContext): Promise<void>;
+
+  /** Appends multiple records in a single batch. Used by replay for bulk writes. */
+  bulkAppend?(records: Record[], context: ProjectionStoreContext): Promise<void>;
 }

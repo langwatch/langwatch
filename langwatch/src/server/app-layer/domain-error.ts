@@ -1,9 +1,18 @@
 import { trace } from "@opentelemetry/api";
 import type { ZodError } from "zod";
 
+import { grafanaTraceUrlFromEnv } from "~/utils/grafanaLinks";
+
 export interface DomainErrorTelemetry {
   traceId: string | undefined;
   spanId: string | undefined;
+  /**
+   * A clickable Grafana link straight to this trace, present whenever a Grafana
+   * is configured (GRAFANA_BASE_URL — set automatically by haven locally).
+   * Included in production too: Grafana is access-controlled, so the URL leaks
+   * nothing to a client that can't reach it.
+   */
+  traceUrl?: string;
 }
 
 export interface SerializedReason {
@@ -74,10 +83,13 @@ export abstract class DomainError extends Error {
 
   /** Produce the full user-facing serialised shape. */
   serialize(): SerializedDomainError {
+    // telemetry.traceId is the real trace id for domain errors, so it links
+    // straight to the trace when a Grafana is configured — see grafanaTraceUrlFromEnv.
+    const traceUrl = grafanaTraceUrlFromEnv(this.telemetry.traceId);
     return {
       kind: this.kind,
       meta: this.meta,
-      telemetry: this.telemetry,
+      telemetry: traceUrl ? { ...this.telemetry, traceUrl } : this.telemetry,
       httpStatus: this.httpStatus,
       reasons: this.reasons.map(serializeReason),
     };

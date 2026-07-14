@@ -12,7 +12,7 @@ import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { Protections } from "~/server/elasticsearch/protections";
+import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 
@@ -160,8 +160,14 @@ function makeEventRefBlobStore(contents: Record<string, string>): BlobStore {
   } as unknown as BlobStore;
 }
 
-/** Set up the two CH queries fetchTracesWithSpansJoined fires in parallel. */
+/**
+ * Set up the CH queries fetchTracesWithSpansJoined fires: a light resolve
+ * (min/max OccurredAt) for the hint-less path, then the summary and span reads.
+ */
 function setupGetTracesWithSpansMocks(traceId: string, spanId: string) {
+  const resolveResult = {
+    json: () => Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
+  };
   const summaryResult = {
     json: () => Promise.resolve([makeSummaryRow(traceId)]),
   };
@@ -169,6 +175,7 @@ function setupGetTracesWithSpansMocks(traceId: string, spanId: string) {
     json: () => Promise.resolve([makeSpanRowWithEventRef(traceId, spanId)]),
   };
   mockClickHouseQuery
+    .mockResolvedValueOnce(resolveResult)
     .mockResolvedValueOnce(summaryResult)
     .mockResolvedValueOnce(spansResult);
 }

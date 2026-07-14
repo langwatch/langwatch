@@ -8,7 +8,7 @@ import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { mintFileUri, mintS3Uri } from "~/server/stored-objects/uri";
 
-import { MAX_BLOB_BYTES } from "./blobConstants";
+import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants";
 import { blobNamespaceId } from "./blobKeys";
 import type { JobBlobStore } from "./jobEnvelope";
 import { gqBlobDecodeCapExceededTotal } from "./metrics";
@@ -234,6 +234,7 @@ export class TieredBlobStore {
     projectId,
     data,
     hashSource,
+    mediaType = "application/gzip",
   }: {
     projectId: TenantId;
     data: Buffer;
@@ -243,23 +244,37 @@ export class TieredBlobStore {
      * `data`, i.e. hash exactly what is stored.
      */
     hashSource?: Buffer | string;
+    /**
+     * Media type stored alongside the s3-tier object. Defaults to the
+     * historical `application/gzip` for callers that don't compress with
+     * anything else; a caller writing zstd (or another codec) must pass the
+     * matching media type so durable storage isn't mislabeled.
+     */
+    mediaType?: string;
   }): Promise<BlobRef> {
     const hash = contentHash(hashSource ?? data);
     if (data.length > this.s3ThresholdBytes) {
       const uri = await this.mintUri({ projectId, hash });
       // Idempotent: identical content mints the same URI, so a racing or retried
       // PUT overwrites the same object instead of duplicating it.
-      await this.objectStoreFor(projectId).put(uri, data, "application/gzip");
+      await this.objectStoreFor(projectId).put(uri, data, mediaType);
       return { tier: "s3", projectId, hash };
     }
-    await this.redisBlobs.put({ id: redisBlobId({ projectId, hash }), data });
+    // GQ2 blobs are refcounted (holder-set eager reclaim), so the TTL is only
+    // the orphan backstop — 4 days, not GQ1's 7-day staged-residence window.
+    await this.redisBlobs.put({
+      id: redisBlobId({ projectId, hash }),
+      data,
+      ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS,
+    });
     return { tier: "redis", projectId, hash };
   }
 
   /**
-   * Returns null when a redis-tier blob is gone; lets an s3 read error
-   * propagate. Either way the envelope decode treats the absence as a missing
-   * blob and reaches the fail-safe (complete the slot, recover via replay).
+   * Returns null when a blob is genuinely gone (key absent, or a durable-store
+   * "not found"). A client-side failure on either tier (connection drop,
+   * timeout, OOM rejection, network 5xx) throws {@link TransientBlobStoreError}
+   * instead, so the caller retries rather than treating a blip as "missing".
    */
   async get(ref: BlobRef): Promise<Buffer | null> {
     return this.fetch(ref, /* refresh */ true);
@@ -279,9 +294,25 @@ export class TieredBlobStore {
   private async fetch(ref: BlobRef, refresh: boolean): Promise<Buffer | null> {
     if (ref.tier === "redis") {
       const id = redisBlobId({ projectId: ref.projectId, hash: ref.hash });
-      return refresh
-        ? this.redisBlobs.get({ id })
-        : this.redisBlobs.peek({ id });
+      // A redis-tier miss is represented by a null return (GETEX/GET on an
+      // absent key), never an exception — so any exception here is the
+      // client itself (connection drop, command timeout, OOM-from-noeviction
+      // rejection), not "the blob is gone". Treat it as transient (retry),
+      // mirroring the s3 branch below, instead of letting it fall through to
+      // the decode fail-safe and permanently drop a job over a blip
+      // (2026-07-11 incident: uncaught ioredis errors here were indistinguishable
+      // from a genuinely missing blob).
+      try {
+        return await (refresh
+          ? this.redisBlobs.get({ id, ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS })
+          : this.redisBlobs.peek({ id }));
+      } catch (err) {
+        throw new TransientBlobStoreError({
+          projectId: ref.projectId,
+          hash: ref.hash,
+          cause: err,
+        });
+      }
     }
     // Re-mint OUTSIDE the missing-classification: a destination-resolve / mint
     // failure is transient (retry), never "missing" (ADR-030 §2).

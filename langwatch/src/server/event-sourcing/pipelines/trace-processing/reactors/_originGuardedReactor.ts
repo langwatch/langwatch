@@ -1,13 +1,17 @@
 import type {
+  OutboxEnqueueRequest,
+  OutboxReactorDefinition,
+} from "../../../outbox/outboxReactor.types";
+import type {
   ReactorContext,
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
 } from "../schemas/constants";
+import type { TraceProcessingEvent } from "../schemas/events";
 
 const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
 
@@ -48,16 +52,69 @@ const MESSAGE_EVENT_TYPES = new Set<string>([
  * Wraps the reactor's `handle` with these guards so each call site
  * doesn't repeat the same preamble.
  */
+/** Pure guard check, shared between the `.withReactor` and `.withOutbox`
+ *  variants below so both branches stay in sync. Returns true when the
+ *  reactor's user-provided body should run. */
+function passesTraceOriginGuards(
+  event: TraceProcessingEvent,
+  foldState: TraceSummaryData,
+): boolean {
+  // 1. Skip stale events (replay/resync re-emit old-occurredAt events).
+  if (event.occurredAt < Date.now() - OLD_TRACE_THRESHOLD_MS) return false;
+
+  // 2. Only genuine message events re-run side-effecting reactors. A daily
+  //    topic-clustering pass re-emits topic_assigned for thousands of
+  //    historical traces; without this it would re-run every monitor/alert
+  //    over the whole backlog (2026-05-27 read-amp incident).
+  if (!MESSAGE_EVENT_TYPES.has(event.type)) return false;
+
+  // 3. Never re-run for a trace whose first span is older than the cutoff,
+  //    even on a genuine new span. Checks the TRACE START
+  //    (foldState.occurredAt), not event.occurredAt — a re-emitted or late
+  //    event is fresh, but the trace itself is days old.
+  if (
+    foldState.occurredAt > 0 &&
+    foldState.occurredAt < Date.now() - MAX_TRACE_AGE_MS
+  ) {
+    return false;
+  }
+
+  if (foldState.blockedByGuardrail && !foldState.computedOutput) return false;
+
+  const attrs = foldState.attributes ?? {};
+  if (!attrs["langwatch.origin"]) return false;
+
+  return true;
+}
+
+/**
+ * An extra pure guard, ANDed with the origin guards. Must be synchronous and
+ * side-effect free: it runs pre-enqueue via `shouldReact` on the fold's hot
+ * path. Guards needing IO belong in `handle`.
+ */
+type ExtraGuard = (
+  event: TraceProcessingEvent,
+  context: ReactorContext<TraceSummaryData>,
+) => boolean;
+
 export function defineOriginGuardedTraceReactor(opts: {
   name: string;
   jobIdPrefix: string;
   ttl?: number;
   delay?: number;
+  isRelevant?: ExtraGuard;
   handle: (
     event: TraceProcessingEvent,
     context: ReactorContext<TraceSummaryData>,
   ) => Promise<void>;
 }): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+  const passes = (
+    event: TraceProcessingEvent,
+    context: ReactorContext<TraceSummaryData>,
+  ): boolean =>
+    passesTraceOriginGuards(event, context.foldState) &&
+    (opts.isRelevant?.(event, context) ?? true);
+
   return {
     name: opts.name,
     options: {
@@ -67,35 +124,62 @@ export function defineOriginGuardedTraceReactor(opts: {
       delay: opts.delay ?? 30_000,
     },
 
+    // Pre-enqueue (ADR-026). The guards are pure and read only the payload the
+    // handler would receive, so evaluating them here is equivalent to the
+    // early-return in `handle` — except a filtered event never pays a
+    // serialize + gzip + blob write that the queue's dedup would then discard.
+    // A 10k-span trace fans this reactor out once per span; the guards reject
+    // nearly all of it. Kept in `handle` too: the queue is not the only caller
+    // (inline mode), and a fail-open `shouldReact` may dispatch anyway.
+    shouldReact: passes,
+
     async handle(event, context) {
-      // 1. Skip stale events (replay/resync re-emit old-occurredAt events).
-      if (event.occurredAt < Date.now() - OLD_TRACE_THRESHOLD_MS) return;
-
-      // 2. Only genuine message events re-run side-effecting reactors. A daily
-      //    topic-clustering pass re-emits topic_assigned for thousands of
-      //    historical traces; without this it would re-run every monitor/alert
-      //    over the whole backlog (2026-05-27 read-amp incident).
-      if (!MESSAGE_EVENT_TYPES.has(event.type)) return;
-
-      const { foldState } = context;
-
-      // 3. Never re-run for a trace whose first span is older than the cutoff,
-      //    even on a genuine new span. Checks the TRACE START
-      //    (foldState.occurredAt), not event.occurredAt — a re-emitted or late
-      //    event is fresh, but the trace itself is days old.
-      if (
-        foldState.occurredAt > 0 &&
-        foldState.occurredAt < Date.now() - MAX_TRACE_AGE_MS
-      ) {
-        return;
-      }
-
-      if (foldState.blockedByGuardrail && !foldState.computedOutput) return;
-
-      const attrs = foldState.attributes ?? {};
-      if (!attrs["langwatch.origin"]) return;
-
+      if (!passes(event, context)) return;
       await opts.handle(event, context);
+    },
+  };
+}
+
+/**
+ * Outbox-flavored counterpart of `defineOriginGuardedTraceReactor`. Same
+ * guards (stale event / non-message event / old trace / blocked guardrail /
+ * origin-not-resolved), but the body returns an `OutboxEnqueueRequest[]`
+ * instead of performing side effects. Used by `.withOutbox`-registered
+ * reactors whose `decide()` builds settle payloads.
+ */
+export function defineOriginGuardedTraceOutboxReactor(opts: {
+  name: string;
+  jobIdPrefix: string;
+  ttl?: number;
+  delay?: number;
+  isRelevant?: ExtraGuard;
+  decide: (
+    event: TraceProcessingEvent,
+    context: ReactorContext<TraceSummaryData>,
+  ) => Promise<OutboxEnqueueRequest[]>;
+}): OutboxReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+  const passes = (
+    event: TraceProcessingEvent,
+    context: ReactorContext<TraceSummaryData>,
+  ): boolean =>
+    passesTraceOriginGuards(event, context.foldState) &&
+    (opts.isRelevant?.(event, context) ?? true);
+
+  return {
+    name: opts.name,
+    options: {
+      makeJobId: (payload) =>
+        `${opts.jobIdPrefix}:${payload.event.tenantId}:${payload.event.aggregateId}`,
+      ttl: opts.ttl ?? 30_000,
+      delay: opts.delay ?? 30_000,
+    },
+
+    // See the `.withReactor` twin above for why this is also a shouldReact.
+    shouldReact: passes,
+
+    async decide(event, context) {
+      if (!passes(event, context)) return [];
+      return opts.decide(event, context);
     },
   };
 }

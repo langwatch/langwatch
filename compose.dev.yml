@@ -391,7 +391,6 @@ services:
       - "${AI_SERVER_PORT:-3456}:3456"
     environment:
       <<: *common-env
-      LANGWATCH_ENDPOINT: "http://app:5560/"
       # LANGWATCH_API_KEY comes from langwatch/.env via env_file below
       PINO_CONSOLE_LEVEL: "debug"
       LOG_LEVEL: "debug"
@@ -407,6 +406,12 @@ services:
         limits:
           memory: 256m
           cpus: "0.25"
+
+  # The local observability stack (grafana/otel-lgtm) is NOT a compose service.
+  # haven owns it: it runs the bundle on colima with explicit memory/CPU/pids/log
+  # and retention caps, and wires every stack to it automatically. Bring it up
+  # with `make observability` (or `haven observability up`).
+  # See dev/docs/adr/042-local-observability-stack.md.
 
 volumes:
   # Stateful — shared across worktrees (#3860 AC#4 / AC#5).

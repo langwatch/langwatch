@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ScenarioGenerationError } from "../../services/scenarioGeneration";
 import { classifyGenerationError } from "../classifyGenerationError";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,6 +20,60 @@ function makeTrpcError(message: string, dataMessage?: string): Error & { data?: 
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("classifyGenerationError", () => {
+  // ── typed kinds ─────────────────────────────────────────────────────────────
+
+  describe("given a ScenarioGenerationError with kind missing_provider", () => {
+    it("returns config tier with configure CTA regardless of the message", () => {
+      const result = classifyGenerationError(
+        new ScenarioGenerationError("bad_request", "missing_provider"),
+      );
+
+      expect(result.tier).toBe("config");
+      expect(result.cta).toBe("configure");
+      expect(result.copy).toContain("default model");
+    });
+  });
+
+  describe("given a ScenarioGenerationError with an unmapped kind", () => {
+    it("falls back to message matching", () => {
+      const result = classifyGenerationError(
+        new ScenarioGenerationError("request timed out", "upstream_timeout"),
+      );
+
+      expect(result.tier).toBe("timeout");
+      expect(result.cta).toBe("retry");
+    });
+
+    it("expands kind and meta into the raw message on the unknown tier", () => {
+      const result = classifyGenerationError(
+        new ScenarioGenerationError("bad_request", "bad_request", {
+          reason: "invalid_json_body",
+        }),
+      );
+
+      expect(result.tier).toBe("unknown");
+      if (result.tier === "unknown") {
+        expect(result.rawMessage).toBe("bad_request (reason: invalid_json_body)");
+      }
+    });
+
+    it("prefixes the kind when the message adds information", () => {
+      const result = classifyGenerationError(
+        new ScenarioGenerationError(
+          "the upstream provider rejected the API key",
+          "upstream_rejected",
+        ),
+      );
+
+      expect(result.tier).toBe("unknown");
+      if (result.tier === "unknown") {
+        expect(result.rawMessage).toBe(
+          "upstream_rejected: the upstream provider rejected the API key",
+        );
+      }
+    });
+  });
+
   // ── config tier ────────────────────────────────────────────────────────────
 
   describe("given an error matching /no default model/", () => {

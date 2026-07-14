@@ -26,7 +26,7 @@ jobs:
       relevant: ${{ steps.detect.outputs.relevant }}
       feature-parity: ${{ steps.detect.outputs.feature-parity }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -77,6 +77,10 @@ jobs:
       - name: Run typecheck
         working-directory: langwatch
         run: pnpm typecheck
+
+      - name: Run typecheck (tests)
+        working-directory: langwatch
+        run: pnpm run typecheck:tests
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -109,7 +113,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -126,7 +130,7 @@ jobs:
         run: |
           pnpm test:unit --run --shard=${{ matrix.shard }}/4 \
             --coverage --coverage.reporter=lcov --coverage.reporter=text \
-            --reporter=default --reporter=json --outputFile=test-results.json \
+            --reporter=default \
             --dangerouslyIgnoreUnhandledErrors
 
       - name: Extract test failures
@@ -176,6 +180,8 @@ jobs:
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
+      LANGWATCH_NLP_SERVICE: "http://localhost:5561"
+      LANGWATCH_ENDPOINT: "http://localhost:3000"
       BUILD_TIME: "true"
       CI: "true"
 
@@ -212,7 +218,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -299,7 +305,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           persist-credentials: false
 
@@ -325,7 +331,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -353,7 +359,7 @@ jobs:
       CI: true
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
@@ -459,7 +465,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - name: Test extract-failures.sh
         run: bash .github/scripts/__tests__/extract-failures.test.sh
@@ -473,7 +479,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:

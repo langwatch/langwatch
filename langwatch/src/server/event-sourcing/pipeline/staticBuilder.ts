@@ -1,9 +1,11 @@
+import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type {
   CommandHandlerOptions,
-  NoCommands, PipelineMetadata, RegisteredCommand,
-  StaticPipelineDefinition
+  NoCommands,
+  PipelineMetadata,
+  RegisteredCommand,
+  StaticPipelineDefinition,
 } from "..";
-import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandler } from "../commands/command";
 import type {
   CommandHandlerClass,
@@ -12,22 +14,32 @@ import type {
 } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
-import type { FoldProjectionDefinition, FoldProjectionOptions } from "../projections/foldProjection.types";
-import type { MapProjectionDefinition, MapProjectionOptions } from "../projections/mapProjection.types";
+import type { OutboxReactorDefinition } from "../outbox/outboxReactor.types";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionOptions,
+} from "../projections/foldProjection.types";
+import type {
+  MapProjectionDefinition,
+  MapProjectionOptions,
+} from "../projections/mapProjection.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import { ConfigurationError } from "../services/errorHandling";
 
 // Turns a union like {name:"a"; payload:A} | {name:"b"; payload:B}
 // into a record { a: A; b: B }
 export type CommandsUnionToRegistry<C extends RegisteredCommand> = {
-  [K in C as K extends { name: infer N extends string } ? N : never]:
-    K extends { payload: infer P } ? P : never;
+  [K in C as K extends { name: infer N extends string }
+    ? N
+    : never]: K extends { payload: infer P } ? P : never;
 };
 
 // Convenience: command name union from a StaticPipelineDefinition
 export type CommandNamesFromPipeline<
-  P extends StaticPipelineDefinition<any, any, any>
-> = keyof CommandsUnionToRegistry<P extends StaticPipelineDefinition<any, any, infer C> ? C : never>;
+  P extends StaticPipelineDefinition<any, any, any>,
+> = keyof CommandsUnionToRegistry<
+  P extends StaticPipelineDefinition<any, any, infer C> ? C : never
+>;
 
 /**
  * Builder for creating static pipeline definitions without runtime dependencies.
@@ -81,7 +93,10 @@ export class StaticPipelineBuilderWithName<EventType extends Event = Event> {
 
 export class StaticPipelineBuilderWithNameAndType<
   EventType extends Event = Event,
-  RegisteredProjections extends Record<string, Projection> = Record<string, Projection>,
+  RegisteredProjections extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
   RegisteredCommands extends RegisteredCommand = NoCommands,
   FoldNames extends string = never,
   MapNames extends string = never,
@@ -113,6 +128,18 @@ export class StaticPipelineBuilderWithNameAndType<
   private mapReactors = new Map<
     string,
     { projectionName: string; definition: ReactorDefinition<EventType> }
+  >();
+  // Outbox reactors are projection-attached like `foldReactors` /
+  // `mapReactors`, but their dispatch path runs through the
+  // ReactorOutbox + drainer rather than firing inline post-fold.
+  // See dev/docs/adr/024-withoutbox-pipeline-builder-primitive.md.
+  private foldOutboxReactors = new Map<
+    string,
+    { projectionName: string; definition: OutboxReactorDefinition<EventType> }
+  >();
+  private mapOutboxReactors = new Map<
+    string,
+    { projectionName: string; definition: OutboxReactorDefinition<EventType> }
   >();
   private featureFlagService?: FeatureFlagServiceInterface;
 
@@ -214,7 +241,12 @@ export class StaticPipelineBuilderWithNameAndType<
     reactorName: string,
     definition: ReactorDefinition<EventType>,
   ): this {
-    if (this.foldReactors.has(reactorName) || this.mapReactors.has(reactorName)) {
+    const nameTaken =
+      this.foldReactors.has(reactorName) ||
+      this.mapReactors.has(reactorName) ||
+      this.foldOutboxReactors.has(reactorName) ||
+      this.mapOutboxReactors.has(reactorName);
+    if (nameTaken) {
       throw new ConfigurationError(
         "StaticPipelineBuilder",
         `Reactor with name "${reactorName}" already exists`,
@@ -230,6 +262,63 @@ export class StaticPipelineBuilderWithNameAndType<
       throw new ConfigurationError(
         "StaticPipelineBuilder",
         `Cannot register reactor "${reactorName}" on projection "${projectionName}" — projection not found`,
+        { projectionName, reactorName },
+      );
+    }
+
+    return this;
+  }
+
+  /**
+   * Register an outbox-backed reactor on a fold or map projection.
+   *
+   * Mirrors `.withReactor` but routes dispatch through the
+   * ReactorOutbox + drainer instead of firing inline post-fold. Use
+   * this for stake-sensitive side effects (customer email/Slack,
+   * dataset writes) that need durable retry and operator visibility
+   * — see dev/docs/adr/024-withoutbox-pipeline-builder-primitive.md.
+   *
+   * The definition's `decide(event, context)` returns the enqueue
+   * requests (zero or more); the runtime fans them into outbox rows
+   * and posts a single wakeup per request. The actual dispatch
+   * (HTTP call, mailer, dataset write) is performed by an
+   * `OutboxDispatcher` registered against the same `reactorName` on
+   * the OutboxDrainer.
+   */
+  withOutbox(
+    projectionName: FoldNames | MapNames,
+    reactorName: string,
+    definition: OutboxReactorDefinition<EventType>,
+  ): this {
+    if (definition.name !== reactorName) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Outbox reactor name mismatch: arg "${reactorName}" !== definition.name "${definition.name}"`,
+        { reactorName, definitionName: definition.name, projectionName },
+      );
+    }
+
+    const nameTaken =
+      this.foldReactors.has(reactorName) ||
+      this.mapReactors.has(reactorName) ||
+      this.foldOutboxReactors.has(reactorName) ||
+      this.mapOutboxReactors.has(reactorName);
+    if (nameTaken) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Reactor with name "${reactorName}" already exists`,
+        { reactorName },
+      );
+    }
+
+    if (this.foldProjections.has(projectionName)) {
+      this.foldOutboxReactors.set(reactorName, { projectionName, definition });
+    } else if (this.mapProjections.has(projectionName)) {
+      this.mapOutboxReactors.set(reactorName, { projectionName, definition });
+    } else {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Cannot register outbox reactor "${reactorName}" on projection "${projectionName}" — projection not found`,
         { projectionName, reactorName },
       );
     }
@@ -320,7 +409,11 @@ export class StaticPipelineBuilderWithNameAndType<
     // and the zero-arg constructor won't be called since handlerInstance is provided.
     this.commands.push({
       name,
-      handlerClass: handlerClass as unknown as CommandHandlerClass<any, any, any>,
+      handlerClass: handlerClass as unknown as CommandHandlerClass<
+        any,
+        any,
+        any
+      >,
       handlerInstance: instance,
       options,
     });
@@ -375,6 +468,8 @@ export class StaticPipelineBuilderWithNameAndType<
       commands: this.commands,
       foldReactors: this.foldReactors,
       mapReactors: this.mapReactors,
+      foldOutboxReactors: this.foldOutboxReactors,
+      mapOutboxReactors: this.mapOutboxReactors,
       featureFlagService: this.featureFlagService,
 
       // Purely for typing: lets downstream code infer the command names + payloads

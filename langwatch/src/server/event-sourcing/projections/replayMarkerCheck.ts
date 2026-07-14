@@ -1,6 +1,6 @@
 import type { Event } from "../domain/types";
 import { RecoverableError } from "../services/errorHandling";
-import { CUTOFF_KEY_PREFIX, isAtOrBeforeCutoffMarker } from "../replay/replayConstants";
+import { CUTOFF_KEY_PREFIX, doneMarkerKey, isAtOrBeforeCutoffMarker } from "../replay/replayConstants";
 
 /**
  * Thrown when a fold projection event must be deferred because projection-replay
@@ -47,37 +47,66 @@ export interface ReplayMarkerChecker {
  * the boundary is consistent between the replay tool's CH queries and the
  * live event handler's Redis check.
  */
+/** Minimal Redis surface: a pipeline that batches the two marker reads. */
+interface ReplayMarkerPipeline {
+  hget(key: string, field: string): ReplayMarkerPipeline;
+  get(key: string): ReplayMarkerPipeline;
+  exec(): Promise<Array<[Error | null, unknown]> | null>;
+}
+interface ReplayMarkerRedis {
+  pipeline(): ReplayMarkerPipeline;
+}
+
 export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
-  constructor(
-    private readonly redis: { hget(key: string, field: string): Promise<string | null> },
-  ) {}
+  constructor(private readonly redis: ReplayMarkerRedis) {}
 
   async check(projectionName: string, event: Event): Promise<ReplayMarkerDecision> {
     const aggregateKey = `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
-    const cutoff = await this.redis.hget(
-      `${CUTOFF_KEY_PREFIX}${projectionName}`,
-      aggregateKey,
-    );
 
-    if (!cutoff) return "process";
+    // Read the active cutoff marker (in-flight replay) and the short-TTL
+    // terminal "done" marker (replay finished) in a single round-trip so the
+    // common no-replay case stays one RTT (both absent → "process").
+    const results = await this.redis
+      .pipeline()
+      .hget(`${CUTOFF_KEY_PREFIX}${projectionName}`, aggregateKey)
+      .get(doneMarkerKey(projectionName, aggregateKey))
+      .exec();
 
-    if (cutoff === "pending") {
+    const cutoff = (results?.[0]?.[1] ?? null) as string | null;
+    const done = (results?.[1]?.[1] ?? null) as string | null;
+
+    // Active replay for this aggregate takes precedence over a stale done marker.
+    if (cutoff) {
+      if (cutoff === "pending") {
+        throw new ReplayDeferralError(
+          projectionName,
+          aggregateKey,
+          "cutoff being recorded, deferring",
+        );
+      }
+
+      if (isAtOrBeforeCutoffMarker(event.createdAt, event.id, cutoff)) {
+        return "skip";
+      }
+
       throw new ReplayDeferralError(
         projectionName,
         aggregateKey,
-        "cutoff being recorded, deferring",
+        "replay in progress, deferring event past cutoff",
       );
     }
 
-    if (isAtOrBeforeCutoffMarker(event.createdAt, event.id, cutoff)) {
-      return "skip";
+    // Replay has finished rebuilding this aggregate (terminal marker still
+    // within its TTL). Skip anything at/before the cutoff — replay already
+    // wrote it, so a job staged but never active during the pause must not
+    // re-run and double-write it — but let anything newer process live.
+    if (done) {
+      return isAtOrBeforeCutoffMarker(event.createdAt, event.id, done)
+        ? "skip"
+        : "process";
     }
 
-    throw new ReplayDeferralError(
-      projectionName,
-      aggregateKey,
-      "replay in progress, deferring event past cutoff",
-    );
+    return "process";
   }
 }
 

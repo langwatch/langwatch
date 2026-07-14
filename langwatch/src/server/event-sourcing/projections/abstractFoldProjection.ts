@@ -158,6 +158,17 @@ export abstract class AbstractFoldProjection<
     occurredAtMs?: number;
   }) => Promise<Event[]>;
 
+  /**
+   * Loads the aggregate's events up to AND INCLUDING `upToEvent` in log
+   * order, sorted by occurredAt ASC. Used by the executor for
+   * `options.refoldOnStoreMiss`. Auto-wired by EventSourcingService.
+   */
+  eventLoaderUpTo?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    upToEvent: Event;
+  }) => Promise<Event[]>;
+
   /** Lazily-built dispatch map: event type string → handler method name. */
   private _dispatchMap?: Record<string, string>;
 

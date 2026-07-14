@@ -36,3 +36,48 @@ Feature: Pairwise compare evaluator (MVP)
     Given 21 rows have been evaluated where variant_a wins 12, variant_b wins 7, and 2 ties
     When I view the Pairwise Compare column header
     Then I see "variant_a wins 12 · 2 ties" with the full breakdown in the tooltip
+
+  # Customer feedback, 2026-07-08 call: reusing the same prompt as both
+  # variants (e.g. re-testing gpt-4.1 vs gpt-5-mini) made both variants
+  # indistinguishable in the scoreboard and per-row verdicts. What actually
+  # differs between two same-name variants isn't always the model (could be
+  # temperature, a prompt edit, anything) — so this doesn't try to guess a
+  # differentiator, it just numbers them.
+  Scenario: Same-name variants fall back to numbering
+    Given variant A and variant B are both named "AI search system"
+    When I view the Pairwise Compare column header or a row verdict
+    Then variant A is shown as "AI search system (1)"
+    And variant B is shown as "AI search system (2)"
+
+  Scenario: Clicking a variant name highlights its source column
+    Given a pairwise verdict shows variant A's name in a row or the column header
+    When I click on variant A's name
+    Then variant A's source column header shows a highlight
+    And clicking variant A's name again clears the highlight
+
+  # Issue: #5378
+  # Golden answer is opt-in, not mandatory — some datasets have no
+  # reference answer, and picking a fake golden field (like "input")
+  # misframes the judge prompt as golden-aware when it isn't.
+  Scenario: Has Golden Answer is on by default
+    When I add an evaluator of type "langevals/pairwise_compare"
+    Then Has Golden Answer is toggled on
+    And a Golden field picker is shown
+
+  Scenario: Turning off Has Golden Answer hides the Golden field picker
+    Given a pairwise evaluator is configured with default settings
+    When I toggle Has Golden Answer off
+    Then no Golden field picker is shown
+    And the evaluator can be saved without a golden field selected
+
+  Scenario: Judge prompt drops golden framing when Has Golden Answer is off
+    Given Has Golden Answer is toggled off
+    And the prompt has not been customized by the user
+    When a row is evaluated
+    Then the rendered judge prompt contains no "golden answer" framing
+    And the judge compares Candidate A and Candidate B on their own merits
+
+  Scenario: Judge prompt keeps golden framing when Has Golden Answer is on
+    Given Has Golden Answer is toggled on (default)
+    When a row is evaluated
+    Then the rendered judge prompt asks the judge to compare both candidates against the golden answer

@@ -3,19 +3,19 @@ import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { env } from "../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../utils/constants";
-import { resolveModelForFeature } from "../modelProviders/resolveModelForFeature";
 import { createLogger } from "../../utils/logger/server";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../api/routers/modelProviders.utils";
 import { getApp } from "../app-layer/app";
-import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import { prisma } from "../db";
 import { getProjectEmbeddingsModel } from "../embeddings";
-import { getPayloadSizeHistogram } from "../metrics";
 import { stagedLangevalsFetch } from "../langevals/stagedFetch";
+import { getPayloadSizeHistogram } from "../metrics";
+import { resolveModelForFeature } from "../modelProviders/resolveModelForFeature";
+import { scheduleTopicClusteringNextPage } from "./topicClusteringQueue";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -80,11 +80,7 @@ export const clusterTopicsForProject = async (
   }, new Date(0));
 
   const daysFrequency =
-    assignedTracesCount < 100
-      ? 7
-      : assignedTracesCount < 500
-        ? 3
-        : 2;
+    assignedTracesCount < 100 ? 7 : assignedTracesCount < 500 ? 3 : 2;
   if (
     !isIncrementalProcessing &&
     lastTopicCreatedAt >
@@ -286,7 +282,10 @@ export async function fetchTracesFromClickHouse(
   // pagination. The page CTE bounds the result, so the cap is unnecessary.
   const pageHaving: string[] = [];
 
-  if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
+  if (
+    isIncrementalProcessing &&
+    (topicIds.length > 0 || subtopicIds.length > 0)
+  ) {
     // Must either not have any of the known topics, or not have any of the known subtopics
     const topicCondition =
       topicIds.length > 0
@@ -412,9 +411,7 @@ export async function fetchTracesFromClickHouse(
         trace_id: row.TraceId,
         input: inputText.slice(0, 8192),
         topic_id:
-          row.TopicId && topicIds.includes(row.TopicId)
-            ? row.TopicId
-            : null,
+          row.TopicId && topicIds.includes(row.TopicId) ? row.TopicId : null,
         subtopic_id:
           row.SubTopicId && subtopicIds.includes(row.SubTopicId)
             ? row.SubTopicId

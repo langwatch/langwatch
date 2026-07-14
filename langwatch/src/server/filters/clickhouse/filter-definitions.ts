@@ -1,3 +1,4 @@
+import { evaluationRunDataSchema } from "~/server/app-layer/evaluations/types";
 import type { FilterField } from "../types";
 import {
   ATTRIBUTE_KEYS,
@@ -49,7 +50,7 @@ function buildEvaluatorIdClickHouseFilter(
 /**
  * ClickHouse filter definitions for each filter field.
  * Each definition specifies how to query filter options from ClickHouse.
- * Set to null for filters not supported in ClickHouse (will fall back to Elasticsearch).
+ * Set to null for filters with no ClickHouse options query.
  */
 export const clickHouseFilters: Record<
   FilterField,
@@ -226,7 +227,7 @@ export const clickHouseFilters: Record<
     tableName: "trace_summaries",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       // Note: The key parameter is passed via query_params as {key:String}
@@ -435,7 +436,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -462,7 +463,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -497,7 +498,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -518,14 +519,34 @@ export const clickHouseFilters: Record<
         LIMIT 10000
       `;
     },
-    extractResults: extractStandardResults,
+    // The option list is the canonical EvaluationStatus enum, not the distinct
+    // Status values that happen to sit in ClickHouse. Stored Status can hold
+    // non-canonical values (hence the STATUS_LABEL_VALUES guard above), and the
+    // trigger matcher compares against the enum — so offering a stored-only
+    // value produced an alert that could never fire (#4805). Deriving from the
+    // schema keeps the two compile-time linked: an enum change fails CI here.
+    // Observed counts are folded in; a status with no rows yet reports 0 so a
+    // trigger can be configured before its first occurrence.
+    extractResults: (rows) => {
+      const observedCounts = new Map(
+        extractStandardResults(rows).map((option) => [
+          option.field,
+          option.count,
+        ]),
+      );
+      return evaluationRunDataSchema.shape.status.options.map((status) => ({
+        field: status,
+        label: status,
+        count: observedCounts.get(status) ?? 0,
+      }));
+    },
   },
 
   "evaluations.label": {
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -583,7 +604,7 @@ export const clickHouseFilters: Record<
     tableName: "stored_spans",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -613,7 +634,7 @@ export const clickHouseFilters: Record<
     tableName: "stored_spans",
     buildQuery: (params) => {
       if (!params.key || !params.subkey) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -649,7 +670,7 @@ export const clickHouseFilters: Record<
     tableName: "stored_spans",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql

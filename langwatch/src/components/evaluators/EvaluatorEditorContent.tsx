@@ -1,7 +1,7 @@
 import { Box, Field, Input, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
-import { FormProvider } from "react-hook-form";
+import { FormProvider, useWatch } from "react-hook-form";
 import type { ZodType } from "zod";
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Link } from "~/components/ui/link";
@@ -97,14 +97,19 @@ export function EvaluatorEditorContent({
           />
         </Field.Root>
 
-        {/* Settings fields using DynamicZodForm */}
+        {/* Settings fields using DynamicZodForm.
+            For pairwise_compare, the `prompt` field is a golden-answer-aware
+            template. When "Has golden answer" is turned OFF, editing that
+            template is meaningless (the {golden} slot is stubbed out and the
+            PairwiseConfigForm auto-swaps to a golden-free default), so hide
+            the field entirely — no reason to show an editor whose changes
+            are always ignored (dogfood: "if golden is off, don't show the
+            prompt"). */}
         {hasSettings && evaluatorType && settingsSchema && (
-          <DynamicZodForm
+          <PairwiseAwareDynamicZodForm
             schema={settingsSchema}
             evaluatorType={evaluatorType as EvaluatorTypes}
-            prefix="settings"
             errors={form.formState.errors.settings}
-            variant="default"
           />
         )}
 
@@ -159,5 +164,40 @@ export function EvaluatorEditorContent({
         )}
       </VStack>
     </FormProvider>
+  );
+}
+
+/**
+ * Thin wrapper around DynamicZodForm that hides the `prompt` field for
+ * pairwise_compare when `has_golden_answer` is turned off. Isolated as a
+ * child component so its `useWatch` call re-runs on toggle without
+ * re-rendering the whole EvaluatorEditorContent tree.
+ */
+function PairwiseAwareDynamicZodForm({
+  schema,
+  evaluatorType,
+  errors,
+}: {
+  schema: ZodType;
+  evaluatorType: EvaluatorTypes;
+  errors: unknown;
+}) {
+  const hasGoldenAnswer = useWatch({
+    name: "settings.has_golden_answer",
+  }) as boolean | undefined;
+  const isPairwise = evaluatorType === "langevals/pairwise_compare";
+  // Treat undefined as ON (schema default is true) so we don't hide the
+  // field on first render before the form has hydrated.
+  const goldenOff = isPairwise && hasGoldenAnswer === false;
+  const skipFields = goldenOff ? ["prompt"] : undefined;
+  return (
+    <DynamicZodForm
+      schema={schema}
+      evaluatorType={evaluatorType}
+      prefix="settings"
+      errors={errors as never}
+      variant="default"
+      skipFields={skipFields}
+    />
   );
 }

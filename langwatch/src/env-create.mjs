@@ -115,7 +115,8 @@ export function createEnvConfig() {
       AZURE_OPENAI_KEY: z.string().optional(),
       OPENAI_API_KEY: z.string().optional(),
       SENDGRID_API_KEY: z.string().optional(),
-      LANGWATCH_NLP_SERVICE: z.string().optional(),
+      LANGWATCH_NLP_SERVICE: optionalIfBuildTime(z.string().url()),
+      LANGWATCH_ENDPOINT: optionalIfBuildTime(z.string().url()),
       LANGEVALS_ENDPOINT: z.string().optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
       // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
@@ -133,6 +134,20 @@ export function createEnvConfig() {
       LANGEVALS_STAGING_TTL_SECONDS: z.coerce.number().int().positive().default(600),
       EVAL_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(16_000_000),
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(180_000_000),
+      // ADR-031: per-trigger hourly hard cap on dispatched trigger emails.
+      // Counts dispatches (one digest of N traces = 1), not traces or
+      // recipients. Only ever bites immediate-cadence triggers; digest
+      // cadences cannot exceed 12/hour.
+      TRIGGER_EMAIL_HOURLY_CAP: z.coerce.number().int().positive().default(100),
+      // ADR-031: per-PROJECT daily hard cap — a backstop ABOVE the per-trigger
+      // hourly cap, bounding the aggregate trigger-email volume a whole project
+      // can emit in 24h (SES sender-reputation protection). Counts RECIPIENTS
+      // (actual outbound email volume), not dispatches.
+      TRIGGER_EMAIL_TENANT_DAILY_CAP: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(10000),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
@@ -313,11 +328,15 @@ export function createEnvConfig() {
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
+      LANGWATCH_ENDPOINT: process.env.LANGWATCH_ENDPOINT,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES: process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
       EVAL_MAX_PAYLOAD_BYTES: process.env.EVAL_MAX_PAYLOAD_BYTES,
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
+      TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
+      TRIGGER_EMAIL_TENANT_DAILY_CAP:
+        process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
