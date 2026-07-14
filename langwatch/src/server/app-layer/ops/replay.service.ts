@@ -198,7 +198,9 @@ export class ReplayService {
           .then((cancelled) => {
             if (cancelled) cancelledFlag = true;
           })
-          .catch(() => {});
+          .catch((err) => {
+            logger.warn({ error: err }, "Failed to poll replay cancel flag");
+          });
       };
 
       // Heartbeat: refresh the lock on a standalone timer for the duration
