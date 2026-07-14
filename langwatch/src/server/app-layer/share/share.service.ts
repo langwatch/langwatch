@@ -53,6 +53,21 @@ export class ShareService {
     return share;
   }
 
+  /**
+   * Get a share link by its database id, validating it is still shareable
+   * (sharing enabled, not expired). Used by publicGetById to ensure the
+   * project chrome is only shown for active share links.
+   */
+  async getShareableById(id: string): Promise<ShareWithProject | null> {
+    const share = await this.repo.findById(id);
+    if (!share) return null;
+    if (share.resourceType === "TRACE" && !share.project.traceSharingEnabled) {
+      return null;
+    }
+    if (isShareExpired(share)) return null;
+    return share;
+  }
+
   async listForResource(params: {
     projectId: string;
     resourceType: ShareResourceType;
@@ -110,12 +125,19 @@ export class ShareService {
       return { status: "granted", share, consumed: false };
     }
 
-    if (isShareViewExhausted(share)) return { status: "exhausted" };
-
-    await this.repo.incrementViewCount({
+    // Atomic consume: attempt to increment only if not exhausted.
+    // The service-level check is kept as a fast-path for the common case
+    // (no contention), but the repository does the authoritative atomic check.
+    const consumed = await this.repo.incrementViewCount({
       id: share.id,
       projectId: share.projectId,
+      maxViews: share.maxViews,
     });
+    
+    if (!consumed) {
+      // Race condition: another resolve consumed the last view between our check and update
+      return { status: "exhausted" };
+    }
     return { status: "granted", share, consumed: true };
   }
 

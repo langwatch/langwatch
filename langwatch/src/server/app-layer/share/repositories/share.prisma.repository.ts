@@ -96,16 +96,30 @@ export class PrismaShareRepository implements ShareRepository {
   async incrementViewCount({
     id,
     projectId,
+    maxViews,
   }: {
     id: string;
     projectId: string;
-  }): Promise<void> {
-    // updateMany (not update) so the where clause can carry projectId — the
-    // multitenancy guard rejects writes scoped only by primary key.
-    await this.prisma.shareLink.updateMany({
-      where: { id, projectId },
+    maxViews: number | null;
+  }): Promise<boolean> {
+    // Atomic conditional update: only increment if the link exists and either
+    // maxViews is null (unlimited) or viewCount < maxViews. This prevents race
+    // conditions where concurrent resolves could all pass the view-exhausted check
+    // and each consume a view beyond the cap.
+    const result = await this.prisma.shareLink.updateMany({
+      where: {
+        id,
+        projectId,
+        // If maxViews is null, no limit — always allow
+        // If maxViews is set, only allow if viewCount < maxViews
+        ...(maxViews !== null
+          ? { viewCount: { lt: maxViews } }
+          : {}),
+      },
       data: { viewCount: { increment: 1 } },
     });
+    // count of updated rows: 1 means we consumed a view, 0 means exhausted or deleted
+    return result.count > 0;
   }
 
   async deleteById({
