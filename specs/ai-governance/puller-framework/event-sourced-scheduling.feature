@@ -73,6 +73,21 @@ Feature: Event-sourced scheduling for pull-mode ingestion sources
     Then an ingestion-pull job is staged without waiting for a worker restart
 
   @integration
+  Scenario: A failed re-arm retries the pull instead of silently ending the recurrence
+    Given the write that re-arms the next pull fails once
+    When the ingestion-pull job is processed
+    Then the failure escapes so the event-sourcing queue retries the whole job
+    And the pull body does not run until a successor pull has been staged
+    And the retry re-arms the next pull and runs the body, with no worker restart
+
+  @integration
+  Scenario: Global pull concurrency is bounded across sources
+    Given more due pull-mode sources than the pull concurrency limit
+    When their ingestion-pull jobs all become due at the same time
+    Then no more than the concurrency limit of pull bodies run at once
+    And every source's pull still runs once the bulkhead drains
+
+  @integration
   Scenario: Updating an active source schedule replaces its pending pull
     Given an active pull-mode source with a pending ingestion-pull job
     When its `pullSchedule` is changed through the source update service

@@ -27,6 +27,7 @@ import { createLogger } from "@langwatch/observability";
  * Spec: specs/ai-governance/puller-framework/event-sourced-scheduling.feature
  */
 import { parseExpression } from "cron-parser";
+import fastq from "fastq";
 
 import { prisma } from "~/server/db";
 import type {
@@ -41,6 +42,33 @@ const logger = createLogger("langwatch:governance:ingestionPullScheduler");
 
 /** Event-sourcing job name for the recurring pull. */
 const INGESTION_PULL_JOB = "ingestionPull";
+
+/**
+ * Bounded global pull concurrency on this node. The removed BullMQ puller
+ * worker ran with `concurrency: 4`; the shared event-sourcing global queue it
+ * moved onto defaults to `GLOBAL_QUEUE_CONCURRENCY` (100) and the per-source
+ * group key only serializes pulls *within* a source. Without a bulkhead, N
+ * sources whose crons land on the same minute would fire N concurrent upstream
+ * audit-log fetches and ClickHouse writes — a 25× jump over the old dedicated
+ * limit that also crowds out unrelated event-sourcing work. This semaphore
+ * retains the previous operational limit and bounds the external blast radius;
+ * override with `GOVERNANCE_PULLER_CONCURRENCY`.
+ */
+export const PULL_CONCURRENCY_LIMIT = Math.max(
+  1,
+  Number(process.env.GOVERNANCE_PULLER_CONCURRENCY) || 4,
+);
+
+/**
+ * fastq bulkhead that caps how many pull bodies run at once across all sources
+ * on this node. The re-arm is deliberately *outside* it (re-arming is cheap and
+ * must never be starved by a saturated pull pool); only the pull body — the
+ * upstream fetch + ClickHouse write — is gated.
+ */
+const pullBulkhead = fastq.promise<unknown, string, void>(
+  (ingestionSourceId: string) => runIngestionPullForSource({ ingestionSourceId }),
+  PULL_CONCURRENCY_LIMIT,
+);
 
 /**
  * Dedup TTL is the wait until the next fire plus a buffer: long enough that a
@@ -184,32 +212,29 @@ async function processIngestionPull(
     return;
   }
 
-  // Re-arm the next pull before running this one (crash-safe recurrence).
+  // Re-arm the next pull BEFORE running this one (crash-safe recurrence). The
+  // failure is intentionally NOT swallowed: if the re-arm write fails, letting
+  // it escape fails this job so the GroupQueue retry path re-runs it (re-arm +
+  // pull) with backoff. Swallowing it would ack a tick with no successor
+  // staged, silently ending the recurrence until a worker restart — exactly the
+  // ingestion-gap failure this migration exists to avoid. The pull body is left
+  // unreached until the successor is staged.
   const facade = pullJobFacade;
   if (facade) {
-    try {
-      await stagePull({
-        facade,
-        source: {
-          id: source.id,
-          pullSchedule: source.pullSchedule,
-          organizationId: source.organizationId,
-        },
-        nowMs: Date.now(),
-      });
-    } catch (error) {
-      logger.error(
-        {
-          ingestionSourceId: source.id,
-          pullSchedule: source.pullSchedule,
-          error,
-        },
-        "failed to re-arm next ingestion pull",
-      );
-    }
+    await stagePull({
+      facade,
+      source: {
+        id: source.id,
+        pullSchedule: source.pullSchedule,
+        organizationId: source.organizationId,
+      },
+      nowMs: Date.now(),
+    });
   }
 
-  await runIngestionPullForSource({ ingestionSourceId: source.id });
+  // Gate the pull body through the bounded bulkhead so a burst of same-minute
+  // sources cannot fan out into unbounded upstream + ClickHouse load.
+  await pullBulkhead.push(source.id);
 }
 
 /**

@@ -41,6 +41,7 @@ import { IngestionSourceService } from "../../activity-monitor/ingestionSource.s
 import {
   armIngestionPullForSource,
   type IngestionPullPayload,
+  PULL_CONCURRENCY_LIMIT,
   registerIngestionPullJob,
   seedIngestionPullers,
 } from "../ingestionPullScheduler";
@@ -474,6 +475,88 @@ describe.skipIf(!hasTestcontainers)(
           });
 
           expect(await pendingPullCount(sourceId)).toBe(1);
+        });
+      });
+    });
+
+    describe("given a re-arm write that fails once", () => {
+      describe("when the ingestion-pull job is processed", () => {
+        /** @scenario "A failed re-arm retries the pull instead of silently ending the recurrence" */
+        it("retries on the event-sourcing queue and recovers without a worker restart", async () => {
+          const sourceId = await createSource();
+
+          // Fail exactly the re-arm send. Send #1 is the initial enqueue below;
+          // send #2 is the re-arm inside processIngestionPull, which we make
+          // throw. If the re-arm failure were swallowed, the job would ack with
+          // no successor staged and the recurrence would silently end. Instead
+          // the throw must escape, the GroupQueue must retry the whole job, and
+          // send #3 (the re-arm on retry) must succeed.
+          const realSend = pullJob!.send.bind(pullJob);
+          let sendCalls = 0;
+          const sendSpy = vi
+            .spyOn(pullJob!, "send")
+            .mockImplementation(async (payload, options) => {
+              sendCalls += 1;
+              if (sendCalls === 2) {
+                throw new Error("injected re-arm write failure");
+              }
+              return realSend(payload, options);
+            });
+
+          await send(sourceId, { delay: 0 }); // send #1
+
+          // The pull body must not run until a successor is staged, so it only
+          // runs after the retry's re-arm (send #3) succeeds.
+          await vi.waitFor(() => expect(control.calls).toBe(1), {
+            timeout: 15000,
+            interval: 50,
+          });
+          expect(sendCalls).toBeGreaterThanOrEqual(3);
+          expect(await pendingPullCount(sourceId)).toBe(1);
+
+          sendSpy.mockRestore();
+        });
+      });
+    });
+
+    describe("given more due pull-mode sources than the pull concurrency limit", () => {
+      describe("when their ingestion-pull jobs all become due at once", () => {
+        /** @scenario "Global pull concurrency is bounded across sources" */
+        it("runs no more than the limit of pull bodies at the same time", async () => {
+          const sourceCount = PULL_CONCURRENCY_LIMIT + 3;
+          let release!: () => void;
+          control.gate = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+
+          const ids: string[] = [];
+          for (let index = 0; index < sourceCount; index += 1) {
+            ids.push(await createSource());
+          }
+
+          // Every source is its own group, so the GroupQueue would run all of
+          // them fully in parallel; only the puller bulkhead caps the fan-out.
+          await Promise.all(ids.map((id) => send(id, { delay: 0 })));
+
+          // Exactly the limit enters the gated body; the rest wait on the
+          // bulkhead.
+          await vi.waitFor(
+            () => expect(control.inFlight).toBe(PULL_CONCURRENCY_LIMIT),
+            { timeout: 15000, interval: 25 },
+          );
+          // Give the queue room to (incorrectly) admit more past the cap.
+          await new Promise((r) => setTimeout(r, 400));
+          expect(control.inFlight).toBe(PULL_CONCURRENCY_LIMIT);
+          expect(control.maxInFlight).toBe(PULL_CONCURRENCY_LIMIT);
+
+          release();
+
+          // All sources eventually complete, never exceeding the cap.
+          await vi.waitFor(() => expect(control.calls).toBe(sourceCount), {
+            timeout: 15000,
+            interval: 50,
+          });
+          expect(control.maxInFlight).toBe(PULL_CONCURRENCY_LIMIT);
         });
       });
     });
