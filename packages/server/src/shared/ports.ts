@@ -19,7 +19,6 @@ export type PortAllocation = {
   redis: number;
   clickhouseHttp: number;
   clickhouseNative: number;
-  bullboard: number;
 };
 
 // `npx @langwatch/server` ships the production Hono build, so the langwatch
@@ -38,7 +37,6 @@ export function allocatePorts(base: number = PORT_BASE_DEFAULT): PortAllocation 
     redis: infra + 1,
     clickhouseHttp: infra + 2,
     clickhouseNative: infra + 3,
-    bullboard: infra + 4,
   };
 }
 
@@ -52,6 +50,5 @@ export function portsToCheck(alloc: PortAllocation): Array<{ port: number; label
     { port: alloc.redis, label: "redis" },
     { port: alloc.clickhouseHttp, label: "clickhouse http" },
     { port: alloc.clickhouseNative, label: "clickhouse native" },
-    // bullboard is opt-in (--bullboard) — only verified bound when enabled.
   ];
 }

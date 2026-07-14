@@ -16,7 +16,7 @@ help:
 	@echo "    make quickstart dev-infra           local app + redis + workers compose; shared dev for PG/CH/NLP/S3"
 	@echo "    make quickstart frontend-only       no compose; pure pnpm dev against your .env URLs"
 	@echo "    make quickstart migration           postgres + clickhouse on host ports (prisma migrate; no workers)"
-	@echo "    make quickstart full-local          kitchen-sink local (dedicated workers container + bullboard + ai-server)"
+	@echo "    make quickstart full-local          kitchen-sink local (dedicated workers container + ai-server)"
 	@echo "    make quickstart-help                non-interactive preset reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo ""

@@ -30,7 +30,7 @@
 #                     to point at shared dev infra. UI work only.
 #   migration         CH+PG on HOST ports (5432 / 8123) so prisma migrate
 #                     can run from host. No app, no Redis, no NLP, no S3.
-#   full-local        all-local + workers + bullboard + ai-server + NLP +
+#   full-local        all-local + workers + ai-server + NLP +
 #                     langevals. Kitchen-sink local dev.
 
 write_dev_overrides() {
