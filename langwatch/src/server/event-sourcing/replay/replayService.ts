@@ -18,9 +18,8 @@ import type { OccurredAtBounds } from "./replayEventLoader";
 import {
   discoverAffectedAggregates,
   countEventsForAggregates,
-  batchGetCutoffEventIds,
   batchLoadAggregateEvents,
-  getAggregateOccurredAtBounds,
+  getBoundedCutoffs,
   loadEventsForAggregatesBulk,
 } from "./replayEventLoader";
 import {
@@ -527,27 +526,16 @@ export class ReplayService {
     // 4. CUTOFF — occurred-at bounds first (over all events of the batch's
     //    aggregates) so the cutoff + load queries prune event_log's weekly
     //    partitions instead of scanning cold storage. See
-    //    getAggregateOccurredAtBounds for why this bound is safe.
+    //    getAggregateOccurredAtBounds for why this bound is safe, and
+    //    getBoundedCutoffs for the zero-event short-circuit.
     onBatchPhase("cutoff");
-    const occurredAtBounds = await getAggregateOccurredAtBounds({
+    const { cutoffs, occurredAtBounds } = await getBoundedCutoffs({
       client,
       tenantId,
       aggregateTypes: [...new Set(batch.map((a) => a.aggregateType))],
       aggregateIds: batch.map((a) => a.aggregateId),
+      eventTypes: projection.definition.eventTypes,
     });
-    // Undefined bounds means the batch's aggregates have zero events — skip
-    // the cutoff query, which would otherwise scan every partition unbounded
-    // just to return empty. An empty cutoff map routes every aggregate down
-    // the without-cutoff/unmark path below.
-    const cutoffs = occurredAtBounds
-      ? await batchGetCutoffEventIds({
-          client,
-          tenantId,
-          aggregateIds: batch.map((a) => a.aggregateId),
-          eventTypes: projection.definition.eventTypes,
-          occurredAtBounds,
-        })
-      : new Map<string, CutoffInfo>();
 
     const withCutoffKeys: string[] = [];
     const withoutCutoffKeys: string[] = [];
@@ -899,26 +887,15 @@ export class ReplayService {
     log.write({ step: "drain-batch", tenant: tenantId, count: batch.length, durationMs: Date.now() - drainStart, kind: "map" });
 
     // 4. CUTOFF — occurred-at bounds first, for partition pruning (see
-    //    replayBatch / getAggregateOccurredAtBounds).
+    //    replayBatch / getAggregateOccurredAtBounds / getBoundedCutoffs).
     onBatchPhase("cutoff");
-    const occurredAtBounds = await getAggregateOccurredAtBounds({
+    const { cutoffs, occurredAtBounds } = await getBoundedCutoffs({
       client,
       tenantId,
       aggregateTypes: [...new Set(batch.map((a) => a.aggregateType))],
       aggregateIds: batch.map((a) => a.aggregateId),
+      eventTypes: projection.definition.eventTypes,
     });
-    // Undefined bounds means the batch's aggregates have zero events — skip
-    // the cutoff query (see replayBatch); the empty cutoff map routes
-    // everything down the without-cutoff/unmark path below.
-    const cutoffs = occurredAtBounds
-      ? await batchGetCutoffEventIds({
-          client,
-          tenantId,
-          aggregateIds: batch.map((a) => a.aggregateId),
-          eventTypes: projection.definition.eventTypes,
-          occurredAtBounds,
-        })
-      : new Map<string, CutoffInfo>();
 
     const withCutoffKeys: string[] = [];
     const withoutCutoffKeys: string[] = [];
@@ -1452,28 +1429,20 @@ export class ReplayService {
       [...byTenant.entries()],
       async ([tenantId, entries]) => {
         const client = await this.resolveClient(tenantId);
-        const aggregateIds = entries.map((e) => e.aggregateId);
-        const occurredAtBounds = await getAggregateOccurredAtBounds({
+        const { cutoffs: tenantCutoffs, occurredAtBounds } = await getBoundedCutoffs({
           client,
           tenantId,
           aggregateTypes: [...new Set(entries.map((e) => e.aggregateType))],
-          aggregateIds,
+          aggregateIds: entries.map((e) => e.aggregateId),
+          eventTypes: [...allEventTypes],
         });
         if (!occurredAtBounds) {
-          // Undefined bounds means this tenant's aggregates have zero events —
-          // skip the cutoff query, which would otherwise scan every partition
-          // unbounded just to return empty. With no allCutoffs entries these
+          // Zero events for this tenant's aggregates (see getBoundedCutoffs) —
+          // no boundsByTenant entry and no allCutoffs entries, so these
           // aggregates fall into the without-cutoff/unmark path below.
           return;
         }
         boundsByTenant.set(tenantId, occurredAtBounds);
-        const tenantCutoffs = await batchGetCutoffEventIds({
-          client,
-          tenantId,
-          aggregateIds,
-          eventTypes: [...allEventTypes],
-          occurredAtBounds,
-        });
         for (const [k, v] of tenantCutoffs) {
           allCutoffs.set(k, v);
         }

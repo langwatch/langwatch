@@ -5,6 +5,7 @@ import {
   batchGetCutoffEventIds,
   batchLoadAggregateEvents,
   getAggregateOccurredAtBounds,
+  getBoundedCutoffs,
   loadEventsForAggregatesBulk,
 } from "../replayEventLoader";
 import {
@@ -369,6 +370,52 @@ describe("replayEventLoader", () => {
 
           expect(bounds).toBeUndefined();
           expect(querySpy).not.toHaveBeenCalled();
+        } finally {
+          querySpy.mockRestore();
+        }
+      });
+    });
+  });
+
+  describe("getBoundedCutoffs", () => {
+    it("returns cutoffs and the occurred-at bounds they were computed under", async () => {
+      const client = getTestClickHouseClient()!;
+      const { cutoffs, occurredAtBounds } = await getBoundedCutoffs({
+        client,
+        tenantId,
+        aggregateTypes: ["test"],
+        aggregateIds: ["agg-1", "agg-2"],
+        eventTypes: ["test.event"],
+      });
+
+      expect(occurredAtBounds).toEqual({ minMs: 1700000000000, maxMs: 1700000002000 });
+      expect(cutoffs.get(`${tenantId}:test:agg-1`)).toEqual({
+        timestamp: 1700000001000,
+        eventId: "evt-002",
+      });
+      expect(cutoffs.get(`${tenantId}:test:agg-2`)).toEqual({
+        timestamp: 1700000002000,
+        eventId: "evt-003",
+      });
+    });
+
+    describe("when the aggregates have no events", () => {
+      it("short-circuits with empty cutoffs and skips the cutoff query", async () => {
+        const client = getTestClickHouseClient()!;
+        const querySpy = vi.spyOn(client, "query");
+        try {
+          const { cutoffs, occurredAtBounds } = await getBoundedCutoffs({
+            client,
+            tenantId,
+            aggregateTypes: ["test"],
+            aggregateIds: ["nonexistent-agg"],
+            eventTypes: ["test.event"],
+          });
+
+          expect(occurredAtBounds).toBeUndefined();
+          expect(cutoffs.size).toBe(0);
+          // Only the bounds query ran — the unbounded cutoff query was skipped.
+          expect(querySpy).toHaveBeenCalledTimes(1);
         } finally {
           querySpy.mockRestore();
         }
