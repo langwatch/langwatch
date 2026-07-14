@@ -129,7 +129,7 @@ describe("renderLaunchAgent", () => {
 
   describe("when the platform is macOS", () => {
     /** @scenario On macOS the agent is a launchd login item */
-    it("renders a launchd plist under ~/Library/LaunchAgents that launches the app with the env at login", () => {
+    it("renders a launchd plist that launches the app with the env at login", () => {
       const d = renderLaunchAgent({
         platform: "darwin",
         home: "/Users/dev",
@@ -137,21 +137,33 @@ describe("renderLaunchAgent", () => {
         env,
       });
 
-      expect(d.path).toBe(
+      expect(d.registerPath).toBe(
         `/Users/dev/Library/LaunchAgents/${COPILOT_APP_AGENT_LABEL}.plist`,
       );
-      expect(d.content).toContain("<key>RunAtLoad</key>");
-      expect(d.content).toContain(
+      const plist = d.files[0]!;
+      expect(plist.path).toBe(d.registerPath);
+      expect(plist.content).toContain("<key>RunAtLoad</key>");
+      expect(plist.content).toContain(
         "/Applications/GitHub Copilot.app/Contents/MacOS/github",
       );
-      expect(d.content).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
-      expect(d.content).toContain("Authorization=Bearer ik-lw-abc_secret");
+      expect(plist.content).toContain("Authorization=Bearer ik-lw-abc_secret");
+    });
+
+    it("writes the token-bearing plist with owner-only (0600) permissions", () => {
+      const d = renderLaunchAgent({
+        platform: "darwin",
+        home: "/Users/dev",
+        execPath: "/Applications/GitHub Copilot.app/Contents/MacOS/github",
+        env,
+      });
+
+      expect(d.files[0]!.mode).toBe(0o600);
     });
   });
 
   describe("when the platform is Linux", () => {
     /** @scenario On Linux the agent is a systemd --user unit */
-    it("renders a systemd --user unit with Environment= lines and ExecStart", () => {
+    it("quotes ExecStart so an app path with spaces is not word-split", () => {
       const d = renderLaunchAgent({
         platform: "linux",
         home: "/home/dev",
@@ -159,31 +171,58 @@ describe("renderLaunchAgent", () => {
         env,
       });
 
-      expect(d.path).toBe(
+      expect(d.registerPath).toBe(
         `/home/dev/.config/systemd/user/${COPILOT_APP_AGENT_LABEL}.service`,
       );
-      expect(d.content).toContain("WantedBy=default.target");
-      expect(d.content).toContain(
+      const unit = d.files[0]!.content;
+      expect(unit).toContain(
         'Environment="OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel"',
       );
-      expect(d.content).toContain("ExecStart=/opt/GitHub Copilot/github-copilot");
+      // the fix: quoted, so systemd treats the spaced path as one token
+      expect(unit).toContain('ExecStart="/opt/GitHub Copilot/github-copilot"');
+      expect(unit).not.toContain(
+        "ExecStart=/opt/GitHub Copilot/github-copilot",
+      );
     });
   });
 
   describe("when the platform is Windows", () => {
-    /** @scenario On Windows the agent is a Task Scheduler logon task */
-    it("renders a Task Scheduler logon task XML carrying the env", () => {
-      const d = renderLaunchAgent({
-        platform: "win32",
-        home: "C:\\Users\\dev",
-        execPath: "C:\\Users\\dev\\AppData\\Local\\Programs\\GitHub Copilot\\GitHub Copilot.exe",
-        env,
-      });
+    const winSpec = {
+      platform: "win32" as const,
+      home: "C:\\Users\\dev",
+      execPath:
+        "C:\\Users\\dev\\AppData\\Local\\Programs\\GitHub Copilot\\GitHub Copilot.exe",
+      env,
+    };
 
-      expect(d.path).toContain(`${COPILOT_APP_AGENT_LABEL}.xml`);
-      expect(d.content).toContain("<LogonTrigger>");
-      expect(d.content).toContain("<Name>OTEL_EXPORTER_OTLP_ENDPOINT</Name>");
-      expect(d.content).toContain("GitHub Copilot.exe");
+    /** @scenario On Windows the agent is a Task Scheduler logon task */
+    it("registers a logon task whose XML carries NO invalid <Environment> element", () => {
+      const d = renderLaunchAgent(winSpec);
+
+      const xml = d.files.find((f) => f.path === d.registerPath)!.content;
+      expect(d.registerPath).toContain(`${COPILOT_APP_AGENT_LABEL}.xml`);
+      expect(xml).toContain("<LogonTrigger>");
+      // <Environment> is NOT a valid Task Scheduler element — must be absent
+      expect(xml).not.toContain("<Environment>");
+    });
+
+    it("sets the env via a wrapper script the task launches, not the XML", () => {
+      const d = renderLaunchAgent(winSpec);
+
+      const xml = d.files.find((f) => f.path === d.registerPath)!.content;
+      const wrapper = d.files.find((f) => f.path.endsWith(".cmd"))!;
+
+      // the task command points at the wrapper
+      expect(xml).toContain(`${COPILOT_APP_AGENT_LABEL}.cmd`);
+      // the wrapper sets each var then starts the app
+      expect(wrapper.content).toContain(
+        'set "OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer ik-lw-abc_secret"',
+      );
+      expect(wrapper.content).toContain('start "" "');
+      expect(wrapper.content).toContain("GitHub Copilot.exe");
+      // token lives only in the wrapper, not the registered XML
+      expect(xml).not.toContain("ik-lw-abc_secret");
+      expect(wrapper.mode).toBe(0o600);
     });
   });
 });

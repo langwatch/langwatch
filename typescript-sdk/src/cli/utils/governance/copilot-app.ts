@@ -121,12 +121,27 @@ export interface LaunchAgentSpec {
   env: Record<string, string>;
 }
 
-export interface LaunchAgentDescriptor {
-  /** Absolute path the descriptor is written to. */
+export interface AgentFile {
+  /** Absolute path to write. */
   path: string;
-  /** File content. */
+  /** Exact file content. */
   content: string;
+  /** POSIX mode; token-bearing files are 0o600 so other local users
+   * cannot read the ingest key. Ignored on Windows. */
+  mode: number;
 }
+
+export interface LaunchAgentDescriptor {
+  /** The file handed to the OS service manager to register. */
+  registerPath: string;
+  /** Every file to write (descriptor + any launch wrapper), in write
+   * order. Paths are env-independent, so cleanup can be derived by
+   * rendering with an empty env. */
+  files: AgentFile[];
+}
+
+/** 0o600 — token-bearing files must not be world-readable. */
+const SECRET_MODE = 0o600;
 
 function xmlEscape(s: string): string {
   return s
@@ -136,10 +151,23 @@ function xmlEscape(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** Windows app dir holding the launch wrapper + task XML. */
+function windowsAgentDir(home: string): string {
+  return path.join(home, "AppData", "Local", "LangWatch");
+}
+
 /**
- * Render the OS-native login-agent descriptor that launches the Copilot
- * app with the capture env at login. Pure: returns the target path and
- * exact file content, so it is fully assertable without touching disk.
+ * Render the OS-native login-agent files that launch the Copilot app with
+ * the capture env at login. Pure: returns exact paths + content, fully
+ * assertable without touching disk.
+ *
+ * Per-platform env-injection mechanism:
+ *   - macOS   — launchd `EnvironmentVariables` dict on the plist.
+ *   - Linux   — systemd `Environment=` directives (ExecStart is quoted so
+ *               an app path with spaces is not word-split).
+ *   - Windows — Task Scheduler XML has NO way to set process env, so the
+ *               task runs a generated `.cmd` wrapper that `set`s the vars
+ *               and then `start`s the app.
  */
 export function renderLaunchAgent(spec: LaunchAgentSpec): LaunchAgentDescriptor {
   const entries = Object.entries(spec.env);
@@ -170,20 +198,24 @@ ${envXml}
 </dict>
 </plist>
 `;
+      const plistPath = path.join(
+        spec.home,
+        "Library",
+        "LaunchAgents",
+        `${COPILOT_APP_AGENT_LABEL}.plist`,
+      );
       return {
-        path: path.join(
-          spec.home,
-          "Library",
-          "LaunchAgents",
-          `${COPILOT_APP_AGENT_LABEL}.plist`,
-        ),
-        content,
+        registerPath: plistPath,
+        files: [{ path: plistPath, content, mode: SECRET_MODE }],
       };
     }
     case "linux": {
       const envLines = entries
         .map(([k, v]) => `Environment="${k}=${v.replace(/"/g, '\\"')}"`)
         .join("\n");
+      // ExecStart is quoted: the app path may contain spaces (e.g.
+      // "/opt/GitHub Copilot/github-copilot"); unquoted, systemd would
+      // word-split it into a bogus executable + argument.
       const content = `[Unit]
 Description=LangWatch capture for the GitHub Copilot app
 After=default.target
@@ -191,30 +223,37 @@ After=default.target
 [Service]
 Type=simple
 ${envLines}
-ExecStart=${spec.execPath}
+ExecStart="${spec.execPath}"
 
 [Install]
 WantedBy=default.target
 `;
+      const unitPath = path.join(
+        spec.home,
+        ".config",
+        "systemd",
+        "user",
+        `${COPILOT_APP_AGENT_LABEL}.service`,
+      );
       return {
-        path: path.join(
-          spec.home,
-          ".config",
-          "systemd",
-          "user",
-          `${COPILOT_APP_AGENT_LABEL}.service`,
-        ),
-        content,
+        registerPath: unitPath,
+        files: [{ path: unitPath, content, mode: SECRET_MODE }],
       };
     }
     case "win32": {
-      const envXml = entries
-        .map(
-          ([k, v]) =>
-            `        <Variable>\n          <Name>${xmlEscape(k)}</Name>\n          <Value>${xmlEscape(v)}</Value>\n        </Variable>`,
-        )
-        .join("\n");
-      const content = `<?xml version="1.0" encoding="UTF-16"?>
+      const dir = windowsAgentDir(spec.home);
+      const wrapperPath = path.join(dir, `${COPILOT_APP_AGENT_LABEL}.cmd`);
+      const xmlPath = path.join(dir, `${COPILOT_APP_AGENT_LABEL}.xml`);
+
+      // Task Scheduler cannot set env in XML; the task runs this wrapper,
+      // which sets each var then launches the app. `%` is doubled so cmd
+      // does not treat it as a variable reference.
+      const setLines = entries
+        .map(([k, v]) => `set "${k}=${v.replace(/%/g, "%%")}"`)
+        .join("\r\n");
+      const wrapper = `@echo off\r\n${setLines}\r\nstart "" "${spec.execPath}"\r\n`;
+
+      const xml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Triggers>
     <LogonTrigger>
@@ -223,23 +262,17 @@ WantedBy=default.target
   </Triggers>
   <Actions>
     <Exec>
-      <Command>${xmlEscape(spec.execPath)}</Command>
-      <Environment>
-${envXml}
-      </Environment>
+      <Command>${xmlEscape(wrapperPath)}</Command>
     </Exec>
   </Actions>
 </Task>
 `;
       return {
-        path: path.join(
-          spec.home,
-          "AppData",
-          "Local",
-          "LangWatch",
-          `${COPILOT_APP_AGENT_LABEL}.xml`,
-        ),
-        content,
+        registerPath: xmlPath,
+        files: [
+          { path: wrapperPath, content: wrapper, mode: SECRET_MODE },
+          { path: xmlPath, content: xml, mode: SECRET_MODE },
+        ],
       };
     }
   }

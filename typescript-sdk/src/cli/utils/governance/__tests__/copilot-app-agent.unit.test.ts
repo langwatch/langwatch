@@ -23,7 +23,7 @@ function fakeIo(existing = new Set<string>()) {
     mkdirp: () => {
       /* no real directories are created in tests */
     },
-    writeFile: (file, content) => void files.set(file, content),
+    writeFile: (file, content, _mode) => void files.set(file, content),
     removeFile: (file) => void files.delete(file),
     fileExists: (file) => files.has(file),
     run: (cmd, args) => void runs.push({ cmd, args }),
@@ -76,7 +76,7 @@ describe("installCopilotAppAgent", () => {
 
   describe("when installing on Windows", () => {
     /** @scenario On Windows the agent is a Task Scheduler logon task */
-    it("writes the task XML and registers it with schtasks", () => {
+    it("writes the task XML plus an env wrapper and registers with schtasks", () => {
       const { io, files, runs } = fakeIo();
 
       const p = installCopilotAppAgent(
@@ -84,7 +84,13 @@ describe("installCopilotAppAgent", () => {
         io,
       );
 
-      expect(files.get(p)).toContain("<LogonTrigger>");
+      const xml = files.get(p)!;
+      expect(xml).toContain("<LogonTrigger>");
+      expect(xml).not.toContain("<Environment>"); // invalid element must be absent
+      // the env wrapper is written alongside and referenced by the task
+      const wrapperPath = [...files.keys()].find((f) => f.endsWith(".cmd"))!;
+      expect(files.get(wrapperPath)).toContain('set "COPILOT_OTEL_ENABLED=true"');
+      expect(xml).toContain(".cmd");
       expect(
         runs.some((r) => r.cmd === "schtasks" && r.args.includes("/Create")),
       ).toBe(true);

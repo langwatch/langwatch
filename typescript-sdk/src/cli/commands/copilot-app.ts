@@ -116,7 +116,7 @@ export async function connectCopilotApp(
   const project =
     cfg.organization?.slug ?? cfg.organization?.name ?? "your personal project";
   deps.info(
-    `GitHub Copilot app connected. Usage will be tracked into ${project}. Restart the app to begin capture.`,
+    `GitHub Copilot app connected. Usage will be tracked into ${project}. If the app is already open, quit and reopen it to start capture.`,
   );
 
   return {

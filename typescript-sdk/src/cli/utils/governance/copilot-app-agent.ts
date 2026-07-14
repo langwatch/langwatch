@@ -22,7 +22,7 @@ import {
 
 export interface AgentIo {
   mkdirp: (dir: string) => void;
-  writeFile: (file: string, content: string) => void;
+  writeFile: (file: string, content: string, mode: number) => void;
   removeFile: (file: string) => void;
   fileExists: (file: string) => boolean;
   /** Register/unregister with the OS service manager. */
@@ -31,7 +31,7 @@ export interface AgentIo {
 
 const defaultIo: AgentIo = {
   mkdirp: (dir) => fs.mkdirSync(dir, { recursive: true }),
-  writeFile: (file, content) => fs.writeFileSync(file, content),
+  writeFile: (file, content, mode) => fs.writeFileSync(file, content, { mode }),
   removeFile: (file) => {
     try {
       fs.rmSync(file);
@@ -45,17 +45,21 @@ const defaultIo: AgentIo = {
   },
 };
 
-/** The descriptor path for the agent on this platform (no side effects). */
+/** The file registered with the OS service manager (no side effects). */
 export function copilotAppAgentPath(
   platform: AppPlatform,
   home: string,
 ): string {
-  return renderLaunchAgent({
-    platform,
-    home,
-    execPath: "",
-    env: {},
-  }).path;
+  return renderLaunchAgent({ platform, home, execPath: "", env: {} })
+    .registerPath;
+}
+
+/** Every file the agent writes on this platform — for cleanup. Paths are
+ * env-independent, so an empty-env render yields the full set. */
+function copilotAppAgentFiles(platform: AppPlatform, home: string): string[] {
+  return renderLaunchAgent({ platform, home, execPath: "", env: {} }).files.map(
+    (f) => f.path,
+  );
 }
 
 /** Whether the agent descriptor is already on disk. */
@@ -139,9 +143,14 @@ export function installCopilotAppAgent(
   io: AgentIo = defaultIo,
 ): string {
   const descriptor = renderLaunchAgent(spec);
-  io.mkdirp(path.dirname(descriptor.path));
-  io.writeFile(descriptor.path, descriptor.content);
-  for (const { cmd, args } of registerCommands(spec.platform, descriptor.path)) {
+  for (const file of descriptor.files) {
+    io.mkdirp(path.dirname(file.path));
+    io.writeFile(file.path, file.content, file.mode);
+  }
+  for (const { cmd, args } of registerCommands(
+    spec.platform,
+    descriptor.registerPath,
+  )) {
     try {
       io.run(cmd, args);
     } catch {
@@ -149,7 +158,7 @@ export function installCopilotAppAgent(
       // other failures are surfaced by the caller's confirm step.
     }
   }
-  return descriptor.path;
+  return descriptor.registerPath;
 }
 
 /**
@@ -162,12 +171,12 @@ export function removeCopilotAppAgent(
   home: string,
   io: AgentIo = defaultIo,
 ): boolean {
-  const descriptorPath = copilotAppAgentPath(platform, home);
-  const present = io.fileExists(descriptorPath);
+  const registerPath = copilotAppAgentPath(platform, home);
+  const present = io.fileExists(registerPath);
 
   if (platform === "darwin") {
     try {
-      io.run("launchctl", ["unload", descriptorPath]);
+      io.run("launchctl", ["unload", registerPath]);
     } catch {
       /* not loaded */
     }
@@ -179,6 +188,9 @@ export function removeCopilotAppAgent(
       /* not registered */
     }
   }
-  io.removeFile(descriptorPath);
+  // Delete every file the agent wrote (descriptor + any launch wrapper).
+  for (const file of copilotAppAgentFiles(platform, home)) {
+    io.removeFile(file);
+  }
   return present;
 }
