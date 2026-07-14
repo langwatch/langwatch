@@ -679,6 +679,61 @@ describe("evaluateGraphTrigger", () => {
     });
   });
 
+  describe("given a breach whose dispatch throws", () => {
+    beforeEach(() => {
+      harness.dispatch.mockRejectedValue(new Error("provider unreachable"));
+    });
+
+    it("rolls the claim back and rethrows, so the outbox retry can re-dispatch", async () => {
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).rejects.toThrow("provider unreachable");
+
+      // The claim was taken pre-send, then rolled back on the throw — had it
+      // stayed open, the outbox retry would see it in the pre-check, back off
+      // as `already_firing`, and the notification would be lost forever.
+      expect(harness.triggerSent.claimCalls).toBe(1);
+      expect(harness.triggerSent.deleteCalls).toHaveLength(1);
+      expect(harness.triggerSent.openRows).toHaveLength(0);
+
+      harness.dispatch.mockResolvedValue({
+        channel: "slack",
+        didSend: true,
+        missingVariables: [],
+        renderErrors: [],
+      });
+      const retry = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+      expect(retry.status).toBe("fired");
+      expect(harness.dispatch).toHaveBeenCalledTimes(2);
+      expect(harness.triggerSent.openRows).toHaveLength(1);
+    });
+
+    it("propagates the dispatch error even when the rollback itself fails", async () => {
+      vi.spyOn(harness.triggerSent, "deleteOpenClaim").mockRejectedValue(
+        new Error("db gone"),
+      );
+
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).rejects.toThrow("provider unreachable");
+    });
+  });
+
   describe("given a breach whose dispatch reports render diagnostics", () => {
     it("surfaces missingVariables and renderErrors on the result", async () => {
       harness.dispatch.mockResolvedValue({

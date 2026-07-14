@@ -448,19 +448,43 @@ export async function evaluateGraphTrigger({
       };
     }
 
-    const dispatchResult = await deps.notifier.dispatch({
-      trigger,
-      project,
-      context,
-      recipients: params.members ?? [],
-      slackWebhook: params.slackWebhook ?? null,
-      botDestination,
-      fireDigest: graphAlertFireDigest({
-        triggerId,
-        customGraphId,
-        previousFireId: previousFire?.id ?? null,
-      }),
-    });
+    // A THROWN dispatch (provider/network failure, as opposed to a clean
+    // `didSend: false`) must also roll the claim back before propagating:
+    // the outbox retries the evaluation, and the retry's open pre-check
+    // would see the orphaned claim and back off as `already_firing` —
+    // silently dropping the notification forever (the same no-op-on-retry
+    // trap the cadence path documents in `dispatcher.ts`). The per-recipient
+    // ledger is keyed on the PREVIOUS fire's id, unaffected by this delete,
+    // so a retry after a partial send still skips recipients already reached.
+    let dispatchResult: GraphAlertDispatchResult;
+    try {
+      dispatchResult = await deps.notifier.dispatch({
+        trigger,
+        project,
+        context,
+        recipients: params.members ?? [],
+        slackWebhook: params.slackWebhook ?? null,
+        botDestination,
+        fireDigest: graphAlertFireDigest({
+          triggerId,
+          customGraphId,
+          previousFireId: previousFire?.id ?? null,
+        }),
+      });
+    } catch (dispatchError) {
+      try {
+        await deps.triggerSent.deleteOpenClaim({ id: claim.id, projectId });
+      } catch (cleanupError) {
+        // Best-effort: the dispatch failure is the actionable signal; a
+        // failed rollback must not mask it. The orphaned claim self-heals
+        // when the metric recovers (markResolved frees the identity).
+        logger.error(
+          { triggerId, projectId, customGraphId, error: cleanupError },
+          "Failed to roll back the open graph-alert claim after a dispatch failure — the alert may stay suppressed until the metric recovers",
+        );
+      }
+      throw dispatchError;
+    }
 
     // An alert that told nobody is not "currently firing". Leaving the claim
     // open would light the alert up in the UI, stamp a last-fired time, and —
