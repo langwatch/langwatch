@@ -22,12 +22,18 @@ export interface VersionDefinition {
  */
 export type ResolvedEndpoint =
   | (EndpointRegistration & { withdrawn?: false })
-  | { method: HttpMethod | "sse"; path: string; withdrawn: true };
+  | {
+      method: HttpMethod | "sse";
+      path: string;
+      config: EndpointRegistration["config"];
+      withdrawn: true;
+    };
 
 /** A composite key for de-duplicating endpoints within a version. */
 function endpointKey(method: string, path: string): string {
   const normalized = method === "sse" ? "get" : method;
-  return `${normalized}:${path}`;
+  const normalizedPath = path === "" ? "/" : path;
+  return `${normalized}:${normalizedPath}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,9 +57,24 @@ export function resolveVersions(
   definitions: VersionDefinition[],
   previewEndpoints: EndpointRegistration[],
 ): Map<string, ResolvedEndpoint[]> {
-  const dated = definitions
-    .filter((d) => isDateVersion(d.version))
-    .sort((a, b) => a.version.localeCompare(b.version));
+  const seenVersions = new Set<string>();
+  for (const definition of definitions) {
+    if (!isDateVersion(definition.version)) {
+      throw new RangeError(
+        `Invalid API version "${definition.version}"; expected a real date in YYYY-MM-DD form`,
+      );
+    }
+    if (seenVersions.has(definition.version)) {
+      throw new Error(
+        `API version "${definition.version}" is registered more than once`,
+      );
+    }
+    seenVersions.add(definition.version);
+  }
+
+  const dated = [...definitions].sort((a, b) =>
+    a.version.localeCompare(b.version),
+  );
 
   const result = new Map<string, ResolvedEndpoint[]>();
   let previousMap = new Map<string, ResolvedEndpoint>();
@@ -66,7 +87,13 @@ export function resolveVersions(
       const key = endpointKey(ep.method, ep.path);
 
       if (ep.withdrawn) {
-        currentMap.set(key, { method: ep.method, path: ep.path, withdrawn: true });
+        const inherited = currentMap.get(key);
+        currentMap.set(key, {
+          method: ep.method,
+          path: ep.path,
+          config: inherited?.config ?? ep.config,
+          withdrawn: true,
+        });
       } else {
         currentMap.set(key, { ...ep, withdrawn: false });
       }
@@ -85,10 +112,22 @@ export function resolveVersions(
 
   // `preview` endpoints are separate
   if (previewEndpoints.length > 0) {
-    result.set(
-      VERSION_PREVIEW,
-      previewEndpoints.map((ep) => ({ ...ep, withdrawn: false as const })),
-    );
+    const previewMap = new Map<string, ResolvedEndpoint>();
+    for (const ep of previewEndpoints) {
+      const key = endpointKey(ep.method, ep.path);
+      if (ep.withdrawn) {
+        const inherited = previewMap.get(key);
+        previewMap.set(key, {
+          method: ep.method,
+          path: ep.path,
+          config: inherited?.config ?? ep.config,
+          withdrawn: true,
+        });
+      } else {
+        previewMap.set(key, { ...ep, withdrawn: false });
+      }
+    }
+    result.set(VERSION_PREVIEW, Array.from(previewMap.values()));
   }
 
   return result;
@@ -99,7 +138,12 @@ export function resolveVersions(
 // ---------------------------------------------------------------------------
 
 export type ResolvedVersion =
-  | { found: true; version: string; status: "stable" | "latest" | "preview" | "unversioned"; endpoints: ResolvedEndpoint[] }
+  | {
+      found: true;
+      version: string;
+      status: "stable" | "latest" | "preview" | "unversioned";
+      endpoints: ResolvedEndpoint[];
+    }
   | { found: false };
 
 /**
@@ -119,25 +163,45 @@ export function resolveRequestVersion(
     // Bare path -- alias for latest
     const latest = versionMap.get(VERSION_LATEST);
     if (!latest) return { found: false };
-    return { found: true, version: VERSION_LATEST, status: "unversioned", endpoints: latest };
+    return {
+      found: true,
+      version: VERSION_LATEST,
+      status: "unversioned",
+      endpoints: latest,
+    };
   }
 
   if (requestVersion === VERSION_LATEST) {
     const latest = versionMap.get(VERSION_LATEST);
     if (!latest) return { found: false };
-    return { found: true, version: VERSION_LATEST, status: "latest", endpoints: latest };
+    return {
+      found: true,
+      version: VERSION_LATEST,
+      status: "latest",
+      endpoints: latest,
+    };
   }
 
   if (requestVersion === VERSION_PREVIEW) {
     const preview = versionMap.get(VERSION_PREVIEW);
     if (!preview) return { found: false };
-    return { found: true, version: VERSION_PREVIEW, status: "preview", endpoints: preview };
+    return {
+      found: true,
+      version: VERSION_PREVIEW,
+      status: "preview",
+      endpoints: preview,
+    };
   }
 
   if (isDateVersion(requestVersion)) {
     const endpoints = versionMap.get(requestVersion);
     if (!endpoints) return { found: false };
-    return { found: true, version: requestVersion, status: "stable", endpoints };
+    return {
+      found: true,
+      version: requestVersion,
+      status: "stable",
+      endpoints,
+    };
   }
 
   return { found: false };

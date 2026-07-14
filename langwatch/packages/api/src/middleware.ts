@@ -109,9 +109,7 @@ export function tracerMiddleware(options?: { name?: string }) {
  * org/project/user context via `getCurrentContext()`.
  */
 export function loggerMiddleware(options?: { name?: string }) {
-  const logger = createLogger(
-    `langwatch:api:${options?.name ?? "hono"}`,
-  );
+  const logger = createLogger(`langwatch:api:${options?.name ?? "hono"}`);
 
   return async (c: Context, next: Next): Promise<void> => {
     const ctx = {
@@ -138,9 +136,7 @@ export function loggerMiddleware(options?: { name?: string }) {
         throw err;
       } finally {
         const duration = Date.now() - start;
-        const statusCode = error
-          ? getStatusCodeFromError(error)
-          : c.res.status;
+        const statusCode = error ? getStatusCodeFromError(error) : c.res.status;
 
         logHttpRequest(logger, {
           method: c.req.method,

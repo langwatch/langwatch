@@ -14,9 +14,18 @@ export const VERSION_PREVIEW = "preview" as const;
 
 const DATE_VERSION_RE = /^20\d{2}-\d{2}-\d{2}$/;
 
-/** Returns true when `value` matches the `YYYY-MM-DD` date-version pattern. */
+/** Returns true when `value` is a real calendar date in `YYYY-MM-DD` form. */
 export function isDateVersion(value: string): value is DateVersion {
-  return DATE_VERSION_RE.test(value);
+  if (!DATE_VERSION_RE.test(value)) return false;
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year!, month! - 1, day!));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month! - 1 &&
+    date.getUTCDate() === day
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -35,7 +44,7 @@ export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
  * Generic `TProject` lets consumers type `app.project` downstream:
  *
  * ```ts
- * createService<{ project: Project }>({ name: "things" })
+ * createService<Project>({ name: "things" })
  * ```
  */
 export interface BaseApp<TProject = unknown> {
@@ -127,16 +136,30 @@ export interface ServiceConfig {
 // ---------------------------------------------------------------------------
 
 /** Extract inferred input type from config, defaulting to undefined. */
-type InferInput<TConfig> = TConfig extends { input: infer I extends ZodType } ? z.infer<I> : undefined;
+type InferInput<TConfig> = TConfig extends {
+  input: infer I extends ZodType;
+}
+  ? z.infer<I>
+  : undefined;
 
 /** Extract inferred params type from config, defaulting to undefined. */
-type InferParams<TConfig> = TConfig extends { params: infer P extends ZodType } ? z.infer<P> : undefined;
+type InferParams<TConfig> = TConfig extends {
+  params: infer P extends ZodType;
+}
+  ? z.infer<P>
+  : undefined;
 
 /** Extract inferred query type from config, defaulting to undefined. */
-type InferQuery<TConfig> = TConfig extends { query: infer Q extends ZodType } ? z.infer<Q> : undefined;
+type InferQuery<TConfig> = TConfig extends {
+  query: infer Q extends ZodType;
+}
+  ? z.infer<Q>
+  : undefined;
 
 /** Extract inferred output type from config. */
-type InferOutput<TConfig> = TConfig extends { output: infer O extends ZodType } ? z.infer<O> : never;
+type InferOutput<TConfig> = TConfig extends { output: infer O extends ZodType }
+  ? z.infer<O>
+  : never;
 
 /**
  * The handler function signature.

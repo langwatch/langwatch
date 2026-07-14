@@ -1,6 +1,8 @@
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { ZodType, z } from "zod";
+
+import type { EndpointConfig } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // SSE configuration
@@ -8,6 +10,9 @@ import type { ZodType, z } from "zod";
 
 /**
  * Configuration object for SSE endpoints registered via `v.sse()`.
+ *
+ * SSE endpoints are mounted as GET routes and therefore accept query-string
+ * input only, not a JSON request body.
  *
  * Each event type is declared with a Zod schema. The framework validates
  * event data against the schema before sending.
@@ -24,9 +29,9 @@ export interface SSEConfig<
   description?: string;
 
   // -- per-endpoint options (same as EndpointConfig) -------------------------
-  auth?: "default" | "none";
+  auth?: EndpointConfig["auth"];
   resourceLimit?: string;
-  middleware?: Array<(c: Context, next: () => Promise<void>) => Promise<void | Response>>;
+  middleware?: MiddlewareHandler[];
 }
 
 // ---------------------------------------------------------------------------
@@ -58,10 +63,16 @@ export interface TypedSSEStream<TEvents extends Record<string, ZodType>> {
  *
  * Receives the Hono context, parsed arguments, and a typed SSE stream.
  */
-export type SSEHandler<TApp, TEvents extends Record<string, ZodType>, TConfig> = (
+export type SSEHandler<
+  TApp,
+  TEvents extends Record<string, ZodType>,
+  TConfig,
+> = (
   c: Context,
   args: {
-    query: TConfig extends { query: ZodType } ? z.infer<TConfig["query"]> : undefined;
+    query: TConfig extends { query: ZodType }
+      ? z.infer<TConfig["query"]>
+      : undefined;
     app: TApp;
   },
   stream: TypedSSEStream<TEvents>,
@@ -98,8 +109,10 @@ export function createSSEResponse<TEvents extends Record<string, ZodType>>(
                 issues: result.error.issues,
               }),
             });
-            return;
+            throw result.error;
           }
+
+          data = result.data;
         }
         await sseStream.writeSSE({
           event: String(event),

@@ -24,7 +24,11 @@ interface DomainErrorLike {
     meta: Record<string, unknown>;
     telemetry?: { traceId?: string; spanId?: string };
     httpStatus: number;
-    reasons: Array<{ kind: string; meta?: Record<string, unknown>; reasons?: unknown[] }>;
+    reasons: Array<{
+      kind: string;
+      meta?: Record<string, unknown>;
+      reasons?: unknown[];
+    }>;
   };
 }
 
@@ -146,8 +150,11 @@ function formatError(
   }
 
   // 4. Unknown errors -- 500
-  const isDev = typeof process !== "undefined" && process.env?.["NODE_ENV"] === "development";
-  const message = isDev && err instanceof Error ? err.message : "Internal server error";
+  const isDev =
+    typeof process !== "undefined" &&
+    process.env?.["NODE_ENV"] === "development";
+  const message =
+    isDev && err instanceof Error ? err.message : "Internal server error";
   const status: ContentfulStatusCode = 500;
   const body: ErrorResponseBody = {
     kind: "internal_error",
@@ -168,7 +175,10 @@ function formatError(
  *
  * Reads `c.get("isVersionedRequest")` to decide the response format.
  */
-export function createErrorHandler(): (err: Error, c: Context) => Response | Promise<Response> {
+export function createErrorHandler(): (
+  err: Error,
+  c: Context,
+) => Response | Promise<Response> {
   return (err: Error, c: Context) => {
     const isVersioned = c.get("isVersionedRequest") === true;
     const { status, body } = formatError(err, isVersioned);

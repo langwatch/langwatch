@@ -7,12 +7,14 @@ import { formatError, isDomainErrorLike } from "../errors.js";
 // Helpers -- fake DomainError-like object (duck-typed)
 // ---------------------------------------------------------------------------
 
-function makeDomainError(overrides: {
-  kind?: string;
-  message?: string;
-  httpStatus?: number;
-  meta?: Record<string, unknown>;
-} = {}): Error & {
+function makeDomainError(
+  overrides: {
+    kind?: string;
+    message?: string;
+    httpStatus?: number;
+    meta?: Record<string, unknown>;
+  } = {},
+): Error & {
   kind: string;
   httpStatus: number;
   meta: Record<string, unknown>;
@@ -154,7 +156,10 @@ describe("formatError", () => {
           },
           {
             code: "schema_failure",
-            meta: expect.objectContaining({ field: "age", type: "invalid_type" }),
+            meta: expect.objectContaining({
+              field: "age",
+              type: "invalid_type",
+            }),
           },
         ]),
       );

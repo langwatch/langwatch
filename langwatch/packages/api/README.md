@@ -54,7 +54,10 @@ export const app = createService({
         output: thingSchema,
       },
       async (_c, { params, app }) => {
-        return app.thingService.getById({ id: params.id, projectId: app.project.id });
+        return app.thingService.getById({
+          id: params.id,
+          projectId: app.project.id,
+        });
       },
     );
   })
@@ -92,7 +95,7 @@ v.get("/path", config, async (c, { input, params, query, app }) => {
 });
 ```
 
-When `output` is defined, return raw data. The framework validates + serializes.
+When `output` is defined, return raw data. The framework validates + serializes; a handler response that violates its output contract is reported as an internal server error.
 When `output` is not defined, return a Hono `Response` directly.
 
 ## Endpoint config
@@ -113,11 +116,11 @@ Second argument to `v.get()`, `v.post()`, etc:
 }
 ```
 
-All fields optional. Pass `{}` for a bare endpoint.
+All fields optional. Pass `{}` for a bare endpoint. Endpoint paths must be empty or begin with `/`. Declaring `resourceLimit` without a service-level `_legacy.resourceLimitMiddleware` fails the build rather than silently disabling the limit.
 
 ## Versioning
 
-Versions are dates. Each version inherits all endpoints from the previous one. Override or add endpoints, and use `withdraw()` to remove.
+Versions are real `YYYY-MM-DD` calendar dates. Invalid or duplicate versions fail at registration instead of being silently ignored. Each version inherits all endpoints from the previous one. Override or add endpoints, and use `withdraw()` to remove.
 
 ```ts
 .version("2025-03-15", (v) => {
@@ -135,19 +138,21 @@ Versions are dates. Each version inherits all endpoints from the previous one. O
 
 URL structure:
 
-| URL | Resolves to |
-|-----|-------------|
-| `/api/things/2025-03-15/` | Exact version |
-| `/api/things/2025-09-01/` | Exact version |
-| `/api/things/latest/` | Most recent dated version |
-| `/api/things/` | Same as latest (backwards compat) |
-| `/api/things/preview/` | Preview endpoints (never in latest) |
+| URL                       | Resolves to                         |
+| ------------------------- | ----------------------------------- |
+| `/api/things/2025-03-15/` | Exact version                       |
+| `/api/things/2025-09-01/` | Exact version                       |
+| `/api/things/latest/`     | Most recent dated version           |
+| `/api/things/`            | Same as latest (backwards compat)   |
+| `/api/things/preview/`    | Preview endpoints (never in latest) |
 
 Response headers: `X-API-Version` and `X-API-Version-Status` (stable/latest/preview/unversioned).
 
+The first path segment is reserved when it is `latest`, `preview`, or a date-shaped version. This prevents a missing versioned route from falling through to a dynamic unversioned endpoint.
+
 ## Providers
 
-`.provide()` injects services into handlers via `app.*`. Factories receive the base context. No cross-provider dependencies.
+`.provide()` injects services into handlers via `app.*`. Factories receive the base context and resolve concurrently, so there are no cross-provider dependencies. Provider factories run after auth and organization middleware, with the resolved request context available to logging. The `project` and `_legacy` names are reserved for the base context.
 
 ```ts
 .provide({
@@ -160,17 +165,23 @@ Response headers: `X-API-Version` and `X-API-Version-Status` (stable/latest/prev
 
 ## SSE streaming
 
+SSE endpoints are GET routes. Use `query` for request data; JSON request bodies are intentionally unsupported. `stream.emit()` validates and serializes the parsed payload. On validation failure it emits an `error` event and rejects, so the handler must explicitly catch the error if it wants to continue streaming.
+
 ```ts
-v.sse("/execute", {
-  events: {
-    result: z.object({ score: z.number() }),
-    error: z.object({ message: z.string() }),
+v.sse(
+  "/execute",
+  {
+    events: {
+      result: z.object({ score: z.number() }),
+      error: z.object({ message: z.string() }),
+    },
+    query: querySchema,
   },
-  query: querySchema,
-}, async (c, { query, app }, stream) => {
-  await stream.emit("result", { score: 0.95 }); // validated against schema
-  stream.close();
-});
+  async (c, { query, app }, stream) => {
+    await stream.emit("result", { score: 0.95 }); // validated against schema
+    stream.close();
+  },
+);
 ```
 
 ## Error handling
@@ -191,11 +202,19 @@ Validation error example:
   "reasons": [
     {
       "code": "schema_failure",
-      "meta": { "field": "url", "type": "invalid_string", "message": "must be a valid URL" }
+      "meta": {
+        "field": "url",
+        "type": "invalid_string",
+        "message": "must be a valid URL"
+      }
     },
     {
       "code": "schema_failure",
-      "meta": { "field": "title", "type": "too_small", "message": "title is required" }
+      "meta": {
+        "field": "title",
+        "type": "too_small",
+        "message": "title is required"
+      }
     }
   ]
 }
@@ -212,7 +231,7 @@ const res = await app.request("/api/things", {
 expect(res.status).toBe(200);
 ```
 
-Unit tests: `pnpm test:unit packages/api`
+Unit tests: `pnpm --filter @langwatch/api test:unit`
 
 ## File structure
 
@@ -240,4 +259,4 @@ When creating a new API service using this framework:
 7. Handlers return raw data when `output` is set; the framework validates and serializes
 8. Throw `NotFoundError` / `DomainError` for error responses — don't return `c.json({ error }, 404)` manually
 9. Use `status: 201` in endpoint config for creation endpoints
-10. Copy the scenarios service at `src/app/api/scenarios/[[...route]]/scenarios.service.ts` as a reference
+10. Use the Quick start in this README as the reference until an existing service has been migrated to the package

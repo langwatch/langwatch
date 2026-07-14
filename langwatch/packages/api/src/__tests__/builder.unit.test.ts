@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
 import type { MiddlewareHandler } from "hono";
+import { generateSpecs } from "hono-openapi";
+import { getCurrentContext } from "@langwatch/observability/context";
 
 import { createService } from "../builder.js";
 
@@ -47,9 +49,13 @@ describe("createService", () => {
     it("responds to latest path", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/items", { output: z.object({ ok: z.boolean() }) }, async () => {
-            return { ok: true };
-          });
+          v.get(
+            "/items",
+            { output: z.object({ ok: z.boolean() }) },
+            async () => {
+              return { ok: true };
+            },
+          );
         })
         .build();
 
@@ -61,9 +67,13 @@ describe("createService", () => {
     it("responds to bare path (no version) as latest alias", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/items", { output: z.object({ ok: z.boolean() }) }, async () => {
-            return { ok: true };
-          });
+          v.get(
+            "/items",
+            { output: z.object({ ok: z.boolean() }) },
+            async () => {
+              return { ok: true };
+            },
+          );
         })
         .build();
 
@@ -85,6 +95,59 @@ describe("createService", () => {
       expect(res.status).toBe(404);
     });
   });
+
+  describe("when registering an invalid or duplicate version", () => {
+    it("fails fast instead of silently dropping endpoints", () => {
+      const service = buildTestService();
+
+      expect(() => service.version("2025-02-30", () => {})).toThrow(
+        /Invalid API version/,
+      );
+
+      service.version("2025-02-28", () => {});
+      expect(() => service.version("2025-02-28", () => {})).toThrow(
+        /registered more than once/,
+      );
+    });
+  });
+
+  describe("when service or endpoint paths are malformed", () => {
+    it("fails fast with an actionable error", () => {
+      expect(() => createService({ name: " " })).toThrow(/must not be empty/);
+      expect(() =>
+        createService({ name: "test", basePath: "api/test" }).build(),
+      ).toThrow(/basePath must start/);
+      expect(() =>
+        buildTestService().version("2025-03-15", (v) => {
+          v.get("items", {}, async (c) => c.body(null, 204));
+        }),
+      ).toThrow(/Endpoint path must start/);
+    });
+  });
+
+  describe("when a version namespace misses a route", () => {
+    it("does not fall through to a dynamic unversioned endpoint", async () => {
+      const app = buildTestService()
+        .version("2025-03-15", (v) => {
+          v.get(
+            "/:id/:child",
+            { params: z.object({ id: z.string(), child: z.string() }) },
+            async (c, { params }) => c.json(params),
+          );
+        })
+        .build();
+
+      expect((await makeRequest(app, "/api/test/latest/missing")).status).toBe(
+        404,
+      );
+      expect(
+        (await makeRequest(app, "/api/test/2099-01-01/missing")).status,
+      ).toBe(404);
+
+      const bare = await makeRequest(app, "/api/test/item-1/detail");
+      expect(bare.status).toBe(200);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -99,9 +162,13 @@ describe("provide", () => {
           greeting: () => "hello from provider",
         })
         .version("2025-03-15", (v) => {
-          v.get("/greet", { output: z.object({ message: z.string() }) }, async (_c, { app }) => {
-            return { message: app.greeting };
-          });
+          v.get(
+            "/greet",
+            { output: z.object({ message: z.string() }) },
+            async (_c, { app }) => {
+              return { message: app.greeting };
+            },
+          );
         })
         .build();
 
@@ -120,15 +187,85 @@ describe("provide", () => {
           },
         })
         .version("2025-03-15", (v) => {
-          v.get("/data", { output: z.object({ loaded: z.boolean() }) }, async (_c, { app }) => {
-            return app.data;
-          });
+          v.get(
+            "/data",
+            { output: z.object({ loaded: z.boolean() }) },
+            async (_c, { app }) => {
+              return app.data;
+            },
+          );
         })
         .build();
 
       const res = await makeRequest(app, "/api/test/2025-03-15/data");
       expect(res.status).toBe(200);
       expect(await jsonBody(res)).toEqual({ loaded: true });
+    });
+  });
+
+  describe("when providers are added after a version", () => {
+    it("preserves the endpoints already registered on the fluent builder", async () => {
+      const app = buildTestService()
+        .version("2025-03-15", (v) => {
+          v.get(
+            "/health",
+            { output: z.literal("ok") },
+            async () => "ok" as const,
+          );
+        })
+        .provide({ dependency: () => "available" })
+        .build();
+
+      const res = await makeRequest(app, "/api/test/2025-03-15/health");
+      expect(res.status).toBe(200);
+      expect(await res.json()).toBe("ok");
+    });
+  });
+
+  describe("when a provider uses a reserved BaseApp key", () => {
+    it("rejects the provider instead of overwriting request context", () => {
+      expect(() =>
+        buildTestService().provide({ project: () => ({ id: "wrong" }) }),
+      ).toThrow(/reserved by BaseApp/);
+    });
+  });
+
+  describe("when auth resolves request context", () => {
+    it("makes that context available to providers before the handler runs", async () => {
+      const auth: MiddlewareHandler = async (c, next) => {
+        c.set("organization", { id: "org-1" });
+        c.set("project", { id: "project-1" });
+        c.set("user", { id: "user-1" });
+        await next();
+      };
+
+      const app = createService({ name: "test", basePath: "/api/test", auth })
+        .provide({ requestContext: () => getCurrentContext() })
+        .version("2025-03-15", (v) => {
+          v.get(
+            "/context",
+            {
+              output: z.object({
+                organizationId: z.string(),
+                projectId: z.string(),
+                userId: z.string(),
+              }),
+            },
+            async (_c, { app }) => ({
+              organizationId: app.requestContext?.organizationId ?? "missing",
+              projectId: app.requestContext?.projectId ?? "missing",
+              userId: app.requestContext?.userId ?? "missing",
+            }),
+          );
+        })
+        .build();
+
+      const res = await makeRequest(app, "/api/test/2025-03-15/context");
+      expect(await res.json()).toEqual({
+        organizationId: "org-1",
+        projectId: "project-1",
+        userId: "user-1",
+      });
     });
   });
 });
@@ -189,8 +326,17 @@ describe("input validation", () => {
         body: JSON.stringify({ name: "" }),
       });
 
-      // hono-openapi/zod validator returns 400 by default
-      expect(res.status).toBeLessThan(500);
+      expect(res.status).toBe(422);
+      expect(await jsonBody(res)).toMatchObject({
+        kind: "validation_error",
+        reasons: [
+          {
+            code: "schema_failure",
+            meta: { field: "name", type: "too_small" },
+          },
+        ],
+      });
+      expect(res.headers.get("X-API-Version")).toBe("2025-03-15");
     });
   });
 });
@@ -214,6 +360,28 @@ describe("output validation", () => {
       expect(res.status).toBe(200);
       // Zod .parse strips extra fields
       expect(await jsonBody(res)).toEqual({ id: 1, name: "item" });
+    });
+  });
+
+  describe("when handler output violates the declared schema", () => {
+    it("returns an internal error instead of blaming the client", async () => {
+      const app = buildTestService()
+        .version("2025-03-15", (v) => {
+          v.get(
+            "/items",
+            { output: z.object({ id: z.number() }) },
+            async () => ({ id: "not-a-number" }) as never,
+          );
+        })
+        .build();
+
+      const res = await makeRequest(app, "/api/test/2025-03-15/items");
+
+      expect(res.status).toBe(500);
+      expect(await jsonBody(res)).toEqual({
+        kind: "internal_error",
+        message: "Internal server error",
+      });
     });
   });
 });
@@ -283,7 +451,11 @@ describe("per-endpoint auth option", () => {
         await next();
       });
 
-      const app = createService({ name: "test", basePath: "/api/test", auth: authMiddleware })
+      const app = createService({
+        name: "test",
+        basePath: "/api/test",
+        auth: authMiddleware,
+      })
         .version("2025-03-15", (v) => {
           v.get(
             "/public",
@@ -351,7 +523,7 @@ describe("resource limit middleware", () => {
         basePath: "/api/test",
         _legacy: {
           resourceLimitMiddleware: (limitType: string) => {
-            return async (_c: any, next: any) => {
+            return async (_c, next) => {
               resourceLimitCalled(limitType);
               await next();
             };
@@ -374,6 +546,18 @@ describe("resource limit middleware", () => {
       expect(resourceLimitCalled).toHaveBeenCalledWith("items");
     });
   });
+
+  describe("when a resource limit is declared without its middleware factory", () => {
+    it("fails closed while building the service", () => {
+      const service = buildTestService().version("2025-03-15", (v) => {
+        v.post("/items", { resourceLimit: "items" }, async (c) =>
+          c.body(null, 204),
+        );
+      });
+
+      expect(() => service.build()).toThrow(/has no resourceLimitMiddleware/);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -385,14 +569,22 @@ describe("version forward-copying via builder", () => {
     it("makes v1 endpoints available in v2", async () => {
       const app = buildTestService()
         .version("2025-01-01", (v) => {
-          v.get("/items", { output: z.object({ from: z.string() }) }, async () => ({
-            from: "v1",
-          }));
+          v.get(
+            "/items",
+            { output: z.object({ from: z.string() }) },
+            async () => ({
+              from: "v1",
+            }),
+          );
         })
         .version("2025-06-01", (v) => {
-          v.get("/new", { output: z.object({ from: z.string() }) }, async () => ({
-            from: "v2",
-          }));
+          v.get(
+            "/new",
+            { output: z.object({ from: z.string() }) },
+            async () => ({
+              from: "v2",
+            }),
+          );
         })
         .build();
 
@@ -412,12 +604,20 @@ describe("version forward-copying via builder", () => {
     it("returns 410 Gone for the withdrawn endpoint", async () => {
       const app = buildTestService()
         .version("2025-01-01", (v) => {
-          v.get("/old", { output: z.object({ ok: z.boolean() }) }, async () => ({
-            ok: true,
-          }));
-          v.get("/kept", { output: z.object({ ok: z.boolean() }) }, async () => ({
-            ok: true,
-          }));
+          v.get(
+            "/old",
+            { output: z.object({ ok: z.boolean() }) },
+            async () => ({
+              ok: true,
+            }),
+          );
+          v.get(
+            "/kept",
+            { output: z.object({ ok: z.boolean() }) },
+            async () => ({
+              ok: true,
+            }),
+          );
         })
         .version("2025-06-01", (v) => {
           v.withdraw("get", "/old");
@@ -440,6 +640,75 @@ describe("version forward-copying via builder", () => {
       const keptRes = await makeRequest(app, "/api/test/2025-06-01/kept");
       expect(keptRes.status).toBe(200);
     });
+
+    it("keeps inherited auth and endpoint middleware on the 410 response", async () => {
+      const calls: string[] = [];
+      const auth: MiddlewareHandler = async (_c, next) => {
+        calls.push("auth");
+        await next();
+      };
+      const endpointMiddleware: MiddlewareHandler = async (_c, next) => {
+        calls.push("endpoint");
+        await next();
+      };
+
+      const app = createService({ name: "test", basePath: "/api/test", auth })
+        .version("2025-01-01", (v) => {
+          v.get("/old", { middleware: [endpointMiddleware] }, async (c) =>
+            c.json({ ok: true }),
+          );
+        })
+        .version("2025-06-01", (v) => {
+          v.withdraw("get", "/old");
+        })
+        .build();
+
+      const res = await makeRequest(app, "/api/test/2025-06-01/old");
+      expect(res.status).toBe(410);
+      expect(calls).toEqual(["auth", "endpoint"]);
+      expect(res.headers.get("X-API-Version")).toBe("2025-06-01");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OpenAPI metadata
+// ---------------------------------------------------------------------------
+
+describe("OpenAPI responses", () => {
+  it("documents the configured success status", async () => {
+    const app = buildTestService()
+      .version("2025-03-15", (v) => {
+        v.post(
+          "/items",
+          { output: z.object({ id: z.string() }), status: 201 },
+          async () => ({ id: "item-1" }),
+        );
+      })
+      .build();
+
+    const spec = await generateSpecs(app);
+    expect(
+      spec.paths["/api/test/2025-03-15/items"]?.post?.responses,
+    ).toHaveProperty("201");
+    expect(
+      spec.paths["/api/test/2025-03-15/items"]?.post?.responses,
+    ).not.toHaveProperty("200");
+  });
+
+  it("adds a default success response for description-only routes", async () => {
+    const app = buildTestService()
+      .version("2025-03-15", (v) => {
+        v.get("/health", { description: "Health check" }, async (c) =>
+          c.text("ok"),
+        );
+      })
+      .build();
+
+    const spec = await generateSpecs(app);
+    expect(
+      spec.paths["/api/test/2025-03-15/health"]?.get?.responses,
+    ).toHaveProperty("200");
   });
 });
 
@@ -452,9 +721,13 @@ describe("version response headers", () => {
     it("sets X-API-Version and X-API-Version-Status headers", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/items", { output: z.object({ ok: z.boolean() }) }, async () => ({
-            ok: true,
-          }));
+          v.get(
+            "/items",
+            { output: z.object({ ok: z.boolean() }) },
+            async () => ({
+              ok: true,
+            }),
+          );
         })
         .build();
 
@@ -468,9 +741,13 @@ describe("version response headers", () => {
     it("sets status to latest", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/items", { output: z.object({ ok: z.boolean() }) }, async () => ({
-            ok: true,
-          }));
+          v.get(
+            "/items",
+            { output: z.object({ ok: z.boolean() }) },
+            async () => ({
+              ok: true,
+            }),
+          );
         })
         .build();
 
@@ -484,9 +761,13 @@ describe("version response headers", () => {
     it("sets status to unversioned", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/items", { output: z.object({ ok: z.boolean() }) }, async () => ({
-            ok: true,
-          }));
+          v.get(
+            "/items",
+            { output: z.object({ ok: z.boolean() }) },
+            async () => ({
+              ok: true,
+            }),
+          );
         })
         .build();
 
@@ -505,14 +786,22 @@ describe("preview", () => {
     it("makes them available at /preview/ path", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/items", { output: z.object({ stable: z.boolean() }) }, async () => ({
-            stable: true,
-          }));
+          v.get(
+            "/items",
+            { output: z.object({ stable: z.boolean() }) },
+            async () => ({
+              stable: true,
+            }),
+          );
         })
         .preview((v) => {
-          v.get("/beta", { output: z.object({ preview: z.boolean() }) }, async () => ({
-            preview: true,
-          }));
+          v.get(
+            "/beta",
+            { output: z.object({ preview: z.boolean() }) },
+            async () => ({
+              preview: true,
+            }),
+          );
         })
         .build();
 
@@ -524,14 +813,22 @@ describe("preview", () => {
     it("does not include preview endpoints in latest", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/items", { output: z.object({ stable: z.boolean() }) }, async () => ({
-            stable: true,
-          }));
+          v.get(
+            "/items",
+            { output: z.object({ stable: z.boolean() }) },
+            async () => ({
+              stable: true,
+            }),
+          );
         })
         .preview((v) => {
-          v.get("/beta", { output: z.object({ preview: z.boolean() }) }, async () => ({
-            preview: true,
-          }));
+          v.get(
+            "/beta",
+            { output: z.object({ preview: z.boolean() }) },
+            async () => ({
+              preview: true,
+            }),
+          );
         })
         .build();
 
@@ -590,7 +887,10 @@ describe("error handling", () => {
 
       const res = await makeRequest(app, "/api/test/2025-03-15/fail");
       expect(res.status).toBe(404);
-      const body = (await jsonBody(res)) as { kind: string; meta: { id: string } };
+      const body = (await jsonBody(res)) as {
+        kind: string;
+        meta: { id: string };
+      };
       expect(body.kind).toBe("thing_not_found");
       expect(body.meta.id).toBe("123");
     });
@@ -617,10 +917,14 @@ describe("global middleware", () => {
         ],
       })
         .version("2025-03-15", (v) => {
-          v.get("/items", { output: z.object({ ok: z.boolean() }) }, async () => {
-            calls.push("handler");
-            return { ok: true };
-          });
+          v.get(
+            "/items",
+            { output: z.object({ ok: z.boolean() }) },
+            async () => {
+              calls.push("handler");
+              return { ok: true };
+            },
+          );
         })
         .build();
 
@@ -639,37 +943,67 @@ describe("HTTP methods", () => {
     return buildTestService()
       .version("2025-03-15", (v) => {
         v.get("/r", { output: z.literal("get") }, async () => "get" as const);
-        v.post("/r", { output: z.literal("post") }, async () => "post" as const);
+        v.post(
+          "/r",
+          { output: z.literal("post") },
+          async () => "post" as const,
+        );
         v.put("/r", { output: z.literal("put") }, async () => "put" as const);
-        v.delete("/r", { output: z.literal("del") }, async () => "del" as const);
-        v.patch("/r", { output: z.literal("patch") }, async () => "patch" as const);
+        v.delete(
+          "/r",
+          { output: z.literal("del") },
+          async () => "del" as const,
+        );
+        v.patch(
+          "/r",
+          { output: z.literal("patch") },
+          async () => "patch" as const,
+        );
       })
       .build();
   }
 
   it("handles GET", async () => {
     const app = buildMethodApp();
-    expect(await (await makeRequest(app, "/api/test/2025-03-15/r")).json()).toBe("get");
+    expect(
+      await (await makeRequest(app, "/api/test/2025-03-15/r")).json(),
+    ).toBe("get");
   });
 
   it("handles POST", async () => {
     const app = buildMethodApp();
-    expect(await (await makeRequest(app, "/api/test/2025-03-15/r", { method: "POST" })).json()).toBe("post");
+    expect(
+      await (
+        await makeRequest(app, "/api/test/2025-03-15/r", { method: "POST" })
+      ).json(),
+    ).toBe("post");
   });
 
   it("handles PUT", async () => {
     const app = buildMethodApp();
-    expect(await (await makeRequest(app, "/api/test/2025-03-15/r", { method: "PUT" })).json()).toBe("put");
+    expect(
+      await (
+        await makeRequest(app, "/api/test/2025-03-15/r", { method: "PUT" })
+      ).json(),
+    ).toBe("put");
   });
 
   it("handles DELETE", async () => {
     const app = buildMethodApp();
-    expect(await (await makeRequest(app, "/api/test/2025-03-15/r", { method: "DELETE" })).json()).toBe("del");
+    expect(
+      await (
+        await makeRequest(app, "/api/test/2025-03-15/r", { method: "DELETE" })
+      ).json(),
+    ).toBe("del");
   });
 
   it("handles PATCH", async () => {
     const app = buildMethodApp();
-    expect(await (await makeRequest(app, "/api/test/2025-03-15/r", { method: "PATCH" })).json()).toBe("patch");
+    expect(
+      await (
+        await makeRequest(app, "/api/test/2025-03-15/r", { method: "PATCH" })
+      ).json(),
+    ).toBe("patch");
   });
 });
 
@@ -720,9 +1054,7 @@ describe("null return", () => {
     it("returns 204 No Content", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/void", {}, async (c) => {
-            return c.body(null, 204);
-          });
+          v.get("/void", { output: z.undefined() }, async () => undefined);
         })
         .build();
 

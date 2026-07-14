@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { z } from "zod";
+import { ZodError, z } from "zod";
 
 import { createService } from "../builder.js";
 
@@ -31,7 +31,9 @@ async function collectSSE(res: Response): Promise<string[]> {
   return chunks;
 }
 
-function parseSSEEvents(chunks: string[]): Array<{ event: string; data: unknown }> {
+function parseSSEEvents(
+  chunks: string[],
+): Array<{ event: string; data: unknown }> {
   const raw = chunks.join("");
   const events: Array<{ event: string; data: unknown }> = [];
 
@@ -102,7 +104,7 @@ describe("SSE endpoints", () => {
   });
 
   describe("when SSE event data fails schema validation", () => {
-    it("emits an error event instead of the invalid data", async () => {
+    it("emits an error event and rejects instead of silently continuing", async () => {
       const app = createService({ name: "test", basePath: "/api/test" })
         .version("2025-03-15", (v) => {
           v.sse(
@@ -113,9 +115,13 @@ describe("SSE endpoints", () => {
               },
             },
             async (_c, _args, stream) => {
-              // This should emit an error event, not throw
-              await stream.emit("result", { score: "invalid" as unknown as number });
-              // Valid event should still work after
+              await expect(
+                stream.emit("result", {
+                  score: "invalid" as unknown as number,
+                }),
+              ).rejects.toBeInstanceOf(ZodError);
+
+              // Callers may explicitly recover and continue the stream.
               await stream.emit("result", { score: 0.95 });
               stream.close();
             },
@@ -133,12 +139,43 @@ describe("SSE endpoints", () => {
 
       // First event: validation error
       expect(events[0]!.event).toBe("error");
-      const errorData = events[0]!.data as { message: string; issues: unknown[] };
+      const errorData = events[0]!.data as {
+        message: string;
+        issues: unknown[];
+      };
       expect(errorData.message).toContain("Validation failed");
       expect(errorData.issues.length).toBeGreaterThan(0);
 
       // Second event: valid data went through
       expect(events[1]).toEqual({ event: "result", data: { score: 0.95 } });
+    });
+  });
+
+  describe("when an SSE endpoint declares a query schema", () => {
+    it("parses query input on its GET route", async () => {
+      const app = createService({ name: "test", basePath: "/api/test" })
+        .version("2025-03-15", (v) => {
+          v.sse(
+            "/stream",
+            {
+              events: { ready: z.object({ channel: z.string() }) },
+              query: z.object({ channel: z.string() }),
+            },
+            async (_c, { query }, stream) => {
+              await stream.emit("ready", { channel: query.channel });
+            },
+          );
+        })
+        .build();
+
+      const res = await app.request(
+        "/api/test/2025-03-15/stream?channel=updates",
+      );
+      const events = parseSSEEvents(await collectSSE(res));
+
+      expect(events).toEqual([
+        { event: "ready", data: { channel: "updates" } },
+      ]);
     });
   });
 });

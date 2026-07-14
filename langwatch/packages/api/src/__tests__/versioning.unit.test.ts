@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import type { EndpointRegistration } from "../types.js";
+import { isDateVersion } from "../types.js";
 import {
   resolveVersions,
   resolveRequestVersion,
@@ -28,6 +29,29 @@ function makeEndpoint(
 // ---------------------------------------------------------------------------
 
 describe("resolveVersions", () => {
+  describe("when a version is invalid or duplicated", () => {
+    it("rejects invalid calendar dates", () => {
+      expect(() =>
+        resolveVersions(
+          [{ version: "2025-02-30", endpoints: [makeEndpoint()] }],
+          [],
+        ),
+      ).toThrow(/Invalid API version/);
+    });
+
+    it("rejects duplicate version definitions", () => {
+      expect(() =>
+        resolveVersions(
+          [
+            { version: "2025-03-15", endpoints: [makeEndpoint()] },
+            { version: "2025-03-15", endpoints: [makeEndpoint()] },
+          ],
+          [],
+        ),
+      ).toThrow(/registered more than once/);
+    });
+  });
+
   describe("when given a single version", () => {
     it("resolves the version and creates a latest alias", () => {
       const definitions: VersionDefinition[] = [
@@ -73,11 +97,15 @@ describe("resolveVersions", () => {
       const definitions: VersionDefinition[] = [
         {
           version: "2025-01-01",
-          endpoints: [makeEndpoint({ method: "get", path: "/items", handler: v1Handler })],
+          endpoints: [
+            makeEndpoint({ method: "get", path: "/items", handler: v1Handler }),
+          ],
         },
         {
           version: "2025-06-01",
-          endpoints: [makeEndpoint({ method: "get", path: "/items", handler: v2Handler })],
+          endpoints: [
+            makeEndpoint({ method: "get", path: "/items", handler: v2Handler }),
+          ],
         },
       ];
 
@@ -99,6 +127,31 @@ describe("resolveVersions", () => {
       expect(v2Active.withdrawn).not.toBe(true);
       if (!v2Active.withdrawn) {
         expect(v2Active.handler).toBe(v2Handler);
+      }
+    });
+
+    it("treats an empty root path and slash root path as the same endpoint", () => {
+      const rootHandler = () => ({ version: 1 });
+      const replacementHandler = () => ({ version: 2 });
+      const definitions: VersionDefinition[] = [
+        {
+          version: "2025-01-01",
+          endpoints: [makeEndpoint({ path: "", handler: rootHandler })],
+        },
+        {
+          version: "2025-06-01",
+          endpoints: [makeEndpoint({ path: "/", handler: replacementHandler })],
+        },
+      ];
+
+      const result = resolveVersions(definitions, []);
+      const endpoints = result.get("2025-06-01")!;
+
+      expect(endpoints).toHaveLength(1);
+      const endpoint = endpoints[0]!;
+      expect(endpoint.withdrawn).not.toBe(true);
+      if (!endpoint.withdrawn) {
+        expect(endpoint.handler).toBe(replacementHandler);
       }
     });
   });
@@ -141,7 +194,9 @@ describe("resolveVersions", () => {
       const definitions: VersionDefinition[] = [
         { version: "2025-01-01", endpoints: [makeEndpoint()] },
       ];
-      const previewEndpoints = [makeEndpoint({ method: "post", path: "/beta" })];
+      const previewEndpoints = [
+        makeEndpoint({ method: "post", path: "/beta" }),
+      ];
 
       const result = resolveVersions(definitions, previewEndpoints);
 
@@ -153,7 +208,9 @@ describe("resolveVersions", () => {
       const definitions: VersionDefinition[] = [
         { version: "2025-01-01", endpoints: [makeEndpoint()] },
       ];
-      const previewEndpoints = [makeEndpoint({ method: "post", path: "/beta" })];
+      const previewEndpoints = [
+        makeEndpoint({ method: "post", path: "/beta" }),
+      ];
 
       const result = resolveVersions(definitions, previewEndpoints);
 
@@ -165,13 +222,45 @@ describe("resolveVersions", () => {
       // Preview should only have the beta endpoint
       expect(preview).toHaveLength(1);
     });
+
+    it("normalizes GET and SSE keys when de-duplicating preview endpoints", () => {
+      const previewEndpoints = [
+        makeEndpoint({ method: "get", path: "/stream" }),
+        makeEndpoint({ method: "sse", path: "/stream" }),
+      ];
+
+      const result = resolveVersions([], previewEndpoints);
+
+      expect(result.get("preview")).toHaveLength(1);
+      expect(result.get("preview")?.[0]?.method).toBe("sse");
+    });
+
+    it("preserves preview withdrawals as 410 markers", () => {
+      const previewEndpoints = [
+        makeEndpoint({ method: "get", path: "/beta" }),
+        makeEndpoint({
+          method: "get",
+          path: "/beta",
+          withdrawn: true,
+        }),
+      ];
+
+      const result = resolveVersions([], previewEndpoints);
+
+      expect(result.get("preview")).toEqual([
+        expect.objectContaining({ path: "/beta", withdrawn: true }),
+      ]);
+    });
   });
 
   describe("when versions are provided out of order", () => {
     it("sorts them chronologically", () => {
       const v2Handler = () => ({ latest: true });
       const definitions: VersionDefinition[] = [
-        { version: "2025-06-01", endpoints: [makeEndpoint({ handler: v2Handler })] },
+        {
+          version: "2025-06-01",
+          endpoints: [makeEndpoint({ handler: v2Handler })],
+        },
         { version: "2025-01-01", endpoints: [makeEndpoint()] },
       ];
 
@@ -187,6 +276,15 @@ describe("resolveVersions", () => {
   });
 });
 
+describe("isDateVersion", () => {
+  it("accepts real dates and rejects impossible calendar dates", () => {
+    expect(isDateVersion("2024-02-29")).toBe(true);
+    expect(isDateVersion("2025-02-29")).toBe(false);
+    expect(isDateVersion("2025-13-01")).toBe(false);
+    expect(isDateVersion("v1")).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // resolveRequestVersion
 // ---------------------------------------------------------------------------
@@ -194,7 +292,10 @@ describe("resolveVersions", () => {
 describe("resolveRequestVersion", () => {
   const definitions: VersionDefinition[] = [
     { version: "2025-01-01", endpoints: [makeEndpoint()] },
-    { version: "2025-06-01", endpoints: [makeEndpoint({ method: "post", path: "/new" })] },
+    {
+      version: "2025-06-01",
+      endpoints: [makeEndpoint({ method: "post", path: "/new" })],
+    },
   ];
   const previewEndpoints = [makeEndpoint({ method: "get", path: "/beta" })];
   const versionMap = resolveVersions(definitions, previewEndpoints);
