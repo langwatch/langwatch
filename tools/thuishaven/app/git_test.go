@@ -1,11 +1,26 @@
 package app
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
+
+// gitTestHygiene is a local fake for GitTargetDir tests with a settable
+// Worktrees error. Deliberately separate from hub_test.go's fakeHygiene.
+type gitTestHygiene struct {
+	worktrees    []Worktree
+	worktreesErr error
+}
+
+func (f *gitTestHygiene) Worktrees(string) ([]Worktree, error) { return f.worktrees, f.worktreesErr }
+func (f *gitTestHygiene) Dirty(string) bool                    { return false }
+func (f *gitTestHygiene) DirSize(string) (int64, bool)         { return 0, false }
+func (f *gitTestHygiene) Remove(string) error                  { return nil }
+func (f *gitTestHygiene) PruneGitWorktrees(string)             {}
+func (f *gitTestHygiene) RemoveWorktree(string, string) error  { return nil }
 
 func TestResolveGitTarget(t *testing.T) {
 	stacks := []domain.Stack{
@@ -49,6 +64,53 @@ func TestResolveGitTarget(t *testing.T) {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("error %q should list %q", err.Error(), want)
 				}
+			}
+			if got := strings.Count(err.Error(), "portless"); got != 1 {
+				t.Errorf("error %q should list %q exactly once (deduped), got %d occurrences", err.Error(), "portless", got)
+			}
+		})
+	})
+}
+
+func TestGitTargetDir(t *testing.T) {
+	stacks := []domain.Stack{
+		{Slug: "portless", WorktreeDir: "/repos/worktrees/portless"},
+	}
+
+	t.Run("given the worktree listing fails", func(t *testing.T) {
+		o := &Orchestrator{
+			store: &fakeStore{stacks: stacks},
+			hyg:   &gitTestHygiene{worktreesErr: errors.New("git worktree list: boom")},
+		}
+
+		t.Run("when the target is a registered stack slug, it still resolves", func(t *testing.T) {
+			dir, err := o.GitTargetDir("/repos/langwatch", "portless")
+			if err != nil || dir != "/repos/worktrees/portless" {
+				t.Errorf("got (%q, %v), want the registered stack's dir despite the listing failure", dir, err)
+			}
+		})
+
+		t.Run("when the target is unknown, the error surfaces the listing failure", func(t *testing.T) {
+			_, err := o.GitTargetDir("/repos/langwatch", "nosuch")
+			if err == nil {
+				t.Fatal("expected an error for an unknown target")
+			}
+			if !strings.Contains(err.Error(), "nosuch") {
+				t.Errorf("error %q should name the unknown target", err.Error())
+			}
+			if !strings.Contains(err.Error(), "git worktree list: boom") {
+				t.Errorf("error %q should surface the worktree-listing failure", err.Error())
+			}
+		})
+	})
+
+	t.Run("given no hygiene adapter is wired", func(t *testing.T) {
+		o := &Orchestrator{store: &fakeStore{stacks: stacks}}
+
+		t.Run("when the target is a registered stack slug, it resolves from stacks alone", func(t *testing.T) {
+			dir, err := o.GitTargetDir("/repos/langwatch", "portless")
+			if err != nil || dir != "/repos/worktrees/portless" {
+				t.Errorf("got (%q, %v), want the registered stack's dir", dir, err)
 			}
 		})
 	})

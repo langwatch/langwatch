@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -13,17 +14,18 @@ import (
 type fakeSupervisor struct {
 	shells []string
 	envs   [][]string
+	err    error
 }
 
 func (f *fakeSupervisor) RunOnce(_ context.Context, _, _, shell string, env []string) error {
 	f.shells = append(f.shells, shell)
 	f.envs = append(f.envs, env)
-	return nil
+	return f.err
 }
 func (f *fakeSupervisor) RunOnceBounded(_ context.Context, _, _, shell string, env []string, _ ReapLimits) error {
 	f.shells = append(f.shells, shell)
 	f.envs = append(f.envs, env)
-	return nil
+	return f.err
 }
 func (f *fakeSupervisor) Supervise(context.Context, []Child) {}
 
@@ -42,6 +44,13 @@ func seedOrchestrator(sup *fakeSupervisor, store *fakeStore, sys System) *Orches
 	}
 }
 
+func liveStackStore() *fakeStore {
+	return &fakeStore{stacks: []domain.Stack{{
+		Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42,
+		Services: []domain.Service{{Name: "app", Port: 5560}},
+	}}}
+}
+
 func TestSeedPresets(t *testing.T) {
 	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x", LwDir: "/wt/feat-x/langwatch"}
 
@@ -49,15 +58,22 @@ func TestSeedPresets(t *testing.T) {
 		sup := &fakeSupervisor{}
 		o := seedOrchestrator(sup, &fakeStore{}, &fakeSystem{})
 
-		t.Run("when seeding, only the plain seed runs with no preset env", func(t *testing.T) {
+		t.Run("when seeding, only the plain seed runs carrying the local API key", func(t *testing.T) {
 			if err := o.Seed(context.Background(), params, ""); err != nil {
 				t.Fatalf("Seed: %v", err)
 			}
-			if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "prisma:seed") {
+			if len(sup.shells) != 1 || len(sup.envs) != 1 {
+				t.Fatalf("want exactly one seed run, got shells=%v envs=%v", sup.shells, sup.envs)
+			}
+			if !strings.Contains(sup.shells[0], "prisma:seed") {
 				t.Errorf("shells = %v, want just prisma:seed", sup.shells)
 			}
-			if len(sup.envs[0]) != 0 {
-				t.Errorf("env = %v, want none", sup.envs[0])
+			joined := strings.Join(sup.envs[0], " ")
+			if !strings.Contains(joined, "HAVEN_SEED_LANGWATCH_API_KEY=sk-lw-local-development-key") {
+				t.Errorf("env = %v, want the local API key", sup.envs[0])
+			}
+			if strings.Contains(joined, "HAVEN_SEED_PRESET") {
+				t.Errorf("env = %v, want no preset", sup.envs[0])
 			}
 		})
 	})
@@ -86,30 +102,84 @@ func TestSeedPresets(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), "not running") {
 				t.Fatalf("expected a stack-not-running error, got %v", err)
 			}
+			if len(sup.shells) != 1 || len(sup.envs) != 1 {
+				t.Fatalf("want exactly the prisma:seed run, got shells=%v", sup.shells)
+			}
+			if !strings.Contains(sup.shells[0], "prisma:seed") {
+				t.Errorf("shells = %v, want just prisma:seed", sup.shells)
+			}
+			if !strings.Contains(strings.Join(sup.envs[0], " "), "HAVEN_SEED_PRESET=demo") {
+				t.Errorf("env = %v, want the preset", sup.envs[0])
+			}
+		})
+	})
+
+	t.Run("given the demo preset with a live stack whose app port is not answering", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{}}
+		o := seedOrchestrator(sup, liveStackStore(), sys)
+
+		t.Run("when seeding, traces are refused and only the plain seed ran", func(t *testing.T) {
+			err := o.Seed(context.Background(), params, "demo")
+			if err == nil || !strings.Contains(err.Error(), "not answering") {
+				t.Fatalf("expected a not-answering refusal, got %v", err)
+			}
 			if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "prisma:seed") {
 				t.Errorf("shells = %v, want just prisma:seed", sup.shells)
 			}
-			if len(sup.envs[0]) != 1 || sup.envs[0][0] != "HAVEN_SEED_PRESET=demo" {
-				t.Errorf("env = %v, want the preset", sup.envs[0])
+		})
+	})
+
+	t.Run("given the demo preset with a live stack whose only app service is a baseline fallback", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		store := &fakeStore{stacks: []domain.Stack{{
+			Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42,
+			Services: []domain.Service{{Name: "app", Port: 5560, IsFallback: true}},
+		}}}
+		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{5560: true}}
+		o := seedOrchestrator(sup, store, sys)
+
+		t.Run("when seeding, the fallback app is not a local target so traces are refused", func(t *testing.T) {
+			err := o.Seed(context.Background(), params, "demo")
+			if err == nil || !strings.Contains(err.Error(), "not answering") {
+				t.Fatalf("expected a not-answering refusal, got %v", err)
+			}
+			if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "prisma:seed") {
+				t.Errorf("shells = %v, want just prisma:seed", sup.shells)
+			}
+		})
+	})
+
+	t.Run("given the prisma:seed process fails", func(t *testing.T) {
+		sup := &fakeSupervisor{err: errors.New("seed boom")}
+		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{5560: true}}
+		o := seedOrchestrator(sup, liveStackStore(), sys)
+
+		t.Run("when seeding the demo preset, the error propagates and traces never run", func(t *testing.T) {
+			err := o.Seed(context.Background(), params, "demo")
+			if err == nil {
+				t.Fatal("expected the seed error to propagate")
+			}
+			if len(sup.shells) != 1 {
+				t.Errorf("want only the failed prisma:seed shell, got %v", sup.shells)
 			}
 		})
 	})
 
 	t.Run("given the demo preset with a live stack", func(t *testing.T) {
 		sup := &fakeSupervisor{}
-		store := &fakeStore{stacks: []domain.Stack{{
-			Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42,
-			Services: []domain.Service{{Name: "app", Port: 5560}},
-		}}}
 		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{5560: true}}
-		o := seedOrchestrator(sup, store, sys)
+		o := seedOrchestrator(sup, liveStackStore(), sys)
 
 		t.Run("when seeding, sample traces are ingested through the app's loopback port", func(t *testing.T) {
 			if err := o.Seed(context.Background(), params, "demo"); err != nil {
 				t.Fatalf("Seed: %v", err)
 			}
-			if len(sup.shells) != 2 || !strings.Contains(sup.shells[1], "seed:sample-traces") {
+			if len(sup.shells) != 2 || len(sup.envs) != 2 {
 				t.Fatalf("shells = %v, want prisma:seed then seed:sample-traces", sup.shells)
+			}
+			if !strings.Contains(sup.shells[1], "seed:sample-traces") {
+				t.Fatalf("shells = %v, want seed:sample-traces second", sup.shells)
 			}
 			joined := strings.Join(sup.envs[1], " ")
 			if !strings.Contains(joined, "HAVEN_SEED_ENDPOINT=http://127.0.0.1:5560") {

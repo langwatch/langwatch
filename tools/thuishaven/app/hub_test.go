@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -50,10 +51,17 @@ type fakeSystem struct {
 	terminated []int
 }
 
-func (f *fakeSystem) FreePorts(n int) ([]int, error)               { return make([]int, n), nil }
-func (f *fakeSystem) PortInUse(int) bool                           { return false }
-func (f *fakeSystem) ProcessAlive(pid int) bool                    { return f.alive[pid] }
-func (f *fakeSystem) Terminate(pid int)                            { f.terminated = append(f.terminated, pid) }
+func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
+func (f *fakeSystem) PortInUse(int) bool             { return false }
+func (f *fakeSystem) ProcessAlive(pid int) bool      { return f.alive[pid] }
+func (f *fakeSystem) Terminate(pid int) {
+	f.terminated = append(f.terminated, pid)
+	// A terminated launcher dies with its process group; reflect that so the
+	// bounded wait in DestroyWorktree observes the exit instead of spinning.
+	if f.alive != nil {
+		f.alive[pid] = false
+	}
+}
 func (f *fakeSystem) SpawnDetached([]string, string, string) error { return nil }
 func (f *fakeSystem) Now() time.Time                               { return time.Time{} }
 func (f *fakeSystem) Getpid() int                                  { return 1 }
@@ -120,7 +128,9 @@ func TestDownStack(t *testing.T) {
 		}}}
 		sys := &fakeSystem{alive: map[int]bool{42: true}}
 		proxy := &fakeProxy{}
-		o := hubOrchestrator(store, sys, proxy, &fakeDBServer{}, &fakeDBServer{}, &fakeHygiene{})
+		ch := &fakeDBServer{databases: []string{"lw_feat_x"}}
+		pg := &fakeDBServer{databases: []string{"lw_feat_x"}}
+		o := hubOrchestrator(store, sys, proxy, ch, pg, &fakeHygiene{})
 
 		t.Run("when downed, it stops the launcher and removes routes and registry entry", func(t *testing.T) {
 			if err := o.DownStack(context.Background(), "feat-x"); err != nil {
@@ -134,6 +144,11 @@ func TestDownStack(t *testing.T) {
 			}
 			if len(store.removed) != 1 || store.removed[0] != "feat-x" {
 				t.Errorf("registry entry should be removed, got %v", store.removed)
+			}
+			// Down keeps data — only DestroyWorktree drops databases. This guards
+			// the load-bearing distinction: nothing should drop a database on down.
+			if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
+				t.Errorf("down must keep databases, got ch=%v pg=%v", ch.dropped, pg.dropped)
 			}
 		})
 	})
@@ -243,8 +258,10 @@ func TestDestroyWorktree(t *testing.T) {
 		})
 	})
 
-	t.Run("given the worktree's database is the protected main database", func(t *testing.T) {
+	t.Run("given the worktree's registered slug is the protected main database", func(t *testing.T) {
 		store, _, _, ch, pg, _, _ := setup()
+		// The slug is derived from the registry, not the worktree-local cache.
+		store.stacks[0].Slug = "main"
 		store.slugCache[victim] = "main"
 		hyg := &fakeHygiene{worktrees: []Worktree{{Dir: primary}, {Dir: victim}}}
 		o := hubOrchestrator(store, &fakeSystem{}, &fakeProxy{}, ch, pg, hyg)
@@ -255,6 +272,29 @@ func TestDestroyWorktree(t *testing.T) {
 			}
 			if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
 				t.Errorf("protected database must never be dropped, got ch=%v pg=%v", ch.dropped, pg.dropped)
+			}
+		})
+	})
+
+	t.Run("given a forged slug cache naming another worktree's slug", func(t *testing.T) {
+		// A hostile branch ships .langwatch-slug naming a different, still-live
+		// worktree; the registry (which haven controls) must win so the victim's
+		// database is dropped and the innocent worktree's is left untouched.
+		store, _, _, ch, pg, _, o := setup()
+		store.slugCache[victim] = "other"
+		store.stacks = append(store.stacks, domain.Stack{Slug: "other", WorktreeDir: "/repos/worktrees/other"})
+		ch.databases = []string{"lw_feat_x", "lw_other", "lw_main"}
+		pg.databases = []string{"lw_feat_x", "lw_other", "lw_main"}
+
+		t.Run("when destroyed, it drops the registry slug's database, not the forged one", func(t *testing.T) {
+			if err := o.DestroyWorktree(context.Background(), primary, victim, primary); err != nil {
+				t.Fatalf("DestroyWorktree: %v", err)
+			}
+			if len(ch.dropped) != 1 || ch.dropped[0] != "lw_feat_x" {
+				t.Errorf("should drop the registry slug's db only, got %v", ch.dropped)
+			}
+			if slices.Contains(pg.dropped, "lw_other") {
+				t.Errorf("must not drop another worktree's database, got %v", pg.dropped)
 			}
 		})
 	})

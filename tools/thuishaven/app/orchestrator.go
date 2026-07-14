@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -219,7 +221,21 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	// API key exist), so every `up` guarantees the same migrations AND the same
 	// seeded credential are in place — a freshly-provisioned DB is immediately
 	// usable with the well-known LANGWATCH_API_KEY, no manual sign-up.
-	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
+	//
+	// When haven manages Postgres the overlay carries a per-slug loopback
+	// DATABASE_URL (provably local) and the seed uses it. When it does not — DB
+	// management disabled, or Postgres failed to come up — the seed would inherit
+	// whatever DATABASE_URL is in .env, so guard that inherited URL exactly as
+	// `haven seed` does and skip (never seed a non-local database) rather than
+	// abort the up.
+	if hasEnvKey(env, "DATABASE_URL") {
+		if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
+			o.log.Warn("seed failed (continuing)", zap.Error(err))
+		}
+	} else if err := o.guardInheritedSeedEnv(p.LwDir); err != nil {
+		o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
+		fmt.Printf("haven: %v — skipping seed\n", err)
+	} else if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
 		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
 	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir))
@@ -381,10 +397,15 @@ var SeedPresets = []string{"demo"}
 // affordance. A preset layers a variant on top of the stable identity; the
 // empty preset is the unchanged default.
 func (o *Orchestrator) Seed(ctx context.Context, p UpParams, preset string) error {
-	if preset != "" && !contains(SeedPresets, preset) {
+	if preset != "" && !slices.Contains(SeedPresets, preset) {
 		return fmt.Errorf("unknown seed preset %q — available: %s", preset, strings.Join(SeedPresets, ", "))
 	}
-	var env []string
+	// Seed the database this worktree's stack actually uses — not whatever
+	// DATABASE_URL happens to be inherited. seedEnv resolves the running stack and
+	// passes its overlay (per-slug loopback DATABASE_URL/CLICKHOUSE_URL, the local
+	// API key) into the child, mirroring the `up` path, so the env cmd.guardSeedEnv
+	// validated and the env the seed connects to are the same provably-local target.
+	env := o.seedEnv(p)
 	if preset != "" {
 		env = append(env, "HAVEN_SEED_PRESET="+preset)
 	}
@@ -395,6 +416,44 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams, preset string) erro
 		return nil
 	}
 	return o.seedSampleTraces(ctx, p)
+}
+
+// seedEnv builds the base environment for the prisma:seed child: the running
+// stack's resolved overlay when one is registered (so the seed writes into this
+// worktree's per-slug database rather than whatever DATABASE_URL is inherited),
+// always carrying HAVEN_SEED_LANGWATCH_API_KEY so the seeded project key matches
+// the local ingestion key — otherwise a re-seed rotates it back to the default
+// and the subsequent sample-trace ingestion 401s. With no stack registered the
+// child inherits the (guardSeedEnv-validated) process/.env environment.
+func (o *Orchestrator) seedEnv(p UpParams) []string {
+	var env []string
+	if slug, err := o.resolveSlug(p); err == nil {
+		if st, ok := o.stackBySlug(slug); ok {
+			env = st.OverlayEnv()
+		}
+	}
+	if o.cfg.LocalAPIKey != "" && !hasEnvKey(env, "HAVEN_SEED_LANGWATCH_API_KEY") {
+		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+o.cfg.LocalAPIKey)
+	}
+	return env
+}
+
+// guardInheritedSeedEnv validates the database URLs a seed with no managed-DB
+// overlay would inherit, resolved at the child's real precedence (process env
+// over the merged dotenv layers).
+func (o *Orchestrator) guardInheritedSeedEnv(lwDir string) error {
+	return domain.GuardSeedTargets(domain.LoadDotenv(lwDir), os.Getenv)
+}
+
+// hasEnvKey reports whether a KEY=VALUE slice already sets key.
+func hasEnvKey(env []string, key string) bool {
+	prefix := key + "="
+	for _, e := range env {
+		if strings.HasPrefix(e, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // seedSampleTraces ingests the deterministic demo traces through the running

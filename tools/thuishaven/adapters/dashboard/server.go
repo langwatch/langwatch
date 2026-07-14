@@ -10,7 +10,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -27,7 +29,10 @@ type Server struct {
 }
 
 // Probes are the optional OS checks the page uses to show live health and
-// resource numbers. Any nil probe simply blanks the stat it feeds.
+// resource numbers. A nil PortInUse leaves every service dot in its default
+// "down" state (the page can't confirm the port is listening); a nil GroupRSS or
+// TotalMemory simply blanks the stat it feeds, and a nil ProcessAlive falls back
+// to treating a stack with a launcher PID as live.
 type Probes struct {
 	PortInUse    func(port int) bool
 	ProcessAlive func(pid int) bool
@@ -48,7 +53,7 @@ func (s *Server) Serve(ctx context.Context, port int) error {
 	mux.HandleFunc("/api/registry", s.handleRegistry)
 	mux.HandleFunc("/v1/", s.handleTelemetry) // OTLP: /v1/traces, /v1/metrics, /v1/logs
 	mux.HandleFunc("/", s.handleIndex)
-	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(mux), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -59,6 +64,49 @@ func (s *Server) Serve(ctx context.Context, port int) error {
 		return err
 	}
 	return nil
+}
+
+// guardHost rejects any request whose Host header is neither loopback nor a
+// hostname under haven's own domain. Binding 127.0.0.1 already stops remote TCP
+// connections, but a DNS-rebinding page can still make a victim's browser issue
+// loopback requests carrying an attacker-controlled Host — pinning the Host to
+// haven's own domain (langwatch.localhost and its subdomains) closes that
+// same-origin hole without listing every stack host individually.
+func (s *Server) guardHost(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.hostAllowed(r.Host) {
+			http.Error(w, "forbidden host", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// hostAllowed reports whether host (an HTTP Host header, possibly with a port) is
+// loopback or falls under the domain haven registers its hostnames beneath.
+func (s *Server) hostAllowed(host string) bool {
+	h := host
+	if hostOnly, _, err := net.SplitHostPort(h); err == nil {
+		h = hostOnly
+	}
+	h = strings.ToLower(strings.TrimSpace(h))
+	switch h {
+	case "", "127.0.0.1", "::1", "localhost":
+		return true
+	}
+	// The base domain haven owns (langwatch.localhost), derived live from the
+	// shared-surface URL so it honours a custom LANGWATCH_LOCAL_TLD. The bare
+	// domain is the dashboard root; every stack host and the observability /
+	// telemetry surfaces are subdomains of it.
+	u, err := url.Parse(s.sharedURL("langwatch"))
+	if err != nil {
+		return false
+	}
+	base := strings.ToLower(u.Hostname())
+	if base == "" {
+		return false
+	}
+	return h == base || strings.HasSuffix(h, "."+base)
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -129,9 +177,14 @@ func (s *Server) handleTelemetry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "telemetry fan-out accepts POST", http.StatusMethodNotAllowed)
 		return
 	}
+	// Cap the buffered body: the daemon holds it in RAM and hands a copy to a
+	// goroutine per running stack, so an unbounded POST (a local process, or a
+	// page CSRF-posting to the loopback port) could exhaust memory. 32 MiB is far
+	// above any real OTLP export.
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "telemetry body too large", http.StatusRequestEntityTooLarge)
 		return
 	}
 	prefix := os.Getenv("LANGWATCH_OTLP_FORWARD_PREFIX")

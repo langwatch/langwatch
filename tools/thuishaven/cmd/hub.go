@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/0xdeafcafe/moron/tui"
 
@@ -22,7 +24,9 @@ func runHub(ctx context.Context, d deps, _ []string) error {
 			return err
 		}
 		if err := tui.Run(dir); err != nil {
-			return err
+			// A stale row (e.g. the worktree dir was deleted underneath us)
+			// shouldn't end the session — surface the error and re-enter the hub.
+			fmt.Fprintf(os.Stderr, "haven: git view for %s failed: %v\n", dir, err)
 		}
 		if ctx.Err() != nil {
 			return nil

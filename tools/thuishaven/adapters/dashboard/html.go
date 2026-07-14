@@ -9,13 +9,86 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// stackCard is renderCard's result: the card markup plus the per-stack
+// numbers renderHTML aggregates into the page-level stats.
+type stackCard struct {
+	html          string
+	live          bool
+	rss           uint64
+	servicesUp    int
+	servicesTotal int
+}
+
+// renderCard draws one stack card — slug, live/stale pill, chips, worktree
+// dir, and a row per service with a liveness dot.
+func renderCard(s domain.Stack, probes Probes) stackCard {
+	var c stackCard
+	c.live = s.LauncherPID != 0
+	if c.live && probes.ProcessAlive != nil {
+		c.live = probes.ProcessAlive(s.LauncherPID)
+	}
+	badge, badgeClass := "stale", "stale"
+	if c.live {
+		badge, badgeClass = "live", "live"
+	}
+
+	if c.live && probes.GroupRSS != nil {
+		c.rss = probes.GroupRSS(s.LauncherPID)
+	}
+
+	var rows strings.Builder
+	for _, svc := range s.Services {
+		c.servicesTotal++
+		dotClass := "down"
+		if probes.PortInUse != nil && probes.PortInUse(svc.Port) {
+			dotClass = "up"
+			c.servicesUp++
+		}
+		rows.WriteString(fmt.Sprintf(
+			`<tr><td class="dot-cell"><span class="dot %s"></span></td><td class="svc">%s</td><td><a href="%s">%s</a></td><td class="dim mono">:%d</td></tr>`,
+			dotClass, html.EscapeString(svc.Name), html.EscapeString(svc.URL), html.EscapeString(svc.Hostname), svc.Port))
+		// The API shares app's origin — show it as a sub-row so the single URL
+		// is unmistakable (no separate api.<slug> hostname).
+		if svc.Name == "app" && s.APIPort != 0 {
+			rows.WriteString(fmt.Sprintf(
+				`<tr><td class="dot-cell"></td><td class="svc dim">└ api</td><td><a href="%s/api">%s/api</a></td><td class="dim mono">:%d</td></tr>`,
+				html.EscapeString(svc.URL), html.EscapeString(svc.Hostname), s.APIPort))
+		}
+	}
+
+	var chips strings.Builder
+	chips.WriteString(chip("branch", s.Branch))
+	if s.ClickHouseDatabase != "" {
+		chips.WriteString(chip("clickhouse", s.ClickHouseDatabase))
+	}
+	chips.WriteString(chip("redis db", fmt.Sprintf("%d", s.RedisDB)))
+	if c.rss > 0 {
+		chips.WriteString(chip("ram", humanBytesU(c.rss)))
+	}
+	if !s.UpdatedAt.IsZero() {
+		chips.WriteString(chip("heartbeat", shortAge(time.Since(s.UpdatedAt))))
+	}
+	if s.IsBaseline {
+		chips.WriteString(`<span class="chip baseline">baseline</span>`)
+	}
+
+	c.html = fmt.Sprintf(`
+      <section class="card">
+        <header><span class="slug">%s</span><span class="pill %s">%s</span></header>
+        <div class="chips">%s</div>
+        <div class="dir">%s</div>
+        <table>%s</table>
+      </section>`, html.EscapeString(s.Slug), badgeClass, badge, chips.String(), html.EscapeString(s.WorktreeDir), rows.String())
+	return c
+}
+
 // renderHTML draws the hub: aggregate health up top (stacks, services, RAM,
 // databases), then one card per stack — which worktree owns which slug, its
 // branch, databases, footprint, and every service hostname with a live dot.
 func renderHTML(stacks []domain.Stack, sharedURL func(string) string, probes Probes) string {
 	type agg struct {
-		live, servicesUp, servicesTotal int
-		rss                             uint64
+		live, servicesUp, servicesTotal, databases int
+		rss                                        uint64
 	}
 	var a agg
 
@@ -24,65 +97,20 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string, probes Pro
 		cards.WriteString(`<p class="empty">No stacks running — start one with <code>pnpm dev</code> in a worktree.</p>`)
 	}
 	for _, s := range stacks {
-		live := s.LauncherPID != 0
-		if live && probes.ProcessAlive != nil {
-			live = probes.ProcessAlive(s.LauncherPID)
-		}
-		badge, badgeClass := "stale", "stale"
-		if live {
-			badge, badgeClass = "live", "live"
+		c := renderCard(s, probes)
+		cards.WriteString(c.html)
+		if c.live {
 			a.live++
 		}
-
-		var rss uint64
-		if live && probes.GroupRSS != nil {
-			rss = probes.GroupRSS(s.LauncherPID)
-			a.rss += rss
-		}
-
-		var rows strings.Builder
-		for _, svc := range s.Services {
-			a.servicesTotal++
-			dotClass := "down"
-			if probes.PortInUse != nil && probes.PortInUse(svc.Port) {
-				dotClass = "up"
-				a.servicesUp++
-			}
-			rows.WriteString(fmt.Sprintf(
-				`<tr><td class="dot-cell"><span class="dot %s"></span></td><td class="svc">%s</td><td><a href="%s">%s</a></td><td class="dim mono">:%d</td></tr>`,
-				dotClass, html.EscapeString(svc.Name), html.EscapeString(svc.URL), html.EscapeString(svc.Hostname), svc.Port))
-			// The API shares app's origin — show it as a sub-row so the single URL
-			// is unmistakable (no separate api.<slug> hostname).
-			if svc.Name == "app" && s.APIPort != 0 {
-				rows.WriteString(fmt.Sprintf(
-					`<tr><td class="dot-cell"></td><td class="svc dim">└ api</td><td><a href="%s/api">%s/api</a></td><td class="dim mono">:%d</td></tr>`,
-					html.EscapeString(svc.URL), html.EscapeString(svc.Hostname), s.APIPort))
-			}
-		}
-
-		var chips strings.Builder
-		chips.WriteString(chip("branch", s.Branch))
+		a.rss += c.rss
+		a.servicesUp += c.servicesUp
+		a.servicesTotal += c.servicesTotal
+		// Real database allocations: a ClickHouse database when the stack has
+		// one, plus the Redis DB every stack gets.
 		if s.ClickHouseDatabase != "" {
-			chips.WriteString(chip("clickhouse", s.ClickHouseDatabase))
+			a.databases++
 		}
-		chips.WriteString(chip("redis db", fmt.Sprintf("%d", s.RedisDB)))
-		if rss > 0 {
-			chips.WriteString(chip("ram", humanBytesU(rss)))
-		}
-		if !s.UpdatedAt.IsZero() {
-			chips.WriteString(chip("heartbeat", shortAge(time.Since(s.UpdatedAt))))
-		}
-		if s.IsBaseline {
-			chips.WriteString(`<span class="chip baseline">baseline</span>`)
-		}
-
-		cards.WriteString(fmt.Sprintf(`
-      <section class="card">
-        <header><span class="slug">%s</span><span class="pill %s">%s</span></header>
-        <div class="chips">%s</div>
-        <div class="dir">%s</div>
-        <table>%s</table>
-      </section>`, html.EscapeString(s.Slug), badgeClass, badge, chips.String(), html.EscapeString(s.WorktreeDir), rows.String()))
+		a.databases++
 	}
 
 	ramStat := "—"
@@ -99,7 +127,7 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string, probes Pro
     <div class="stat"><span class="n">%d<span class="of"> / %d</span></span><span class="l">services up</span></div>
     <div class="stat"><span class="n">%s</span><span class="l">stack ram</span></div>
     <div class="stat"><span class="n">%d</span><span class="l">databases</span></div>`,
-		a.live, len(stacks), a.servicesUp, a.servicesTotal, ramStat, len(stacks))
+		a.live, len(stacks), a.servicesUp, a.servicesTotal, ramStat, a.databases)
 
 	return fmt.Sprintf(pageTemplate,
 		stats,
@@ -119,8 +147,10 @@ func shortAge(d time.Duration) string {
 		return fmt.Sprintf("%ds ago", int(d.Seconds()))
 	case d < time.Hour:
 		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	default:
+	case d < 24*time.Hour:
 		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
 	}
 }
 

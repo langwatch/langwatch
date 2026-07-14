@@ -1,8 +1,11 @@
 package domain
 
 import (
+	"bufio"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -55,6 +58,81 @@ func GuardLocalDatabaseURL(rawURL, wantUser string) error {
 		}
 	}
 	return nil
+}
+
+// EnvLookup resolves an environment variable; os.Getenv satisfies it (and a fake
+// does in tests). It lets the seed guard resolve URLs with process-environment
+// precedence without hard-wiring os into the guard's own signature.
+type EnvLookup func(string) string
+
+// GuardSeedTargets refuses to seed when either database URL the seed child will
+// actually connect to points anywhere but local dev. dotenv holds the merged
+// .env + .env.portless values; getenv resolves the process environment, which
+// wins — exactly the precedence the seed child sees (Prisma/tsx read the process
+// environment over the dotenv file), so the env this guard validates and the env
+// the seed connects to are provably the same.
+func GuardSeedTargets(dotenv map[string]string, getenv EnvLookup) error {
+	resolve := func(key string) string {
+		if getenv != nil {
+			if v := getenv(key); v != "" {
+				return v
+			}
+		}
+		return dotenv[key]
+	}
+	if err := GuardLocalDatabaseURL(resolve("DATABASE_URL"), PostgresRole); err != nil {
+		return fmt.Errorf("refusing to seed: %w", err)
+	}
+	if err := GuardLocalDatabaseURL(resolve("CLICKHOUSE_URL"), ""); err != nil {
+		return fmt.Errorf("refusing to seed: %w", err)
+	}
+	return nil
+}
+
+// LoadDotenv merges .env then .env.portless from lwDir into a single map (later
+// files override earlier ones, matching the app's own load order). It is the
+// shared entry point both cmd (the `haven seed` guard) and app (the always-seed
+// on `haven up`) use so they validate one, identical view of the dotenv layers.
+func LoadDotenv(lwDir string) map[string]string {
+	env := map[string]string{}
+	for _, name := range []string{".env", ".env.portless"} {
+		ReadEnvFile(filepath.Join(lwDir, name), env)
+	}
+	return env
+}
+
+// ReadEnvFile merges KEY=VALUE lines from a dotenv file into env. Missing files
+// are fine; this is a guard's reader, not a full loader.
+func ReadEnvFile(path string, env map[string]string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		line = strings.TrimPrefix(line, "export ")
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		// Strip a trailing inline comment (" #…") from an unquoted value, so
+		// `DATABASE_URL=postgres://localhost/db # note` does not parse the comment
+		// into the URL and refuse a perfectly local target. A quoted value keeps
+		// everything up to its closing quote.
+		if !strings.HasPrefix(value, `"`) && !strings.HasPrefix(value, `'`) {
+			if i := strings.Index(value, " #"); i >= 0 {
+				value = strings.TrimSpace(value[:i])
+			}
+		}
+		value = strings.Trim(value, `"'`)
+		env[strings.TrimSpace(key)] = value
+	}
 }
 
 // redact hides everything after the scheme so an error message never echoes

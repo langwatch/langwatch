@@ -228,7 +228,11 @@ var commands = map[string]command{
 		if err := guardSeedEnv(d.lwDir); err != nil {
 			return err
 		}
-		return d.orch.Seed(ctx, d.params, flagValue(rest, "--preset"))
+		preset, err := seedPresetArg(rest)
+		if err != nil {
+			return err
+		}
+		return d.orch.Seed(ctx, d.params, preset)
 	},
 	"list": func(_ context.Context, d deps, rest []string) error {
 		return d.orch.List(d.isAgent || hasFlag(rest, "--json"))
@@ -457,6 +461,27 @@ func flagValue(args []string, name string) string {
 		}
 	}
 	return ""
+}
+
+// seedPresetArg extracts --preset for `haven seed`, rejecting the two silent
+// footguns: a trailing --preset with no value, and a positional arg (`haven
+// seed demo`) that flagValue would ignore — both would otherwise run the plain
+// default seed and exit successfully.
+func seedPresetArg(rest []string) (string, error) {
+	preset := flagValue(rest, "--preset")
+	if hasFlag(rest, "--preset") && preset == "" {
+		return "", fmt.Errorf("--preset needs a value — available: %s", strings.Join(app.SeedPresets, ", "))
+	}
+	for i := 0; i < len(rest); i++ {
+		if rest[i] == "--preset" {
+			i++ // skip the flag's value
+			continue
+		}
+		if !strings.HasPrefix(rest[i], "-") {
+			return "", fmt.Errorf("unexpected argument %q — presets are passed as --preset <name>; available: %s", rest[i], strings.Join(app.SeedPresets, ", "))
+		}
+	}
+	return preset, nil
 }
 
 func hasFlag(args []string, flag string) bool {

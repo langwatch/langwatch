@@ -6,7 +6,8 @@
 //
 // Same philosophy as Postgres: a brew-managed Redis is a machine-wide resource
 // other local work may already depend on, so an already-running redis service
-// (any) is reused as-is, and Stop is a no-op.
+// (any) is adopted rather than restarted — though Ensure still applies (or
+// clears) the maxmemory ceiling on it — and Stop is a no-op.
 package redisbrew
 
 import (
@@ -50,21 +51,39 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 	if err := s.waitReady(ctx, 15*time.Second); err != nil {
 		return 0, err
 	}
-	s.applyMemoryCap(ctx)
+	if err := s.applyMemoryCap(ctx); err != nil {
+		return 0, err
+	}
 	return s.port, nil
 }
 
 // applyMemoryCap sets maxmemory on the running server so a leaky stack fails
 // loudly at the ceiling instead of paging the machine. The eviction policy is
 // deliberately left alone: the default noeviction is the only policy safe for
-// BullMQ queues. Best-effort — a redis that refuses CONFIG SET (renamed
-// command, protected mode) still works, just uncapped.
-func (s *Server) applyMemoryCap(ctx context.Context) {
+// BullMQ queues. maxMemoryMB <= 0 actively clears the ceiling (`config set
+// maxmemory 0`) so disabling via HAVEN_REDIS_MAXMEMORY_MB=0 also undoes a cap
+// a previous Ensure applied. Failures propagate: a redis that refuses CONFIG
+// SET (renamed command, protected mode) fails Ensure rather than silently
+// running uncapped — set HAVEN_REDIS_MAXMEMORY_MB=0 to skip the cap.
+func (s *Server) applyMemoryCap(ctx context.Context) error {
+	target := fmt.Sprintf("%dmb", s.maxMemoryMB)
 	if s.maxMemoryMB <= 0 {
-		return
+		target = "0"
 	}
-	_ = exec.CommandContext(ctx, "redis-cli", "-h", "127.0.0.1", "-p", fmt.Sprint(s.port),
-		"config", "set", "maxmemory", fmt.Sprintf("%dmb", s.maxMemoryMB)).Run()
+	out, err := exec.CommandContext(ctx, "redis-cli", "-h", "127.0.0.1", "-p", fmt.Sprint(s.port),
+		"config", "set", "maxmemory", target).CombinedOutput()
+	reply := strings.TrimSpace(string(out))
+	if err == nil && strings.HasPrefix(reply, "OK") {
+		return nil
+	}
+	detail := reply
+	if err != nil {
+		detail = fmt.Sprintf("%v: %s", err, reply)
+	}
+	if s.maxMemoryMB <= 0 {
+		return fmt.Errorf("redis on :%d refused `config set maxmemory 0` (clearing a previously applied ceiling): %s", s.port, detail)
+	}
+	return fmt.Errorf("redis on :%d refused the %s memory ceiling (`config set maxmemory`): %s — set HAVEN_REDIS_MAXMEMORY_MB=0 to run without a cap", s.port, target, detail)
 }
 
 func (s *Server) waitReady(ctx context.Context, timeout time.Duration) error {
@@ -127,11 +146,11 @@ func (s *Server) memoryUse(ctx context.Context) string {
 	if used == "" {
 		return ""
 	}
-	cap_ := fields["maxmemory_human"]
-	if cap_ == "" || strings.HasPrefix(cap_, "0") {
-		cap_ = "no cap"
+	ceiling := fields["maxmemory_human"]
+	if ceiling == "" || strings.HasPrefix(ceiling, "0") {
+		ceiling = "no cap"
 	}
-	return fmt.Sprintf("memory %s of %s", used, cap_)
+	return fmt.Sprintf("memory %s of %s", used, ceiling)
 }
 
 // Stop is deliberately a no-op — see the package doc.

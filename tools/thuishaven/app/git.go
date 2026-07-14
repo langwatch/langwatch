@@ -17,10 +17,15 @@ import (
 // here.
 func (o *Orchestrator) GitTargetDir(repoRoot, target string) (string, error) {
 	var worktrees []Worktree
+	var listErr error
 	if o.hyg != nil {
-		worktrees, _ = o.hyg.Worktrees(repoRoot)
+		worktrees, listErr = o.hyg.Worktrees(repoRoot)
 	}
-	return ResolveGitTarget(o.store.Stacks(), worktrees, target)
+	dir, err := ResolveGitTarget(o.store.Stacks(), worktrees, target)
+	if err != nil && listErr != nil {
+		return "", fmt.Errorf("%w (listing worktrees also failed: %v)", err, listErr)
+	}
+	return dir, err
 }
 
 // ResolveGitTarget picks the directory a target names: a registered stack's

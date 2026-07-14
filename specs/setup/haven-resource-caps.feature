@@ -4,11 +4,25 @@ Feature: Resource caps — shared services can't take the machine
   current footprint, so a runaway service fails visibly instead of silently
   eating the machine.
 
+  # Behavior lives in tools/thuishaven: `adapters/redisbrew/server.go`
+  # applies the maxmemory ceiling (default in `domain/redis.go`,
+  # DefaultRedisMaxMemoryMB; HAVEN_REDIS_MAXMEMORY_MB tunes it, 0 disables)
+  # and `app/report.go` renders the doctor footprint lines. No Go tests bind
+  # these scenarios yet — both need a live Redis / running stacks — so they
+  # stay `@unimplemented` until an integration harness exists. The parity
+  # checker (`langwatch/scripts/check-feature-parity.ts`) only scans
+  # TypeScript test roots, so this file stays out of its WATCHED list.
+
+  # Deliberately says "the Redis haven manages", not "the shared Redis":
+  # `specs/setup/haven-private-redis-plan.md` replaces the shared brew Redis
+  # with per-worktree instances, and the cap applies either way.
+  @integration @unimplemented
   Scenario: Managed Redis is memory-capped
-    When haven ensures the shared Redis
+    When haven ensures the Redis it manages
     Then a maxmemory ceiling is applied to it
     And the ceiling is tunable (and can be disabled) via the environment
 
+  @integration @unimplemented
   Scenario: The doctor shows each service's memory footprint
     When I run "haven doctor"
     Then the ClickHouse line includes its current memory use against its cap

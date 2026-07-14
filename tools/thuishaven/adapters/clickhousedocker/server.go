@@ -283,6 +283,8 @@ func (s *Server) Health(ctx context.Context) (bool, string) {
 	detail := fmt.Sprintf("up on :%d, %d stack database(s)", ep.HTTPPort, len(dbs))
 	if mem := s.memoryUse(ctx); mem != "" {
 		detail += ", " + mem
+	} else {
+		detail += ", memory unreadable"
 	}
 	return true, detail
 }

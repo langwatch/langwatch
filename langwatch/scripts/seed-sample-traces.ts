@@ -19,6 +19,35 @@ const ENDPOINT = process.env.HAVEN_SEED_ENDPOINT ?? "http://localhost:5560";
 const API_KEY =
   process.env.HAVEN_SEED_LANGWATCH_API_KEY ?? "sk-lw-local-development-key";
 
+// Locality guard: this script POSTs an ingestion key to HAVEN_SEED_ENDPOINT.
+// Refuse to run against anything but a local host so a stray env var can never
+// leak the key or seed demo traces into a real project. Mirrors the hostname
+// allowlist in tools/thuishaven/domain/guard.go.
+function assertLocalEndpoint(endpoint: string): void {
+  let hostname: string;
+  try {
+    hostname = new URL(endpoint).hostname;
+  } catch {
+    console.error(`Refusing to seed: HAVEN_SEED_ENDPOINT is not a valid URL (${endpoint}).`);
+    process.exit(1);
+  }
+  const normalized = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const isLocal =
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized.endsWith(".localhost");
+  if (!isLocal) {
+    console.error(
+      `Refusing to seed: HAVEN_SEED_ENDPOINT host "${hostname}" is not local. ` +
+        "This script only targets localhost, 127.0.0.1, ::1, or *.localhost.",
+    );
+    process.exit(1);
+  }
+}
+
+assertLocalEndpoint(ENDPOINT);
+
 interface SampleTurn {
   user: string;
   assistant: string;
@@ -104,7 +133,17 @@ const THREADS: SampleThread[] = [
   },
 ];
 
-async function post(traceId: string, thread: SampleThread, turn: SampleTurn, finishedAtMs: number): Promise<void> {
+async function post({
+  traceId,
+  thread,
+  turn,
+  finishedAtMs,
+}: {
+  traceId: string;
+  thread: SampleThread;
+  turn: SampleTurn;
+  finishedAtMs: number;
+}): Promise<void> {
   const startedAtMs = finishedAtMs - 1800;
   const payload = {
     trace_id: traceId,
@@ -146,6 +185,7 @@ async function post(traceId: string, thread: SampleThread, turn: SampleTurn, fin
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
     throw new Error(
@@ -156,19 +196,23 @@ async function post(traceId: string, thread: SampleThread, turn: SampleTurn, fin
 
 async function main() {
   const now = Date.now();
-  let sent = 0;
   let turnIndex = 0;
   const totalTurns = THREADS.reduce((n, t) => n + t.turns.length, 0);
   for (const thread of THREADS) {
     for (const [i, turn] of thread.turns.entries()) {
-      // Spread the traces over the last few hours, newest last-turn first.
+      // Spread the traces over the last ~3 hours, 23 minutes apart; the last
+      // turn iterated is the newest.
       const finishedAt = now - (totalTurns - turnIndex) * 23 * 60 * 1000;
-      await post(`demo-seed-${thread.threadId}-${i + 1}`, thread, turn, finishedAt);
-      sent++;
+      await post({
+        traceId: `demo-seed-${thread.threadId}-${i + 1}`,
+        thread,
+        turn,
+        finishedAtMs: finishedAt,
+      });
       turnIndex++;
     }
   }
-  console.log(`🌱 Seeded ${sent} sample traces into ${ENDPOINT}`);
+  console.log(`🌱 Seeded ${turnIndex} sample traces into ${ENDPOINT}`);
   console.log(
     "   They flow through the real pipeline — give the workers a few seconds to project them.",
   );

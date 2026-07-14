@@ -204,14 +204,14 @@ type Semaphore interface {
 // checking for uncommitted work, sizing reclaimable artefacts, removing them, and
 // pruning orphaned git worktree admin entries.
 type Hygiene interface {
-	Worktrees(repoRoot string) ([]Worktree, error)
+	Worktrees(gitDir string) ([]Worktree, error)
 	Dirty(worktreeDir string) bool
 	DirSize(path string) (bytes int64, exists bool)
 	Remove(path string) error
 	PruneGitWorktrees(repoRoot string)
 	// RemoveWorktree deletes a linked worktree (directory + git admin entry),
 	// forcing past uncommitted changes — the app layer owns the confirmation.
-	RemoveWorktree(repoRoot, dir string) error
+	RemoveWorktree(gitDir, dir string) error
 }
 
 // Worktree is one entry from `git worktree list`.

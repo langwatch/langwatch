@@ -98,7 +98,7 @@ func (Hygiene) PruneGitWorktrees(repoRoot string) {
 func (Hygiene) RemoveWorktree(repoRoot, dir string) error {
 	out, err := exec.Command("git", "-C", repoRoot, "worktree", "remove", "--force", "--force", dir).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("git worktree remove: %s", strings.TrimSpace(string(out)))
+		return fmt.Errorf("git worktree remove: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }

@@ -335,7 +335,13 @@ async function main() {
   console.log(`✅ Team:         ${team.id} (${team.slug})`);
   console.log(`✅ Project:      ${project.id} (${project.slug})`);
   console.log(`✅ Admin login:  ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
-  console.log(`✅ Ingestion key:        ${project.apiKey}`);
+  // Only echo the key in full when it's the non-secret default; otherwise redact
+  // (same rationale as the seeding log above — real credentials must not hit shipped logs).
+  const displayApiKey =
+    project.apiKey === DEFAULT_INGESTION_KEY
+      ? project.apiKey
+      : `${project.apiKey.slice(0, 8)}…`;
+  console.log(`✅ Ingestion key:        ${displayApiKey}`);
   console.log(`✅ Private access token: ${PRIVATE_ACCESS_TOKEN}`);
   console.log(`✅ Public access token:  ${PUBLIC_ACCESS_TOKEN}`);
 }

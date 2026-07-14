@@ -23,7 +23,6 @@ type Row struct {
 	RSS               uint64
 	ServicesUp        int
 	ServicesTotal     int
-	AppURL            string
 }
 
 // Actions wires the hub to the world. Rows is re-read on every refresh tick;
@@ -73,6 +72,7 @@ type model struct {
 	rows    []Row
 	cursor  int
 	mode    mode
+	pending *Row   // the row a confirmation prompt is acting on, frozen at open time
 	typed   string // the name typed to confirm a destroy
 	flash   string // last action's outcome, shown until the next keypress
 	openDir string
@@ -111,6 +111,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		if m.busy {
+			// A hung Down/Destroy callback must not leave the hub unkillable —
+			// keep quit live even while every other key is swallowed.
+			switch msg.String() {
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			}
 			return m, nil
 		}
 		switch m.mode {
@@ -144,12 +150,14 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case "d":
-		if _, ok := m.selected(); ok {
+		if r, ok := m.selected(); ok {
 			m.mode = modeConfirmDown
+			m.pending = &r
 		}
 	case "x":
-		if _, ok := m.selected(); ok {
+		if r, ok := m.selected(); ok {
 			m.mode = modeConfirmDestroy
+			m.pending = &r
 			m.typed = ""
 		}
 	}
@@ -159,32 +167,36 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m model) updateConfirmDown(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y":
-		r, ok := m.selected()
-		if !ok {
-			m.mode = modeBrowse
+		r := m.pending
+		m.mode = modeBrowse
+		m.pending = nil
+		if r == nil || !m.rowStillPresent(*r) {
+			m.flash = "down cancelled — stack changed"
 			return m, nil
 		}
-		m.mode = modeBrowse
 		m.busy = true
+		slug := r.Slug
 		return m, func() tea.Msg {
-			return actionDoneMsg{verb: "down", slug: r.Slug, err: m.actions.Down(m.ctx, r.Slug)}
+			return actionDoneMsg{verb: "down", slug: slug, err: m.actions.Down(m.ctx, slug)}
 		}
 	default:
 		m.mode = modeBrowse
+		m.pending = nil
 		m.flash = "down cancelled"
 	}
 	return m, nil
 }
 
 func (m model) updateConfirmDestroy(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	r, ok := m.selected()
-	if !ok {
+	r := m.pending
+	if r == nil {
 		m.mode = modeBrowse
 		return m, nil
 	}
 	switch msg.String() {
 	case "esc", "ctrl+c":
 		m.mode = modeBrowse
+		m.pending = nil
 		m.flash = "destroy cancelled"
 	case "backspace":
 		if len(m.typed) > 0 {
@@ -192,15 +204,21 @@ func (m model) updateConfirmDestroy(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter":
 		m.mode = modeBrowse
+		m.pending = nil
 		if m.typed != r.Slug {
 			m.flash = "name did not match — nothing destroyed"
 			m.typed = ""
 			return m, nil
 		}
 		m.typed = ""
+		if !m.rowStillPresent(*r) {
+			m.flash = "destroy cancelled — stack changed"
+			return m, nil
+		}
 		m.busy = true
+		dir, slug := r.Dir, r.Slug
 		return m, func() tea.Msg {
-			return actionDoneMsg{verb: "destroy", slug: r.Slug, err: m.actions.Destroy(m.ctx, r.Dir)}
+			return actionDoneMsg{verb: "destroy", slug: slug, err: m.actions.Destroy(m.ctx, dir)}
 		}
 	default:
 		if msg.Type == tea.KeyRunes {
@@ -208,6 +226,18 @@ func (m model) updateConfirmDestroy(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// rowStillPresent reports whether the frozen confirmation row is still in the
+// freshly-read row set — a refresh tick may have removed it while the prompt
+// was open, in which case the destructive action must not fire.
+func (m model) rowStillPresent(r Row) bool {
+	for _, x := range m.rows {
+		if x.Slug == r.Slug && x.Dir == r.Dir {
+			return true
+		}
+	}
+	return false
 }
 
 func (m model) selected() (Row, bool) {
@@ -258,12 +288,10 @@ func (m model) View() string {
 	switch {
 	case m.busy:
 		b.WriteString(styleWarn.Render("  working…") + "\n")
-	case m.mode == modeConfirmDown:
-		r, _ := m.selected()
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  shut %q down? Its databases are kept. y/n", r.Slug)) + "\n")
-	case m.mode == modeConfirmDestroy:
-		r, _ := m.selected()
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  DESTROY %q — stops the stack, drops its databases, deletes the worktree.", r.Slug)) + "\n")
+	case m.mode == modeConfirmDown && m.pending != nil:
+		b.WriteString(styleWarn.Render(fmt.Sprintf("  shut %q down? Its databases are kept. y/n", m.pending.Slug)) + "\n")
+	case m.mode == modeConfirmDestroy && m.pending != nil:
+		b.WriteString(styleWarn.Render(fmt.Sprintf("  DESTROY %q — stops the stack, drops its databases, deletes the worktree.", m.pending.Slug)) + "\n")
 		b.WriteString(styleWarn.Render(fmt.Sprintf("  type the name to confirm: %s▏", m.typed)) + "\n")
 	case m.flash != "":
 		b.WriteString("  " + m.flash + "\n")
