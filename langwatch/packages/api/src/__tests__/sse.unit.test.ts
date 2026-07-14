@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ZodError, z } from "zod";
 
 import { createService } from "../builder.js";
+import { getSSECompletion } from "../sse.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -210,6 +211,37 @@ describe("SSE endpoints", () => {
         expect.anything(),
       );
       expect(events).toContainEqual({ event: "error", data: "stream failed" });
+    });
+  });
+
+  describe("when the client disconnects", () => {
+    it("settles the SSE lifecycle used by request instrumentation", async () => {
+      let requestContext: Parameters<typeof getSSECompletion>[0] | undefined;
+      const app = createService({
+        name: "test",
+        basePath: "/api/test",
+        logger: false,
+        tracer: false,
+      })
+        .version("2025-03-15", (v) => {
+          v.sse(
+            "/stream",
+            { events: { ready: z.object({ ok: z.boolean() }) } },
+            async (c) => {
+              requestContext = c;
+              await new Promise(() => {});
+            },
+          );
+        })
+        .build();
+
+      const response = await app.request("/api/test/2025-03-15/stream");
+      expect(requestContext).toBeDefined();
+      const completion = getSSECompletion(requestContext!);
+
+      await response.body?.cancel();
+
+      await expect(completion).resolves.toEqual({});
     });
   });
 });

@@ -121,9 +121,14 @@ function appendAccessMiddleware({
   }
 
   if (includeResourceLimit && config.resourceLimit) {
-    stack.push(
-      serviceConfig._legacy!.resourceLimitMiddleware!(config.resourceLimit),
-    );
+    const createResourceLimitMiddleware =
+      serviceConfig._legacy?.resourceLimitMiddleware;
+    if (!createResourceLimitMiddleware) {
+      throw new Error(
+        `Endpoint resource limit "${config.resourceLimit}" requires resourceLimitMiddleware`,
+      );
+    }
+    stack.push(createResourceLimitMiddleware(config.resourceLimit));
   }
   if (config.middleware) stack.push(...config.middleware);
 }

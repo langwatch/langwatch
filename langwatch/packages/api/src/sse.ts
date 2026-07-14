@@ -1,5 +1,5 @@
 import type { Context, MiddlewareHandler } from "hono";
-import { streamSSE } from "hono/streaming";
+import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import type { ZodType, z } from "zod";
 
 import type { EndpointConfig } from "./types.js";
@@ -9,6 +9,41 @@ export interface SSECompletion {
 }
 
 const completions = new WeakMap<Context, Promise<SSECompletion>>();
+
+function createTypedStream<TEvents extends Record<string, ZodType>>({
+  sseStream,
+  events,
+}: {
+  sseStream: SSEStreamingApi;
+  events: TEvents;
+}): TypedSSEStream<TEvents> {
+  return {
+    async emit(event, data) {
+      const schema = events[event];
+      if (schema) {
+        const result = schema.safeParse(data);
+        if (!result.success) {
+          await sseStream.writeSSE({
+            event: "error",
+            data: JSON.stringify({
+              message: `Validation failed for event "${String(event)}"`,
+              issues: result.error.issues,
+            }),
+          });
+          throw result.error;
+        }
+        data = result.data;
+      }
+      await sseStream.writeSSE({
+        event: String(event),
+        data: JSON.stringify(data),
+      });
+    },
+    close() {
+      sseStream.close();
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // SSE configuration
@@ -113,33 +148,8 @@ export function createSSEResponse<TEvents extends Record<string, ZodType>>({
   return streamSSE(
     c,
     async (sseStream) => {
-      const typedStream: TypedSSEStream<TEvents> = {
-        async emit(event, data) {
-          const schema = events[event];
-          if (schema) {
-            const result = schema.safeParse(data);
-            if (!result.success) {
-              await sseStream.writeSSE({
-                event: "error",
-                data: JSON.stringify({
-                  message: `Validation failed for event "${String(event)}"`,
-                  issues: result.error.issues,
-                }),
-              });
-              throw result.error;
-            }
-
-            data = result.data;
-          }
-          await sseStream.writeSSE({
-            event: String(event),
-            data: JSON.stringify(data),
-          });
-        },
-        close() {
-          sseStream.close();
-        },
-      };
+      sseStream.onAbort(() => finish({}));
+      const typedStream = createTypedStream({ sseStream, events });
 
       try {
         await handler(typedStream);

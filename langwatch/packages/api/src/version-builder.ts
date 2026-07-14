@@ -97,11 +97,11 @@ export class VersionBuilder<TApp> {
     });
   }
 
-  private _register(
+  private _register<TConfig extends EndpointConfig>(
     method: HttpMethod,
     path: string,
-    config: EndpointConfig,
-    handler: Handler<TApp, EndpointConfig>,
+    config: TConfig,
+    handler: Handler<TApp, TConfig>,
   ): void {
     assertEndpointPath(path);
     this._endpoints.push({

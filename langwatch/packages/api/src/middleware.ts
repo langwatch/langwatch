@@ -28,6 +28,18 @@ const headersGetter = {
     carrier.get(key) ?? void 0,
 };
 
+function injectTraceHeaders(c: Context): void {
+  const carrier: Record<string, string> = {};
+  propagation.inject(otContext.active(), carrier);
+  for (const [key, value] of Object.entries(carrier)) {
+    try {
+      c.res.headers.set(key, value);
+    } catch {
+      // ignore if response headers are not available
+    }
+  }
+}
+
 /**
  * Creates a Hono middleware that wraps each request in an OTel span.
  *
@@ -95,16 +107,7 @@ export function tracerMiddleware(options?: { name?: string }) {
             requestError = err;
             throw err;
           } finally {
-            const carrier: Record<string, string> = {};
-            propagation.inject(otContext.active(), carrier);
-            for (const [key, value] of Object.entries(carrier)) {
-              try {
-                c.res.headers.set(key, value);
-              } catch {
-                // ignore if response headers are not available
-              }
-            }
-
+            injectTraceHeaders(c);
             runAfterSSECompletion({
               c,
               onSettled: finishSpan,

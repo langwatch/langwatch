@@ -92,6 +92,19 @@ interface ErrorResponseBody {
   telemetry?: { traceId?: string; spanId?: string };
 }
 
+function finalizeErrorResponse({
+  status,
+  body,
+  isVersioned,
+}: {
+  status: ContentfulStatusCode;
+  body: ErrorResponseBody;
+  isVersioned: boolean;
+}): { status: ContentfulStatusCode; body: ErrorResponseBody } {
+  if (!isVersioned) body.error = httpStatusText(status);
+  return { status, body };
+}
+
 /**
  * Formats an error into a JSON response body + status code.
  *
@@ -110,46 +123,43 @@ function formatError({
   if (isDomainErrorLike(err)) {
     const serialized = err.serialize();
     const status = serialized.httpStatus as ContentfulStatusCode;
-    const body: ErrorResponseBody = {
-      kind: serialized.kind,
-      message: err.message ?? serialized.kind,
-      meta: serialized.meta,
-      reasons: serialized.reasons,
-      telemetry: serialized.telemetry,
-    };
-    if (!isVersioned) {
-      body.error = httpStatusText(status);
-    }
-    return { status, body };
+    return finalizeErrorResponse({
+      status,
+      isVersioned,
+      body: {
+        kind: serialized.kind,
+        message: err.message ?? serialized.kind,
+        meta: serialized.meta,
+        reasons: serialized.reasons,
+        telemetry: serialized.telemetry,
+      },
+    });
   }
 
   // 2. ZodError
   if (err instanceof ZodError) {
     const payload = zodErrorToPayload(err);
     const status: ContentfulStatusCode = 422;
-    const body: ErrorResponseBody = {
-      kind: payload.kind,
-      message: payload.message,
-      reasons: payload.reasons,
-    };
-    if (!isVersioned) {
-      body.error = httpStatusText(status);
-    }
-    return { status, body };
+    return finalizeErrorResponse({
+      status,
+      isVersioned,
+      body: {
+        kind: payload.kind,
+        message: payload.message,
+        reasons: payload.reasons,
+      },
+    });
   }
 
   // 3. Error with `status` property (e.g. Hono HTTPException)
   const errObj = err as Record<string, unknown>;
   if (err instanceof Error && typeof errObj["status"] === "number") {
     const status = errObj["status"] as ContentfulStatusCode;
-    const body: ErrorResponseBody = {
-      kind: "http_error",
-      message: err.message,
-    };
-    if (!isVersioned) {
-      body.error = httpStatusText(status);
-    }
-    return { status, body };
+    return finalizeErrorResponse({
+      status,
+      isVersioned,
+      body: { kind: "http_error", message: err.message },
+    });
   }
 
   // 4. Unknown errors -- 500
@@ -159,14 +169,11 @@ function formatError({
   const message =
     isDev && err instanceof Error ? err.message : "Internal server error";
   const status: ContentfulStatusCode = 500;
-  const body: ErrorResponseBody = {
-    kind: "internal_error",
-    message,
-  };
-  if (!isVersioned) {
-    body.error = httpStatusText(status);
-  }
-  return { status, body };
+  return finalizeErrorResponse({
+    status,
+    isVersioned,
+    body: { kind: "internal_error", message },
+  });
 }
 
 // ---------------------------------------------------------------------------
