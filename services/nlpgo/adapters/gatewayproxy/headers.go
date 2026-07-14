@@ -89,9 +89,12 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		}
 	case domain.ProviderAzure:
 		cred.APIKey = h.Get(headerAPIKey)
-		// api_base + api_version are required for Azure routing; we
-		// don't validate at this layer — let the provider adapter
-		// surface a typed error if the customer has misconfigured.
+		// api_base carries the Azure resource endpoint and is required for
+		// routing; api_version is optional — when the provider has none
+		// configured we leave the key unset so the adapter can fall back to
+		// Bifrost's own default (an empty value here would defeat it). We
+		// don't validate at this layer — let the provider adapter surface a
+		// typed error if the customer has misconfigured.
 		if base := h.Get(headerAPIBase); base != "" {
 			cred.Extra["api_base"] = base
 		}
