@@ -20,6 +20,9 @@
  *   figure in premium-request units, NOT dollars — deliberately kept
  *   out of langwatch cost fields so the pricing-lookup pipeline stays
  *   the single source of dollar cost)
+ * - `github.copilot.nano_aiu` → metadata.copilot_nano_aiu (the raw
+ *   AI-unit count at nano-scale — a distinct figure from cost, likewise
+ *   metadata-only, never a dollar field)
  * - `github.copilot.git.repository` / `github.copilot.github.org` →
  *   metadata.copilot_repository / metadata.copilot_organization
  * - span type inferred from gen_ai.operation.name (invoke_agent →
@@ -100,6 +103,12 @@ export class CopilotExtractor implements CanonicalAttributesExtractor {
     if (copilotCost !== undefined && copilotCost !== null) {
       ctx.setAttr("metadata.copilot_cost", String(copilotCost));
       ctx.recordRule(`${this.id}:cost_units`);
+    }
+
+    const nanoAiu = attrs.take(`${COPILOT_ATTR_PREFIX}nano_aiu`);
+    if (nanoAiu !== undefined && nanoAiu !== null) {
+      ctx.setAttr("metadata.copilot_nano_aiu", String(nanoAiu));
+      ctx.recordRule(`${this.id}:nano_aiu`);
     }
 
     const repository = attrs.take(`${COPILOT_ATTR_PREFIX}git.repository`);

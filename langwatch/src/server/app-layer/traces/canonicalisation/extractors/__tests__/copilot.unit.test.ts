@@ -41,6 +41,21 @@ describe("CopilotExtractor", () => {
       expect(ctx.out["langwatch.cost.usd"]).toBeUndefined();
     });
 
+    /** @scenario Raw AI-unit cost is lifted onto the canonical span */
+    it("lifts the raw AI-unit count as metadata, never as langwatch cost", () => {
+      // github.copilot.nano_aiu is the raw AI-unit count (nano-scale), a
+      // distinct figure from github.copilot.cost — kept as metadata, never
+      // a dollar field, so the pricing-lookup pipeline owns dollar cost.
+      const ctx = createExtractorContext({
+        "github.copilot.nano_aiu": 4459750000,
+      });
+
+      new CopilotExtractor().apply(ctx);
+
+      expect(ctx.out["metadata.copilot_nano_aiu"]).toBe("4459750000");
+      expect(ctx.out["langwatch.cost.usd"]).toBeUndefined();
+    });
+
     it("lifts the hashed end-user id onto langwatch.user.id", () => {
       const ctx = createExtractorContext({
         "enduser.pseudo.id": "a1b2c3hash",

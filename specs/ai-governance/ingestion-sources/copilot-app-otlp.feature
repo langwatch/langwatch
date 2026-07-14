@@ -47,7 +47,7 @@ Feature: Copilot app OTLP spans canonicalize on the unified substrate
 
   Rule: the copilot extractor lifts the app-specific extras
 
-    @unit @unimplemented
+    @unit
     Scenario: Raw AI-unit cost is lifted onto the canonical span
       Given a copilot span carrying a github.copilot.nano_aiu attribute
       When the canonicalisation chain runs
