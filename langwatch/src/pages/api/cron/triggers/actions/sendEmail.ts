@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import { dispatchGraphAlertAction } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
 import { captureException, toError } from "~/utils/posthogErrorCapture";

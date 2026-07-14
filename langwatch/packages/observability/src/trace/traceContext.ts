@@ -1,6 +1,5 @@
 /**
- * Injects W3C trace context headers into outbound HTTP requests
- * for scenario execution.
+ * Injects W3C trace context headers into outbound HTTP requests.
  *
  * Uses @opentelemetry/api propagation to inject `traceparent` from the
  * active OTEL context. Silently no-ops when no active OTEL context exists.
@@ -11,6 +10,7 @@ import {
   propagation,
   trace,
 } from "@opentelemetry/api";
+import { INVALID_TRACE_ID } from "../constants";
 
 interface InjectResult {
   headers: Record<string, string>;
@@ -48,8 +48,7 @@ export function getActiveTraceId(): string | undefined {
   if (!span) return undefined;
 
   const traceId = span.spanContext().traceId;
-  // OTEL uses "00000000000000000000000000000000" as invalid trace ID
-  if (!traceId || traceId === "00000000000000000000000000000000") {
+  if (!traceId || traceId === INVALID_TRACE_ID) {
     return undefined;
   }
 

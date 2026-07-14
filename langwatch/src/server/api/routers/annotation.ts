@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   type AnnotationQueueItem,
   type PrismaClient,
@@ -12,7 +13,6 @@ import type { Session } from "~/server/auth";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { slugify } from "~/utils/slugify";
-import { createLogger } from "../../../utils/logger/server";
 import type { Protections } from "../../traces/protections";
 import {
   checkPermissionOrPubliclyShared,

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FetchSSETimeoutError } from "./errors";
 import { fetchSSE } from "./fetchSSE";
 
-vi.mock("~/utils/logger", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: (name: string) => ({
     error: vi.fn(),
     warn: vi.fn(),

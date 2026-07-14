@@ -1,7 +1,7 @@
+import type { Logger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import type { Cluster, Redis } from "ioredis";
 import { type ProcessRole, roleRunsWorkers } from "~/server/app-layer/config";
-import type { Logger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { OutboxEnqueueRequest } from "../outboxReactor.types";
 import type { OutboxHeartbeatRegistry } from "./heartbeat.registry";

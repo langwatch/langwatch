@@ -22,7 +22,7 @@ import {
   type ReportChart,
   type ReportTraceRow,
 } from "~/shared/templating/templateContext";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:report-dispatch");
 

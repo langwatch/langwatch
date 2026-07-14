@@ -11,7 +11,7 @@ import {
   type SlackTemplateType,
 } from "~/shared/templating/renderSlack";
 import type { GraphAlertTemplateContext } from "~/shared/templating/templateContext";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:graph-alert-action-dispatch");
 

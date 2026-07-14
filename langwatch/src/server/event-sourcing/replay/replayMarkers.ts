@@ -6,6 +6,7 @@ import {
   DONE_MARKER_TTL_SECONDS,
   doneMarkerKey,
 } from "./replayConstants";
+import type { ReplayLogWriter } from "./replayLog";
 
 /** Throw if any command in a pipeline result has an error. */
 function checkPipelineErrors(results: [error: Error | null, result: unknown][] | null, operation: string): void {
@@ -146,6 +147,66 @@ export async function markCompletedBatch({
   }
   const results = await pipeline.exec();
   checkPipelineErrors(results, "markCompletedBatch");
+}
+
+/**
+ * Failure-path cleanup: HDEL a batch of aggregate keys from each projection's
+ * cutoff hash WITHOUT adding them to the completed set (unlike
+ * {@link unmarkBatch}) and WITHOUT touching done markers. Used when a batch
+ * errors (or a cancellation abandons it) mid-flight: its aggregates were never
+ * replayed, so their pending/cutoff markers must go — returning them to
+ * unconditional live processing, matching their pre-replay state — while done
+ * markers and completed-set entries from previously completed batches survive
+ * so an operator re-run still skips those aggregates.
+ */
+export async function removeInFlightMarkers({
+  redis,
+  projectionNames,
+  aggKeys,
+}: {
+  redis: IORedis;
+  projectionNames: string[];
+  aggKeys: string[];
+}): Promise<void> {
+  if (aggKeys.length === 0 || projectionNames.length === 0) return;
+  const pipeline = redis.pipeline();
+  for (const projName of projectionNames) {
+    pipeline.hdel(cutoffKey(projName), ...aggKeys);
+  }
+  const results = await pipeline.exec();
+  checkPipelineErrors(results, "removeInFlightMarkers");
+}
+
+/**
+ * Best-effort wrapper around {@link removeInFlightMarkers} for a batch that
+ * errored (or was abandoned by cancellation) mid-flight. Never throws: a
+ * marker-cleanup failure is logged and must not mask the original batch error.
+ */
+export async function clearFailedBatchMarkers({
+  redis,
+  projectionNames,
+  aggKeys,
+  log,
+}: {
+  redis: IORedis;
+  projectionNames: string[];
+  aggKeys: string[];
+  log: ReplayLogWriter;
+}): Promise<void> {
+  try {
+    await removeInFlightMarkers({
+      redis,
+      projectionNames,
+      aggKeys,
+    });
+  } catch (cleanupError) {
+    log.write({
+      step: "error",
+      error: `failed to clear replay markers for failed batch: ${
+        cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+      }`,
+    });
+  }
 }
 
 /** Get the set of completed aggregate keys for a projection. */

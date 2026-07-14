@@ -6,7 +6,7 @@
  * This module wraps the GET /api/trace/:traceId endpoint to retrieve spans.
  */
 
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type { Span } from "../../tracer/types";
 
 const logger = createLogger("TraceApiSpanQuery");

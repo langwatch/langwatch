@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { AlertType } from "@prisma/client";
 import { Column, Link, Row, Section } from "@react-email/components";
 import { Container } from "@react-email/container";
@@ -10,7 +11,6 @@ import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
 import type { TriggerData } from "~/pages/api/cron/triggers/types";
 import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger/server";
 import { computeDefaultFrom, sendEmail } from "./emailSender";
 import {
   buildTriggerNoReplyAddress,

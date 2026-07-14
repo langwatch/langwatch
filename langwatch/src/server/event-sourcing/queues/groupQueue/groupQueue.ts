@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { createLogger } from "@langwatch/observability";
 import {
   context as otelContext,
   SpanKind,
@@ -9,7 +10,6 @@ import fastq from "fastq";
 import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
-import { createLogger } from "~/utils/logger/server";
 import {
   createContextFromJobData,
   getJobContextMetadata,
@@ -23,8 +23,8 @@ import {
 } from "../../../observability/tenantRateTracker";
 import { connection } from "../../../redis";
 import {
-  redactStorageUrisInText,
   type ProjectStorageDestination,
+  redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
 import { isDispatchError } from "../../outbox/dispatchError";
 import type {

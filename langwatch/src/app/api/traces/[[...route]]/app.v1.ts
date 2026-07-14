@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
@@ -29,7 +30,6 @@ import {
   formatTraceSummaryDigest,
   generateAsciiTree,
 } from "~/server/traces/trace-formatting";
-import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";

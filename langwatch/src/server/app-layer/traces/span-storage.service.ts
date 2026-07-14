@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -6,8 +7,6 @@ import {
   mapNormalizedSpanToSpan,
 } from "~/server/traces/mappers/span.mapper";
 import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
-import { createLogger } from "~/utils/logger/server";
-import { redactSpanContent } from "./visibility-window.service";
 import type { BlobStore } from "./blob-store.service";
 import type {
   ModelSpanSampleRow,
@@ -20,6 +19,7 @@ import type {
 } from "./repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { SpanInsertData } from "./types";
+import { redactSpanContent } from "./visibility-window.service";
 
 /**
  * Optional blob-offload resolution dependencies for the v2 read path (ADR-022).

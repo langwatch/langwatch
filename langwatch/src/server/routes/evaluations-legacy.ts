@@ -11,6 +11,7 @@
  */
 
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type { Project } from "@prisma/client";
 import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
 import type { JsonArray } from "@prisma/client/runtime/library";
@@ -83,7 +84,6 @@ import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 

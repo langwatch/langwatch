@@ -6,7 +6,7 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import {
   MAX_NODE_COUNT,
   normalizeQuery,

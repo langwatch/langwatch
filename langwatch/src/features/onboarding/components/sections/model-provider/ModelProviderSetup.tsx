@@ -7,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
@@ -23,7 +24,6 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../../../../../server/modelProviders/registry";
 import { api } from "../../../../../utils/api";
-import { createLogger } from "../../../../../utils/logger";
 import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,

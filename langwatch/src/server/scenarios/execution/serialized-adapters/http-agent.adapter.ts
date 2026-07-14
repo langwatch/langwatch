@@ -7,18 +7,18 @@
 
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import type { Logger } from "@langwatch/observability";
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import { JSONPath } from "jsonpath-plus";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";
+import { createChildProcessLogger } from "../child-logger";
 import {
   buildTemplateContext,
   renderBodyTemplate,
   renderUrlTemplate,
 } from "../http-template-engine";
-import { injectTraceContextHeaders } from "../trace-context-headers";
 import type { HttpAgentData } from "../types";
-import { createChildProcessLogger } from "../child-logger";
-import type { Logger } from "~/utils/logger/server";
 
 /**
  * Truncate a response body for log inclusion. Long bodies are useless in

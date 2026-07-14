@@ -24,7 +24,7 @@ import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/cli
 import type { SeriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { AnalyticsClientUnavailableError } from "../errors";
 import { buildEvalRollupTimeseriesQuery } from "../query-builders/eval-rollup-timeseries-query";
 import { buildEvalSlimTimeseriesQuery } from "../query-builders/eval-slim-timeseries-query";

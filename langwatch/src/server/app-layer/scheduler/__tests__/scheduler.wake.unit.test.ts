@@ -1,6 +1,6 @@
 import type { Redis } from "ioredis";
 import { describe, expect, it, vi } from "vitest";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { SchedulerRegistry } from "../scheduler.registry";
 import { SchedulerService } from "../scheduler.service";
 import type { ScheduledJobRepository } from "../scheduler.types";

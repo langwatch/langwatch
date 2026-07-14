@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { Experiment, ExperimentType, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -16,7 +17,6 @@ import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-me
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
-import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:dspy:init");
 

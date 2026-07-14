@@ -30,6 +30,8 @@ interface CreateNextContextOptions {
   res: any;
 }
 
+import { createLogger } from "@langwatch/observability";
+import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import type { OrganizationUserRole } from "@prisma/client";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
@@ -43,10 +45,8 @@ import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
-import { createLogger } from "../../utils/logger/server";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
-import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");

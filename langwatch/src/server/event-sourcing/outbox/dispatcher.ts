@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import { createHash } from "crypto";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
@@ -35,7 +36,6 @@ import {
   buildTemplateContext,
   type TemplateMatchInput,
 } from "~/shared/templating/templateContext";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { createTenantId } from "../domain/tenantId";
 import {

@@ -3,8 +3,8 @@ import IORedis, { Cluster } from "ioredis";
 // PHASE_PRODUCTION_BUILD was "phase-production-build" from next/constants
 const PHASE_PRODUCTION_BUILD = "phase-production-build";
 
+import { createLogger } from "@langwatch/observability";
 import { env } from "../env.mjs";
-import { createLogger } from "../utils/logger/server";
 import { parseRedisDbIndex } from "./redis-db-index";
 
 export { parseRedisDbIndex } from "./redis-db-index";

@@ -7,7 +7,7 @@ import {
 } from "../payload";
 import { PgOutboxAuditAdapter } from "../pgAuditAdapter";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

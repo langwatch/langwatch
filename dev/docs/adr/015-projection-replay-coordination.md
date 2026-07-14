@@ -38,7 +38,7 @@ For each batch of aggregates (default 1000):
 
 6. **Write** — Flush accumulated fold states to ClickHouse in a single batched INSERT per tenant (`wait_for_async_insert: 1`). Since ReplacingMergeTree uses `UpdatedAt` for dedup, the replay's writes always win because `apply()` produces the canonical state from all events.
 
-7. **Unmark + Unpause** — `HDEL` cutoff markers, `SREM` the pause entry, signal GroupQueue wake-up. Deferred live events retry and process normally.
+7. **Unmark + Unpause** — replace each replayed aggregate's cutoff marker with a terminal `done:` marker (`markCompletedBatch`: `HDEL` from the cutoff hash + `SET` of the per-aggregate done key carrying the same `{ts}:{eventId}` value) and `SADD` it into the completed set; aggregates that had no cutoff (no events found) are plain-`HDEL`ed. Then `SREM` the pause entry and signal GroupQueue wake-up. Deferred live events retry: the done marker keeps events at or before the cutoff skipped — a job staged but never active during the pause is not caught by the drain, and without the boundary it would re-process events the replay just rebuilt — while events after the cutoff process normally.
 
 ### Marker format and comparison
 
@@ -50,10 +50,11 @@ This comparison is defined once in `replayConstants.ts` and shared by both the r
 
 | Key | Type | Purpose |
 |---|---|---|
-| `projection-replay:cutoff:{projectionName}` | Hash | Field = aggregateKey, Value = "pending" or "{ts}:{eventId}" |
+| `projection-replay:cutoff:{projectionName}` | Hash | Field = aggregateKey, Value = "pending" or "{ts}:{eventId}" — in-flight markers for the current batch |
+| `projection-replay:done:{projectionName}:{aggregateKey}` | String | Value = "{ts}:{eventId}" — terminal per-aggregate marker written when replay finishes an aggregate, preserving its cutoff boundary so post-unpause stragglers (jobs staged but never active during the pause) still skip events at/before the cutoff while newer events process normally |
 | `projection-replay:completed:{projectionName}` | Set | Aggregate keys that finished replay (for resume) |
 
-All markers have a 7-day TTL to prevent orphaned markers from permanently blocking live processing if a replay crashes without cleanup.
+The cutoff hash has a 7-day TTL to prevent orphaned markers from permanently blocking live processing if a replay crashes without cleanup. Done markers live in their own short-TTL string keys (15 minutes, `DONE_MARKER_TTL_SECONDS`) rather than in the cutoff hash, so a giant all-tenant replay does not retain a marker per aggregate for its whole duration — the cutoff hash stays bounded to in-flight aggregates and done markers self-expire. The completed set has no TTL; it is deleted by the final cleanup after full completion.
 
 ### Architecture: framework-owned service
 
@@ -153,9 +154,31 @@ processing for the entire run:
 4. **Per-tenant I/O and progress cadence.** Cutoff and load queries now run
    in parallel across tenants within a batch; replay-phase progress emits are
    throttled (every 100 aggregates) instead of per aggregate; and the ops
-   replay lock (1h TTL) is refreshed at least once per batch
-   (`ReplayRepository.refreshLock`), so long runs no longer silently lose
-   status updates when the lock expires mid-run.
+   replay lock (1h TTL) is kept alive by a standalone heartbeat timer in the
+   ops `ReplayService` — a `setInterval` firing every
+   `LOCK_REFRESH_INTERVAL_MS` (60s) for the duration of the run, cleared in a
+   `finally` around the runtime call. This supersedes the earlier per-batch
+   refresh: running independently of progress/batch callbacks, the heartbeat
+   keeps the lock (and status updates) alive even when a single batch phase
+   (a huge tenant's drain wait, a slow ClickHouse load) emits nothing for
+   longer than the lock TTL. Each tick calls `ReplayRepository.refreshLock`
+   and also polls the cancel flag; if the refresh reports the lock is now
+   held by another run, the tick flags the stale run for abort via the
+   existing cancellation path and stops the heartbeat.
+
+## Amendment (2026-07-14): Failed batches clear their in-flight replay markers
+
+The per-batch error path (and a cancellation that abandons an in-flight batch,
+which surfaces through the same catch) previously returned early without
+touching the batch's `pending`/cutoff markers, so the live checker kept
+deferring the failed batch's aggregates until the 7-day marker TTL lapsed or
+an operator re-ran the replay. The failure path now removes those markers
+(`removeInFlightMarkers` — HDEL only) before returning: the batch's aggregates
+were never replayed, so they go straight back to unconditional live
+processing, matching their pre-replay state. `done` markers and completed-set
+entries written by previously completed batches are deliberately left intact
+so a re-run still skips completed aggregates (resume). Cleanup is best-effort
+— a marker-cleanup failure is logged and never masks the original batch error.
 
 ## References
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Logger } from "~/utils/logger/server";
+import type { Logger } from "@langwatch/observability";
 import { computeNextRunAt } from "../nextRunAt";
 import { SchedulerRegistry } from "../scheduler.registry";
 import { SchedulerService } from "../scheduler.service";

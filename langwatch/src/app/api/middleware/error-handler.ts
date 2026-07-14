@@ -1,3 +1,4 @@
+import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -8,7 +9,6 @@ import { grafanaConfigFromEnv, grafanaLinksForTrace } from "~/utils/grafanaLinks
 import { HttpError, NotFoundError } from "../shared/errors";
 import { errorSchema } from "../shared/schemas";
 
-const INVALID_TRACE_ID = "0".repeat(32);
 const INVALID_SPAN_ID = "0".repeat(16);
 
 /**

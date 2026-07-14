@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import { featureFlagService } from "~/server/featureFlag";
-import { createLogger } from "~/utils/logger/server";
 import type {
   OutboxEnqueueRequest,
   OutboxReactorDefinition,

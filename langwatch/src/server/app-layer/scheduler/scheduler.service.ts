@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import type { Cluster, Redis } from "ioredis";
 import { type ProcessRole, roleRunsWorkers } from "../config";
-import type { Logger } from "~/utils/logger/server";
+import type { Logger } from "@langwatch/observability";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { computeNextRunAt } from "./nextRunAt";
 import type { SchedulerRegistry } from "./scheduler.registry";

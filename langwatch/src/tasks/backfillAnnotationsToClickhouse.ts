@@ -1,7 +1,7 @@
-import { prisma } from "../server/db";
+import { createLogger } from "@langwatch/observability";
 import { getApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
-import { createLogger } from "../utils/logger/server";
+import { prisma } from "../server/db";
 
 const logger = createLogger("langwatch:tasks:backfillAnnotationsToClickhouse");
 

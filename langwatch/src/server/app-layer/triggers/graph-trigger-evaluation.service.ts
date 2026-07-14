@@ -52,7 +52,7 @@ import {
   type GraphAlertDispatchResult,
 } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
 import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,

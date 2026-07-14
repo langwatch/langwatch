@@ -1,11 +1,11 @@
+import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useRef } from "react";
-import {
-  isCompactStreamingEvent,
-  type CompactStreamingEvent,
-} from "~/utils/streaming-event-codec";
-import { api } from "~/utils/api";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
-import { createLogger } from "~/utils/logger";
+import { api } from "~/utils/api";
+import {
+  type CompactStreamingEvent,
+  isCompactStreamingEvent,
+} from "~/utils/streaming-event-codec";
 import { usePageVisibility } from "./usePageVisibility";
 import { useSSESubscription } from "./useSSESubscription";
 

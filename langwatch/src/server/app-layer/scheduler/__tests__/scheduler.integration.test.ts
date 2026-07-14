@@ -11,7 +11,7 @@
 import { randomUUID } from "crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { getTestProject } from "~/utils/testUtils";
 import { PrismaScheduledJobRepository } from "../scheduled-job.repository";
 import { SchedulerRegistry } from "../scheduler.registry";

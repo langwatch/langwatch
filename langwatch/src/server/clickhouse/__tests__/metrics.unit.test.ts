@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const promClientMocks = vi.hoisted(() => ({
   constructedGaugeNames: [] as string[],
@@ -12,7 +12,7 @@ const loggerMocks = vi.hoisted(() => ({
   error: vi.fn(),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMocks,
 }));
 
