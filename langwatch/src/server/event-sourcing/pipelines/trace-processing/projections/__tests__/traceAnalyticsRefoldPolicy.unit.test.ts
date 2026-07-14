@@ -8,7 +8,6 @@ import {
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "../traceAnalytics.foldProjection";
-import { MAX_PROCESSED_SPANS } from "../traceSummary.foldProjection";
 
 /**
  * Regression guard for the 2026-07-09 re-fold storm, slim-fold edition. The
@@ -28,6 +27,8 @@ import { MAX_PROCESSED_SPANS } from "../traceSummary.foldProjection";
 const TENANT_ID = createTenantId("project-1");
 const TRACE_ID = "trace-1";
 const CHECKPOINT_MS = 9_000;
+/** A trace far bigger than any old processing cap: derivation no longer stops. */
+const LARGE_TRACE_SPAN_COUNT = 512;
 
 function stateWithSpanCount(spanCount: number): TraceAnalyticsData {
   const projection = new TraceAnalyticsFoldProjection({
@@ -80,7 +81,7 @@ describe("TraceAnalyticsFoldProjection re-fold policy", () => {
     const store: FoldProjectionStore<TraceAnalyticsData> = {
       get: vi
         .fn()
-        .mockResolvedValue(stateWithSpanCount(MAX_PROCESSED_SPANS + 1)),
+        .mockResolvedValue(stateWithSpanCount(LARGE_TRACE_SPAN_COUNT + 1)),
       store: vi.fn().mockResolvedValue(undefined),
     };
     const projection = new TraceAnalyticsFoldProjection({ store });
@@ -94,14 +95,14 @@ describe("TraceAnalyticsFoldProjection re-fold policy", () => {
     );
 
     expect(eventLoader).not.toHaveBeenCalled();
-    expect(result.spanCount).toBe(MAX_PROCESSED_SPANS + 2);
+    expect(result.spanCount).toBe(LARGE_TRACE_SPAN_COUNT + 2);
   });
 
   describe("given a slim trace-analytics state with spans already folded", () => {
     describe("when a batch of three earlier spans is folded", () => {
       /** @scenario "Folding out-of-order spans without a re-fold still counts every span" */
       it("skips the event-log replay, counts every span, and never rewinds the checkpoint", async () => {
-        const stored = stateWithSpanCount(MAX_PROCESSED_SPANS + 10);
+        const stored = stateWithSpanCount(LARGE_TRACE_SPAN_COUNT + 10);
         let persisted: TraceAnalyticsData | undefined;
         const store: FoldProjectionStore<TraceAnalyticsData> = {
           get: vi.fn().mockResolvedValue(stored),
@@ -127,8 +128,8 @@ describe("TraceAnalyticsFoldProjection re-fold policy", () => {
         );
 
         expect(eventLoader).not.toHaveBeenCalled();
-        expect(result.spanCount).toBe(MAX_PROCESSED_SPANS + 13);
-        expect(persisted?.spanCount).toBe(MAX_PROCESSED_SPANS + 13);
+        expect(result.spanCount).toBe(LARGE_TRACE_SPAN_COUNT + 13);
+        expect(persisted?.spanCount).toBe(LARGE_TRACE_SPAN_COUNT + 13);
         // The checkpoint is a high-water mark: folding older spans never rewinds it.
         expect(result.LastEventOccurredAt).toBe(CHECKPOINT_MS);
       });

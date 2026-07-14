@@ -87,7 +87,6 @@ describe("LogRecordStorageClickHouseRepository.insertLogRecord", () => {
   });
 
   describe("when the log record is a plain log", () => {
-    /** @scenario "A log record keeps the platform default retention" */
     it("keeps the platform default retention", async () => {
       const { repo, insert } = repoCapturingInsert();
 
@@ -176,7 +175,7 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
           SpanId: "span-1",
           TimeUnixMs: 1_700_000_000_000,
           Body: "api_request_body",
-          Attributes: { "event.name": "api_request_body", body: "{\"x\":1}" },
+          Attributes: { "event.name": "api_request_body", body: '{"x":1}' },
           ResourceAttributes: { "langwatch.origin": "coding_agent" },
           ScopeName: "com.anthropic.claude_code.events",
           ScopeVersion: "1.2.3",
@@ -195,7 +194,7 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
           spanId: "span-1",
           timeUnixMs: 1_700_000_000_000,
           body: "api_request_body",
-          attributes: { "event.name": "api_request_body", body: "{\"x\":1}" },
+          attributes: { "event.name": "api_request_body", body: '{"x":1}' },
           resourceAttributes: { "langwatch.origin": "coding_agent" },
           scopeName: "com.anthropic.claude_code.events",
           scopeVersion: "1.2.3",
