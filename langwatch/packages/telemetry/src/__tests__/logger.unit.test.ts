@@ -38,9 +38,23 @@ describe("createLogger", () => {
   });
 
   it("sets level to error in test environment", () => {
-    const logger = createLogger("test-level");
+    const pinoLogLevel = process.env.PINO_LOG_LEVEL;
+    const legacyLogLevel = process.env._LOG_LEVEL;
 
-    expect(logger.level).toBe("error");
+    delete process.env.PINO_LOG_LEVEL;
+    delete process.env._LOG_LEVEL;
+
+    try {
+      const logger = createLogger("test-level");
+
+      expect(logger.level).toBe("error");
+    } finally {
+      if (pinoLogLevel === undefined) delete process.env.PINO_LOG_LEVEL;
+      else process.env.PINO_LOG_LEVEL = pinoLogLevel;
+
+      if (legacyLogLevel === undefined) delete process.env._LOG_LEVEL;
+      else process.env._LOG_LEVEL = legacyLogLevel;
+    }
   });
 
   describe("when disableContext is true", () => {
