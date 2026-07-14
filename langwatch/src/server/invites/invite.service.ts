@@ -43,7 +43,7 @@ import { TeamUserRole } from "@prisma/client";
 import type { Session } from "~/server/auth";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import { getApp } from "../app-layer/app";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:invites");
 

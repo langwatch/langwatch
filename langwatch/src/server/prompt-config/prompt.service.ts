@@ -5,7 +5,7 @@ import type {
   PromptScope,
 } from "@prisma/client";
 import type { z } from "zod";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import {
   deriveResponseFormatFromOutputs,
   handleSchema,

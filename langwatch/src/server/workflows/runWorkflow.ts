@@ -12,7 +12,7 @@ import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators";
 import type { MaybeStoredModelProvider } from "../modelProviders/registry";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { stripUnsupportedLLMParamsFromWorkflow } from "./stripUnsupportedLLMParams";
 
 const logger = createLogger("langwatch:workflows:runWorkflow");

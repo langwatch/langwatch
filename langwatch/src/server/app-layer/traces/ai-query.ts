@@ -2,7 +2,7 @@ import { generateObject, generateText, type ModelMessage } from "ai";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
 import { FIELD_VALUES, SEARCH_FIELDS } from "./query-language/metadata";
 import { isEmptyAST, parse } from "./query-language/parse";

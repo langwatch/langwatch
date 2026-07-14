@@ -1,6 +1,6 @@
 import type { PrismaClient, PromptTag } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { SEEDED_TAGS } from "~/prompts/constants/tags";
 
 const logger = createLogger("langwatch:prompt-tags");
