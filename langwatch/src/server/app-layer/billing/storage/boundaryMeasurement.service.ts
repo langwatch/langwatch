@@ -85,8 +85,16 @@ export interface BoundaryMeasurementDeps {
    * one (reverse-then-emit) — so measuring would re-add a phantom old-group
    * ENTRY (measured old bytes minus a reversed-to-zero prior) and over-count
    * the gauge until the old group's exit. Skipping the project until the
-   * mutation lands avoids that; cumulative-minus-prior self-heals on the
-   * next run. Optional — when absent, no project is skipped.
+   * mutation lands avoids that (customer-favorable: under, never over).
+   *
+   * Recovery of the skipped days: the measurement query is cumulative over
+   * a whole partition, so any later slice of the same partition measured
+   * after the mutation lands catches the skipped bytes back up. The one
+   * gap is a partition on its FINAL transit day skipped for the entire
+   * in-flight window — no later slice re-measures it, so it is recovered by
+   * the phase-3 reference audit (which keeps in-flight-mutation orgs on the
+   * daily tier), not by measurement. Optional — when absent, no project is
+   * skipped.
    */
   hasInFlightRetentionMutation?: (params: {
     projectId: string;

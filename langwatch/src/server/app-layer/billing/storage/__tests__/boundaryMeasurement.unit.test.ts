@@ -208,7 +208,9 @@ describe("BoundaryMeasurementService", () => {
       await service.measureEntriesForOrg({ organizationId: "org_1", at });
 
       expect(appended).toEqual([]);
-      expect(queries).toEqual([]); // skipped before any ClickHouse read
+      // Skipped before any _size_bytes read (in production the in-flight
+      // predicate itself does one cheap system.mutations lookup).
+      expect(queries).toEqual([]);
     });
 
     it("measures normally once the mutation has landed", async () => {
