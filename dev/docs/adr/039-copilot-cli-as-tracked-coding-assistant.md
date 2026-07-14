@@ -143,19 +143,23 @@ Every Copilot surface converges on the **same `copilot.ts` extractor** on the un
 ### E2. The app is captured by a periodic scoped sync reader (locked)
 The GitHub Copilot app is a native binary that writes host-readable session files to `~/.copilot`. Capture is a **`langwatch copilot-app sync`** command: on each run (on demand or scheduled) it reads **app-owned sessions that are new or advanced since the last sync**, builds per-turn OTLP spans, and POSTs them to `/api/otel` with the user's personal ingest key. It holds a small persisted **watermark** (last session + turn synced) so repeat runs only send new turns. It is a plain command with no resident process — nothing runs between syncs. This decouples capture from the app's lifecycle, so it works however the app was started.
 
-### E3. Hybrid file source with a completeness gate (locked)
-Per turn the reader joins two native sources by `(session_id, turn_index)`:
-- **Usage** from `session-store.db.assistant_usage_events` — `input/output/cache_read/cache_write/reasoning_tokens`, `model`, `nano_aiu`, latency, `finish_reason`, and `context_*_tokens` (system / conversation / tool_definitions / mcp_tools / buffer).
-- **Content** from `session-state/<id>/events.jsonl` — user/assistant message content, tool calls.
+### E3. Fused span per LLM call — db-primary, content matched by time order (locked)
+The two native files describe the same session from two angles and **share no per-call id** (verified against real files 2026-07-14): the usage DB is keyed on `(session_id, turn_index, id)`, the content JSONL on uuids (`requestId`/`apiCallId`/`turnId`), and `turn_index` is coarse (one turn = several LLM calls). They agree only on `session_id` and the wall clock.
 
-A turn is **emitted only when both sources have it** (completeness gate), so a partial-write tick never ships a tokens-only or content-only span, and a turn is emitted exactly once. When the app's OTLP-file-exporter output is present (the user configured OTel file-export), the reader uses those standard `gen_ai.*` spans for the core and enriches them with the native usage fields, joined on the same key.
+The reader therefore emits **one fused span per LLM call, db-primary**:
+- **Core** (one span per row) from `session-store.db.assistant_usage_events` — `input/output/cache_read/cache_write/reasoning_tokens`, `model`, `nano_aiu`, latency, `finish_reason`, and `context_*_tokens` (system / conversation / tool_definitions / mcp_tools / buffer).
+- **Content enrichment** from `session-state/<id>/events.jsonl` (prompt/response, tool calls), **matched within a session by time order**: for a session, sort usage rows by `created_at` and `assistant.message`s by `timestamp` and pair positionally. This is reliable on the observed data — 1:1 counts (21↔21), ~6–22 ms alignment, monotonic — but it is a **heuristic time-match, not an exact id**.
+
+**Mis-pairing guard:** pair only when the per-session usage-row and message counts match and each paired timestamp is within a bounded window (spike sets the ms threshold). If counts diverge or a pair falls outside the window, emit the **usage span without content** and record a `github.copilot.pairing_degraded` marker rather than staple the wrong content — a numbers-only span is acceptable; a mis-attributed prompt is not.
+
+When the app's OTLP-file-exporter output is present (the user configured OTel file-export), the reader uses those standard `gen_ai.*` spans for the core and enriches them with the native usage fields — same time-ordered match.
 
 `session-store.db` is read **read-only, one snapshot per sync tick, with a busy-timeout** — it is SQLite with a live WAL, so it is opened as a query-only snapshot rather than tailed as text; `events.jsonl` is read as an append-only file. The SQLite snapshot read is a new reader; the OTLP-building + POST is the reused codex core.
 
 ### E4. Scoping and dedup (locked)
 - **sourceType `copilot_app`**, distinct from `copilot_cli`.
 - The reader **claims only app-owned sessions** — identified by the app's own session provenance in `session-store.db` (the discriminator that separates app sessions from CLI sessions in the shared `~/.copilot` is confirmed in the spike). Because it never reads CLI-origin sessions, it cannot collide with the CLI's live-OTLP lane.
-- **Within-reader idempotency:** the watermark (E2) plus a deterministic span id per `(session_id, turn_index)` means re-running sync re-sends nothing already stored.
+- **Within-reader idempotency:** the watermark (E2) plus a deterministic span id per usage row (`session_id` + the row's `id`/ordinal) means re-running sync re-sends nothing already stored.
 - **One file-reader abstraction** serves `codex` and `copilot_app`.
 
 ### E5. Constants
@@ -166,14 +170,16 @@ A turn is **emitted only when both sources have it** (completeness gate), so a p
 | usage source | `~/.copilot/session-store.db.assistant_usage_events` | tokens, model, `nano_aiu`, `context_*_tokens` |
 | content source | `~/.copilot/session-state/<id>/events.jsonl` | prompts, responses, tool calls |
 | enrichment source | app OTLP-file-exporter output (when present) | stable `gen_ai.*` core |
-| join key | `(session_id, turn_index)` | pairs usage + content per turn |
+| span granularity | one span per `assistant_usage_events` row (one LLM call) | db-primary core |
+| content match | `session_id` + timestamp order (positional, bounded window) | pairs content to each usage row (heuristic, guarded) |
+| pairing-degraded marker | `github.copilot.pairing_degraded` | set when a usage span ships without matched content |
 | cost attribute | `github.copilot.nano_aiu` (raw AI-unit count) | stamped as a raw unit, never a dollar/cost field |
 
 ### E6. Invariants
 | Invariant | Meaning | Satisfied by |
 |---|---|---|
-| Each turn ingested once | no duplicates across syncs or lanes | reader claims only app-owned sessions (never CLI sessions, so no cross-lane overlap) + watermark + deterministic per-turn span id |
-| No partial turn | a span always has both tokens and content | completeness gate on `(session_id, turn_index)` before emit (E3) |
+| Each call ingested once | no duplicates across syncs or lanes | reader claims only app-owned sessions (never CLI sessions, so no cross-lane overlap) + watermark + deterministic per-row span id |
+| Never mis-attribute content | a span's prompt/response is either correctly its own or absent | time-ordered match only under count-parity + bounded window; otherwise emit numbers-only + `pairing_degraded` (E3) |
 | Safe concurrent read | reading while the app writes never corrupts or blocks | read-only WAL snapshot + busy-timeout for the db; append-only read for the jsonl (E3) |
 | No resident process | nothing runs between syncs | `sync` is a one-shot command; state is the persisted watermark only |
 | One extractor | app spans canonicalize via `copilot.ts` | reader emits `gen_ai.*` + `github.copilot.*`; extractor extended for `github.copilot.nano_aiu` + `context_*_tokens` |
@@ -182,7 +188,7 @@ A turn is **emitted only when both sources have it** (completeness gate), so a p
 
 ### E7. Consequences
 - **Positive:** the app's session data is on the host in the open, so capture needs no auth-header workaround and no sandbox escape; the OTLP-building core is shared with codex; per-turn cost (`nano_aiu`) and the content-source token breakdown are captured natively.
-- **Limits:** capture happens at sync cadence, not per-turn-live; only sessions the app has written are captured (a session mid-first-turn is picked up on the next sync). Native-file parsing depends on the app's on-disk schema, pinned to stable fields with a versioned reader, with OTLP-file-export used for the core when present.
+- **Limits:** capture happens at sync cadence, not per-turn-live; only sessions the app has written are captured (a session mid-first-turn is picked up on the next sync). The content match is by time order, not an exact id — bounded by the mis-pairing guard (E3), so the worst case is a numbers-only span, never a wrong prompt. Native-file parsing depends on the app's on-disk schema, pinned to stable fields with a versioned reader, with OTLP-file-export used for the core when present.
 
 ### E8. Roadmap (next, each its own decision)
 - **VS Code extension** — Lane 1 via `github.copilot.chat.otel.*` with a token-in-URL receiver route.
@@ -191,6 +197,7 @@ A turn is **emitted only when both sources have it** (completeness gate), so a p
 
 ## Revisions
 
+- **v9 (2026-07-14, empirical join verification — E3 corrected):** adversarial testing of the design against the real `~/.copilot` files invalidated the v7/v8 join key. The usage DB and content JSONL **share no per-call id** (DB keyed on `(session_id, turn_index, id)`; JSONL on `requestId`/`apiCallId`/`turnId`; `turn_index` is coarse). Corrected E3: emit **one fused span per `assistant_usage_events` row (db-primary)** and match content **by `session_id` + timestamp order** (verified 1:1, ~6–22 ms aligned, monotonic) — a heuristic, not an exact id. Added a **mis-pairing guard** (pair only under per-session count-parity + a bounded time window; else emit numbers-only + `github.copilot.pairing_degraded`) so the worst case is a cost-only span, never a mis-attributed prompt. Updated the span-id / watermark to per-row, the constants (span granularity + content-match + degraded marker), and the "never mis-attribute content" invariant. Deterministic-per-turn-id dedup replaced by per-row. User chose fuse (Option 1) over session-correlate / jsonl-only after a worked comparison.
 - **v8 (2026-07-14, red-team + reframe):** the mandatory red-team found the codex "launch-and-stream" model imported guarantees whose preconditions the app lacks. Fixes: (1) **capture mechanism changed** from launching the app + streaming for its lifetime to a **periodic scoped sync reader** (`langwatch copilot-app sync`) — a GUI app hands off/daemonizes on launch, so a wait-on-child streamer captured almost nothing; the sync reader decouples capture from the app's lifecycle. (2) **Dedup made real** — the reader claims only app-owned sessions (never CLI sessions), so it can't double-count against the live-OTLP CLI lane; within-reader idempotency via a watermark + deterministic per-turn span id. (3) **Two-source join specified** — a completeness gate on `(session_id, turn_index)` before emit, so no tokens-only or content-only span. (4) **SQLite handled honestly** — `session-store.db` is read as a read-only WAL snapshot with a busy-timeout (a new reader), not tailed as text; only the OTLP-build+POST core is reused. (5) `nano_aiu` stamped as `github.copilot.nano_aiu` (a raw unit), never a dollar/cost field. Also per direction: all third-party/competitor references removed throughout, the rejected-alternatives section dropped in favor of a positive scope + a Roadmap of the next surfaces. No framing constraint changed.
 - **v7 (2026-07-14, `/parc-ferme` — extension forks locked):** the §Extension went from framing to locked decisions. Scope **narrowed to the GitHub Copilot app only** (user: "focus only on github app") — VS Code/token-in-URL **dissolved** to a deferred open question. Locked: (E2) codex-style wrapper `langwatch copilot-app` — launch the app, stream `~/.copilot` for its lifetime, no daemon; (E3) **hybrid** file source — native `session-store.db` + `events.jsonl` primary, OTLP-file-export as enrichment; (E4) sourceType `copilot_app`, one shared file-reader, deterministic per-turn span-id dedup for the shared `~/.copilot`; (E9) VS Code, enterprise identity-link, metrics + content-source-cost feature all deferred. Four framing constraints confirmed (one extractor/substrate, reuse codex reader, capture-everything default, no new endpoint). Status Proposed pending red-team + lock.
 - **v6 (2026-07-14, multi-surface extension — stacked on PR #5605):** broadened ADR-039 from CLI-only to **all Copilot surfaces** rather than opening a new ADR. Added the §Extension section: two-lane capture model (live OTLP + `~/.copilot` file reader, codex pattern), empirically-verified app/VS-Code surface facts, the `copilot_cli`/`copilot_app`/`copilot_vscode` taxonomy, shared file-reader + IDE-settings-writer abstractions, and the open forks for `/parc-ferme`. CLI decisions §1–§4 unchanged (Accepted); the extension is Proposed. Tracked in #5783 / #5784.
