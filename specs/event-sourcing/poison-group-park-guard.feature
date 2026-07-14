@@ -27,10 +27,14 @@ Feature: GroupQueue poison-group park guard
   #     its bystanders.
   #   - Isolation: a suspect over the threshold runs SOLO in the worker -
   #     intake paused, every other in-flight job settled - behind an isolation
-  #     marker written to Redis before any decode/handler work. A death during
-  #     a marked solo run is attributable beyond doubt; the surviving marker
-  #     parks the group on its next claim. A healthy bystander survives its
-  #     solo run, clears marker and strikes, and never parks.
+  #     marker written to Redis before any decode/handler work. The marker is
+  #     bound to the staged job it was written for: a death mid-run redelivers
+  #     that exact job, so only a matching marker parks the group on its next
+  #     claim. A marker naming a job that already completed queue-side (the
+  #     process died between the complete and the marker clear) mismatches the
+  #     group's next job and is discarded instead of falsely parking it. A
+  #     healthy bystander survives its solo run, clears marker and strikes,
+  #     and never parks.
   #   - Decode size guard: staged values larger than the encode-side cap
   #     (legacy/bare payloads that predate or bypass envelope writes) are
   #     parked without being JSON.parsed; gunzip output is bounded so a
@@ -49,6 +53,13 @@ Feature: GroupQueue poison-group park guard
     And the stored group error explains that the death happened in isolation
     And the staged job remains staged for operator inspection or replay
     And other groups continue to dispatch and process normally
+
+  Scenario: a marker from a completed isolation run cannot park the group's next job
+    Given a suspect group whose isolated job completed queue-side
+    And the process died before clearing the isolation marker
+    When a worker claims the group's next job
+    Then the job runs instead of being parked
+    And the stale isolation marker is discarded at claim time
 
   Scenario: a suspect group is run in isolation instead of being parked on strikes alone
     Given a group whose claim strikes exceed the poison threshold

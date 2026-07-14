@@ -97,10 +97,15 @@ describe.skipIf(!hasTestcontainers)(
 
     /**
      * Seeds the death-in-isolation signature: the marker a prior isolation run
-     * wrote (awaited) before the process died without reaching its clear.
+     * wrote (awaited) for a specific staged job before the process died
+     * without reaching its clear. `queue.send` stages a payload under its
+     * `id`, so the default matches the job the tests send next.
      */
-    const seedIsolationDeath = (name: string, groupId: string) =>
-      redis.set(isolatingKey(name, groupId), "1");
+    const seedIsolationDeath = (
+      name: string,
+      groupId: string,
+      stagedJobId = "job-1",
+    ) => redis.set(isolatingKey(name, groupId), stagedJobId);
 
     describe("given a group whose isolation marker survived a worker death", () => {
       describe("when a worker claims the group again", () => {
@@ -153,6 +158,38 @@ describe.skipIf(!hasTestcontainers)(
           );
 
           expect(processed.mock.calls[0]![0].groupId).toBe("healthy");
+        });
+      });
+    });
+
+    describe("given a stale isolation marker naming a job that already completed", () => {
+      describe("when the group's next job is claimed", () => {
+        /** @scenario a marker from a completed isolation run cannot park the group's next job */
+        it("runs the job instead of parking and discards the stale marker", async () => {
+          // The post-completion crash window: the isolated job COMPLETED
+          // queue-side, then the process died before the marker clear (e.g.
+          // during blob release). The surviving marker names the completed
+          // job - not the group's next job - and must not condemn it.
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          await seedIsolationDeath(name, "recovered", "job-done");
+
+          await queue.send({ id: "job-next", groupId: "recovered", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(processed.mock.calls[0]![0].id).toBe("job-next");
+          expect(await blockedMembers(name)).not.toContain("recovered");
+          // The mismatching marker is discarded at claim time, atomically
+          // with the read - not left to linger until its TTL.
+          expect(await redis.get(isolatingKey(name, "recovered"))).toBeNull();
         });
       });
     });

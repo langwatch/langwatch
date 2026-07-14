@@ -753,7 +753,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     if (strikeThreshold > 0) {
       let diedInIsolation = false;
       try {
-        diedInIsolation = await this.scripts.wasIsolationInterrupted(groupId);
+        // Job-bound check: only a marker naming THIS staged job proves the
+        // process died during its solo run. A marker left by a completed
+        // job's run (death after the queue-side complete, before the marker
+        // clear) mismatches and is discarded instead of parking a successor.
+        diedInIsolation = await this.scripts.wasIsolationInterrupted(
+          groupId,
+          stagedJobId,
+        );
       } catch {
         // Guard accounting is protective, never load-bearing: an unreadable
         // marker must not stop the queue.
@@ -902,7 +909,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       let marked = false;
       if (quiesced) {
         try {
-          await this.scripts.markIsolationStarted(groupId);
+          await this.scripts.markIsolationStarted(groupId, stagedJobId);
           marked = true;
         } catch {
           // Marker write failed: run unattributed rather than risking a park
