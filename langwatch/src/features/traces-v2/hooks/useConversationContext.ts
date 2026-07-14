@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useTraceViewer } from "../context/TraceViewerContext";
+import { useCanViewConversation } from "../context/TraceViewerContext";
 import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import type { TraceListItem } from "../types/trace";
 
@@ -59,12 +59,7 @@ export function useConversationContext(
   traceId: string | null | undefined,
 ): ConversationContextResult {
   const { project } = useOrganizationTeamProject();
-  const { readOnly, sharedThreadId } = useTraceViewer();
-  const canReadConversation =
-    !readOnly ||
-    (!!conversationId &&
-      sharedThreadId != null &&
-      conversationId === sharedThreadId);
+  const canReadConversation = useCanViewConversation({ conversationId });
 
   // Conversation context for preview-mode traces is seeded
   // directly into the cache by `useOpenTraceDrawer`. We disable

@@ -7,7 +7,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
-import { useTraceViewer } from "../../context/TraceViewerContext";
+import { useCanViewConversation } from "../../context/TraceViewerContext";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { BlurredContentGate } from "../BlurredContentGate";
 import { ConversationContext } from "./ConversationContext";
@@ -56,7 +56,10 @@ export function TraceDrawerContent({
   readOnly = false,
 }: TraceDrawerContentProps) {
   const { colorMode } = useColorMode();
-  const { sharedThreadId } = useTraceViewer();
+  const canViewConversation = useCanViewConversation({
+    conversationId: trace?.conversationId,
+    isReadOnly: readOnly,
+  });
   // One Shiki adapter for the whole surface. All `<RenderedMarkdown>`,
   // `<ShikiCodeBlock>`, and the JSON tokenizer consume this — without it,
   // each consumer spins up its own highlighter (theme + lang JSON +
@@ -76,10 +79,6 @@ export function TraceDrawerContent({
   // the Trace view and open the span. See
   // specs/traces-v2/span-reference-jump-to-trace.feature
   const openSpanInTrace = useDrawerStore((s) => s.openSpanInTrace);
-  const canViewConversation =
-    !!trace?.conversationId &&
-    (!readOnly || trace.conversationId === sharedThreadId);
-
   // Watch the actual rendered container so the layout decision reflects
   // whatever pixel width the surface has — not the abstract widthPx state.
   const paneContainerRef = useRef<HTMLDivElement>(null);

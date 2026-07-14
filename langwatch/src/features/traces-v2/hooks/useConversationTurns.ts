@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
-import { useTraceViewer } from "../context/TraceViewerContext";
+import {
+  useCanViewConversation,
+  useTraceViewer,
+} from "../context/TraceViewerContext";
 import type { TraceListItem } from "../types/trace";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -40,12 +43,11 @@ export function conversationTurnsWindow(nowMs: number): {
  */
 export function useConversationTurns(conversationId: string | null) {
   const { project } = useOrganizationTeamProject();
-  const { readOnly, sharedThreadId } = useTraceViewer();
-  const canReadSharedConversation =
-    readOnly &&
-    !!conversationId &&
-    sharedThreadId != null &&
-    conversationId === sharedThreadId;
+  const { readOnly } = useTraceViewer();
+  const canReadSharedConversation = useCanViewConversation({
+    conversationId,
+    shouldRequireReadOnly: true,
+  });
 
   const timeRange = useMemo(
     () => conversationTurnsWindow(Date.now()),

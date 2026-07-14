@@ -16,6 +16,16 @@ vi.mock("../../context/TraceViewerContext", () => ({
     readOnly: state.readOnly,
     sharedThreadId: state.sharedThreadId,
   }),
+  useCanViewConversation: ({
+    conversationId,
+    shouldRequireReadOnly = false,
+  }: {
+    conversationId: string | null;
+    shouldRequireReadOnly?: boolean;
+  }) =>
+    !!conversationId &&
+    (!shouldRequireReadOnly || state.readOnly) &&
+    (!state.readOnly || conversationId === state.sharedThreadId),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({

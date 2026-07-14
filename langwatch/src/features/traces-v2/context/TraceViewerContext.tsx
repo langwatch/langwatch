@@ -53,6 +53,44 @@ export function useTraceViewer(): TraceViewer {
   return useContext(TraceViewerContext);
 }
 
+/** Conversation capability shared by every trace-viewer call site. */
+export function canViewConversation({
+  conversationId,
+  isReadOnly,
+  sharedThreadId,
+  shouldRequireReadOnly = false,
+}: {
+  conversationId: string | null | undefined;
+  isReadOnly: boolean;
+  sharedThreadId: string | null | undefined;
+  shouldRequireReadOnly?: boolean;
+}): boolean {
+  if (!conversationId || (shouldRequireReadOnly && !isReadOnly)) return false;
+  return !isReadOnly || conversationId === sharedThreadId;
+}
+
+/**
+ * Centralizes the client-side share capability check. This only suppresses UI
+ * and queries; the server remains the authorization boundary.
+ */
+export function useCanViewConversation({
+  conversationId,
+  isReadOnly,
+  shouldRequireReadOnly = false,
+}: {
+  conversationId: string | null | undefined;
+  isReadOnly?: boolean;
+  shouldRequireReadOnly?: boolean;
+}): boolean {
+  const viewer = useTraceViewer();
+  return canViewConversation({
+    conversationId,
+    isReadOnly: isReadOnly ?? viewer.readOnly,
+    sharedThreadId: viewer.sharedThreadId,
+    shouldRequireReadOnly,
+  });
+}
+
 /** Convenience for the many hooks that only need to disable themselves. */
 export function useIsReadOnlyTrace(): boolean {
   return useContext(TraceViewerContext).readOnly;

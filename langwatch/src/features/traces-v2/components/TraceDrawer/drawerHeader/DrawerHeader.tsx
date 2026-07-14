@@ -33,7 +33,7 @@ import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
-import { useTraceViewer } from "../../../context/TraceViewerContext";
+import { useCanViewConversation } from "../../../context/TraceViewerContext";
 import { useConversationContext } from "../../../hooks/useConversationContext";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useSpanTree } from "../../../hooks/useSpanTree";
@@ -488,11 +488,14 @@ export const DrawerHeader = memo(function DrawerHeader({
   onClose,
   readOnly = false,
 }: DrawerHeaderProps) {
-  const { sharedThreadId } = useTraceViewer();
   // Retain attribute-derived fields across payload flaps (row-data seed →
   // full summary → refetch) so chips never vanish once shown for the same
   // traceId — see useRetainedTraceHeader for the root-cause writeup.
   const trace = useRetainedTraceHeader(traceProp);
+  const canViewConversation = useCanViewConversation({
+    conversationId: trace.conversationId,
+    isReadOnly: readOnly,
+  });
   const isMaximized = useDrawerStore((s) => s.isMaximized);
   const pinned = useDrawerStore((s) => s.pinned);
   const togglePinned = useDrawerStore((s) => s.togglePinned);
@@ -589,9 +592,6 @@ export const DrawerHeader = memo(function DrawerHeader({
     trace.conversationId ?? null,
     trace.traceId,
   );
-  const canViewConversation =
-    !!trace.conversationId &&
-    (!readOnly || trace.conversationId === sharedThreadId);
   const { pins, removePin } = usePinnedAttributes(project?.id);
   const toggleFacet = useFilterStore((s) => s.toggleFacet);
   // `applyQueryTextFromPin` is used by the auto-pinned metadata filter
