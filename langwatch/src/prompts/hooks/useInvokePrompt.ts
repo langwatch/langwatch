@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { type MutationOptions, useMutation } from "@tanstack/react-query";
 import type { Node } from "@xyflow/react";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";

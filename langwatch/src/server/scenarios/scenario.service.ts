@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type { PrismaClient, Scenario } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";

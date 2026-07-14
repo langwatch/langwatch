@@ -19,7 +19,7 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 
-vi.mock("@langwatch/telemetry/tracing", () => ({
+vi.mock("@langwatch/observability/tracing", () => ({
   injectTraceContextHeaders: vi.fn(
     ({ headers }: { headers: Record<string, string> }) => ({
       headers,

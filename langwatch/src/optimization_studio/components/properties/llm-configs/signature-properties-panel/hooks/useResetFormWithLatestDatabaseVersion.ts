@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";

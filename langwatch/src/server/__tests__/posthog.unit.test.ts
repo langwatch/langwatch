@@ -20,7 +20,7 @@ vi.mock("posthog-node", () => ({
   },
 }));
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

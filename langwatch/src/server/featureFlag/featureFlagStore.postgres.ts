@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { prisma } from "../db";
 import { TtlCache } from "../utils/ttlCache";
 import { KILL_SWITCH_CACHE_TTL_MS } from "./constants";

@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { type Organization, Prisma, type PrismaClient, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { APIError } from "better-auth/api";
 import { getApp } from "~/server/app-layer/app";

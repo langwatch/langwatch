@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getApp } from "../../../../src/server/app-layer/app";
 import { captureException, toError } from "../../../../src/utils/posthogErrorCapture";

@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 import Router, { useRouter } from "~/utils/compat/next-router";

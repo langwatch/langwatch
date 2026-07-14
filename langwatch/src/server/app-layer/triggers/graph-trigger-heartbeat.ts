@@ -26,7 +26,7 @@
  * `not_breached` outcome from the analytics data.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { ActionParams } from "~/pages/api/cron/triggers/types";
 import {

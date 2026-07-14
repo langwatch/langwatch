@@ -31,8 +31,8 @@ We use Node.js **AsyncLocalStorage** to propagate request context across async b
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `context` | `packages/telemetry/src/context/` | Core context management and logger registration |
-| `logger.ts` | `packages/telemetry/src/` | Isomorphic logger factory with context injection |
+| `context` | `packages/observability/src/context/` | Core context management and logger registration |
+| `logger.ts` | `packages/observability/src/` | Isomorphic logger factory with context injection |
 | `loggerMiddleware` | `src/app/api/middleware/` | Hono HTTP context setup |
 
 ### RequestContext Shape

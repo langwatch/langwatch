@@ -19,7 +19,7 @@
  * (see the middleware below). Staff therefore bypass the flag entirely.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { Context } from "hono";
 import { z } from "zod";

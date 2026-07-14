@@ -10,7 +10,7 @@
  */
 
 import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { prisma } from "~/server/db";
 import type { MaybeStoredModelProvider } from "~/server/modelProviders/registry";

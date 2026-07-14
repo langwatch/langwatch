@@ -11,7 +11,7 @@
  */
 
 import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Project } from "@prisma/client";
 import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
 import type { JsonArray } from "@prisma/client/runtime/library";

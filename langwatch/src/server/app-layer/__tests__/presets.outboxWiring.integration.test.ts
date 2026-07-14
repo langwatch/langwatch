@@ -29,7 +29,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // outbox-reactor-adapter's registration warning, which fires synchronously
 // while `initializeDefaultApp` wires the pipelines.
 const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
-vi.mock("@langwatch/telemetry", () => {
+vi.mock("@langwatch/observability", () => {
   const make = () => {
     const logger = {
       trace: vi.fn(),

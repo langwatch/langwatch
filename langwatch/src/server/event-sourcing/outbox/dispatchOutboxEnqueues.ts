@@ -1,4 +1,4 @@
-import type { Logger } from "@langwatch/telemetry";
+import type { Logger } from "@langwatch/observability";
 import { DEFAULT_TRACE_DEBOUNCE_MS } from "~/automations/cadences";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { OutboxEnqueueRequest } from "./outboxReactor.types";

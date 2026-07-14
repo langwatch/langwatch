@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { AppConfig } from "../../../src/server/app-layer/config";
 import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
 import type {

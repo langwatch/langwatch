@@ -20,7 +20,7 @@ const loggerMock = vi.hoisted(() => ({
   warn: vi.fn(),
   error: vi.fn(),
 }));
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 

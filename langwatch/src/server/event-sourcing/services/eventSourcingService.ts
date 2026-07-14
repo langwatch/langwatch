@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";

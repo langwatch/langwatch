@@ -16,7 +16,7 @@
  * Preserves the legacy behaviour bit-for-bit for unflagged projects.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { buildTimeseriesQuery } from "~/server/analytics/clickhouse/aggregation-builder";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { TimeseriesInputType } from "~/server/analytics/registry";

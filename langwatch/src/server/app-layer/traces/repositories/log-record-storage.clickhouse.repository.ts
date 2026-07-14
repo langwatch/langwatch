@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import {
   CLAUDE_CODE_KIND_ATTR,
   CLAUDE_CODE_LOG_RETENTION_DAYS,

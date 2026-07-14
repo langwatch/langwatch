@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";

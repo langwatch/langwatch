@@ -8,7 +8,7 @@ import {
   type GovernanceKpiContribution,
   GovernanceKpisClickHouseRepository,
 } from "@ee/governance/services/governanceKpis.clickhouse.repository";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type {

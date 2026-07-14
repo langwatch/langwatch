@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Context, MiddlewareHandler } from "hono";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";

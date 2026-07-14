@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { Currency, type PrismaClient } from "@prisma/client";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import type {
   ReactorContext,

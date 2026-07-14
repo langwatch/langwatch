@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useRef } from "react";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 import { api } from "~/utils/api";

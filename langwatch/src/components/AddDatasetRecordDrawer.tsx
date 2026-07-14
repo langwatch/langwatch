@@ -4,7 +4,7 @@
  */
 
 import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { useDrawer } from "~/hooks/useDrawer";

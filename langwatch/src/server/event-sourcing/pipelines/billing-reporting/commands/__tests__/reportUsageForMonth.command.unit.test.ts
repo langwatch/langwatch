@@ -66,7 +66,7 @@ const {
 // Module mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn(() => createMockLogger()),
 }));
 

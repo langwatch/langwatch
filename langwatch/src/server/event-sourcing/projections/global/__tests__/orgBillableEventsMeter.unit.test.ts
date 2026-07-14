@@ -57,7 +57,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
 
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn(() => createMockLogger()),
 }));
 

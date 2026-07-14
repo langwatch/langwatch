@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { bodyLimit } from "hono/body-limit";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";

@@ -6,7 +6,7 @@ import {
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type {

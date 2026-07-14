@@ -19,7 +19,7 @@
  * See: specs/ai-gateway/_shared/contract.md §4.5
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type {
   GatewayBudget,
   GatewayBudgetLedgerStatus,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 /**
  * AdminWorkspaceViewAuditService — records audit-log + OCSF rows
  * when an org admin drills into another user's Personal Workspace

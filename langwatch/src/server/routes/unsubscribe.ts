@@ -14,7 +14,7 @@
  * rate-limited callers get 429.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";

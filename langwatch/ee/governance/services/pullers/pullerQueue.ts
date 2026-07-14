@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { ConnectionOptions } from "bullmq";
 import { prisma } from "~/server/db";
 import { QueueWithFallback } from "~/server/queues/queueWithFallback";

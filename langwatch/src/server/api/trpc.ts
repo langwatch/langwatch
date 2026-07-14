@@ -30,8 +30,8 @@ interface CreateNextContextOptions {
   res: any;
 }
 
-import { createLogger } from "@langwatch/telemetry";
-import { getLogLevelFromStatusCode } from "@langwatch/telemetry/request";
+import { createLogger } from "@langwatch/observability";
+import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import type { OrganizationUserRole } from "@prisma/client";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";

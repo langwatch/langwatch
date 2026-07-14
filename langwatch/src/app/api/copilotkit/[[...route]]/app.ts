@@ -9,7 +9,7 @@ import {
   CopilotRuntime,
   copilotRuntimeNodeHttpEndpoint,
 } from "@copilotkit/runtime";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
 import { createProjectApp, requires } from "~/server/api/security";
 import { PromptStudioAdapter } from "./service-adapter";

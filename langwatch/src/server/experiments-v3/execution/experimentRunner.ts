@@ -8,7 +8,7 @@
  * caller can poll or open in the browser.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { type OrchestratorInput, runOrchestrator } from "./orchestrator";

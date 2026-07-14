@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { Cluster, type Redis as IORedis } from "ioredis";
 import { tenantIdFromGroupId } from "../../../observability/tenantRateTracker";
 import {

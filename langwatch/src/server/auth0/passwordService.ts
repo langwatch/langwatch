@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { env } from "../../env.mjs";
 
 const logger = createLogger("langwatch:auth0:password");

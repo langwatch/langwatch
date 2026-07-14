@@ -64,7 +64,7 @@
  * @module ssrfProtection
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import dns from "dns/promises";
 import { isIP } from "net";
 import {

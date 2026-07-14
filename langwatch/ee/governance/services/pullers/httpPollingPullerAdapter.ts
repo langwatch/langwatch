@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 /**
  * HttpPollingPullerAdapter — universal HTTP-polling adapter for
  * paginated REST audit-log APIs. Mirrors Airbyte's HTTP-source

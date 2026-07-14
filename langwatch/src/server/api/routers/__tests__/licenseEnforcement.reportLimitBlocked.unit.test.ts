@@ -23,7 +23,7 @@ vi.mock("~/server/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn(() => ({
     info: vi.fn(),
     warn: vi.fn(),

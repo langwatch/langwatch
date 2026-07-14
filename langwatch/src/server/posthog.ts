@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { PostHog } from "posthog-node";
 import { env } from "../env.mjs";
 

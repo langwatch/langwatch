@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../featureFlag/types";
 import type { Anomaly } from "./anomalyState";

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 /**
  * Resolves whether a tool's direct-OTLP usage is "non-billable" (bundled into
  * a subscription plan rather than billed per token), so the receiver can stamp

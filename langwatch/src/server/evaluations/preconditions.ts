@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import safe from "safe-regex2";
 import type { ExecuteEvaluationCommandData } from "../event-sourcing/pipelines/evaluation-processing/schemas/commands";
 import {

@@ -3,7 +3,7 @@ import {
   SendEmailCommand,
   SendRawEmailCommand,
 } from "@aws-sdk/client-ses";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import sgMail from "@sendgrid/mail";
 import { env } from "../../env.mjs";
 

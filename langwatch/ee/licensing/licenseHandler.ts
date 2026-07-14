@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import { getApp } from "../../src/server/app-layer/app";

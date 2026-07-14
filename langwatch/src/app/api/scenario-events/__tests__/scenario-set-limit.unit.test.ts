@@ -10,7 +10,7 @@ vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId: vi.fn(),
 }));
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

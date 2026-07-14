@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";

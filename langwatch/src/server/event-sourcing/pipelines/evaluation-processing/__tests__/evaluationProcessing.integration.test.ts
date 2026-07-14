@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";

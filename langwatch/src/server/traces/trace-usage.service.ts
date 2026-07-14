@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "~/server/db";
 import { OrganizationRepository } from "~/server/repositories/organization.repository";

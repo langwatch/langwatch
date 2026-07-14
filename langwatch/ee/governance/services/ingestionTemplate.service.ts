@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 /**
  * IngestionTemplateService — owns the catalog read + admin-authoring
  * surface for the personal-project trace-ingest flow.

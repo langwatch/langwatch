@@ -10,7 +10,7 @@
  * - Tests can inject mocks without vi.mock
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";

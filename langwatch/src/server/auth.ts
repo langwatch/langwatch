@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { IncomingHttpHeaders } from "http";
 import { auth } from "~/server/better-auth";
 import { prisma } from "~/server/db";

@@ -37,7 +37,7 @@ vi.mock("@langwatch/ksuid", () => ({
   }),
 }));
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn().mockReturnValue({
     info: vi.fn(),
     warn: vi.fn(),

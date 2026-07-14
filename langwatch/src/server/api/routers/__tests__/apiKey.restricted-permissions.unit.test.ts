@@ -44,7 +44,7 @@ vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
   };
 });
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     warn: vi.fn(),

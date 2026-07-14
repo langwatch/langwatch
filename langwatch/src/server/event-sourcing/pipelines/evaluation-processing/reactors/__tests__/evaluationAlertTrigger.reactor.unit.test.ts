@@ -10,7 +10,7 @@ import {
   type EvaluationAlertTriggerReactorDeps,
 } from "../evaluationAlertTrigger.reactor";
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import {
   CADENCE_WINDOW_MS,

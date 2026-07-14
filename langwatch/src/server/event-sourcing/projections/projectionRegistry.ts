@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { ProcessRole } from "../../app-layer/config";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event } from "../domain/types";

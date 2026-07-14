@@ -6,7 +6,7 @@ import {
   PlatformTemplateImmutableError,
   TemplateNotFoundError,
 } from "@ee/governance/services/ingestionTemplate.service";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 /**
  * Public Hono REST API for governance resources.
  *

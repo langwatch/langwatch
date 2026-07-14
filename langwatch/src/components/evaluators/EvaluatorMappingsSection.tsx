@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type AvailableSource,

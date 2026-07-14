@@ -41,7 +41,7 @@ import {
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";

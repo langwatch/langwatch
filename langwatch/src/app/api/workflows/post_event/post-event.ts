@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { getS3CacheKey } from "../../../../optimization_studio/server/addEnvs";
 import { invokeLambda } from "../../../../optimization_studio/server/lambda";

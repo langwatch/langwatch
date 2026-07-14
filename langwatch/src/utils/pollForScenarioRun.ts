@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
 const logger = createLogger("pollForScenarioRun");

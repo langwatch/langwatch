@@ -1,5 +1,5 @@
 "use client";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import cloneDeep from "lodash.clonedeep";
 import type { DeepPartial } from "react-hook-form";
 import { z } from "zod";

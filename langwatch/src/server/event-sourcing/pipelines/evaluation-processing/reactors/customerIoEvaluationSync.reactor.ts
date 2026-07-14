@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { NurturingService } from "../../../../../../ee/billing/nurturing/nurturing.service";
 import { captureException, toError } from "../../../../../utils/posthogErrorCapture";

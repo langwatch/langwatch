@@ -12,7 +12,7 @@
  * @see specs/scenarios/observability-context.feature
  */
 
-import { createLogger, type Logger } from "@langwatch/telemetry";
+import { createLogger, type Logger } from "@langwatch/observability";
 
 export const SCENARIO_LOG_CONTEXT_ENV = "LANGWATCH_LOG_CONTEXT";
 

@@ -11,7 +11,7 @@ import {
   LambdaClient,
   UpdateFunctionCodeCommand,
 } from "@aws-sdk/client-lambda";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { env } from "../../../env.mjs";
 import {
   deleteStagedObject,

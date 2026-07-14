@@ -10,7 +10,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { CheckCircle, FileText, Trash2, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import { connection as defaultRedisConnection } from "~/server/redis";
 

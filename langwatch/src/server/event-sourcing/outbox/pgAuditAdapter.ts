@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { QueueAuditAdapter } from "../queues/queue.types";
 import { isCadence, isGraphEval, isSettle, type OutboxJob } from "./payload";

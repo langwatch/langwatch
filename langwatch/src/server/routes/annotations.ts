@@ -7,7 +7,7 @@
  * - src/pages/api/annotations/trace/[trace].ts
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import type { Permission } from "~/server/api/rbac";

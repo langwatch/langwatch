@@ -12,7 +12,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect } from "react";
 import { LuChevronRight } from "react-icons/lu";
 import { HistoryIcon } from "~/components/icons/History";

@@ -1,5 +1,5 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";

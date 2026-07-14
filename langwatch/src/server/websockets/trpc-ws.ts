@@ -14,7 +14,7 @@
  * `splitLink`) which procedures ride which transport.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { applyWSSHandler } from "@trpc/server/adapters/ws";
 import type { Server as HttpServer, IncomingMessage } from "http";
 import { WebSocketServer } from "ws";

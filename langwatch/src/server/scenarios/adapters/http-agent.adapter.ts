@@ -1,7 +1,7 @@
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
-import { createLogger } from "@langwatch/telemetry";
-import { injectTraceContextHeaders } from "@langwatch/telemetry/tracing";
+import { createLogger } from "@langwatch/observability";
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { PrismaClient } from "@prisma/client";
 import { JSONPath } from "jsonpath-plus";
 import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";

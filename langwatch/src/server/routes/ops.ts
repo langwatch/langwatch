@@ -36,7 +36,7 @@
  * integration test issues real HTTP requests.
  */
 import { timingSafeEqual } from "node:crypto";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import {
   createServiceApp,
   handlerManagedAuth,

@@ -8,7 +8,7 @@
  * @see specs/scenarios/pre-compiled-child-process.feature
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import fs from "fs";
 import path from "path";
 

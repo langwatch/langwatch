@@ -1,5 +1,5 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { prisma } from "../db";
 import { _getSharedClickHouseClient } from "./client";

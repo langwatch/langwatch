@@ -2,7 +2,7 @@
  * Hono routes for cron jobs.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Project, Trigger } from "@prisma/client";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";

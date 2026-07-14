@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";

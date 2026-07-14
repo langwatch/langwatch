@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { Counter, Gauge, Histogram, register } from "prom-client";
 
 const logger = createLogger("langwatch:clickhouse:metrics");

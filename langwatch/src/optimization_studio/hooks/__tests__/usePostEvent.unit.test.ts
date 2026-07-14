@@ -12,7 +12,7 @@ vi.mock("../../../components/ui/toaster", () => ({
 }));
 
 // Mock logger
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

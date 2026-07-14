@@ -7,8 +7,8 @@
 
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
-import type { Logger } from "@langwatch/telemetry";
-import { injectTraceContextHeaders } from "@langwatch/telemetry/tracing";
+import type { Logger } from "@langwatch/observability";
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import { JSONPath } from "jsonpath-plus";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";

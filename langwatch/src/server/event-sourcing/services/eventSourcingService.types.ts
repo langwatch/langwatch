@@ -1,4 +1,4 @@
-import type { createLogger } from "@langwatch/telemetry";
+import type { createLogger } from "@langwatch/observability";
 import type { ProcessRole } from "../../app-layer/config";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";

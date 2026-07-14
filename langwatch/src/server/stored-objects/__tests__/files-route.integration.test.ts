@@ -86,7 +86,7 @@ vi.mock("~/server/rateLimit", () => ({
 }));
 
 // Suppress logger noise
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

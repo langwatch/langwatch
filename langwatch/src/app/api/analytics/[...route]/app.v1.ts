@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";

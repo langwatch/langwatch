@@ -7,7 +7,7 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     error: vi.fn(),
     info: vi.fn(),

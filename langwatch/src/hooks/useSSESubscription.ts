@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { TRPCClientError } from "@trpc/client";
 import { useEffect, useRef, useState } from "react";
 import type { AppRouter } from "~/server/api/root";

@@ -1,4 +1,4 @@
-import type { Logger } from "@langwatch/telemetry";
+import type { Logger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import type { Cluster, Redis } from "ioredis";
 import { type ProcessRole, roleRunsWorkers } from "~/server/app-layer/config";

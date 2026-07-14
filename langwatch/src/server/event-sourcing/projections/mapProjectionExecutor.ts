@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Event } from "../domain/types";
 import type { MapProjectionDefinition } from "./mapProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";

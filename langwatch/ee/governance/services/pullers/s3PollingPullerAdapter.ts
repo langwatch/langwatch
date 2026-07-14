@@ -30,7 +30,7 @@ import {
   ListObjectsV2Command,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
 import {

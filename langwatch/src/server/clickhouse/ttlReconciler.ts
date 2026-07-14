@@ -1,6 +1,6 @@
 import { createClient } from "@clickhouse/client";
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { RETENTION_MANAGED_TABLES } from "../data-retention/retentionPolicy.schema";
 import { parseConnectionUrl } from "./goose";
 

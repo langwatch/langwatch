@@ -32,7 +32,7 @@ import {
   type GovernanceKpisSyncReactorDeps,
 } from "../governanceKpisSync.reactor";
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

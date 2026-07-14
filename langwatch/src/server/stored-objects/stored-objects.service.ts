@@ -7,7 +7,7 @@
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { Instance, Ksuid } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import {

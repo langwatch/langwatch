@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import { createHash } from "crypto";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";

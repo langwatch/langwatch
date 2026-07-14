@@ -9,7 +9,7 @@
  * @see specs/scenarios/scenario-failure-handler.feature
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { getApp } from "~/server/app-layer/app";

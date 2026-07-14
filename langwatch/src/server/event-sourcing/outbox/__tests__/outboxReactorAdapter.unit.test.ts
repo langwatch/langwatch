@@ -12,7 +12,7 @@ import {
 } from "../payload";
 import type { OutboxRuntime } from "../setup";
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

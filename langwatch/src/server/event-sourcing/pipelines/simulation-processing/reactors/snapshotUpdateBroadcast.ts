@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast.service";
 import type {
   ReactorContext,

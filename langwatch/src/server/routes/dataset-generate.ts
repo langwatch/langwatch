@@ -7,7 +7,7 @@
  * back to the client.
  */
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import {
   convertToModelMessages,
   smoothStream,

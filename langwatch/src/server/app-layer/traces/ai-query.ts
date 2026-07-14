@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { generateObject, generateText, type ModelMessage } from "ai";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";

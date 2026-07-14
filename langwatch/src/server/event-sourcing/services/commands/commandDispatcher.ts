@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import type { createLogger } from "@langwatch/telemetry";
+import type { createLogger } from "@langwatch/observability";
 import {
   incrementEsCommandTotal,
   observeEsCommandDuration,

@@ -1,4 +1,4 @@
-import type { createLogger } from "@langwatch/telemetry";
+import type { createLogger } from "@langwatch/observability";
 
 /**
  * Error categories for standardized error handling.

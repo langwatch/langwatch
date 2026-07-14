@@ -1,8 +1,8 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import {
   getStatusCodeFromError,
   logHttpRequest,
-} from "@langwatch/telemetry/request";
+} from "@langwatch/observability/request";
 import type { Context, Next } from "hono";
 import {
   createContextFromHono,

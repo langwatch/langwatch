@@ -1,5 +1,5 @@
 import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
 import type { SimulationTarget } from "../api/routers/scenarios";

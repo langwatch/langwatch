@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import { withJobContext } from "~/server/queues/withJobContext";

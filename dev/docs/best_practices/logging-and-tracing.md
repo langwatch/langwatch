@@ -5,7 +5,7 @@ See [ADR-003](../adr/003-logging.md) for architectural decisions.
 ## Creating Loggers
 
 ```typescript
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:my-module");
 
@@ -50,7 +50,7 @@ Context is automatically set up via `loggerMiddleware` in `trpc.ts`.
 ### Sending Context to Jobs
 
 ```typescript
-import { getJobContextMetadata } from "@langwatch/telemetry/context";
+import { getJobContextMetadata } from "@langwatch/observability/context";
 
 const metadata = getJobContextMetadata();
 await queue.add("process-trace", {
@@ -65,7 +65,7 @@ await queue.add("process-trace", {
 import {
   createContextFromJobData,
   runWithContext,
-} from "@langwatch/telemetry/context";
+} from "@langwatch/observability/context";
 
 worker.process(async (job) => {
   const ctx = createContextFromJobData(job.data.__context);
@@ -79,7 +79,7 @@ worker.process(async (job) => {
 ## Updating Context After Authentication
 
 ```typescript
-import { updateCurrentContext } from "@langwatch/telemetry/context";
+import { updateCurrentContext } from "@langwatch/observability/context";
 
 updateCurrentContext({
   userId: session.user.id,

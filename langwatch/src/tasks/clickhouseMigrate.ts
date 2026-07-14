@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { getPrivateClickHouseUrls } from "../server/clickhouse/clickhouseClient";
 import { runMigrations } from "../server/clickhouse/goose";
 import { reconcileTTL } from "../server/clickhouse/ttlReconciler";

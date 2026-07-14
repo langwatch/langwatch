@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { getClickHouseClientForOrganization, getClickHouseClientForProject } from "../../../src/server/clickhouse/clickhouseClient";
 
 const logger = createLogger("langwatch:billing:billableEventsQuery");

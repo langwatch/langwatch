@@ -7,7 +7,7 @@
  * (name, situation, criteria) from a user prompt.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { hasProjectPermission } from "~/server/api/rbac";

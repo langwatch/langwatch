@@ -1,5 +1,5 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import IORedis, { type Redis } from "ioredis";
 import { migrateUp } from "~/server/clickhouse/goose";
 import { toError } from "~/utils/posthogErrorCapture";

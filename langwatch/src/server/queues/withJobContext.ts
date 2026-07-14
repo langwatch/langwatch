@@ -3,7 +3,7 @@ import {
   type JobContextMetadata,
   type JobDataWithContext,
   runWithContext,
-} from "@langwatch/telemetry/context";
+} from "@langwatch/observability/context";
 import type { Job } from "bullmq";
 
 /**

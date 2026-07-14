@@ -21,7 +21,7 @@
  * warn level and keep the preview in place, marked via anyResolved=false on
  * the affected trace.
  */
-import type { Logger as PinoLogger } from "@langwatch/telemetry";
+import type { Logger as PinoLogger } from "@langwatch/observability";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
   BlobFieldNotFoundError,

@@ -4,7 +4,7 @@ import {
   mapProductSelectionToIntegrationMethod,
 } from "./productInterest";
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

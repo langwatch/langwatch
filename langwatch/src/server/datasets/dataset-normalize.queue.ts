@@ -21,7 +21,7 @@
  * the whole event-sourcing graph.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
 import { DatasetRepository } from "./dataset.repository";

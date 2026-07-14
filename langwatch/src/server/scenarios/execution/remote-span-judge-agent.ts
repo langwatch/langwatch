@@ -19,7 +19,7 @@ import {
   type JudgeAgentConfig,
   judgeAgent,
 } from "@langwatch/scenario";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { collectRemoteSpans } from "./remote-span-collector";
 import type { SpanQueryFn } from "./types";
 

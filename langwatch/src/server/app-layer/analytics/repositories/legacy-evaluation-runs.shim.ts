@@ -20,7 +20,7 @@
  * unflagged-eval-metric queries.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { buildTimeseriesQuery } from "~/server/analytics/clickhouse/aggregation-builder";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { TimeseriesInputType } from "~/server/analytics/registry";

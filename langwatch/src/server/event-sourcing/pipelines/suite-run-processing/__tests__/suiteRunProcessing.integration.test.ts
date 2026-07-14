@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { createTenantId } from "../../../";
 import {

@@ -5,7 +5,7 @@
  * for both the execute route (UI) and the run route (CI/CD API).
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Evaluator } from "@prisma/client";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";

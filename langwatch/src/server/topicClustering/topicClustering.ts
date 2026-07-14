@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { env } from "../../env.mjs";

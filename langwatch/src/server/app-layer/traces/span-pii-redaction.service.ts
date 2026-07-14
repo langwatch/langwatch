@@ -31,7 +31,7 @@ const STRICT_ONLY_PII_ENTITIES: readonly string[] =
     (entity) => !new Set<string>(ESSENTIAL_PII_ENTITIES).has(entity),
   );
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { featureFlagService } from "~/server/featureFlag";
 import {
   DEFAULT_PII_REDACTION_LEVEL,

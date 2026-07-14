@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Experiment, ExperimentType, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { z } from "zod";

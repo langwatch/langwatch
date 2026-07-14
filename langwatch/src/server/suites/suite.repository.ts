@@ -5,7 +5,7 @@
  * Uses the Repository pattern consistent with ScenarioRepository.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type {
   Prisma,

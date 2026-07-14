@@ -10,7 +10,7 @@
  * unchanged.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { collectUsageStats } from "~/server/collectUsageStats";
 import { prisma } from "~/server/db";

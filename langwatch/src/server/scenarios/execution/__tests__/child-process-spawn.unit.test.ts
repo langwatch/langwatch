@@ -28,7 +28,7 @@ vi.mock("fs", () => ({
 }));
 
 // Mock the logger so we can assert on log calls
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn(() => mockLogger),
 }));
 

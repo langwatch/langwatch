@@ -1,6 +1,6 @@
 import type { Readable } from "node:stream";
 import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type {
   Dataset,
   DatasetRecord,

@@ -12,7 +12,7 @@
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { type ChildProcess, spawn } from "child_process";
 import path from "path";
 import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";

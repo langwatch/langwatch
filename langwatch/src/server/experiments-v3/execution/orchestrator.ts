@@ -11,7 +11,7 @@
  */
 
 import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type {
   ComparisonEvaluatorConfig,

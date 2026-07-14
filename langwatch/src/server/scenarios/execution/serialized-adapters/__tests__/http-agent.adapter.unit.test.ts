@@ -13,14 +13,14 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 
-vi.mock("@langwatch/telemetry/tracing", () => ({
+vi.mock("@langwatch/observability/tracing", () => ({
   injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
     headers,
     traceId: undefined,
   })),
 }));
 
-import { injectTraceContextHeaders } from "@langwatch/telemetry/tracing";
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 const mockSsrfSafeFetch = vi.mocked(ssrfSafeFetch);

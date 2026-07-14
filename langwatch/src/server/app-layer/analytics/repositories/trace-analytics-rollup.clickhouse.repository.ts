@@ -12,7 +12,7 @@
  * Owns NO SQL — that's the builder's job.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";

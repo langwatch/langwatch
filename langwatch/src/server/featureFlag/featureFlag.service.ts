@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { checkFlagEnvOverride } from "./envOverride";
 import { FeatureFlagServiceMemory } from "./featureFlagService.memory";

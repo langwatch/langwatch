@@ -9,7 +9,7 @@
  */
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { zValidator } from "@hono/zod-validator";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
 import { streamSSE } from "hono/streaming";
 import { CompletionCopilot } from "monacopilot";

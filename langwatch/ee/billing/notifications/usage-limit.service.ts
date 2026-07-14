@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { env } from "../../../src/env.mjs";
 import type { OrganizationService } from "../../../src/server/app-layer/organizations/organization.service";
 import type { PlanProvider } from "../../../src/server/app-layer/subscription/plan-provider";

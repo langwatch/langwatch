@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { tenantIdFromGroupId } from "~/server/observability/tenantRateTracker";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { EventSourcedQueueProcessor } from "../queues/queue.types";

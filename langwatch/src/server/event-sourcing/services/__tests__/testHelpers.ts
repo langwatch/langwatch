@@ -1,4 +1,4 @@
-import type { Logger } from "@langwatch/telemetry";
+import type { Logger } from "@langwatch/observability";
 import { vi } from "vitest";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { EventType } from "../../domain/eventType";

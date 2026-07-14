@@ -1,5 +1,5 @@
 import { Button } from "@chakra-ui/react";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { useFormContext } from "react-hook-form";
 import { LuPencil } from "react-icons/lu";
 import { toaster } from "~/components/ui/toaster";

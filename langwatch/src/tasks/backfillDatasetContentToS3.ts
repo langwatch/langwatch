@@ -36,7 +36,7 @@
  * follow-up, not this rung).
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { type Dataset, Prisma, type PrismaClient } from "@prisma/client";
 import { StreamingChunkWriter } from "../server/datasets/dataset-chunk-writer";
 import { withDatasetLock } from "../server/datasets/dataset-lock";

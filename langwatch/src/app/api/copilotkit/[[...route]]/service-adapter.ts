@@ -4,7 +4,7 @@ import type {
   CopilotServiceAdapter,
 } from "@copilotkit/runtime";
 import { randomUUID } from "@copilotkit/shared";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type z from "zod";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";

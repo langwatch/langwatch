@@ -5,7 +5,7 @@
  * traces across async boundaries.
  *
  * Core context propagation and logger integration live in
- * `@langwatch/telemetry/context`; this app module only adds framework adapters.
+ * `@langwatch/observability/context`; this app module only adds framework adapters.
  *
  * @module asyncContext
  */
@@ -20,6 +20,6 @@ export {
   type RequestContext,
   runWithContext,
   updateCurrentContext,
-} from "@langwatch/telemetry/context";
+} from "@langwatch/observability/context";
 export { createContextFromHono } from "./adapters/hono";
 export { createContextFromTRPC } from "./adapters/trpc";

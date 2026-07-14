@@ -31,7 +31,7 @@ vi.mock("~/server/traces/trace-formatting", () => ({
     .mockReturnValue("Input: hello\nOutput: world"),
 }));
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

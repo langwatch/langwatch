@@ -11,7 +11,7 @@
  * shared S3 env vars (S3_ENDPOINT, S3_BUCKET_NAME, etc.).
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { prisma } from "./db";
 

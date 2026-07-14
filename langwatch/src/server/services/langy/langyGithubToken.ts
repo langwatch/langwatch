@@ -12,7 +12,7 @@
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { env } from "~/env.mjs";

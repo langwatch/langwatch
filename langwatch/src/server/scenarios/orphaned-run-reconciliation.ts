@@ -27,7 +27,7 @@
  * @see https://github.com/langwatch/langwatch/issues/3195
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { STALL_THRESHOLD_MS } from "./stall-detection";
 
 const logger = createLogger("langwatch:scenarios:orphan-reconciliation");

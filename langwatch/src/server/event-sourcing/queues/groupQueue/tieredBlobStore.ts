@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 
-import type { Logger } from "@langwatch/telemetry";
+import type { Logger } from "@langwatch/observability";
 
 import { COMMAND_INLINE_THRESHOLD } from "~/server/app-layer/traces/lean-for-projection";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";

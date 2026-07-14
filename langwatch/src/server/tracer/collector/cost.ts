@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { compileSafeRegex } from "../../../utils/safeRegex";
 import {

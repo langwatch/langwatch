@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import type { AppendStore } from "../mapProjection.types";

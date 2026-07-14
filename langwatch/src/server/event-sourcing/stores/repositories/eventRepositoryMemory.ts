@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const logger = createLogger("langwatch:event-sourcing:event-repository-memory");

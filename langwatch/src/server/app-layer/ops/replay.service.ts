@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import { env } from "~/env.mjs";
 import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";

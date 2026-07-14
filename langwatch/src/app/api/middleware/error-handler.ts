@@ -1,4 +1,4 @@
-import { INVALID_TRACE_ID } from "@langwatch/telemetry/constants";
+import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 

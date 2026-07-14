@@ -8,7 +8,7 @@
  * Run state is stored in Redis with TTL for automatic cleanup.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { connection } from "~/server/redis";
 import type { EvaluationV3Event, ExecutionSummary } from "./types";
 

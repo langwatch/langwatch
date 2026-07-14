@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { isSuiteSetId } from "../../../../suites/suite-set-id";
 import type {
   ReactorContext,

@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type {
   FeatureFlagEvaluateOptions,

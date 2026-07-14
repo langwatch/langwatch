@@ -29,7 +29,7 @@ vi.mock("../../../featureFlag", () => ({
   featureFlagService: { isEnabled: mockIsEnabled },
 }));
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

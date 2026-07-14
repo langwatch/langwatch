@@ -11,7 +11,7 @@
  * about flag-and-dispatch and the tripwire stays about comparison + logging.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { TimeseriesBucket, TimeseriesResult } from "~/server/analytics/types";
 import type { AnalyticsTable } from "../routing/route-table";
 

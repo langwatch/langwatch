@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import http from "http";
 import { register } from "prom-client";
 import { assertRedisReady } from "~/server/redis";

@@ -15,7 +15,7 @@
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { ScenarioExecutionPool } from "../../../../scenarios/execution/execution-pool";
 import type {
   ReactorContext,

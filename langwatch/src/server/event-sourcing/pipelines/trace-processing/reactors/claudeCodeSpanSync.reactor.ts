@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import {
   CLAUDE_CODE_EVENT_SCOPE,
   CLAUDE_CODE_PII_ATTR,

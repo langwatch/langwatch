@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";

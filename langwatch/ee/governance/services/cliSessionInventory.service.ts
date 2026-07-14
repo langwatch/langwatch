@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 /**
  * CliSessionInventoryService — read + revoke per-user CLI device-flow
  * sessions. Mirrors the macOS "Logged-in Devices" pattern: every active

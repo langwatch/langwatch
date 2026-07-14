@@ -10,7 +10,7 @@
  */
 
 import { zValidator } from "@hono/zod-validator";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";

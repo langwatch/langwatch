@@ -7,7 +7,7 @@
  * `query-builders/eval-rollup-timeseries-query.ts`.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";

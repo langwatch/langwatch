@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { ZodSchema, z } from "zod";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { CommandType } from "../domain/commandType";

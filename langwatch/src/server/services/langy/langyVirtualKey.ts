@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";

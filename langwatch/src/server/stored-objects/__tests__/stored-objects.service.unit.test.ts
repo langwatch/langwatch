@@ -38,7 +38,7 @@ vi.mock("~/server/metrics", () => ({
   storedObjectReadFailureCounter: { inc: vi.fn() },
 }));
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

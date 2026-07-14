@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { featureFlagService } from "../featureFlag";
 import { connection } from "../redis";
 import { AnomalyDetector } from "./anomalyDetector";

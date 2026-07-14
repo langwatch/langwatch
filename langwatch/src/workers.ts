@@ -7,7 +7,7 @@ import "dotenv/config";
 // so its side effects run before the worker modules below evaluate.
 import "./instrumentation.node";
 import { setEnvironment } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 
 setEnvironment(process.env.ENVIRONMENT ?? "local");

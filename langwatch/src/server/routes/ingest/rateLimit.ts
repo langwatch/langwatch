@@ -17,7 +17,7 @@
  * Spec: specs/ai-gateway/governance/receiver-auth-rate-limit.feature
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import { connection as defaultRedisConnection } from "~/server/redis";
 

@@ -32,7 +32,7 @@ export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
   [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
 } as const;
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { TeamUserRole } from "@prisma/client";
 import { env } from "~/env.mjs";
 import type { Session } from "~/server/auth";

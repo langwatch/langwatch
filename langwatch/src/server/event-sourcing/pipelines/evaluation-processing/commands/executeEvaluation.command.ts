@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { extractErrorMessage } from "../../../../../utils/captureError";
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,

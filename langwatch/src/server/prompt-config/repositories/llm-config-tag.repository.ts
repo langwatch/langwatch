@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Prisma, PrismaClient, PromptTag, PromptTagAssignment } from "@prisma/client";
 import { nanoid } from "nanoid";
 

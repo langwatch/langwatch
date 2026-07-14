@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";

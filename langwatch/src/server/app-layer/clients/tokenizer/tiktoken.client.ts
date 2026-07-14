@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import fs from "fs/promises";
 import path from "path";
 import type { TokenizerClient } from "./tokenizer.client";

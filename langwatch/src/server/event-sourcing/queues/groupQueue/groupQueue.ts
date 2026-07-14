@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import {
   context as otelContext,
   SpanKind,

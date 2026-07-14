@@ -59,7 +59,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
 }));
 
 // Suppress logger noise in test output
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

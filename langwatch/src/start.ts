@@ -66,7 +66,7 @@ async function loadDevHttpsCredentials(
   return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
 }
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 // Hono — unified API router
 import type { Hono } from "hono";
 import { register } from "prom-client";

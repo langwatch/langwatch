@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type { Prisma, PrismaClient, Scenario } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";

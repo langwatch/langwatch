@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { getModelById } from "../server/modelProviders/registry";
 
 const logger = createLogger("modelLimits");

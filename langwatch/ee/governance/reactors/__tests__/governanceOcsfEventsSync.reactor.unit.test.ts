@@ -44,7 +44,7 @@ import {
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "../governanceOcsfEventsSync.reactor";
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

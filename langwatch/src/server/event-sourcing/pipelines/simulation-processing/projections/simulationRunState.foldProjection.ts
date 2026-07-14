@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 import type { Projection } from "../../../";

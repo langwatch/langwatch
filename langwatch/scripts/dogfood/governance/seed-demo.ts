@@ -27,7 +27,7 @@
  * against a secondary demo org already in the allowlist.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import * as fs from "fs";
 import * as path from "path";

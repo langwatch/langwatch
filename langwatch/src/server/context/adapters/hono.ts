@@ -1,4 +1,4 @@
-import type { RequestContext } from "@langwatch/telemetry";
+import type { RequestContext } from "@langwatch/observability";
 import type { Context as HonoContext } from "hono";
 
 /**

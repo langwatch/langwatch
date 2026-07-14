@@ -30,7 +30,7 @@
  * and leaves everything else untouched ("degraded, not broken").
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { binaryInputPartSchema } from "./binary-part";

@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import type {

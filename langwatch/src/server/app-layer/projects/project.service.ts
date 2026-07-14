@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";

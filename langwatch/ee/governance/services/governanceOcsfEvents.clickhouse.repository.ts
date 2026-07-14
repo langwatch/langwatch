@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 /**
  * GovernanceOcsfEventsClickHouseRepository — write side of the
  * `governance_ocsf_events` fold projection. Each call inserts ONE

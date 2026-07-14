@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { TtlCache } from "~/server/utils/ttlCache";
 import {
   captureException,

@@ -16,7 +16,7 @@ const { mockQueryLogger, mockLogger } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: (name: string) =>
     name.includes("query") ? mockQueryLogger : mockLogger,
 }));

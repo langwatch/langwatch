@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
 import { env } from "../env.mjs";
 

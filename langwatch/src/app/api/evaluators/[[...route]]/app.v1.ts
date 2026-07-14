@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Prisma } from "@prisma/client";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";

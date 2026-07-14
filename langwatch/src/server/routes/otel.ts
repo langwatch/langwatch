@@ -13,7 +13,7 @@ import {
   stampIngestKeyProvenanceOnMetricRequest,
   stampIngestKeyProvenanceOnTraceRequest,
 } from "@ee/governance/services/ingestKeyProvenance.utils";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";

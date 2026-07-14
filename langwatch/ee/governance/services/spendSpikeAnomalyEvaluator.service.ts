@@ -33,7 +33,7 @@
  * are ee/-only).
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { AnomalyRule, Prisma, PrismaClient } from "@prisma/client";
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { AnomalyAlertDispatcherService } from "./activity-monitor/anomalyAlertDispatcher.service";

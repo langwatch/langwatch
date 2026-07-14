@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectsForCopy } from "~/hooks/useProjectsForCopy";
 import { api } from "~/utils/api";

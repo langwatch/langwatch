@@ -11,7 +11,7 @@
  * NOTE: The simple GET /api/health (204) is already handled in health.ts.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type {
   ESpanKind,
   IExportTraceServiceRequest,

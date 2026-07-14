@@ -24,7 +24,7 @@
  * repository is the only thing that speaks Prisma.
  */
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";

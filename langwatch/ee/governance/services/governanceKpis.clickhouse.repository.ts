@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 /**
  * GovernanceKpisClickHouseRepository — write side of the
  * `governance_kpis` fold projection. Each call inserts ONE row keyed

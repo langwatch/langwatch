@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 import type { AlertType } from "@prisma/client";
 import { Column, Link, Row, Section } from "@react-email/components";
 import { Container } from "@react-email/container";

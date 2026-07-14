@@ -7,7 +7,7 @@ const mockLogger = {
   debug: vi.fn(),
 };
 
-vi.mock("@langwatch/telemetry", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn(() => mockLogger),
 }));
 

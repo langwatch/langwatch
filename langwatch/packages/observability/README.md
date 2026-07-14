@@ -1,4 +1,4 @@
-# @langwatch/telemetry
+# @langwatch/observability
 
 Shared logging, request context, and trace-propagation utilities for LangWatch services.
 
@@ -7,7 +7,7 @@ Shared logging, request context, and trace-propagation utilities for LangWatch s
 Use the same import in browser and Node.js code:
 
 ```ts
-import { createLogger } from "@langwatch/telemetry";
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("my-service");
 logger.info("hello");
@@ -33,7 +33,7 @@ import {
   getCurrentContext,
   runWithContext,
   updateCurrentContext,
-} from "@langwatch/telemetry/context";
+} from "@langwatch/observability/context";
 
 runWithContext({ organizationId: "org-1", projectId: "project-1" }, () => {
   logger.info("processing request");
@@ -51,7 +51,7 @@ OpenTelemetry helpers are also isolated from the browser-safe package root:
 import {
   getActiveTraceId,
   injectTraceContextHeaders,
-} from "@langwatch/telemetry/tracing";
+} from "@langwatch/observability/tracing";
 
 const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
 ```
@@ -59,7 +59,7 @@ const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
 ## HTTP request logging
 
 ```ts
-import { getStatusCodeFromError, logHttpRequest } from "@langwatch/telemetry";
+import { getStatusCodeFromError, logHttpRequest } from "@langwatch/observability";
 
 logHttpRequest(logger, {
   method: "GET",
