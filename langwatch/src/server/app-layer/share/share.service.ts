@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ShareLink, ShareVisibility } from "@prisma/client";
+import type { Prisma, ShareLink, ShareVisibility } from "@prisma/client";
 import type { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
 import type {
   ShareRepository,
@@ -246,16 +246,16 @@ export class ShareService {
     // signing step and the database write is not consumed either.
     let grant: ReturnType<typeof signShareGrant>;
     try {
-      grant = signShareGrant(
-        {
+      grant = signShareGrant({
+        claims: {
           share_id: share.id,
           project_id: share.projectId,
           resource_type: share.resourceType,
           resource_id: share.resourceId,
           thread_id: share.threadId,
         },
-        share.expiresAt,
-      );
+        shareExpiresAt: share.expiresAt,
+      });
     } catch (error) {
       if (error instanceof ShareGrantExpiredError) {
         return { status: "expired" };
@@ -310,21 +310,30 @@ export class ShareService {
       projectId: params.projectId,
       resourceType: params.resourceType,
       resourceId: params.resourceId,
-      operation: () => this.createShareWithinLock(params),
+      operation: ({ transaction }) =>
+        this.createShareWithinLock({ params, transaction }),
     });
   }
 
   private async createShareWithinLock({
-    projectId,
-    resourceType,
-    resourceId,
-    threadId,
-    visibility,
-    expiresAt,
-    maxViews,
-    userId,
-  }: CreateShareParams): Promise<ShareLink> {
-    const share = await this.repo.create({
+    params: {
+      projectId,
+      resourceType,
+      resourceId,
+      threadId,
+      visibility,
+      expiresAt,
+      maxViews,
+      userId,
+    },
+    transaction,
+  }: {
+    params: CreateShareParams;
+    transaction: Prisma.TransactionClient;
+  }): Promise<ShareLink> {
+    const repo = this.repo.withTransaction(transaction);
+    const pinnedTraces = this.pinnedTraces.withTransaction(transaction);
+    const share = await repo.create({
       token: generateShareToken(),
       projectId,
       resourceType,
@@ -340,13 +349,13 @@ export class ShareService {
       try {
         // Idempotent (upsert): keeps the trace pinned while it is shared,
         // without clobbering a pre-existing manual pin.
-        await this.pinnedTraces.autoPin({ projectId, traceId: resourceId });
+        await pinnedTraces.autoPin({ projectId, traceId: resourceId });
       } catch (error) {
         logger.error(
           { projectId, traceId: resourceId, error },
           "Failed to auto-pin trace on share",
         );
-        await this.repo.deleteById({ id: share.id, projectId });
+        // Throwing rolls the transaction back, including the new share row.
         throw error;
       }
     }
@@ -369,24 +378,29 @@ export class ShareService {
       projectId,
       resourceType: share.resourceType,
       resourceId: share.resourceId,
-      operation: () => this.revokeByIdWithinLock({ id, projectId }),
+      operation: ({ transaction }) =>
+        this.revokeByIdWithinLock({ id, projectId, transaction }),
     });
   }
 
   private async revokeByIdWithinLock({
     id,
     projectId,
+    transaction,
   }: {
     id: string;
     projectId: string;
+    transaction: Prisma.TransactionClient;
   }): Promise<void> {
-    const share = await this.repo.findById(id);
+    const repo = this.repo.withTransaction(transaction);
+    const pinnedTraces = this.pinnedTraces.withTransaction(transaction);
+    const share = await repo.findById(id);
     if (!share || share.projectId !== projectId) return;
 
-    await this.repo.deleteById({ id, projectId });
+    await repo.deleteById({ id, projectId });
 
     if (share.resourceType === "TRACE") {
-      const isStillShared = await this.repo.hasActiveShareForResource({
+      const isStillShared = await repo.hasActiveShareForResource({
         projectId,
         resourceType: "TRACE",
         resourceId: share.resourceId,
@@ -395,7 +409,7 @@ export class ShareService {
         // Best-effort: the link is already revoked (the user's intent); a
         // failed unpin only leaves an orphan pin annotation, which is logged.
         try {
-          await this.pinnedTraces.autoUnpin({
+          await pinnedTraces.autoUnpin({
             projectId,
             traceId: share.resourceId,
           });
@@ -406,13 +420,13 @@ export class ShareService {
           );
         }
 
-        const hasReplacement = await this.repo.hasActiveShareForResource({
+        const hasReplacement = await repo.hasActiveShareForResource({
           projectId,
           resourceType: "TRACE",
           resourceId: share.resourceId,
         });
         if (hasReplacement) {
-          await this.pinnedTraces.autoPin({
+          await pinnedTraces.autoPin({
             projectId,
             traceId: share.resourceId,
           });
@@ -435,8 +449,13 @@ export class ShareService {
       projectId,
       resourceType,
       resourceId,
-      operation: () =>
-        this.unshareWithinLock({ projectId, resourceType, resourceId }),
+      operation: ({ transaction }) =>
+        this.unshareWithinLock({
+          projectId,
+          resourceType,
+          resourceId,
+          transaction,
+        }),
     });
   }
 
@@ -444,16 +463,20 @@ export class ShareService {
     projectId,
     resourceType,
     resourceId,
+    transaction,
   }: {
     projectId: string;
     resourceType: ShareResourceType;
     resourceId: string;
+    transaction: Prisma.TransactionClient;
   }): Promise<void> {
+    const repo = this.repo.withTransaction(transaction);
+    const pinnedTraces = this.pinnedTraces.withTransaction(transaction);
     // Auto-unpin first so a failure leaves the shares intact (consistent with
-    // createShare rollback).
+    // the transactional createShare rollback).
     if (resourceType === "TRACE") {
       try {
-        await this.pinnedTraces.autoUnpin({ projectId, traceId: resourceId });
+        await pinnedTraces.autoUnpin({ projectId, traceId: resourceId });
       } catch (error) {
         logger.error(
           { projectId, traceId: resourceId, error },
@@ -463,7 +486,7 @@ export class ShareService {
       }
     }
 
-    await this.repo.deleteByResource({ projectId, resourceType, resourceId });
+    await repo.deleteByResource({ projectId, resourceType, resourceId });
   }
 
   async revokeAllTraceShares(projectId: string): Promise<void> {

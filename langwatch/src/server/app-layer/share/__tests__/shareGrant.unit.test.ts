@@ -24,7 +24,7 @@ beforeAll(() => {
 describe("share grant", () => {
   describe("given a grant signed by this deployment", () => {
     it("round-trips the claims", () => {
-      const { jwt: token } = signShareGrant(claims);
+      const { jwt: token } = signShareGrant({ claims });
 
       expect(verifyShareGrant(token)).toEqual(claims);
     });
@@ -35,7 +35,7 @@ describe("share grant", () => {
         thread_id: "conversation_1",
       };
 
-      const { jwt: token } = signShareGrant(threadedClaims);
+      const { jwt: token } = signShareGrant({ claims: threadedClaims });
 
       expect(verifyShareGrant(token)).toEqual(threadedClaims);
     });
@@ -43,7 +43,7 @@ describe("share grant", () => {
 
   describe("given a tampered grant", () => {
     it("rejects a grant whose payload was edited", () => {
-      const { jwt: token } = signShareGrant(claims);
+      const { jwt: token } = signShareGrant({ claims });
       const [header, _payload, signature] = token.split(".");
       const forged = Buffer.from(
         JSON.stringify({ ...claims, resource_id: "trace_b" }),
@@ -89,15 +89,18 @@ describe("share grant", () => {
     });
 
     it("refuses to mint a grant for an expired share", () => {
-      expect(() => signShareGrant(claims, new Date())).toThrow(
-        "Cannot sign a share grant for an expired share",
-      );
+      expect(() =>
+        signShareGrant({ claims, shareExpiresAt: new Date() }),
+      ).toThrow("Cannot sign a share grant for an expired share");
     });
 
     it("refuses to mint a grant for an immediately expiring share", () => {
-      expect(() => signShareGrant(claims, new Date(Date.now() + 500))).toThrow(
-        "Cannot sign a share grant for an expired share",
-      );
+      expect(() =>
+        signShareGrant({
+          claims,
+          shareExpiresAt: new Date(Date.now() + 500),
+        }),
+      ).toThrow("Cannot sign a share grant for an expired share");
     });
   });
 
@@ -105,7 +108,7 @@ describe("share grant", () => {
     it("caps the grant expiry at the share expiry", () => {
       const shareExpiresAt = new Date(Date.now() + 30_000);
 
-      const grant = signShareGrant(claims, shareExpiresAt);
+      const grant = signShareGrant({ claims, shareExpiresAt });
 
       expect(grant.expiresAt).toBeLessThanOrEqual(
         Math.floor(shareExpiresAt.getTime() / 1000),
@@ -139,7 +142,7 @@ describe("share grant", () => {
    */
   describe("reading the grant back from a Cookie header", () => {
     it("round-trips a grant issued via buildShareGrantCookie", () => {
-      const { jwt: token } = signShareGrant(claims);
+      const { jwt: token } = signShareGrant({ claims });
       // A Set-Cookie value's first pair is the cookie; a request Cookie header
       // carries just the name=value pairs.
       const cookieHeader = `${SHARE_GRANT_COOKIE}=${token}`;
@@ -148,7 +151,7 @@ describe("share grant", () => {
     });
 
     it("finds the grant among other cookies", () => {
-      const { jwt: token } = signShareGrant(claims);
+      const { jwt: token } = signShareGrant({ claims });
       const header = `foo=bar; ${SHARE_GRANT_COOKIE}=${token}; baz=qux`;
 
       expect(readShareGrantFromCookieHeader(header)).toEqual(claims);

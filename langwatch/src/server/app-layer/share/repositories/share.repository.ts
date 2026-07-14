@@ -1,4 +1,5 @@
 import type {
+  Prisma,
   ShareResourceType as PrismaShareResourceType,
   ShareLink,
   ShareVisibility,
@@ -31,6 +32,9 @@ export interface CreateShareLinkParams {
 }
 
 export interface ShareRepository {
+  /** Return a repository bound to the advisory-lock transaction. */
+  withTransaction(transaction: Prisma.TransactionClient): ShareRepository;
+
   /** Resolve a share by its secret token — the anonymous read path. Includes
    *  the project context needed to gate on the sharing kill switch and audience. */
   findByToken(token: string): Promise<ShareWithProject | null>;

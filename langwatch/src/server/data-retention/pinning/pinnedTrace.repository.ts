@@ -1,4 +1,9 @@
-import { type PinnedTrace, PinSource, type PrismaClient } from "@prisma/client";
+import {
+  type PinnedTrace,
+  PinSource,
+  type Prisma,
+  type PrismaClient,
+} from "@prisma/client";
 
 interface CreatePinnedTraceParams {
   projectId: string;
@@ -9,7 +14,15 @@ interface CreatePinnedTraceParams {
 }
 
 export class PinnedTraceRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient | Prisma.TransactionClient,
+  ) {}
+
+  withTransaction(
+    transaction: Prisma.TransactionClient,
+  ): PinnedTraceRepository {
+    return new PinnedTraceRepository(transaction);
+  }
 
   async findByProjectAndTrace({
     projectId,

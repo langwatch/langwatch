@@ -23,6 +23,9 @@ describe("PrismaShareLifecycleLocker", () => {
 
       expect(result).toBe("done");
       expect(operation).toHaveBeenCalledOnce();
+      expect(operation).toHaveBeenCalledWith({
+        transaction: expect.objectContaining({ $executeRaw: executeRaw }),
+      });
       expect(executeRaw.mock.calls[0]?.[1]).toBe(
         "share:project_1:TRACE:trace_1",
       );

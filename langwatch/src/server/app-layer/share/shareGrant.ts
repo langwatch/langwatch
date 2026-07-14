@@ -40,10 +40,13 @@ function getSecret(): string {
   return secret;
 }
 
-export function signShareGrant(
-  claims: ShareGrantClaims,
-  shareExpiresAt?: Date | null,
-): {
+export function signShareGrant({
+  claims,
+  shareExpiresAt,
+}: {
+  claims: ShareGrantClaims;
+  shareExpiresAt?: Date | null;
+}): {
   jwt: string;
   expiresAt: number;
 } {

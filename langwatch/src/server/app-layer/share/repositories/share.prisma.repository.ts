@@ -1,4 +1,4 @@
-import type { PrismaClient, ShareLink } from "@prisma/client";
+import type { Prisma, PrismaClient, ShareLink } from "@prisma/client";
 import type {
   CreateShareLinkParams,
   ShareRepository,
@@ -21,7 +21,15 @@ const projectInclude = {
 } as const;
 
 export class PrismaShareRepository implements ShareRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient | Prisma.TransactionClient,
+  ) {}
+
+  withTransaction(
+    transaction: Prisma.TransactionClient,
+  ): PrismaShareRepository {
+    return new PrismaShareRepository(transaction);
+  }
 
   async findByToken(token: string): Promise<ShareWithProject | null> {
     return this.prisma.shareLink.findUnique({

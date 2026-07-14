@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
 import type {
@@ -9,6 +10,7 @@ import { ShareService, type ShareViewer } from "../share.service";
 
 const ORG_ID = "org_1";
 const PROJECT_ID = "project_1";
+const LIFECYCLE_TRANSACTION = {} as Prisma.TransactionClient;
 
 function buildShare(
   overrides: Partial<ShareWithProject> = {},
@@ -62,7 +64,7 @@ function buildSerialLifecycleLocker(): ShareLifecycleLocker {
       tails.set(key, current);
       await previous;
       try {
-        return await operation();
+        return await operation({ transaction: LIFECYCLE_TRANSACTION });
       } finally {
         release();
         if (tails.get(key) === current) tails.delete(key);
@@ -73,11 +75,15 @@ function buildSerialLifecycleLocker(): ShareLifecycleLocker {
 
 describe("ShareService", () => {
   let repo: ShareRepository;
-  let pinnedTraces: Pick<PinnedTraceService, "autoUnpin" | "autoPin">;
+  let pinnedTraces: Pick<
+    PinnedTraceService,
+    "autoUnpin" | "autoPin" | "withTransaction"
+  >;
   let service: ShareService;
 
   beforeEach(() => {
     repo = {
+      withTransaction: vi.fn().mockImplementation(() => repo),
       findByToken: vi.fn(),
       findById: vi.fn(),
       listByResource: vi.fn(),
@@ -90,6 +96,9 @@ describe("ShareService", () => {
       deleteAllTraceShares: vi.fn(),
     } as unknown as ShareRepository;
     pinnedTraces = {
+      withTransaction: vi
+        .fn()
+        .mockImplementation(() => pinnedTraces as PinnedTraceService),
       autoUnpin: vi.fn().mockResolvedValue(undefined),
       autoPin: vi.fn().mockResolvedValue(undefined),
     };
@@ -332,7 +341,7 @@ describe("ShareService", () => {
       });
     });
 
-    describe("given a public link", () => {
+    describe("when the link is public", () => {
       /** @scenario A public link resolves for an anonymous viewer */
       it("grants an anonymous viewer and consumes one view", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
@@ -497,7 +506,7 @@ describe("ShareService", () => {
       });
     });
 
-    describe("given a link with no expiry or view cap", () => {
+    describe("when the link has no expiry or view cap", () => {
       /** @scenario A link with no expiry and no view cap resolves indefinitely */
       it("grants every resolution", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
@@ -533,6 +542,10 @@ describe("ShareService", () => {
 
       const created = vi.mocked(repo.create).mock.calls[0]![0];
       expect(created.token).toMatch(/^[0-9A-Za-z]{32}$/);
+      expect(repo.withTransaction).toHaveBeenCalledWith(LIFECYCLE_TRANSACTION);
+      expect(pinnedTraces.withTransaction).toHaveBeenCalledWith(
+        LIFECYCLE_TRANSACTION,
+      );
       expect(pinnedTraces.autoPin).toHaveBeenCalledWith({
         projectId: PROJECT_ID,
         traceId: "trace_a",
@@ -566,7 +579,7 @@ describe("ShareService", () => {
       expect(repo.create).toHaveBeenCalledTimes(2);
     });
 
-    it("rolls the link back when auto-pinning fails", async () => {
+    it("rolls the transaction back when auto-pinning fails", async () => {
       vi.mocked(repo.create).mockResolvedValue({ id: "share_1" } as never);
       vi.mocked(pinnedTraces.autoPin).mockRejectedValue(new Error("boom"));
 
@@ -578,10 +591,7 @@ describe("ShareService", () => {
         }),
       ).rejects.toThrow("boom");
 
-      expect(repo.deleteById).toHaveBeenCalledWith({
-        id: "share_1",
-        projectId: PROJECT_ID,
-      });
+      expect(repo.deleteById).not.toHaveBeenCalled();
     });
   });
 

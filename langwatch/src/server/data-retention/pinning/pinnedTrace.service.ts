@@ -1,4 +1,4 @@
-import { type PinnedTrace, PinSource } from "@prisma/client";
+import { type PinnedTrace, PinSource, type Prisma } from "@prisma/client";
 import type { PinnedTraceRepository } from "./pinnedTrace.repository";
 
 interface PinTraceParams {
@@ -36,8 +36,16 @@ export type HasActiveShareForTrace = (params: {
 export class PinnedTraceService {
   constructor(
     private readonly repository: PinnedTraceRepository,
-    private readonly hasActiveShareForTrace: HasActiveShareForTrace = async () => false,
+    private readonly hasActiveShareForTrace: HasActiveShareForTrace = async () =>
+      false,
   ) {}
+
+  withTransaction(transaction: Prisma.TransactionClient): PinnedTraceService {
+    return new PinnedTraceService(
+      this.repository.withTransaction(transaction),
+      this.hasActiveShareForTrace,
+    );
+  }
 
   async pin(params: PinTraceParams): Promise<PinnedTrace> {
     return this.repository.create({
