@@ -408,6 +408,11 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/traces")),
       },
       {
+        // SPIKE #5670 — read-only tenant-isolated trace query surface.
+        path: "/:project/trace-query",
+        ...page(() => import("./pages/[project]/trace-query")),
+      },
+      {
         path: "/:project/messages/:trace",
         ...page(() => import("./pages/[project]/messages/[trace]/index")),
       },

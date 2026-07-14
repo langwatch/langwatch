@@ -72,6 +72,7 @@ import { subscriptionRouter } from "./routers/subscription";
 import { suiteRouter } from "./routers/suites";
 import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
+import { traceQueryRouter } from "./routers/traceQuery";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
@@ -88,6 +89,7 @@ const coreRouters = {
   team: teamRouter,
   traces: tracesRouter,
   tracesV2: tracesV2Router,
+  traceQuery: traceQueryRouter,
   spans: spansRouter,
   analytics: analyticsRouter,
   monitors: monitorsRouter,
