@@ -402,7 +402,10 @@ export function HomePageBanners() {
 		}
 	});
 
-	if (!hasMounted || eligible.length === 0 || !slide) return null;
+	// Nothing renders until the project resolves: the snooze map is keyed per
+	// project, so before `projectId` exists every slide would look eligible —
+	// snoozed users would see a flash, and the CTA would push /undefined/...
+	if (!hasMounted || !projectId || eligible.length === 0 || !slide) return null;
 
 	const dismiss = (slideToHide: Slide) => {
 		if (projectId) snoozeSlide(slideToHide, projectId);

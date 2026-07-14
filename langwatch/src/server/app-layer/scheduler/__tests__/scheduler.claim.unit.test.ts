@@ -90,6 +90,7 @@ describe("PrismaScheduledJobRepository.settleClaim", () => {
           expectedLease: leaseUntil,
           nextRunAt,
           lastSlot: slot,
+          currentSlot: null, // delivered — no slot in flight any more
           attempts: 0,
           lastError: null,
         });
@@ -118,12 +119,14 @@ describe("PrismaScheduledJobRepository.settleClaim", () => {
 
         const leaseUntil = new Date("2026-07-13T09:10:00.000Z");
         const retryAt = new Date("2026-07-13T09:01:00.000Z");
+        const slot = new Date("2026-07-13T09:00:00.000Z");
         const settled = await repo.settleClaim({
           id: "job-1",
           projectId: "project-1",
           expectedLease: leaseUntil,
           nextRunAt: retryAt,
           lastSlot: null, // never delivered — stays null
+          currentSlot: slot, // the retry re-fires THIS calendar instant
           attempts: 1,
           lastError: "boom",
         });
@@ -132,6 +135,7 @@ describe("PrismaScheduledJobRepository.settleClaim", () => {
         const args = executeRaw.mock.calls[0];
         expect(args).toContain(toPg(leaseUntil));
         expect(args).toContain(toPg(retryAt));
+        expect(args).toContain(toPg(slot)); // the pinned in-flight slot
         expect(args).toContain(1); // attempts bumped
         expect(args).toContain("boom"); // lastError recorded
         // lastSlot bound as null (SQL NULL), not a timestamp literal.
@@ -155,6 +159,7 @@ describe("PrismaScheduledJobRepository.settleClaim", () => {
           expectedLease: new Date("2026-07-13T09:10:00.000Z"),
           nextRunAt: new Date("2026-07-20T09:00:00.000Z"),
           lastSlot: new Date("2026-07-13T09:00:00.000Z"),
+          currentSlot: null,
           attempts: 0,
           lastError: null,
         });

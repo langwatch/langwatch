@@ -316,10 +316,14 @@ describe("AutomationDrawer", () => {
   describe("given the trace subject is edited inline", () => {
     describe("when a filter query is typed", () => {
       it("records it on the draft filterQuery without opening a secondary", async () => {
+        const user = userEvent.setup();
         renderDrawer();
 
         // The subject facet is inline now — a fresh trace automation authors a
-        // Traces-V2 query on the main pane (no "When" secondary to open).
+        // Traces-V2 query on the main pane (no "When" secondary to open). The
+        // Builder is the default surface; the raw-query input lives behind the
+        // Code toggle.
+        await user.click(await screen.findByRole("button", { name: "Code" }));
         const input = await screen.findByPlaceholderText(/status:error/i);
         fireEvent.change(input, { target: { value: "status:error" } });
 
@@ -486,7 +490,7 @@ describe("AutomationDrawer", () => {
         expect(useAutomationStore.getState().draft.filterQuery).toBe(
           "status:error",
         );
-        expect(screen.getByText("Edit report")).toBeInTheDocument();
+        expect(screen.getByText("Edit schedule")).toBeInTheDocument();
       });
 
       it("hydrates a graph-source report without stranding a graph alert", async () => {
@@ -517,7 +521,7 @@ describe("AutomationDrawer", () => {
         renderDrawer({ automationId: "trigger-1" });
 
         const saveButton = await screen.findByRole("button", {
-          name: "Save report",
+          name: "Save schedule",
         });
         await waitFor(() => expect(saveButton).toBeEnabled());
         await user.click(saveButton);
@@ -550,7 +554,7 @@ describe("AutomationDrawer", () => {
         renderDrawer({ automationId: "trigger-1" });
 
         const saveButton = await screen.findByRole("button", {
-          name: "Save report",
+          name: "Save schedule",
         });
         await waitFor(() => expect(saveButton).toBeEnabled());
         await user.click(saveButton);
@@ -581,7 +585,7 @@ describe("AutomationDrawer", () => {
           );
         });
         expect(
-          await screen.findByRole("button", { name: "Save report" }),
+          await screen.findByRole("button", { name: "Save schedule" }),
         ).toBeDisabled();
         // And says why, in the cadence field itself.
         expect(
@@ -597,6 +601,8 @@ describe("AutomationDrawer", () => {
         const user = userEvent.setup();
         renderDrawer();
 
+        // The raw-query input lives behind the Code toggle (Builder default).
+        await user.click(await screen.findByRole("button", { name: "Code" }));
         const input = await screen.findByPlaceholderText(/status:error/i);
         fireEvent.change(input, { target: { value: "status:error" } });
         await waitFor(() => {
@@ -605,7 +611,7 @@ describe("AutomationDrawer", () => {
           );
         });
 
-        await user.click(screen.getByRole("button", { name: /^Report/ }));
+        await user.click(screen.getByRole("button", { name: /^Schedule/ }));
 
         await waitFor(() => {
           expect(useAutomationStore.getState().draft.source).toBe("report");

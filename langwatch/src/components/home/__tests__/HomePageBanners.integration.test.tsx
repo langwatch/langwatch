@@ -36,7 +36,10 @@ vi.mock("~/components/ui/link", () => ({
   ),
 }));
 
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { HomePageBanners } from "../HomePageBanners";
+
+const useOrganizationTeamProjectMock = vi.mocked(useOrganizationTeamProject);
 
 const VOICE_KEY = "langwatch:voice-agents-home-banner-dismissed:v1:project-1";
 const AUTOMATIONS_KEY =
@@ -52,6 +55,9 @@ describe("<HomePageBanners />", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    useOrganizationTeamProjectMock.mockReturnValue({
+      project: { id: "project-1", slug: "my-project" },
+    } as ReturnType<typeof useOrganizationTeamProject>);
   });
 
   afterEach(() => {
@@ -87,6 +93,24 @@ describe("<HomePageBanners />", () => {
     // One eligible banner → no carousel dots.
     expect(
       screen.queryByRole("button", { name: /Show announcement/ }),
+    ).toBeNull();
+  });
+
+  it("renders nothing before the project id resolves", () => {
+    // Before the project resolves the per-project snooze map can't be read,
+    // so every slide would look eligible — a snoozed user would see a flash
+    // and the automations CTA would push /undefined/automations.
+    useOrganizationTeamProjectMock.mockReturnValue({
+      project: undefined,
+    } as ReturnType<typeof useOrganizationTeamProject>);
+    renderWithProviders(<HomePageBanners />);
+    expect(
+      screen.queryByRole("heading", { name: "React the moment it matters" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("heading", {
+        name: "Voice agent simulations are here",
+      }),
     ).toBeNull();
   });
 

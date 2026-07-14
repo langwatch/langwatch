@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import type { Cluster, Redis } from "ioredis";
-import type { ProcessRole } from "../config";
+import { type ProcessRole, roleRunsWorkers } from "../config";
 import type { Logger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { computeNextRunAt } from "./nextRunAt";
@@ -100,8 +100,9 @@ export interface SchedulerServiceDeps {
  * and a crash mid-fire re-fires the slot when the lease expires — a failed slot
  * is never silently lost. Durability is the durable `ScheduledJob` row.
  *
- * Worker-only: `start()` no-ops on any other `processRole`, so it is safe to
- * wire into shared bootstrap without role gating (mirrors
+ * Worker-stack-only: `start()` no-ops unless the role runs the worker stack
+ * (`roleRunsWorkers`: "worker" AND the dev single-process "all" role), so it
+ * is safe to wire into shared bootstrap without role gating (mirrors
  * `OutboxHeartbeatScheduler`).
  *
  * Cross-pod early-wake is BEST-EFFORT via Redis pub/sub (optional `redis` dep):
@@ -163,12 +164,12 @@ export class SchedulerService {
     this.wakeCurrentSleep?.();
   }
 
-  /** Start the loop. No-op outside the worker role; idempotent. */
+  /** Start the loop. No-op for roles without the worker stack; idempotent. */
   start(): void {
-    if (this.processRole !== "worker") {
+    if (!roleRunsWorkers(this.processRole)) {
       this.logger.debug(
         { processRole: this.processRole },
-        "SchedulerService.start: non-worker role, skipping",
+        "SchedulerService.start: role does not run the worker stack, skipping",
       );
       return;
     }
@@ -326,8 +327,16 @@ export class SchedulerService {
     job: ScheduledJobRecord;
     now: Date;
   }): Promise<void> {
-    // The calendar instant coming due — the value we condition the lease on.
-    const slot = job.nextRunAt;
+    // The calendar instant being fired. On a fresh slot this is `nextRunAt`;
+    // on a RETRY wake or a crash-refire, `nextRunAt` is a backoff/lease
+    // instant, and the real slot identity lives in `currentSlot` (pinned by
+    // the first claim). Without this split a retried daily report would hand
+    // its handler the backoff instant and `reportWindowMs` would collapse the
+    // report window to minutes.
+    const slot = job.currentSlot ?? job.nextRunAt;
+    // The lease is still conditioned on the row's CURRENT wake instant — that
+    // is what `findDue` read and what a racing worker would also condition on.
+    const claimAt = job.nextRunAt;
 
     // The next cron instant strictly after the DELIVERED slot, in the job's own
     // zone (DST-correct). Computed up front for TWO jobs: (a) it detects a
@@ -376,7 +385,7 @@ export class SchedulerService {
     const won = await this.repo.claim({
       id: job.id,
       projectId: job.projectId,
-      expectedNextRunAt: slot,
+      expectedNextRunAt: claimAt,
       leaseUntil,
     });
     if (!won) {
@@ -403,6 +412,7 @@ export class SchedulerService {
         leaseUntil,
         nextRunAt: nextSlot,
         lastSlot: job.lastSlot,
+        currentSlot: null,
         attempts: 0,
         lastError: null,
         context: "release-unknown-handler",
@@ -436,6 +446,7 @@ export class SchedulerService {
       leaseUntil,
       nextRunAt: nextSlot,
       lastSlot: slot,
+      currentSlot: null,
       attempts: 0,
       lastError: null,
       context: "delivered",
@@ -492,6 +503,7 @@ export class SchedulerService {
         leaseUntil,
         nextRunAt: retryAt,
         lastSlot: job.lastSlot, // unchanged — the slot is retried, not delivered
+        currentSlot: slot, // pin the calendar slot the retry must re-fire
         attempts: attempts + 1,
         lastError: message,
         context: "retry",
@@ -526,6 +538,7 @@ export class SchedulerService {
       leaseUntil,
       nextRunAt: nextSlot,
       lastSlot: job.lastSlot, // unchanged — the slot was never delivered
+      currentSlot: null, // the slot is abandoned; the next fire is a fresh one
       attempts: 0,
       lastError: message,
       context: "abandon",
@@ -549,6 +562,7 @@ export class SchedulerService {
     leaseUntil,
     nextRunAt,
     lastSlot,
+    currentSlot,
     attempts,
     lastError,
     context,
@@ -557,6 +571,7 @@ export class SchedulerService {
     leaseUntil: Date;
     nextRunAt: Date;
     lastSlot: Date | null;
+    currentSlot: Date | null;
     attempts: number;
     lastError: string | null;
     context: string;
@@ -567,6 +582,7 @@ export class SchedulerService {
       expectedLease: leaseUntil,
       nextRunAt,
       lastSlot,
+      currentSlot,
       attempts,
       lastError,
     });

@@ -55,6 +55,7 @@ function makeJob(overrides: Partial<ScheduledJobRecord> = {}): ScheduledJobRecor
     timezone: TZ,
     nextRunAt: SLOT,
     lastSlot: null,
+    currentSlot: null,
     attempts: 0,
     lastError: null,
     active: true,
@@ -260,6 +261,71 @@ describe("SchedulerService lease-and-retry (ADR-044 P1)", () => {
         expect(settle.lastSlot?.getTime()).toBe(SLOT.getTime()); // DELIVERED
         expect(settle.attempts).toBe(0); // retry state cleared
         expect(settle.lastError).toBeNull();
+      });
+    });
+  });
+
+  describe("given a fresh slot whose handler throws", () => {
+    describe("when the retry policy settles", () => {
+      it("pins the calendar slot in currentSlot so the retry re-fires the same instant", async () => {
+        const { logger } = makeLogger();
+        const job = makeJob({ attempts: 0 });
+        const { settleClaim } = await runOneFire({
+          job,
+          logger,
+          handler: async () => {
+            throw new Error("transient provider 503");
+          },
+        });
+
+        const settle = settleClaim.mock.calls[0]![0] as {
+          currentSlot: Date | null;
+        };
+        expect(settle.currentSlot?.getTime()).toBe(SLOT.getTime());
+      });
+    });
+  });
+
+  describe("given a retry wake whose nextRunAt is the backoff instant", () => {
+    describe("when the loop re-fires it", () => {
+      it("hands the handler the ORIGINAL cron slot, not the backoff instant, and stamps lastSlot with it on success", async () => {
+        const { logger } = makeLogger();
+        // The first attempt failed at SLOT; the retry settle re-armed
+        // nextRunAt at a one-minute backoff and pinned currentSlot = SLOT.
+        // Without the pin, this fire would compute its slot — and hence a
+        // daily report's window — from the backoff instant (minutes, not a
+        // day) and stamp lastSlot with it.
+        const backoffAt = new Date(SLOT.getTime() + 60_000);
+        const job = makeJob({
+          attempts: 1,
+          nextRunAt: backoffAt,
+          currentSlot: SLOT,
+          lastError: "transient provider 503",
+        });
+        const fires: { slot: Date }[] = [];
+        const { settleClaim } = await runOneFire({
+          job,
+          logger,
+          handler: async (fire) => {
+            fires.push(fire as { slot: Date });
+          },
+        });
+
+        expect(fires).toHaveLength(1);
+        expect(fires[0]!.slot.getTime()).toBe(SLOT.getTime());
+
+        const settle = settleClaim.mock.calls[0]![0] as {
+          nextRunAt: Date;
+          lastSlot: Date | null;
+          currentSlot: Date | null;
+          attempts: number;
+        };
+        // Delivered: the calendar marker is the ORIGINAL slot, the pin is
+        // cleared, and the calendar advances from the slot (not the backoff).
+        expect(settle.lastSlot?.getTime()).toBe(SLOT.getTime());
+        expect(settle.currentSlot).toBeNull();
+        expect(settle.nextRunAt.getTime()).toBe(NEXT_CRON.getTime());
+        expect(settle.attempts).toBe(0);
       });
     });
   });

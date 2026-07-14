@@ -1,6 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { redactSlackActionParams } from "~/automations/providers/definitions/slack/secret";
+import { type SlackActionParams } from "~/automations/providers/definitions/slack/shared";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
@@ -95,7 +97,23 @@ export const graphsRouter = createTRPCRouter({
         },
       });
 
-      return graphs;
+      // The included trigger row carries the encrypted Slack bot token in
+      // actionParams — strip it before the rows leave the server (ADR-041:
+      // the token never reaches the client), same redaction the automations
+      // router applies on its read paths.
+      return graphs.map((graph) =>
+        graph.trigger
+          ? {
+              ...graph,
+              trigger: {
+                ...graph.trigger,
+                actionParams: redactSlackActionParams(
+                  (graph.trigger.actionParams ?? {}) as SlackActionParams,
+                ),
+              },
+            }
+          : graph,
+      );
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))

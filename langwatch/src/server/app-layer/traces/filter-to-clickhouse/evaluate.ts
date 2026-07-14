@@ -214,12 +214,33 @@ function evaluateFreeText(
   negated: boolean,
   trace: InMemoryTrace,
 ): boolean {
-  // ILIKE %value% over the computed input/output — case-insensitive contains.
+  // Mirrors `translateFreeText`'s `(ComputedInput ILIKE %v% OR ComputedOutput
+  // ILIKE %v%)` — including ClickHouse's three-valued logic over the
+  // Nullable(String) columns: `NULL ILIKE …` is NULL, `NULL OR true` is true,
+  // `NULL OR false` is NULL, `NOT NULL` is NULL, and a NULL predicate excludes
+  // the row. So a match on one column counts even when the other is NULL, but
+  // a negated free-text filter never matches a trace whose non-matching side
+  // includes a NULL column.
   const value = extractStringValue(tag).toLowerCase();
-  const input = (trace.summary.computedInput ?? "").toLowerCase();
-  const output = (trace.summary.computedOutput ?? "").toLowerCase();
-  const matched = input.includes(value) || output.includes(value);
-  return negated ? !matched : matched;
+  const inputMatch = ilikeContains(trace.summary.computedInput, value);
+  const outputMatch = ilikeContains(trace.summary.computedOutput, value);
+  const matched =
+    inputMatch === true || outputMatch === true
+      ? true
+      : inputMatch === null || outputMatch === null
+        ? null
+        : false;
+  const result = negated ? (matched === null ? null : !matched) : matched;
+  return result === true;
+}
+
+/** `column ILIKE %value%` with SQL semantics: NULL column → NULL, not false. */
+function ilikeContains(
+  column: string | null | undefined,
+  lowerValue: string,
+): boolean | null {
+  if (column == null) return null;
+  return column.toLowerCase().includes(lowerValue);
 }
 
 function evaluateTraceAttribute(

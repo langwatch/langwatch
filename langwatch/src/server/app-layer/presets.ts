@@ -719,7 +719,7 @@ export function initializeDefaultApp(options?: {
   // register yet (the report handler lands in a later phase), so the loop runs
   // and log-and-skips any orphan targetType.
   const scheduler =
-    config.processRole === "worker"
+    roleRunsWorkers(config.processRole)
       ? new SchedulerService({
           repo: new PrismaScheduledJobRepository(prisma),
           registry: schedulerRegistry,
@@ -733,7 +733,7 @@ export function initializeDefaultApp(options?: {
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
   // alerts). The scheduler registry is a process singleton.
-  if (config.processRole === "worker") {
+  if (roleRunsWorkers(config.processRole)) {
     schedulerRegistry.register({
       targetType: REPORT_SCHEDULER_TARGET_TYPE,
       handler: (fire) =>

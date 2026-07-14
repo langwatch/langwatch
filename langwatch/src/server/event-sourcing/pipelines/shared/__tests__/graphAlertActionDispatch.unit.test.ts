@@ -79,6 +79,17 @@ function makeDeps() {
   const filterSuppressedRecipients = vi.fn(
     async ({ emails }: { emails: string[] }) => emails,
   );
+  // Under both ADR-031 caps by default — individual tests override to
+  // exercise the exhausted branches.
+  const consumeEmailCapSlot = vi.fn(
+    async (_params: { dedupKey: string }) => ({ allowed: true, count: 1 }),
+  );
+  const consumeTenantEmailCapSlot = vi.fn(
+    async (_params: { dedupKey: string; recipientCount: number }) => ({
+      allowed: true,
+      count: 1,
+    }),
+  );
   const claims = new Set<string>();
   const isRecipientSent = vi.fn(
     async ({ traceId }: { traceId: string }) => claims.has(traceId),
@@ -94,6 +105,10 @@ function makeDeps() {
       sendSlack,
       sendSlackBot,
       filterSuppressedRecipients,
+      consumeEmailCapSlot,
+      emailHourlyCap: 100,
+      consumeTenantEmailCapSlot,
+      tenantDailyCap: 10_000,
       isRecipientSent,
       recordRecipientSent,
     } as unknown as Parameters<typeof dispatchGraphAlertAction>[0]["deps"],
@@ -101,6 +116,8 @@ function makeDeps() {
     sendSlack,
     sendSlackBot,
     filterSuppressedRecipients,
+    consumeEmailCapSlot,
+    consumeTenantEmailCapSlot,
     isRecipientSent,
     recordRecipientSent,
     claims,
@@ -261,6 +278,195 @@ describe("dispatchGraphAlertAction", () => {
         });
         expect(result.didSend).toBe(false);
         expect(sendEmail).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  // Regression (dispatch5015 P1): the event-sourced graph-alert path called
+  // the dispatcher WITHOUT consuming the ADR-031 email caps, while the cron
+  // consumed both before the same send — so with the firing flag on, a
+  // flapping graph metric could mail unbounded past TRIGGER_EMAIL_HOURLY_CAP /
+  // TRIGGER_EMAIL_TENANT_DAILY_CAP. Both gates now live inside the dispatcher,
+  // shared by both callers.
+  describe("given the ADR-031 email caps", () => {
+    function makeEmailInput() {
+      return {
+        trigger: makeTrigger(),
+        project: makeProject(),
+        context: makeContext(),
+        recipients: ["a@example.com", "b@example.com"],
+        slackWebhook: null,
+        fireDigest: FIRE_DIGEST,
+      };
+    }
+
+    describe("when both caps have slots left", () => {
+      it("consumes the hourly cap before the provider call, keyed on the fire digest", async () => {
+        const { deps, sendEmail, consumeEmailCapSlot } = makeDeps();
+
+        await dispatchGraphAlertAction({ deps, input: makeEmailInput() });
+
+        expect(consumeEmailCapSlot).toHaveBeenCalledTimes(1);
+        expect(consumeEmailCapSlot).toHaveBeenCalledWith(
+          expect.objectContaining({
+            projectId: "proj_1",
+            triggerId: "trg_1",
+            dedupKey: `proj_1/trg_1:digest:${FIRE_DIGEST}`,
+          }),
+        );
+        const capOrder = consumeEmailCapSlot.mock.invocationCallOrder[0]!;
+        const sendOrder = sendEmail.mock.invocationCallOrder[0]!;
+        expect(capOrder).toBeLessThan(sendOrder);
+      });
+
+      it("consumes the project daily cap by surviving recipient count", async () => {
+        const {
+          deps,
+          filterSuppressedRecipients,
+          consumeTenantEmailCapSlot,
+        } = makeDeps();
+        filterSuppressedRecipients.mockResolvedValueOnce(["a@example.com"]);
+
+        await dispatchGraphAlertAction({ deps, input: makeEmailInput() });
+
+        // Counts RECIPIENTS after suppression (1 of 2 survived), not
+        // dispatches — the daily cap bounds actual outbound email volume.
+        expect(consumeTenantEmailCapSlot).toHaveBeenCalledWith(
+          expect.objectContaining({
+            projectId: "proj_1",
+            recipientCount: 1,
+            dedupKey: `proj_1:tenant:${FIRE_DIGEST}`,
+          }),
+        );
+      });
+    });
+
+    describe("when the trigger is over its hourly cap", () => {
+      it("skips the send, never consults the daily cap, and reports the fire as consumed", async () => {
+        const { deps, sendEmail, consumeEmailCapSlot, consumeTenantEmailCapSlot } =
+          makeDeps();
+        consumeEmailCapSlot.mockResolvedValueOnce({
+          allowed: false,
+          count: 101,
+        });
+
+        const result = await dispatchGraphAlertAction({
+          deps,
+          input: makeEmailInput(),
+        });
+
+        expect(sendEmail).not.toHaveBeenCalled();
+        expect(consumeTenantEmailCapSlot).not.toHaveBeenCalled();
+        // `didSend` stays true so the evaluator keeps its open claim — the
+        // incident must open exactly as the cron's `addTriggersSent` does
+        // after a cap-suppressed send; rolling the claim back would re-arm
+        // the alert on every fold update while the cap is exhausted.
+        expect(result.didSend).toBe(true);
+        expect(result.capExhausted).toBe("trigger-hourly");
+      });
+    });
+
+    describe("when the project is over its daily email cap", () => {
+      it("skips the send and reports the fire as consumed", async () => {
+        const { deps, sendEmail, consumeTenantEmailCapSlot } = makeDeps();
+        consumeTenantEmailCapSlot.mockResolvedValueOnce({
+          allowed: false,
+          count: 10_001,
+        });
+
+        const result = await dispatchGraphAlertAction({
+          deps,
+          input: makeEmailInput(),
+        });
+
+        expect(sendEmail).not.toHaveBeenCalled();
+        expect(result.didSend).toBe(true);
+        expect(result.capExhausted).toBe("project-daily");
+      });
+    });
+
+    describe("when the same fire is retried by the outbox", () => {
+      it("passes identical dedup keys, so the consumer's claim gate prevents a double-consume", async () => {
+        const { deps, consumeEmailCapSlot, consumeTenantEmailCapSlot } =
+          makeDeps();
+        const input = makeEmailInput();
+
+        await dispatchGraphAlertAction({ deps, input });
+        await dispatchGraphAlertAction({ deps, input });
+
+        // The no-double-consume guarantee lives in the consumer's SET-NX
+        // claim on the dedupKey — the dispatcher's contract is a STABLE key
+        // per fire, identical across retries.
+        const hourlyKeys = consumeEmailCapSlot.mock.calls.map(
+          (call) => (call[0] as { dedupKey: string }).dedupKey,
+        );
+        expect(hourlyKeys).toEqual([
+          `proj_1/trg_1:digest:${FIRE_DIGEST}`,
+          `proj_1/trg_1:digest:${FIRE_DIGEST}`,
+        ]);
+        const tenantKeys = consumeTenantEmailCapSlot.mock.calls.map(
+          (call) => (call[0] as { dedupKey: string }).dedupKey,
+        );
+        expect(tenantKeys).toEqual([
+          `proj_1:tenant:${FIRE_DIGEST}`,
+          `proj_1:tenant:${FIRE_DIGEST}`,
+        ]);
+      });
+    });
+
+    describe("when the NEXT fire of the same alert dispatches", () => {
+      it("carries a different dedup key, so it consumes a fresh cap slot", async () => {
+        const { deps, consumeEmailCapSlot } = makeDeps();
+
+        await dispatchGraphAlertAction({ deps, input: makeEmailInput() });
+        await dispatchGraphAlertAction({
+          deps,
+          input: { ...makeEmailInput(), fireDigest: "fedcba9876543210" },
+        });
+
+        const keys = consumeEmailCapSlot.mock.calls.map(
+          (call) => (call[0] as { dedupKey: string }).dedupKey,
+        );
+        expect(new Set(keys).size).toBe(2);
+      });
+    });
+
+    describe("when every recipient is suppressed", () => {
+      it("does not consume either cap", async () => {
+        const {
+          deps,
+          filterSuppressedRecipients,
+          consumeEmailCapSlot,
+          consumeTenantEmailCapSlot,
+        } = makeDeps();
+        filterSuppressedRecipients.mockResolvedValueOnce([]);
+
+        await dispatchGraphAlertAction({ deps, input: makeEmailInput() });
+
+        expect(consumeEmailCapSlot).not.toHaveBeenCalled();
+        expect(consumeTenantEmailCapSlot).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a Slack alert dispatches", () => {
+      it("never consults the email caps", async () => {
+        const { deps, consumeEmailCapSlot, consumeTenantEmailCapSlot } =
+          makeDeps();
+
+        await dispatchGraphAlertAction({
+          deps,
+          input: {
+            trigger: makeTrigger({ action: TriggerAction.SEND_SLACK_MESSAGE }),
+            project: makeProject(),
+            context: makeContext(),
+            recipients: [],
+            slackWebhook: "https://hooks.slack.com/services/T/B/abc",
+            fireDigest: FIRE_DIGEST,
+          },
+        });
+
+        expect(consumeEmailCapSlot).not.toHaveBeenCalled();
+        expect(consumeTenantEmailCapSlot).not.toHaveBeenCalled();
       });
     });
   });

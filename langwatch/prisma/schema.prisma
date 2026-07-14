@@ -3018,6 +3018,14 @@ model ScheduledJob {
   // Only advanced once a fire is DELIVERED, so a failed slot is retried, not
   // silently skipped.
   lastSlot   DateTime?
+  // The calendar instant of the slot currently in flight (claimed, retrying,
+  // or crash-recovering). Stamped by the FIRST claim of a slot and preserved
+  // across retry/lease re-claims, because `nextRunAt` mutates into a backoff
+  // or lease instant the moment a slot is worked — without this column a
+  // retried daily report would compute its window from the backoff instant
+  // (minutes) instead of the cron slot (a day). NULL when no slot is in
+  // flight (delivered / abandoned / released).
+  currentSlot DateTime?
   // Retry bookkeeping. On claim the loop leases the slot by pushing
   // `nextRunAt` a lease-window into the future without advancing to the next
   // cron slot; a handler failure re-arms `nextRunAt` at a bounded backoff and

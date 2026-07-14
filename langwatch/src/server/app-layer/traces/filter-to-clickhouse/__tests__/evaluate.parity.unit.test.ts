@@ -380,6 +380,47 @@ const cases: Case[] = [
     trace: makeTrace({ computedInput: "nothing here" }),
     expected: false,
   },
+  {
+    // NULL OR true is true in ClickHouse — a NULL column never blocks a match
+    // on the other one.
+    name: "free text matches when the other IO column is null",
+    query: "hello",
+    trace: makeTrace({ computedInput: null, computedOutput: "hello there" }),
+    expected: true,
+  },
+  {
+    name: "negated free text matches when both columns miss",
+    query: "NOT refund",
+    trace: makeTrace({
+      computedInput: "hello",
+      computedOutput: "world",
+    }),
+    expected: true,
+  },
+  {
+    // NOT (NULL OR NULL) is NULL in ClickHouse, and a NULL predicate excludes
+    // the row — so the dispatcher must not fire on traces with no computed IO.
+    name: "negated free text excludes a trace with null computed IO",
+    query: "NOT refund",
+    trace: makeTrace({ computedInput: null, computedOutput: null }),
+    expected: false,
+  },
+  {
+    // NOT (NULL OR false) is also NULL — one null column poisons the negation
+    // even when the other column is present and non-matching.
+    name: "negated free text excludes when one IO column is null and the other misses",
+    query: "NOT refund",
+    trace: makeTrace({ computedInput: "hello", computedOutput: null }),
+    expected: false,
+  },
+  {
+    // NOT (NULL OR true) is false — a match on the non-null column still
+    // excludes under negation, null or not.
+    name: "negated free text excludes a match despite a null column",
+    query: "NOT refund",
+    trace: makeTrace({ computedInput: null, computedOutput: "refund please" }),
+    expected: false,
+  },
   // Boolean composition
   {
     name: "AND requires both sides",

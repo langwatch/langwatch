@@ -341,7 +341,7 @@ export const automationRouter = createTRPCRouter({
 
       await getApp().triggers.invalidate(input.projectId);
 
-      return trigger;
+      return redactTriggerForRead(trigger);
     }),
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
@@ -568,7 +568,7 @@ export const automationRouter = createTRPCRouter({
 
       await getApp().triggers.invalidate(input.projectId);
 
-      return trigger;
+      return redactTriggerForRead(trigger);
     }),
   getTriggerById: protectedProcedure
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
@@ -641,7 +641,7 @@ export const automationRouter = createTRPCRouter({
 
       await getApp().triggers.invalidate(input.projectId);
 
-      return trigger;
+      return redactTriggerForRead(trigger);
     }),
   testFireTemplate: protectedProcedure
     .input(
@@ -806,6 +806,7 @@ export const automationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const isGraphAlert = !!input.customGraphId;
       const isReport = !isGraphAlert && !!input.report;
+      let parsedActionParams: Record<string, unknown> = {};
       try {
         validateTemplateDraft(input.templates);
         if (isGraphAlert) {
@@ -878,6 +879,11 @@ export const automationRouter = createTRPCRouter({
             message: `Invalid actionParams for ${input.action}: ${perActionParsed.error.errors[0]?.message ?? "validation failed"}`,
           });
         }
+        // Persist the PARSED params, not the wire object: Zod strips keys the
+        // action doesn't declare, so a Slack secret typed before switching the
+        // channel to Email can't ride along and land in the row in plaintext
+        // (where the Slack-only encrypt/redact passes would never touch it).
+        parsedActionParams = perActionParsed.data as Record<string, unknown>;
         if (
           input.action === TriggerAction.SEND_EMAIL &&
           input.actionParams.members &&
@@ -960,12 +966,12 @@ export const automationRouter = createTRPCRouter({
       let actionParams: Record<string, unknown> =
         input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
           ? {
-              ...input.actionParams,
+              ...parsedActionParams,
               createdByUserId: ctx.session?.user.id,
             }
           : slackActionParams
             ? { ...slackActionParams }
-            : { ...input.actionParams };
+            : { ...parsedActionParams };
 
       // Graph alerts: route the row shape through the SSOT builder so it's
       // byte-identical to what `graphs.updateById` writes on the dashboard
@@ -1149,6 +1155,6 @@ export const automationRouter = createTRPCRouter({
       }
 
       await getApp().triggers.invalidate(input.projectId);
-      return trigger;
+      return redactTriggerForRead(trigger);
     }),
 });

@@ -33,6 +33,13 @@ export interface ScheduledJobRecord {
    */
   lastSlot: Date | null;
   /**
+   * The calendar instant of the slot currently in flight; null when no slot
+   * is being worked. `nextRunAt` mutates into a lease/backoff instant the
+   * moment a slot is claimed, so THIS is the slot identity a retry or a
+   * crash-refire must hand the handler (see `fireJob`'s slot derivation).
+   */
+  currentSlot: Date | null;
+  /**
    * Retry counter for the slot currently being worked. Bumped on each handler
    * failure and reset to 0 once the slot is delivered (or abandoned to the next
    * cron instant after the retry cap). The scheduler service owns the cap.
@@ -108,6 +115,9 @@ export interface ScheduledJobRepository {
     expectedNextRunAt: Date;
     leaseUntil: Date;
   }): Promise<boolean>;
+  // (claim also stamps `currentSlot` via COALESCE: the FIRST claim of a slot
+  // records the calendar instant it read as due; retry/lease re-claims — whose
+  // `expectedNextRunAt` is a backoff or lease instant — preserve it.)
 
   /**
    * Resolve a lease this worker holds: a CONDITIONAL update
@@ -118,11 +128,12 @@ export interface ScheduledJobRepository {
    * call returns `false`). The SERVICE decides the values — this is a dumb
    * conditional writer that carries no retry policy:
    *   - delivered: `nextRunAt` = next cron instant, `lastSlot` = the slot,
-   *     `attempts` = 0, `lastError` = null.
+   *     `currentSlot` = null, `attempts` = 0, `lastError` = null.
    *   - retry: `nextRunAt` = now + backoff, `lastSlot` unchanged (pass the
-   *     row's existing value), `attempts` bumped, `lastError` = message.
+   *     row's existing value), `currentSlot` = the in-flight slot, `attempts`
+   *     bumped, `lastError` = message.
    *   - abandoned / released: `nextRunAt` = next cron instant, `lastSlot`
-   *     unchanged, `attempts` = 0.
+   *     unchanged, `currentSlot` = null, `attempts` = 0.
    */
   settleClaim(params: {
     id: string;
@@ -130,6 +141,7 @@ export interface ScheduledJobRepository {
     expectedLease: Date;
     nextRunAt: Date;
     lastSlot: Date | null;
+    currentSlot: Date | null;
     attempts: number;
     lastError: string | null;
   }): Promise<boolean>;

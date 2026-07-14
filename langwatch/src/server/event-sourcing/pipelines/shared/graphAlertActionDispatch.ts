@@ -117,6 +117,42 @@ export interface GraphAlertDispatchDeps {
     emails: string[];
   }) => Promise<string[]>;
   /**
+   * ADR-031: per-trigger hourly hard cap on dispatched trigger emails — the
+   * SAME consumer the trace cadence dispatcher and the cron's email path use.
+   * `allowed: false` means this trigger already sent `cap` emails this hour
+   * and the dispatch must be dropped (not sent, not retried). Injected so
+   * tests can fake it; Slack never calls it.
+   *
+   * `dedupKey` is the stable per-dispatch identity — keyed on the fire digest
+   * here — so an outbox retry of the same fire does not re-INCR and burn a
+   * second cap slot (the retry double-count finding).
+   */
+  consumeEmailCapSlot: (params: {
+    projectId: string;
+    triggerId: string;
+    now: Date;
+    dedupKey: string;
+  }) => Promise<{ allowed: boolean; count: number }>;
+  /** The configured hourly cap, for operator-facing drop logs (ADR-031). */
+  emailHourlyCap: number;
+  /**
+   * ADR-031: per-PROJECT daily hard cap — a backstop ABOVE the per-trigger
+   * hourly cap, consulted only once the hourly cap has passed and the
+   * suppression-filtered recipient set is known. Counts RECIPIENTS (actual
+   * outbound email volume, what SES reputation is measured on), not
+   * dispatches. Same fire-digest dedup as the hourly cap, so a retry re-reads
+   * the running total instead of counting its recipients twice.
+   */
+  consumeTenantEmailCapSlot: (params: {
+    projectId: string;
+    now: Date;
+    cap: number;
+    recipientCount: number;
+    dedupKey: string;
+  }) => Promise<{ allowed: boolean; count: number }>;
+  /** The configured per-project daily cap, for operator-facing drop logs. */
+  tenantDailyCap: number;
+  /**
    * Read side of the per-recipient at-most-once ledger (ADR-031). Backed by
    * the SAME `TriggerSent` claim store the trace cadence dispatcher threads
    * into the mailer — the recipient key rides the `traceId` column under a
@@ -147,10 +183,18 @@ export interface GraphAlertDispatchDeps {
 
 export interface GraphAlertDispatchResult {
   channel: "email" | "slack" | "none";
-  /** True when a provider call was actually made. False on a config-only
-   *  drop (no recipients, no webhook), which the caller logs but does
-   *  NOT treat as an error. */
+  /** True when this fire is consumed from the caller's perspective: a
+   *  provider call was made, a retry found every recipient already claimed,
+   *  or an ADR-031 email cap suppressed the delivery (see `capExhausted`).
+   *  False only on a config-only drop (no recipients, all unsubscribed, no
+   *  webhook), which the caller logs — and rolls its claim back on — but
+   *  does NOT treat as an error. */
   didSend: boolean;
+  /** Set when an ADR-031 email cap dropped the delivery. `didSend` stays true
+   *  — the fire consumed its cap slot and the caller must open the incident,
+   *  matching the cron, which records `TriggerSent` even when a cap dropped
+   *  the email — but no provider call was made. */
+  capExhausted?: "trigger-hourly" | "project-daily";
   /** Variables a custom template referenced but the render context did
    *  not supply (ADR-036 / ADR-037). Aggregated across whichever
    *  channel rendered. */
@@ -178,9 +222,11 @@ export interface GraphAlertDispatchResult {
  * discriminated branch whose two arms share no logic.
  *
  * What it DOES share with the trace notify path, deliberately: the ADR-031
- * suppression list and the per-recipient at-most-once ledger (both injected as
- * deps and keyed the same way), so an unsubscribe means the same thing and a
- * retry re-notifies nobody, whichever path delivered.
+ * suppression list, the per-trigger hourly + per-project daily email caps,
+ * and the per-recipient at-most-once ledger (all injected as deps and keyed
+ * the same way), so an unsubscribe means the same thing, a flapping metric
+ * cannot mail past the caps, and a retry re-notifies nobody — whichever path
+ * delivered.
  *
  * Uses `ALERT_TRIGGER_DEFAULTS` directly as the default template set,
  * then defers to the same Liquid pipeline the
@@ -252,6 +298,75 @@ export async function dispatchGraphAlertAction({
       return {
         channel: "email",
         didSend: false,
+        missingVariables: [],
+        renderErrors: [],
+      };
+    }
+    // ADR-031: the two hard email caps, consumed HERE — inside the shared
+    // dispatcher — so the cron and the event-sourced evaluator cannot drift
+    // (the parity contract: `release_es_graph_triggers_firing` decides WHO
+    // evaluates, never what the customer receives). Both claims are keyed on
+    // the fire digest, so an outbox retry of THIS fire re-reads the count
+    // instead of burning a second slot, and the next incident (new digest)
+    // gets a fresh slot.
+    //
+    // Over either cap the dispatch is a terminal drop: no send, no throw —
+    // throwing would let the outbox retry the spam. `didSend` stays true so
+    // the caller opens the incident, exactly as the cron does
+    // (`addTriggersSent` runs even after a cap-suppressed send). Rolling the
+    // evaluator's claim back instead would re-arm the alert on every fold
+    // update for as long as the cap is exhausted. `capExhausted` carries what
+    // actually happened for logs / telemetry.
+    const capSlot = await deps.consumeEmailCapSlot({
+      projectId: project.id,
+      triggerId: trigger.id,
+      now: new Date(),
+      dedupKey: `${project.id}/${trigger.id}:digest:${input.fireDigest}`,
+    });
+    if (!capSlot.allowed) {
+      logger.error(
+        {
+          triggerId: trigger.id,
+          projectId: project.id,
+          count: capSlot.count,
+          cap: deps.emailHourlyCap,
+        },
+        "Custom-graph trigger exceeded its hourly email cap — dropping this dispatch",
+      );
+      return {
+        channel: "email",
+        didSend: true,
+        capExhausted: "trigger-hourly",
+        missingVariables: [],
+        renderErrors: [],
+      };
+    }
+    // ADR-031: per-PROJECT daily cap — the backstop ABOVE the per-trigger
+    // hourly cap, run only once the hourly cap has passed and the surviving
+    // recipient set is known. Counts RECIPIENTS (`allowedRecipients.length`),
+    // the actual outbound email volume, not dispatches.
+    const tenantSlot = await deps.consumeTenantEmailCapSlot({
+      projectId: project.id,
+      now: new Date(),
+      cap: deps.tenantDailyCap,
+      recipientCount: allowedRecipients.length,
+      dedupKey: `${project.id}:tenant:${input.fireDigest}`,
+    });
+    if (!tenantSlot.allowed) {
+      logger.warn(
+        {
+          triggerId: trigger.id,
+          projectId: project.id,
+          count: tenantSlot.count,
+          cap: deps.tenantDailyCap,
+        },
+        "Project exceeded its daily trigger-email cap — dropping this " +
+          "custom-graph dispatch. Backstop above the per-trigger hourly cap.",
+      );
+      return {
+        channel: "email",
+        didSend: true,
+        capExhausted: "project-daily",
         missingVariables: [],
         renderErrors: [],
       };

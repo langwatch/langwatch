@@ -8,6 +8,10 @@ import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import {
+  consumeEmailCapSlot,
+  consumeTenantEmailCapSlot,
+} from "~/server/event-sourcing/outbox/emailHourlyCap";
+import {
   graphAlertFireDigest,
   type GraphAlertDispatchDeps,
   type GraphAlertDispatchInput,
@@ -88,7 +92,8 @@ export function buildCronGraphAlertInput(
 /**
  * Senders + gates for the cron. Identical to the outbox runtime's wiring in
  * `event-sourcing/outbox/setup.ts` — same mailer, same Slack clients, same
- * suppression list, same `TriggerSent` at-most-once ledger.
+ * suppression list, same ADR-031 email caps, same `TriggerSent` at-most-once
+ * ledger.
  */
 export function cronGraphAlertDeps(): GraphAlertDispatchDeps {
   const app = getApp();
@@ -98,6 +103,35 @@ export function cronGraphAlertDeps(): GraphAlertDispatchDeps {
     sendSlackBot: postSlackChatMessage,
     filterSuppressedRecipients: (params) =>
       app.emailSuppressions.filterSuppressed(params),
+    // ADR-031: the two hard email caps, bound from env — the same consumers
+    // the outbox runtime binds, so whichever path evaluates, the caps mean
+    // the same thing. The dispatcher keys both claims on the fire digest, so
+    // a cron re-tick of the same fire re-reads the count instead of burning
+    // a second slot.
+    consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
+      consumeEmailCapSlot({
+        projectId,
+        triggerId,
+        now,
+        cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+        dedupKey,
+      }),
+    emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
+    consumeTenantEmailCapSlot: ({
+      projectId,
+      now,
+      cap,
+      recipientCount,
+      dedupKey,
+    }) =>
+      consumeTenantEmailCapSlot({
+        projectId,
+        now,
+        cap,
+        recipientCount,
+        dedupKey,
+      }),
+    tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
     isRecipientSent: (params) => app.triggers.isSendClaimed(params),
     recordRecipientSent: async (params) => {
       await app.triggers.claimSend(params);

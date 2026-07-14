@@ -46,8 +46,8 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     // the boundary by the session offset — firing future jobs hours early).
     const rows = await this.prisma.$queryRaw<ScheduledJobRecord[]>`
       SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
-             "nextRunAt", "lastSlot", "attempts", "lastError", "active",
-             "createdAt", "updatedAt"
+             "nextRunAt", "lastSlot", "currentSlot", "attempts", "lastError",
+             "active", "createdAt", "updatedAt"
       FROM "ScheduledJob"
       WHERE "active" = true AND "nextRunAt" <= ${toPgTimestampUtc(now)}::timestamp
       ORDER BY "nextRunAt" ASC
@@ -111,9 +111,14 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     // EvalPlanQual pick exactly one winner (verified: 3 concurrent claims →
     // 1 winner). The `"projectId"` predicate also satisfies the multitenancy
     // guard's raw-query tenancy check; it always equals the row's own project.
+    // `currentSlot` is stamped with COALESCE: the FIRST claim of a slot reads
+    // the calendar instant out of `nextRunAt` and pins it; a retry wake (whose
+    // `nextRunAt` is a backoff instant) or a crash-refire (lease instant)
+    // re-claims WITHOUT overwriting the pinned slot. Settle clears it.
     const affected = await this.prisma.$executeRaw`
       UPDATE "ScheduledJob"
       SET "nextRunAt" = ${toPgTimestampUtc(leaseUntil)}::timestamp,
+          "currentSlot" = COALESCE("currentSlot", ${toPgTimestampUtc(expectedNextRunAt)}::timestamp),
           "updatedAt" = now()
       WHERE "id" = ${id}
         AND "projectId" = ${projectId}
@@ -128,6 +133,7 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     expectedLease,
     nextRunAt,
     lastSlot,
+    currentSlot,
     attempts,
     lastError,
   }: {
@@ -136,6 +142,7 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     expectedLease: Date;
     nextRunAt: Date;
     lastSlot: Date | null;
+    currentSlot: Date | null;
     attempts: number;
     lastError: string | null;
   }): Promise<boolean> {
@@ -151,6 +158,7 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
       UPDATE "ScheduledJob"
       SET "nextRunAt" = ${toPgTimestampUtc(nextRunAt)}::timestamp,
           "lastSlot" = ${lastSlot === null ? null : toPgTimestampUtc(lastSlot)}::timestamp,
+          "currentSlot" = ${currentSlot === null ? null : toPgTimestampUtc(currentSlot)}::timestamp,
           "attempts" = ${attempts},
           "lastError" = ${lastError},
           "updatedAt" = now()
@@ -182,9 +190,11 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     // multitenancy guard would reject it. An edit re-marks the row active and
     // refreshes the calendar; `lastSlot` (fire history) is left untouched.
     // (Model-layer write, so Prisma handles the naive-UTC timestamp binding.)
+    // `currentSlot` resets on edit: the calendar changed, so any in-flight
+    // retry belongs to the OLD schedule and must not misattribute the next fire.
     const { count } = await this.prisma.scheduledJob.updateMany({
       where: { projectId, targetType, targetId },
-      data: { cron, timezone, nextRunAt, active: true },
+      data: { cron, timezone, nextRunAt, active: true, currentSlot: null },
     });
     if (count === 0) {
       await this.prisma.scheduledJob.create({
@@ -238,8 +248,8 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     // opt-out for a system-owned cross-tenant view (read-only, never fires).
     return this.prisma.$queryRaw<ScheduledJobRecord[]>`
       SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
-             "nextRunAt", "lastSlot", "attempts", "lastError", "active",
-             "createdAt", "updatedAt"
+             "nextRunAt", "lastSlot", "currentSlot", "attempts", "lastError",
+             "active", "createdAt", "updatedAt"
       FROM "ScheduledJob"
       ORDER BY "active" DESC, "nextRunAt" ASC
       LIMIT ${limit}

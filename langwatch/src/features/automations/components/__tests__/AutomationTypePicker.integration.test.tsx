@@ -29,7 +29,7 @@ describe("AutomationTypePicker", () => {
   });
 
   describe("given the three presets", () => {
-    it("shows Automation, Alert, and Report — never a Trace data card", () => {
+    it("shows Automation, Alert, and Schedule — never a Trace data card", () => {
       renderPicker();
 
       expect(
@@ -39,18 +39,18 @@ describe("AutomationTypePicker", () => {
         screen.getByRole("button", { name: /Alert/i }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /Report/i }),
+        screen.getByRole("button", { name: /Schedule/i }),
       ).toBeInTheDocument();
       expect(screen.queryByText("Trace data")).not.toBeInTheDocument();
     });
   });
 
-  describe("when the Report preset is picked", () => {
+  describe("when the Schedule preset is picked", () => {
     it("dispatches SET_SOURCE to report", async () => {
       const user = userEvent.setup();
       renderPicker();
 
-      await user.click(screen.getByRole("button", { name: /Report/i }));
+      await user.click(screen.getByRole("button", { name: /Schedule/i }));
 
       expect(useAutomationStore.getState().draft.source).toBe("report");
     });
@@ -90,7 +90,7 @@ describe("AutomationTypePicker", () => {
       // The active card (Automation, the default source) stays live; the
       // others render aria-disabled.
       expect(
-        screen.getByRole("button", { name: /Report/i }),
+        screen.getByRole("button", { name: /Schedule/i }),
       ).toHaveAttribute("aria-disabled", "true");
     });
   });

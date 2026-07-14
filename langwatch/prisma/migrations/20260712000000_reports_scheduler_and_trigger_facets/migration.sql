@@ -35,6 +35,7 @@ CREATE TABLE "ScheduledJob" (
     "timezone" TEXT NOT NULL,
     "nextRunAt" TIMESTAMP(3) NOT NULL,
     "lastSlot" TIMESTAMP(3),
+    "currentSlot" TIMESTAMP(3),
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "lastError" TEXT,
     "active" BOOLEAN NOT NULL DEFAULT true,

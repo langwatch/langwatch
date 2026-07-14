@@ -147,18 +147,17 @@ describe("ViewAutomationDrawer", () => {
       it("lists recent fires with resolution durations", () => {
         renderDrawer();
 
+        // A resolved incident shows when it fired and how long it lasted.
         expect(
-          screen.getByText(/fired about 2 hours ago$/),
-        ).toBeDefined();
-        expect(
-          screen.getByText(/resolved after 15m/),
+          screen.getByText(/about 5 hours ago · lasted 15m/),
         ).toBeDefined();
       });
 
       it("marks the open incident as still firing", () => {
         renderDrawer();
 
-        expect(screen.getByText("Still firing")).toBeDefined();
+        expect(screen.getByText("Firing")).toBeDefined();
+        expect(screen.getByText("still firing")).toBeDefined();
       });
     });
 
@@ -208,7 +207,7 @@ describe("ViewAutomationDrawer", () => {
 
         renderDrawer();
 
-        expect(screen.getByText(/resolved after 1h 30m/)).toBeDefined();
+        expect(screen.getByText(/lasted 1h 30m/)).toBeDefined();
       });
     });
 
@@ -227,7 +226,7 @@ describe("ViewAutomationDrawer", () => {
 
         renderDrawer();
 
-        expect(screen.getByText(/resolved after 2h$/)).toBeDefined();
+        expect(screen.getByText(/lasted 2h$/)).toBeDefined();
       });
     });
   });

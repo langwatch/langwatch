@@ -217,6 +217,37 @@ export function buildOutboxRuntime({
                 triggerId,
                 emails,
               }),
+            // ADR-031: the same two hard email caps the cron path consumes,
+            // bound from env exactly like the trace cadence wiring above —
+            // without them a flapping graph metric could mail unbounded past
+            // TRIGGER_EMAIL_HOURLY_CAP / TRIGGER_EMAIL_TENANT_DAILY_CAP.
+            // The dispatcher keys both claims on the fire digest, so an
+            // outbox retry of the same fire re-reads the count instead of
+            // burning a second slot.
+            consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
+              consumeEmailCapSlot({
+                projectId,
+                triggerId,
+                now,
+                cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+                dedupKey,
+              }),
+            emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
+            consumeTenantEmailCapSlot: ({
+              projectId,
+              now,
+              cap,
+              recipientCount,
+              dedupKey,
+            }) =>
+              consumeTenantEmailCapSlot({
+                projectId,
+                now,
+                cap,
+                recipientCount,
+                dedupKey,
+              }),
+            tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
             // ADR-031 per-recipient at-most-once ledger — the SAME TriggerSent
             // claim store the trace cadence dispatcher threads into the mailer.
             // The graph-alert incident row is written after the send, so an

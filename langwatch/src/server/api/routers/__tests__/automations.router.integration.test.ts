@@ -227,6 +227,58 @@ describe("automationRouter", () => {
         });
       });
 
+      describe("on create when the saved row carries an encrypted bot token", () => {
+        it("redacts slackBotToken from the mutation response (ADR-041)", async () => {
+          mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+          mockTriggerCreate.mockResolvedValueOnce({
+            id: "trigger_new",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            actionParams: {
+              slackDelivery: "bot",
+              slackChannelId: "C123",
+              slackBotToken: "encrypted-ciphertext",
+            },
+          });
+
+          const result = await caller.upsert(baseGraphAlertInput as any);
+
+          expect(
+            (result.actionParams as Record<string, unknown>).slackBotToken,
+          ).toBeUndefined();
+          expect(
+            (result.actionParams as Record<string, unknown>).slackBotTokenSet,
+          ).toBe(true);
+        });
+      });
+
+      describe("on create when a Slack secret rides along on an email action", () => {
+        it("strips undeclared keys via the per-action schema before persisting", async () => {
+          mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+          mockTriggerCreate.mockResolvedValueOnce({ id: "trigger_new" });
+
+          await caller.upsert({
+            ...baseGraphAlertInput,
+            action: TriggerAction.SEND_EMAIL,
+            actionParams: {
+              members: ["ops@example.com"],
+              // A token typed before switching the channel to Email must not
+              // land in the row in plaintext — the Slack-only encrypt/redact
+              // passes would never touch it there.
+              slackBotToken: "xoxb-should-never-persist",
+            },
+          } as any);
+
+          expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
+          const createArgs = mockTriggerCreate.mock.calls[0]![0];
+          const persisted = createArgs.data.actionParams as Record<
+            string,
+            unknown
+          >;
+          expect(persisted.slackBotToken).toBeUndefined();
+          expect(persisted.members).toEqual(["ops@example.com"]);
+        });
+      });
+
       describe("on create when a soft-deleted alert already occupies the graph", () => {
         it("reactivates the existing row instead of hitting the unique constraint", async () => {
           mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });

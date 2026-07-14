@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  Code,
   HStack,
   Heading,
   Skeleton,
@@ -43,6 +44,21 @@ function formatDurationBetween(from: Date, to: Date): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+/** Parse the trigger's legacy structured-filters JSON string, tolerating
+ *  malformed payloads (returns null so the caller falls back to the empty
+ *  state instead of crashing the drawer). */
+function parseFiltersObject(filters: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(filters);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export function ViewAutomationDrawer({
@@ -139,8 +155,28 @@ export function ViewAutomationDrawer({
         </Text>
       );
     }
+    if (trigger.filterQuery) {
+      // ADR-043: a trace-subject automation shows its search query, mirroring
+      // the automations page's "Acts on" cell.
+      return (
+        <Code
+          size="sm"
+          variant="surface"
+          whiteSpace="pre-wrap"
+          wordBreak="break-word"
+        >
+          {trigger.filterQuery}
+        </Code>
+      );
+    }
+    // Legacy structured filters are stored as a JSON string — "{}" (no
+    // conditions) is truthy, so emptiness has to be checked on the parsed
+    // object or the "No conditions" fallback is unreachable.
     if (trigger.filters && typeof trigger.filters === "string") {
-      return <FilterDisplay filters={trigger.filters} hasBorder={true} />;
+      const parsed = parseFiltersObject(trigger.filters);
+      if (parsed && Object.keys(parsed).length > 0) {
+        return <FilterDisplay filters={trigger.filters} hasBorder={true} />;
+      }
     }
     return (
       <Text textStyle="sm" color="fg.muted">
