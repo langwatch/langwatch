@@ -1,9 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import type { NormalizedAttributes } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
-import { SpanDataBag } from "../../spanDataBag";
 import { ATTR_KEYS } from "../_constants";
-import type { ExtractorContext } from "../_types";
 import { VertexAdkExtractor } from "../vertexAdk";
 import { createExtractorContext } from "./_testHelpers";
 
@@ -522,13 +519,18 @@ describe("VertexAdkExtractor", () => {
 
   describe("given the payload arrives as a JSON string that bypassed pre-parsing", () => {
     it("parses the request payload itself", () => {
-      const ctx = createRawContext({
-        "gen_ai.provider.name": "gcp.vertex.agent",
-        "gcp.vertex.agent.llm_request": JSON.stringify({
-          model: "gemini-2.5-pro",
-          contents: [{ parts: [{ text: "hello" }], role: "user" }],
-        }),
-      });
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.provider.name": "gcp.vertex.agent",
+          "gcp.vertex.agent.llm_request": JSON.stringify({
+            model: "gemini-2.5-pro",
+            contents: [{ parts: [{ text: "hello" }], role: "user" }],
+          }),
+        },
+        undefined,
+        undefined,
+        { skipJsonParsing: true },
+      );
 
       extractor.apply(ctx);
 
@@ -555,39 +557,3 @@ describe("VertexAdkExtractor", () => {
     });
   });
 });
-
-/**
- * Builds a context WITHOUT the helper's automatic JSON-string parsing, so
- * the extractor's own defensive safeJsonParse path is exercised.
- */
-function createRawContext(raw: Record<string, unknown>): ExtractorContext {
-  const bag = new SpanDataBag(raw as NormalizedAttributes, []);
-  const out: NormalizedAttributes = {};
-
-  const setAttr = vi.fn((key: string, value: unknown) => {
-    if (value === null || value === undefined) return;
-    out[key] = value;
-  });
-  const setAttrIfAbsent = vi.fn((key: string, value: unknown) => {
-    if (!(key in out)) {
-      if (value === null || value === undefined) return;
-      out[key] = value;
-    }
-  });
-
-  return {
-    bag,
-    out,
-    span: {
-      name: "test",
-      kind: 0,
-      instrumentationScope: { name: "test", version: null },
-      statusMessage: null,
-      statusCode: null,
-      parentSpanId: "abc123",
-    },
-    recordRule: vi.fn(),
-    setAttr,
-    setAttrIfAbsent,
-  };
-}

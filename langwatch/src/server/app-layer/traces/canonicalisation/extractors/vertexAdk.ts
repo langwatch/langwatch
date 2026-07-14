@@ -31,6 +31,11 @@
  */
 
 import { ATTR_KEYS } from "./_constants";
+import {
+  convertGeminiContent,
+  stringifyToolPayload,
+  systemInstructionText,
+} from "./_geminiContent";
 import { inferSpanTypeIfAbsent, recordValueType } from "./_extraction";
 import { asNumber, isNonEmptyString, isRecord, safeJsonParse } from "./_guards";
 import type {
@@ -54,130 +59,6 @@ const OPERATION_NAME_SPAN_TYPE_MAP: Record<string, string> = {
   chat: "llm",
   execute_tool: "tool",
   invoke_agent: "agent",
-};
-
-const safeStringify = (value: unknown): string | null => {
-  try {
-    const s = JSON.stringify(value);
-    return typeof s === "string" ? s : null;
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Gemini content roles are "user" | "model"; chat messages use
- * "user" | "assistant".
- */
-const geminiRoleToChatRole = (role: unknown, defaultRole: string): string => {
-  if (role === "model") return "assistant";
-  return isNonEmptyString(role) ? role : defaultRole;
-};
-
-/**
- * Converts a single Gemini content object ({ role, parts }) into chat
- * messages. Text and function_call parts fold into one message (an
- * assistant turn can carry both text and tool calls); function_response
- * parts become separate tool-role messages, matching chat semantics —
- * ADK wraps tool results in a user-role content.
- */
-const convertGeminiContent = (
-  content: unknown,
-  defaultRole: string,
-): unknown[] => {
-  if (!isRecord(content)) return [];
-
-  const role = geminiRoleToChatRole(content.role, defaultRole);
-  const parts = Array.isArray(content.parts) ? content.parts : [];
-
-  const messages: unknown[] = [];
-  let texts: string[] = [];
-  let toolCalls: unknown[] = [];
-
-  const flush = () => {
-    if (texts.length === 0 && toolCalls.length === 0) return;
-    messages.push({
-      role,
-      ...(texts.length > 0 ? { content: texts.join("\n") } : {}),
-      ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-    });
-    texts = [];
-    toolCalls = [];
-  };
-
-  for (const part of parts) {
-    if (!isRecord(part)) continue;
-
-    if (typeof part.text === "string") {
-      texts.push(part.text);
-      continue;
-    }
-
-    if (isRecord(part.function_call)) {
-      const fc = part.function_call;
-      toolCalls.push({
-        ...(isNonEmptyString(fc.id) ? { id: fc.id } : {}),
-        type: "function",
-        function: {
-          name: isNonEmptyString(fc.name) ? fc.name : "",
-          arguments: safeStringify(fc.args ?? {}) ?? "{}",
-        },
-      });
-      continue;
-    }
-
-    if (isRecord(part.function_response)) {
-      flush();
-      const fr = part.function_response;
-      messages.push({
-        role: "tool",
-        ...(isNonEmptyString(fr.id) ? { tool_call_id: fr.id } : {}),
-        ...(isNonEmptyString(fr.name) ? { name: fr.name } : {}),
-        content: safeStringify(fr.response ?? {}) ?? "{}",
-      });
-      continue;
-    }
-  }
-  flush();
-
-  return messages;
-};
-
-/**
- * ADK system instructions are usually a plain string, but the Gemini API
- * also accepts a content object ({ parts: [{ text }] }) or a list of
- * strings/parts.
- */
-const systemInstructionText = (raw: unknown): string | null => {
-  if (typeof raw === "string") {
-    return raw.length > 0 ? raw : null;
-  }
-
-  const partsToText = (parts: unknown[]): string | null => {
-    const texts: string[] = [];
-    for (const part of parts) {
-      if (typeof part === "string") {
-        texts.push(part);
-      } else if (isRecord(part) && typeof part.text === "string") {
-        texts.push(part.text);
-      }
-    }
-    return texts.length > 0 ? texts.join("\n") : null;
-  };
-
-  if (Array.isArray(raw)) return partsToText(raw);
-  if (isRecord(raw) && Array.isArray(raw.parts)) return partsToText(raw.parts);
-  return null;
-};
-
-/**
- * Tool-call args/response arrive as a JSON string or an already-parsed
- * object. Normalise to a non-empty string for langwatch.input/output.
- */
-const stringifyToolPayload = (raw: unknown): string | null => {
-  if (raw === undefined || raw === null) return null;
-  if (typeof raw === "string") return raw.length > 0 ? raw : null;
-  return safeStringify(raw);
 };
 
 export class VertexAdkExtractor implements CanonicalAttributesExtractor {
@@ -306,14 +187,14 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
       [ATTR_KEYS.GEN_AI_REQUEST_TOP_K, config.top_k],
       [ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS, config.max_output_tokens],
     ];
-    let paramsExtracted = false;
+    let hasExtractedParams = false;
     for (const [key, raw] of paramMap) {
       const value = asNumber(raw);
       if (value !== null && this.setIfMissing(ctx, key, value)) {
-        paramsExtracted = true;
+        hasExtractedParams = true;
       }
     }
-    if (paramsExtracted) {
+    if (hasExtractedParams) {
       ctx.recordRule(`${this.id}:params`);
     }
   }
@@ -364,14 +245,14 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
         ],
         [ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, usage.thoughts_token_count],
       ];
-      let usageExtracted = false;
+      let hasExtractedUsage = false;
       for (const [key, raw] of usageMap) {
         const value = asNumber(raw);
         if (value !== null && this.setIfMissing(ctx, key, value)) {
-          usageExtracted = true;
+          hasExtractedUsage = true;
         }
       }
-      if (usageExtracted) {
+      if (hasExtractedUsage) {
         ctx.recordRule(`${this.id}:usage_metadata->gen_ai.usage`);
       }
     }
@@ -402,11 +283,11 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     );
     if (args !== null) {
       attrs.take(VERTEX_ADK_KEYS.TOOL_CALL_ARGS);
-      const argsSet = [
+      const hasSetArgs = [
         this.setIfMissing(ctx, ATTR_KEYS.LANGWATCH_INPUT, args),
         this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS, args),
       ].some(Boolean);
-      if (argsSet) {
+      if (hasSetArgs) {
         ctx.recordRule(`${this.id}:tool_call_args->input`);
       }
     }
@@ -416,11 +297,11 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     );
     if (result !== null) {
       attrs.take(VERTEX_ADK_KEYS.TOOL_RESPONSE);
-      const resultSet = [
+      const hasSetResult = [
         this.setIfMissing(ctx, ATTR_KEYS.LANGWATCH_OUTPUT, result),
         this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT, result),
       ].some(Boolean);
-      if (resultSet) {
+      if (hasSetResult) {
         ctx.recordRule(`${this.id}:tool_response->output`);
       }
     }
