@@ -920,6 +920,34 @@ importers:
         specifier: ^8.55.0
         version: 8.58.1(eslint@10.2.1)(typescript@5.9.3)
 
+  packages/api:
+    dependencies:
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.1
+      hono:
+        specifier: ^4.12.25
+        version: 4.12.27
+      hono-openapi:
+        specifier: ^0.4.0
+        version: 0.4.8(@hono/zod-validator@0.4.3(hono@4.12.27)(zod@3.25.76))(hono@4.12.27)(openapi-types@12.1.3)(zod-openapi@4.2.4(zod@3.25.76))(zod@3.25.76)
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.1.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@26.1.0)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(@vitest/ui@4.1.9)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@26.1.0)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/observability:
     dependencies:
       pino:
