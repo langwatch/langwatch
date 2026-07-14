@@ -193,3 +193,43 @@ export function isValidBonsaiExpression(text: string): boolean {
   if (text.trim().length === 0) return false;
   return validator.validate(text).valid;
 }
+
+/**
+ * Client-side evaluation for the playground: runs an expression against
+ * an attribute map with the same attr()/has()/take() helpers the server
+ * uses. `take` operates on a copy — the caller's map is never mutated.
+ */
+export function evaluateBonsaiExpression(
+  expression: string,
+  attributes: Record<string, unknown>,
+): { ok: true; value: unknown } | { ok: false; error: string } {
+  if (expression.trim().length === 0) {
+    return { ok: false, error: "empty expression" };
+  }
+  const scratch: Record<string, unknown> = { ...attributes };
+  const instance = bonsai({ timeout: 50, maxDepth: 30 })
+    .use(strings)
+    .use(arrays)
+    .use(math)
+    .use(types);
+  instance.addFunction("attr", (key: unknown) =>
+    typeof key === "string" ? scratch[key] : undefined,
+  );
+  instance.addFunction("has", (key: unknown) =>
+    typeof key === "string" ? key in scratch : false,
+  );
+  instance.addFunction("take", (key: unknown) => {
+    if (typeof key !== "string") return undefined;
+    const value = scratch[key];
+    delete scratch[key];
+    return value;
+  });
+  try {
+    return {
+      ok: true,
+      value: instance.evaluateSync(expression, { attrs: scratch }),
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

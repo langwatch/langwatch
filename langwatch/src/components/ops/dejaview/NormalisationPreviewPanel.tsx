@@ -18,6 +18,7 @@ import dynamic from "~/utils/compat/next-dynamic";
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import {
   BONSAI_LANGUAGE_ID,
+  evaluateBonsaiExpression,
   isValidBonsaiExpression,
   registerBonsaiLanguage,
   setBonsaiCompletionKeys,
@@ -92,6 +93,13 @@ const EXPRESSION_EXAMPLES: Array<{
   },
 ];
 
+/** Shown above the expression editors as a quick how-it-works reference. */
+const GENERIC_EXAMPLE_SNIPPET = `attr("gen_ai.request.model")                                read any attribute (dotted keys need attr)
+attr("vendor.messages") |> filter(.role == "user") |> map(.content)   pipe through transforms
+take("vendor.raw_output") ?? attr("langwatch.output")       take() consumes the source, ?? falls back
+has("gen_ai.output.messages")                               probe for a key
+attrs                                                       the whole attribute map`;
+
 type MapRuleDraft = {
   key: string;
   matcher: "exact" | "regex";
@@ -110,6 +118,30 @@ type PreviewInput = Parameters<
 >[0];
 
 const AUTO_RUN_DEBOUNCE_MS = 700;
+
+/**
+ * Shared Monaco options. quickSuggestions.strings is the important one:
+ * the main completion surface is INSIDE attr("…") string quotes, and
+ * Monaco disables quick suggestions in strings by default — without
+ * this, attribute-key completions never appear. Word-based suggestions
+ * are disabled so buffer words don't drown the curated list.
+ */
+const BONSAI_EDITOR_OPTIONS = {
+  minimap: { enabled: false },
+  lineNumbers: "off" as const,
+  folding: false,
+  glyphMargin: false,
+  lineDecorationsWidth: 4,
+  renderLineHighlight: "none" as const,
+  overviewRulerLanes: 0,
+  scrollBeyondLastLine: false,
+  wordWrap: "on" as const,
+  fontSize: 12,
+  automaticLayout: true,
+  quickSuggestions: { other: true, comments: false, strings: true },
+  suggestOnTriggerCharacters: true,
+  wordBasedSuggestions: "off" as const,
+};
 
 export function NormalisationPreviewPanel({
   aggregateId,
@@ -180,7 +212,27 @@ export function NormalisationPreviewPanel({
     ],
   });
 
-  const run = () => preview.mutate(buildInput());
+  // Payload rule indexes ≠ draft indexes (empty/invalid drafts are
+  // filtered out), so remember which payload rule maps to which
+  // expression-draft editor for error highlighting.
+  const expressionPayloadIndexRef = useRef<Map<number, number>>(new Map());
+  const buildInputTracked = (): PreviewInput => {
+    const input = buildInput();
+    const mapping = new Map<number, number>();
+    let draftIndex = -1;
+    (input.rules ?? []).forEach((rule, payloadIndex) => {
+      if (rule.kind !== "expression") return;
+      // Recover the draft index by matching filtered order.
+      draftIndex = expressionRules.findIndex(
+        (d, i) => i > draftIndex && d.expression === rule.expression,
+      );
+      if (draftIndex >= 0) mapping.set(payloadIndex, draftIndex);
+    });
+    expressionPayloadIndexRef.current = mapping;
+    return input;
+  };
+
+  const run = () => preview.mutate(buildInputTracked());
 
   // Live updates: once the operator has run the preview, edits re-run it
   // automatically (debounced). Invalid expressions are filtered out by
@@ -194,12 +246,65 @@ export function NormalisationPreviewPanel({
   });
   useEffect(() => {
     if (!hasRunRef.current) return;
-    const timer = setTimeout(() => preview.mutate(buildInput()), AUTO_RUN_DEBOUNCE_MS);
+    const timer = setTimeout(
+      () => preview.mutate(buildInputTracked()),
+      AUTO_RUN_DEBOUNCE_MS,
+    );
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serializedInput]);
 
   const result = preview.data;
+  // Every array is guarded: if the API process is serving an older build
+  // of the preview endpoint (dev-server version skew), missing fields
+  // must degrade to empty sections, never crash the panel.
+  const resultSpans = result?.spans ?? [];
+  const resultProjections = result?.projections ?? [];
+  const resultRuleStats = result?.ruleStats ?? [];
+
+  // Aggregate per-rule runtime errors across spans and attach them to
+  // the expression editor that produced them.
+  const expressionErrorsByDraft = useMemo(() => {
+    const byDraft = new Map<number, { count: number; message: string }>();
+    for (const span of resultSpans) {
+      for (const err of span.ruleErrors ?? []) {
+        const draftIndex = expressionPayloadIndexRef.current.get(err.ruleIndex);
+        if (draftIndex === undefined) continue;
+        const existing = byDraft.get(draftIndex);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          byDraft.set(draftIndex, { count: 1, message: err.error });
+        }
+      }
+    }
+    return byDraft;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
+
+  // Playground context: prefer the replayed canonical attributes of the
+  // selected event once a run exists; before that, decode the raw OTLP
+  // attributes straight off the stored event so the playground works
+  // without a server round-trip.
+  const playgroundContext = useMemo(() => {
+    const targetEventId =
+      selectedEventId !== "all" ? selectedEventId : spanEvents[0]?.eventId;
+    if (targetEventId === undefined) return null;
+    const fromRun = resultSpans.find((s) => s.eventId === targetEventId);
+    if (fromRun) {
+      return {
+        attributes: fromRun.replayedAttributes as Record<string, unknown>,
+        label: "replayed canonical attributes",
+      };
+    }
+    const event = spanEvents.find((e) => e.eventId === targetEventId);
+    if (!event) return null;
+    return {
+      attributes: decodeOtlpSpanAttributes(event.payload),
+      label: "raw event attributes — run the preview for the canonical view",
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, selectedEventId, spanEvents]);
 
   return (
     <Box flex={1} overflowY="auto" minH={0} w="full" padding={6}>
@@ -385,10 +490,23 @@ export function NormalisationPreviewPanel({
               </Button>
             ))}
           </HStack>
+          <Box
+            as="pre"
+            padding={2}
+            borderRadius="sm"
+            bg="bg.muted"
+            overflowX="auto"
+            textStyle="xs"
+            fontFamily="mono"
+            color="fg.muted"
+          >
+            {GENERIC_EXAMPLE_SNIPPET}
+          </Box>
           {expressionRules.map((rule, index) => (
             <ExpressionRuleEditor
               key={index}
               rule={rule}
+              serverError={expressionErrorsByDraft.get(index) ?? null}
               onChange={(patch) => updateAt(setExpressionRules, index, patch)}
               onRemove={() => removeAt(setExpressionRules, index)}
             />
@@ -424,6 +542,13 @@ export function NormalisationPreviewPanel({
           </Text>
         </VStack>
 
+        {playgroundContext && (
+          <PlaygroundSection
+            attributes={playgroundContext.attributes}
+            contextLabel={playgroundContext.label}
+          />
+        )}
+
         {preview.error && (
           <Box
             padding={3}
@@ -452,12 +577,12 @@ export function NormalisationPreviewPanel({
               <Badge size="sm" variant="outline">
                 {result.spanEventsFound} span events
               </Badge>
-              {result.skippedInvalidEvents > 0 && (
+              {(result.skippedInvalidEvents ?? 0) > 0 && (
                 <Badge size="sm" variant="outline" colorPalette="orange">
                   {result.skippedInvalidEvents} unparseable
                 </Badge>
               )}
-              {result.ruleStats.map((stat) => (
+              {resultRuleStats.map((stat) => (
                 <Badge
                   key={stat.ruleIndex}
                   size="sm"
@@ -470,7 +595,7 @@ export function NormalisationPreviewPanel({
               ))}
             </HStack>
 
-            {result.projections.length > 0 && (
+            {resultProjections.length > 0 && (
               <VStack align="stretch" gap={2}>
                 <Text textStyle="sm" fontWeight="semibold">
                   Projection impact
@@ -480,7 +605,7 @@ export function NormalisationPreviewPanel({
                   your rules. Rules apply across all span events here —
                   projections accumulate over the whole event stream.
                 </Text>
-                {result.projections.map((impact) => (
+                {resultProjections.map((impact) => (
                   <VStack
                     key={impact.projectionName}
                     align="stretch"
@@ -520,14 +645,14 @@ export function NormalisationPreviewPanel({
               </VStack>
             )}
 
-            {result.spans.length === 0 && (
+            {resultSpans.length === 0 && (
               <Text textStyle="sm" color="fg.muted">
                 No span-received events to replay
                 {selectedEventId !== "all" ? " for the selected event" : ""}.
               </Text>
             )}
 
-            {result.spans.map((span) => (
+            {resultSpans.map((span) => (
               <SpanPreviewCard key={span.eventId} span={span} />
             ))}
           </VStack>
@@ -539,10 +664,12 @@ export function NormalisationPreviewPanel({
 
 function ExpressionRuleEditor({
   rule,
+  serverError,
   onChange,
   onRemove,
 }: {
   rule: ExpressionRuleDraft;
+  serverError: { count: number; message: string } | null;
   onChange: (patch: Partial<ExpressionRuleDraft>) => void;
   onRemove: () => void;
 }) {
@@ -560,11 +687,12 @@ function ExpressionRuleEditor({
   };
 
   return (
+    <VStack align="stretch" gap={1}>
     <HStack gap={2} align="start">
       <Box
         flex={4}
         borderWidth="1px"
-        borderColor="border.muted"
+        borderColor={serverError ? "red.400" : "border.muted"}
         borderRadius="sm"
         overflow="hidden"
       >
@@ -578,17 +706,7 @@ function ExpressionRuleEditor({
             onChange({ expression: value ?? "" })
           }
           options={{
-            minimap: { enabled: false },
-            lineNumbers: "off",
-            folding: false,
-            glyphMargin: false,
-            lineDecorationsWidth: 4,
-            renderLineHighlight: "none",
-            overviewRulerLanes: 0,
-            scrollBeyondLastLine: false,
-            wordWrap: "on",
-            fontSize: 12,
-            automaticLayout: true,
+            ...BONSAI_EDITOR_OPTIONS,
             scrollbar: { vertical: "hidden" },
             placeholder: 'attr("vendor.key") |> upper',
           }}
@@ -610,6 +728,13 @@ function ExpressionRuleEditor({
         <Trash2 size={13} />
       </Button>
     </HStack>
+    {serverError && (
+      <Text textStyle="xs" color="red.500">
+        failed on {serverError.count} span
+        {serverError.count === 1 ? "" : "s"}: {serverError.message}
+      </Text>
+    )}
+    </VStack>
   );
 }
 
@@ -784,6 +909,128 @@ function DiffTable({ entries }: { entries: DiffEntry[] }) {
   );
 }
 
+const PLAYGROUND_DEBOUNCE_MS = 350;
+const MAX_PLAYGROUND_RESULT_LENGTH = 8_000;
+
+/**
+ * Free-form bonsai scratchpad: write any expression and see it evaluated
+ * live (client-side, no server round-trip) against the selected event's
+ * attributes. The fastest way to iterate before committing something to
+ * an expression rule.
+ */
+function PlaygroundSection({
+  attributes,
+  contextLabel,
+}: {
+  attributes: Record<string, unknown>;
+  contextLabel: string;
+}) {
+  const [code, setCode] = useState("");
+  const [output, setOutput] = useState<
+    { ok: true; value: string } | { ok: false; error: string } | null
+  >(null);
+
+  const attributesRef = useRef(attributes);
+  attributesRef.current = attributes;
+
+  useEffect(() => {
+    if (code.trim().length === 0) {
+      setOutput(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const evaluated = evaluateBonsaiExpression(code, attributesRef.current);
+      if (evaluated.ok) {
+        let rendered: string;
+        try {
+          rendered = JSON.stringify(evaluated.value, null, 2) ?? "undefined";
+        } catch {
+          rendered = String(evaluated.value);
+        }
+        if (rendered.length > MAX_PLAYGROUND_RESULT_LENGTH) {
+          rendered = `${rendered.slice(0, MAX_PLAYGROUND_RESULT_LENGTH)}…`;
+        }
+        setOutput({ ok: true, value: rendered });
+      } else {
+        setOutput(evaluated);
+      }
+    }, PLAYGROUND_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [code, attributes]);
+
+  const onMount: OnMount = (editor, monaco) => {
+    registerBonsaiLanguage(monaco);
+    const validate = () => {
+      const model = editor.getModel();
+      if (model) validateBonsaiModel(monaco, model);
+    };
+    validate();
+    editor.onDidChangeModelContent(validate);
+  };
+
+  return (
+    <VStack
+      align="stretch"
+      gap={2}
+      padding={3}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+    >
+      <HStack gap={2}>
+        <Text textStyle="xs" fontWeight="medium" color="fg.muted">
+          Playground — evaluate any expression live
+        </Text>
+        <Box flex={1} />
+        <Text textStyle="xs" color="fg.muted">
+          context: {contextLabel}
+        </Text>
+      </HStack>
+      <Box
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="sm"
+        overflow="hidden"
+      >
+        <MonacoEditor
+          height="180px"
+          language={BONSAI_LANGUAGE_ID}
+          value={code}
+          beforeMount={(monaco: Monaco) => registerBonsaiLanguage(monaco)}
+          onMount={onMount}
+          onChange={(value: string | undefined) => setCode(value ?? "")}
+          options={{
+            ...BONSAI_EDITOR_OPTIONS,
+            lineNumbers: "on",
+            placeholder:
+              'attr("gcp.vertex.agent.llm_request").contents |> map(.parts)',
+          }}
+        />
+      </Box>
+      {output !== null &&
+        (output.ok ? (
+          <Box
+            as="pre"
+            padding={2}
+            borderRadius="sm"
+            bg="bg.muted"
+            overflowX="auto"
+            textStyle="xs"
+            fontFamily="mono"
+            maxH="260px"
+            overflowY="auto"
+          >
+            {output.value}
+          </Box>
+        ) : (
+          <Text textStyle="xs" color="red.500" fontFamily="mono">
+            {output.error}
+          </Text>
+        ))}
+    </VStack>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────
@@ -835,4 +1082,70 @@ function safeParse(raw: string): unknown {
   } catch {
     return null;
   }
+}
+
+/**
+ * Decodes a stored span-received event's OTLP attributes into plain
+ * values for the playground: {stringValue} strings (JSON-looking ones
+ * parsed, mirroring the pipeline's parseJsonStringValues), int/double/
+ * bool values, and nested array/kvlist values.
+ */
+function decodeOtlpSpanAttributes(payload: unknown): Record<string, unknown> {
+  const parsed = typeof payload === "string" ? safeParse(payload) : payload;
+  const span =
+    parsed && typeof parsed === "object"
+      ? (parsed as { span?: unknown }).span
+      : null;
+  const attributes =
+    span && typeof span === "object"
+      ? (span as { attributes?: unknown }).attributes
+      : null;
+  if (!Array.isArray(attributes)) return {};
+
+  const out: Record<string, unknown> = {};
+  for (const kv of attributes) {
+    if (!kv || typeof kv !== "object") continue;
+    const key = (kv as { key?: unknown }).key;
+    if (typeof key !== "string") continue;
+    out[key] = decodeOtlpAnyValue((kv as { value?: unknown }).value);
+  }
+  return out;
+}
+
+function decodeOtlpAnyValue(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+  const v = value as Record<string, unknown>;
+  if (typeof v.stringValue === "string") {
+    const s = v.stringValue.trim();
+    if (
+      (s.startsWith("{") && s.endsWith("}")) ||
+      (s.startsWith("[") && s.endsWith("]"))
+    ) {
+      const parsed = safeParse(v.stringValue);
+      if (parsed !== null) return parsed;
+    }
+    return v.stringValue;
+  }
+  if (v.intValue !== undefined && v.intValue !== null) return Number(v.intValue);
+  if (v.doubleValue !== undefined && v.doubleValue !== null) {
+    return Number(v.doubleValue);
+  }
+  if (v.boolValue !== undefined && v.boolValue !== null) {
+    return v.boolValue === true || v.boolValue === "true";
+  }
+  const arrayValue = v.arrayValue as { values?: unknown[] } | undefined;
+  if (Array.isArray(arrayValue?.values)) {
+    return arrayValue.values.map(decodeOtlpAnyValue);
+  }
+  const kvlistValue = v.kvlistValue as
+    | { values?: Array<{ key?: unknown; value?: unknown }> }
+    | undefined;
+  if (Array.isArray(kvlistValue?.values)) {
+    return Object.fromEntries(
+      kvlistValue.values
+        .filter((kv) => typeof kv?.key === "string")
+        .map((kv) => [kv.key as string, decodeOtlpAnyValue(kv.value)]),
+    );
+  }
+  return undefined;
 }
