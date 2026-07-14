@@ -157,6 +157,20 @@ processing for the entire run:
    (`ReplayRepository.refreshLock`), so long runs no longer silently lose
    status updates when the lock expires mid-run.
 
+## Amendment (2026-07-14): Failed batches clear their in-flight replay markers
+
+The per-batch error path (and a cancellation that abandons an in-flight batch,
+which surfaces through the same catch) previously returned early without
+touching the batch's `pending`/cutoff markers, so the live checker kept
+deferring the failed batch's aggregates until the 7-day marker TTL lapsed or
+an operator re-ran the replay. The failure path now removes those markers
+(`removeInFlightMarkers` — HDEL only) before returning: the batch's aggregates
+were never replayed, so they go straight back to unconditional live
+processing, matching their pre-replay state. `done` markers and completed-set
+entries written by previously completed batches are deliberately left intact
+so a re-run still skips completed aggregates (resume). Cleanup is best-effort
+— a marker-cleanup failure is logged and never masks the original batch error.
+
 ## References
 
 - Related ADRs:

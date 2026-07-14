@@ -11,8 +11,9 @@ import { ReplayService } from "../replayService";
 import type { RegisteredFoldProjection, RegisteredMapProjection } from "../types";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
-import { CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX } from "../replayConstants";
+import { CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX, doneMarkerKey } from "../replayConstants";
 import { aggregateKey } from "../replayMarkers";
+import { RedisReplayMarkerChecker } from "../../projections/replayMarkerCheck";
 
 describe("ReplayService tenant-specific ClickHouse", () => {
   let tenantA: string;
@@ -604,6 +605,11 @@ describe("ReplayService tenant-specific ClickHouse", () => {
 
       // Fold projection was unpaused by the error path in `replayProjection`.
       expect(await redis.sismember(pausedSetKey, foldPauseKey)).toBe(0);
+
+      // The failed batch's pending/cutoff markers were cleared too — live
+      // events for its aggregates process normally right away instead of
+      // deferring until the marker TTL lapses.
+      expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`)).toEqual({});
     });
 
     it("skips aggregates already in the completed set on resume", async () => {
@@ -937,6 +943,100 @@ describe("ReplayService tenant-specific ClickHouse", () => {
 
         // The per-batch finally unpaused despite the failure.
         expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
+      });
+
+      it("clears the failed batch's replay markers so live events process normally right away", async () => {
+        const redis = getTestRedisConnection()!;
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optBatchFailMarkers_${suffix}`;
+
+        const bulkAppend = vi.fn(async () => {
+          throw new Error("bulk write boom");
+        });
+        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const service = createServiceWithResolver();
+
+        const result = await service.replayOptimized({
+          projections: [],
+          mapProjections: [projection],
+          tenantIds: [tenantA],
+          since: "2023-11-01",
+        });
+
+        expect(result.batchErrors).toBeGreaterThan(0);
+
+        // The failed batch's aggregates were never replayed — their
+        // pending/cutoff markers must not linger for the 7-day marker TTL.
+        const cutoffMarkers = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+        expect(cutoffMarkers).toEqual({});
+
+        // The live marker checker lets the failed batch's aggregates process
+        // normally — no ReplayDeferralError, no skip.
+        const checker = new RedisReplayMarkerChecker(redis);
+        for (const aggregateId of ["trace-a1", "trace-a2"]) {
+          const decision = await checker.check(mapName, {
+            tenantId: tenantA,
+            aggregateType: "trace",
+            aggregateId,
+            id: "evt-live-after-failure",
+            createdAt: Date.now(),
+          } as any);
+          expect(decision).toBe("process");
+        }
+      });
+
+      it("keeps completed batches' done markers so a re-run skips their aggregates", async () => {
+        const redis = getTestRedisConnection()!;
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optMidRunFail_${suffix}`;
+
+        // First batch flushes fine; the second batch's write fails, aborting
+        // the run midway (aggregateBatchSize 1 → one aggregate per batch).
+        const bulkAppend = vi
+          .fn()
+          .mockResolvedValueOnce(undefined)
+          .mockRejectedValue(new Error("bulk write boom"));
+        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const service = createServiceWithResolver();
+
+        const result = await service.replayOptimized({
+          projections: [],
+          mapProjections: [projection],
+          tenantIds: [tenantA],
+          since: "2023-11-01",
+          aggregateBatchSize: 1,
+        });
+
+        expect(result.batchErrors).toBe(1);
+        expect(bulkAppend).toHaveBeenCalledTimes(2);
+
+        // Which aggregate completed first depends on discovery order — derive
+        // it from the successful first flush.
+        const completedId = (bulkAppend.mock.calls[0]![0] as Array<{ src: string }>)[0]!.src;
+        const failedId = ["trace-a1", "trace-a2"].find((id) => id !== completedId)!;
+        const completedAggKey = aggregateKey({
+          tenantId: tenantA,
+          aggregateType: "trace",
+          aggregateId: completedId,
+        });
+        const failedAggKey = aggregateKey({
+          tenantId: tenantA,
+          aggregateType: "trace",
+          aggregateId: failedId,
+        });
+
+        // The failed batch's aggregate holds no marker of any kind — it is
+        // back to unconditional live processing.
+        const cutoffMarkers = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+        expect(cutoffMarkers).toEqual({});
+        expect(await redis.exists(doneMarkerKey(mapName, failedAggKey))).toBe(0);
+
+        // ... while the completed batch keeps its done marker and its
+        // completed-set entry, so an operator re-run resumes past it.
+        expect(await redis.exists(doneMarkerKey(mapName, completedAggKey))).toBe(1);
+        expect(await redis.smembers(`${COMPLETED_KEY_PREFIX}${mapName}`)).toEqual([
+          completedAggKey,
+        ]);
       });
     });
   });

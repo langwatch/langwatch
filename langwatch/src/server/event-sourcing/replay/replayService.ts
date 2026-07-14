@@ -29,6 +29,7 @@ import {
   markCutoffBatch,
   markCompletedBatch,
   unmarkBatch,
+  removeInFlightMarkers,
   getCompletedSet,
   getCutoffMarkers,
   removeStaleMarker,
@@ -97,6 +98,41 @@ export class ReplayService {
 
   private async resolveClient(tenantId?: string): Promise<ClickHouseClient> {
     return this.deps.clickhouseClientResolver(tenantId ?? "default");
+  }
+
+  /**
+   * Best-effort marker cleanup for a batch that errored (or was abandoned by
+   * cancellation) mid-flight. Its aggregates were never replayed, so their
+   * pending/cutoff markers are removed — returning them to unconditional live
+   * processing right away instead of deferring their live events until the
+   * 7-day marker TTL lapses. Done markers and completed-set entries from
+   * previously completed batches are left intact so an operator re-run still
+   * skips completed aggregates. Never throws: a marker-cleanup failure must
+   * not mask the original batch error.
+   */
+  private async clearFailedBatchMarkers({
+    projectionNames,
+    aggKeys,
+    log,
+  }: {
+    projectionNames: string[];
+    aggKeys: string[];
+    log: ReplayLogWriter;
+  }): Promise<void> {
+    try {
+      await removeInFlightMarkers({
+        redis: this.deps.redis,
+        projectionNames,
+        aggKeys,
+      });
+    } catch (cleanupError) {
+      log.write({
+        step: "error",
+        error: `failed to clear replay markers for failed batch: ${
+          cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+        }`,
+      });
+    }
   }
 
   async discover({
@@ -406,6 +442,12 @@ export class ReplayService {
             tenant: tenantId,
             aggregate: `batch ${batchNum}`,
             error: errorMsg,
+          });
+
+          await this.clearFailedBatchMarkers({
+            projectionNames: [projection.projectionName],
+            aggKeys: batch.map((agg) => aggregateKey(agg)),
+            log,
           });
 
           progress.batchErrors = batchErrors;
@@ -773,6 +815,12 @@ export class ReplayService {
             tenant: tenantId,
             aggregate: `map-batch ${batchNum}`,
             error: errorMsg,
+          });
+
+          await this.clearFailedBatchMarkers({
+            projectionNames: [projection.projectionName],
+            aggKeys: batch.map((agg) => aggregateKey(agg)),
+            log,
           });
 
           progress.batchErrors = batchErrors;
@@ -1232,6 +1280,15 @@ export class ReplayService {
         const errorMsg = error instanceof Error ? error.message : String(error);
         if (!firstError) firstError = errorMsg;
         log.write({ step: "error", batch: batchNum, error: errorMsg });
+
+        // Before the emit below — cancellation can throw from onProgress, and
+        // the failed batch's markers must be gone either way. Extra HDELs for
+        // projections an aggregate wasn't marked for are no-ops.
+        await this.clearFailedBatchMarkers({
+          projectionNames: allProjectionNames,
+          aggKeys: batchKeys,
+          log,
+        });
 
         progress.batchErrors = totalBatchErrors;
         progress.firstError = firstError;
