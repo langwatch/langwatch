@@ -646,6 +646,15 @@ export function initializeDefaultApp(options?: {
         });
         return orgProjects.map((project) => project.id);
       },
+      // One cheap `system.mutations` lookup per project per daily sweep —
+      // skips measurement while a retention relabel is mid-flight so the
+      // reverse-then-emit re-book can't be measured back in as a phantom.
+      hasInFlightRetentionMutation: async ({ projectId }) => {
+        const inFlight = await retroactiveUpdateService.getMutationProgress({
+          projectId,
+        });
+        return inFlight.length > 0;
+      },
     }),
     exits: new BoundaryExitService({ events: storageBoundaryEvents }),
     sampling: new GaugeSamplingService({

@@ -29,9 +29,11 @@ function fakeClient(rowsByTable: Record<string, unknown[]>) {
 function makeService({
   rowsByTable,
   prior = [],
+  retentionMutationInFlight = false,
 }: {
   rowsByTable: Record<string, unknown[]>;
   prior?: { category: string; retentionDays: number; totalBytes: bigint }[];
+  retentionMutationInFlight?: boolean;
 }) {
   const { client, queries } = fakeClient(rowsByTable);
   const appended: AppendBoundaryEventInput[] = [];
@@ -48,6 +50,7 @@ function makeService({
       countEventsAfter: vi.fn(async () => 0),
     },
     listProjectIds: async () => ["project_1"],
+    hasInFlightRetentionMutation: async () => retentionMutationInFlight,
   });
   return { service, appended, queries };
 }
@@ -184,6 +187,41 @@ describe("BoundaryMeasurementService", () => {
         Date.UTC(2026, 4, 31),
         Date.UTC(2026, 5, 7),
       ]);
+    });
+  });
+
+  describe("when a retention mutation is in flight for the project", () => {
+    it("skips measurement so the reverse-then-emit re-book is not measured back in", async () => {
+      // Post reverse-then-emit (63→91): the event log has reversed the old
+      // 63 group to net zero, but ClickHouse still carries the old 63 label
+      // because the ALTER mutation has not landed. Measuring now would see
+      // full 63 bytes vs a zero prior and emit a phantom 63 ENTRY — the
+      // over-count the reviewer flagged. The in-flight guard prevents it.
+      const { service, appended, queries } = makeService({
+        rowsByTable: {
+          stored_spans: [{ retentionDays: 63, bytes: "1000" }],
+        },
+        prior: [{ category: "traces", retentionDays: 63, totalBytes: 0n }],
+        retentionMutationInFlight: true,
+      });
+
+      await service.measureEntriesForOrg({ organizationId: "org_1", at });
+
+      expect(appended).toEqual([]);
+      expect(queries).toEqual([]); // skipped before any ClickHouse read
+    });
+
+    it("measures normally once the mutation has landed", async () => {
+      const { service, appended } = makeService({
+        rowsByTable: {
+          stored_spans: [{ retentionDays: 91, bytes: "1000" }],
+        },
+        retentionMutationInFlight: false,
+      });
+
+      await service.measureEntriesForOrg({ organizationId: "org_1", at });
+
+      expect(appended.map((e) => e.retentionDays)).toEqual([91]);
     });
   });
 

@@ -78,6 +78,19 @@ export interface BoundaryMeasurementDeps {
   events: StorageBoundaryEventRepository;
   /** ALL of the org's project ids, archived included — archived data still occupies storage. */
   listProjectIds: (params: { organizationId: string }) => Promise<string[]>;
+  /**
+   * True while a retroactive `_retention_days` mutation is in flight for the
+   * project. During that window ClickHouse still carries the OLD retention
+   * label while the event log has already re-booked the bytes under the new
+   * one (reverse-then-emit) — so measuring would re-add a phantom old-group
+   * ENTRY (measured old bytes minus a reversed-to-zero prior) and over-count
+   * the gauge until the old group's exit. Skipping the project until the
+   * mutation lands avoids that; cumulative-minus-prior self-heals on the
+   * next run. Optional — when absent, no project is skipped.
+   */
+  hasInFlightRetentionMutation?: (params: {
+    projectId: string;
+  }) => Promise<boolean>;
 }
 
 /**
@@ -156,6 +169,17 @@ export class BoundaryMeasurementService {
     const projectIds = await this.deps.listProjectIds({ organizationId });
 
     for (const projectId of projectIds) {
+      // Reverse-then-emit hazard: while a retention mutation is in flight,
+      // ClickHouse still carries the old retention label but the event log
+      // already re-booked those bytes under the new one. Measuring now would
+      // re-add a phantom old-group ENTRY (over-count). Skip the project until
+      // the mutation lands; cumulative-minus-prior catches it up next run.
+      if (
+        this.deps.hasInFlightRetentionMutation &&
+        (await this.deps.hasInFlightRetentionMutation({ projectId }))
+      ) {
+        continue;
+      }
       for (const partitionStart of partitionStarts) {
         await this.measurePartition({
           organizationId,
