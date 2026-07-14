@@ -263,15 +263,22 @@ export const processCustomGraphTrigger = async (
           },
         };
 
-        // Execute the appropriate action
+        // Execute the appropriate action. `didSend` mirrors the dispatcher's
+        // semantics (see `GraphAlertDispatchResult.didSend`): true when the
+        // fire is consumed — a provider call was made, or an ADR-031 cap
+        // suppressed the delivery — false when dispatch failed or dropped on
+        // config, so the incident is NOT recorded and the next tick retries.
+        let didSend = true;
         if (action === TriggerAction.SEND_EMAIL) {
-          await handleSendEmail(context);
+          ({ didSend } = await handleSendEmail(context));
         } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
-          await handleSendSlackMessage(context);
+          ({ didSend } = await handleSendSlackMessage(context));
         }
 
-        // Record that this alert was sent (creates new TriggerSent with resolvedAt = null)
-        await addTriggersSent(triggerId, triggerData);
+        if (didSend) {
+          // Record that this alert was sent (creates new TriggerSent with resolvedAt = null)
+          await addTriggersSent(triggerId, triggerData);
+        }
 
         await updateAlert(triggerId, Date.now(), projectId);
 
@@ -302,7 +309,12 @@ export const processCustomGraphTrigger = async (
             id: unresolvedTriggerSent.id,
             projectId: projectId,
           },
-          data: { resolvedAt: new Date() },
+          // Clear openIncidentKey alongside resolvedAt, mirroring the trigger
+          // repository's `markResolvedById`: the identity MUST free up (go
+          // NULL) for the alert to fire again, or the event-sourced path's
+          // next `claimOpenForGraphAlert` INSERT hits the still-held unique
+          // key (P2002) forever.
+          data: { resolvedAt: new Date(), openIncidentKey: null },
         });
       }
 

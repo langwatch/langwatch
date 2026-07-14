@@ -126,10 +126,10 @@ vi.mock("~/pages/api/cron/triggers/utils", async (importOriginal) => {
 });
 
 vi.mock("~/pages/api/cron/triggers/actions/sendEmail", () => ({
-  handleSendEmail: vi.fn(async () => {}),
+  handleSendEmail: vi.fn(async () => ({ didSend: true })),
 }));
 vi.mock("~/pages/api/cron/triggers/actions/sendSlackMessage", () => ({
-  handleSendSlackMessage: vi.fn(async () => {}),
+  handleSendSlackMessage: vi.fn(async () => ({ didSend: true })),
 }));
 
 // ─────────────────────────────────────────────────────────────────────

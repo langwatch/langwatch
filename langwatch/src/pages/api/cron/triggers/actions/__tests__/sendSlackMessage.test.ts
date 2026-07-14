@@ -93,6 +93,17 @@ describe("handleSendSlackMessage", () => {
   });
 
   describe("when the automation delivers through a webhook", () => {
+    it("reports the fire as consumed (didSend true)", async () => {
+      const result = await handleSendSlackMessage(
+        makeContext({
+          slackDelivery: "webhook",
+          slackWebhook: "https://hooks.slack.com/test-webhook",
+        }),
+      );
+
+      expect(result).toEqual({ didSend: true });
+    });
+
     it("posts the rendered alert to the configured webhook", async () => {
       await handleSendSlackMessage(
         makeContext({
@@ -176,11 +187,14 @@ describe("handleSendSlackMessage", () => {
     });
 
     describe("when the bot connection is missing its channel", () => {
-      it("captures the failure instead of silently posting nothing", async () => {
-        await handleSendSlackMessage(
+      it("captures the failure and reports didSend false instead of silently posting nothing", async () => {
+        const result = await handleSendSlackMessage(
           makeContext({ slackDelivery: "bot", slackBotToken: "ciphertext" }),
         );
 
+        // Nothing was delivered: the caller must not open the incident, or
+        // the alert would read "firing" while never having notified anyone.
+        expect(result).toEqual({ didSend: false });
         expect(postSlackChatMessage).not.toHaveBeenCalled();
         expect(sendRenderedSlackMessage).not.toHaveBeenCalled();
         expect(captureException).toHaveBeenCalledWith(
@@ -200,17 +214,18 @@ describe("handleSendSlackMessage", () => {
   });
 
   describe("when the Slack send throws", () => {
-    it("captures the exception with full context", async () => {
+    it("captures the exception and reports didSend false so the caller does not record the incident", async () => {
       const error = new Error("Slack webhook failed");
       vi.mocked(sendRenderedSlackMessage).mockRejectedValue(error);
 
-      await handleSendSlackMessage(
+      const result = await handleSendSlackMessage(
         makeContext({
           slackDelivery: "webhook",
           slackWebhook: "https://hooks.slack.com/test",
         }),
       );
 
+      expect(result).toEqual({ didSend: false });
       expect(captureException).toHaveBeenCalledWith(error, {
         extra: {
           triggerId: "trigger-1",

@@ -17,15 +17,23 @@ import {
  * automation POSTed to `""`, threw, and had the throw swallowed here while the
  * caller still recorded the incident: the alert read as "currently firing" and
  * nothing was ever sent.
+ *
+ * Returns the dispatcher's `didSend` so the caller can decide whether to
+ * record the incident: dispatch errors are captured (never thrown — a cron
+ * batch must not die on one alert) but reported as `didSend: false`, so an
+ * undelivered alert does NOT open an incident and the next tick retries.
  */
-export const handleSendSlackMessage = async (context: TriggerContext) => {
+export const handleSendSlackMessage = async (
+  context: TriggerContext,
+): Promise<{ didSend: boolean }> => {
   const { trigger } = context;
 
   try {
-    await dispatchGraphAlertAction({
+    const result = await dispatchGraphAlertAction({
       deps: cronGraphAlertDeps(),
       input: buildCronGraphAlertInput(context),
     });
+    return { didSend: result.didSend };
   } catch (error) {
     captureException(toError(error), {
       extra: {
@@ -34,5 +42,6 @@ export const handleSendSlackMessage = async (context: TriggerContext) => {
         action: TriggerAction.SEND_SLACK_MESSAGE,
       },
     });
+    return { didSend: false };
   }
 };

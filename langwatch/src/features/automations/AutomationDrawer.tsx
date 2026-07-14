@@ -1,4 +1,13 @@
-import { Box, Button, Heading, HStack, Spacer, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Skeleton,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { AlertType, TriggerKind, type TriggerAction } from "@prisma/client";
 import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -651,13 +660,22 @@ export function AutomationDrawer({
     isReport,
   ]);
 
+  // Edit mode must not render the (blank) INITIAL_DRAFT form while the saved
+  // row is still loading: a keystroke during the load makes the hydration
+  // guard above treat the draft as already-edited and skip hydration, so a
+  // later Save would overwrite the saved automation with a near-blank draft.
+  // Show a skeleton until the row lands, and an error state if it never does.
+  const editLoading = !!automationId && triggerQuery.isLoading;
+  const editError = !!automationId && triggerQuery.isError;
+
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
   const nameSet = draft.name.trim().length > 0;
   // Cadence is an always-visible inline facet now (ADR-043), so there is no
   // "confirm the cadence" detour to gate on — subject + cadence validity is
   // folded into conditionsSet.
-  const canSave = nameSet && conditionsSet && configComplete;
+  const canSave =
+    nameSet && conditionsSet && configComplete && !editLoading && !editError;
 
   const onTestFire = useCallback(() => {
     if (!channel || !projectId || !draft.action) return;
@@ -917,20 +935,43 @@ export function AutomationDrawer({
                 across every section (and drift over time), scale the whole form
                 surface down here. Contained to the drawer body, so the
                 header/footer and the rest of the app are untouched. */}
-            <Box css={{ zoom: 0.9 }}>
-              <MainSectionList
-                isEdit={!!automationId}
-                sourceLocked={sourceLocked}
-                prefilledGraphId={prefilledGraphId}
-              />
-            </Box>
+            {editError ? (
+              <Box
+                padding={3}
+                borderRadius="md"
+                border="1px solid"
+                colorPalette="red"
+                borderColor="colorPalette.muted"
+                bg="colorPalette.subtle"
+              >
+                <Text textStyle="sm" color="fg">
+                  Couldn't load this {labels.noun}. Close the drawer and try
+                  again.
+                </Text>
+              </Box>
+            ) : editLoading ? (
+              <VStack align="stretch" gap={4} data-testid="automation-edit-loading">
+                <Skeleton height="32px" width="60%" />
+                <Skeleton height="80px" width="full" />
+                <Skeleton height="80px" width="full" />
+                <Skeleton height="80px" width="full" />
+              </VStack>
+            ) : (
+              <Box css={{ zoom: 0.9 }}>
+                <MainSectionList
+                  isEdit={!!automationId}
+                  sourceLocked={sourceLocked}
+                  prefilledGraphId={prefilledGraphId}
+                />
+              </Box>
+            )}
           </Drawer.Body>
           <Drawer.Footer>
             <HStack width="full">
               <Spacer />
               {/* Send test sits next to Save (ADR-043 feedback): once a notify
                   channel is set up, fire the real message before committing. */}
-              {channel ? (
+              {channel && !editLoading && !editError ? (
                 <Tooltip
                   content="Finish the delivery setup to send a test."
                   disabled={configComplete}

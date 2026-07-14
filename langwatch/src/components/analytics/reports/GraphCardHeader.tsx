@@ -149,6 +149,7 @@ export function GraphCardHeader({
                 tabIndex={0}
                 padding={1}
                 cursor="pointer"
+                color="fg"
                 onClick={(e) => {
                   e.stopPropagation();
                   openEditAlert();
@@ -161,7 +162,7 @@ export function GraphCardHeader({
                   }
                 }}
               >
-                <Bell width={18} color="black" />
+                <Bell width={18} />
               </Box>
             </Tooltip>
           ) : (

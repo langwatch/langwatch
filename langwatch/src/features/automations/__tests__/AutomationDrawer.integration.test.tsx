@@ -221,6 +221,13 @@ describe("AutomationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTriggerRow = null;
+    // Restore the default resolved-query shape — tests that emulate a
+    // loading / errored edit query override this per-test.
+    mockGetTriggerByIdQuery.mockImplementation(() => ({
+      data: mockTriggerRow,
+      isLoading: false,
+      error: null,
+    }));
     useAutomationStore.getState().reset();
   });
 
@@ -272,6 +279,78 @@ describe("AutomationDrawer", () => {
           );
         });
         expect(screen.getByText("Edit automation")).toBeInTheDocument();
+      });
+    });
+
+    describe("when the saved row is still loading", () => {
+      it("shows a skeleton instead of the blank form and disables Save", async () => {
+        mockGetTriggerByIdQuery.mockImplementation(() => ({
+          data: null,
+          isLoading: true,
+          isError: false,
+          error: null,
+        }));
+        renderDrawer({ automationId: "trigger-1" });
+
+        expect(
+          await screen.findByTestId("automation-edit-loading"),
+        ).toBeInTheDocument();
+        // The blank form must not render — a keystroke into it would block
+        // hydration and let Save overwrite the row with a near-blank draft.
+        expect(screen.queryByPlaceholderText(/name/i)).not.toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Save changes" }),
+        ).toBeDisabled();
+      });
+
+      it("swaps the skeleton for the hydrated form once the row lands", async () => {
+        mockGetTriggerByIdQuery.mockImplementation(() => ({
+          data: null,
+          isLoading: true,
+          isError: false,
+          error: null,
+        }));
+        const { rerender } = renderDrawer({ automationId: "trigger-1" });
+        expect(
+          await screen.findByTestId("automation-edit-loading"),
+        ).toBeInTheDocument();
+
+        mockTriggerRow = savedRow();
+        mockGetTriggerByIdQuery.mockImplementation(() => ({
+          data: mockTriggerRow,
+          isLoading: false,
+          isError: false,
+          error: null,
+        }));
+        rerender(<AutomationDrawer automationId="trigger-1" />);
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Saved automation",
+          );
+        });
+        expect(
+          screen.queryByTestId("automation-edit-loading"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the saved row fails to load", () => {
+      it("shows an error state instead of the form and keeps Save disabled", async () => {
+        mockGetTriggerByIdQuery.mockImplementation(() => ({
+          data: null,
+          isLoading: false,
+          isError: true,
+          error: new Error("boom"),
+        }));
+        renderDrawer({ automationId: "trigger-1" });
+
+        expect(
+          await screen.findByText(/couldn't load this/i),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Save changes" }),
+        ).toBeDisabled();
       });
     });
 

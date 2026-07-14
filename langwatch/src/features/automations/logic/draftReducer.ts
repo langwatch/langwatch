@@ -58,7 +58,7 @@ export const INITIAL_REPORT_DRAFT: ReportDraft = {
 };
 
 /** The threshold rule a custom-graph alert fires on. Mirrors the fields the
- *  dashboard `AlertDrawer` collects and the dispatcher reads off the
+ *  automations drawer's alert form collects and the dispatcher reads off the
  *  Trigger row's `actionParams`. Lives at the draft root (not in a slice)
  *  because both Email and Slack providers reuse the same rule and only
  *  differ in their destination keys. */

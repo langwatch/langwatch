@@ -595,7 +595,9 @@ export const automationRouter = createTRPCRouter({
         automationId: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("triggers:view"))
+    // triggers:update (not :view): this endpoint decrypts and exercises the
+    // stored Slack bot token — the same capability testFireTemplate gates on.
+    .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
       let token = input.botToken?.trim() || null;
       if (!token && input.automationId) {

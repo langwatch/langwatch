@@ -484,7 +484,7 @@ function TraceQuerySubject({
           <QueryFilterInput
             value={query}
             onChange={onChange}
-            placeholder="e.g. status:error AND model:gpt-4o"
+            placeholder="e.g. status:error AND model:gpt-5-mini"
           />
           <HStack gap={1} flexWrap="wrap">
             <Text textStyle="xs" color="fg.muted">

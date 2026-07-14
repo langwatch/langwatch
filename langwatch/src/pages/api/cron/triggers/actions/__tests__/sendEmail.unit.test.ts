@@ -118,6 +118,14 @@ describe("handleSendEmail", () => {
   });
 
   describe("when email is sent successfully", () => {
+    it("reports the fire as consumed (didSend true)", async () => {
+      const result = await handleSendEmail(
+        makeContext({ members: ["user@example.com"] }),
+      );
+
+      expect(result).toEqual({ didSend: true });
+    });
+
     it("renders the alert templates and mails every recipient", async () => {
       await handleSendEmail(
         makeContext({ members: ["user1@example.com", "user2@example.com"] }),
@@ -189,11 +197,14 @@ describe("handleSendEmail", () => {
   });
 
   describe("when action params has no members", () => {
-    it("skips the send without consulting the cap", async () => {
-      await handleSendEmail(makeContext({}));
+    it("skips the send without consulting the cap and reports didSend false", async () => {
+      const result = await handleSendEmail(makeContext({}));
 
       expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
       expect(consumeEmailCapSlot).not.toHaveBeenCalled();
+      // Config-only drop: nothing was delivered, so the caller must not
+      // record the incident.
+      expect(result).toEqual({ didSend: false });
     });
   });
 
@@ -212,14 +223,20 @@ describe("handleSendEmail", () => {
   });
 
   describe("when the trigger is over its hourly cap", () => {
-    it("drops the dispatch without sending", async () => {
+    it("drops the dispatch without sending but still reports didSend true", async () => {
       consumeEmailCapSlot.mockResolvedValueOnce({ allowed: false, count: 101 });
 
-      await handleSendEmail(makeContext({ members: ["user@example.com"] }));
+      const result = await handleSendEmail(
+        makeContext({ members: ["user@example.com"] }),
+      );
 
       expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
       // Hourly cap drops first; the project daily cap is never reached.
       expect(consumeTenantEmailCapSlot).not.toHaveBeenCalled();
+      // Cap-exhausted counts as consumed: the caller opens the incident,
+      // matching the event-sourced path, so a flapping metric cannot re-arm
+      // the alert while the cap is exhausted.
+      expect(result).toEqual({ didSend: true });
     });
   });
 
@@ -300,12 +317,15 @@ describe("handleSendEmail", () => {
   });
 
   describe("when the mailer throws an error", () => {
-    it("captures the exception with full context", async () => {
+    it("captures the exception and reports didSend false so the caller does not record the incident", async () => {
       const error = new Error("Email send failed");
       vi.mocked(sendRenderedTriggerEmail).mockRejectedValue(error);
 
-      await handleSendEmail(makeContext({ members: ["user@example.com"] }));
+      const result = await handleSendEmail(
+        makeContext({ members: ["user@example.com"] }),
+      );
 
+      expect(result).toEqual({ didSend: false });
       expect(captureException).toHaveBeenCalledWith(error, {
         extra: {
           triggerId: "trigger-1",

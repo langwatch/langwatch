@@ -24,16 +24,25 @@ import {
  * `ALERT_TRIGGER_DEFAULTS` — the very copy they previewed in the drawer —
  * instead of the legacy React email tree, which ignored the four template
  * columns entirely.
+ *
+ * Returns the dispatcher's `didSend` so the caller can decide whether to
+ * record the incident: dispatch errors are captured (never thrown — a cron
+ * batch must not die on one alert) but reported as `didSend: false`, so an
+ * undelivered alert does NOT open an incident and the next tick retries.
+ * A cap-exhausted drop stays `didSend: true`, matching the event-sourced path.
  */
-export const handleSendEmail = async (context: TriggerContext) => {
+export const handleSendEmail = async (
+  context: TriggerContext,
+): Promise<{ didSend: boolean }> => {
   const { trigger } = context;
 
   try {
     const input = buildCronGraphAlertInput(context);
-    await dispatchGraphAlertAction({
+    const result = await dispatchGraphAlertAction({
       deps: cronGraphAlertDeps(),
       input,
     });
+    return { didSend: result.didSend };
   } catch (error) {
     captureException(toError(error), {
       extra: {
@@ -42,5 +51,6 @@ export const handleSendEmail = async (context: TriggerContext) => {
         action: TriggerAction.SEND_EMAIL,
       },
     });
+    return { didSend: false };
   }
 };
