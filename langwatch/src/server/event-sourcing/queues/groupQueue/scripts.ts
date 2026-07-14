@@ -1572,6 +1572,34 @@ export interface DrainedJob {
 export const DEFAULT_TENANT_CAP = 50;
 
 /**
+ * Parse a non-negative integer env var with a fallback.
+ *
+ * Shared by the operator knobs whose kill-switch/fallback semantics are
+ * identical: `0` is an explicit, meaningful value (kept), while unset / empty /
+ * non-numeric / negative all collapse to `fallback`. Read at call time (not at
+ * import) so tests can mutate process.env without re-importing the frozen env
+ * module.
+ *
+ * Semantics:
+ *   - env unset / empty / non-numeric / negative → fallback
+ *   - env = "0" → 0 (explicit kill switch)
+ *   - env = positive integer → that integer
+ */
+function readNonNegativeIntEnv({
+  name,
+  fallback,
+}: {
+  name: string;
+  fallback: number;
+}): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return n;
+}
+
+/**
  * Read the tenant soft-cap from the environment.
  * Post-2026-05-11 incident follow-up; see DISPATCH_LUA comment for design.
  * Symbol is captured in env-create.mjs for schema discoverability; we
@@ -1584,11 +1612,43 @@ export const DEFAULT_TENANT_CAP = 50;
  *   - env = positive integer → that integer
  */
 export function readTenantCap(): number {
-  const raw = process.env.LANGWATCH_DISPATCH_TENANT_CAP;
-  if (raw === undefined || raw === "") return DEFAULT_TENANT_CAP;
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < 0) return DEFAULT_TENANT_CAP;
-  return n;
+  return readNonNegativeIntEnv({
+    name: "LANGWATCH_DISPATCH_TENANT_CAP",
+    fallback: DEFAULT_TENANT_CAP,
+  });
+}
+
+/**
+ * Poison guard (specs/event-sourcing/poison-group-park-guard.feature): a group
+ * is parked once this many consecutive claims ended with the process dying
+ * before the strike could be cleared. Deaths tolerated = threshold; the claim
+ * after that parks. Kept small: every extra strike is another fleet-wide
+ * worker crash. Interleaved victims of someone else's poison clear their
+ * single strike on their next healthy claim, so only the group that keeps
+ * killing workers ever reaches the threshold.
+ */
+export const DEFAULT_CLAIM_STRIKE_THRESHOLD = 3;
+
+/**
+ * Strikes self-expire so a burst of unrelated worker deaths (node eviction,
+ * OOM of a neighbour) can't park a healthy group hours later. Refreshed on
+ * every claim, so an actively-crash-looping group never loses its count.
+ */
+export const CLAIM_STRIKE_TTL_SECONDS = 60 * 60;
+
+/**
+ * Read the poison-guard strike threshold from the environment.
+ *
+ * Semantics (mirrors readTenantCap):
+ *   - env unset / empty / non-numeric / negative → DEFAULT_CLAIM_STRIKE_THRESHOLD
+ *   - env = "0" → 0 (explicit kill switch - guard disabled)
+ *   - env = positive integer → that integer
+ */
+export function readClaimStrikeThreshold(): number {
+  return readNonNegativeIntEnv({
+    name: "LANGWATCH_GQ_POISON_STRIKE_THRESHOLD",
+    fallback: DEFAULT_CLAIM_STRIKE_THRESHOLD,
+  });
 }
 
 /**
@@ -2168,6 +2228,40 @@ export class GroupStagingScripts {
     await this.redis.srem(`${this.keyPrefix}paused-jobs`, key);
   }
 
+  private claimStrikesKey(groupId: string): string {
+    return `${this.keyPrefix}group:${groupId}:strikes`;
+  }
+
+  /**
+   * Poison-guard claim strike (specs/event-sourcing/poison-group-park-guard.feature).
+   * Recorded when a worker claims a group's job, cleared on every code path
+   * where the process survives - so only groups whose jobs kill the process
+   * (event-loop seizure → liveness kill) accumulate a count. The TTL keeps an
+   * old strike from parking a healthy group long after an unrelated death.
+   *
+   * @returns the strike count including this claim
+   */
+  async recordClaimStrike(groupId: string): Promise<number> {
+    const key = this.claimStrikesKey(groupId);
+    const results = await this.redis
+      .multi()
+      .incr(key)
+      .expire(key, CLAIM_STRIKE_TTL_SECONDS)
+      .exec();
+    const count = results?.[0]?.[1];
+    return typeof count === "number" ? count : 0;
+  }
+
+  async clearClaimStrikes(groupId: string): Promise<void> {
+    await this.redis.del(this.claimStrikesKey(groupId));
+  }
+
+  async getClaimStrikes(groupId: string): Promise<number> {
+    const raw = await this.redis.get(this.claimStrikesKey(groupId));
+    const n = raw === null ? 0 : Number.parseInt(raw, 10);
+    return Number.isFinite(n) ? n : 0;
+  }
+
   /**
    * Retrieve stored error info for a blocked group.
    *
@@ -2181,7 +2275,7 @@ export class GroupStagingScripts {
     const errorKey = `${this.keyPrefix}group:${groupId}:error`;
     const result = await this.redis.hgetall(errorKey);
 
-    if (!result || !result.message) {
+    if (!result?.message) {
       return null;
     }
 

@@ -14,7 +14,12 @@ LangWatch needs observability to debug production issues and correlate requests 
 
 We use **Pino** for structured JSON logging:
 
-- **Console output**: WARN+ in development (via pino-pretty), INFO+ in production
+- **Console output**: INFO+ by default (dev and prod), via pino-pretty in dev.
+  When the local observability stack is up, haven mutes the console to WARN+
+  (`LOG_CONSOLE_LEVEL`, overridable via `LW_OBS_CONSOLE_LEVEL`) because the full
+  `info`/`debug` stream is now in Grafana; it also drops the business-context
+  fields (org/project/user) from each pretty line, keeping only `trace_id`/
+  `span_id` for correlation. See ADR-042.
 - **OTel export**: DEBUG+ when `OTEL_EXPORTER_OTLP_ENDPOINT` is configured
 - **Context injection**: Automatic via pino's `mixin` option
 

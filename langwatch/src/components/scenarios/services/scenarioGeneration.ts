@@ -69,27 +69,43 @@ export async function generateScenarioWithAI(
     }),
   });
 
+  // The endpoint answers with JSON on every outcome — 200 success and 4xx/5xx
+  // error envelopes alike. A NON-JSON body therefore did not come from the
+  // route handler; it came from a layer in FRONT of the app: a reverse-proxy
+  // or gateway 502/504, an auth-redirect login page, a timeout error page, or
+  // an older self-hosted build. Parsing it as JSON throws a raw
+  // `Unexpected token '<', "<!DOCTYPE "...` that masks the real HTTP status and
+  // strands the user — convert it into an actionable, status-bearing error
+  // instead (langwatch#5758).
+  let payload: { error?: string; domainError?: unknown; scenario?: unknown };
+  try {
+    payload = await response.json();
+  } catch {
+    const statusText = response.statusText ? ` ${response.statusText}` : "";
+    throw new Error(
+      `The server returned an unexpected response (HTTP ${response.status}${statusText}) instead of scenario data. This is usually temporary — please try again in a moment.`,
+    );
+  }
+
   if (!response.ok) {
-    const error = await response.json();
     const domainError = serializedDomainErrorSchema.safeParse(
-      error.domainError,
+      payload.domainError,
     );
     if (domainError.success) {
       throw new ScenarioGenerationError(
-        error.error || "Failed to generate scenario",
+        payload.error || "Failed to generate scenario",
         domainError.data.kind,
         domainError.data.meta,
       );
     }
-    throw new Error(error.error || "Failed to generate scenario");
+    throw new Error(payload.error || "Failed to generate scenario");
   }
 
-  const data = await response.json();
-  if (!data.scenario) {
+  if (!payload.scenario) {
     throw new Error("Invalid response: missing scenario data");
   }
 
-  const parsed = generatedScenarioSchema.safeParse(data.scenario);
+  const parsed = generatedScenarioSchema.safeParse(payload.scenario);
   if (!parsed.success) {
     throw new Error(`Invalid scenario data: ${parsed.error.message}`);
   }

@@ -364,6 +364,76 @@ describe("<ScenarioMessageRenderer/>", () => {
     });
   });
 
+  describe("when a message carries a stored document attachment (binary part)", () => {
+    /** @scenario "A document attachment renders as a labeled chip that opens the file in a new tab" */
+    it("renders a chip with a file icon and filename that opens the stored file in a new tab", () => {
+      renderWith([
+        {
+          id: "msg_pdf_attachment",
+          role: "user",
+          content: [
+            { type: "text", text: "Please summarize this document." },
+            {
+              type: "binary",
+              mimeType: "application/pdf",
+              id: "so_123",
+              url: "/api/files/proj_test/so_123",
+              filename: "document.pdf",
+            },
+          ],
+        },
+      ]);
+
+      const chip = screen.getByTestId("media-part-binary");
+      // The filename query gives downloads from the opened viewer the
+      // original name (stored objects are content-addressed, no name of
+      // their own).
+      expect(chip).toHaveAttribute(
+        "href",
+        "/api/files/proj_test/so_123?filename=document.pdf",
+      );
+      expect(chip).toHaveAttribute("target", "_blank");
+      expect(chip).toHaveAttribute("rel", "noopener noreferrer");
+      expect(chip).not.toHaveAttribute("download");
+      expect(screen.getByText("document.pdf")).toBeInTheDocument();
+      // File icon plus the open-in-new-tab affordance.
+      expect(chip.querySelector("svg")).not.toBeNull();
+      expect(screen.getByTestId("media-part-binary-open")).toBeInTheDocument();
+
+      // The user sent the attachment, so the chip hugs the right side like a
+      // user bubble (audio players stretch instead — see data-media-align).
+      const mediaWrapper = chip.closest("[data-media-align]");
+      expect(mediaWrapper).toHaveAttribute("data-media-align", "flex-end");
+      expect(chip.closest("[data-align]")).toHaveAttribute(
+        "data-align",
+        "flex-end",
+      );
+    });
+
+    it("falls back to a download link for legacy inline base64 attachments", () => {
+      renderWith([
+        {
+          id: "msg_pdf_legacy",
+          role: "user",
+          content: [
+            {
+              type: "binary",
+              mimeType: "application/pdf",
+              data: "JVBERi0xLjQ=",
+              filename: "legacy.pdf",
+            },
+          ],
+        },
+      ]);
+
+      const chip = screen.getByTestId("media-part-binary");
+      expect(chip).toHaveAttribute("download", "legacy.pdf");
+      expect(chip).not.toHaveAttribute("target");
+      expect(screen.getByText("legacy.pdf")).toBeInTheDocument();
+      expect(screen.queryByTestId("media-part-binary-open")).toBeNull();
+    });
+  });
+
   // -------------------------------------------------------------------------
   // #4698 — text-first part ordering + audio-only + assistant=left.
   //

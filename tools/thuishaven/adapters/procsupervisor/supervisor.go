@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -129,6 +130,15 @@ func (s Supervisor) Supervise(ctx context.Context, children []app.Child) {
 // is cancelled, then SIGTERMs the process group and SIGKILLs after 5s.
 func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain}
+	// Gate the start on a dependency being ready (e.g. the web lane on the API),
+	// so this process — and the hostname routed to it — never comes up before what
+	// it needs is serving.
+	if ac.ReadyProbeURL != "" {
+		waitForReady(ctx, ac.ReadyProbeURL, c.logln)
+		if ctx.Err() != nil {
+			return
+		}
+	}
 	for ctx.Err() == nil {
 		cmd := c.command(ctx)
 		c.pipe(cmd)
@@ -160,6 +170,38 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 			case <-ctx.Done():
 			case <-time.After(time.Second):
 			}
+		}
+	}
+}
+
+// waitForReady blocks until an HTTP GET to url gets a non-5xx response (the
+// dependency is up and serving) or ctx is cancelled. It announces the wait once
+// so it's visible in the output. There is deliberately NO timeout: "don't start
+// until healthy" is the whole point, and Ctrl-C (ctx cancel) is the escape.
+func waitForReady(ctx context.Context, url string, log func(string)) {
+	client := &http.Client{Timeout: 2 * time.Second}
+	announced := false
+	for ctx.Err() == nil {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err == nil {
+			if resp, derr := client.Do(req); derr == nil {
+				_ = resp.Body.Close()
+				if resp.StatusCode < 500 {
+					if announced {
+						log("dependency is ready — starting")
+					}
+					return
+				}
+			}
+		}
+		if !announced {
+			log(fmt.Sprintf("waiting for %s before starting …", url))
+			announced = true
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(500 * time.Millisecond):
 		}
 	}
 }

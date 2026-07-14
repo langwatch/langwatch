@@ -16,7 +16,7 @@ import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-import { FieldInfoTooltip } from "./FieldInfoTooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 
 type BudgetRow = {
   id: string;

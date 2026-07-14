@@ -98,8 +98,23 @@ const PUBLIC_TOKEN_ROLE_NAME = "local-dev-public-ingestion";
 const MODEL_DEFAULT_CONFIG_ID = "local-dev-model-default-config";
 
 async function main() {
-  const apiKey = process.env.LANGWATCH_API_KEY ?? DEFAULT_INGESTION_KEY;
-  console.log(`🌱 Seeding static local dev identity (ingestion key: ${apiKey})`);
+  // Prefer the haven-injected local credential (HAVEN_SEED_LANGWATCH_API_KEY); the
+  // platform never carries LANGWATCH_API_KEY anymore, but keep it as a fallback for
+  // non-haven flows that still pass one explicitly.
+  const apiKey =
+    process.env.HAVEN_SEED_LANGWATCH_API_KEY ??
+    process.env.LANGWATCH_API_KEY ??
+    DEFAULT_INGESTION_KEY;
+  // Redact — in non-haven flows apiKey may be a real credential, and logs get shipped.
+  console.log(
+    `🌱 Seeding static local dev identity (ingestion key: ${apiKey.slice(0, 8)}…)`,
+  );
+
+  // HAVEN_SEED_PRESET=demo seeds the project as already past onboarding
+  // (firstMessage/integrated set), so the UI opens on the real product instead
+  // of the "waiting for your first message" journey. `haven seed --preset demo`
+  // sets this and then ingests sample traces through the collector.
+  const isPastOnboarding = process.env.HAVEN_SEED_PRESET === "demo";
 
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },
@@ -133,10 +148,12 @@ async function main() {
       teamId: team.id,
       language: "en",
       framework: "langchain",
-      firstMessage: false,
-      integrated: false,
+      firstMessage: isPastOnboarding,
+      integrated: isPastOnboarding,
     },
-    update: { apiKey },
+    update: isPastOnboarding
+      ? { apiKey, firstMessage: true, integrated: true }
+      : { apiKey },
   });
 
   // Admin user + BetterAuth credential (email/password) login.
@@ -318,7 +335,13 @@ async function main() {
   console.log(`✅ Team:         ${team.id} (${team.slug})`);
   console.log(`✅ Project:      ${project.id} (${project.slug})`);
   console.log(`✅ Admin login:  ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
-  console.log(`✅ Ingestion key:        ${project.apiKey}`);
+  // Only echo the key in full when it's the non-secret default; otherwise redact
+  // (same rationale as the seeding log above — real credentials must not hit shipped logs).
+  const displayApiKey =
+    project.apiKey === DEFAULT_INGESTION_KEY
+      ? project.apiKey
+      : `${project.apiKey.slice(0, 8)}…`;
+  console.log(`✅ Ingestion key:        ${displayApiKey}`);
   console.log(`✅ Private access token: ${PRIVATE_ACCESS_TOKEN}`);
   console.log(`✅ Public access token:  ${PUBLIC_ACCESS_TOKEN}`);
 }

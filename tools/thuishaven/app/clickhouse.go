@@ -110,6 +110,10 @@ func (o *Orchestrator) clickHouseDrop(ctx context.Context, p UpParams, all bool)
 			return err
 		}
 		for _, db := range dbs {
+			if domain.IsProtectedDatabase(db) {
+				fmt.Printf("kept %q (protected — the standing main database)\n", db)
+				continue
+			}
 			if err := o.ch.DropDatabase(ctx, db); err != nil {
 				return err
 			}

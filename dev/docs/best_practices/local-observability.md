@@ -130,16 +130,45 @@ LW_OBS_GRAFANA_PORT=3100 LW_OBS_OTLP_HTTP_PORT=4319 make observability
 
 ## Reading the data as an agent
 
+**When the stack is up, query this instead of grepping `langwatch/server.log`.**
+Indexed attribute search (by service, level, trace id, worktree) finds the
+failure far faster than scanning a multi-megabyte log file — and with the stack
+up the console is muted to `warn+` (haven sets `LOG_CONSOLE_LEVEL`), so the
+`info`/`debug` detail only lives here. `server.log` is the fallback for when the
+stack is down.
+
 Two ways, both wired by `make observability-connect`:
 
 1. **gcx CLI** — Grafana's official CLI. `connect` runs `gcx login local
    --server http://localhost:3000 --token <token>`. Then:
 
    ```bash
+   # Logs for one service, most recent first.
    gcx logs query '{service_name="langwatch-backend"}' --since 15m
+   # Only warnings/errors.
+   gcx logs query '{service_name="langwatch-backend"} | level=~"WARN|ERROR"' --since 15m
+   # Everything for ONE trace, across services — the fast path from an error's
+   # trace id (returned in the error body / the Langy "view trace" link) to its logs.
+   gcx logs query '{service_name=~".+"} | trace_id="<traceId>"' --since 1h
+   gcx traces query '<traceId>' --since 1h        # the trace itself, in Tempo
    gcx metrics query 'process_runtime_go_goroutines' --since 15m
-   gcx traces query '{ .service.name = "langwatch-ai-gateway" }' --since 15m
    gcx datasources list
+   ```
+
+   **Filter to your own worktree.** Every stack tags its telemetry
+   `langwatch.worktree=<slug>`, which lands in Loki as the structured-metadata
+   field `langwatch_worktree` (NOT an indexed stream label). So when several
+   worktrees share the one collector, isolate yours with a pipe filter, not a
+   stream selector:
+
+   ```bash
+   gcx logs query '{service_name="langwatch-backend"} | langwatch_worktree="<slug>"' --since 15m
+   ```
+
+   In Tempo the same tag is `resource.langwatch.worktree` in TraceQL:
+
+   ```bash
+   gcx traces query '{ resource.langwatch.worktree = "<slug>" }' --since 15m
    ```
 
 2. **Grafana skills** — the `grafana-lgtm` / `grafana-core` / `grafana-datasources`

@@ -214,21 +214,89 @@ export type PairwiseEvaluatorConfig = z.infer<
 >;
 
 /**
- * Whether a pairwise config's golden-field requirement is satisfied: either
+ * Whether a comparison config's golden-field requirement is satisfied: either
  * a golden field is set, or the user has explicitly opted out of
- * golden-answer comparison (#5378). `hasGoldenAnswer !== false` (rather than
- * `=== true`) is deliberate — old saved configs that predate this field have
- * `hasGoldenAnswer` undefined and must still default to golden-required.
- * Single source of truth for the UI gating (EvaluationsV3Table), client
- * validation (mappingValidation), and server cell-generation (orchestrator)
- * call sites — they must never drift from each other.
+ * golden-answer comparison (#5378). Checking `hasGoldenAnswer === false`
+ * (rather than `!== true`) is deliberate — old saved configs that predate this
+ * field have `hasGoldenAnswer` undefined and must still default to
+ * golden-required. Single source of truth for the UI gating
+ * (EvaluationsV3Table), client validation (mappingValidation), and server
+ * cell-generation (orchestrator) call sites — they must never drift.
  */
-export function isGoldenFieldSatisfied(pairwise: {
+export function isGoldenFieldSatisfied(config: {
   goldenField?: string;
   hasGoldenAnswer?: boolean;
 }): boolean {
-  return !!pairwise.goldenField || pairwise.hasGoldenAnswer === false;
+  return !!config.goldenField || config.hasGoldenAnswer === false;
 }
+
+/**
+ * Comparison evaluator config — the single shape behind every column-vs-column
+ * preference judgement, whether there are two candidates or ten. Backed by
+ * `langevals/select_best_compare`, which handles N=2 without a special case.
+ *
+ * Supersedes the two-slot `pairwiseEvaluatorConfigSchema` above, which is now
+ * read-only legacy: `toComparisonConfig` folds it into this shape on load and
+ * nothing writes it again.
+ *
+ * - variants: ordered TargetConfig ids whose per-row outputs are the
+ *   candidates. At least 2 entries required.
+ * - variantOutputPaths: per-variant output-field path. When a variant emits a
+ *   structured object (e.g. `{answer, confidence}`) the judge shouldn't see the
+ *   whole blob — narrow it to one subfield. Missing / empty means "use the
+ *   whole output". Generalises pairwise's variantAOutputPath/variantBOutputPath.
+ * - hasGoldenAnswer: whether the judge compares against a reference answer at
+ *   all. When false, goldenField is not required — the judge compares the
+ *   candidates on their own merits (#5378). Mirrors the evaluator's
+ *   `settings.has_golden_answer`, same dual-representation pattern as
+ *   includeMetrics/settings.include_metrics.
+ * - goldenField: dataset field name holding the reference answer. Only
+ *   meaningful when hasGoldenAnswer is true.
+ * - includeMetrics: per-candidate metrics injected into the judge prompt.
+ * - randomizeOrder: when true (default), candidate order is shuffled
+ *   deterministically per row (seeded by rowIndex) to mitigate position bias.
+ *   Mirrors the Python evaluator's `randomize_order`.
+ */
+/**
+ * The one judge behind every comparison. Kept as a constant so no call site
+ * hard-codes the wire slug: the display name is "Comparison", but the
+ * langevals module is still `select_best_compare`, and renaming that module
+ * would break every saved DB Evaluator row pointing at it.
+ *
+ * Legacy `langevals/pairwise_compare` rows are still runnable through their own
+ * endpoint, but the workbench never creates or dispatches them any more.
+ */
+export const COMPARISON_EVALUATOR_TYPE = "langevals/select_best_compare";
+
+/** @deprecated Legacy two-slot judge. Read for back-compat; never written. */
+export const LEGACY_PAIRWISE_EVALUATOR_TYPE = "langevals/pairwise_compare";
+
+export const comparisonEvaluatorConfigSchema = z.object({
+  variants: z.array(z.string()).default([]),
+  variantOutputPaths: z.record(z.string(), z.array(z.string())).optional(),
+  hasGoldenAnswer: z.boolean().default(true),
+  goldenField: z.string().optional(),
+  includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
+  randomizeOrder: z.boolean().default(true),
+});
+export type ComparisonEvaluatorConfig = z.infer<
+  typeof comparisonEvaluatorConfigSchema
+>;
+
+/**
+ * Comparison evaluators judge target columns against each other, so they render
+ * as their own dedicated verdict column rather than as a chip attached to each
+ * target. Everywhere the per-target chip list is built, these must be filtered
+ * out — otherwise the same comparison appears once per column and reads as N
+ * separate evaluations.
+ *
+ * Tolerates the legacy `pairwise` shape so that a saved experiment is
+ * classified correctly even before `toComparisonConfig` has folded it in.
+ */
+export const isComparisonEvaluator = (e: {
+  pairwise?: unknown;
+  comparison?: unknown;
+}): boolean => !!e.comparison || !!e.pairwise;
 
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
@@ -245,8 +313,14 @@ export const evaluatorConfigSchema = z.object({
   dbEvaluatorId: z.string().optional(),
   /** Local unsaved evaluator settings that override DB values during execution */
   localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
-  /** Set only for pairwise / n-way evaluators (#5100, #5101). */
+  /**
+   * @deprecated Read-only legacy shape. Saved experiments from before the
+   * pairwise/N-way merge carry this; `toComparisonConfig` folds it into
+   * `comparison` on load. Never written.
+   */
   pairwise: pairwiseEvaluatorConfigSchema.optional(),
+  /** Set only for comparison evaluators — the one column-vs-column judge. */
+  comparison: comparisonEvaluatorConfigSchema.optional(),
 });
 export type EvaluatorConfig = Omit<
   z.infer<typeof evaluatorConfigSchema>,
@@ -333,14 +407,20 @@ export const targetConfigSchema = z
      */
     localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
     /**
-     * Pairwise config for column-style pairwise evaluator targets (#5100).
-     * Set only when type === "evaluator" AND the underlying evaluator is
-     * langevals/pairwise_compare. Mirrors the evaluator-as-chip pairwise
-     * field so the column path has a single source of truth for which two
-     * other targets to compare. Per-row input mappings are derived from
-     * variantA/variantB/goldenField at save time and run time.
+     * @deprecated Read-only legacy shape for column-style pairwise targets
+     * (#5100). `toComparisonConfig` folds it into `comparison` on load.
+     * Never written.
      */
     pairwise: pairwiseEvaluatorConfigSchema.optional(),
+    /**
+     * Comparison config for column-style comparison targets. Set only when
+     * type === "evaluator" AND the underlying evaluator is the comparison
+     * judge. Gives the column path a single source of truth for which other
+     * targets to compare; per-row input mappings are derived from
+     * variants/goldenField at save time and run time. Also drives the
+     * target-column Swords icon and the "reuse existing comparison" flow.
+     */
+    comparison: comparisonEvaluatorConfigSchema.optional(),
     /**
      * Studio workflow target: the committed studio workflow evaluated as a whole
      * per dataset row (distinct from an "agent" target with agentType "workflow",
@@ -452,8 +532,12 @@ export type UIState = {
   selectedCell?: CellPosition;
   editingCell?: CellPosition;
   // Which target column is highlighted via clicking a variant name in a
-  // pairwise verdict (glow effect on that column's header).
+  // pairwise / N-way verdict (glow effect on that column's header).
   highlightedVariantTargetId?: string;
+  // Whether the highlighted column was the winner or a loser of the verdict
+  // that was clicked. Drives the glow colour and the "Won" badge on the
+  // target header. Undefined for a tie (or when nothing is highlighted).
+  highlightedVariantOutcome?: "won" | "lost";
   selectedRows: Set<number>;
   expandedEvaluator?: {
     targetId: string;
@@ -583,13 +667,13 @@ export type EvaluationsV3Actions = {
     inputField: string,
   ) => void;
   /**
-   * Pairwise column-target (#5100): write the high-level pairwise config and
+   * Comparison column-target: write the high-level comparison config and
    * deterministically derive the per-row field mappings on the same target.
-   * Strictly additive — leaves non-pairwise targets untouched.
+   * Leaves non-comparison targets untouched.
    */
-  updateTargetPairwise: (
+  updateTargetComparison: (
     targetId: string,
-    pairwise: PairwiseEvaluatorConfig,
+    comparison: ComparisonEvaluatorConfig,
   ) => void;
 
   // Global evaluator actions (evaluators apply to ALL targets automatically)
@@ -629,7 +713,10 @@ export type EvaluationsV3Actions = {
   closeOverlay: () => void;
   setSelectedCell: (cell: CellPosition | undefined) => void;
   setEditingCell: (cell: CellPosition | undefined) => void;
-  setHighlightedVariantTargetId: (targetId: string | undefined) => void;
+  setHighlightedVariantTargetId: (
+    targetId: string | undefined,
+    outcome?: "won" | "lost",
+  ) => void;
   toggleRowSelection: (row: number) => void;
   selectAllRows: (rowCount: number) => void;
   clearRowSelection: () => void;

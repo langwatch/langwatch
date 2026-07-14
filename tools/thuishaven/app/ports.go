@@ -76,6 +76,10 @@ type Child struct {
 	Shell string
 	Env   []string
 	Color string
+	// ReadyProbeURL, if set, holds this child's start until an HTTP GET to the URL
+	// gets a non-5xx response — so a lane that depends on another (the web/app on
+	// the API) never starts before what it needs is serving. Empty = start now.
+	ReadyProbeURL string
 }
 
 // System is the set of OS facts the app needs, behind a port so it can be faked.
@@ -89,6 +93,9 @@ type System interface {
 	Getpid() int
 	// TotalMemory is the machine's physical RAM in bytes (0 if undetectable).
 	TotalMemory() uint64
+	// GroupRSS is the resident set of a process group (keyed by any member pid),
+	// in bytes — a stack's real memory footprint (0 if undetectable).
+	GroupRSS(pid int) uint64
 }
 
 // ClickHouse manages one shared, memory-capped Altinity ClickHouse container (on
@@ -197,11 +204,14 @@ type Semaphore interface {
 // checking for uncommitted work, sizing reclaimable artefacts, removing them, and
 // pruning orphaned git worktree admin entries.
 type Hygiene interface {
-	Worktrees(repoRoot string) ([]Worktree, error)
+	Worktrees(gitDir string) ([]Worktree, error)
 	Dirty(worktreeDir string) bool
 	DirSize(path string) (bytes int64, exists bool)
 	Remove(path string) error
 	PruneGitWorktrees(repoRoot string)
+	// RemoveWorktree deletes a linked worktree (directory + git admin entry),
+	// forcing past uncommitted changes — the app layer owns the confirmation.
+	RemoveWorktree(gitDir, dir string) error
 }
 
 // Worktree is one entry from `git worktree list`.

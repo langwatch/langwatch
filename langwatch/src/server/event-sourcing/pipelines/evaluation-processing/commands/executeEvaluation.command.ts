@@ -55,6 +55,19 @@ export interface ExecuteEvaluationCommandDeps {
   azureSafetyEnvResolver?: (
     projectId: string,
   ) => Promise<Record<string, string> | null>;
+  /**
+   * Offloads oversized evaluator inputs to durable object storage before the
+   * event is built, so `event_log.EventPayload` and the fold stay bounded
+   * (ADR-040). Returns the inputs unchanged (inline) or a stored-object
+   * marker. Flag-gated and fail-open at the composition root; absent here
+   * means today's behavior (inputs flow inline; the repository belt-and-braces
+   * cap is the only bound).
+   */
+  offloadInputs?: (args: {
+    projectId: string;
+    evaluationId: string;
+    inputs: Record<string, unknown> | null;
+  }) => Promise<Record<string, unknown> | null>;
 }
 
 const SCHEMA = defineCommandSchema(
@@ -302,17 +315,22 @@ export class ExecuteEvaluationCommand implements CommandHandler<
         ? result.error ?? result.details ?? "Evaluator failed"
         : result.error;
 
-      return emitReported(data, tenantId, {
-        status: result.status,
-        score: result.score,
-        passed: result.passed,
-        label: result.label,
-        details: isError ? undefined : result.details,
-        error: errorField,
-        errorDetails: result.errorDetails ?? null,
-        inputs: result.inputs ?? null,
-        costId,
-      });
+      return await emitReported(
+        data,
+        tenantId,
+        {
+          status: result.status,
+          score: result.score,
+          passed: result.passed,
+          label: result.label,
+          details: isError ? undefined : result.details,
+          error: errorField,
+          errorDetails: result.errorDetails ?? null,
+          inputs: result.inputs ?? null,
+          costId,
+        },
+        this.deps.offloadInputs,
+      );
     } catch (error) {
       logger.error(
         {
@@ -334,7 +352,7 @@ export class ExecuteEvaluationCommand implements CommandHandler<
   }
 }
 
-function emitReported(
+async function emitReported(
   data: ExecuteEvaluationCommandData,
   tenantId: ReturnType<typeof createTenantId>,
   result: {
@@ -348,7 +366,22 @@ function emitReported(
     errorDetails?: string | null;
     costId?: string | null;
   },
-): EvaluationProcessingEvent[] {
+  offloadInputs?: ExecuteEvaluationCommandDeps["offloadInputs"],
+): Promise<EvaluationProcessingEvent[]> {
+  // ADR-040: offload oversized inputs to durable object storage BEFORE the
+  // event is created, so the S3 PUT precedes the event_log append (matching
+  // the PUT-then-row ordering used by stored-objects) and the event carries
+  // only the bounded marker. No-op when the hook is absent (flag off) or when
+  // there are no inputs.
+  const inputs =
+    offloadInputs && result.inputs
+      ? await offloadInputs({
+          projectId: tenantId,
+          evaluationId: data.evaluationId,
+          inputs: result.inputs,
+        })
+      : result.inputs ?? null;
+
   const event = EventUtils.createEvent<EvaluationReportedEvent>({
     aggregateType: "evaluation",
     aggregateId: data.evaluationId,
@@ -367,7 +400,7 @@ function emitReported(
       passed: result.passed ?? null,
       label: result.label ?? null,
       details: result.details ?? null,
-      inputs: result.inputs ?? null,
+      inputs,
       error: result.error ?? null,
       errorDetails: result.errorDetails ?? null,
       costId: result.costId ?? null,

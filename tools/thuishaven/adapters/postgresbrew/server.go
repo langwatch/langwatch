@@ -145,9 +145,12 @@ func (s *Server) EnsureDatabase(ctx context.Context, database string) error {
 	return s.exec(ctx, "postgres", fmt.Sprintf("CREATE DATABASE %s OWNER %s", quoteIdent(database), quoteIdent(domain.PostgresRole)))
 }
 
-// DropDatabase removes a stack's database.
+// DropDatabase removes a stack's database. WITH (FORCE) terminates any
+// lingering connections first: a database being dropped has no legitimate
+// readers left (a stale dev server holding a pool open must not block the
+// drop), and plain DROP DATABASE refuses while anything is connected.
 func (s *Server) DropDatabase(ctx context.Context, database string) error {
-	return s.exec(ctx, "postgres", "DROP DATABASE IF EXISTS "+quoteIdent(database))
+	return s.exec(ctx, "postgres", "DROP DATABASE IF EXISTS "+quoteIdent(database)+" WITH (FORCE)")
 }
 
 // Databases lists the lw_* databases currently on the server.

@@ -1,7 +1,7 @@
 import { APICallError, RetryError } from "ai";
 import { describe, expect, it } from "vitest";
 import { DomainError } from "../../app-layer/domain-error";
-import { nlpgoHandledErrorFrom } from "../goHandledError";
+import { isAbortLikeError, nlpgoHandledErrorFrom } from "../goHandledError";
 
 /** The exact envelope nlpgo returned for an unroutable provider prefix. */
 const MISSING_PROVIDER_BODY = JSON.stringify({
@@ -93,5 +93,29 @@ describe("nlpgoHandledErrorFrom", () => {
     it("returns null for a plain Error", () => {
       expect(nlpgoHandledErrorFrom(new Error("boom"))).toBeNull();
     });
+  });
+});
+
+describe("isAbortLikeError()", () => {
+  it("matches a DOMException abort by name (the AbortSignal.timeout reason shape)", () => {
+    // A DOMException is NOT instanceof Error in this runtime — the exact quirk
+    // the helper matches on `name` to guard against.
+    expect(isAbortLikeError(new DOMException("timed out", "TimeoutError"))).toBe(
+      true,
+    );
+    expect(isAbortLikeError(new DOMException("aborted", "AbortError"))).toBe(
+      true,
+    );
+  });
+
+  it("matches the Next.js ResponseAborted name (mirrors the SDK's isAbortError)", () => {
+    expect(isAbortLikeError({ name: "ResponseAborted" })).toBe(true);
+  });
+
+  it("does not match a non-abort error, null, or undefined", () => {
+    expect(isAbortLikeError(new Error("boom"))).toBe(false);
+    expect(isAbortLikeError({ name: "APICallError" })).toBe(false);
+    expect(isAbortLikeError(null)).toBe(false);
+    expect(isAbortLikeError(undefined)).toBe(false);
   });
 });

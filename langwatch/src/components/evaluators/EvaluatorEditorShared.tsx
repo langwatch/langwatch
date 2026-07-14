@@ -25,11 +25,16 @@ import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
 } from "~/components/variables";
-import { PairwiseConfigForm } from "~/experiments-v3/components/EvaluatorPanel/PairwiseConfigForm";
+
+import { ComparisonConfigForm } from "~/experiments-v3/components/EvaluatorPanel/ComparisonConfigForm";
 import type {
+  ComparisonEvaluatorConfig,
   LocalEvaluatorConfig,
-  PairwiseEvaluatorConfig,
   TargetConfig,
+} from "~/experiments-v3/types";
+import {
+  COMPARISON_EVALUATOR_TYPE,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
 import {
   getComplexProps,
@@ -53,21 +58,30 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 
-// Stable reference for the "no pairwise config yet" default (new pairwise
+// Stable reference for the "no comparison config yet" default (new comparison
 // evaluator, before the user has picked anything). Must be a module-level
-// constant, not an inline literal in JSX — PairwiseConfigForm re-syncs its
+// constant, not an inline literal in JSX — ComparisonConfigForm re-syncs its
 // local draft from this `value` prop whenever the *reference* changes
 // (`useEffect(() => setDraft(value), [value])`), and onChange only writes
 // to a ref (not back into this prop), so a fresh `{...}` literal on every
-// EvaluatorEditorBody re-render silently wiped Variant A/B/Golden field
+// EvaluatorEditorBody re-render silently wiped the variants / Golden field
 // mid-selection any time an unrelated field in the drawer re-rendered it.
-const EMPTY_PAIRWISE_CONFIG: PairwiseEvaluatorConfig = {
-  variantA: "",
-  variantB: "",
+const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
+  variants: [],
   hasGoldenAnswer: true,
   goldenField: "",
   includeMetrics: [],
+  randomizeOrder: true,
 };
+
+/**
+ * A legacy pairwise evaluator opens in the same form as a current one: its
+ * config is normalized to the comparison shape on load, so the only thing its
+ * evaluatorType still selects is which judge endpoint runs it.
+ */
+const isComparisonEvaluatorType = (evaluatorType: string | undefined): boolean =>
+  evaluatorType === COMPARISON_EVALUATOR_TYPE ||
+  evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
 
 export type EvaluatorMappingsConfig = {
   level?: "trace" | "thread";
@@ -99,12 +113,12 @@ export type EvaluatorEditorDrawerProps = {
   ) => void;
   initialLocalConfig?: LocalEvaluatorConfig;
   /**
-   * Pairwise compare drawer context (#5100). Non-serializable; flows
-   * through complexProps. When present, the drawer renders
-   * PairwiseConfigForm in place of the per-row mappings section.
+   * Comparison drawer context. Non-serializable; flows through complexProps.
+   * When present, the drawer renders ComparisonConfigForm in place of the
+   * per-row mappings section.
    */
-  pairwiseContext?: {
-    initialPairwise?: PairwiseEvaluatorConfig;
+  comparisonContext?: {
+    initialComparison?: ComparisonEvaluatorConfig;
     targets: { id: string }[];
     datasetColumns: { id: string; name: string }[];
   };
@@ -146,15 +160,19 @@ export type EvaluatorEditorController = {
   onMappingChange:
     | ((identifier: string, mapping: UIFieldMapping | undefined) => void)
     | undefined;
-  /** Pairwise compare drawer context (#5100). Set only for pairwise evaluator types. */
-  pairwiseContext:
+  /** Comparison drawer context. Set only for comparison evaluator types. */
+  comparisonContext:
     | {
-        initialPairwise?: PairwiseEvaluatorConfig;
+        initialComparison?: ComparisonEvaluatorConfig;
         targets: TargetConfig[];
         datasetColumns: { id: string; name: string }[];
       }
     | undefined;
-  onPairwiseChange: ((config: PairwiseEvaluatorConfig) => void) | undefined;
+  /** The live comparison draft, mirrored from ComparisonConfigForm. */
+  comparison: ComparisonEvaluatorConfig;
+  onComparisonChange:
+    | ((config: ComparisonEvaluatorConfig) => void)
+    | undefined;
   onLocalConfigChange:
     | ((config: LocalEvaluatorConfig | undefined) => void)
     | undefined;
@@ -196,22 +214,41 @@ export function useEvaluatorEditorController(
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
   const onMappingChange = flowCallbacks?.onMappingChange;
-  // Pairwise compare (#5100): when this context is set, the drawer renders
-  // PairwiseConfigForm instead of the per-row mappings section.
-  const pairwiseContext = complexProps.pairwiseContext as
+  // Comparison: when this context is set, the drawer renders
+  // ComparisonConfigForm instead of the per-row mappings section.
+  const comparisonContext = complexProps.comparisonContext as
     | {
-        initialPairwise?: PairwiseEvaluatorConfig;
+        initialComparison?: ComparisonEvaluatorConfig;
         targets: TargetConfig[];
         datasetColumns: { id: string; name: string }[];
       }
     | undefined;
-  const onPairwiseChange = (
+  const onComparisonChange = (
     flowCallbacks as
       | {
-          onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
+          onComparisonChange?: (config: ComparisonEvaluatorConfig) => void;
         }
       | undefined
-  )?.onPairwiseChange;
+  )?.onComparisonChange;
+
+  // ComparisonConfigForm keeps its own draft and only pushes changes outward,
+  // so the editor has to mirror it here — otherwise the footer can't know
+  // whether enough variants are picked to enable Save.
+  const [comparison, setComparison] = useState<ComparisonEvaluatorConfig>(
+    comparisonContext?.initialComparison ?? EMPTY_COMPARISON_CONFIG,
+  );
+  const initialComparison = comparisonContext?.initialComparison;
+  useEffect(() => {
+    setComparison(initialComparison ?? EMPTY_COMPARISON_CONFIG);
+  }, [initialComparison]);
+
+  const handleComparisonChange = useCallback(
+    (next: ComparisonEvaluatorConfig) => {
+      setComparison(next);
+      onComparisonChange?.(next);
+    },
+    [onComparisonChange],
+  );
 
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
@@ -311,22 +348,29 @@ export function useEvaluatorEditorController(
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // `defaultSettings` depends on the cascade-resolved model/embeddings queries,
+  // which can resolve (new object reference) *after* the user has already
+  // started filling out the form — e.g. Pairwise Compare's Include cost /
+  // duration toggles. `form.formState.isDirty` alone doesn't survive that
+  // race reliably (RHF batches its dirty flag; the effect body may read a
+  // stale value before the toggle-flip flushes), so cost gets a resolved
+  // default that stomps duration back to `[]`. Latch a ref to "already done
+  // the initial reset" for this evaluator so late-resolving defaults never
+  // re-fire the reset once the form is live.
+  const didInitializeCreateFormRef = useRef<string | null>(null);
   useEffect(() => {
-    // `defaultSettings` depends on the cascade-resolved model/embeddings
-    // queries, which can resolve (new object reference) *after* the user has
-    // already started filling out the form — e.g. Pairwise Compare's Include
-    // cost/duration toggles. Without the isDirty guard, that async resolve
-    // re-fires this effect and form.reset() silently wipes whatever the user
-    // already touched ("resetting out of the blue").
-    if (evaluatorDef && !evaluatorId && !form.formState.isDirty) {
-      form.reset({
-        name: forceUserToDecideAName ? "" : evaluatorDef.name,
-        settings: defaultSettings,
-      });
-    }
+    if (!evaluatorDef || evaluatorId) return;
+    const key = evaluatorType ?? evaluatorDef.name ?? "unknown";
+    if (didInitializeCreateFormRef.current === key) return;
+    form.reset({
+      name: forceUserToDecideAName ? "" : evaluatorDef.name,
+      settings: defaultSettings,
+    });
+    didInitializeCreateFormRef.current = key;
   }, [
     evaluatorDef,
     evaluatorId,
+    evaluatorType,
     defaultSettings,
     form,
     forceUserToDecideAName,
@@ -481,7 +525,20 @@ export function useEvaluatorEditorController(
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const name = form.watch("name");
-  const isValid = !!name && name.trim().length > 0;
+
+  // A comparison with fewer than two variants judges nothing — the
+  // orchestrator skips it outright ("fewer than 2 variants configured"). Gate
+  // Save and Apply on it rather than letting the user create a column that
+  // silently never runs.
+  //
+  // Filter empty slots, not just array length: a folded legacy pairwise
+  // config (fromPairwise) always returns a 2-element `variants` array even
+  // when one or both slots are unset, so `.length` alone can't tell a fully
+  // configured comparison from an under-filled one.
+  const hasEnoughVariants =
+    !isComparisonEvaluatorType(evaluatorType) ||
+    comparison.variants.filter(Boolean).length >= 2;
+  const isValid = !!name && name.trim().length > 0 && hasEnoughVariants;
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
@@ -644,8 +701,9 @@ export function useEvaluatorEditorController(
     saveButtonText,
     mappingsConfig,
     onMappingChange,
-    pairwiseContext,
-    onPairwiseChange,
+    comparisonContext,
+    comparison,
+    onComparisonChange: onComparisonChange ? handleComparisonChange : undefined,
     onLocalConfigChange,
     title,
     handleSave,
@@ -679,13 +737,19 @@ export function EvaluatorEditorBody({
     projectSlug,
     mappingsConfig,
     onMappingChange,
-    pairwiseContext,
-    onPairwiseChange,
+    comparisonContext,
+    comparison,
+    onComparisonChange,
   } = controller;
 
-  // Pairwise (#5100): if the caller passed pairwise context, ignore the
-  // generic mappings UI entirely and render the targets+golden picker.
-  const isPairwise = !!(pairwiseContext && onPairwiseChange);
+  // Comparison: if the caller passed comparison context, ignore the generic
+  // mappings UI entirely and render the variants+golden picker. Derive from
+  // evaluatorType alone so the inline UI shows the right fields even when
+  // drawer navigation transitions wipe flowCallbacks/complexProps mid-flight.
+  // Callback presence (`onComparisonChange`) is still checked at the render
+  // site below so persistence works when wiring is present, but it no longer
+  // decides which layout to draw.
+  const isComparison = isComparisonEvaluatorType(evaluatorType);
 
   if (evaluatorId && isLoadingEvaluator) {
     return (
@@ -727,13 +791,26 @@ export function EvaluatorEditorBody({
             prefix="settings"
             errors={form.formState.errors.settings}
             variant="default"
-            // Pairwise renders include_metrics and has_golden_answer as
-            // inline controls in PairwiseConfigForm (the latter sits right
-            // next to the Golden field picker it toggles, #5378); suppress
-            // the generic renderers here so the user doesn't see two
-            // competing UIs for the same fields.
+            // For the Comparison shortcut, keep ONLY the Model picker from
+            // the schema-driven form. Every other field is either duplicated
+            // by the inline ComparisonConfigForm (has_golden_answer,
+            // include_metrics) or a configurable default the user rarely
+            // needs during the "which columns am I comparing" flow
+            // (prompt / swap_and_confirm / allow_tie / randomize_order).
+            // They remain fully editable via the full evaluator editor
+            // (click the column chip on the workbench after creation).
             skipFields={
-              isPairwise ? ["include_metrics", "has_golden_answer"] : undefined
+              isComparison
+                ? [
+                    // The comparison form owns these; `swap_and_confirm` only
+                    // exists on the legacy pairwise judge and is not offered.
+                    "swap_and_confirm",
+                    "randomize_order",
+                    "allow_tie",
+                    "has_golden_answer",
+                    "include_metrics",
+                  ]
+                : undefined
             }
           />
         )}
@@ -766,7 +843,7 @@ export function EvaluatorEditorBody({
         )}
 
         {!hasSettings &&
-          !isPairwise &&
+          !isComparison &&
           (!mappingsConfig || !onMappingChange) &&
           !isWorkflowEvaluator && (
             <Text fontSize="sm" color="fg.muted">
@@ -774,18 +851,18 @@ export function EvaluatorEditorBody({
             </Text>
           )}
 
-        {isPairwise && pairwiseContext && onPairwiseChange && (
+        {isComparison && comparisonContext && onComparisonChange && (
           <Box paddingTop={4}>
-            <PairwiseConfigForm
-              value={pairwiseContext.initialPairwise ?? EMPTY_PAIRWISE_CONFIG}
-              onChange={onPairwiseChange}
-              targets={pairwiseContext.targets}
-              datasetColumns={pairwiseContext.datasetColumns}
+            <ComparisonConfigForm
+              value={comparison}
+              onChange={onComparisonChange}
+              targets={comparisonContext.targets}
+              datasetColumns={comparisonContext.datasetColumns}
             />
           </Box>
         )}
 
-        {!isPairwise && mappingsConfig && onMappingChange && (
+        {!isComparison && mappingsConfig && onMappingChange && (
           <Box paddingTop={4}>
             <EvaluatorMappingsSection
               evaluatorDef={effectiveEvaluatorDef}
@@ -828,11 +905,20 @@ export function EvaluatorEditorFooter({
     isValid,
     saveButtonText,
     onLocalConfigChange,
+    onComparisonChange,
     handleSave,
     handleDiscard,
     handleApply,
     handleClose,
   } = controller;
+
+  // Only a comparison editor mirrors its config into the store live (via
+  // onComparisonChange), so only there does an unrunnable (sub-2-variant)
+  // config need Apply gated. For every other local-config evaluator — an
+  // unnamed LLM-judge whose name isValid deliberately rejects — Apply must
+  // keep its original always-enabled behavior, so gating on isValid here
+  // doesn't newly trap them behind the name requirement.
+  const isComparisonEditor = !!onComparisonChange;
 
   if (onLocalConfigChange) {
     return (
@@ -862,6 +948,13 @@ export function EvaluatorEditorFooter({
           colorPalette="blue"
           size="sm"
           onClick={handleApply}
+          // A comparison below its 2-variant minimum must not be applyable —
+          // onComparisonChange has already mirrored an unrunnable config into
+          // the store live and Apply just closes over it. The ENTIRE guard is
+          // scoped to the comparison editor: base had no `disabled` on Apply
+          // at all, so a non-comparison editor (e.g. a still-unnamed LLM
+          // judge) keeps Apply always-enabled, pixel-identical to before.
+          disabled={isComparisonEditor && (!isValid || isSaving)}
           data-testid="evaluator-apply-button"
         >
           Apply

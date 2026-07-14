@@ -1,18 +1,18 @@
 import { Readable } from "node:stream";
-import { HTTPException } from "hono/http-exception";
 import type { MiddlewareHandler } from "hono";
-import { prisma } from "~/server/db";
+import { HTTPException } from "hono/http-exception";
+import { anyAuthenticated, createServiceApp } from "~/server/api/security";
 import { requireProjectPermission } from "~/server/auth/permissions";
+import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
+import { isReadbackSafe } from "~/server/stored-objects/safe-media-types";
 import {
   resolveStoredObjectOwner,
   StoredObjectOwnerLookupUnavailableError,
 } from "~/server/stored-objects/stored-objects-cross-tenant-lookup";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import { isReadbackSafe } from "~/server/stored-objects/safe-media-types";
-import { dualAuth } from "../../middleware/dual-auth";
 import type { DualAuthVariables } from "../../middleware/dual-auth";
-import { anyAuthenticated, createServiceApp } from "~/server/api/security";
+import { dualAuth } from "../../middleware/dual-auth";
 
 // File reads authenticate via dualAuth (project API key OR user session) and
 // authorize per-object in the handler (authorizeFileRead checks the caller's
@@ -66,10 +66,7 @@ const FILES_RESPONSE_BASE_HEADERS: Readonly<Record<string, string>> = {
   "Referrer-Policy": "no-referrer",
 };
 
-function jsonResponse(
-  body: unknown,
-  status: number,
-): Response {
+function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -118,20 +115,32 @@ async function authorizeFileRead({
  * Content-Type allowlist, Content-Disposition, Content-Length, and all
  * security headers. For HEAD requests the stream is drained and the body is
  * omitted; for GET the stream is forwarded.
+ *
+ * `requestedFilename` is the caller-supplied display name (the `filename`
+ * query param the attachment chip appends). Stored objects are
+ * content-addressed, so the row itself has no filename; passing the
+ * message-level one through gives downloads from the browser viewer a
+ * human name instead of the object id. It runs through the same
+ * `sanitizeFilenameSegment` allowlist as the id (header injection is
+ * neutralised), and an empty sanitised result falls back to the id.
  */
 function streamFileResponse({
   row,
   stream,
   method,
   mediaType,
+  requestedFilename,
 }: {
   row: { id: string; size_bytes: number };
-  stream: import("node:stream").Readable;
+  stream: Readable;
   method: "GET" | "HEAD";
   mediaType: string;
+  requestedFilename?: string;
 }): Response {
   const contentType = safeMediaType(mediaType);
-  const filename = sanitizeFilenameSegment(row.id);
+  const filename =
+    (requestedFilename ? sanitizeFilenameSegment(requestedFilename) : "") ||
+    sanitizeFilenameSegment(row.id);
 
   const headers: Record<string, string> = {
     "Content-Type": contentType,
@@ -216,17 +225,16 @@ async function handleFileRead(
     max: FILES_RATE_LIMIT_MAX,
   });
   if (!rl.allowed) {
-    return new Response(
-      JSON.stringify({ error: "rate_limited" }),
-      {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": String(Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000))),
-          ...FILES_RESPONSE_BASE_HEADERS,
-        },
+    return new Response(JSON.stringify({ error: "rate_limited" }), {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(
+          Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000)),
+        ),
+        ...FILES_RESPONSE_BASE_HEADERS,
       },
-    );
+    });
   }
 
   // Step 2: resolve the owning project.
@@ -304,6 +312,7 @@ async function handleFileRead(
     stream: result.stream,
     method: options.method,
     mediaType: result.row.media_type,
+    requestedFilename: c.req.query("filename"),
   });
 }
 

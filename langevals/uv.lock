@@ -32,6 +32,7 @@ members = [
     "langevals-topic-clustering",
 ]
 overrides = [
+    { name = "json-repair", specifier = ">=0.60.1" },
     { name = "langchain", specifier = ">=0.3.30" },
     { name = "langsmith", specifier = ">=0.8.18" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
@@ -1807,11 +1808,11 @@ wheels = [
 
 [[package]]
 name = "json-repair"
-version = "0.55.2"
+version = "0.61.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/23/72/aa66feeb21fa966071138c6ad253b815cdce04c4754aa1902f18b8ea5a03/json_repair-0.55.2.tar.gz", hash = "sha256:aa5c89692126257efb8e3cf1efe6787387634b5c360fb77313d66f146e980de6", size = 40144, upload-time = "2026-02-02T05:46:31.541Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/7c/6d7c931fb6348f957154f9af926a77777a03ef0f6108c51cc2d7c9876a22/json_repair-0.61.2.tar.gz", hash = "sha256:b63ae5ad44c8720158e24bdd7e33506f7036174c287831b187a51619a6f58a34", size = 50539, upload-time = "2026-07-05T11:53:08.137Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/82/f7/d4e8d5928239173bf596a0300fe98f901a3cc5ffe9007ed03d5ea953cac7/json_repair-0.55.2-py3-none-any.whl", hash = "sha256:08109b093fc9fe99b956b8309f9c1dfd2740637056d93df489cc7b4eb56d4286", size = 30321, upload-time = "2026-02-02T05:46:29.882Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/ba/c90076ab3fb22d43a31e2e53f56ffbaea25d524d8db3b38082779a562789/json_repair-0.61.2-py3-none-any.whl", hash = "sha256:779a0cdb48f609d6eb669273023cf4c92b5ac6d80a496eb919ee93c84c351ec8", size = 48977, upload-time = "2026-07-05T11:53:06.774Z" },
 ]
 
 [[package]]

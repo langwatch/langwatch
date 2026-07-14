@@ -441,7 +441,10 @@ describe("mappingValidation", () => {
       });
 
       describe("when variantA/variantB are unset", () => {
-        it("still requires variantA/variantB", () => {
+        // The merge collapsed the two slot fields into one `variants` list, so
+        // an under-filled comparison reports a single missing field however
+        // many variants it wanted.
+        it("still requires at least two variants", () => {
           const target = createPairwiseTargetConfig({
             pairwise: {
               variantA: "",
@@ -456,10 +459,7 @@ describe("mappingValidation", () => {
 
           expect(result.isValid).toBe(false);
           expect(
-            result.missingMappings.some((m) => m.fieldId === "variantA"),
-          ).toBe(true);
-          expect(
-            result.missingMappings.some((m) => m.fieldId === "variantB"),
+            result.missingMappings.some((m) => m.fieldId === "variants"),
           ).toBe(true);
         });
       });

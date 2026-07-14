@@ -56,14 +56,59 @@ Open <https://langwatch.localhost> to see every stack across your worktrees.
 
 ```text
 haven setup      one-time bootstrap — verify/install portless, trust its CA
-haven            live TUI of all stacks (a terminal version of the dashboard)
+haven            the hub: every stack + actions on the selected one — open its
+                 git view, shut it down, destroy the worktree (haven hub / ps)
 haven up         what `pnpm dev:haven` runs — resolve slug, register, supervise
 haven list       every stack: slug, branch, worktree, hostnames (--json too)
-haven doctor     proxy / daemon / observability / stack health
-haven seed       reseed this stack's database
+haven doctor     proxy / daemon / observability / stack health + memory footprints
+haven seed       reseed this stack's database (refuses non-local database URLs);
+                 --preset demo seeds past onboarding with sample traces
+haven git        embedded git TUI (moron) for any worktree — `haven git <slug>`
+                 inspects another stack's worktree without cd or checkout;
+                 `--list`/`--json` print the per-worktree overview instead
+haven prune      reclaim disk + drop pruned worktrees' databases (dry-run
+                 without --yes; the standing lw_main database is always kept)
 haven down       tear this worktree's routes + registry entry down
+haven watch      passive live view (the hub without the actions)
 haven help       exhaustive, copy-pasteable reference
 ```
+
+**The hub.** Bare `haven` (or `haven hub`) opens the interactive fleet view:
+every stack with its liveness, branch, service health, and RAM footprint.
+Actions run on the selected stack — enter/`g` opens its git view (and returns
+to the hub on quit), `d` shuts it down keeping its databases, and `x` destroys
+the worktree entirely: stack stopped, ClickHouse + Postgres databases dropped,
+directory deleted, confirmed by typing the stack's name. The primary checkout
+and the worktree haven runs from can never be destroyed.
+
+**Seed presets.** `haven seed` reseeds the stable local identity. `haven seed
+--preset demo` additionally marks the project as already past onboarding and
+ingests a deterministic set of sample traces through the running stack's real
+collector — so the UI opens on populated lists instead of the first-message
+journey. The stack must be up for the traces (they exercise the actual
+ingestion pipeline; re-running is idempotent).
+
+**Resource caps.** Everything haven manages is bounded: the ClickHouse
+container and the observability stack are memory-capped (and their colima VM is
+sized at creation), and the managed Redis gets a `maxmemory` ceiling
+(`HAVEN_REDIS_MAXMEMORY_MB`, default 512, `0` disables) so a leaky stack fails
+loudly instead of paging the machine. `haven doctor` shows each service's
+current memory use, and the hub + dashboard show each stack's RAM footprint.
+
+**Git across worktrees.** `haven git` opens [moron](https://github.com/0xdeafcafe/moron)
+in-process (a Go module dependency — nothing extra to install) for the current
+worktree; pass a stack slug, worktree name, or path to open another. Inside the
+TUI, Enter on a branch shows its diff against HEAD without checking it out, and
+Enter on a worktree re-targets the whole view at that worktree — the filesystem
+is never touched. The hub page (`langwatch.localhost`) shows the same fleet with
+live health, per-stack RAM, and database names.
+
+**Destructive-operation guards.** Database drops only ever run against the
+managed loopback servers, `seed` refuses when the worktree's effective
+`DATABASE_URL`/`CLICKHOUSE_URL` is non-local, uses the wrong dev user, or has a
+production-looking name, and bulk cleanup (`prune`, `drop --all`) always keeps
+`lw_main` — the standing database you fall back to when a worktree doesn't need
+its own data.
 
 **Agent mode.** `--agent` (or `HAVEN_AGENT=1`, `NO_COLOR`, or a non-TTY stdout)
 switches to plain, colourless, redraw-free output — zero token waste when an AI

@@ -15,7 +15,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { EvaluatorListDrawer } from "../EvaluatorListDrawer";
 
-const { mockEvaluator, deleteMutate } = vi.hoisted(() => ({
+const {
+  mockEvaluator,
+  mockComparisonEvaluator,
+  mockLegacyPairwiseEvaluator,
+  deleteMutate,
+} = vi.hoisted(() => ({
   mockEvaluator: {
     id: "evaluator_1",
     name: "Exactness",
@@ -23,8 +28,24 @@ const { mockEvaluator, deleteMutate } = vi.hoisted(() => ({
     config: {},
     updatedAt: "2026-01-01T00:00:00.000Z",
   },
+  mockComparisonEvaluator: {
+    id: "evaluator_comparison",
+    name: "Comparison",
+    type: "llm",
+    config: { evaluatorType: "langevals/select_best_compare" },
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  },
+  mockLegacyPairwiseEvaluator: {
+    id: "evaluator_pairwise",
+    name: "Pairwise Compare",
+    type: "llm",
+    config: { evaluatorType: "langevals/pairwise_compare" },
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  },
   deleteMutate: vi.fn(),
 }));
+
+let evaluatorsData: unknown[] = [mockEvaluator];
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -33,7 +54,7 @@ vi.mock("~/utils/api", () => ({
     }),
     evaluators: {
       getAll: {
-        useQuery: () => ({ isLoading: false, data: [mockEvaluator] }),
+        useQuery: () => ({ isLoading: false, data: evaluatorsData }),
       },
       delete: {
         useMutation: () => ({ mutate: deleteMutate, isLoading: false }),
@@ -74,16 +95,18 @@ describe("EvaluatorListDrawer", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    evaluatorsData = [mockEvaluator];
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  const renderDrawer = () =>
-    render(<EvaluatorListDrawer open={true} onSelect={onSelect} />, {
-      wrapper: Wrapper,
-    });
+  const renderDrawer = (props: Partial<{ filterEvaluatorType: string }> = {}) =>
+    render(
+      <EvaluatorListDrawer open={true} onSelect={onSelect} {...props} />,
+      { wrapper: Wrapper },
+    );
 
   describe("when keyboard keys come from the nested actions menu", () => {
     it("does not select the card on Enter from the menu trigger", async () => {
@@ -170,6 +193,52 @@ describe("EvaluatorListDrawer", () => {
       await user.click(await screen.findByRole("button", { name: "Cancel" }));
 
       expect(deleteMutate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when no filterEvaluatorType is given (generic per-target Add Evaluator)", () => {
+    it("excludes Comparison and legacy Pairwise evaluators from the list", async () => {
+      evaluatorsData = [
+        mockEvaluator,
+        mockComparisonEvaluator,
+        mockLegacyPairwiseEvaluator,
+      ];
+      renderDrawer();
+
+      await screen.findByTestId(`evaluator-card-${mockEvaluator.id}`);
+
+      expect(
+        screen.queryByTestId(`evaluator-card-${mockComparisonEvaluator.id}`),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId(
+          `evaluator-card-${mockLegacyPairwiseEvaluator.id}`,
+        ),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when filterEvaluatorType narrows to Comparison", () => {
+    it("shows only Comparison evaluators", async () => {
+      evaluatorsData = [
+        mockEvaluator,
+        mockComparisonEvaluator,
+        mockLegacyPairwiseEvaluator,
+      ];
+      renderDrawer({ filterEvaluatorType: "langevals/select_best_compare" });
+
+      await screen.findByTestId(
+        `evaluator-card-${mockComparisonEvaluator.id}`,
+      );
+
+      expect(
+        screen.queryByTestId(`evaluator-card-${mockEvaluator.id}`),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId(
+          `evaluator-card-${mockLegacyPairwiseEvaluator.id}`,
+        ),
+      ).not.toBeInTheDocument();
     });
   });
 });

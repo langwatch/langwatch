@@ -433,10 +433,18 @@ export function useProviderFormSubmit({
       // auto-seed (seedOnboardingDefaultsForProvider) runs regardless of
       // the "use as default provider" checkbox — so the DefaultModelsSection
       // card needs to refetch even when the user didn't opt into the replay.
+      // listAllForOrganizationForFrontend is here too: the settings table
+      // reads that org-wide list for org:view users, and this invalidation
+      // is awaited before onSuccess closes the drawer — omit it and the
+      // table re-renders with the stale pre-save list (no loading
+      // affordance), which reads as "the save didn't take" and drives
+      // users to re-add the same provider (the other duplicate-row path
+      // in #5380).
       await Promise.all([
         utils.modelProvider.getAllForProject.invalidate(),
         utils.modelProvider.getAllForProjectForFrontend.invalidate(),
         utils.modelProvider.listAllForProjectForFrontend.invalidate(),
+        utils.modelProvider.listAllForOrganizationForFrontend.invalidate(),
         utils.modelProvider.getResolvedDefault.invalidate(),
         utils.modelProvider.getDefaultModelsForProject.invalidate(),
       ]);

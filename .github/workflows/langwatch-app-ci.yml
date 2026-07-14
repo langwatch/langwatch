@@ -47,6 +47,7 @@ jobs:
             feature-parity:
               - 'specs/**'
               - 'langwatch/**'
+              - 'tools/**'
               - 'mcp-server/**'
               - 'typescript-sdk/**'
               - 'python-sdk/**'

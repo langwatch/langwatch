@@ -99,7 +99,7 @@ function matchUrl({
     return `${baseHost}/${projectSlug}/analytics/custom/${graphId}`;
   }
   if (traceId) {
-    return `${baseHost}/${projectSlug}/messages/${traceId}`;
+    return `${baseHost}/${projectSlug}/traces/${traceId}`;
   }
   return "#";
 }

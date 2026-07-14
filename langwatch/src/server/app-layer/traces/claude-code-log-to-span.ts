@@ -20,8 +20,16 @@
  * per-batch converter can never rejoin those halves. So this converter is run
  * over the WHOLE TURN's saved logs (the receiver records the claude logs to
  * stored_log_records and a reactor re-folds them); the trace is keyed per turn
- * (`traceId = sha256(session.id:prompt.id)`), so a turn's log set is small and
- * bounded and every batch is already visible when it is folded.
+ * (`traceId = sha256(session.id:prompt.id)`), so a turn's log set is one turn's
+ * worth of records and every batch is already visible when it is folded.
+ *
+ * A turn's log set is NOT assumed small: one pathological agentic turn can drive
+ * thousands of tool/model calls. The span-sync reactor bounds the conversion at
+ * {@link CLAUDE_TURN_LOG_CAP} records (in turn order) and passes the drop count
+ * here as `truncation`, so a runaway turn can neither seize the worker nor build
+ * an unbounded span tree. When the cap bites, the root span carries
+ * {@link CLAUDE_TRUNCATED_LOGS_ATTR} and {@link CLAUDE_DROPPED_LOG_COUNT_ATTR} so
+ * the truncation is observable at read.
  *
  * Idempotency (load-bearing). The fold re-runs over the turn's growing log set,
  * so a given call is converted many times as more of its parts arrive. Spans
@@ -155,6 +163,55 @@ export const CLAUDE_CODE_PII_ATTR = "langwatch.claude_code.pii";
 export const CLAUDE_CODE_LOG_RETENTION_DAYS = 1;
 
 /**
+ * Maximum number of a turn's marked log records the span-sync conversion folds
+ * in one pass. One pathological agentic turn can stream thousands of tool/model
+ * calls; without a bound the reactor re-reads and re-converts the whole growing
+ * set on every debounce, seizing the worker and building an unbounded span tree.
+ * The reactor fetches at most `cap + 1` records (in turn order), converts the
+ * first `cap`, and stamps the root span with the truncation attributes below so
+ * the drop is observable. Generous enough that a normal turn is never clipped;
+ * an operator can raise it via `LANGWATCH_CLAUDE_TURN_LOG_CAP`.
+ */
+export const CLAUDE_TURN_LOG_CAP = 2000;
+
+/**
+ * Upper bound on the per-turn conversion cap. Keeps an operator-supplied
+ * `LANGWATCH_CLAUDE_TURN_LOG_CAP` from re-opening the unbounded-conversion
+ * failure mode; a turn never needs more than this many records converted.
+ */
+export const MAX_CLAUDE_TURN_LOG_CAP = 20000;
+
+/**
+ * Root-span attribute set to `true` when a turn's log set exceeded
+ * {@link CLAUDE_TURN_LOG_CAP} and the conversion was bounded, so the truncation
+ * is observable in the trace. Named under the existing `langwatch.claude_code.*`
+ * convention shared with {@link CLAUDE_CODE_KIND_ATTR}/{@link CLAUDE_CODE_PII_ATTR}.
+ */
+export const CLAUDE_TRUNCATED_LOGS_ATTR = "langwatch.claude_code.truncated_logs";
+
+/**
+ * Root-span attribute carrying how many of a turn's marked log records were
+ * dropped when the conversion was bounded (>= 1 whenever
+ * {@link CLAUDE_TRUNCATED_LOGS_ATTR} is set). The exact count when the reactor's
+ * uncapped count query succeeds; a lower bound (>= 1) when that query fails and
+ * the reactor falls back to `fetched - cap` (only the `cap + 1` fetch is known).
+ */
+export const CLAUDE_DROPPED_LOG_COUNT_ATTR =
+  "langwatch.claude_code.dropped_log_count";
+
+/**
+ * Resolve the operator-configured per-turn conversion cap from an env value,
+ * clamped to `[1, MAX_CLAUDE_TURN_LOG_CAP]`. Absent, non-numeric, or below-one
+ * values fall back to {@link CLAUDE_TURN_LOG_CAP}. Mirrors the parse semantics of
+ * the shard-count env resolvers.
+ */
+export function resolveClaudeTurnLogCap(raw: string | undefined): number {
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) return CLAUDE_TURN_LOG_CAP;
+  return Math.min(parsed, MAX_CLAUDE_TURN_LOG_CAP);
+}
+
+/**
  * The span kind a claude_code log event feeds, or null when the event is not
  * folded into a span (so it stays a plain, visible log). The receiver marks +
  * saves every event with a non-null kind; the reactor folds them; the read path
@@ -215,6 +272,10 @@ const dblAttr = (key: string, value: number): OtlpKeyValue => ({
   key,
   value: { doubleValue: value },
 });
+const boolAttr = (key: string, value: boolean): OtlpKeyValue => ({
+  key,
+  value: { boolValue: value },
+});
 
 const asNumber = (raw: string | undefined): number | null => {
   if (raw === undefined || raw === "") return null;
@@ -265,21 +326,33 @@ function groupByTrace(
  * `promptTextById` maps a `prompt.id` to the clean user-typed text from the
  * co-located `user_prompt` event, used as the turn input when no user_prompt
  * record is in the set or claude truncated the api_request_body inline.
+ *
+ * `truncation` carries how many of the turn's records the caller dropped to keep
+ * the conversion bounded (see {@link CLAUDE_TURN_LOG_CAP}); a positive
+ * `droppedLogCount` stamps the root span with {@link CLAUDE_TRUNCATED_LOGS_ATTR}
+ * and {@link CLAUDE_DROPPED_LOG_COUNT_ATTR} so the truncation is observable.
  */
 export function convertClaudeCodeTurnToSpans(
   records: ClaudeCodeLogRecordInput[],
   promptTextById: ReadonlyMap<string, string> = new Map(),
+  truncation: ClaudeTurnTruncation = { droppedLogCount: 0 },
 ): SynthesizedClaudeSpan[] {
   const out: SynthesizedClaudeSpan[] = [];
   for (const traceRecords of groupByTrace(records).values()) {
-    out.push(...buildTurnSpans(traceRecords, promptTextById));
+    out.push(...buildTurnSpans(traceRecords, promptTextById, truncation));
   }
   return out;
+}
+
+/** How many of a turn's records were dropped to bound the span conversion. */
+export interface ClaudeTurnTruncation {
+  droppedLogCount: number;
 }
 
 function buildTurnSpans(
   records: ClaudeCodeLogRecordInput[],
   promptTextById: ReadonlyMap<string, string>,
+  truncation: ClaudeTurnTruncation,
 ): SynthesizedClaudeSpan[] {
   const traceId = records[0]?.traceId;
   if (!traceId) return [];
@@ -306,6 +379,7 @@ function buildTurnSpans(
     rootSpanId,
     children,
     promptTextById,
+    truncation,
   });
   return [root, ...children];
 }
@@ -667,12 +741,14 @@ function buildRootSpan({
   rootSpanId,
   children,
   promptTextById,
+  truncation,
 }: {
   records: ClaudeCodeLogRecordInput[];
   traceId: string;
   rootSpanId: string;
   children: SynthesizedClaudeSpan[];
   promptTextById: ReadonlyMap<string, string>;
+  truncation: ClaudeTurnTruncation;
 }): SynthesizedClaudeSpan {
   const userPrompt = records.find((r) => r.eventName === "user_prompt") ?? null;
   const promptText =
@@ -687,6 +763,12 @@ function buildRootSpan({
   if (sessionId) {
     attrs.push(strAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId));
     attrs.push(strAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, sessionId));
+  }
+  // Mark the turn as truncated when the caller bounded the conversion, so the
+  // drop is observable at read instead of silently missing spans.
+  if (truncation.droppedLogCount > 0) {
+    attrs.push(boolAttr(CLAUDE_TRUNCATED_LOGS_ATTR, true));
+    attrs.push(intAttr(CLAUDE_DROPPED_LOG_COUNT_ATTR, truncation.droppedLogCount));
   }
   if (promptText) {
     attrs.push(

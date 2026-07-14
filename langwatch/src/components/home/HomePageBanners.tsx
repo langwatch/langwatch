@@ -4,8 +4,7 @@ import { motion, useAnimationFrame, useMotionValue } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { IconType } from "react-icons";
-import { LuArrowRight, LuMic, LuSparkles, LuX, LuZap } from "react-icons/lu";
-import { setTracesV2Preferred } from "~/features/traces-v2/hooks/useTracesV2Preference";
+import { LuArrowRight, LuMic, LuX, LuZap } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";
@@ -135,36 +134,6 @@ const SLIDES: Slide[] = [
 				"_blank",
 				"noopener,noreferrer",
 			),
-	},
-	{
-		id: "traces-v2",
-		storagePrefix: "langwatch:tracesV2-home-banner-dismissed:v2:try:",
-		colorsLight: ["#6b21a8", "#a855f7", "#ec4899", "#fdf2f8"],
-		colorsDark: ["#581c87", "#9333ea", "#db2777", "#1f0a2e"],
-		mesh: {
-			distortion: 0.78,
-			swirl: 0.72,
-			scale: 1.15,
-			offsetX: 0.08,
-			offsetY: 0.24,
-			rotation: 86,
-		},
-		Icon: LuSparkles,
-		heading: "The new Trace Explorer is here",
-		badge: "Beta",
-		subtitle: (
-			<>
-				A faster, friendlier tracing experience, built on everything we learned
-				from v1. Take it for a spin and tell us what you think.
-			</>
-		),
-		ctaLabel: "Try the new Trace Explorer",
-		ctaColor: "purple.700",
-		posthogEvent: "traces_v2_opt_in",
-		navigate: ({ router, projectSlug }) => {
-			setTracesV2Preferred(true);
-			void router.push(`/${projectSlug}/traces`);
-		},
 	},
 ];
 

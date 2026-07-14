@@ -81,8 +81,8 @@ export function HomePagePicker({ organizationId }: Props) {
       opts.push({
         value: "project",
         label: "Project home",
-        description: `Always land on /${firstProjectSlug}/messages`,
-        path: `/${firstProjectSlug}/messages`,
+        description: `Always land on /${firstProjectSlug}/traces`,
+        path: `/${firstProjectSlug}/traces`,
       });
     }
     if (persona === "governance_admin") {

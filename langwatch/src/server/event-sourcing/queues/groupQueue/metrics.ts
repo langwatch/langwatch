@@ -27,6 +27,7 @@ const metricNames = [
   "gq_blob_decode_cap_exceeded_total",
   "gq_envelope_gq2_downgrade_total",
   "gq_payload_too_large_total",
+  "gq_groups_poison_parked_total",
   "gq_retry_encode_failures_total",
 ] as const;
 
@@ -193,6 +194,18 @@ export const gqPayloadTooLargeTotal = new Counter({
   name: "gq_payload_too_large_total",
   help: "Payload rejected at the encode cap",
   labelNames: ["queue_name"] as const,
+});
+
+/**
+ * Claim-side poison guard parked a group into the blocked set
+ * (specs/event-sourcing/poison-group-park-guard.feature). reason:
+ * "claim_strikes" = consecutive worker deaths while the group was in flight;
+ * "oversized_payload" = staged value over the decode cap.
+ */
+export const gqGroupsPoisonParkedTotal = new Counter({
+  name: "gq_groups_poison_parked_total",
+  help: "Groups parked into the blocked set by the claim-side poison guard",
+  labelNames: ["queue_name", "reason"] as const,
 });
 
 /**

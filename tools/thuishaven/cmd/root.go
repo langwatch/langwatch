@@ -52,13 +52,14 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Bare `haven`: the TUI in a terminal, help when driven by an agent/pipe.
+	// Bare `haven`: the interactive hub in a terminal, help when driven by an
+	// agent/pipe.
 	if len(args) == 0 {
 		if isAgent {
 			fmt.Print(helpText)
 			return nil
 		}
-		return d.orch.Watch(ctx)
+		return runHub(ctx, d, nil)
 	}
 	return d.dispatch(ctx, args[0], args[1:])
 }
@@ -117,7 +118,11 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), domain.DefaultColimaLimits(ram, cpus))
 	ch := clickhousedocker.New(rt, havenHome(), envOr("HAVEN_CH_IMAGE", domain.ClickHouseImage), clickHouseLimits())
 	pg := postgresbrew.New(envOr("HAVEN_PG_FORMULA", domain.DefaultPostgresFormula), envInt("HAVEN_PG_PORT", domain.DefaultPostgresPort))
-	rds := redisbrew.New(envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula), envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort))
+	rds := redisbrew.New(
+		envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula),
+		envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort),
+		envInt("HAVEN_REDIS_MAXMEMORY_MB", domain.DefaultRedisMaxMemoryMB),
+	)
 	obs := otellgtm.New(
 		rt,
 		havenHome(),
@@ -125,6 +130,18 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		observabilityEndpoints(),
 		domain.DefaultObservabilityLimits(ram, cpus),
 	)
+
+	// The console floor haven imposes while the observability stack is up: default
+	// warn, because the full info/debug stream is in Grafana and the terminal only
+	// needs what wants a human. LW_OBS_CONSOLE_LEVEL overrides it; "off"/"none"/""
+	// opts out and leaves the console to .env.
+	obsConsoleLevel := "warn"
+	if v, ok := os.LookupEnv("LW_OBS_CONSOLE_LEVEL"); ok {
+		obsConsoleLevel = v
+	}
+	if obsConsoleLevel == "off" || obsConsoleLevel == "none" {
+		obsConsoleLevel = ""
+	}
 
 	cfg := app.Config{
 		Naming:                   naming,
@@ -139,14 +156,20 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		ShouldManageRedis:        os.Getenv("LANGWATCH_HAVEN_REDIS") != "0",
 		// Observability shares CH's colima VM, so it defaults ON now — the VM is
 		// already paying for itself. LANGWATCH_HAVEN_OBS=0 opts out.
-		ShouldStartObservability: os.Getenv("LANGWATCH_HAVEN_OBS") != "0",
-		LocalAPIKey:              envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
-		RepoRoot:                 worktree,
+		ShouldStartObservability:  os.Getenv("LANGWATCH_HAVEN_OBS") != "0",
+		LocalAPIKey:               envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
+		RepoRoot:                  worktree,
+		ObservabilityConsoleLevel: obsConsoleLevel,
 	}
 
 	return deps{
-		orch:     app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, logger),
-		dash:     dashboard.New(store.Stacks, sharedURL),
+		orch: app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, logger),
+		dash: dashboard.New(store.Stacks, sharedURL, dashboard.Probes{
+			PortInUse:    sys.PortInUse,
+			ProcessAlive: sys.ProcessAlive,
+			GroupRSS:     sys.GroupRSS,
+			TotalMemory:  sys.TotalMemory,
+		}),
 		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree)},
 		opts:     optionsFromEnv(worktree),
 		worktree: worktree,
@@ -166,6 +189,18 @@ var commands = map[string]command{
 			return d.orch.UpStub(ctx, d.params, dashboard.StartEcho)
 		}
 		return d.orch.Up(ctx, d.params, d.opts)
+	},
+	"pr": func(ctx context.Context, d deps, rest []string) error {
+		return app.TryPR(ctx, app.TryPRParams{
+			Ref:                 firstNonFlag(rest),
+			RepoRoot:            d.worktree,
+			WorktreeBase:        prWorktreeBase(d.worktree),
+			NoInstall:           hasFlag(rest, "--no-install"),
+			Force:               hasFlag(rest, "--force"),
+			DryRun:              hasFlag(rest, "--dry-run"),
+			AllowScripts:        hasFlag(rest, "--trusted") || hasFlag(rest, "--allow-scripts"),
+			DiscardLocalChanges: hasFlag(rest, "--discard-local-changes"),
+		}, runHavenUpIn)
 	},
 	"setup":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Setup(ctx) },
 	"watch":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Watch(ctx) },
@@ -188,11 +223,22 @@ var commands = map[string]command{
 	"observability": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.RunObservability(ctx, rest)
 	},
-	"hmr":  func(ctx context.Context, d deps, rest []string) error { return d.orch.RunHMR(ctx, d.lwDir, rest) },
-	"seed": func(ctx context.Context, d deps, _ []string) error { return d.orch.Seed(ctx, d.params) },
+	"hmr": func(ctx context.Context, d deps, rest []string) error { return d.orch.RunHMR(ctx, d.lwDir, rest) },
+	"seed": func(ctx context.Context, d deps, rest []string) error {
+		if err := guardSeedEnv(d.lwDir); err != nil {
+			return err
+		}
+		preset, err := seedPresetArg(rest)
+		if err != nil {
+			return err
+		}
+		return d.orch.Seed(ctx, d.params, preset)
+	},
 	"list": func(_ context.Context, d deps, rest []string) error {
 		return d.orch.List(d.isAgent || hasFlag(rest, "--json"))
 	},
+	"git":    runGitUI,
+	"hub":    runHub,
 	"doctor": func(_ context.Context, d deps, _ []string) error { return d.orch.Doctor() },
 }
 
@@ -204,6 +250,9 @@ var aliases = map[string]string{
 	"tc":     "typecheck",
 	"ls":     "list",
 	"status": "list",
+	"moron":  "git",
+	"ps":     "hub",
+	"active": "hub",
 }
 
 // observabilityEndpoints are fixed ports rather than ephemeral ones: the gcx CLI
@@ -241,15 +290,21 @@ func (d deps) dispatch(ctx context.Context, sub string, rest []string) error {
 
 func optionsFromEnv(repoRoot string) app.PlanOptions {
 	return app.PlanOptions{
-		ShouldGoWatch:             os.Getenv("LANGWATCH_GO_WATCH") == "1",
-		ShouldStartWorkers:        os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
-		ShouldRunWorkersInProcess: os.Getenv("WORKERS_IN_PROCESS") == "1" || os.Getenv("WORKERS_IN_PROCESS") == "true",
-		ShouldSkipNLP:        os.Getenv("LANGWATCH_SKIP_NLP") == "1",
-		ShouldSkipGateway:    os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
-		ShouldSkipLangyAgent: os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1",
-		ShouldSeed:           os.Getenv("LANGWATCH_SEED") == "1",
-		IsStub:             os.Getenv("HAVEN_STUB") == "1",
-		RepoRoot:           repoRoot,
+		ShouldGoWatch:      os.Getenv("LANGWATCH_GO_WATCH") == "1",
+		ShouldStartWorkers: os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
+		// Under haven the worker stack defaults to IN-PROCESS (hosted in the app
+		// process), saving the RAM of a second Node process — the sensible default on
+		// a laptop juggling several worktrees. Workers keep their own logger name
+		// ("langwatch:workers"), so their lines stay identifiable even without a
+		// separate lane. Opt back into a standalone `workers` lane with
+		// WORKERS_IN_PROCESS=0.
+		ShouldRunWorkersInProcess: os.Getenv("WORKERS_IN_PROCESS") != "0" && os.Getenv("WORKERS_IN_PROCESS") != "false",
+		ShouldSkipNLP:             os.Getenv("LANGWATCH_SKIP_NLP") == "1",
+		ShouldSkipGateway:         os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
+		ShouldSkipLangyAgent:      os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1",
+		ShouldSeed:                os.Getenv("LANGWATCH_SEED") == "1",
+		IsStub:                    os.Getenv("HAVEN_STUB") == "1",
+		RepoRoot:                  repoRoot,
 	}
 }
 
@@ -326,6 +381,61 @@ func gitIsLinkedWorktree(dir string) bool {
 	return abs(string(gitDir)) != abs(string(commonDir))
 }
 
+// runHavenUpIn re-invokes haven's own `up` with cwd set to a PR worktree, so the
+// whole provision/supervise pipeline runs there (haven derives everything from
+// cwd). Foreground: it blocks supervising the stack until the user stops it,
+// inheriting stdio so the stack banner + logs stream through.
+func runHavenUpIn(ctx context.Context, dir string) error {
+	argv := selfArgv(dir, "up")
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	// On Ctrl-C (ctx cancel), ask `haven up` to shut down gracefully with SIGTERM
+	// instead of exec's default SIGKILL, so its stack deregistration/cleanup runs.
+	// WaitDelay bounds that grace so a wedged child can't hang the shell forever.
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	cmd.WaitDelay = 10 * time.Second
+	return cmd.Run()
+}
+
+// prWorktreeBase is where `haven pr` puts new PR worktrees: HAVEN_WORKTREE_DIR if
+// set, else the sibling `worktrees/` dir next to the main checkout (matching the
+// existing layout, e.g. .../langwatch/worktrees).
+func prWorktreeBase(dir string) string {
+	if v := os.Getenv("HAVEN_WORKTREE_DIR"); v != "" {
+		return v
+	}
+	return filepath.Join(filepath.Dir(gitMainWorktree(dir)), "worktrees")
+}
+
+// gitMainWorktree returns the repo's primary checkout (the first entry of `git
+// worktree list`), which is the anchor the sibling worktrees/ dir hangs off —
+// stable no matter which linked worktree haven pr was invoked from.
+func gitMainWorktree(dir string) string {
+	out, err := exec.Command("git", "-C", dir, "worktree", "list", "--porcelain").Output()
+	if err != nil {
+		return gitTopLevel(dir)
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		if rest, ok := strings.CutPrefix(line, "worktree "); ok {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return gitTopLevel(dir)
+}
+
+// firstNonFlag returns the first positional arg (the PR ref), skipping -flags.
+func firstNonFlag(args []string) string {
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			return a
+		}
+	}
+	return ""
+}
+
 func stripFlag(args []string, flag string) ([]string, bool) {
 	var out []string
 	found := false
@@ -337,6 +447,41 @@ func stripFlag(args []string, flag string) ([]string, bool) {
 		out = append(out, a)
 	}
 	return out, found
+}
+
+// flagValue returns the value following --name (or embedded in --name=value),
+// "" when the flag is absent.
+func flagValue(args []string, name string) string {
+	for i, a := range args {
+		if a == name && i+1 < len(args) {
+			return args[i+1]
+		}
+		if v, ok := strings.CutPrefix(a, name+"="); ok {
+			return v
+		}
+	}
+	return ""
+}
+
+// seedPresetArg extracts --preset for `haven seed`, rejecting the two silent
+// footguns: a trailing --preset with no value, and a positional arg (`haven
+// seed demo`) that flagValue would ignore — both would otherwise run the plain
+// default seed and exit successfully.
+func seedPresetArg(rest []string) (string, error) {
+	preset := flagValue(rest, "--preset")
+	if hasFlag(rest, "--preset") && preset == "" {
+		return "", fmt.Errorf("--preset needs a value — available: %s", strings.Join(app.SeedPresets, ", "))
+	}
+	for i := 0; i < len(rest); i++ {
+		if rest[i] == "--preset" {
+			i++ // skip the flag's value
+			continue
+		}
+		if !strings.HasPrefix(rest[i], "-") {
+			return "", fmt.Errorf("unexpected argument %q — presets are passed as --preset <name>; available: %s", rest[i], strings.Join(app.SeedPresets, ", "))
+		}
+	}
+	return preset, nil
 }
 
 func hasFlag(args []string, flag string) bool {
