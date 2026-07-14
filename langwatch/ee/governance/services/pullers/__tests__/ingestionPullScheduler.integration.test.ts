@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { UNLIMITED_PLAN } from "@ee/licensing/constants";
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 /**
@@ -21,6 +22,9 @@ import {
   vi,
 } from "vitest";
 
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { type AggregateType, definePipeline } from "~/server/event-sourcing";
 import {
@@ -104,6 +108,12 @@ describe.skipIf(!hasTestcontainers)(
 
     beforeAll(async () => {
       await startTestContainers();
+      await resetApp();
+      globalForApp.__langwatch_app = createTestApp({
+        planProvider: PlanProviderService.create({
+          getActivePlan: async () => UNLIMITED_PLAN,
+        }),
+      });
       redis = getTestRedisConnection()!;
       const clickHouseClient = getTestClickHouseClient()!;
 
@@ -176,6 +186,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterAll(async () => {
+      await resetApp();
       await eventSourcing.close().catch(() => {});
       await prisma.ingestionSource.deleteMany({ where: { organizationId } });
       await prisma.project.deleteMany({
