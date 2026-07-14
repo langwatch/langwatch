@@ -136,10 +136,16 @@ specs/ai-governance/cli-wrappers/*.feature          — scenarios for the new to
 Adds the standalone GitHub Copilot app as a tracked surface, on the same `copilot.ts` extractor and `/api/otel` ingest as the CLI. Status: Proposed. Scope: the app; later surfaces are in the Roadmap.
 
 ### E1. File-reader lane
-The app writes session transcripts to `~/.copilot/session-state/<id>/events.jsonl`. A reader converts each new assistant turn into a `gen_ai.*` OTLP span and POSTs it to `/api/otel` with the user's personal ingest key, reusing the `codex-rollout-otlp.ts` emit core. sourceType `copilot_app`.
+The app writes host-readable session files to `~/.copilot`. A reader converts each LLM call into a `gen_ai.*` OTLP span and POSTs it to `/api/otel` with the user's personal ingest key, reusing the `codex-rollout-otlp.ts` emit core. sourceType `copilot_app`.
 
-### E2. Source is `events.jsonl`
-Per assistant message the span carries content (prompt, response, tool calls), `model`, and `outputTokens`. The message id (`messageId`) is the dedup key and the deterministic span id. Content capture is on by default; prompts are protected by the existing ESSENTIAL server-side PII redaction on `/api/otel`.
+### E2. One fused span per LLM call — usage + content
+Each session is described by two files that share no per-call id: usage rows are keyed on `(session_id, turn_index, id)`, content messages on `messageId`/`requestId`, and `turn_index` is coarse (one turn spans several calls). Each span is therefore assembled from both:
+- **Usage** — from `session-store.db.assistant_usage_events`: `input/output/cache_read/cache_write/reasoning_tokens`, `model`, `nano_aiu`, latency, `finish_reason`, and the context-source token breakdown (`context_system/conversation/tool_definitions/mcp_tools/buffer_tokens`).
+- **Content** — from `session-state/<id>/events.jsonl`: prompt, response, tool calls.
+
+Within a session, usage rows (ordered by `created_at`) and assistant messages (ordered by `timestamp`) are paired positionally. Pairing applies only when the per-session counts match and each pair falls within a bounded time window; otherwise the usage span is emitted without content and marked `github.copilot.pairing_degraded`. A cost-only span is acceptable; a mis-attributed prompt is not. Content capture is on by default, protected by the existing ESSENTIAL server-side PII redaction on `/api/otel`.
+
+`session-store.db` is read read-only as a WAL snapshot with a busy-timeout; `events.jsonl` is read append-only.
 
 ### E3. Automatic capture via a user login agent
 A user-level agent (launchd on macOS, systemd `--user` on Linux, Task Scheduler on Windows) starts on login, watches `~/.copilot` via OS file events, and emits new turns live. It is self-installed when the user connects Copilot (portal action or `langwatch login` detecting the installed app) and removed by `langwatch logout`. It is a single long-lived, event-driven process — no per-write respawn, no supervisor.
@@ -151,36 +157,43 @@ The reader emits only app-owned sessions, so it never overlaps the CLI's live-OT
 | Name | Value |
 |---|---|
 | sourceType | `copilot_app` |
-| source | `~/.copilot/session-state/<id>/events.jsonl` |
-| span id / dedup key | assistant message `messageId` |
+| usage source | `~/.copilot/session-store.db.assistant_usage_events` |
+| content source | `~/.copilot/session-state/<id>/events.jsonl` |
+| span granularity | one span per `assistant_usage_events` row (one LLM call) |
+| content pairing | `session_id` + timestamp order, bounded window |
+| span id / dedup key | `session_id` + usage-row `id` |
+| pairing-degraded marker | `github.copilot.pairing_degraded` |
+| cost attribute | `github.copilot.nano_aiu` (raw AI-unit count, never a dollar/cost field) |
 | host | user login agent (launchd / systemd --user / Task Scheduler) |
 | lifecycle | self-installed at connect; removed by `langwatch logout` |
 
 ### Invariants
 | Invariant | Satisfied by |
 |---|---|
-| Each turn ingested once | deterministic span id from `messageId` + persisted watermark |
+| Each call ingested once | reader claims only app-owned sessions + persisted watermark + deterministic per-row span id |
+| Never mis-attribute content | pairing only under per-session count-parity + bounded window; otherwise numbers-only + `pairing_degraded` |
 | No cross-lane double-capture | reader emits only app-owned sessions |
+| Safe concurrent read | read-only WAL snapshot + busy-timeout (db); append-only read (jsonl) |
 | Automatic, no user action | login agent + file-watch |
 | Well-behaved agent | one long-lived, event-driven process; no respawn, no supervisor |
-| One extractor | reader emits `gen_ai.*`; canonicalized by `copilot.ts` |
+| One extractor | reader emits `gen_ai.*` + `github.copilot.*`; canonicalized by `copilot.ts`, extended for `github.copilot.nano_aiu` + `context_*_tokens` |
 | Content protected | ESSENTIAL PII redaction on `/api/otel` |
 | Fat-payload safe | `capOversizedAttributes` on the span path |
 
 ### Consequences
-- Prompts, responses, model, and output tokens are captured live and automatically, with no auth-header workaround and no sandbox.
-- Input/cache tokens, cost, and the context-source token breakdown are not present in `events.jsonl`; they are deferred to a usage-enrichment step (Roadmap).
+- Prompts, responses, model, full token counts, cost, and the context-source token breakdown are captured live and automatically, with no auth-header workaround and no sandbox.
+- Content is paired to usage by time order within a bounded window, not an exact id; the worst case is a cost-only span, never a wrong prompt.
 - File parsing depends on the app's on-disk format and uses a versioned parser.
 
 ### Open questions
 - The discriminator that identifies app-owned sessions within the shared `~/.copilot`.
+- The pairing time-window threshold.
 
 ### Roadmap
-- Usage enrichment (input/cache tokens, cost, context-source breakdown) from `session-store.db`.
 - VS Code extension — Lane 1 via `github.copilot.chat.otel.*`.
 - Enterprise fleet with per-user identity.
 
 ## Changelog
 
 - 2026-07-10 — CLI integration (§Decision 1–10): both paths, ingestion-first default, sourceType `copilot_cli`, `copilot.ts` extractor. Accepted, shipped in PR #5605.
-- 2026-07-14 — GitHub Copilot app extension (§Extension): file-reader lane over `events.jsonl`, auto-installed login-agent watcher, sourceType `copilot_app`. Proposed, PR #5784.
+- 2026-07-14 — GitHub Copilot app extension (§Extension): file-reader lane fusing `session-store.db` usage with `events.jsonl` content, auto-installed login-agent watcher, sourceType `copilot_app`. Proposed, PR #5784.
