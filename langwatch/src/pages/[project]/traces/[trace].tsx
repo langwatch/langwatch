@@ -2,11 +2,11 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 
 /**
- * Redirect page for the legacy /[project]/messages/[trace] deep link.
- * Old notification links and bookmarks land here; they now open the
- * Trace Explorer drawer, which is the default trace experience.
+ * Redirect page for /[project]/traces/[trace] — the canonical short link to a
+ * single trace, used by notification links (Slack, email, webhooks) and API
+ * responses. Opens the Trace Explorer drawer for that trace.
  */
-export default function TraceDetailsRedirect() {
+export default function TraceDeepLinkRedirect() {
   const router = useRouter();
   const projectSlug = router.query.project as string | undefined;
   const traceId = router.query.trace as string | undefined;

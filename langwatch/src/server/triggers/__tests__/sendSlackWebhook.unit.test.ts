@@ -180,7 +180,7 @@ describe("sendSlackWebhook", () => {
       expect(sendMock).toHaveBeenCalledTimes(1);
       const text = sendMock.mock.calls[0]?.[0]?.text as string;
       expect(text).toContain("⚠️ LangWatch Trigger - *Quality Alert*");
-      expect(text).toContain("/demo/messages/trace-1|trace-1>");
+      expect(text).toContain("/demo/traces/trace-1|trace-1>");
       expect(text).toContain("*Input:* user question");
       expect(text).toContain("*Output:* assistant answer");
       expect(text).toContain("*Event Type:* thumbs_up");

@@ -50,9 +50,8 @@ function snooze(projectId: string) {
 	}
 }
 
-// Teal → cyan → indigo palette, so this banner visually rhymes with
-// `TracesV2HomeBanner` (same MeshGradient + glass-card shape) without looking
-// like a duplicate when the home page rotates between the two announcements.
+// Teal → cyan → indigo palette for the home announcement slot
+// (MeshGradient + glass-card shape shared by past announcement banners).
 const MESH_COLORS_LIGHT = ["#0f766e", "#06b6d4", "#6366f1", "#ecfeff"];
 const MESH_COLORS_DARK = ["#134e4a", "#0e7490", "#312e81", "#0a1424"];
 
@@ -257,10 +256,8 @@ export function VoiceAgentsHomeBanner({
 }
 
 /**
- * Helper for callers that want to gate the voice banner on the prior
- * traces-v2 banner being dismissed/snoozed already. Exposed so the
- * `HomePage` orchestrator can pick one banner at a time without leaking
- * storage-key knowledge.
+ * Exposed so the `HomePage` orchestrator can decide whether to render the
+ * banner without leaking storage-key knowledge.
  */
 export function isVoiceAgentsBannerSnoozed(projectId: string): boolean {
 	return isSnoozed(projectId);

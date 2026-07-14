@@ -156,7 +156,7 @@ describe("renderTriggerSlack", () => {
             id: "trace_inj",
             input: MRKDWN_INJECTION,
             output: MRKDWN_INJECTION,
-            url: "https://app.langwatch.ai/acme/messages/trace_inj",
+            url: "https://app.langwatch.ai/acme/traces/trace_inj",
             metadata: {},
           },
         }),
