@@ -6,6 +6,7 @@ import {
   DONE_MARKER_TTL_SECONDS,
   doneMarkerKey,
 } from "./replayConstants";
+import type { ReplayLogWriter } from "./replayLog";
 
 /** Throw if any command in a pipeline result has an error. */
 function checkPipelineErrors(results: [error: Error | null, result: unknown][] | null, operation: string): void {
@@ -174,6 +175,43 @@ export async function removeInFlightMarkers({
   }
   const results = await pipeline.exec();
   checkPipelineErrors(results, "removeInFlightMarkers");
+}
+
+/**
+ * Best-effort marker cleanup for a batch that errored (or was abandoned by
+ * cancellation) mid-flight. Its aggregates were never replayed, so their
+ * pending/cutoff markers are removed — returning them to unconditional live
+ * processing right away instead of deferring their live events until the
+ * 7-day marker TTL lapses. Done markers and completed-set entries from
+ * previously completed batches are left intact so an operator re-run still
+ * skips completed aggregates. Never throws: a marker-cleanup failure must
+ * not mask the original batch error.
+ */
+export async function clearFailedBatchMarkers({
+  redis,
+  projectionNames,
+  aggKeys,
+  log,
+}: {
+  redis: IORedis;
+  projectionNames: string[];
+  aggKeys: string[];
+  log: ReplayLogWriter;
+}): Promise<void> {
+  try {
+    await removeInFlightMarkers({
+      redis,
+      projectionNames,
+      aggKeys,
+    });
+  } catch (cleanupError) {
+    log.write({
+      step: "error",
+      error: `failed to clear replay markers for failed batch: ${
+        cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+      }`,
+    });
+  }
 }
 
 /** Get the set of completed aggregate keys for a projection. */
