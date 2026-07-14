@@ -6,6 +6,10 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
   getClickHouseClientForProject: getClickHouseClientForProjectMock,
 }));
 
+import {
+  OFFLOADED_INPUTS_PROJECTION_KEY,
+  STORED_OBJECT_MARKER_KEY,
+} from "~/server/app-layer/evaluations/evaluation-inputs-offload";
 import { EvaluationService } from "../evaluation.service";
 
 describe("EvaluationService.getEvaluationInputs", () => {
@@ -46,6 +50,45 @@ describe("EvaluationService.getEvaluationInputs", () => {
           tenantId: "project_test",
           evaluationId: "eval-1",
         });
+      });
+    });
+  });
+
+  describe("given offloaded inputs whose resolution fail-safes back to the marker", () => {
+    describe("when its inputs are requested", () => {
+      it("degrades to the compact projection instead of the raw marker", async () => {
+        const marker = {
+          [STORED_OBJECT_MARKER_KEY]: {
+            id: "so-secret-id",
+            sizeBytes: 2_000_000,
+            sha256: "a".repeat(64),
+            preview: '{"question":"hi"',
+            truncatedPreview: true,
+          },
+        };
+        const query = vi.fn(async () => ({
+          json: async () => [{ Inputs: JSON.stringify(marker) }],
+        }));
+        getClickHouseClientForProjectMock.mockResolvedValue({ query });
+
+        // The resolver's fail-safe contract returns its input marker on every
+        // degraded path (missing object, purpose/hash mismatch, stream/parse
+        // error). The service boundary must project it, never ship it raw.
+        const service = new EvaluationService(async ({ inputs }) => inputs);
+        const result = await service.getEvaluationInputs({
+          projectId: "project_test",
+          evaluationId: "eval-1",
+        });
+
+        expect(result?.[OFFLOADED_INPUTS_PROJECTION_KEY]).toEqual({
+          preview: '{"question":"hi"',
+          truncated: true,
+          sizeBytes: 2_000_000,
+        });
+        const serialized = JSON.stringify(result);
+        expect(serialized).not.toContain(STORED_OBJECT_MARKER_KEY);
+        expect(serialized).not.toContain("so-secret-id");
+        expect(serialized).not.toContain("a".repeat(64));
       });
     });
   });

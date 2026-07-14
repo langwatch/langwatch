@@ -460,6 +460,54 @@ describe("resolveInputsMarker", () => {
     });
   });
 
+  describe("given a marker with a non-empty id but no content hash", () => {
+    it("returns the marker without fetching the named object", async () => {
+      const storedObjects = makeFakeStoredObjects();
+      const bytes = Buffer.from(JSON.stringify({ secret: "same-project" }));
+      const id = seedObject(storedObjects, {
+        bytes,
+        purpose: EVAL_INPUTS_STORED_OBJECT_PURPOSE,
+      });
+      const getById = vi.spyOn(storedObjects, "getById");
+      // A marker-shaped input naming a real evaluation-inputs object but
+      // omitting the hash: the write path always records one alongside a
+      // non-empty id, so this shape only arises malformed or forged. Without
+      // the hash there is no proof the bytes are the offloaded content.
+      const marker = markerFor({ id, bytes, sha256: null });
+
+      const resolved = await resolveInputsMarker({
+        inputs: marker,
+        projectId: "proj-1",
+        storedObjects,
+      });
+
+      expect(resolved).toBe(marker);
+      expect(getById).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a marker whose content hash is not a well-formed sha256", () => {
+    it("returns the marker without fetching the named object", async () => {
+      const storedObjects = makeFakeStoredObjects();
+      const bytes = Buffer.from(JSON.stringify({ secret: "same-project" }));
+      const id = seedObject(storedObjects, {
+        bytes,
+        purpose: EVAL_INPUTS_STORED_OBJECT_PURPOSE,
+      });
+      const getById = vi.spyOn(storedObjects, "getById");
+      const marker = markerFor({ id, bytes, sha256: "not-a-hash" });
+
+      const resolved = await resolveInputsMarker({
+        inputs: marker,
+        projectId: "proj-1",
+        storedObjects,
+      });
+
+      expect(resolved).toBe(marker);
+      expect(getById).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a well-formed marker with matching purpose and hash", () => {
     it("resolves to the full inputs", async () => {
       const storedObjects = makeFakeStoredObjects();

@@ -403,7 +403,7 @@ export function registerTracesRoutes(
         project.id,
         [resolvedTraceId],
         protections,
-        { resolveOffloadedInputs: true },
+        { shouldResolveOffloadedInputs: true },
       );
       const evaluations = evaluationsMap[resolvedTraceId] ?? [];
 

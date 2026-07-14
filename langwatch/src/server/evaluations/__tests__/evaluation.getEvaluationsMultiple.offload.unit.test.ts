@@ -71,7 +71,7 @@ describe("EvaluationService.getEvaluationsMultiple", () => {
   });
 
   describe("given a row whose inputs were offloaded", () => {
-    describe("when read on a list path (resolveOffloadedInputs omitted)", () => {
+    describe("when read on a list path (shouldResolveOffloadedInputs omitted)", () => {
       it("projects to a compact shape and never leaks the raw marker or storage id/sha256", async () => {
         mockClickHouseReturning([offloadedRow()]);
         // The seam must NOT be called on the list path - projection is I/O-free.
@@ -98,7 +98,37 @@ describe("EvaluationService.getEvaluationsMultiple", () => {
       });
     });
 
-    describe("when read on a single-trace path (resolveOffloadedInputs true)", () => {
+    describe("when resolution fail-safes back to the marker on a single-trace path", () => {
+      it("degrades to the compact projection instead of shipping the raw marker", async () => {
+        mockClickHouseReturning([offloadedRow()]);
+        // The resolver's fail-safe contract returns its input marker on every
+        // degraded path (missing object, purpose/hash mismatch, stream/parse
+        // error). The service boundary must convert that to the projection -
+        // never serialize the internal id/sha256 out of a failure.
+        const resolveSeam = vi.fn(async ({ inputs }) => inputs);
+        const service = new EvaluationService(resolveSeam);
+
+        const result = await service.getEvaluationsMultiple({
+          projectId: "project_test",
+          traceIds: ["trace-1"],
+          shouldResolveOffloadedInputs: true,
+        });
+
+        const inputs = result["trace-1"]![0]!.inputs as Record<string, any>;
+        expect(inputs[OFFLOADED_INPUTS_PROJECTION_KEY]).toEqual({
+          preview: '{"question":"hi"',
+          truncated: true,
+          sizeBytes: 2_000_000,
+        });
+
+        const serialized = JSON.stringify(result);
+        expect(serialized).not.toContain(STORED_OBJECT_MARKER_KEY);
+        expect(serialized).not.toContain("so-secret-id");
+        expect(serialized).not.toContain("a".repeat(64));
+      });
+    });
+
+    describe("when read on a single-trace path (shouldResolveOffloadedInputs true)", () => {
       it("resolves the marker to the full inputs via the injected seam", async () => {
         mockClickHouseReturning([offloadedRow()]);
         const fullInputs = { question: "hi", context: ["chunk-a", "chunk-b"] };
@@ -108,7 +138,7 @@ describe("EvaluationService.getEvaluationsMultiple", () => {
         const result = await service.getEvaluationsMultiple({
           projectId: "project_test",
           traceIds: ["trace-1"],
-          resolveOffloadedInputs: true,
+          shouldResolveOffloadedInputs: true,
         });
 
         expect(result["trace-1"]![0]!.inputs).toEqual(fullInputs);

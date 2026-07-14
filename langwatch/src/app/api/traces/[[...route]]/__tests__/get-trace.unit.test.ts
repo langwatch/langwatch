@@ -176,7 +176,7 @@ describe("GET /:traceId", () => {
         "project-123",
         ["trace-abc"],
         expect.any(Object),
-        { resolveOffloadedInputs: true },
+        { shouldResolveOffloadedInputs: true },
       );
     });
 
@@ -234,7 +234,7 @@ describe("GET /:traceId", () => {
         "project-123",
         [fullId],
         expect.any(Object),
-        { resolveOffloadedInputs: true },
+        { shouldResolveOffloadedInputs: true },
       );
     });
   });

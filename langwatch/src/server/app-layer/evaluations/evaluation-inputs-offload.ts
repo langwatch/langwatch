@@ -125,6 +125,13 @@ export function isStoredObjectMarker(
   );
 }
 
+const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
+
+/** A lowercase 64-hex SHA-256, the only hash shape the write path produces. */
+function isWellFormedSha256(value: unknown): value is string {
+  return typeof value === "string" && SHA256_HEX_RE.test(value);
+}
+
 /** Reserved key carrying the compact, safe list projection of a marker. */
 export const OFFLOADED_INPUTS_PROJECTION_KEY = "_lw_offloaded" as const;
 
@@ -134,8 +141,13 @@ export const OFFLOADED_INPUTS_PROJECTION_KEY = "_lw_offloaded" as const;
  * never the internal storage plumbing (`id`, `sha256`, the raw marker key).
  * List consumers cannot resolve the full inputs; they fetch those lazily
  * through the single-evaluation seam (getEvaluationInputs) when needed.
+ *
+ * A type alias (not an interface) for the same reason as
+ * {@link StoredObjectInputsMarker}: aliases get an implicit index signature,
+ * so the projection is assignable to `Record<string, unknown>` at the service
+ * read boundaries.
  */
-export interface OffloadedInputsProjection {
+export type OffloadedInputsProjection = {
   [OFFLOADED_INPUTS_PROJECTION_KEY]: {
     /** First EVAL_INPUTS_PREVIEW_BYTES of the serialized inputs, as a string. */
     preview: string;
@@ -144,7 +156,7 @@ export interface OffloadedInputsProjection {
     /** Byte length of the serialized inputs that were offloaded. */
     sizeBytes: number;
   };
-}
+};
 
 /**
  * Projects an offload marker to the compact, leak-free shape safe to ship on
@@ -436,6 +448,20 @@ export async function resolveInputsMarker({
     return inputs;
   }
 
+  // Integrity: a resolvable marker must carry the exact content hash recorded
+  // at offload time (the write path always stores one alongside a non-empty
+  // id). A marker-shaped input with a missing or malformed hash could name any
+  // same-project object and have its bytes surfaced without proof they are the
+  // offloaded content, so the hash requirement cannot depend on the marker
+  // volunteering one. Fail safe to the marker/preview without fetching.
+  if (!isWellFormedSha256(marker.sha256)) {
+    logger.warn(
+      { projectId, storedObjectId: marker.id },
+      "Offloaded evaluation inputs marker lacks a well-formed sha256; returning marker with preview",
+    );
+    return inputs;
+  }
+
   try {
     const result = await storedObjects.getById({ projectId, id: marker.id });
     if (!result || !("stream" in result)) {
@@ -467,18 +493,16 @@ export async function resolveInputsMarker({
       result.stream,
       EVAL_INPUTS_HARD_CEILING_BYTES,
     );
-    // Integrity: when the marker carries the content hash, the fetched bytes
-    // must hash to it. A mismatch means the durable object diverged from what
-    // was offloaded (overwrite, corruption); fail safe to the marker/preview.
-    if (marker.sha256) {
-      const actualSha256 = createHash("sha256").update(buffer).digest("hex");
-      if (actualSha256 !== marker.sha256) {
-        logger.warn(
-          { projectId, storedObjectId: marker.id },
-          "Offloaded evaluation inputs failed sha256 verification; returning marker with preview",
-        );
-        return inputs;
-      }
+    // Integrity: the fetched bytes must hash to the marker's content hash. A
+    // mismatch means the durable object diverged from what was offloaded
+    // (overwrite, corruption); fail safe to the marker/preview.
+    const actualSha256 = createHash("sha256").update(buffer).digest("hex");
+    if (actualSha256 !== marker.sha256) {
+      logger.warn(
+        { projectId, storedObjectId: marker.id },
+        "Offloaded evaluation inputs failed sha256 verification; returning marker with preview",
+      );
+      return inputs;
     }
     const parsed: unknown = JSON.parse(buffer.toString("utf8"));
     if (

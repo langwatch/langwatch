@@ -120,7 +120,7 @@ export class EvaluationService {
     projectId,
     traceIds,
     protections: _protections,
-    resolveOffloadedInputs = false,
+    shouldResolveOffloadedInputs = false,
   }: {
     projectId: string;
     traceIds: string[];
@@ -133,7 +133,7 @@ export class EvaluationService {
      * compact, leak-free projection instead of the raw `__lw_stored_object`
      * envelope. The raw marker never leaves this service.
      */
-    resolveOffloadedInputs?: boolean;
+    shouldResolveOffloadedInputs?: boolean;
   }): Promise<Record<string, TraceEvaluation[]>> {
     return await this.tracer.withActiveSpan(
       "EvaluationService.getEvaluationsMultiple",
@@ -209,7 +209,7 @@ export class EvaluationService {
           return await this.finalizeOffloadedInputs({
             projectId,
             grouped,
-            resolveOffloadedInputs,
+            shouldResolveOffloadedInputs,
           });
         } catch (error) {
           if (isMemoryLimitError(error)) {
@@ -253,29 +253,50 @@ export class EvaluationService {
   /**
    * Replaces any offloaded-inputs marker (ADR-040) on the mapped evaluations
    * so the raw `__lw_stored_object` envelope never leaves the service. When
-   * `resolveOffloadedInputs` is set the marker is resolved to the full inputs
-   * (bounded single-trace reads); otherwise it degrades to the compact,
+   * `shouldResolveOffloadedInputs` is set the marker is resolved to the full
+   * inputs (bounded single-trace reads); otherwise it degrades to the compact,
    * leak-free projection (list paths). Non-marker inputs pass through.
    */
   private async finalizeOffloadedInputs({
     projectId,
     grouped,
-    resolveOffloadedInputs,
+    shouldResolveOffloadedInputs,
   }: {
     projectId: string;
     grouped: Record<string, TraceEvaluation[]>;
-    resolveOffloadedInputs: boolean;
+    shouldResolveOffloadedInputs: boolean;
   }): Promise<Record<string, TraceEvaluation[]>> {
     for (const evaluations of Object.values(grouped)) {
       for (const evaluation of evaluations) {
         const inputs = evaluation.inputs;
         if (!isStoredObjectMarker(inputs)) continue;
-        evaluation.inputs = resolveOffloadedInputs
-          ? await this.resolveInputsMarker({ projectId, inputs })
+        evaluation.inputs = shouldResolveOffloadedInputs
+          ? await this.resolveMarkerToNonMarker({ projectId, inputs })
           : projectMarkerForList(inputs);
       }
     }
     return grouped;
+  }
+
+  /**
+   * Resolves a marker to the full inputs while guaranteeing what leaves the
+   * service is never a raw `__lw_stored_object` envelope. The resolver
+   * fail-safes by returning its input marker (preview-only marker, missing
+   * object, purpose or hash mismatch, stream/parse error); at this boundary
+   * that degraded result is projected to the compact, leak-free shape instead
+   * of shipped raw with its internal `id`/`sha256`.
+   */
+  private async resolveMarkerToNonMarker({
+    projectId,
+    inputs,
+  }: {
+    projectId: string;
+    inputs: Record<string, unknown> | null;
+  }): Promise<Record<string, unknown> | null> {
+    const resolved = await this.resolveInputsMarker({ projectId, inputs });
+    return isStoredObjectMarker(resolved)
+      ? projectMarkerForList(resolved)
+      : resolved;
   }
 
   /**
@@ -329,8 +350,10 @@ export class EvaluationService {
           // ADR-040: when inputs were offloaded, `parsed` is a stored-object
           // marker. Resolve it to the full inputs here - the natural lazy seam
           // the UI already fetches through - so the caller cannot tell whether
-          // the inputs were inline or offloaded. Non-markers pass through.
-          return this.resolveInputsMarker({ projectId, inputs });
+          // the inputs were inline or offloaded. Non-markers pass through; a
+          // resolution failure degrades to the projection, never the raw
+          // marker.
+          return await this.resolveMarkerToNonMarker({ projectId, inputs });
         } catch (error) {
           if (isMemoryLimitError(error)) {
             this.logger.warn(

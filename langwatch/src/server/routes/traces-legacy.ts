@@ -122,7 +122,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
       project.id,
       [traceId],
       protections,
-      { resolveOffloadedInputs: true },
+      { shouldResolveOffloadedInputs: true },
     );
     const evaluations = evaluationsMap[traceId] ?? [];
 
