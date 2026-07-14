@@ -59,6 +59,7 @@ Feature: Projection replay
     When a batch fails partway through
     Then the replay stops and reports the failure
     And live processing for the affected projections resumes
+    And live events for the failed batch's aggregates are processed normally right away
 
   Scenario: Rebuilt records are written in bulk
     Given aggregates with existing event history across many traces
@@ -68,6 +69,6 @@ Feature: Projection replay
 
   Scenario: A long replay keeps reporting progress until it finishes
     Given a replay is running for longer than its coordination lock's initial lifetime
-    When each batch completes
-    Then the replay's coordination lock is extended
-    And progress and cancellation keep working for the whole run
+    When the run continues past that lifetime
+    Then progress and cancellation keep working for the whole run
+    And this holds even when a single batch takes longer than that lifetime
