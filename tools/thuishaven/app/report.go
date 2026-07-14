@@ -75,6 +75,19 @@ func (o *Orchestrator) Doctor() error {
 		rdsOK, detail := o.rds.Health(context.Background())
 		fmt.Printf("%s managed redis — %s\n", ok(rdsOK), detail)
 	}
-	fmt.Printf("     stacks running: %d   tld: .%s\n", len(o.store.Stacks()), o.cfg.Naming.TLD)
+	live, rss := o.stackFootprint()
+	fmt.Printf("     stacks running: %d (%d live, ~%s RAM)   tld: .%s\n", len(o.store.Stacks()), live, humanBytes(int64(rss)), o.cfg.Naming.TLD)
 	return nil
+}
+
+// stackFootprint sums the live stacks' process-group RSS — the "what are my
+// dev stacks actually costing this machine" number.
+func (o *Orchestrator) stackFootprint() (live int, rss uint64) {
+	for _, s := range o.store.Stacks() {
+		if o.sys.ProcessAlive(s.LauncherPID) {
+			live++
+			rss += o.sys.GroupRSS(s.LauncherPID)
+		}
+	}
+	return live, rss
 }

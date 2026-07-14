@@ -3,6 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
+	"slices"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -34,9 +37,9 @@ func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch Cl
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).
 type UpParams struct {
-	WorktreeDir  string
-	LwDir        string
-	Branch       string
+	WorktreeDir      string
+	LwDir            string
+	Branch           string
 	ExplicitSlug     string // from LANGWATCH_SLUG; wins over the derived/cached slug
 	IsBaseline       bool   // this stack is the shared default others fall back to
 	IsLinkedWorktree bool   // a `git worktree add` checkout, not the primary clone
@@ -218,7 +221,21 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	// API key exist), so every `up` guarantees the same migrations AND the same
 	// seeded credential are in place — a freshly-provisioned DB is immediately
 	// usable with the well-known LANGWATCH_API_KEY, no manual sign-up.
-	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
+	//
+	// When haven manages Postgres the overlay carries a per-slug loopback
+	// DATABASE_URL (provably local) and the seed uses it. When it does not — DB
+	// management disabled, or Postgres failed to come up — the seed would inherit
+	// whatever DATABASE_URL is in .env, so guard that inherited URL exactly as
+	// `haven seed` does and skip (never seed a non-local database) rather than
+	// abort the up.
+	if hasEnvKey(env, "DATABASE_URL") {
+		if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
+			o.log.Warn("seed failed (continuing)", zap.Error(err))
+		}
+	} else if err := o.guardInheritedSeedEnv(p.LwDir); err != nil {
+		o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
+		fmt.Printf("haven: %v — skipping seed\n", err)
+	} else if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
 		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
 	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir))
@@ -371,9 +388,101 @@ func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
 	})
 }
 
-// Seed reseeds the current stack's database — the "give me a fresh DB" affordance.
-func (o *Orchestrator) Seed(ctx context.Context, p UpParams) error {
-	return o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", nil)
+// SeedPresets are the seed variants beyond the plain static identity. "demo"
+// seeds the project as already past onboarding and ingests sample traces
+// through the running stack's collector, so the UI opens on real-looking data.
+var SeedPresets = []string{"demo"}
+
+// Seed reseeds the current stack's database — the "give me a fresh DB"
+// affordance. A preset layers a variant on top of the stable identity; the
+// empty preset is the unchanged default.
+func (o *Orchestrator) Seed(ctx context.Context, p UpParams, preset string) error {
+	if preset != "" && !slices.Contains(SeedPresets, preset) {
+		return fmt.Errorf("unknown seed preset %q — available: %s", preset, strings.Join(SeedPresets, ", "))
+	}
+	// Seed the database this worktree's stack actually uses — not whatever
+	// DATABASE_URL happens to be inherited. seedEnv resolves the running stack and
+	// passes its overlay (per-slug loopback DATABASE_URL/CLICKHOUSE_URL, the local
+	// API key) into the child, mirroring the `up` path, so the env cmd.guardSeedEnv
+	// validated and the env the seed connects to are the same provably-local target.
+	env := o.seedEnv(p)
+	if preset != "" {
+		env = append(env, "HAVEN_SEED_PRESET="+preset)
+	}
+	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
+		return err
+	}
+	if preset != "demo" {
+		return nil
+	}
+	return o.seedSampleTraces(ctx, p)
+}
+
+// seedEnv builds the base environment for the prisma:seed child: the running
+// stack's resolved overlay when one is registered (so the seed writes into this
+// worktree's per-slug database rather than whatever DATABASE_URL is inherited),
+// always carrying HAVEN_SEED_LANGWATCH_API_KEY so the seeded project key matches
+// the local ingestion key — otherwise a re-seed rotates it back to the default
+// and the subsequent sample-trace ingestion 401s. With no stack registered the
+// child inherits the (guardSeedEnv-validated) process/.env environment.
+func (o *Orchestrator) seedEnv(p UpParams) []string {
+	var env []string
+	if slug, err := o.resolveSlug(p); err == nil {
+		if st, ok := o.stackBySlug(slug); ok {
+			env = st.OverlayEnv()
+		}
+	}
+	if o.cfg.LocalAPIKey != "" && !hasEnvKey(env, "HAVEN_SEED_LANGWATCH_API_KEY") {
+		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+o.cfg.LocalAPIKey)
+	}
+	return env
+}
+
+// guardInheritedSeedEnv validates the database URLs a seed with no managed-DB
+// overlay would inherit, resolved at the child's real precedence (process env
+// over the merged dotenv layers).
+func (o *Orchestrator) guardInheritedSeedEnv(lwDir string) error {
+	return domain.GuardSeedTargets(domain.LoadDotenv(lwDir), os.Getenv)
+}
+
+// hasEnvKey reports whether a KEY=VALUE slice already sets key.
+func hasEnvKey(env []string, key string) bool {
+	prefix := key + "="
+	for _, e := range env {
+		if strings.HasPrefix(e, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// seedSampleTraces ingests the deterministic demo traces through the running
+// stack's collector — the real pipeline, not a ClickHouse side door — so the
+// stack must be up. It talks to the app's loopback port over plain HTTP
+// (portless terminates TLS in front of it; Node does not trust the proxy's CA).
+func (o *Orchestrator) seedSampleTraces(ctx context.Context, p UpParams) error {
+	slug, err := o.resolveSlug(p)
+	if err != nil {
+		return err
+	}
+	st, ok := o.stackBySlug(slug)
+	if !ok || !o.sys.ProcessAlive(st.LauncherPID) {
+		return fmt.Errorf("stack %q is not running — sample traces go through the real collector, so start it (pnpm dev:haven) and re-run `haven seed --preset demo`", slug)
+	}
+	var appPort int
+	for _, svc := range st.Services {
+		if svc.Name == "app" && !svc.IsFallback {
+			appPort = svc.Port
+		}
+	}
+	if appPort == 0 || !o.sys.PortInUse(appPort) {
+		return fmt.Errorf("stack %q's app is not answering yet — wait for it to boot and re-run `haven seed --preset demo`", slug)
+	}
+	env := []string{
+		fmt.Sprintf("HAVEN_SEED_ENDPOINT=http://127.0.0.1:%d", appPort),
+		"HAVEN_SEED_LANGWATCH_API_KEY=" + o.cfg.LocalAPIKey,
+	}
+	return o.sup.RunOnce(ctx, "seed-traces", p.LwDir, "pnpm run seed:sample-traces", env)
 }
 
 // runsLocally reports whether this worktree runs the service itself (vs falling

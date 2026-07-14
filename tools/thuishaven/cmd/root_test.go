@@ -57,6 +57,62 @@ func TestStripFlag(t *testing.T) {
 	})
 }
 
+func TestFlagValue(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"space-separated value", []string{"--preset", "demo"}, "demo"},
+		{"equals-embedded value", []string{"--preset=demo"}, "demo"},
+		{"absent flag", []string{"--force"}, ""},
+		{"no args", nil, ""},
+		// A trailing --preset has no following value to return; the seed command
+		// rejects this shape via seedPresetArg rather than silently defaulting.
+		{"trailing flag without value", []string{"--preset"}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := flagValue(tc.args, "--preset"); got != tc.want {
+				t.Errorf("flagValue(%q, --preset) = %q, want %q", tc.args, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSeedPresetArg(t *testing.T) {
+	t.Run("when --preset carries a value", func(t *testing.T) {
+		for _, args := range [][]string{{"--preset", "demo"}, {"--preset=demo"}} {
+			preset, err := seedPresetArg(args)
+			if err != nil {
+				t.Fatalf("seedPresetArg(%q) = %v, want nil error", args, err)
+			}
+			if preset != "demo" {
+				t.Errorf("seedPresetArg(%q) = %q, want %q", args, preset, "demo")
+			}
+		}
+	})
+	t.Run("when no preset is given, it returns the default empty preset", func(t *testing.T) {
+		preset, err := seedPresetArg(nil)
+		if err != nil {
+			t.Fatalf("seedPresetArg(nil) = %v, want nil error", err)
+		}
+		if preset != "" {
+			t.Errorf("seedPresetArg(nil) = %q, want empty", preset)
+		}
+	})
+	t.Run("when --preset trails without a value, it errors instead of seeding the default", func(t *testing.T) {
+		if _, err := seedPresetArg([]string{"--preset"}); err == nil {
+			t.Error("seedPresetArg accepted a trailing --preset with no value")
+		}
+	})
+	t.Run("when the preset is passed positionally, it errors instead of ignoring it", func(t *testing.T) {
+		if _, err := seedPresetArg([]string{"demo"}); err == nil {
+			t.Error("seedPresetArg accepted a positional preset it would have ignored")
+		}
+	})
+}
+
 func TestHasFlag(t *testing.T) {
 	if !hasFlag([]string{"4913", "--trusted"}, "--trusted") {
 		t.Error("hasFlag missed a present flag")

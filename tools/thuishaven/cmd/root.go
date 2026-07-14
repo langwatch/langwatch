@@ -52,13 +52,14 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Bare `haven`: the TUI in a terminal, help when driven by an agent/pipe.
+	// Bare `haven`: the interactive hub in a terminal, help when driven by an
+	// agent/pipe.
 	if len(args) == 0 {
 		if isAgent {
 			fmt.Print(helpText)
 			return nil
 		}
-		return d.orch.Watch(ctx)
+		return runHub(ctx, d, nil)
 	}
 	return d.dispatch(ctx, args[0], args[1:])
 }
@@ -117,7 +118,11 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), domain.DefaultColimaLimits(ram, cpus))
 	ch := clickhousedocker.New(rt, havenHome(), envOr("HAVEN_CH_IMAGE", domain.ClickHouseImage), clickHouseLimits())
 	pg := postgresbrew.New(envOr("HAVEN_PG_FORMULA", domain.DefaultPostgresFormula), envInt("HAVEN_PG_PORT", domain.DefaultPostgresPort))
-	rds := redisbrew.New(envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula), envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort))
+	rds := redisbrew.New(
+		envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula),
+		envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort),
+		envInt("HAVEN_REDIS_MAXMEMORY_MB", domain.DefaultRedisMaxMemoryMB),
+	)
 	obs := otellgtm.New(
 		rt,
 		havenHome(),
@@ -158,8 +163,13 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	}
 
 	return deps{
-		orch:     app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, logger),
-		dash:     dashboard.New(store.Stacks, sharedURL),
+		orch: app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, logger),
+		dash: dashboard.New(store.Stacks, sharedURL, dashboard.Probes{
+			PortInUse:    sys.PortInUse,
+			ProcessAlive: sys.ProcessAlive,
+			GroupRSS:     sys.GroupRSS,
+			TotalMemory:  sys.TotalMemory,
+		}),
 		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree)},
 		opts:     optionsFromEnv(worktree),
 		worktree: worktree,
@@ -213,11 +223,22 @@ var commands = map[string]command{
 	"observability": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.RunObservability(ctx, rest)
 	},
-	"hmr":  func(ctx context.Context, d deps, rest []string) error { return d.orch.RunHMR(ctx, d.lwDir, rest) },
-	"seed": func(ctx context.Context, d deps, _ []string) error { return d.orch.Seed(ctx, d.params) },
+	"hmr": func(ctx context.Context, d deps, rest []string) error { return d.orch.RunHMR(ctx, d.lwDir, rest) },
+	"seed": func(ctx context.Context, d deps, rest []string) error {
+		if err := guardSeedEnv(d.lwDir); err != nil {
+			return err
+		}
+		preset, err := seedPresetArg(rest)
+		if err != nil {
+			return err
+		}
+		return d.orch.Seed(ctx, d.params, preset)
+	},
 	"list": func(_ context.Context, d deps, rest []string) error {
 		return d.orch.List(d.isAgent || hasFlag(rest, "--json"))
 	},
+	"git":    runGitUI,
+	"hub":    runHub,
 	"doctor": func(_ context.Context, d deps, _ []string) error { return d.orch.Doctor() },
 }
 
@@ -229,6 +250,9 @@ var aliases = map[string]string{
 	"tc":     "typecheck",
 	"ls":     "list",
 	"status": "list",
+	"moron":  "git",
+	"ps":     "hub",
+	"active": "hub",
 }
 
 // observabilityEndpoints are fixed ports rather than ephemeral ones: the gcx CLI
@@ -423,6 +447,41 @@ func stripFlag(args []string, flag string) ([]string, bool) {
 		out = append(out, a)
 	}
 	return out, found
+}
+
+// flagValue returns the value following --name (or embedded in --name=value),
+// "" when the flag is absent.
+func flagValue(args []string, name string) string {
+	for i, a := range args {
+		if a == name && i+1 < len(args) {
+			return args[i+1]
+		}
+		if v, ok := strings.CutPrefix(a, name+"="); ok {
+			return v
+		}
+	}
+	return ""
+}
+
+// seedPresetArg extracts --preset for `haven seed`, rejecting the two silent
+// footguns: a trailing --preset with no value, and a positional arg (`haven
+// seed demo`) that flagValue would ignore — both would otherwise run the plain
+// default seed and exit successfully.
+func seedPresetArg(rest []string) (string, error) {
+	preset := flagValue(rest, "--preset")
+	if hasFlag(rest, "--preset") && preset == "" {
+		return "", fmt.Errorf("--preset needs a value — available: %s", strings.Join(app.SeedPresets, ", "))
+	}
+	for i := 0; i < len(rest); i++ {
+		if rest[i] == "--preset" {
+			i++ // skip the flag's value
+			continue
+		}
+		if !strings.HasPrefix(rest[i], "-") {
+			return "", fmt.Errorf("unexpected argument %q — presets are passed as --preset <name>; available: %s", rest[i], strings.Join(app.SeedPresets, ", "))
+		}
+	}
+	return preset, nil
 }
 
 func hasFlag(args []string, flag string) bool {
