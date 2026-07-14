@@ -1,10 +1,10 @@
-# ADR-039: GitHub Copilot CLI joins the `langwatch <tool>` wrapper, ingestion-first, on the unified substrate
+# ADR-039: GitHub Copilot as a tracked coding assistant — CLI + IDE + app, on the unified substrate
 
-**Date:** 2026-07-10
+**Date:** 2026-07-10 (CLI, Accepted) · extended 2026-07-14 (multi-surface, Proposed)
 
-**Status:** Accepted
+**Status:** Accepted (CLI / §1–§4) · Proposed (multi-surface extension / §Extension)
 
-> One-line: `langwatch copilot` becomes a **first-class wrapped tool** with **both paths** — gateway via **BYOK env vars** and direct OTLP via **native OTel** — defaulting to **ingestion** (sourceType **`copilot_cli`**), extracted by a **`copilot.ts` extractor that delegates standard GenAI-semconv parsing to the shared genAi reader**.
+> One-line: `langwatch copilot` becomes a **first-class wrapped tool** with **both paths** — gateway via **BYOK env vars** and direct OTLP via **native OTel** — defaulting to **ingestion** (sourceType **`copilot_cli`**), extracted by a **`copilot.ts` extractor that delegates standard GenAI-semconv parsing to the shared genAi reader**. **Extended (2026-07-14):** every other Copilot surface (**standalone app**, **VS Code extension**) folds onto the same `copilot.ts` extractor via **two ingestion lanes** — live OTLP and a `~/.copilot` file reader.
 
 ## Context
 
@@ -131,8 +131,37 @@ specs/ai-governance/cli-wrappers/*.feature          — scenarios for the new to
 - **Copilot metrics-API reconciliation (deferred, not blocking):** whether to surface GitHub's `totals_by_cli` per-user report next to our numbers in analytics.
 - **Enterprise managed-settings cooperation (deferred):** longer-term, orgs could point managed settings AT LangWatch (enterprise-pinned collector = our endpoint) instead of fighting the override — a docs/sales play, not code.
 
+## Extension: multi-surface capture (stacked on PR #5605 — Proposed, 2026-07-14)
+
+The CLI decisions above (§1–§4) are Accepted and shipped. This extension broadens the same design to **every Copilot surface**, driven by empirical investigation of the standalone app and VS Code extension. It is **Proposed** — the forks below go through `/parc-ferme` before implementation. Tracked task list: issue #5783 / PR #5784.
+
+### E1. One canonical shape, two ingestion lanes
+Every surface converges on the **same `copilot.ts` extractor** on the unified substrate (ADR-018), fed by two lanes:
+- **Lane 1 — live OTLP:** env-flip (CLI) or managed-pin (fleet) surfaces emit `gen_ai.*` to `/api/otel`. Built in §1–§4.
+- **Lane 2 — file reader:** a reader tails `~/.copilot` (or the OTLP-file-exporter output) and re-emits as OTLP — reusing the `codex-rollout-otlp.ts` pattern. New.
+
+### E2. Surface facts (empirically verified 2026-07-14)
+- **Standalone app ("Copilot IDE"):** a native binary that spawns the `copilot` CLI over stdio (**not** a sealed VM, unlike Claude Cowork). Writes host-readable files to `~/.copilot`: `session-store.db.assistant_usage_events` (per-turn tokens, model, `nano_aiu` cost, latency, and `context_*_tokens` **content-source token breakdown**) and `session-state/*/events.jsonl` (prompts, responses, tools). Also honors the same `COPILOT_OTEL_*` env vars. **Fully capturable via Lane 2** (and possibly Lane 1 — network-sandbox untested).
+- **VS Code extension:** host-based OTel (`github.copilot.chat.otel.*`); auth headers are **not** a user settings key (env-only) → needs a **token-in-URL** receiver route to close the GUI-launch auth gap. Adds `copilot_chat.*` legacy attrs + metrics (edit-acceptance, LOC, TTFT).
+- **Enterprise fleet:** managed-settings `telemetry` block injects headers securely, but one org token + hash-only identity (`enduser.pseudo.id`) → **named per-user attribution needs an identity-link** (shared with the pull-mode connectors).
+
+### E3. sourceType taxonomy
+`copilot_cli` (shipped) · `copilot_app` (Lane 2) · `copilot_vscode` (Lane 1). The shared `~/.copilot` dir (CLI + app both write it) is disambiguated by entrypoint tag + dedup.
+
+### E4. Shared abstractions (reuse, don't fork)
+- **One file-reader** serving `codex` + `copilot_app` (+ future).
+- **One IDE-settings-writer** serving Copilot VS Code + Claude Code VS Code (same OTel stream).
+
+### E5. Open forks (for /parc-ferme)
+- File-lane source of truth: OTLP-file-exporter output vs native SQLite + events.jsonl.
+- App capture UX: background reader vs one-shot `sync` vs live env-flip.
+- token-in-URL leakage security review.
+- Per-user identity link: v1 or fast-follow.
+- Metrics (`copilot_chat.*`) + **content-source cost attribution** (native in the app's DB — the opik-cipx axis): in scope or phase 2.
+
 ## Revisions
 
+- **v6 (2026-07-14, multi-surface extension — stacked on PR #5605):** broadened ADR-039 from CLI-only to **all Copilot surfaces** rather than opening a new ADR. Added the §Extension section: two-lane capture model (live OTLP + `~/.copilot` file reader, codex pattern), empirically-verified app/VS-Code surface facts, the `copilot_cli`/`copilot_app`/`copilot_vscode` taxonomy, shared file-reader + IDE-settings-writer abstractions, and the open forks for `/parc-ferme`. CLI decisions §1–§4 unchanged (Accepted); the extension is Proposed. Tracked in #5783 / #5784.
 - **v5 (2026-07-10, implementation review pass):** ruthless review of the branch found one blocker + refinements, all folded in. (1) **Blocker:** a previously persisted Path-B rc function defeated the content-capture opt-out AND could resurrect a stale (rotated) ingest token on ingestion runs — its env-prefix applies at invocation, after the wrapper's exports. `unset -f` now runs in BOTH modes (the rc file is never touched; bare runs keep capturing). (2) Silent-default runs no longer pin `tool_mode` — `resolveWrapperMode` persists the pin only on the legacy no-forced-mode derivation; explicit prompt answers persist upstream, so an aborted prompt or CI run can't suppress the path prompt forever. (3) Copilot's gateway env now `clears` the full Path B telemetry block (derived from `telemetryEnvVarNames("copilot")`) so hand-exported OTel env can't double-trace. (4) The extractor's provenance gate dropped bare `enduser.pseudo.id` (standard semconv — consuming it would rename foreign tenants' attributes); provenance = `@github/copilot` scope or a `github.copilot.*` attribute.
 - **v4 (2026-07-10, implementation spike resolutions — binary sweep of copilot 1.0.69):** (1) Content capture is the standard env var `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` — Decision 5's degradation ladder collapses to its best branch (no config write exists or is needed); an explicit parent-env `false` is respected with a tokens-only notice, and logout strip symmetry comes free via `telemetryEnvVarNames()`. Content rides `gen_ai.input/output.messages` span attributes. (2) `COPILOT_OTEL_EXPORTER_TYPE` values are `otlp-http` (default) / `file` — pinned to `otlp-http`. (3) Path A base URL must include `/v1` (the binary's own local-provider example is `localhost:11434/v1`) — same convention as opencode. (4) Decision 8 amendment: device-level managed settings live at `/Library/Application Support/GitHubCopilot/managed-settings.json` (macOS, plus MDM domain `com.github.copilot`) and `/etc/github-copilot/policy.d/*.json` (Linux), BUT there is also a server layer fetched at runtime from GitHub's `/copilot_internal/managed_settings` with the user's auth — not preflightable from disk, so detect+warn covers the device layer only. (5) Instrumentation scope is `@github/copilot`; no `coding-agent-span-filter` entry needed (all spans are GenAI-shaped). Extras verified on the wire: `enduser.pseudo.id`, `github.copilot.cost` (premium-request units, NOT dollars — kept out of langwatch cost fields), `github.copilot.total_premium_requests`.
 - **v3 (2026-07-10, adversarial consistency review):** verified v2's blocker claims against the actual code (they held) and found four new gaps. (1) **Double-trace hole** — a persisted Path-B rc function survives into gateway runs via the `-i` login-shell spawn and re-injects OTel vars at invocation time; gateway reapply now prepends `unset -f <tool>`; pre-existing for gemini/opencode, fixed generically in the same PR. (2) `resolveWrapperPath` has **three** gateway defaults, not two — the prompt-abort path (Ctrl-C) also defaulted copilot into gateway billing; all three now flip to ingestion. (3) The ingestion-mint-failure fallback in `runWrapped` is another unlabeled billing shift — gets the copilot billing notice. (4) An inherited `COPILOT_OTEL_EXPORTER_TYPE=file` (ccusage setup) silently kills Path B — the env block now sets the exporter type explicitly. Also corrected the `service.name` constant's purpose (extraction gates on `gen_ai.*`, not service.name), added the span-filter scope question + exporter-type value to the spike, and noted version-check latency + Windows persistence parity. No locked fork reopened.
