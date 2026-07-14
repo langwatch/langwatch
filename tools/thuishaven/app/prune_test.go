@@ -154,6 +154,7 @@ func TestPruneDatabasesSlugGuards(t *testing.T) {
 
 // --- drop --all protects lw_main ---------------------------------------------
 
+// @scenario "The standing main database survives bulk cleanup"
 func TestClickHouseDropAllProtectsMain(t *testing.T) {
 	t.Run("given --all over a server holding lw_main and a feature db", func(t *testing.T) {
 		t.Run("when dropping, only the feature db is dropped and lw_main is kept", func(t *testing.T) {

@@ -23,6 +23,7 @@ func clearSeedEnv(t *testing.T) {
 	t.Setenv("CLICKHOUSE_URL", "")
 }
 
+// @scenario "Destructive commands refuse anything that is not local dev"
 func TestGuardSeedEnv(t *testing.T) {
 	t.Run("given a production-looking DATABASE_URL in .env", func(t *testing.T) {
 		t.Run("when guarding, it refuses before seeding", func(t *testing.T) {

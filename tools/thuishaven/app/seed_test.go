@@ -51,6 +51,9 @@ func liveStackStore() *fakeStore {
 	}}}
 }
 
+// @scenario "The default seed is unchanged"
+// @scenario "The demo preset needs the stack for its traces"
+// @scenario "Unknown presets are rejected with the available choices"
 func TestSeedPresets(t *testing.T) {
 	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x", LwDir: "/wt/feat-x/langwatch"}
 

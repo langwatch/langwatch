@@ -11,12 +11,12 @@ Feature: Git inspection across worktrees via haven
   # `app/prune.go` (database reclaim during prune), and `domain/guard.go`
   # (local-dev + protected-database guards). Scenarios are bound by Go tests
   # (`go test ./...` in tools/thuishaven): `app/git_test.go`
-  # (TestResolveGitTarget), `app/hub_test.go` (TestDestroyWorktree keeps
-  # lw_main), `domain/guard_test.go` (TestGuardLocalDatabaseURL,
-  # TestIsProtectedDatabase). The parity checker
-  # (`langwatch/scripts/check-feature-parity.ts`) only scans TypeScript test
-  # roots, so this file stays out of its WATCHED list; TUI-launch and
-  # end-to-end prune flows remain `@unimplemented`.
+  # (TestResolveGitTarget), `app/prune_test.go` (drop --all keeps lw_main),
+  # `cmd/guard_test.go` + `domain/guard_test.go` (the local-dev refusal).
+  # The parity checker (`langwatch/scripts/check-feature-parity.ts`) scans
+  # tools/thuishaven's Go tests: @unit scenarios are bound by `// @scenario`
+  # annotations above the Go test funcs; TUI-launch and end-to-end prune
+  # flows remain `@unimplemented`.
 
   Background:
     Given a repository with several worktrees managed by haven

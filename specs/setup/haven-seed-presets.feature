@@ -12,8 +12,9 @@ Feature: Seed presets — a database that is ready to look at
   # unknown preset, stack down, live-stack trace wiring). The full
   # ingest-through-the-collector path is only exercised manually, so that
   # scenario stays `@unimplemented`. The parity checker
-  # (`langwatch/scripts/check-feature-parity.ts`) only scans TypeScript test
-  # roots, so this file stays out of its WATCHED list.
+  # (`langwatch/scripts/check-feature-parity.ts`) scans tools/thuishaven's
+  # Go tests: @unit scenarios are bound by `// @scenario` annotations above
+  # those test funcs.
 
   @unit
   Scenario: The default seed is unchanged

@@ -120,6 +120,7 @@ func hubOrchestrator(store *fakeStore, sys *fakeSystem, proxy *fakeProxy, ch, pg
 
 // --- DownStack ----------------------------------------------------------------
 
+// @scenario "Shutting a stack down from the hub"
 func TestDownStack(t *testing.T) {
 	t.Run("given a live registered stack", func(t *testing.T) {
 		store := &fakeStore{stacks: []domain.Stack{{
@@ -181,6 +182,9 @@ func TestDownStack(t *testing.T) {
 
 // --- DestroyWorktree ------------------------------------------------------------
 
+// @scenario "Destroying a worktree from the hub"
+// @scenario "The primary checkout can never be destroyed"
+// @scenario "The worktree the hub runs from can never be destroyed"
 func TestDestroyWorktree(t *testing.T) {
 	primary := "/repos/langwatch"
 	victim := "/repos/worktrees/feat-x"

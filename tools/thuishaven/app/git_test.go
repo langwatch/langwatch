@@ -22,6 +22,8 @@ func (f *gitTestHygiene) Remove(string) error                  { return nil }
 func (f *gitTestHygiene) PruneGitWorktrees(string)             {}
 func (f *gitTestHygiene) RemoveWorktree(string, string) error  { return nil }
 
+// @scenario "Opening the git UI for another stack by slug"
+// @scenario "Unknown target is rejected with the available choices"
 func TestResolveGitTarget(t *testing.T) {
 	stacks := []domain.Stack{
 		{Slug: "portless", WorktreeDir: "/repos/worktrees/portless"},

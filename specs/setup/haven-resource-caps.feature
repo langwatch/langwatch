@@ -9,9 +9,9 @@ Feature: Resource caps — shared services can't take the machine
   # DefaultRedisMaxMemoryMB; HAVEN_REDIS_MAXMEMORY_MB tunes it, 0 disables)
   # and `app/report.go` renders the doctor footprint lines. No Go tests bind
   # these scenarios yet — both need a live Redis / running stacks — so they
-  # stay `@unimplemented` until an integration harness exists. The parity
-  # checker (`langwatch/scripts/check-feature-parity.ts`) only scans
-  # TypeScript test roots, so this file stays out of its WATCHED list.
+  # stay `@unimplemented` until an integration harness exists. (The parity
+  # checker scans tools/thuishaven's Go tests; bind future scenarios with
+  # `// @scenario` annotations above the test funcs.)
 
   # Deliberately says "the Redis haven manages", not "the shared Redis":
   # `specs/setup/haven-private-redis-plan.md` replaces the shared brew Redis

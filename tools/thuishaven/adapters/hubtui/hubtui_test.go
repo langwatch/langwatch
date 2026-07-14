@@ -75,6 +75,8 @@ func mutableActions(rows *[]Row, downed, destroyed *[]string) Actions {
 	}
 }
 
+// @scenario "Jumping into a stack's git view from the hub"
+// @scenario "Destruction requires typing the name"
 func TestHubModel(t *testing.T) {
 	t.Run("given two stacks", func(t *testing.T) {
 		t.Run("when enter is pressed on the second row, it opens that worktree's git view", func(t *testing.T) {
