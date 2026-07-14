@@ -75,11 +75,11 @@ type model struct {
 	pending *Row   // the row a confirmation prompt is acting on, frozen at open time
 	typed   string // the name typed to confirm a destroy
 	flash   string // last action's outcome, shown until the next keypress
-	// quitting means quit was requested while an action was in flight: the hub
+	// isQuitting means quit was requested while an action was in flight: the hub
 	// exits when the action completes (a second ctrl+c force-quits).
-	quitting bool
-	openDir  string
-	busy     bool
+	isQuitting bool
+	openDir    string
+	busy       bool
 }
 
 func newModel(ctx context.Context, a Actions) model {
@@ -111,7 +111,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.cursor >= len(m.rows) {
 			m.cursor = max(0, len(m.rows)-1)
 		}
-		if m.quitting {
+		if m.isQuitting {
 			return m, tea.Quit
 		}
 		return m, nil
@@ -124,12 +124,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// callback still can't hold the terminal hostage.
 			switch msg.String() {
 			case "ctrl+c":
-				if m.quitting {
+				if m.isQuitting {
 					return m, tea.Quit
 				}
-				m.quitting = true
+				m.isQuitting = true
 			case "q":
-				m.quitting = true
+				m.isQuitting = true
 			}
 			return m, nil
 		}
@@ -300,7 +300,7 @@ func (m model) View() string {
 
 	b.WriteString("\n")
 	switch {
-	case m.busy && m.quitting:
+	case m.busy && m.isQuitting:
 		b.WriteString(styleWarn.Render("  working… exiting when the current action finishes (ctrl+c again to force)") + "\n")
 	case m.busy:
 		b.WriteString(styleWarn.Render("  working…") + "\n")

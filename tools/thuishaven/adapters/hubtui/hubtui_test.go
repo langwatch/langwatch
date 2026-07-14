@@ -31,7 +31,7 @@ func press(t *testing.T, m model, s string) model {
 	out := next.(model)
 	if cmd != nil {
 		if msg := cmd(); msg != nil {
-			if _, quitting := msg.(tea.QuitMsg); !quitting {
+			if _, isQuitting := msg.(tea.QuitMsg); !isQuitting {
 				n2, _ := out.Update(msg)
 				out = n2.(model)
 			}
@@ -302,7 +302,7 @@ func TestHubBusyGate(t *testing.T) {
 			if cmd != nil {
 				t.Fatal("q while busy must not quit immediately — the in-flight action would be abandoned half-way")
 			}
-			if !m.quitting {
+			if !m.isQuitting {
 				t.Fatal("q while busy should arm the drain")
 			}
 			next, cmd = m.Update(actionDoneMsg{verb: "down", slug: "alpha"})
