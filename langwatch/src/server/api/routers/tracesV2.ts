@@ -9,7 +9,10 @@ import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
-import { enrichCodingAgentSpansFromLogs } from "~/server/app-layer/traces/claude-code-log-enrichment";
+import {
+  contentAttrKeys,
+  enrichCodingAgentSpansFromLogs,
+} from "~/server/app-layer/traces/claude-code-log-enrichment";
 import {
   buildCodingAgentTranscript,
   type CodingAgentTranscript,
@@ -17,6 +20,10 @@ import {
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import {
+  DERIVED_INPUT_ATTR_PREFIX,
+  DERIVED_OUTPUT_ATTR_PREFIX,
+} from "~/server/app-layer/traces/log-content-derivation";
 import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import {
@@ -1736,22 +1743,22 @@ export interface TraceLogRecordDto {
   scopeVersion: string | null;
   /**
    * True when this record carried captured content the viewer may not see, so
-   * the content `body` (top-level and the `body` attribute) was withheld. The
-   * UI renders the redacted placeholder, mirroring the span endpoints'
-   * `inputRedacted` / `outputRedacted`.
+   * the content was withheld — the top-level body, the per-event content
+   * attributes (`prompt` / `response` / `body`), and the ingest-derived
+   * `langwatch.gen_ai.*` content attrs. The UI renders the redacted
+   * placeholder, mirroring the span endpoints' `inputRedacted` /
+   * `outputRedacted`.
    */
   bodyRedacted?: boolean;
   /** Audience label naming who CAN see the withheld content, when restricted. */
   bodyVisibleTo?: string | null;
 }
 
-/** The log-record attribute carrying the emitter's raw content payload. */
-const LOG_CONTENT_BODY_ATTR = "body";
 /** The log-record attribute carrying the emitter's event name. */
 const LOG_EVENT_NAME_ATTR = "event.name";
 
 /**
- * Log `event.name` values whose `body` is captured INPUT content — the user's
+ * Log `event.name` values whose content payload is captured INPUT — the user's
  * prompt or the model-call request payload. Gated behind captured-input
  * visibility. Mirrors the input events the read-path Claude enrichment joins.
  */
@@ -1761,7 +1768,7 @@ const LOG_INPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Log `event.name` values whose `body` is captured OUTPUT content — the
+ * Log `event.name` values whose content payload is captured OUTPUT — the
  * assistant's reply or the model-call response payload. Gated behind
  * captured-output visibility.
  */
@@ -1772,20 +1779,28 @@ const LOG_OUTPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
 
 /**
  * Enforce captured-content visibility on one trace-correlated log record before
- * it leaves the API. The raw log records carry prompt / response content in
- * their content `body` (the top-level OTLP body for content-of-record emitters,
- * and the `body` attribute for the claude_code events), so this procedure must
- * gate that content behind the SAME `canSeeCapturedInput` / `canSeeCapturedOutput`
- * visibility the sibling span endpoints enforce — otherwise the raw-log read is
- * a redaction bypass.
+ * it leaves the API. The raw log records carry prompt / response content under
+ * PER-EVENT attribute keys — `prompt` for `user_prompt`, `response` for
+ * `assistant_response`, `body` for the raw `api_*_body` payloads — plus the
+ * top-level OTLP body for content-of-record emitters. This procedure must
+ * withhold every one of those keys behind the SAME `canSeeCapturedInput` /
+ * `canSeeCapturedOutput` visibility the sibling span endpoints enforce, so the
+ * key list comes from {@link contentAttrKeys}, the very mapping the read-path
+ * enrichment and transcript derivation surface content from — a key stripped
+ * from one list but not the other is a policy bypass.
+ *
+ * Ingest also stamps DERIVED content onto the attributes
+ * (`langwatch.gen_ai.output.text`, `…output.tool_calls`, …input counts): the
+ * same captured content re-shaped, so it is stripped by prefix alongside the
+ * raw keys.
  *
  * Input-category events gate on input visibility, output-category events on
  * output visibility, and any UNCLASSIFIED record that still carries a content
- * body fails closed (both visibilities required). Only the content body is
- * withheld: event name, `request_id`, `cost_usd`, `query_source` and every
- * other metadata attribute (and cost, governed by its own permission) pass
- * through untouched, so a structural record like the `api_request` cost anchor
- * is returned intact.
+ * body fails closed (both visibilities required). Only content is withheld:
+ * event name, `request_id`, `cost_usd`, `query_source` and every other
+ * metadata attribute (and cost, governed by its own permission) pass through
+ * untouched, so a structural record like the `api_request` cost anchor is
+ * returned intact.
  */
 export function redactTraceLogContent(
   row: TraceLogRecordDto,
@@ -1797,13 +1812,26 @@ export function redactTraceLogContent(
   },
 ): TraceLogRecordDto {
   const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
-  const attrBody = row.attributes[LOG_CONTENT_BODY_ATTR];
-  const hasAttrContent = typeof attrBody === "string" && attrBody.length > 0;
+  const presentContentKeys = contentAttrKeys(eventName).filter((key) => {
+    const value = row.attributes[key];
+    return typeof value === "string" && value.length > 0;
+  });
+  const derivedContentKeys = Object.keys(row.attributes).filter(
+    (key) =>
+      key.startsWith(DERIVED_INPUT_ATTR_PREFIX) ||
+      key.startsWith(DERIVED_OUTPUT_ATTR_PREFIX),
+  );
   // The top-level OTLP body is content only when it is NOT merely echoing the
   // event-name marker (claude_code stamps the marker there; a generic
   // content-of-record emitter puts the record's content there).
   const topBodyIsContent = row.body.length > 0 && row.body !== eventName;
-  if (!hasAttrContent && !topBodyIsContent) return row;
+  if (
+    presentContentKeys.length === 0 &&
+    derivedContentKeys.length === 0 &&
+    !topBodyIsContent
+  ) {
+    return row;
+  }
 
   const isInput = LOG_INPUT_CONTENT_EVENTS.has(eventName);
   const isOutput = LOG_OUTPUT_CONTENT_EVENTS.has(eventName);
@@ -1818,7 +1846,15 @@ export function redactTraceLogContent(
   if (!hidden) return row;
 
   const attributes = { ...row.attributes };
-  if (hasAttrContent) delete attributes[LOG_CONTENT_BODY_ATTR];
+  for (const key of presentContentKeys) delete attributes[key];
+  // Derived attrs are stripped by the category they were computed from; an
+  // unclassified hidden record sheds both, mirroring its fail-closed gate.
+  for (const key of derivedContentKeys) {
+    const isDerivedInput = key.startsWith(DERIVED_INPUT_ATTR_PREFIX);
+    if (isInput ? isDerivedInput : isOutput ? !isDerivedInput : true) {
+      delete attributes[key];
+    }
+  }
   return {
     ...row,
     body: topBodyIsContent ? "" : row.body,

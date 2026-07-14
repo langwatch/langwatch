@@ -2,8 +2,12 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
-  LogRecordStorageService,
+  CODING_AGENT_ORIGIN,
+  enrichCodingAgentSpansFromLogs,
+} from "~/server/app-layer/traces/claude-code-log-enrichment";
+import {
   createDefaultLogRecordStorageService,
+  type LogRecordStorageService,
 } from "~/server/app-layer/traces/log-record-storage.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { prisma as defaultPrisma } from "~/server/db";
@@ -13,10 +17,6 @@ import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-pro
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
-import {
-  CODING_AGENT_ORIGIN,
-  enrichCodingAgentSpansFromLogs,
-} from "~/server/app-layer/traces/claude-code-log-enrichment";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 import { resolveOffloadedTracesBatch } from "./resolve-offloaded-traces-batch";
@@ -328,11 +328,12 @@ export class TraceService {
   /**
    * Batch sibling of {@link enrichCodingAgentTrace} for the multi-trace read
    * paths (evals, export, legacy thread reads). Enriches each coding-agent trace
-   * in the array with its own lazy, time-capped log read (reads run in parallel);
-   * every non-coding-agent trace short-circuits inside `enrichCodingAgentTrace`
-   * and pays nothing. The upfront origin check skips even the `Promise.all`
-   * allocation on the common all-non-coding-agent page, so a project that never
-   * uses a coding assistant never touches the log store. Best-effort per trace.
+   * in the array with its own lazy, time-capped log read (reads run in parallel,
+   * a bounded few at a time); every non-coding-agent trace short-circuits inside
+   * `enrichCodingAgentTrace` and pays nothing. The upfront origin check skips
+   * even the fan-out allocation on the common all-non-coding-agent page, so a
+   * project that never uses a coding assistant never touches the log store.
+   * Best-effort per trace.
    */
   private async enrichCodingAgentTraces(
     projectId: string,
@@ -342,9 +343,24 @@ export class TraceService {
       (trace) => trace.metadata?.["langwatch.origin"] === CODING_AGENT_ORIGIN,
     );
     if (!hasCodingAgentTrace) return traces;
-    return Promise.all(
-      traces.map((trace) => this.enrichCodingAgentTrace(projectId, trace)),
-    );
+    // Bounded fan-out: each coding-agent trace's enrichment holds a capped but
+    // heavy log read (raw bodies run to 60 KB a row) in memory, so an
+    // unbounded Promise.all over a big export/eval page multiplies that by the
+    // page size. Five in flight keeps the multi-trace paths at a bounded
+    // memory ceiling; non-coding-agent traces short-circuit inside
+    // `enrichCodingAgentTrace` and cost nothing.
+    const enrichConcurrency = 5;
+    const enriched: Trace[] = [...traces];
+    for (let start = 0; start < traces.length; start += enrichConcurrency) {
+      const chunk = traces.slice(start, start + enrichConcurrency);
+      const results = await Promise.all(
+        chunk.map((trace) => this.enrichCodingAgentTrace(projectId, trace)),
+      );
+      for (let offset = 0; offset < results.length; offset++) {
+        enriched[start + offset] = results[offset]!;
+      }
+    }
+    return enriched;
   }
 
   /**

@@ -4,9 +4,10 @@ import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trac
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
-import type {
-  LogRecordStorageRepository,
-  StoredLogRecordRow,
+import {
+  type LogRecordStorageRepository,
+  type StoredLogRecordRow,
+  TRACE_LOG_READ_CAP,
 } from "./log-record-storage.repository";
 
 const TABLE_NAME = "stored_log_records" as const;
@@ -91,6 +92,7 @@ export class LogRecordStorageClickHouseRepository
     tenantId: string,
     traceId: string,
     occurredAtMs?: number,
+    limit: number = TRACE_LOG_READ_CAP,
   ): Promise<StoredLogRecordRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
@@ -150,12 +152,15 @@ export class LogRecordStorageClickHouseRepository
             GROUP BY TenantId, TraceId, SpanId, ProjectionId
           )
         ORDER BY TimeUnixMs ASC
+        LIMIT {limitPlusOne:UInt32}
       `,
       query_params: {
         tenantId,
         traceId,
         fromMs,
         toMs,
+        // One row past the cap so truncation is detectable without a count.
+        limitPlusOne: limit + 1,
       },
       format: "JSONEachRow",
     });
@@ -170,6 +175,14 @@ export class LogRecordStorageClickHouseRepository
       ScopeName: string | null;
       ScopeVersion: string | null;
     }>;
+
+    if (rows.length > limit) {
+      rows.length = limit;
+      logger.warn(
+        { tenantId, traceId, limit },
+        "Trace log read truncated at the row cap; the oldest rows are returned and later ones dropped",
+      );
+    }
 
     return rows.map((row) => ({
       traceId: row.TraceId,

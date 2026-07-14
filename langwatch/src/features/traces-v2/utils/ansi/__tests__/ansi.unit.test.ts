@@ -166,6 +166,21 @@ describe("parseAnsi", () => {
       expect(textOf(parseAnsi("abc\x1b[31"))).toBe("abc");
     });
 
+    it("keeps the line break after a CSI truncated mid-stream", () => {
+      // Chunked output can cut a sequence short of its final byte; the `\n`
+      // that follows is real content, not the sequence's final byte, and
+      // eating it would glue two lines together.
+      const lines = parseAnsi("abc\x1b[31\ndef");
+      expect(lines).toHaveLength(2);
+      expect(textOf(lines)).toBe("abc\ndef");
+    });
+
+    it("re-processes an interrupting ordinary character after a malformed CSI as text", () => {
+      // Bytes below 0x40 cannot terminate a CSI; here a tab (0x09) interrupts
+      // the digit run — the tab must survive as content, not be swallowed.
+      expect(textOf(parseAnsi("a\x1b[3\tb"))).toBe("a\tb");
+    });
+
     it("ignores a malformed extended-colour introducer", () => {
       const [seg] = segmentsOf(parseAnsi("\x1b[38;5mX"));
       expect(seg!.text).toBe("X");

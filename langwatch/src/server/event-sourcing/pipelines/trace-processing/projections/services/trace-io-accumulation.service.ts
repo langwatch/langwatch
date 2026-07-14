@@ -1,8 +1,8 @@
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   extractAssistantTextFromResponseBody,
   isConversationalQuerySource,
 } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { DERIVED_ATTRS } from "~/server/app-layer/traces/log-content-derivation";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -180,7 +180,6 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
   return { input: null, output: null };
 }
 
-
 /**
  * Accumulates computed input/output across spans using priority rules:
  * root > explicit (langwatch) > last-finishing inferred (gen_ai).
@@ -249,7 +248,7 @@ export class TraceIOAccumulationService {
 
     // Tool spans never define the trace's headline I/O: they are
     // sub-operations (a Bash run, an Edit), not the conversation. This is
-    // load-bearing for synthesized claude_code tool spans, which are
+    // load-bearing for Claude Code's real claude_code.tool spans, which are
     // parentless (= root) so their langwatch.input would otherwise hijack the
     // trace input. Skipping them lets a tool span carry its own input/output
     // for the span detail without polluting the trace summary.
@@ -273,8 +272,10 @@ export class TraceIOAccumulationService {
 
     const isRoot = span.parentSpanId === null;
 
-    const inputResult =
-      this.traceIOExtractionService.extractRichIOFromSpan(span, "input");
+    const inputResult = this.traceIOExtractionService.extractRichIOFromSpan(
+      span,
+      "input",
+    );
     if (
       inputResult &&
       (isRoot || computedInput === null || currentInputIsFallback)
@@ -301,8 +302,10 @@ export class TraceIOAccumulationService {
       }
     }
 
-    const outputResult =
-      this.traceIOExtractionService.extractRichIOFromSpan(span, "output");
+    const outputResult = this.traceIOExtractionService.extractRichIOFromSpan(
+      span,
+      "output",
+    );
     if (outputResult) {
       const isExplicit = outputResult.source === "langwatch";
       // Semantic output must always override a prior fallback, regardless of
@@ -338,10 +341,7 @@ export class TraceIOAccumulationService {
       // regardless of span end-time ordering. outputFromRootSpan stays unset
       // so the next semantic root-span match still wins.
       const outputFallback =
-        this.traceIOExtractionService.extractFallbackIOFromSpan(
-          span,
-          "output",
-        );
+        this.traceIOExtractionService.extractFallbackIOFromSpan(span, "output");
       if (outputFallback) {
         computedOutput = preferText(outputFallback.text, outputFallback.raw);
         outputSpanEndTimeMs = span.endTimeUnixMs;

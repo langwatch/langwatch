@@ -323,13 +323,16 @@ export function parseAnsi(input: string): AnsiLine[] {
           }
           break;
         }
-        const finalByte = input[j];
-        if (finalByte === "m") {
+        const finalCode = j < len ? input.charCodeAt(j) : -1;
+        const hasValidFinalByte = finalCode >= 0x40 && finalCode <= 0x7e;
+        if (hasValidFinalByte && input[j] === "m") {
           setStyle(applySgr(style, input.slice(i + 2, j)));
         }
-        // Advance past the final byte (or to end if the sequence was
-        // truncated / malformed).
-        i = j < len ? j + 1 : len;
+        // Consume the final byte only when it really is one. A sequence
+        // interrupted mid-params (chunked/truncated output) is followed by a
+        // REAL character — often `\n` — which must be re-processed as text,
+        // not swallowed as the sequence's final byte (that eats line breaks).
+        i = hasValidFinalByte ? j + 1 : j;
         continue;
       }
       if (nextCh === "]") {

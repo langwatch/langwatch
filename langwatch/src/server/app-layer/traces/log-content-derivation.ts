@@ -56,6 +56,17 @@ export const DERIVED_ATTRS = {
   INPUT_MESSAGE_COUNT: "langwatch.gen_ai.input.message_count",
 } as const;
 
+/**
+ * Prefixes grouping the derived attrs by the captured-content category they
+ * are computed FROM. The API's log redaction strips attributes by these
+ * prefixes when the matching category is hidden from the viewer — derived
+ * text is captured content too, just re-shaped at ingest. `STOP_REASON`
+ * (`langwatch.gen_ai.response.*`) sits outside both prefixes on purpose:
+ * like `cost_usd`, it is operational metadata, not content.
+ */
+export const DERIVED_INPUT_ATTR_PREFIX = "langwatch.gen_ai.input.";
+export const DERIVED_OUTPUT_ATTR_PREFIX = "langwatch.gen_ai.output.";
+
 /** A single tool the assistant asked for. */
 interface DerivedToolCall {
   id: string;
@@ -148,7 +159,9 @@ function readToolCalls(content: unknown): DerivedToolCall[] {
 function parseJsonObject(raw: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+    return typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null;
   } catch {

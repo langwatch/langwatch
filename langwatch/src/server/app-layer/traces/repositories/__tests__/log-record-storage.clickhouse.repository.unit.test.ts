@@ -152,6 +152,49 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
     });
   });
 
+  // The heavy Body column rides every row, so the read must be bounded: an
+  // uncapped marathon-session trace (thousands of logs × up to 60 KB bodies)
+  // re-opens the fat-payload memory failure mode on the READ side.
+  describe("when a trace has more logs than the read cap", () => {
+    const storedRow = (index: number) => ({
+      TraceId: "trace-1",
+      SpanId: `span-${index}`,
+      TimeUnixMs: 1_700_000_000_000 + index,
+      Body: "api_request_body",
+      Attributes: {},
+      ResourceAttributes: {},
+      ScopeName: "s",
+      ScopeVersion: null,
+    });
+
+    it("bounds the query at the default cap plus one detection row", async () => {
+      const { repo, query } = repoCapturingQuery();
+
+      await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000);
+
+      const { query: sql, query_params } = capturedQuery(query);
+      expect(sql).toContain("LIMIT {limitPlusOne:UInt32}");
+      expect(query_params.limitPlusOne).toBe(2001);
+    });
+
+    it("returns only the oldest rows up to a caller-narrowed limit", async () => {
+      const { repo } = repoCapturingQuery([
+        storedRow(0),
+        storedRow(1),
+        storedRow(2),
+      ]);
+
+      const rows = await repo.getLogsByTraceId(
+        "project_test",
+        "trace-1",
+        1_700_000_000_000,
+        2,
+      );
+
+      expect(rows.map((row) => row.spanId)).toEqual(["span-0", "span-1"]);
+    });
+  });
+
   describe("when reading the trace's logs (generic — no claude-kind filter)", () => {
     it("selects the Body + Attributes and does not filter on the claude kind attr", async () => {
       const { repo, query } = repoCapturingQuery();

@@ -20,9 +20,9 @@ import type { Logger } from "pino";
 import type { Span } from "~/server/tracer/types";
 
 import {
-  computeClaudeSpanEnrichment,
   type ClaudeContentLog,
   type ClaudeSpanRef,
+  computeClaudeSpanEnrichment,
 } from "./claude-code-span-enrichment";
 import { DERIVED_ATTRS } from "./log-content-derivation";
 import type { LogRecordStorageService } from "./log-record-storage.service";
@@ -58,18 +58,30 @@ const RESPONSE_ATTR = "response";
 const USER_PROMPT_EVENT = "user_prompt";
 const ASSISTANT_RESPONSE_EVENT = "assistant_response";
 
+/**
+ * The attribute keys that can carry the event's content payload, in the order
+ * {@link readContentBody} probes them (`body` is always the trailing
+ * fallback). Exported for the API's log redaction: it must withhold EXACTLY
+ * the keys a reader would surface, from this one mapping — a key listed here
+ * but missed there leaks captured content through the raw-log and transcript
+ * reads to viewers the data-privacy policy hides it from.
+ */
+export function contentAttrKeys(eventName: string): readonly string[] {
+  if (eventName === USER_PROMPT_EVENT) return [PROMPT_ATTR, BODY_ATTR];
+  if (eventName === ASSISTANT_RESPONSE_EVENT) return [RESPONSE_ATTR, BODY_ATTR];
+  return [BODY_ATTR];
+}
+
 /** The attribute carrying the event's content payload, per event name. */
 function readContentBody(
   eventName: string,
   attrs: Record<string, string>,
 ): string | null {
-  const preferred =
-    eventName === USER_PROMPT_EVENT
-      ? PROMPT_ATTR
-      : eventName === ASSISTANT_RESPONSE_EVENT
-        ? RESPONSE_ATTR
-        : BODY_ATTR;
-  return nonEmptyOrNull(attrs[preferred]) ?? nonEmptyOrNull(attrs[BODY_ATTR]);
+  for (const key of contentAttrKeys(eventName)) {
+    const value = nonEmptyOrNull(attrs[key]);
+    if (value !== null) return value;
+  }
+  return null;
 }
 
 /** Span attribute keys (unflattened onto `Span.params` by the span mapper). */
@@ -98,7 +110,9 @@ function nonEmptyOrNull(value: string | undefined): string | null {
  */
 export function mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
   return spans
-    .filter((span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null)
+    .filter(
+      (span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null,
+    )
     .slice()
     .sort((a, b) => a.timestamps.started_at - b.timestamps.started_at)
     .map((span) => ({

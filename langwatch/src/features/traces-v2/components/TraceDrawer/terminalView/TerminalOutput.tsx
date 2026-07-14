@@ -8,6 +8,21 @@ import { TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./palette";
 /** How many lines show before the output collapses — the same handful Claude Code itself shows. */
 const COLLAPSE_AT_LINES = 6;
 
+/**
+ * Collapse on size too, not just line count: common Bash stdout (minified
+ * JSON, base64) is one multi-megabyte LINE, which a line-count predicate never
+ * folds — and it would render in full, synchronously, through the ANSI parser
+ * on first paint.
+ */
+const COLLAPSE_AT_CHARS = 10_000;
+
+/**
+ * Hard ceiling on how much output is ever RENDERED, even expanded — parsing
+ * and painting a multi-megabyte blob hangs the tab. Copy is unaffected: the
+ * click-to-copy always lifts the complete text.
+ */
+const RENDER_CEILING_CHARS = 500_000;
+
 interface TerminalOutputProps {
   /** Raw tool/command output, possibly carrying ANSI escape codes. */
   text: string;
@@ -32,23 +47,58 @@ export const TerminalOutput = memo(function TerminalOutput({
 }: TerminalOutputProps) {
   const [expanded, setExpanded] = useState(false);
   const { copy } = useCopyToClipboard();
-  const plain = useMemo(() => stripAnsi(text), [text]);
 
-  const lines = useMemo(() => text.split("\n"), [text]);
-  const hiddenLineCount = lines.length - COLLAPSE_AT_LINES;
-  const isCollapsible = hiddenLineCount > 0;
-  const visibleText =
-    isCollapsible && !expanded ? lines.slice(0, COLLAPSE_AT_LINES).join("\n") : text;
+  const { visibleText, isCollapsible, foldLabel, displayCapped } =
+    useMemo(() => {
+      const lines = text.split("\n");
+      const hiddenLineCount = lines.length - COLLAPSE_AT_LINES;
+      const collapsible =
+        hiddenLineCount > 0 || text.length > COLLAPSE_AT_CHARS;
+      const shown =
+        collapsible && !expanded
+          ? lines
+              .slice(0, COLLAPSE_AT_LINES)
+              .join("\n")
+              .slice(0, COLLAPSE_AT_CHARS)
+          : text.slice(0, RENDER_CEILING_CHARS);
+      const hiddenCharCount = text.length - shown.length;
+      return {
+        visibleText: shown,
+        isCollapsible: collapsible,
+        foldLabel:
+          hiddenLineCount > 0
+            ? `+${hiddenLineCount} lines`
+            : `+${formatCharCount(hiddenCharCount)}`,
+        displayCapped: expanded && text.length > RENDER_CEILING_CHARS,
+      };
+    }, [text, expanded]);
 
   const handleClick = useCallback(() => {
     const selection = window.getSelection?.();
     if (selection && selection.toString().length > 0) return;
-    copy(plain);
-  }, [copy, plain]);
+    // De-ANSI'd on demand: most outputs are only ever looked at, and while
+    // collapsed only a slice of the text is even rendered — stripping the
+    // whole thing on mount would pay the full-blob walk for nothing.
+    copy(stripAnsi(text));
+  }, [copy, text]);
 
   return (
-    <Box color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.screenFg} cursor="text" onClick={handleClick}>
+    <Box
+      color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.screenFg}
+      cursor="text"
+      onClick={handleClick}
+    >
       <AnsiText text={visibleText} />
+      {displayCapped && (
+        <Text
+          fontFamily={TERMINAL_FONT_STACK}
+          fontSize="13px"
+          color={TERMINAL_TOKENS.faint}
+          userSelect="none"
+        >
+          … display capped, click the output to copy all of it
+        </Text>
+      )}
       {isCollapsible && (
         <Text
           fontFamily={TERMINAL_FONT_STACK}
@@ -62,9 +112,16 @@ export const TerminalOutput = memo(function TerminalOutput({
             setExpanded((value) => !value);
           }}
         >
-          {expanded ? "▲ show less" : `… +${hiddenLineCount} lines (click to expand)`}
+          {expanded ? "▲ show less" : `… ${foldLabel} (click to expand)`}
         </Text>
       )}
     </Box>
   );
 });
+
+/** "4,096 chars" reads worse than "4k chars" at terminal scale. */
+function formatCharCount(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M chars`;
+  if (count >= 1_000) return `${Math.round(count / 1_000)}k chars`;
+  return `${count} chars`;
+}

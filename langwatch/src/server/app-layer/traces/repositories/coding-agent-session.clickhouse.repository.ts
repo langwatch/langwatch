@@ -339,6 +339,12 @@ export class CodingAgentSessionClickHouseRepository
         traceId,
         // A session can run for hours, and a late span can move StartedAt
         // backwards, so widen the hint rather than pin it to the exact ms.
+        // ±7 days is the max tolerated drift between the caller's hint and
+        // the row's real StartedAt: a shift past that (a client clock that is
+        // out by more than a week) lands the row outside this window and the
+        // read returns the stale pre-shift version, or null. Accepted
+        // tradeoff — the window is what keeps this a partition-pruned point
+        // read instead of a full-table scan.
         ...(startedAtMs !== undefined
           ? {
               from: startedAtMs - 7 * 24 * 60 * 60 * 1000,
@@ -361,7 +367,9 @@ const asNumber = (value: unknown): number => {
 };
 
 const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+  Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string")
+    : [];
 
 const asNumberMap = (value: unknown): Record<string, number> =>
   typeof value === "object" && value !== null && !Array.isArray(value)

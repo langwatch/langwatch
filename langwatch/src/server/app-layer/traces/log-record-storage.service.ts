@@ -6,8 +6,8 @@ import {
 import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
 import { LogRecordStorageClickHouseRepository } from "./repositories/log-record-storage.clickhouse.repository";
 import {
-  NullLogRecordStorageRepository,
   type LogRecordStorageRepository,
+  NullLogRecordStorageRepository,
   type StoredLogRecordRow,
 } from "./repositories/log-record-storage.repository";
 
@@ -19,17 +19,25 @@ export class LogRecordStorageService {
   }
 
   /**
-   * Read every log record correlated to one trace (generic across emitters).
-   * `occurredAtMs` is an optional partition-pruning hint on the `TimeUnixMs`
-   * partition key. Powers the logs-read API (raw-log inspector, dashboard
-   * frontend join) and the legacy read-path Claude Code content enrichment.
+   * Read every log record correlated to one trace (generic across emitters),
+   * oldest first, capped at `limit` rows (the repository's read cap unless the
+   * caller narrows it). `occurredAtMs` is an optional partition-pruning hint
+   * on the `TimeUnixMs` partition key. Powers the logs-read API (raw-log
+   * inspector, dashboard frontend join) and the legacy read-path Claude Code
+   * content enrichment.
    */
   async getLogsByTraceId(
     tenantId: string,
     traceId: string,
     occurredAtMs?: number,
+    limit?: number,
   ): Promise<StoredLogRecordRow[]> {
-    return this.repository.getLogsByTraceId(tenantId, traceId, occurredAtMs);
+    return this.repository.getLogsByTraceId(
+      tenantId,
+      traceId,
+      occurredAtMs,
+      limit,
+    );
   }
 }
 
