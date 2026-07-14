@@ -487,19 +487,25 @@ export class ReplayService {
     //    partitions instead of scanning cold storage. See
     //    getAggregateOccurredAtBounds for why this bound is safe.
     onBatchPhase("cutoff");
-    const occurredAtBounds =
-      (await getAggregateOccurredAtBounds({
-        client,
-        tenantId,
-        aggregateIds: batch.map((a) => a.aggregateId),
-      })) ?? undefined;
-    const cutoffs = await batchGetCutoffEventIds({
+    const occurredAtBounds = await getAggregateOccurredAtBounds({
       client,
       tenantId,
+      aggregateTypes: [...new Set(batch.map((a) => a.aggregateType))],
       aggregateIds: batch.map((a) => a.aggregateId),
-      eventTypes: projection.definition.eventTypes,
-      occurredAtBounds,
     });
+    // Undefined bounds means the batch's aggregates have zero events — skip
+    // the cutoff query, which would otherwise scan every partition unbounded
+    // just to return empty. An empty cutoff map routes every aggregate down
+    // the without-cutoff/unmark path below.
+    const cutoffs = occurredAtBounds
+      ? await batchGetCutoffEventIds({
+          client,
+          tenantId,
+          aggregateIds: batch.map((a) => a.aggregateId),
+          eventTypes: projection.definition.eventTypes,
+          occurredAtBounds,
+        })
+      : new Map<string, CutoffInfo>();
 
     const withCutoffKeys: string[] = [];
     const withoutCutoffKeys: string[] = [];
@@ -847,19 +853,24 @@ export class ReplayService {
     // 4. CUTOFF — occurred-at bounds first, for partition pruning (see
     //    replayBatch / getAggregateOccurredAtBounds).
     onBatchPhase("cutoff");
-    const occurredAtBounds =
-      (await getAggregateOccurredAtBounds({
-        client,
-        tenantId,
-        aggregateIds: batch.map((a) => a.aggregateId),
-      })) ?? undefined;
-    const cutoffs = await batchGetCutoffEventIds({
+    const occurredAtBounds = await getAggregateOccurredAtBounds({
       client,
       tenantId,
+      aggregateTypes: [...new Set(batch.map((a) => a.aggregateType))],
       aggregateIds: batch.map((a) => a.aggregateId),
-      eventTypes: projection.definition.eventTypes,
-      occurredAtBounds,
     });
+    // Undefined bounds means the batch's aggregates have zero events — skip
+    // the cutoff query (see replayBatch); the empty cutoff map routes
+    // everything down the without-cutoff/unmark path below.
+    const cutoffs = occurredAtBounds
+      ? await batchGetCutoffEventIds({
+          client,
+          tenantId,
+          aggregateIds: batch.map((a) => a.aggregateId),
+          eventTypes: projection.definition.eventTypes,
+          occurredAtBounds,
+        })
+      : new Map<string, CutoffInfo>();
 
     const withCutoffKeys: string[] = [];
     const withoutCutoffKeys: string[] = [];
@@ -1172,21 +1183,24 @@ export class ReplayService {
 
       emit();
 
-      // Pause only for this batch's window.
-      for (const p of allProjectionsToPause) {
-        await pauseProjection({
-          redis: this.deps.redis,
-          pauseKey: p.pauseKey,
-        });
-      }
-      log.write({
-        step: "pause-batch",
-        batch: batchNum,
-        projections: allProjectionNames,
-      });
-
       let batchResult: { eventsReplayed: number };
       try {
+        // Pause only for this batch's window. The pause loop lives INSIDE the
+        // try/finally so a mid-loop pauseProjection failure still unpauses
+        // whatever was already paused (unpauseProjection is an idempotent
+        // SREM, so unpausing never-paused projections is safe).
+        for (const p of allProjectionsToPause) {
+          await pauseProjection({
+            redis: this.deps.redis,
+            pauseKey: p.pauseKey,
+          });
+        }
+        log.write({
+          step: "pause-batch",
+          batch: batchNum,
+          projections: allProjectionNames,
+        });
+
         // Drain only THIS batch's aggregates — not every discovered aggregate.
         progress.batchPhase = "drain";
         emit();
@@ -1202,7 +1216,6 @@ export class ReplayService {
           aggregateProjectionMap,
           projectionByName,
           mapProjectionByName,
-          aggregateBatchSize,
           concurrency,
           log,
           onBatchPhase: (phase, eventsProcessed) => {
@@ -1261,12 +1274,12 @@ export class ReplayService {
       });
     }
 
-    // 6. Cleanup markers for all projections
+    // 3. Cleanup markers for all projections
     for (const name of allProjectionNames) {
       await cleanupAll({ redis: this.deps.redis, projectionName: name });
     }
 
-    // 7. Trigger OPTIMIZE TABLE on touched CH tables
+    // 4. Trigger OPTIMIZE TABLE on touched CH tables
     if (totalEventsReplayed > 0 && totalBatchErrors === 0) {
       const tables = new Set<string>();
       for (const p of config.projections) {
@@ -1304,7 +1317,6 @@ export class ReplayService {
     aggregateProjectionMap,
     projectionByName,
     mapProjectionByName,
-    aggregateBatchSize: _aggregateBatchSize,
     concurrency,
     log,
     onBatchPhase,
@@ -1316,7 +1328,6 @@ export class ReplayService {
     >;
     projectionByName: Map<string, RegisteredFoldProjection>;
     mapProjectionByName: Map<string, RegisteredMapProjection>;
-    aggregateBatchSize: number;
     concurrency: number;
     log: ReplayLogWriter;
     onBatchPhase: (phase: BatchPhase, eventsProcessed?: number) => void;
@@ -1380,13 +1391,24 @@ export class ReplayService {
     // getAggregateOccurredAtBounds for the safety argument.
     const allCutoffs = new Map<string, CutoffInfo>();
     const boundsByTenant = new Map<string, OccurredAtBounds | undefined>();
-    await Promise.all(
-      [...byTenant.entries()].map(async ([tenantId, entries]) => {
+    await pMapLimited(
+      [...byTenant.entries()],
+      async ([tenantId, entries]) => {
         const client = await this.resolveClient(tenantId);
         const aggregateIds = entries.map((e) => e.aggregateId);
-        const occurredAtBounds =
-          (await getAggregateOccurredAtBounds({ client, tenantId, aggregateIds })) ??
-          undefined;
+        const occurredAtBounds = await getAggregateOccurredAtBounds({
+          client,
+          tenantId,
+          aggregateTypes: [...new Set(entries.map((e) => e.aggregateType))],
+          aggregateIds,
+        });
+        if (!occurredAtBounds) {
+          // Undefined bounds means this tenant's aggregates have zero events —
+          // skip the cutoff query, which would otherwise scan every partition
+          // unbounded just to return empty. With no allCutoffs entries these
+          // aggregates fall into the without-cutoff/unmark path below.
+          return;
+        }
         boundsByTenant.set(tenantId, occurredAtBounds);
         const tenantCutoffs = await batchGetCutoffEventIds({
           client,
@@ -1398,7 +1420,8 @@ export class ReplayService {
         for (const [k, v] of tenantCutoffs) {
           allCutoffs.set(k, v);
         }
-      }),
+      },
+      concurrency,
     );
 
     // Split into with/without cutoffs
@@ -1457,8 +1480,9 @@ export class ReplayService {
     // Load events grouped by tenant (one CH query per tenant, in parallel).
     const allEvents = new Map<string, ReplayEvent[]>();
 
-    await Promise.all(
-      [...byTenant.entries()].map(async ([tenantId, entries]) => {
+    await pMapLimited(
+      [...byTenant.entries()],
+      async ([tenantId, entries]) => {
         const aggIds = entries
           .filter((e) => allCutoffs.has(e.key))
           .map((e) => e.aggregateId);
@@ -1477,7 +1501,8 @@ export class ReplayService {
         for (const [aggKey, events] of tenantEvents) {
           allEvents.set(aggKey, events);
         }
-      }),
+      },
+      concurrency,
     );
 
     // Apply all relevant projections per aggregate — with concurrency

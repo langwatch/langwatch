@@ -159,6 +159,12 @@ processing for the entire run:
 
 ## References
 
-- Related ADRs: None (first event-sourcing operational tooling ADR)
+- Related ADRs:
+  - [ADR-007: Event Sourcing Architecture](./007-event-sourcing-architecture.md) — the event-sourcing foundation this replay tooling operates on
+  - [ADR-021: Lean Fold Cache](./021-lean-fold-cache.md) — fold cache whose rebuilds are coordinated through this replay protocol
+  - [ADR-022: event_log as single source of truth](./022-event-log-source-of-truth.md) — the event log replays read from
+  - [ADR-024: Cold-path tiered storage](./024-cold-path-tiered-storage.md) — the S3 cold storage that the amendment's partition pruning avoids scanning
+  - [ADR-034: Event-Sourced Analytics Materialization](./034-event-sourced-analytics-materialization.md) — analytics projections rebuilt via this replay mechanism
+- Spec: `specs/event-sourcing/projection-replay.feature` — behavioural scenarios for the replay coordination this ADR decides
 - ClickHouse ReplacingMergeTree: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/replacingmergetree
 - BullMQ GroupQueue pause mechanism: internal `{event-sourcing/jobs}:gq:paused-jobs` set

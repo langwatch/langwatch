@@ -7,6 +7,8 @@ Feature: Projection replay
   until the replay finishes, so the projection ends up consistent with both
   the historical events and the live stream.
 
+  # Related ADRs: 015 (projection replay coordination)
+
   Background:
     Given a registered map projection "spanStorage" for aggregate type "trace"
 
@@ -16,7 +18,7 @@ Feature: Projection replay
     Then live processing for the affected aggregates is paused
     And a cutoff is taken marking the last historical event covered by the replay
     And the projection's records are rewritten from the event history up to the cutoff
-    And live processing resumes once the replay completes
+    And live processing for those aggregates resumes as soon as their batch is replayed
 
   Scenario: Live events at or before the cutoff are skipped during replay
     Given a replay of the "spanStorage" projection is in progress
@@ -43,7 +45,7 @@ Feature: Projection replay
     When an operator starts a replay covering both "traceSummary" and "spanStorage"
     Then each projection's output is rebuilt from the same event history
     And live events for the affected aggregates are skipped or deferred for both projections
-    And live processing for both projections resumes once the replay completes
+    And live processing for both projections resumes as soon as each batch is replayed
 
   Scenario: Only the batch being replayed pauses live processing
     Given a replay of the "spanStorage" projection spanning multiple batches

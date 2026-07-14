@@ -19,7 +19,7 @@ const REPLAY_LOCK_TTL_SECONDS = 3600;
  * keep the lock alive for runs longer than REPLAY_LOCK_TTL_SECONDS, whose
  * expiry used to silently stop status updates mid-run.
  */
-const LOCK_REFRESH_INTERVAL_MS = 60_000;
+export const LOCK_REFRESH_INTERVAL_MS = 60_000;
 
 class ReplayCancelledError extends Error {
   constructor() {
@@ -169,6 +169,18 @@ export class ReplayService {
             runId: params.runId,
             ttlSeconds: REPLAY_LOCK_TTL_SECONDS,
           })
+          .then((stillHeld) => {
+            if (!stillHeld) {
+              // Lock expired and another run took over — abort this stale
+              // run via the existing cancellation path so it stops touching
+              // the shared projection pause keys.
+              logger.warn(
+                { runId: params.runId },
+                "Replay lock lost to another run; aborting stale replay",
+              );
+              cancelledFlag = true;
+            }
+          })
           .catch((err) => {
             logger.warn({ error: err }, "Failed to refresh replay lock");
           });
@@ -260,7 +272,17 @@ export class ReplayService {
         });
       }
     } catch (err) {
-      if (err instanceof ReplayCancelledError) {
+      // If another run has taken the lock over, it owns the status row now —
+      // finalizing here would overwrite the successor's "running" status with
+      // this stale run's cancelled/failed state. A null holder (expired, no
+      // successor) still finalizes so the run's end state stays observable.
+      const lockHolder = await this.repo.getLockHolder();
+      if (lockHolder !== null && lockHolder !== params.runId) {
+        logger.warn(
+          { runId: params.runId, lockHolder },
+          "Skipping replay finalization: lock now held by another run",
+        );
+      } else if (err instanceof ReplayCancelledError) {
         await this.finalizeCancelled({
           runId: params.runId,
           historyCtx: params,

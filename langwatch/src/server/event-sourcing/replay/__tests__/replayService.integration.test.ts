@@ -940,4 +940,126 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       });
     });
   });
+
+  describe("replayOptimized multi-tenant batches", () => {
+    describe("when a batch spans multiple tenants", () => {
+      it("routes each tenant's records to its own tenant-scoped bulkAppend call", async () => {
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const mapName = `optMultiTenant_${suffix}`;
+        // A unique event type keeps discovery scoped to exactly the aggregates
+        // seeded below, independent of data earlier tests inserted.
+        const eventType = `trace.multitenant_${suffix}`;
+        const aggA1 = `trace-mt-a1-${suffix}`;
+        const aggA2 = `trace-mt-a2-${suffix}`;
+        const aggB1 = `trace-mt-b1-${suffix}`;
+
+        await client.insert({
+          table: "event_log",
+          values: [
+            {
+              TenantId: tenantA,
+              AggregateType: "trace",
+              AggregateId: aggA1,
+              EventId: `evt-mt-a-001-${suffix}`,
+              EventType: eventType,
+              EventTimestamp: 1700000005000,
+              EventOccurredAt: 1700000005000,
+              EventVersion: "2025-01-01",
+              EventPayload: JSON.stringify({ value: 1 }),
+              _retention_days: 0,
+            },
+            {
+              TenantId: tenantA,
+              AggregateType: "trace",
+              AggregateId: aggA2,
+              EventId: `evt-mt-a-002-${suffix}`,
+              EventType: eventType,
+              EventTimestamp: 1700000006000,
+              EventOccurredAt: 1700000006000,
+              EventVersion: "2025-01-01",
+              EventPayload: JSON.stringify({ value: 2 }),
+              _retention_days: 0,
+            },
+            {
+              TenantId: tenantB,
+              AggregateType: "trace",
+              AggregateId: aggB1,
+              EventId: `evt-mt-b-001-${suffix}`,
+              EventType: eventType,
+              EventTimestamp: 1700000007000,
+              EventOccurredAt: 1700000007000,
+              EventVersion: "2025-01-01",
+              EventPayload: JSON.stringify({ value: 3 }),
+              _retention_days: 0,
+            },
+          ],
+          format: "JSONEachRow",
+        });
+
+        // Discovery must see all three freshly inserted events — poll until
+        // ClickHouse reports them visible (insert visibility is not
+        // synchronous on CI).
+        for (let attempt = 0; attempt < 50; attempt++) {
+          const visible = await client.query({
+            query: `SELECT count() AS c FROM event_log WHERE TenantId IN ({tenantA:String}, {tenantB:String}) AND EventType = {eventType:String}`,
+            query_params: { tenantA, tenantB, eventType },
+            format: "JSONEachRow",
+          });
+          const [row] = (await visible.json()) as Array<{ c: string }>;
+          if (Number(row?.c) >= 3) break;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        const bulkAppend = vi.fn().mockResolvedValue(undefined);
+        const projection: RegisteredMapProjection = {
+          projectionName: mapName,
+          pipelineName: "test_pipeline",
+          aggregateType: "trace",
+          source: "pipeline",
+          pauseKey: `test_pipeline/handler/${mapName}`,
+          kind: "map",
+          definition: {
+            name: mapName,
+            eventTypes: [eventType],
+            map: (event: any) => ({ src: event.aggregateId }),
+            store: { append: async () => undefined, bulkAppend },
+          },
+        };
+
+        const service = createServiceWithResolver();
+
+        const result = await service.replayOptimized({
+          projections: [],
+          mapProjections: [projection],
+          tenantIds: [tenantA, tenantB],
+          since: "2023-11-01",
+        });
+
+        expect(result.batchErrors).toBe(0);
+        // 2 aggregates for tenant A + 1 for tenant B, one event each.
+        expect(result.aggregatesReplayed).toBe(3);
+        expect(result.totalEvents).toBe(3);
+
+        // The per-tenant cutoff/load fan-out resolved a client for each tenant.
+        expect(resolverCalls).toContain(tenantA);
+        expect(resolverCalls).toContain(tenantB);
+
+        // Records flush in per-tenant chunks: exactly one tenant-scoped
+        // bulkAppend per tenant, each carrying ONLY that tenant's aggregates.
+        // A boundsByTenant keying bug or cross-tenant mixup in the parallel
+        // cutoff/load path would drop or mix records across these calls.
+        expect(bulkAppend).toHaveBeenCalledTimes(2);
+        const recordsByTenant = new Map<string, string[]>();
+        for (const [records, ctx] of bulkAppend.mock.calls as Array<[Array<{ src: string }>, any]>) {
+          expect(recordsByTenant.has(ctx.tenantId)).toBe(false);
+          recordsByTenant.set(
+            ctx.tenantId,
+            records.map((r) => r.src).sort(),
+          );
+        }
+        expect(recordsByTenant.get(tenantA)).toEqual([aggA1, aggA2]);
+        expect(recordsByTenant.get(tenantB)).toEqual([aggB1]);
+      });
+    });
+  });
 });

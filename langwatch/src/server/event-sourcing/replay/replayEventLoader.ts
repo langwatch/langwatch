@@ -197,20 +197,26 @@ function occurredAtPredicate(bounds?: OccurredAtBounds): {
  *
  * The query itself reads only the tiny `EventOccurredAt` column via the
  * primary-key filter — cheap compared to the payload-bearing load queries it
- * lets ClickHouse prune.
+ * lets ClickHouse prune. `event_log` is ORDER BY (TenantId, AggregateType,
+ * AggregateId, IdempotencyKey), so the `AggregateType` predicate is required
+ * for the key filter to stay a binary search instead of degrading to a scan
+ * of the whole tenant prefix.
  *
- * Returns null when the aggregates have no events (nothing to prune or load).
+ * Returns undefined when the aggregates have no events (nothing to prune or
+ * load).
  */
 export async function getAggregateOccurredAtBounds({
   client,
   tenantId,
+  aggregateTypes,
   aggregateIds,
 }: {
   client: ClickHouseClient;
   tenantId: string;
+  aggregateTypes: string[];
   aggregateIds: string[];
-}): Promise<OccurredAtBounds | null> {
-  if (aggregateIds.length === 0) return null;
+}): Promise<OccurredAtBounds | undefined> {
+  if (aggregateIds.length === 0) return undefined;
 
   const result = await client.query({
     query: `
@@ -220,9 +226,10 @@ export async function getAggregateOccurredAtBounds({
         max(EventOccurredAt) AS maxOccurredAt
       FROM event_log
       WHERE TenantId = {tenantId:String}
+        AND AggregateType IN ({aggregateTypes:Array(String)})
         AND AggregateId IN ({aggregateIds:Array(String)})
     `,
-    query_params: { tenantId, aggregateIds },
+    query_params: { tenantId, aggregateTypes, aggregateIds },
     format: "JSONEachRow",
   });
 
@@ -232,7 +239,7 @@ export async function getAggregateOccurredAtBounds({
     maxOccurredAt: string;
   }[];
   const row = rows[0];
-  if (!row || parseInt(row.cnt, 10) === 0) return null;
+  if (!row || parseInt(row.cnt, 10) === 0) return undefined;
 
   return {
     minMs: parseInt(row.minOccurredAt, 10),

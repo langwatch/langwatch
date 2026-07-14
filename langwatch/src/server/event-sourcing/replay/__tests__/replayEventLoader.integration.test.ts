@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import {
   discoverAffectedAggregates,
   countEventsForAggregates,
@@ -334,6 +334,7 @@ describe("replayEventLoader", () => {
       const bounds = await getAggregateOccurredAtBounds({
         client,
         tenantId,
+        aggregateTypes: ["test"],
         aggregateIds: ["agg-1", "agg-2"],
       });
 
@@ -341,28 +342,36 @@ describe("replayEventLoader", () => {
     });
 
     describe("when the aggregates have no events", () => {
-      it("returns null", async () => {
+      it("returns undefined", async () => {
         const client = getTestClickHouseClient()!;
         const bounds = await getAggregateOccurredAtBounds({
           client,
           tenantId,
+          aggregateTypes: ["test"],
           aggregateIds: ["nonexistent-agg"],
         });
 
-        expect(bounds).toBeNull();
+        expect(bounds).toBeUndefined();
       });
     });
 
     describe("when the aggregate id list is empty", () => {
-      it("returns null without querying", async () => {
+      it("returns undefined without querying", async () => {
         const client = getTestClickHouseClient()!;
-        const bounds = await getAggregateOccurredAtBounds({
-          client,
-          tenantId,
-          aggregateIds: [],
-        });
+        const querySpy = vi.spyOn(client, "query");
+        try {
+          const bounds = await getAggregateOccurredAtBounds({
+            client,
+            tenantId,
+            aggregateTypes: ["test"],
+            aggregateIds: [],
+          });
 
-        expect(bounds).toBeNull();
+          expect(bounds).toBeUndefined();
+          expect(querySpy).not.toHaveBeenCalled();
+        } finally {
+          querySpy.mockRestore();
+        }
       });
     });
   });
@@ -377,6 +386,7 @@ describe("replayEventLoader", () => {
       const bounds = await getAggregateOccurredAtBounds({
         client,
         tenantId,
+        aggregateTypes: ["test"],
         aggregateIds: ["agg-1", "agg-2"],
       });
       const bounded = await batchGetCutoffEventIds({
@@ -402,6 +412,7 @@ describe("replayEventLoader", () => {
       const bounds = await getAggregateOccurredAtBounds({
         client,
         tenantId,
+        aggregateTypes: ["test"],
         aggregateIds: ["agg-1"],
       });
       const events = await batchLoadAggregateEvents({
@@ -418,11 +429,57 @@ describe("replayEventLoader", () => {
       expect(events.map((e) => e.id)).toEqual(["evt-001", "evt-002"]);
     });
 
+    describe("when the bounds are deliberately narrower than the data", () => {
+      // Bounds ending at 1700000001000 exclude agg-2's only event
+      // (evt-003 at 1700000002000). Correct bounds never filter results,
+      // so an exclusion here proves the predicate is actually wired into
+      // the SQL -- guarding against the pruning being silently dropped.
+      const narrowBounds = { minMs: 1700000000000, maxMs: 1700000001000 };
+
+      it("batchGetCutoffEventIds excludes events outside the bounds", async () => {
+        const client = getTestClickHouseClient()!;
+        const cutoffs = await batchGetCutoffEventIds({
+          client,
+          tenantId,
+          aggregateIds: ["agg-1", "agg-2"],
+          eventTypes: ["test.event"],
+          occurredAtBounds: narrowBounds,
+        });
+
+        expect(cutoffs.get(`${tenantId}:test:agg-1`)!.eventId).toBe("evt-002");
+        expect(cutoffs.has(`${tenantId}:test:agg-2`)).toBe(false);
+      });
+
+      it("loadEventsForAggregatesBulk excludes events outside the bounds", async () => {
+        const client = getTestClickHouseClient()!;
+        const cutoffs = await batchGetCutoffEventIds({
+          client,
+          tenantId,
+          aggregateIds: ["agg-1", "agg-2"],
+          eventTypes: ["test.event"],
+        });
+
+        const bounded = await loadEventsForAggregatesBulk({
+          client,
+          tenantId,
+          aggregateIds: ["agg-1", "agg-2"],
+          cutoffs,
+          occurredAtBounds: narrowBounds,
+        });
+
+        expect(bounded.get(`${tenantId}:test:agg-1`)?.map((e) => e.id)).toEqual(
+          ["evt-001", "evt-002"],
+        );
+        expect(bounded.has(`${tenantId}:test:agg-2`)).toBe(false);
+      });
+    });
+
     it("loadEventsForAggregatesBulk returns the same events as unbounded", async () => {
       const client = getTestClickHouseClient()!;
       const bounds = await getAggregateOccurredAtBounds({
         client,
         tenantId,
+        aggregateTypes: ["test"],
         aggregateIds: ["agg-1", "agg-2"],
       });
       const cutoffs = await batchGetCutoffEventIds({

@@ -154,6 +154,11 @@ export class FoldAccumulator {
   }
 }
 
+interface BufferedMapRecord {
+  record: any;
+  context: ProjectionStoreContext;
+}
+
 /**
  * Accumulates map projection records as events are fed in one at a time.
  *
@@ -172,11 +177,6 @@ export class FoldAccumulator {
  * to the final `flush()`. Memory is therefore bounded by `writeBatchSize`,
  * not by the number of events in an aggregate batch.
  */
-interface BufferedMapRecord {
-  record: any;
-  context: ProjectionStoreContext;
-}
-
 export class MapAccumulator {
   private byTenant = new Map<string, BufferedMapRecord[]>();
   private bufferedCount = 0;
