@@ -10,6 +10,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import { Trash } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
@@ -23,7 +24,6 @@ import {
   customGraphInputToFormData,
 } from "../../pages/[project]/analytics/custom/index";
 import { api } from "../../utils/api";
-import { createLogger } from "../../utils/logger";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Drawer } from "../ui/drawer";
 import { Radio, RadioGroup } from "../ui/radio";

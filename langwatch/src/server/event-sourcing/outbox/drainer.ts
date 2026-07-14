@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import { tenantIdFromGroupId } from "~/server/observability/tenantRateTracker";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { EventSourcedQueueProcessor } from "../queues/queue.types";
 import { isDispatchError } from "./dispatchError";

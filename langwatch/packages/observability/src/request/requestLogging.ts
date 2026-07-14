@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { Logger } from "../logger";
 
 /**
  * Common request logging data structure.
@@ -20,13 +20,11 @@ export interface RequestLogData {
  * Checks both `status` (HttpError, Hono) and `httpStatus` (DomainError).
  */
 export function getStatusCodeFromError(error: unknown): number {
-  if (error instanceof Error) {
-    if ("httpStatus" in error && typeof error.httpStatus === "number") {
-      return error.httpStatus;
-    }
-    if ("status" in error && typeof error.status === "number") {
-      return error.status;
-    }
+  if (error && typeof error === "object") {
+    const err = error as Record<string, unknown>;
+    if (typeof err.httpStatus === "number") return err.httpStatus;
+    if (typeof err.status === "number") return err.status;
+    return 500;
   }
 
   if (error) {
@@ -58,12 +56,12 @@ export function getLogLevelFromStatusCode(
  */
 export function logHttpRequest(logger: Logger, data: RequestLogData): void {
   const logData: Record<string, unknown> = {
+    ...data.extra,
     method: data.method,
     url: data.url,
     statusCode: data.statusCode,
     duration: data.duration,
     userAgent: data.userAgent,
-    ...data.extra,
   };
 
   if (data.error) {
@@ -86,10 +84,8 @@ export function hasAuthorizationToken(headers: {
   const xAuthToken = headers["x-auth-token"];
   const authHeader = headers.authorization;
 
-  return !!(
-    xAuthToken ??
-    (authHeader?.toLowerCase().startsWith("bearer ")
-      ? authHeader.slice(7)
-      : null)
-  );
+  if (xAuthToken) return true;
+  if (authHeader) return true;
+
+  return false;
 }

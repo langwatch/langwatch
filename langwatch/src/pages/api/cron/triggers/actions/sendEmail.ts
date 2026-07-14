@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import { createHash } from "crypto";
 import { env } from "~/env.mjs";
@@ -7,7 +8,6 @@ import {
   consumeTenantEmailCapSlot,
 } from "~/server/event-sourcing/outbox/emailHourlyCap";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { ActionParams, TriggerContext } from "../types";
 

@@ -12,14 +12,14 @@
  */
 
 import {
-  JudgeAgentAdapter,
-  AgentRole,
-  judgeAgent,
   type AgentInput,
   type AgentReturnTypes,
+  AgentRole,
+  JudgeAgentAdapter,
   type JudgeAgentConfig,
+  judgeAgent,
 } from "@langwatch/scenario";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { collectRemoteSpans } from "./remote-span-collector";
 import type { SpanQueryFn } from "./types";
 

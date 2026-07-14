@@ -1,9 +1,9 @@
+import { createLogger } from "@langwatch/observability";
 import type { TRPCLink } from "@trpc/client";
 import { TRPCClientError } from "@trpc/client";
 import type { AnyRouter } from "@trpc/server";
 import { observable } from "@trpc/server/observable";
 import superjson from "superjson";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:sse-link");
 

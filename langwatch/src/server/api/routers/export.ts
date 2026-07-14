@@ -8,10 +8,10 @@
  */
 
 import { on } from "node:events";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../rbac";
 
 const logger = createLogger("langwatch:api:export");

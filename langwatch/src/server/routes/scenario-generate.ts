@@ -6,10 +6,12 @@
  * Uses the Vercel AI SDK to generate a structured scenario object
  * (name, situation, criteria) from a user prompt.
  */
+
+import { createLogger } from "@langwatch/observability";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/api/rbac";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
@@ -17,7 +19,6 @@ import {
   isAbortLikeError,
   nlpgoHandledErrorFrom,
 } from "~/server/nlpgo/goHandledError";
-import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:api:scenario:generate");

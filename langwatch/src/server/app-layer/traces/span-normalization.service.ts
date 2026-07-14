@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import crypto from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
 import type {
   OtlpInstrumentationScope,
   OtlpResource,

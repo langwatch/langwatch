@@ -147,10 +147,6 @@ export default defineConfig(async (): Promise<UserConfig> => {
       "~": path.resolve(__dirname, "./src"),
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
       "@ee": path.resolve(__dirname, "./ee"),
-
-      // Browser stubs for Node.js-only modules
-      "pino-pretty": path.resolve(__dirname, "./src/noop-css.cjs"),
-      "pino": path.resolve(__dirname, "node_modules/pino/browser.js"),
     },
   },
   define: {

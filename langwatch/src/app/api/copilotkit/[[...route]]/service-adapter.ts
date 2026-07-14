@@ -4,6 +4,7 @@ import type {
   CopilotServiceAdapter,
 } from "@copilotkit/runtime";
 import { randomUUID } from "@copilotkit/shared";
+import { createLogger } from "@langwatch/observability";
 import type z from "zod";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
@@ -22,7 +23,6 @@ import type { PromptConfigFormValues } from "~/prompts/types";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
 import { parseLLMError } from "~/utils/formatLLMError";
-import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import { extractStreamableOutput, type OutputConfig } from "./output-formatter";

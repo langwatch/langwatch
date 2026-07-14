@@ -64,6 +64,7 @@
  * @module ssrfProtection
  */
 
+import { createLogger } from "@langwatch/observability";
 import dns from "dns/promises";
 import { isIP } from "net";
 import {
@@ -72,7 +73,6 @@ import {
   fetch as undiciFetch,
 } from "undici";
 import { env } from "../env.mjs";
-import { createLogger } from "./logger";
 import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrfConstants";
 
 const logger = createLogger("langwatch:ssrfProtection");

@@ -23,7 +23,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // one spy we can assert on. The adapter emits the drop-warning synchronously at
 // registration time when no outbox runtime is present.
 const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
-vi.mock("~/utils/logger/server", () => {
+vi.mock("@langwatch/observability", () => {
   const logger = {
     trace: vi.fn(),
     debug: vi.fn(),

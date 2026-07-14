@@ -1,12 +1,12 @@
+import { createLogger } from "@langwatch/observability";
 import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
-import { TokenResolver, type OrgResolvedToken, type ResolvedToken } from "./token-resolver";
-import { ApiKeyPermissionDeniedError } from "./errors";
 import type { Permission } from "~/server/api/rbac";
-import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { DomainError } from "~/server/app-layer/domain-error";
-import { createLogger } from "~/utils/logger/server";
+import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";
+import { ApiKeyPermissionDeniedError } from "./errors";
+import { type OrgResolvedToken, type ResolvedToken, TokenResolver } from "./token-resolver";
 
 const logger = createLogger("langwatch:api:unified-auth");
 const permissionLogger = createLogger("langwatch:api:api-key-ceiling");

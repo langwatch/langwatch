@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
 import { z } from "zod";
-import { createLogger } from "../../../src/utils/logger";
 
 const logger = createLogger("langwatch:billing:usageReportingService");
 

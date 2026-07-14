@@ -23,10 +23,11 @@
  * the lock's `tx`). The advisory-lock transaction is the unit of work; the
  * repository is the only thing that speaks Prisma.
  */
+
+import { createLogger } from "@langwatch/observability";
 import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
-import { createLogger } from "~/utils/logger/server";
 import { DatasetRepository } from "./dataset.repository";
 import {
   type ChunkedDatasetMeta,

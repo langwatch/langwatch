@@ -1,8 +1,9 @@
+import { createLogger } from "@langwatch/observability";
 import {
-  type ClaudeCodeLogRecordInput,
   CLAUDE_CODE_EVENT_SCOPE,
   CLAUDE_CODE_PII_ATTR,
   CLAUDE_TURN_LOG_CAP,
+  type ClaudeCodeLogRecordInput,
   convertClaudeCodeTurnToSpans,
 } from "~/server/app-layer/traces/claude-code-log-to-span";
 import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
@@ -10,7 +11,6 @@ import type {
   OtlpKeyValue,
   OtlpResource,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { createLogger } from "~/utils/logger/server";
 import type { CommandDispatcher } from "../../../deferred";
 import type { ReactorDefinition } from "../../../reactors/reactor.types";
 import {

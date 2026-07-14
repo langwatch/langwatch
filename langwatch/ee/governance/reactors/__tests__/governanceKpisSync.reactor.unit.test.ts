@@ -21,18 +21,18 @@
  * Spec contracts:
  *   - specs/ai-gateway/governance/folds.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,
 } from "../governanceKpisSync.reactor";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

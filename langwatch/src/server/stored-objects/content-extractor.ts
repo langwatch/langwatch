@@ -29,9 +29,10 @@
  * The walker is deliberately narrow: it only touches the fields it understands
  * and leaves everything else untouched ("degraded, not broken").
  */
+
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
 import { binaryInputPartSchema } from "./binary-part";
 import { coerceContentToArray } from "./coerce-content-to-array";
 import { isReadbackSafe } from "./safe-media-types";

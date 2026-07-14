@@ -7,6 +7,7 @@
  * back to the client.
  */
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { createLogger } from "@langwatch/observability";
 import {
   convertToModelMessages,
   smoothStream,
@@ -14,13 +15,12 @@ import {
   streamText,
   type UIMessage,
 } from "ai";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { tools } from "~/app/api/dataset/generate/tools";
 import { hasProjectPermission } from "~/server/api/rbac";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { createLogger } from "~/utils/logger/server";
-import { tools } from "~/app/api/dataset/generate/tools";
 import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:api:dataset:generate");

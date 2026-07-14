@@ -1,5 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { context as otelContext, trace } from "@opentelemetry/api";
+import {
+  isSpanContextValid,
+  context as otelContext,
+  trace,
+} from "@opentelemetry/api";
 
 /**
  * Business context that can be propagated across async boundaries.
@@ -71,26 +75,27 @@ export function getOtelSpanContext():
   | { traceId: string; spanId: string }
   | undefined {
   const span = trace.getSpan(otelContext.active());
-  if (span) {
-    const spanContext = span.spanContext();
-    return {
-      traceId: spanContext.traceId,
-      spanId: spanContext.spanId,
-    };
-  }
-  return undefined;
+  if (!span) return undefined;
+
+  const spanContext = span.spanContext();
+  if (!isSpanContextValid(spanContext)) return undefined;
+
+  return {
+    traceId: spanContext.traceId,
+    spanId: spanContext.spanId,
+  };
 }
 
 /**
- * Type for job data that includes the optional __context field used to
- * propagate request context through queue payloads.
+ * Type for job data carrying request context through a queue payload.
  */
 export type JobDataWithContext<T extends Record<string, unknown>> = T & {
   __context?: JobContextMetadata;
 };
 
 /**
- * Builds a RequestContext from propagated job metadata.
+ * Rebuilds business context from propagated job metadata. Trace/span context is
+ * restored by the queue's OpenTelemetry instrumentation rather than ALS.
  */
 export function createContextFromJobData(
   metadata?: JobContextMetadata,
@@ -103,18 +108,17 @@ export function createContextFromJobData(
 }
 
 /**
- * Extracts context metadata for job propagation.
- * - Trace/span from OTel for span linking
- * - Business context from ALS for logging
+ * Captures trace/span and business context for propagation in a job payload.
  */
 export function getJobContextMetadata(): JobContextMetadata {
   const spanContext = getOtelSpanContext();
-  const ctx = getCurrentContext();
+  const context = getCurrentContext();
+
   return {
     traceId: spanContext?.traceId,
     parentSpanId: spanContext?.spanId,
-    organizationId: ctx?.organizationId,
-    projectId: ctx?.projectId,
-    userId: ctx?.userId,
+    organizationId: context?.organizationId,
+    projectId: context?.projectId,
+    userId: context?.userId,
   };
 }

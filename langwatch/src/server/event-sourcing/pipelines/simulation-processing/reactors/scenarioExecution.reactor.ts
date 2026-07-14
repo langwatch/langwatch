@@ -15,7 +15,7 @@
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "@langwatch/observability";
 import type { ScenarioExecutionPool } from "../../../../scenarios/execution/execution-pool";
 import type {
   ReactorContext,
