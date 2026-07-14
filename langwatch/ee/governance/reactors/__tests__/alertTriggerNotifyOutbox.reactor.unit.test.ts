@@ -291,6 +291,7 @@ describe("alertTriggerNotifyOutbox reactor", () => {
     function repositoryReturning(rows: TriggerSummary[]): TriggerRepository {
       return {
         findActiveForProject: async () => rows,
+        findActiveReportTargets: async () => [],
         claimSend: async () => true,
         isSendClaimed: async () => false,
         updateLastRunAt: async () => undefined,

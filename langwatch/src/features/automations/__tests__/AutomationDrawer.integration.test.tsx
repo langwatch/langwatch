@@ -35,7 +35,10 @@ const {
   mockGetTriggerByIdQuery: vi.fn(() => ({
     data: mockTriggerRow,
     isLoading: false,
-    error: null,
+    // Widened so per-test overrides can inject an error (an error-state case
+    // sets `error: new Error(...)`); the bare `null` literal would fix the
+    // property's type to `null` and reject those overrides.
+    error: null as Error | null,
   })),
   mockCloseDrawer: vi.fn(),
   mockInvalidate: vi.fn(),
