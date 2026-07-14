@@ -131,36 +131,65 @@ specs/ai-governance/cli-wrappers/*.feature          — scenarios for the new to
 - **Copilot metrics-API reconciliation (deferred, not blocking):** whether to surface GitHub's `totals_by_cli` per-user report next to our numbers in analytics.
 - **Enterprise managed-settings cooperation (deferred):** longer-term, orgs could point managed settings AT LangWatch (enterprise-pinned collector = our endpoint) instead of fighting the override — a docs/sales play, not code.
 
-## Extension: multi-surface capture (stacked on PR #5605 — Proposed, 2026-07-14)
+## Extension: capture the GitHub Copilot app (stacked on PR #5605 — Proposed, 2026-07-14)
 
-The CLI decisions above (§1–§4) are Accepted and shipped. This extension broadens the same design to **every Copilot surface**, driven by empirical investigation of the standalone app and VS Code extension. It is **Proposed** — the forks below go through `/parc-ferme` before implementation. Tracked task list: issue #5783 / PR #5784.
+The CLI decisions above (§1–§4) are Accepted and shipped. This extension adds the **standalone GitHub Copilot app** ("Copilot IDE") as a tracked surface. Scope was narrowed during `/parc-ferme` (2026-07-14): **v1 is the app only** — VS Code and enterprise named-per-user are deferred (see Open questions). Forces: PR #5784 open and stacked, investigation loaded, app just GA'd. Blast radius: data-pipeline + auth/secret (mandatory red-team). Confirmed constraints (excluded from forks): one `copilot.ts` extractor / one substrate (ADR-018); reuse the `codex-rollout-otlp.ts` reader pattern; capture-everything default (protected by ESSENTIAL server-side PII redaction); no new server ingest endpoint (existing `/api/otel` + personal ingest key). Tracked: issue #5783.
 
-### E1. One canonical shape, two ingestion lanes
-Every surface converges on the **same `copilot.ts` extractor** on the unified substrate (ADR-018), fed by two lanes:
-- **Lane 1 — live OTLP:** env-flip (CLI) or managed-pin (fleet) surfaces emit `gen_ai.*` to `/api/otel`. Built in §1–§4.
-- **Lane 2 — file reader:** a reader tails `~/.copilot` (or the OTLP-file-exporter output) and re-emits as OTLP — reusing the `codex-rollout-otlp.ts` pattern. New.
+### E1. The architecture — one canonical shape, two lanes (the app uses Lane 2)
+Every Copilot surface converges on the **same `copilot.ts` extractor** on the unified substrate, fed by two lanes:
+- **Lane 1 — live OTLP:** env-flip (CLI, §1–§4) or managed-pin (fleet, deferred) emits `gen_ai.*` to `/api/otel`.
+- **Lane 2 — file reader (this extension):** reads the tool's own files and re-emits per-turn OTLP, reusing `codex-rollout-otlp.ts`.
 
-### E2. Surface facts (empirically verified 2026-07-14)
-- **Standalone app ("Copilot IDE"):** a native binary that spawns the `copilot` CLI over stdio (**not** a sealed VM, unlike Claude Cowork). Writes host-readable files to `~/.copilot`: `session-store.db.assistant_usage_events` (per-turn tokens, model, `nano_aiu` cost, latency, and `context_*_tokens` **content-source token breakdown**) and `session-state/*/events.jsonl` (prompts, responses, tools). Also honors the same `COPILOT_OTEL_*` env vars. **Fully capturable via Lane 2** (and possibly Lane 1 — network-sandbox untested).
-- **VS Code extension:** host-based OTel (`github.copilot.chat.otel.*`); auth headers are **not** a user settings key (env-only) → needs a **token-in-URL** receiver route to close the GUI-launch auth gap. Adds `copilot_chat.*` legacy attrs + metrics (edit-acceptance, LOC, TTFT).
-- **Enterprise fleet:** managed-settings `telemetry` block injects headers securely, but one org token + hash-only identity (`enduser.pseudo.id`) → **named per-user attribution needs an identity-link** (shared with the pull-mode connectors).
+### E2. The app is Lane 2, captured by a codex-style wrapper (locked)
+The GitHub Copilot app is a native binary that spawns the `copilot` CLI over stdio (**not** a sealed VM — verified 2026-07-14) and writes host-readable files to `~/.copilot`. Capture mirrors codex exactly: a new **`langwatch copilot-app`** command **launches the app binary**, runs the codex-style streamer against `~/.copilot` **for the app's lifetime** (poll each completed turn → emit OTLP; final sweep on quit), and exits when the app exits. **No persistent daemon** — the streamer dies with the wrapped app, honoring the opik-cipx incident lesson (their launchd/systemd supervisor tripped SentinelOne and crashed machines; they removed it permanently).
 
-### E3. sourceType taxonomy
-`copilot_cli` (shipped) · `copilot_app` (Lane 2) · `copilot_vscode` (Lane 1). The shared `~/.copilot` dir (CLI + app both write it) is disambiguated by entrypoint tag + dedup.
+### E3. Hybrid file source (locked)
+The reader reads the app's **native files as the primary source** — `session-store.db.assistant_usage_events` (per-turn `input/output/cache_read/cache_write/reasoning_tokens`, `model`, `nano_aiu` cost, latency, `finish_reason`, and `context_*_tokens` **content-source token breakdown**) + `session-state/*/events.jsonl` (prompts, responses, tool calls) — because they are **always written with zero user setup** and carry the richest data. When the app's **OTLP-file-exporter output is present** (user has OTel file-export configured), the reader prefers those standard `gen_ai.*` spans for the core and **enriches** them with the native cost/context fields. Native primary matches the codex precedent (codex reads its own native rollup) and the zero-setup wedge; OTLP enrichment buys format-stability when available.
 
-### E4. Shared abstractions (reuse, don't fork)
-- **One file-reader** serving `codex` + `copilot_app` (+ future).
-- **One IDE-settings-writer** serving Copilot VS Code + Claude Code VS Code (same OTel stream).
+### E4. sourceType + shared abstractions (locked)
+- **sourceType `copilot_app`** (distinct from `copilot_cli`). The **shared `~/.copilot`** (CLI + app both write it) is disambiguated by the app's own session provenance and a **deterministic span id per turn** (codex pattern) so overlapping reads dedup server-side.
+- **One file-reader abstraction** serving `codex` + `copilot_app` (+ future). Do not fork the reader.
 
-### E5. Open forks (for /parc-ferme)
-- File-lane source of truth: OTLP-file-exporter output vs native SQLite + events.jsonl.
-- App capture UX: background reader vs one-shot `sync` vs live env-flip.
-- token-in-URL leakage security review.
-- Per-user identity link: v1 or fast-follow.
-- Metrics (`copilot_chat.*`) + **content-source cost attribution** (native in the app's DB — the opik-cipx axis): in scope or phase 2.
+### E5. Extension constants
+| Name | Value | Purpose |
+|---|---|---|
+| sourceType | `copilot_app` | ingest provenance for the app |
+| command | `langwatch copilot-app` | launches the app + runs the streamer |
+| primary source | `~/.copilot/session-store.db` + `session-state/*/events.jsonl` | always-on, richest |
+| enrichment source | app OTLP-file-exporter output (when present) | stable `gen_ai.*` core |
+| poll cadence | reuse codex `CODEX_IO_POLL_MS` (2.5s) | per-turn streaming |
+| cost field | `nano_aiu` (÷ 1e9 = AI Units; NOT dollars) | kept off langwatch dollar-cost, like `github.copilot.cost` |
+
+### E6. Extension invariants
+| Invariant | Meaning | Satisfied by |
+|---|---|---|
+| No double-capture | app + CLI share `~/.copilot`; a turn is ingested once | deterministic per-turn span id (codex pattern) → server dedup; `copilot_app` reader only claims app sessions |
+| No persistent daemon | nothing survives the wrapped app | streamer lifetime == app process lifetime (E2), like codex |
+| One extractor | app spans canonicalize via `copilot.ts` | reader emits `gen_ai.*` + `github.copilot.*`; extractor extended for `nano_aiu` + `context_*_tokens` |
+| Content protected | prompts captured, PII-redacted before storage | existing ESSENTIAL redaction on `/api/otel` (unchanged) |
+| Fat-payload safe | large turns can't OOM the fold | existing `capOversizedAttributes` on the span path (unchanged) |
+
+### E7. Rejected alternatives (extension)
+- **OTLP-file-exporter as the *only* source** — needs the app configured for OTel file-export (setup friction) and loses `nano_aiu` cost + content-source breakdown. Kept as *enrichment* only.
+- **Background watcher / login-item daemon** — the persistent-supervisor pattern behavioral EDR flags; the opik-cipx incident is the cautionary tale. Rejected.
+- **Piggyback on the CLI wrapper** — only fires if the user also runs `langwatch copilot`; misses pure-app users.
+- **VS Code token-in-URL in v1** — dissolved: v1 is app-only, so the GUI-header problem doesn't arise yet. Deferred whole.
+- **Named per-user identity-link / metrics / content-source-cost feature in v1** — widens scope past the wedge. Deferred (data is *captured* where free; the *feature* is fast-follow).
+
+### E8. Consequences (extension)
+- **Positive:** the app is the easiest Copilot surface (host-readable files, no auth-header problem, no sandbox); reuses the codex reader wholesale; captures exact cost (`nano_aiu`) + the content-source token breakdown natively (the opik-cipx differentiator, free).
+- **Negative:** **Dock-launched app is not captured** — only via `langwatch copilot-app` (same class as bare `copilot` vs `langwatch copilot`; no rc-function equivalent for a GUI). Native-file parsing is bespoke and can churn with GitHub app updates — mitigated by pinning stable fields + a versioned parser + OTLP enrichment when present.
+- **Neutral:** the streamer is real-time-ish (2.5s poll), not push; acceptable for governance.
+
+### E9. Open questions (extension — deferred, not blocking)
+- **Dock-launch capture:** a one-shot `langwatch copilot-app sync` (read recent `~/.copilot` sessions after the fact) to catch sessions not launched via the wrapper. Owner: implementer, fast-follow.
+- **VS Code extension:** Lane 1 via `github.copilot.chat.otel.*` + a token-in-URL receiver route (headers aren't a user settings key). Own `/parc-ferme`.
+- **Enterprise fleet + named per-user:** managed-settings `telemetry` block + the hash(`enduser.pseudo.id`)→user identity-link (shared with pull connectors). Own decision.
+- **Metrics + content-source-cost feature:** `copilot_chat.*` metrics and surfacing the `context_*_tokens` breakdown as cost attribution. Phase 2.
 
 ## Revisions
 
+- **v7 (2026-07-14, `/parc-ferme` — extension forks locked):** the §Extension went from framing to locked decisions. Scope **narrowed to the GitHub Copilot app only** (user: "focus only on github app") — VS Code/token-in-URL **dissolved** to a deferred open question. Locked: (E2) codex-style wrapper `langwatch copilot-app` — launch the app, stream `~/.copilot` for its lifetime, no daemon; (E3) **hybrid** file source — native `session-store.db` + `events.jsonl` primary, OTLP-file-export as enrichment; (E4) sourceType `copilot_app`, one shared file-reader, deterministic per-turn span-id dedup for the shared `~/.copilot`; (E9) VS Code, enterprise identity-link, metrics + content-source-cost feature all deferred. Four framing constraints confirmed (one extractor/substrate, reuse codex reader, capture-everything default, no new endpoint). Status Proposed pending red-team + lock.
 - **v6 (2026-07-14, multi-surface extension — stacked on PR #5605):** broadened ADR-039 from CLI-only to **all Copilot surfaces** rather than opening a new ADR. Added the §Extension section: two-lane capture model (live OTLP + `~/.copilot` file reader, codex pattern), empirically-verified app/VS-Code surface facts, the `copilot_cli`/`copilot_app`/`copilot_vscode` taxonomy, shared file-reader + IDE-settings-writer abstractions, and the open forks for `/parc-ferme`. CLI decisions §1–§4 unchanged (Accepted); the extension is Proposed. Tracked in #5783 / #5784.
 - **v5 (2026-07-10, implementation review pass):** ruthless review of the branch found one blocker + refinements, all folded in. (1) **Blocker:** a previously persisted Path-B rc function defeated the content-capture opt-out AND could resurrect a stale (rotated) ingest token on ingestion runs — its env-prefix applies at invocation, after the wrapper's exports. `unset -f` now runs in BOTH modes (the rc file is never touched; bare runs keep capturing). (2) Silent-default runs no longer pin `tool_mode` — `resolveWrapperMode` persists the pin only on the legacy no-forced-mode derivation; explicit prompt answers persist upstream, so an aborted prompt or CI run can't suppress the path prompt forever. (3) Copilot's gateway env now `clears` the full Path B telemetry block (derived from `telemetryEnvVarNames("copilot")`) so hand-exported OTel env can't double-trace. (4) The extractor's provenance gate dropped bare `enduser.pseudo.id` (standard semconv — consuming it would rename foreign tenants' attributes); provenance = `@github/copilot` scope or a `github.copilot.*` attribute.
 - **v4 (2026-07-10, implementation spike resolutions — binary sweep of copilot 1.0.69):** (1) Content capture is the standard env var `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` — Decision 5's degradation ladder collapses to its best branch (no config write exists or is needed); an explicit parent-env `false` is respected with a tokens-only notice, and logout strip symmetry comes free via `telemetryEnvVarNames()`. Content rides `gen_ai.input/output.messages` span attributes. (2) `COPILOT_OTEL_EXPORTER_TYPE` values are `otlp-http` (default) / `file` — pinned to `otlp-http`. (3) Path A base URL must include `/v1` (the binary's own local-provider example is `localhost:11434/v1`) — same convention as opencode. (4) Decision 8 amendment: device-level managed settings live at `/Library/Application Support/GitHubCopilot/managed-settings.json` (macOS, plus MDM domain `com.github.copilot`) and `/etc/github-copilot/policy.d/*.json` (Linux), BUT there is also a server layer fetched at runtime from GitHub's `/copilot_internal/managed_settings` with the user's auth — not preflightable from disk, so detect+warn covers the device layer only. (5) Instrumentation scope is `@github/copilot`; no `coding-agent-span-filter` entry needed (all spans are GenAI-shaped). Extras verified on the wire: `enduser.pseudo.id`, `github.copilot.cost` (premium-request units, NOT dollars — kept out of langwatch cost fields), `github.copilot.total_premium_requests`.
