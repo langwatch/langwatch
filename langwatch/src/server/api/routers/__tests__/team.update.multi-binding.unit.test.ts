@@ -4,6 +4,10 @@ import { TeamUserRole } from "@prisma/client";
 import { teamRouter } from "../team";
 import { createInnerTRPCContext } from "../../trpc";
 
+vi.mock("../../../auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 // team.update writes membership to RoleBinding. A user can hold MORE THAN ONE
 // TEAM binding on a team — a built-in role plus additive custom-role grants —
 // and RBAC unions them. The settings form shows/edits only the displayed
