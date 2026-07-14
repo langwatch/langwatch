@@ -2,9 +2,9 @@
 
 **Date:** 2026-07-10 (CLI) · extended 2026-07-14 (app)
 
-**Status:** Accepted (CLI, §Decision) · Proposed (app, §Extension)
+**Status:** Accepted (CLI, §Decision · app, §Extension)
 
-> `langwatch copilot` is a first-class wrapped tool with both paths — gateway via BYOK env vars and direct OTLP via native OTel — defaulting to ingestion (sourceType `copilot_cli`), extracted by `copilot.ts`. The standalone Copilot app is captured on the same `copilot.ts` extractor via a `~/.copilot` file-reader lane (sourceType `copilot_app`).
+> `langwatch copilot` is a first-class wrapped tool with both paths — gateway via BYOK env vars and direct OTLP via native OTel — defaulting to ingestion (sourceType `copilot_cli`), extracted by `copilot.ts`. The standalone Copilot app is captured on the same `copilot.ts` extractor by injecting the same direct-OTLP env at app launch (sourceType `copilot_app`), delivered by a user login agent.
 
 ## Context
 
@@ -133,67 +133,71 @@ specs/ai-governance/cli-wrappers/*.feature          — scenarios for the new to
 
 ## Extension: GitHub Copilot app
 
-Adds the standalone GitHub Copilot app as a tracked surface, on the same `copilot.ts` extractor and `/api/otel` ingest as the CLI. Status: Proposed. Scope: the app; later surfaces are in the Roadmap.
+Adds the standalone GitHub Copilot app as a tracked surface, on the same `copilot.ts` extractor and `/api/otel` ingest as the CLI. Status: Accepted. Scope: the app; later surfaces are in the Roadmap.
 
-### E1. File-reader lane
-The app writes host-readable session files to `~/.copilot`. A reader converts each LLM call into a `gen_ai.*` OTLP span and POSTs it to `/api/otel` with the user's personal ingest key, reusing the `codex-rollout-otlp.ts` emit core. sourceType `copilot_app`.
+### E1. Capture by direct OTLP export — the same mechanism as the CLI
+The app embeds the same OpenTelemetry runtime as the CLI and honors the standard OTLP-endpoint env vars. Setting them makes the app POST one `gen_ai.*` OTLP record per LLM call straight to LangWatch's `/api/otel` — the exact path §Decision already ships for `copilot_cli` Path B. There is no export file, no reader, no tail, no SQLite: capture is the app's own live OTLP push. A single record already carries usage, cost, content, and identity:
 
-### E2. One fused span per LLM call — usage + content
-Each session is described by two files that share no per-call id: usage rows are keyed on `(session_id, turn_index, id)`, content messages on `messageId`/`requestId`, and `turn_index` is coarse (one turn spans several calls). Each span is therefore assembled from both:
-- **Usage** — from `session-store.db.assistant_usage_events`: `input/output/cache_read/cache_write/reasoning_tokens`, `model`, `nano_aiu`, latency, `finish_reason`, and the context-source token breakdown (`context_system/conversation/tool_definitions/mcp_tools/buffer_tokens`).
-- **Content** — from `session-state/<id>/events.jsonl`: prompt, response, tool calls.
+- `gen_ai.usage.input/output/cache_read/reasoning_tokens`, `gen_ai.response.model`
+- `github.copilot.cost`, `github.copilot.nano_aiu`
+- `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`
+- `enduser.pseudo.id`, `github.copilot.service_request_id`, `interaction_id`
 
-Within a session, usage rows (ordered by `created_at`) and assistant messages (ordered by `timestamp`) are paired positionally. Pairing applies only when the per-session counts match and each pair falls within a bounded time window; otherwise the usage span is emitted without content and marked `github.copilot.pairing_degraded`. A cost-only span is acceptable; a mis-attributed prompt is not. Content capture is on by default, protected by the existing ESSENTIAL server-side PII redaction on `/api/otel`.
+Enabled by four env vars on the app process:
+```
+COPILOT_OTEL_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=<langwatch>/api/otel
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer <ingest key>
+COPILOT_OTEL_CAPTURE_CONTENT=true
+```
+The app appends `/v1/traces` to the endpoint, so it POSTs to `/api/otel/v1/traces`. Content capture is on, protected by the existing ESSENTIAL server-side PII redaction on `/api/otel`. sourceType `copilot_app`.
 
-`session-store.db` is read read-only as a WAL snapshot with a busy-timeout; `events.jsonl` is read append-only.
+### E2. Delivery — a user login agent owns the app launch
+The auth token can only be supplied by an env var (Copilot exposes no file-based header), and a GUI app launched from the Dock inherits no shell. So a user-level agent (launchd on macOS, systemd `--user` on Linux, Task Scheduler on Windows) owns the app's launch and sets the four vars on its process. It is self-installed when the user connects Copilot (portal action or `langwatch login` detecting the installed app) and removed by `langwatch logout`. The user takes no action and never touches a GUI setting.
 
-### E3. Automatic capture via a user login agent
-A user-level agent (launchd on macOS, systemd `--user` on Linux, Task Scheduler on Windows) starts on login, watches `~/.copilot` via OS file events, and emits new turns live. It is self-installed when the user connects Copilot (portal action or `langwatch login` detecting the installed app) and removed by `langwatch logout`. It is a single long-lived, event-driven process — no per-write respawn, no supervisor.
-
-### E4. Scope
-The reader emits only app-owned sessions, so it never overlaps the CLI's live-OTLP lane on the shared `~/.copilot`.
+### E3. Scope
+The app exports to the same `/api/otel` as the CLI Path B but under sourceType `copilot_app`, minted as a distinct ingest key from the CLI's `copilot_cli` key — the two surfaces are separated by source, not by transport.
 
 ### Constants
 | Name | Value |
 |---|---|
 | sourceType | `copilot_app` |
-| usage source | `~/.copilot/session-store.db.assistant_usage_events` |
-| content source | `~/.copilot/session-state/<id>/events.jsonl` |
-| span granularity | one span per `assistant_usage_events` row (one LLM call) |
-| content pairing | `session_id` + timestamp order, bounded window |
-| span id / dedup key | `session_id` + usage-row `id` |
-| pairing-degraded marker | `github.copilot.pairing_degraded` |
-| cost attribute | `github.copilot.nano_aiu` (raw AI-unit count, never a dollar/cost field) |
+| capture | app-native direct OTLP push to `/api/otel/v1/traces` |
+| enable vars | `COPILOT_OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, `COPILOT_OTEL_CAPTURE_CONTENT` |
+| span granularity | one record per LLM call, emitted natively by the app |
+| dedup key | `gen_ai.response.id` / `github.copilot.interaction_id` |
+| cost attributes | `github.copilot.cost`, `github.copilot.nano_aiu` (raw AI-unit count) |
 | host | user login agent (launchd / systemd --user / Task Scheduler) |
 | lifecycle | self-installed at connect; removed by `langwatch logout` |
 
 ### Invariants
 | Invariant | Satisfied by |
 |---|---|
-| Each call ingested once | reader claims only app-owned sessions + persisted watermark + deterministic per-row span id |
-| Never mis-attribute content | pairing only under per-session count-parity + bounded window; otherwise numbers-only + `pairing_degraded` |
-| No cross-lane double-capture | reader emits only app-owned sessions |
-| Safe concurrent read | read-only WAL snapshot + busy-timeout (db); append-only read (jsonl) |
-| Automatic, no user action | login agent + file-watch |
-| Well-behaved agent | one long-lived, event-driven process; no respawn, no supervisor |
-| One extractor | reader emits `gen_ai.*` + `github.copilot.*`; canonicalized by `copilot.ts`, extended for `github.copilot.nano_aiu` + `context_*_tokens` |
+| Each call ingested once | native per-call record id; standard `/api/otel` dedup |
+| Never mis-attribute content | one native record carries usage + content together; no pairing step exists to get wrong |
+| No cross-surface double-capture | app uses its own `copilot_app` ingest key, distinct from the CLI's `copilot_cli` key |
+| No scraping of live state | direct OTLP push; never reads the app's SQLite/session files |
+| Automatic, no user action | login agent owns the launch and sets the env; no GUI setting |
+| Well-behaved agent | one long-lived process that owns the app launch; no per-write respawn |
+| One extractor | native `gen_ai.*` + `github.copilot.*` records, canonicalized by `copilot.ts` (extended for `github.copilot.nano_aiu`) |
 | Content protected | ESSENTIAL PII redaction on `/api/otel` |
 | Fat-payload safe | `capOversizedAttributes` on the span path |
 
 ### Consequences
-- Prompts, responses, model, full token counts, cost, and the context-source token breakdown are captured live and automatically, with no auth-header workaround and no sandbox.
-- Content is paired to usage by time order within a bounded window, not an exact id; the worst case is a cost-only span, never a wrong prompt.
-- File parsing depends on the app's on-disk format and uses a versioned parser.
+- Prompts, responses, model, full token counts, and cost (`nano_aiu`) stream live and automatically over standard OTLP — the same transport already shipped for the CLI, so the app adds no new capture pipeline.
+- Empirically validated on the shipped app (1.0.71): the app's spawned runtime inherits injected env and POSTs authenticated `gen_ai.*` OTLP (`Authorization: Bearer …` → `/v1/traces`, ~180 KB per turn) carrying tokens, `github.copilot.cost`/`nano_aiu`, and full messages.
+- The only app-specific work is the login agent that owns the launch; everything downstream (key mint, `/api/otel`, `copilot.ts`) is unchanged.
+- The context-source token breakdown (`context_*_tokens`) lives only in the app's private DB, not on the OTLP record; it is out of scope — total tokens and total cost are unaffected.
 
 ### Open questions
-- The discriminator that identifies app-owned sessions within the shared `~/.copilot`.
-- The pairing time-window threshold.
+- Enterprise `managed-settings.json` (GitHub, 2026-07) could later push OTel config file-based, but its auth header is still env-only and its schema is not yet in the shipped build — not a substitute for the login agent, revisit if GitHub documents a file-based header.
+- If the `context_*_tokens` breakdown is ever wanted, enrich from `session-store.db` keyed on `service_request_id` — deferred, not blocking.
 
 ### Roadmap
-- VS Code extension — Lane 1 via `github.copilot.chat.otel.*`.
+- VS Code extension — via `github.copilot.chat.otel.*` settings.
 - Enterprise fleet with per-user identity.
 
 ## Changelog
 
 - 2026-07-10 — CLI integration (§Decision 1–10): both paths, ingestion-first default, sourceType `copilot_cli`, `copilot.ts` extractor. Accepted, shipped in PR #5605.
-- 2026-07-14 — GitHub Copilot app extension (§Extension): file-reader lane fusing `session-store.db` usage with `events.jsonl` content, auto-installed login-agent watcher, sourceType `copilot_app`. Proposed, PR #5784.
+- 2026-07-14 — GitHub Copilot app extension (§Extension): capture by direct OTLP export — the app POSTs one `gen_ai.*` record per call straight to `/api/otel`, the same transport shipped for the CLI (Path B), enabled by injecting the OTLP-endpoint + Bearer env at app launch via a user login agent; sourceType `copilot_app`. Empirically validated on the shipped app (1.0.71): injected env reaches the app's spawned runtime, which posts authenticated `gen_ai.*` OTLP carrying tokens, `github.copilot.cost`/`nano_aiu`, and full messages. Supersedes two earlier drafts — the `session-store.db` + `events.jsonl` scrape-and-pair design, and the native file-exporter + tail design — both dropped: no file, no tail, no SQLite. Accepted, PR #5784.
