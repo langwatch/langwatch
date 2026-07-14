@@ -82,9 +82,10 @@ export function buildEvalColumnDef({
   label: string;
 }): ColumnDef<TraceListItem, unknown> {
   // TanStack's ColumnDef is invariant in TValue (function-typed props like
-  // aggregatedCell), so a concretely-typed def is not assignable to the
-  // ColumnDef<T, unknown> arrays lenses build. Erase the value type at this
-  // boundary once instead of casting at every push site.
+  // aggregatedCell), so a concretely-typed def is not assignable to
+  // useTraceLensColumns' defs array (Array<ColumnDef<TraceListItem, unknown>>).
+  // Erase the value type at this boundary once instead of casting at the
+  // push site.
   return evalCol.accessor(
     (row) =>
       evalFieldValue({ ev: latestEvalForKey({ row, evaluatorKey }), field }),
