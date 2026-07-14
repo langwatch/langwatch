@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import {
   addEdge,
   applyEdgeChanges,
@@ -10,7 +11,6 @@ import {
 } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { DEFAULT_MAX_TOKENS, DEFAULT_MODEL } from "~/utils/constants";
-import { createLogger } from "~/utils/logger";
 import { LlmConfigInputTypes } from "../../types";
 import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {

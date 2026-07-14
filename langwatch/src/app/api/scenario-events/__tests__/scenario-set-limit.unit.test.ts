@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ScenarioSetLimitExceededError } from "~/server/app-layer/usage/errors";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 
@@ -10,7 +10,7 @@ vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId: vi.fn(),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

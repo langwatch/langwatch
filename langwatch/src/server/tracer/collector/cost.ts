@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/telemetry";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
-import { createLogger } from "../../../utils/logger/server";
 import { compileSafeRegex } from "../../../utils/safeRegex";
 import {
   getLLMModelCosts,

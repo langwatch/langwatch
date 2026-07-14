@@ -42,7 +42,7 @@ vi.mock("../featureFlagService.memory", () => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

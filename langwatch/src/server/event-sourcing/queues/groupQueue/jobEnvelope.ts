@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { Logger } from "pino";
+import type { Logger } from "@langwatch/telemetry";
 
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 

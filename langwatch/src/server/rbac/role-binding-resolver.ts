@@ -1,21 +1,21 @@
+import { createLogger } from "@langwatch/telemetry";
 import {
   OrganizationUserRole,
+  type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-  type PrismaClient,
 } from "@prisma/client";
 import {
   bindingScopeCanGrant,
   hasPermissionWithHierarchy,
   organizationRoleHasPermission,
-  teamRoleHasPermission,
   type Permission,
+  teamRoleHasPermission,
 } from "../api/rbac";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
 } from "./custom-role-permissions";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:rbac:role-binding-resolver");
 // ============================================================================

@@ -1,8 +1,8 @@
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/telemetry";
 import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
-import { createLogger } from "../../../../../utils/logger/server";
 import { featureFlagService } from "../../../../featureFlag";
 import { evaluatorLoopBlockedCounter } from "../../../../metrics";
 import type { QueueSendOptions } from "../../../queues";

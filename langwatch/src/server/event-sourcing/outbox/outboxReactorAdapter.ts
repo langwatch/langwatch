@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 import type { Event } from "../domain/types";
 import type {
   ReactorContext,

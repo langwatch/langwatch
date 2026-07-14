@@ -11,6 +11,7 @@
  */
 
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/telemetry";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type {
   ComparisonEvaluatorConfig,
@@ -25,8 +26,8 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
-import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
+import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
@@ -43,7 +44,6 @@ import {
 } from "~/server/tracer/collector/cost";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
 import { type LoadedWorkflow, workflowLoadKey } from "./dataLoader";

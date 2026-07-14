@@ -1,8 +1,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 import {
-  observeClickHouseQueryDuration,
   incrementClickHouseQueryCount,
+  observeClickHouseQueryDuration,
 } from "~/server/clickhouse/metrics";
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 import { detectColdScan } from "./cold-scan-detector";

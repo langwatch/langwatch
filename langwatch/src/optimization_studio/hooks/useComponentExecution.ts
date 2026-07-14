@@ -1,8 +1,8 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
-import { createLogger } from "~/utils/logger";
 import { generateOtelTraceId } from "../../utils/trace";
 import type { BaseComponent, Component, Field } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";

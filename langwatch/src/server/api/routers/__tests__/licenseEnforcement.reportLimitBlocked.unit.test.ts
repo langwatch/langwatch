@@ -8,7 +8,7 @@
  * - Does not send notification when limit is not reached (fabricated request)
  * - Captures exceptions when notification fails
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -23,7 +23,7 @@ vi.mock("~/server/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: vi.fn(() => ({
     info: vi.fn(),
     warn: vi.fn(),

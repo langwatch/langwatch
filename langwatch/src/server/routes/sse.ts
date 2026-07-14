@@ -16,6 +16,7 @@
 
 import superjson from "superjson";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+
 // Lazy-load appRouter — same reason as trpc.ts (circular dependency avoidance)
 let _appRouter: Awaited<typeof import("~/server/api/root")>["appRouter"] | null = null;
 async function getAppRouter() {
@@ -25,9 +26,10 @@ async function getAppRouter() {
   }
   return _appRouter;
 }
+
+import { createLogger } from "@langwatch/telemetry";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { getServerAuthSession } from "~/server/auth";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:sse");
 

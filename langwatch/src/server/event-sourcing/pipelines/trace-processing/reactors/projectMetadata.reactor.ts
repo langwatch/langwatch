@@ -1,6 +1,5 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
-
-import { createLogger } from "../../../../../utils/logger/server";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";

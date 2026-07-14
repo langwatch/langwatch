@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 import type { AggregateType } from "./domain/aggregateType";
 import type { Event, Projection } from "./domain/types";
 import type {

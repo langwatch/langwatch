@@ -6,6 +6,7 @@ import {
   PlatformTemplateImmutableError,
   TemplateNotFoundError,
 } from "@ee/governance/services/ingestionTemplate.service";
+import { createLogger } from "@langwatch/telemetry";
 /**
  * Public Hono REST API for governance resources.
  *
@@ -33,7 +34,6 @@ import { z } from "zod";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 

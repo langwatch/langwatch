@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/telemetry";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../utils/logger/server";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { Event } from "../domain/types";

@@ -1,9 +1,9 @@
+import { createLogger } from "@langwatch/telemetry";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { resolveInputsMarker } from "~/server/app-layer/evaluations/evaluation-inputs-offload";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type { Protections } from "~/server/traces/protections";
-import { createLogger } from "~/utils/logger/server";
 import { safeJsonParse } from "~/utils/safeJsonParse";
 import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";

@@ -1,8 +1,8 @@
 import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
+import { createLogger } from "@langwatch/telemetry";
 import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { env } from "../../../env.mjs";
-import { createLogger } from "../../../utils/logger/server";
 import { normalizePresidioMarkers } from "../../data-privacy/redaction/markers";
 import type { BatchEvaluationResult } from "../../evaluations/evaluators";
 import {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/env.mjs", () => ({
   env: {
@@ -7,7 +7,7 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     error: vi.fn(),
     info: vi.fn(),

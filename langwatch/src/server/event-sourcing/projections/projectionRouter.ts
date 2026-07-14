@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import {
@@ -15,7 +16,6 @@ import {
   observeEsReactorDuration,
   withMetrics,
 } from "~/server/metrics";
-import { createLogger } from "~/utils/logger/server";
 import { toError } from "~/utils/posthogErrorCapture";
 import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";

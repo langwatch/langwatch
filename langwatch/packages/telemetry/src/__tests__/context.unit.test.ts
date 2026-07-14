@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getCurrentContext,
-  runWithContext,
-  updateCurrentContext,
+  getJobContextMetadata,
   getOtelSpanContext,
   type RequestContext,
+  runWithContext,
+  updateCurrentContext,
 } from "../context/core";
 import { getLogContext } from "../context/logging";
 
@@ -95,7 +96,7 @@ describe("context/core", () => {
     describe("when no context is set", () => {
       it("does not throw", () => {
         expect(() =>
-          updateCurrentContext({ organizationId: "no-context" })
+          updateCurrentContext({ organizationId: "no-context" }),
         ).not.toThrow();
       });
     });
@@ -129,7 +130,9 @@ describe("context/core", () => {
 
     describe("when the span context is invalid", () => {
       it("returns undefined", async () => {
-        const { trace, isSpanContextValid } = await import("@opentelemetry/api");
+        const { trace, isSpanContextValid } = await import(
+          "@opentelemetry/api"
+        );
         vi.mocked(trace.getSpan).mockReturnValueOnce({
           spanContext: () => ({
             traceId: "00000000000000000000000000000000",
@@ -142,6 +145,27 @@ describe("context/core", () => {
         const result = getOtelSpanContext();
         expect(result).toBeUndefined();
       });
+    });
+  });
+
+  describe("getJobContextMetadata", () => {
+    it("captures business context for queue propagation", () => {
+      runWithContext(
+        {
+          organizationId: "job-org",
+          projectId: "job-project",
+          userId: "job-user",
+        },
+        () => {
+          expect(getJobContextMetadata()).toEqual({
+            traceId: undefined,
+            parentSpanId: undefined,
+            organizationId: "job-org",
+            projectId: "job-project",
+            userId: "job-user",
+          });
+        },
+      );
     });
   });
 });
@@ -166,7 +190,11 @@ describe("context/logging", () => {
   describe("when business context is set", () => {
     it("returns the context values", () => {
       runWithContext(
-        { organizationId: "log-org", projectId: "log-proj", userId: "log-user" },
+        {
+          organizationId: "log-org",
+          projectId: "log-proj",
+          userId: "log-user",
+        },
         () => {
           const logCtx = getLogContext();
           expect(logCtx.organizationId).toBe("log-org");
@@ -188,16 +216,13 @@ describe("context/logging", () => {
         }),
       } as any);
 
-      runWithContext(
-        { organizationId: "org-x", projectId: "proj-y" },
-        () => {
-          const logCtx = getLogContext();
-          expect(logCtx.traceId).toBe("trace-id-123");
-          expect(logCtx.spanId).toBe("span-id-456");
-          expect(logCtx.organizationId).toBe("org-x");
-          expect(logCtx.projectId).toBe("proj-y");
-        },
-      );
+      runWithContext({ organizationId: "org-x", projectId: "proj-y" }, () => {
+        const logCtx = getLogContext();
+        expect(logCtx.traceId).toBe("trace-id-123");
+        expect(logCtx.spanId).toBe("span-id-456");
+        expect(logCtx.organizationId).toBe("org-x");
+        expect(logCtx.projectId).toBe("proj-y");
+      });
     });
   });
 });

@@ -1,12 +1,11 @@
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/telemetry";
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
-
-import { createLogger } from "~/utils/logger/server";
 import {
   AZURE_SAFETY_ENV_VARS,
   isAzureEvaluatorType,

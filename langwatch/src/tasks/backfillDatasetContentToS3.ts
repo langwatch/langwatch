@@ -35,6 +35,8 @@
  * cutover is confirmed (Decision 7 — "Drop-`DatasetRecord` migration", a
  * follow-up, not this rung).
  */
+
+import { createLogger } from "@langwatch/telemetry";
 import { type Dataset, Prisma, type PrismaClient } from "@prisma/client";
 import { StreamingChunkWriter } from "../server/datasets/dataset-chunk-writer";
 import { withDatasetLock } from "../server/datasets/dataset-lock";
@@ -45,7 +47,6 @@ import {
 } from "../server/datasets/dataset-storage";
 import { prisma } from "../server/db";
 import { resolveProjectStorageDestination } from "../server/stored-objects/project-storage-destination";
-import { createLogger } from "../utils/logger/server";
 
 const logger = createLogger("langwatch:tasks:backfillDatasetContentToS3");
 

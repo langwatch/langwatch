@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/telemetry";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { createLogger } from "~/utils/logger";
 import { toError } from "~/utils/posthogErrorCapture";
 import { FetchSSETimeoutError } from "./errors";
 

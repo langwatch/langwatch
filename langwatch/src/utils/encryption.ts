@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/telemetry";
 import crypto from "crypto";
 import { env } from "../env.mjs";
-import { createLogger } from "./logger/server";
 
 const ENCRYPTION_ALGORITHM = "aes-256-gcm";
 

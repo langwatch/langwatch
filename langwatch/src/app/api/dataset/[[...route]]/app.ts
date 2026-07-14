@@ -1,4 +1,5 @@
 import { Readable } from "node:stream";
+import { createLogger } from "@langwatch/telemetry";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
@@ -7,7 +8,6 @@ import {
   handlerManagedAuth,
   requires,
 } from "~/server/api/security";
-import { createLogger } from "~/utils/logger/server";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type {

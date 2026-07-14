@@ -5,7 +5,7 @@
  * dependencies. Each method is focused on a single responsibility.
  */
 
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 import type { ModelParamsFailureReason } from "./data-prefetcher";
 import type {
   ExecutionInput,

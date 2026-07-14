@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/telemetry";
 import { useCallback } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 const logger = createLogger("useLocalStorageSelectedDataSetId");

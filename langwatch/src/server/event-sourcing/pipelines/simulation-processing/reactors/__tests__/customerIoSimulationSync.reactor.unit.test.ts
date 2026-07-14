@@ -5,12 +5,12 @@ import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { SimulationRunStateData } from "../../projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "../../schemas/events";
 import {
-  createCustomerIoSimulationSyncReactor,
   type CustomerIoSimulationSyncReactorDeps,
+  createCustomerIoSimulationSyncReactor,
 } from "../customerIoSimulationSync.reactor";
 
 // Suppress logger output
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

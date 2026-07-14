@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/telemetry";
 /**
  * GovernanceOcsfEventsClickHouseRepository — write side of the
  * `governance_ocsf_events` fold projection. Each call inserts ONE
@@ -17,7 +18,6 @@
  * Migration: 00023_create_governance_ocsf_events.sql
  */
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 
 const TABLE_NAME = "governance_ocsf_events" as const;
 

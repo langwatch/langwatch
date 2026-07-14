@@ -10,7 +10,7 @@
  * @see specs/scenarios/observability-context.feature
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpAgentData } from "../../types";
 import { SerializedHttpAgentAdapter } from "../http-agent.adapter";
@@ -19,7 +19,7 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 
-vi.mock("../../trace-context-headers", () => ({
+vi.mock("@langwatch/telemetry/tracing", () => ({
   injectTraceContextHeaders: vi.fn(
     ({ headers }: { headers: Record<string, string> }) => ({
       headers,

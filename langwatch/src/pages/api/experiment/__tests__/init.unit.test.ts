@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
-import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createMocks } from "node-mocks-http";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 
 // Mock dependencies
 vi.mock("~/server/db", () => ({
@@ -40,7 +40,7 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

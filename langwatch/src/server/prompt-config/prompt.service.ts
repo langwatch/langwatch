@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import type {
   LlmPromptConfigVersion,
   Prisma,
@@ -5,7 +6,6 @@ import type {
   PromptScope,
 } from "@prisma/client";
 import type { z } from "zod";
-import { createLogger } from "~/utils/logger";
 import {
   deriveResponseFormatFromOutputs,
   handleSchema,
@@ -22,8 +22,8 @@ import {
 } from "./errors";
 import { toHandleSlug } from "./handle-slug";
 import { hoistSystemMessage } from "./hoist-system-message";
+import { mergeAutoDetectedInputs } from "./mergeAutoDetectedInputs";
 import { PromptVersionService } from "./prompt-version.service";
-import { TagValidationError } from "./repositories/llm-config-tag.repository";
 import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
 import {
   type CreateLlmConfigParams,
@@ -31,8 +31,7 @@ import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
-import { PromptTagAssignmentRepository } from "./repositories/llm-config-tag.repository";
-import { PromptTagRepository } from "./repositories/prompt-tag.repository";
+import { PromptTagAssignmentRepository, TagValidationError } from "./repositories/llm-config-tag.repository";
 import {
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
@@ -41,7 +40,7 @@ import {
   parseRuntimeParameters,
   runtimeParametersEqual,
 } from "./repositories/llm-config-version-schema";
-import { mergeAutoDetectedInputs } from "./mergeAutoDetectedInputs";
+import { PromptTagRepository } from "./repositories/prompt-tag.repository";
 import {
   transformCamelToSnake,
   transformSnakeToCamel,

@@ -9,10 +9,11 @@
  * is set. The `/api/track_usage` receiver on app.langwatch.ai is
  * unchanged.
  */
+
+import { createLogger } from "@langwatch/telemetry";
 import { env } from "~/env.mjs";
 import { collectUsageStats } from "~/server/collectUsageStats";
 import { prisma } from "~/server/db";
-import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
   toError,

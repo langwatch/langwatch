@@ -1,12 +1,12 @@
-import { createLogger } from "../../../../../utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 import type {
   ReactorContext,
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
 import type { SimulationRunStateData } from "../projections/simulationRunState.foldProjection";
+import type { ComputeRunMetricsCommandData } from "../schemas/commands";
 import type { SimulationProcessingEvent } from "../schemas/events";
 import { isSimulationRunFinishedEvent } from "../schemas/typeGuards";
-import type { ComputeRunMetricsCommandData } from "../schemas/commands";
 
 const logger = createLogger(
   "langwatch:simulation-processing:trace-metrics-sync",

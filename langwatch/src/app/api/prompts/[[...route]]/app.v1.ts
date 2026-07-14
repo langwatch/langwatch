@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
@@ -25,7 +26,6 @@ import {
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,

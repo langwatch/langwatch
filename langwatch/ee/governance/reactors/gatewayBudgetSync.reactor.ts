@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/telemetry";
 import type {
   GatewayBudgetLedgerStatus,
   PrismaClient,
 } from "@prisma/client";
+import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import type { ReactorContext, ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
 import {
-  GatewayBudgetClickHouseRepository,
   type BudgetDebitRow,
+  GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
 import type {
   ApplicableScopes,
   GatewayBudgetRepository,
 } from "~/server/gateway/budget.repository";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import type { ReactorContext, ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 
 const logger = createLogger(
   "langwatch:trace-processing:gateway-budget-sync-reactor",

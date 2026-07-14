@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import pino from "pino";
 import superjson from "superjson";
-import { createLogger } from "../logger";
-import { runWithContext } from "../context/core";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { runWithContext } from "../context";
 import { getLogContext } from "../context/logging";
+import { consoleIgnoreFields, createLogger } from "../logger";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },
@@ -13,7 +13,11 @@ vi.mock("@opentelemetry/api", () => ({
 function captureDest() {
   const chunks: string[] = [];
   return {
-    dest: { write(chunk: string) { chunks.push(chunk); } },
+    dest: {
+      write(chunk: string) {
+        chunks.push(chunk);
+      },
+    },
     chunks,
   };
 }
@@ -80,7 +84,7 @@ describe("createLogger", () => {
   });
 
   describe("when serializing errors", () => {
-    it("includes superjson data and metadata for Error instances", () => {
+    it("preserves the current superjson metadata shape for Error instances", () => {
       const { dest, chunks } = captureDest();
 
       // Create a logger that mirrors createLogger's serializer setup
@@ -89,9 +93,13 @@ describe("createLogger", () => {
           level: "error",
           serializers: {
             error: (err: unknown) => {
-              if (!(err instanceof Error)) return pino.stdSerializers.err(err as Error);
-              const { json, meta } = superjson.serialize(err);
-              return { ...pino.stdSerializers.err(err), _superjsonData: json, _superjsonMeta: meta };
+              if (!(err instanceof Error))
+                return pino.stdSerializers.err(err as Error);
+              const serialized = superjson.serialize(err);
+              return {
+                ...pino.stdSerializers.err(err),
+                _superjson: serialized.meta,
+              };
             },
           },
         },
@@ -103,7 +111,7 @@ describe("createLogger", () => {
       const parsed = JSON.parse(chunks[0]!);
       expect(parsed.error.message).toBe("boom");
       expect(parsed.error.type).toBe("Error");
-      expect(parsed.error._superjsonData).toBeDefined();
+      expect(parsed.error).toHaveProperty("_superjson");
     });
 
     it("falls back to standard serializer for non-Error values", () => {
@@ -114,7 +122,8 @@ describe("createLogger", () => {
           level: "error",
           serializers: {
             error: (err: unknown) => {
-              if (!(err instanceof Error)) return pino.stdSerializers.err(err as Error);
+              if (!(err instanceof Error))
+                return pino.stdSerializers.err(err as Error);
               return pino.stdSerializers.err(err);
             },
           },
@@ -156,6 +165,22 @@ describe("createLogger", () => {
 
       const parsed = JSON.parse(chunks[0]!);
       expect(parsed.level).toBe("ERROR");
+    });
+  });
+
+  describe("console context fields", () => {
+    it("hides heavy business context when OTel export is enabled", () => {
+      const ignored = consoleIgnoreFields(true).split(",");
+
+      expect(ignored).toContain("organizationId");
+      expect(ignored).toContain("projectId");
+      expect(ignored).toContain("userId");
+      expect(ignored).not.toContain("traceId");
+      expect(ignored).not.toContain("spanId");
+    });
+
+    it("keeps business context when the console is the only output", () => {
+      expect(consoleIgnoreFields(false)).toBe("pid,hostname");
     });
   });
 });

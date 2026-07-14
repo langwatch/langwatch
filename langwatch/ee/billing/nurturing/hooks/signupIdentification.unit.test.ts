@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireSignupNurturingCalls } from "./signupIdentification";
 
 // Suppress logger output
-vi.mock("../../../../src/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

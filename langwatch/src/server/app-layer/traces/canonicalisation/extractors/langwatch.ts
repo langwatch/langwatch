@@ -25,7 +25,7 @@
  * - gen_ai.system_instructions (extracted from first system message)
  */
 
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 import { ATTR_KEYS } from "./_constants";
 import { ALLOWED_SPAN_TYPES } from "./_extraction";
 import { isRecord } from "./_guards";

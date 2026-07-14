@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { MiddlewareHandler } from "hono";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:middleware:trace-limit");
 

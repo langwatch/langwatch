@@ -4,13 +4,13 @@
  */
 
 import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/telemetry";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger";
 import type {
   DatasetColumns,
   DatasetRecordEntry,

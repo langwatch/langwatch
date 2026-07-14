@@ -1,4 +1,4 @@
-import type { createLogger } from "~/utils/logger/server";
+import type { createLogger } from "@langwatch/telemetry";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
 import type {
   EsKillSwitchKey,

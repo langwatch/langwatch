@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/telemetry";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createLogger } from "~/utils/logger/server";
 import type { createTenantId } from "../../../";
 import {
   getTestClickHouseClient,

@@ -5,6 +5,7 @@
  * for both the execute route (UI) and the run route (CI/CD API).
  */
 
+import { createLogger } from "@langwatch/telemetry";
 import type { Evaluator } from "@prisma/client";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
@@ -17,7 +18,6 @@ import {
   PromptService,
   type VersionedPrompt,
 } from "~/server/prompt-config/prompt.service";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:experiments-v3:dataLoader");
 

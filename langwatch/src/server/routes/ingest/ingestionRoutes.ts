@@ -38,6 +38,7 @@ import {
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { transformOttlPayload } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { createLogger } from "@langwatch/telemetry";
 import type {
   IExportLogsServiceRequest,
   IExportTraceServiceRequest,
@@ -61,7 +62,6 @@ import {
   parseOtlpTraces,
   readOtlpBody,
 } from "~/server/otel/parseOtlpBody";
-import { createLogger } from "~/utils/logger/server";
 
 import { checkIpRateLimit, extractClientIp } from "./rateLimit";
 

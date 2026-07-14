@@ -1,8 +1,8 @@
 import { EventEmitter } from "node:events";
 import * as os from "node:os";
+import { createLogger } from "@langwatch/telemetry";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { createLogger } from "~/utils/logger/server";
 import { normalizeErrorMessage } from "./normalize-error-message";
 import {
   computeEngineCpuPercent,

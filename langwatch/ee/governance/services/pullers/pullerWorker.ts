@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/telemetry";
 /**
  * BullMQ worker driving the PullerAdapter framework.
  *
@@ -28,14 +29,12 @@
 import { Prisma } from "@prisma/client";
 import { type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
-
 import { env } from "~/env.mjs";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { makeQueueName } from "~/server/queues/makeQueueName";
 import { withJobContext } from "~/server/queues/withJobContext";
 import { connection } from "~/server/redis";
-import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
   toError,

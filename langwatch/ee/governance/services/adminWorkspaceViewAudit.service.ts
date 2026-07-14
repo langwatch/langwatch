@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+
+import { createLogger } from "@langwatch/telemetry";
 /**
  * AdminWorkspaceViewAuditService — records audit-log + OCSF rows
  * when an org admin drills into another user's Personal Workspace
@@ -22,15 +24,12 @@
  *         §"Admins read user-scoped traces ONLY via audit-logged drill-in"
  */
 import type { Prisma, PrismaClient } from "@prisma/client";
-
 import {
   GovernanceOcsfEventsClickHouseRepository,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "./governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "./governanceProject.service";
-
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger(
   "langwatch:governance:admin-workspace-view-audit",

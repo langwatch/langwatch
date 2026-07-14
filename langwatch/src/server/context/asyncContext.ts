@@ -4,24 +4,22 @@
  * AsyncLocalStorage-based context propagation for correlating logs and
  * traces across async boundaries.
  *
- * - core.ts: Core types + functions + generic job-payload context helpers
- * - adapters/: Framework-specific context creation (Hono, tRPC)
- * - logging.ts: Logger integration (getLogContext)
+ * Core context propagation and logger integration live in
+ * `@langwatch/telemetry/context`; this app module only adds framework adapters.
  *
  * @module asyncContext
  */
 
-export { createContextFromHono } from "./adapters/hono";
-export { createContextFromTRPC } from "./adapters/trpc";
 export {
   createContextFromJobData,
   getCurrentContext,
   getJobContextMetadata,
+  getLogContext,
   type JobContextMetadata,
   type JobDataWithContext,
   type RequestContext,
   runWithContext,
   updateCurrentContext,
-} from "./core";
-
-export { getLogContext } from "./logging";
+} from "@langwatch/telemetry/context";
+export { createContextFromHono } from "./adapters/hono";
+export { createContextFromTRPC } from "./adapters/trpc";

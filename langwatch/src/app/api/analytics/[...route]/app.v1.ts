@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import { TRPCError } from "@trpc/server";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
@@ -7,7 +8,6 @@ import { timeseriesSeriesInput } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
-import { createLogger } from "~/utils/logger/server";
 import { baseResponses } from "../../shared/base-responses";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
 

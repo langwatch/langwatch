@@ -17,6 +17,8 @@
  *
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
+
+import { createLogger } from "@langwatch/telemetry";
 import { randomBytes } from "crypto";
 import { env } from "~/env.mjs";
 import {
@@ -55,7 +57,6 @@ import {
 } from "~/server/services/langy/langyGithubToken";
 import { encrypt } from "~/utils/encryption";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
-import { createLogger } from "~/utils/logger/server";
 
 import type { NextRequestShim } from "./types";
 

@@ -1,13 +1,13 @@
-import { Prisma, RoleBindingScopeType, TeamUserRole, type Organization, type PrismaClient } from "@prisma/client";
-import { APIError } from "better-auth/api";
 import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { createLogger } from "../../utils/logger/server";
-import { captureException } from "../../utils/posthogErrorCapture";
-import { isSsoProviderMatch, extractEmailDomain } from "./sso";
-import { InviteService } from "~/server/invites/invite.service";
+import { createLogger } from "@langwatch/telemetry";
+import { type Organization, Prisma, type PrismaClient, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { APIError } from "better-auth/api";
 import { getApp } from "~/server/app-layer/app";
+import { InviteService } from "~/server/invites/invite.service";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { fireSsoAutoAddNurturingCalls } from "../../../ee/billing/nurturing/hooks/ssoAutoAdd";
+import { captureException } from "../../utils/posthogErrorCapture";
+import { extractEmailDomain, isSsoProviderMatch } from "./sso";
 
 const logger = createLogger("langwatch:better-auth:hooks");
 

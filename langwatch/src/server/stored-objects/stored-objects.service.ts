@@ -7,6 +7,7 @@
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { Instance, Ksuid } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/telemetry";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import {
@@ -16,7 +17,6 @@ import {
   getStoredObjectWriteFailureCounter,
   storedObjectReadFailureCounter,
 } from "~/server/metrics";
-import { createLogger } from "~/utils/logger/server";
 import { ObjectNotFoundError } from "./errors";
 import {
   redactStorageUri,

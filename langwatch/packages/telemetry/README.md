@@ -1,8 +1,10 @@
 # @langwatch/telemetry
 
-Logging, context propagation, and OpenTelemetry utilities for LangWatch services.
+Shared logging, request context, and trace-propagation utilities for LangWatch services.
 
-## Usage
+## Logging
+
+Use the same import in browser and Node.js code:
 
 ```ts
 import { createLogger } from "@langwatch/telemetry";
@@ -11,44 +13,53 @@ const logger = createLogger("my-service");
 logger.info("hello");
 ```
 
-`createLogger` is isomorphic — it detects the runtime environment and picks the right backend:
+There is intentionally no separate server logger. `createLogger` detects Node.js at runtime:
 
-- **Server (Node.js)**: pino with transports (pretty in dev, JSON in prod), optional OTel export, superjson error serialization, and automatic context injection (traceId, spanId, organizationId, projectId, userId via AsyncLocalStorage).
-- **Browser**: pino browser mode with `console.*` output.
+- **Node.js** uses a shared Pino transport, optional OTel log export, SuperJSON error metadata, and registered async request context.
+- **Browser** uses Pino's browser output. The root package does not import OpenTelemetry or Node-only modules.
 
-### Disable context injection
+Disable automatic server context injection only for exceptional cases:
 
 ```ts
 const logger = createLogger("my-service", { disableContext: true });
 ```
 
-### Context propagation
+## Server request context
+
+Node-only context helpers are exposed through a feature subpath. Importing it also registers the log context provider:
 
 ```ts
-import { runWithContext, getCurrentContext, updateCurrentContext } from "@langwatch/telemetry";
+import {
+  getCurrentContext,
+  runWithContext,
+  updateCurrentContext,
+} from "@langwatch/telemetry/context";
 
-runWithContext({ organizationId: "org-1", projectId: "proj-1" }, () => {
-  // All logs within this scope include org/project context
+runWithContext({ organizationId: "org-1", projectId: "project-1" }, () => {
   logger.info("processing request");
-
-  // Update context after auth
-  updateCurrentContext({ userId: "user-123" });
+  updateCurrentContext({ userId: "user-1" });
 });
 ```
 
-### Trace context
+Queue producers and consumers can use `getJobContextMetadata` and `createContextFromJobData` from the same subpath.
+
+## Trace propagation
+
+OpenTelemetry helpers are also isolated from the browser-safe package root:
 
 ```ts
-import { injectTraceContextHeaders, getActiveTraceId } from "@langwatch/telemetry";
+import {
+  getActiveTraceId,
+  injectTraceContextHeaders,
+} from "@langwatch/telemetry/tracing";
 
-// Inject W3C traceparent into outbound request headers
 const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
 ```
 
-### HTTP request logging
+## HTTP request logging
 
 ```ts
-import { logHttpRequest, getStatusCodeFromError } from "@langwatch/telemetry";
+import { getStatusCodeFromError, logHttpRequest } from "@langwatch/telemetry";
 
 logHttpRequest(logger, {
   method: "GET",
@@ -59,14 +70,14 @@ logHttpRequest(logger, {
 });
 ```
 
-## Environment variables (server only)
+## Environment variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `PINO_LOG_LEVEL` | `debug` | Base log level |
-| `PINO_CONSOLE_LEVEL` | `info` | Console transport level |
-| `PINO_OTEL_ENABLED` | `false` | Enable OpenTelemetry log export |
-| `PINO_OTEL_LEVEL` | `debug` | OTel transport level |
+| `PINO_LOG_LEVEL` | `debug` in Node.js, `info` in browser | Base logger level |
+| `LOG_CONSOLE_LEVEL` | `info` | Console level (`PINO_CONSOLE_LEVEL` is the compatibility fallback) |
+| `LOG_OTEL_LEVEL` | `debug` | OTel level (`PINO_OTEL_LEVEL` is the compatibility fallback) |
+| `PINO_OTEL_ENABLED` | `false` | Set to `true` to enable OTel log export |
 
 ## Testing
 

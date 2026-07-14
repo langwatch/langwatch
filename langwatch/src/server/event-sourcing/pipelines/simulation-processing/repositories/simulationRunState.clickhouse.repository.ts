@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
@@ -7,7 +8,6 @@ import {
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/services/errorHandling";
-import { createLogger } from "../../../../../utils/logger";
 import type {
   Projection,
   ProjectionStoreReadContext,

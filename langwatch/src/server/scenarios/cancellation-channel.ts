@@ -8,7 +8,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 
 const logger = createLogger("langwatch:scenarios:cancellation-channel");
 

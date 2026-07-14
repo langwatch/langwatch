@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { createLogger } from "@langwatch/telemetry";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
 import {
@@ -21,7 +22,6 @@ import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-
 import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
-import { createLogger } from "~/utils/logger/server";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";

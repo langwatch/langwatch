@@ -1,6 +1,6 @@
-import { Counter, Gauge, Histogram, register } from "prom-client";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
+import { Counter, Gauge, Histogram, register } from "prom-client";
 
 const logger = createLogger("langwatch:clickhouse:metrics");
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/telemetry";
 /**
  * Periodic spend-spike anomaly evaluation tick.
  *
@@ -15,7 +16,6 @@
  *       specs/ai-gateway/governance/anomaly-rules.feature
  */
 import { prisma } from "~/server/db";
-import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
   toError,

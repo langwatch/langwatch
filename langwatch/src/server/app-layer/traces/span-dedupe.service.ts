@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/telemetry";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { createLogger } from "~/utils/logger/server";
 import { traced } from "../tracing";
 
 const logger = createLogger("langwatch:trace-processing:span-dedup");

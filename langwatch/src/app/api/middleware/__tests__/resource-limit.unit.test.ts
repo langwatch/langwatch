@@ -1,8 +1,8 @@
-import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
 import { Hono } from "hono";
-import { resourceLimitMiddleware } from "../resource-limit";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import type { LimitType } from "~/server/license-enforcement/types";
+import { resourceLimitMiddleware } from "../resource-limit";
 
 // Mock dependencies
 vi.mock("~/server/db", () => ({
@@ -28,7 +28,7 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -37,10 +37,10 @@ vi.mock("~/utils/logger/server", () => ({
   }),
 }));
 
+import { env } from "~/env.mjs";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
-import { getApp } from "~/server/app-layer/app";
-import { env } from "~/env.mjs";
 
 describe("resourceLimitMiddleware()", () => {
   let mockEnforceLimit: Mock;

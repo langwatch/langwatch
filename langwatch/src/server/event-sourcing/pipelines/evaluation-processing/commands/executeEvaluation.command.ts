@@ -1,11 +1,5 @@
-import type { Command, CommandHandler } from "../../../";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "../../../";
+import { createLogger } from "@langwatch/telemetry";
 import { extractErrorMessage } from "../../../../../utils/captureError";
-import { createLogger } from "../../../../../utils/logger/server";
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
   isAzureEvaluatorType,
@@ -15,15 +9,21 @@ import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/e
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
 import {
-  evaluatePreconditions,
   buildPreconditionTraceDataFromCommand,
   checkEvaluatorRequiredFields,
+  evaluatePreconditions,
   preconditionsNeedEvents,
 } from "../../../../evaluations/preconditions";
-import type { PreconditionTraceData } from "../../../../filters/precondition-matchers";
 import type { CheckPreconditions } from "../../../../evaluations/types";
+import type { PreconditionTraceData } from "../../../../filters/precondition-matchers";
 import type { MappingState } from "../../../../tracer/tracesMapping";
 import type { ElasticSearchEvent, Span } from "../../../../tracer/types";
+import type { Command, CommandHandler } from "../../../";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+} from "../../../";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
 import { executeEvaluationCommandDataSchema } from "../schemas/commands";
 import {

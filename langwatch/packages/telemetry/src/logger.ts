@@ -1,65 +1,94 @@
-import superjson from "superjson";
 import pino, {
+  type DestinationStream,
   type LoggerOptions,
   type Logger as PinoLogger,
-  type DestinationStream,
 } from "pino";
-import { getLogContext } from "./context/logging";
+import type SuperJSON from "superjson";
+import { DEFAULT_SERVICE_NAME } from "./constants";
 
-const isNode =
-  typeof process !== "undefined" &&
-  typeof process.versions?.node === "string";
+type LogContextProvider = () => Record<string, string | null>;
+
+const isNodeRuntime =
+  typeof process !== "undefined" && typeof process.versions?.node === "string";
+
+let logContextProvider: LogContextProvider | undefined;
+let sharedSuperjson: typeof SuperJSON | undefined;
+
+function getSuperjson(): typeof SuperJSON {
+  if (!sharedSuperjson) {
+    const { createRequire } = process.getBuiltinModule("node:module");
+    const loadModule = createRequire(import.meta.url);
+    sharedSuperjson = loadModule("superjson") as typeof SuperJSON;
+  }
+
+  return sharedSuperjson;
+}
+
+/**
+ * Registers the server context provider used by every logger mixin.
+ *
+ * The provider is injected rather than imported so this module stays safe to
+ * load in a browser: no OpenTelemetry or Node-only context module is part of
+ * the root package's module graph.
+ */
+export function registerLogContextProvider(provider: LogContextProvider): void {
+  logContextProvider = provider;
+}
 
 /**
  * Custom Error serializer using superjson.
- * Avoids expensive manual stack trace formatting while preserving all metadata.
+ * Avoids expensive manual stack trace formatting while preserving metadata.
  */
-const superjsonErrorSerializer = (err: unknown) => {
-  if (!(err instanceof Error)) {
-    return pino.stdSerializers.err(err as Error);
+const superjsonErrorSerializer = (error: unknown) => {
+  if (!(error instanceof Error)) {
+    return pino.stdSerializers.err(error as Error);
   }
 
-  const { json, meta } = superjson.serialize(err);
+  const serialized = getSuperjson().serialize(error);
 
   return {
-    ...pino.stdSerializers.err(err),
-    _superjsonData: json,
-    _superjsonMeta: meta,
+    ...pino.stdSerializers.err(error),
+    _superjson: serialized.meta,
   };
 };
 
 export interface CreateLoggerOptions {
   /**
-   * Disable automatic context injection (traceId, spanId, organizationId, projectId, userId).
-   * Only relevant on the server — ignored in browser environments.
+   * Disable automatic context injection (traceId, spanId, organizationId,
+   * projectId, and userId). This option has no effect in the browser.
    */
   disableContext?: boolean;
 }
 
-// Singleton transport instance to avoid spawning multiple worker threads.
-// Each pino.transport() call adds exit listeners; sharing one prevents
-// MaxListenersExceededWarning.
+// Each pino.transport() call adds exit listeners and starts a worker thread.
+// Reusing one transport prevents listener pollution and keeps in-process
+// workers on the same output pipeline.
 let sharedTransport: DestinationStream | null = null;
-let transportInitialized = false;
+let isTransportInitialized = false;
 
 function getSharedTransport(): DestinationStream | null {
-  if (!isNode) return null;
-  if (transportInitialized) return sharedTransport;
-  transportInitialized = true;
+  if (!isNodeRuntime || isTransportInitialized) {
+    return sharedTransport;
+  }
+  isTransportInitialized = true;
 
-  const isDevMode = process.env.NODE_ENV !== "production";
+  const isDevelopment = process.env.NODE_ENV !== "production";
   const isTest = process.env.NODE_ENV === "test";
 
-  if (isTest) return null;
+  if (isTest) {
+    return null;
+  }
 
-  const otelLogsEnabled = process.env.PINO_OTEL_ENABLED === "true";
-  const consoleLevel = process.env.PINO_CONSOLE_LEVEL ?? "info";
-  const otelLevel = process.env.PINO_OTEL_LEVEL ?? "debug";
+  const isOtelExportEnabled = process.env.PINO_OTEL_ENABLED === "true";
+  const consoleLevel =
+    process.env.LOG_CONSOLE_LEVEL ?? process.env.PINO_CONSOLE_LEVEL ?? "info";
+  const otelLevel =
+    process.env.LOG_OTEL_LEVEL ?? process.env.PINO_OTEL_LEVEL ?? "debug";
 
   try {
     sharedTransport = buildTransport({
-      isDevMode,
-      otelLogsEnabled,
+      isDevelopment,
+      isOtelExportEnabled,
       consoleLevel,
       otelLevel,
     });
@@ -75,33 +104,29 @@ function getSharedTransport(): DestinationStream | null {
 }
 
 /**
- * Creates a logger that works in both server and browser environments.
+ * Creates a Pino logger with one API for Node.js and browser consumers.
  *
- * - **Server**: pino transports (pretty / otel), context injection via
- *   AsyncLocalStorage, superjson error serialization.
- * - **Browser**: pino browser mode with `console.*` output.
- *
- * Environment variables (server only):
- * - PINO_CONSOLE_LEVEL: Console log level (default: "info")
- * - PINO_OTEL_ENABLED: Set to "true" to enable OTel log export
- * - PINO_OTEL_LEVEL: OTel export level (default: "debug")
+ * Node.js loggers use the shared console/OTel transport and inject registered
+ * async request context. Browser loggers use Pino's browser mode and never load
+ * the package's OpenTelemetry or Node-only context modules.
  */
 export function createLogger(
   name: string,
   options?: CreateLoggerOptions,
 ): PinoLogger {
-  if (!isNode) {
-    return createBrowserLogger(name);
-  }
-  return createServerLogger(name, options);
+  return isNodeRuntime
+    ? createNodeLogger(name, options)
+    : createBrowserLogger(name);
 }
 
-// ── Browser ──────────────────────────────────────────────────────────
-
 function createBrowserLogger(name: string): PinoLogger {
-  const hasProcess = typeof process !== "undefined";
-  const isTest = hasProcess && process.env.NODE_ENV === "test";
-  const level = isTest ? "error" : ((hasProcess ? process.env.PINO_LOG_LEVEL : undefined) ?? "info");
+  const isTest =
+    typeof process !== "undefined" && process.env.NODE_ENV === "test";
+  const level = isTest
+    ? "error"
+    : typeof process !== "undefined"
+      ? (process.env.PINO_LOG_LEVEL ?? "info")
+      : "info";
 
   return pino({
     name,
@@ -116,66 +141,93 @@ function createBrowserLogger(name: string): PinoLogger {
   });
 }
 
-// ── Server ───────────────────────────────────────────────────────────
-
-function createServerLogger(
+function createNodeLogger(
   name: string,
   options?: CreateLoggerOptions,
 ): PinoLogger {
   const isTest = process.env.NODE_ENV === "test";
   const defaultLevel = isTest ? "error" : "debug";
-  const baseLevel =
+  const level =
     process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? defaultLevel;
 
   const pinoOptions: LoggerOptions = {
     name,
-    level: baseLevel,
+    level,
     timestamp: pino.stdTimeFunctions.isoTime,
     serializers: { error: superjsonErrorSerializer },
     formatters: {
       bindings: (bindings) => bindings,
       level: (label) => ({ level: label.toUpperCase() }),
     },
-    mixin: options?.disableContext ? undefined : () => getLogContext(),
+    mixin: options?.disableContext
+      ? undefined
+      : () => logContextProvider?.() ?? {},
   };
 
   const transport = getSharedTransport();
-  if (transport) {
-    return pino(pinoOptions, transport);
-  }
-
-  return pino(pinoOptions, process.stdout);
+  return transport
+    ? pino(pinoOptions, transport)
+    : pino(pinoOptions, process.stdout);
 }
 
-// ── Transport builders ───────────────────────────────────────────────
-
-function buildTransport(config: {
-  isDevMode: boolean;
-  otelLogsEnabled: boolean;
+function buildTransport({
+  isDevelopment,
+  isOtelExportEnabled,
+  consoleLevel,
+  otelLevel,
+}: {
+  isDevelopment: boolean;
+  isOtelExportEnabled: boolean;
   consoleLevel: string;
   otelLevel: string;
-}) {
-  const { isDevMode, otelLogsEnabled, consoleLevel, otelLevel } = config;
-
+}): DestinationStream {
   const targets: pino.TransportTargetOptions[] = [
-    buildConsoleTransport(isDevMode, consoleLevel),
+    buildConsoleTransport({
+      isDevelopment,
+      level: consoleLevel,
+      isOtelExportEnabled,
+    }),
   ];
 
-  if (otelLogsEnabled) {
+  if (isOtelExportEnabled) {
     targets.push(buildOtelTransport(otelLevel));
   }
 
   return pino.transport({ targets });
 }
 
-function buildConsoleTransport(
-  isDevMode: boolean,
-  level: string,
-): pino.TransportTargetOptions {
-  if (isDevMode) {
+const BASE_CONSOLE_IGNORE = "pid,hostname";
+const HEAVY_CONTEXT_FIELDS = ["organizationId", "projectId", "userId"];
+
+/**
+ * Selects fields hidden from the pretty console. When OTel export is enabled,
+ * business context remains available in Grafana while trace/span IDs stay on
+ * the compact console line for correlation.
+ */
+export function consoleIgnoreFields(isOtelExportEnabled: boolean): string {
+  return isOtelExportEnabled
+    ? [BASE_CONSOLE_IGNORE, ...HEAVY_CONTEXT_FIELDS].join(",")
+    : BASE_CONSOLE_IGNORE;
+}
+
+function buildConsoleTransport({
+  isDevelopment,
+  level,
+  isOtelExportEnabled,
+}: {
+  isDevelopment: boolean;
+  level: string;
+  isOtelExportEnabled: boolean;
+}): pino.TransportTargetOptions {
+  if (isDevelopment) {
     return {
       target: "pino-pretty",
-      options: { colorize: true, minimumLevel: level },
+      options: {
+        colorize: true,
+        singleLine: true,
+        ignore: consoleIgnoreFields(isOtelExportEnabled),
+        minimumLevel: level,
+      },
       level,
     };
   }
@@ -191,10 +243,10 @@ function buildOtelTransport(level: string): pino.TransportTargetOptions {
   return {
     target: "pino-opentelemetry-transport",
     options: {
-      loggerName: "langwatch-backend",
+      loggerName: DEFAULT_SERVICE_NAME,
       serviceVersion: process.env.npm_package_version ?? "1.0.0",
       resourceAttributes: {
-        "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-backend",
+        "service.name": process.env.OTEL_SERVICE_NAME ?? DEFAULT_SERVICE_NAME,
         "deployment.environment": process.env.ENVIRONMENT ?? "development",
       },
     },

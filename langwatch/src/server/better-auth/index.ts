@@ -1,15 +1,14 @@
+import { createLogger } from "@langwatch/telemetry";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { auth0, genericOAuth, okta } from "better-auth/plugins/generic-oauth";
-
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
-import { createLogger } from "../../utils/logger/server";
 import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
 import {
   afterAccountCreate,

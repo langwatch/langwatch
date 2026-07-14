@@ -12,6 +12,8 @@
  * Experiment runs are joined in via aggregate metadata so each summary
  * includes a run count and latest run timestamp without loading run history.
  */
+
+import { createLogger } from "@langwatch/telemetry";
 import type { Experiment } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
@@ -21,7 +23,6 @@ import { prisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import { baseResponses } from "../../shared/base-responses";
 
 patchZodOpenapi();

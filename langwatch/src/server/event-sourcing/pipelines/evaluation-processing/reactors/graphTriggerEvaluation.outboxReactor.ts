@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import type { EvaluationAnalyticsData } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import { featureFlagService } from "~/server/featureFlag";
-import { createLogger } from "~/utils/logger/server";
 import type {
   OutboxEnqueueRequest,
   OutboxReactorDefinition,

@@ -1,17 +1,17 @@
 import { on } from "node:events";
+import { createLogger } from "@langwatch/telemetry";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import type {
+  PresenceCursorEvent,
+  PresenceEvent,
+} from "~/server/app-layer/presence/types";
 import {
   presenceCursorAnchorSchema,
   presenceCursorPayloadSchema,
   presenceLocationSchema,
 } from "~/server/app-layer/presence/types";
-import type {
-  PresenceCursorEvent,
-  PresenceEvent,
-} from "~/server/app-layer/presence/types";
-import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../rbac";
 
 const logger = createLogger("langwatch:api:presence");

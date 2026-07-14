@@ -33,10 +33,9 @@
  *       §"Admin warning fires when quarantine fill rate exceeds threshold"
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/telemetry";
 import type { PrismaClient } from "@prisma/client";
-
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 
 import {
   GOVERNANCE_ATTR,

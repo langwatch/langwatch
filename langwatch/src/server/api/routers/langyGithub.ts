@@ -12,6 +12,7 @@
  * tRPC. Issue #4747.
  */
 
+import { createLogger } from "@langwatch/telemetry";
 import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -27,7 +28,6 @@ import {
   clearGithubTokenCache,
   getGithubTokenForUser,
 } from "~/server/services/langy/langyGithubToken";
-import { createLogger } from "~/utils/logger/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:trpc:langyGithub");

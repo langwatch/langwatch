@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/telemetry";
 /**
  * CliSessionInventoryService — read + revoke per-user CLI device-flow
  * sessions. Mirrors the macOS "Logged-in Devices" pattern: every active
@@ -22,9 +23,7 @@
  * Spec: specs/ai-governance/sessions/sessions-inventory.feature
  */
 import type { Cluster, Redis } from "ioredis";
-
 import { connection as defaultRedisConnection } from "~/server/redis";
-import { createLogger } from "~/utils/logger/server";
 
 import { CliTokenRevocationService } from "./cliTokenRevocation.service";
 

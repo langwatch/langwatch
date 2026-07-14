@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { getS3CacheKey } from "../../../../optimization_studio/server/addEnvs";
 import { invokeLambda } from "../../../../optimization_studio/server/lambda";
@@ -5,7 +6,6 @@ import type {
   StudioClientEvent,
   StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
-import { createLogger } from "../../../../utils/logger/server";
 import { prisma } from "../../../../server/db";
 import { stripUnsupportedLLMParamsFromWorkflow } from "../../../../server/workflows/stripUnsupportedLLMParams";
 

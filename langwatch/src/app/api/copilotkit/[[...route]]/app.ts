@@ -9,10 +9,9 @@ import {
   CopilotRuntime,
   copilotRuntimeNodeHttpEndpoint,
 } from "@copilotkit/runtime";
+import { createLogger } from "@langwatch/telemetry";
 import { describeRoute } from "hono-openapi";
-
 import { createProjectApp, requires } from "~/server/api/security";
-import { createLogger } from "~/utils/logger/server";
 import { PromptStudioAdapter } from "./service-adapter";
 
 const logger = createLogger("langwatch:api:copilotkit");

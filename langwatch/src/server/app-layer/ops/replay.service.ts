@@ -1,13 +1,13 @@
+import { createLogger } from "@langwatch/telemetry";
 import { randomUUID } from "crypto";
-import type {
-  ReplayRepository,
-  ReplayStatus,
-  ReplayHistoryEntry,
-} from "./repositories/replay.repository";
+import { env } from "~/env.mjs";
 import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
 import type { ReplayProgress } from "~/server/event-sourcing/replay/types";
-import { env } from "~/env.mjs";
-import { createLogger } from "~/utils/logger/server";
+import type {
+  ReplayHistoryEntry,
+  ReplayRepository,
+  ReplayStatus,
+} from "./repositories/replay.repository";
 
 const logger = createLogger("langwatch:ops:replay-service");
 

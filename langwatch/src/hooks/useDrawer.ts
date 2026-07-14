@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 import Router, { useRouter } from "~/utils/compat/next-router";
@@ -6,7 +7,6 @@ import type {
   DrawerProps,
   DrawerType,
 } from "../components/drawerRegistry";
-import { createLogger } from "../utils/logger";
 import { URL_QS_PARSE_OPTIONS } from "../utils/qsParseOptions";
 import { routeTraceDrawerForV2 } from "./traceDrawerV2Routing";
 

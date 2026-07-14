@@ -12,17 +12,16 @@
  * Real logic follows once the service layer for VirtualKey / Budget lands.
  */
 
+import { createLogger } from "@langwatch/telemetry";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";
-
 import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-
 import { prisma } from "~/server/db";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
@@ -36,7 +35,6 @@ import {
   VirtualKeyCryptoError,
 } from "~/server/gateway/virtualKey.crypto";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { createLogger } from "~/utils/logger/server";
 
 // `verifySecret` applies the HMAC verifier as the builder chain for every
 // route (uniform with `files/.../app.ts`), rather than an app-wide

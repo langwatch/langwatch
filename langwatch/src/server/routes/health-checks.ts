@@ -10,6 +10,8 @@
  *
  * NOTE: The simple GET /api/health (204) is already handled in health.ts.
  */
+
+import { createLogger } from "@langwatch/telemetry";
 import type {
   ESpanKind,
   IExportTraceServiceRequest,
@@ -17,14 +19,13 @@ import type {
 import crypto from "crypto";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
-import { prisma } from "~/server/db";
 import {
   createServiceApp,
   publicEndpoint,
 } from "~/server/api/security";
+import { prisma } from "~/server/db";
 import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:health-checks");
 

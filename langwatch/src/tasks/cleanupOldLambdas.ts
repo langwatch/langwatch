@@ -10,7 +10,7 @@ import {
   LambdaClient,
   ListFunctionsCommand,
 } from "@aws-sdk/client-lambda";
-import { createLogger } from "../utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 
 const logger = createLogger("langwatch:cleanup-old-lambdas");
 

@@ -11,7 +11,7 @@ vi.mock("../../../src/env.mjs", () => ({
   },
 }));
 
-vi.mock("../../../src/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     error: vi.fn(),
     warn: vi.fn(),
@@ -34,17 +34,17 @@ vi.mock("../../../src/server/utils/dateUtils", () => ({
 }));
 
 import { env } from "../../../src/env.mjs";
-import {
-  UsageLimitService,
-  resourceLimitCooldown,
-  planLimitCooldown,
-  planLimitInFlight,
-} from "../notifications/usage-limit.service";
+import type { OrganizationService } from "../../../src/server/app-layer/organizations/organization.service";
+import type { PlanProvider } from "../../../src/server/app-layer/subscription/plan-provider";
+import type { UsageService } from "../../../src/server/app-layer/usage/usage.service";
 import type { NotificationService } from "../notifications/notification.service";
 import type { NotificationRepository } from "../notifications/repositories/notification.repository";
-import type { OrganizationService } from "../../../src/server/app-layer/organizations/organization.service";
-import type { UsageService } from "../../../src/server/app-layer/usage/usage.service";
-import type { PlanProvider } from "../../../src/server/app-layer/subscription/plan-provider";
+import {
+  planLimitCooldown,
+  planLimitInFlight,
+  resourceLimitCooldown,
+  UsageLimitService,
+} from "../notifications/usage-limit.service";
 
 // ---------------------------------------------------------------------------
 // Helpers

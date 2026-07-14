@@ -27,7 +27,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

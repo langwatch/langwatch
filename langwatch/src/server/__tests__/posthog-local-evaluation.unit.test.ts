@@ -16,7 +16,7 @@
  *
  * @see specs/analytics/posthog-cost-control.feature
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { ctorSpy } = vi.hoisted(() => ({
   ctorSpy: vi.fn(),
@@ -33,7 +33,7 @@ vi.mock("posthog-node", () => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

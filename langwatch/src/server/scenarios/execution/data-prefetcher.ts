@@ -10,27 +10,28 @@
  * - Tests can inject mocks without vi.mock
  */
 
+import { createLogger } from "@langwatch/telemetry";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/server";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
+
+import { decrypt } from "~/utils/encryption";
+import { AgentRepository, type TypedAgent } from "../../agents/agent.repository";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
-import { AgentRepository, type TypedAgent } from "../../agents/agent.repository";
 import { prisma } from "../../db";
 import { PromptService, type VersionedPrompt } from "../../prompt-config/prompt.service";
 import { ScenarioService } from "../scenario.service";
-import { decrypt } from "~/utils/encryption";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,

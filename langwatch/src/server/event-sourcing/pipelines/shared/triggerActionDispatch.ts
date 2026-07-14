@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import { TriggerAction } from "@prisma/client";
 import {
   CADENCE_WINDOW_MS,
@@ -15,7 +16,6 @@ import {
   type TraceMapping,
 } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:trigger-action-dispatch");
 

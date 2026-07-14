@@ -5,12 +5,12 @@ import type { ProjectService } from "../../../../../app-layer/projects/project.s
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
-  createCustomerIoTraceSyncReactor,
   type CustomerIoTraceSyncReactorDeps,
+  createCustomerIoTraceSyncReactor,
 } from "../customerIoTraceSync.reactor";
 
 // Suppress logger output
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

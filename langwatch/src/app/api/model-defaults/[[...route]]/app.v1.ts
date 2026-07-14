@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
@@ -19,7 +20,6 @@ import {
   updateConfig,
 } from "~/server/modelProviders/modelDefaults.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
 import { baseResponses } from "../../shared/base-responses";

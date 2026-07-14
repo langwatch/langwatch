@@ -1,4 +1,6 @@
+import { createLogger } from "@langwatch/telemetry";
 import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
+import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 import type { Projection } from "../../../";
 import {
   AbstractFoldProjection,
@@ -7,29 +9,27 @@ import {
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import { SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
-  SimulationRunQueuedEvent,
-  SimulationRunStartedEvent,
   SimulationMessageSnapshotEvent,
-  SimulationTextMessageStartEvent,
-  SimulationTextMessageEndEvent,
-  SimulationRunFinishedEvent,
-  SimulationRunMetricsComputedEvent,
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
+  SimulationRunFinishedEvent,
+  SimulationRunMetricsComputedEvent,
+  SimulationRunQueuedEvent,
+  SimulationRunStartedEvent,
+  SimulationTextMessageEndEvent,
+  SimulationTextMessageStartEvent,
 } from "../schemas/events";
 import {
-  SimulationRunQueuedEventSchema,
-  SimulationRunStartedEventSchema,
   SimulationMessageSnapshotEventSchema,
-  SimulationTextMessageStartEventSchema,
-  SimulationTextMessageEndEventSchema,
-  SimulationRunFinishedEventSchema,
-  SimulationRunMetricsComputedEventSchema,
   SimulationRunCancelRequestedEventSchema,
   SimulationRunDeletedEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationTextMessageStartEventSchema,
 } from "../schemas/events";
-import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
-import { createLogger } from "~/utils/logger/server";
 
 const projectionLogger = createLogger("simulationRunState.foldProjection");
 

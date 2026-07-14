@@ -42,7 +42,7 @@ const { mockPrisma, mockLoggerWarn, createMockLogger } = vi.hoisted(() => {
 
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: vi.fn(() => createMockLogger()),
 }));
 

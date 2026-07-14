@@ -1,4 +1,5 @@
 import { on } from "node:events";
+import { createLogger } from "@langwatch/telemetry";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -7,7 +8,6 @@ import type {
   BatchRunDataResult,
   ScenarioRunData,
 } from "~/server/scenarios/scenario-event.types";
-import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 
 const logger = createLogger("langwatch:api:scenarios:events");

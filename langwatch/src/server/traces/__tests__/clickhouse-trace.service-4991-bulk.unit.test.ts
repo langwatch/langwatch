@@ -13,13 +13,14 @@
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
+
+import { createLogger } from "@langwatch/telemetry";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { Protections } from "~/server/traces/protections";
-import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import type { ResolvedTraceSpans } from "../resolve-offloaded-traces";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";

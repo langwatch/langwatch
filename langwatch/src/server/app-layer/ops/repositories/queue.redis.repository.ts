@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import {
@@ -13,7 +14,6 @@ import {
 import { TieredBlobStore } from "~/server/event-sourcing/queues/groupQueue/tieredBlobStore";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
-import { createLogger } from "~/utils/logger/server";
 import { normalizeErrorMessage } from "../normalize-error-message";
 import type { ErrorCluster, GroupInfo, QueueInfo } from "../types";
 import type {

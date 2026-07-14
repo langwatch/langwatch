@@ -9,6 +9,7 @@
  */
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { zValidator } from "@hono/zod-validator";
+import { createLogger } from "@langwatch/telemetry";
 import { generateText } from "ai";
 import { streamSSE } from "hono/streaming";
 import { CompletionCopilot } from "monacopilot";
@@ -27,7 +28,6 @@ import { getServerAuthSession } from "~/server/auth";
 import { DatasetNotReadyError } from "~/server/datasets/errors";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { NextRequestShim as any } from "./types";
 

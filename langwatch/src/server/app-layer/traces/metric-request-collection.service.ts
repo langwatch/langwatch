@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/telemetry";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
 import type { DeepPartial } from "~/utils/types";
 import {
   type MetricType,

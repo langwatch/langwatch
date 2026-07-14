@@ -11,15 +11,15 @@ import {
   LambdaClient,
   UpdateFunctionCodeCommand,
 } from "@aws-sdk/client-lambda";
+import { createLogger } from "@langwatch/telemetry";
 import { env } from "../../../env.mjs";
-import { TtlCache } from "../../../server/utils/ttlCache";
 import {
-  STAGED_PAYLOAD_HEADER,
   deleteStagedObject,
-  stagePayloadToS3,
+  STAGED_PAYLOAD_HEADER,
   type StagedObject,
+  stagePayloadToS3,
 } from "../../../server/s3/stagePayload";
-import { createLogger } from "../../../utils/logger/server";
+import { TtlCache } from "../../../server/utils/ttlCache";
 import { captureException } from "../../../utils/posthogErrorCapture";
 import type { StudioClientEvent } from "../../types/events";
 

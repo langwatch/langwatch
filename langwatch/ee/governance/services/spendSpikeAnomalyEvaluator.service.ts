@@ -33,11 +33,9 @@
  * are ee/-only).
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { AnomalyRule, PrismaClient } from "@prisma/client";
-import type { Prisma } from "@prisma/client";
-
+import { createLogger } from "@langwatch/telemetry";
+import type { AnomalyRule, Prisma, PrismaClient } from "@prisma/client";
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 import { AnomalyAlertDispatcherService } from "./activity-monitor/anomalyAlertDispatcher.service";
 import { safeParseSpendSpikeThresholdConfig } from "./activity-monitor/thresholdConfig.schema";
 import { PROJECT_KIND } from "./governanceProject.service";

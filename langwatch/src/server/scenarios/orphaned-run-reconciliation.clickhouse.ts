@@ -7,8 +7,8 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/telemetry";
 import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 import {
   type OrphanedRun,
   type OrphanedRunFinder,

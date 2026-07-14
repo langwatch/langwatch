@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
+import { createLogger } from "@langwatch/telemetry";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
-import { createLogger } from "../../../../../utils/logger/server";
 import type {
   ReactorContext,
   ReactorDefinition,

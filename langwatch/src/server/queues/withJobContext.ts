@@ -1,10 +1,10 @@
-import type { Job } from "bullmq";
 import {
   createContextFromJobData,
   type JobContextMetadata,
   type JobDataWithContext,
   runWithContext,
-} from "~/server/context/core";
+} from "@langwatch/telemetry/context";
+import type { Job } from "bullmq";
 
 /**
  * Legacy job data format where payload was wrapped in __payload.

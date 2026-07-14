@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/telemetry";
 /**
  * GovernanceKpisClickHouseRepository — write side of the
  * `governance_kpis` fold projection. Each call inserts ONE row keyed
@@ -15,7 +16,6 @@
  * Migration: 00021_create_governance_kpis.sql
  */
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 
 const TABLE_NAME = "governance_kpis" as const;
 

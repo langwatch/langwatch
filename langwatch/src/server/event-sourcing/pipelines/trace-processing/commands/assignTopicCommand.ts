@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { Command, CommandHandler } from "../../../";
@@ -6,7 +7,6 @@ import {
 	defineCommandSchema,
 	EventUtils,
 } from "../../../";
-import { createLogger } from "../../../../../utils/logger/server";
 import type { AssignTopicCommandData } from "../schemas/commands";
 import { assignTopicCommandDataSchema } from "../schemas/commands";
 import {

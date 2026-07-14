@@ -50,14 +50,15 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 
-vi.mock("../../execution/trace-context-headers", () => ({
+vi.mock("@langwatch/telemetry/tracing", () => ({
   injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
     headers,
     traceId: undefined,
   })),
 }));
 
-import { injectTraceContextHeaders } from "../../execution/trace-context-headers";
+import { injectTraceContextHeaders } from "@langwatch/telemetry/tracing";
+
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
 describe("HttpAgentAdapter", () => {

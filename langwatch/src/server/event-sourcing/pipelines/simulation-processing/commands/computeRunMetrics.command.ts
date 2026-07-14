@@ -1,16 +1,16 @@
+import { createLogger } from "@langwatch/telemetry";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type {
   Command,
   CommandHandler,
 } from "../../../";
 import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { createLogger } from "../../../../../utils/logger/server";
 import type { ComputeRunMetricsCommandData } from "../schemas/commands";
 import { computeRunMetricsCommandDataSchema } from "../schemas/commands";
 import {
-  SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_EVENT_VERSIONS,
+  SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_RUN_EVENT_TYPES,
 } from "../schemas/constants";
 import type {

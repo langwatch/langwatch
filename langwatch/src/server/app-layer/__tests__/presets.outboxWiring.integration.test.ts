@@ -29,7 +29,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // outbox-reactor-adapter's registration warning, which fires synchronously
 // while `initializeDefaultApp` wires the pipelines.
 const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
-vi.mock("~/utils/logger/server", () => {
+vi.mock("@langwatch/telemetry", () => {
   const make = () => {
     const logger = {
       trace: vi.fn(),
@@ -45,10 +45,10 @@ vi.mock("~/utils/logger/server", () => {
   return { createLogger: make };
 });
 
-import { resetApp } from "~/server/app-layer/app";
 import type { App } from "~/server/app-layer/app";
-import { initializeDefaultApp } from "~/server/app-layer/presets";
+import { resetApp } from "~/server/app-layer/app";
 import type { ProcessRole } from "~/server/app-layer/config";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 
 const REGISTER_DROP_WARNING = "registered without an outbox runtime";
 

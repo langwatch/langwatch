@@ -9,7 +9,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("~/utils/logger/server", () => {
+vi.mock("@langwatch/telemetry", () => {
   const make = (bindings: Record<string, unknown> = {}) => ({
     bindings: () => bindings,
     child: (extra: Record<string, unknown>) =>
@@ -25,9 +25,9 @@ vi.mock("~/utils/logger/server", () => {
 });
 
 import {
-  encodeScenarioLogContext,
-  decodeScenarioLogContext,
   createChildProcessLogger,
+  decodeScenarioLogContext,
+  encodeScenarioLogContext,
   SCENARIO_LOG_CONTEXT_ENV,
 } from "../child-logger";
 

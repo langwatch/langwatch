@@ -36,12 +36,12 @@
  * integration test issues real HTTP requests.
  */
 import { timingSafeEqual } from "node:crypto";
+import { createLogger } from "@langwatch/telemetry";
 import {
   createServiceApp,
   handlerManagedAuth,
 } from "~/server/api/security";
 import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 import {
   buildExplainQuery,
   CLICKHOUSE_GUARDRAILS,

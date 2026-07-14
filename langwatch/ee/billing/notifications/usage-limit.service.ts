@@ -1,19 +1,19 @@
+import { createLogger } from "@langwatch/telemetry";
 import { env } from "../../../src/env.mjs";
-import { createLogger } from "../../../src/utils/logger/server";
+import type { OrganizationService } from "../../../src/server/app-layer/organizations/organization.service";
+import type { PlanProvider } from "../../../src/server/app-layer/subscription/plan-provider";
 import type { UsageService } from "../../../src/server/app-layer/usage/usage.service";
+import { LIMIT_TYPE_DISPLAY_LABELS } from "../../../src/server/license-enforcement/constants";
 import { getCurrentMonthStart } from "../../../src/server/utils/dateUtils";
 import { TtlCache } from "../../../src/server/utils/ttlCache";
-import { LIMIT_TYPE_DISPLAY_LABELS } from "../../../src/server/license-enforcement/constants";
 import { captureException } from "../../../src/utils/posthogErrorCapture";
+import type { PlanLimitNotifierInput, ResourceLimitNotifierInput } from "../types";
 import {
   NotificationService,
   type UsageLimitEmailData,
 } from "./notification.service";
 import type { NotificationRepository } from "./repositories/notification.repository";
-import type { OrganizationService } from "../../../src/server/app-layer/organizations/organization.service";
 import { NOTIFICATION_TYPES } from "./types";
-import type { PlanLimitNotifierInput, ResourceLimitNotifierInput } from "../types";
-import type { PlanProvider } from "../../../src/server/app-layer/subscription/plan-provider";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 
@@ -22,6 +22,7 @@ const MIN_DAYS_BETWEEN_ALERTS = 30;
 
 // NOTE: In-memory cooldown does not survive restarts and does not coordinate across replicas. Accepted tradeoff: worst case is a duplicate Slack alert.
 const resourceLimitCooldown = new TtlCache<true>(24 * 60 * 60 * 1000, "ttlcache:billing:limitCooldown:");
+
 export { resourceLimitCooldown };
 
 // Guards notifyPlanLimitReached against concurrent calls (burst of traces from
@@ -33,7 +34,8 @@ export { resourceLimitCooldown };
 //    across pods via Redis. The DB 30-day window remains authoritative.
 const planLimitInFlight = new Set<string>();
 const planLimitCooldown = new TtlCache<true>(MIN_DAYS_BETWEEN_ALERTS * 24 * 60 * 60 * 1000, "ttlcache:billing:planLimitCooldown:");
-export { planLimitInFlight, planLimitCooldown };
+
+export { planLimitCooldown, planLimitInFlight };
 
 export interface UsageLimitData {
   organizationId: string;

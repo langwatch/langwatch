@@ -1,4 +1,5 @@
-import { createLogger } from "../../../../../utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
+import { isSuiteSetId } from "../../../../suites/suite-set-id";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -6,10 +7,9 @@ import type {
 import type { SimulationRunStateData } from "../projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "../schemas/events";
 import {
-  isSimulationRunStartedEvent,
   isSimulationRunFinishedEvent,
+  isSimulationRunStartedEvent,
 } from "../schemas/typeGuards";
-import { isSuiteSetId } from "../../../../suites/suite-set-id";
 
 const logger = createLogger(
   "langwatch:simulation-processing:suite-run-sync",

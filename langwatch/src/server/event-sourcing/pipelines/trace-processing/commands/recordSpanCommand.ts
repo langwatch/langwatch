@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import { SpanKind } from "@opentelemetry/api";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
@@ -14,7 +15,6 @@ import {
   type SpanContentDropResult,
 } from "~/server/data-privacy/applyOtlpSpanContentDrop";
 import { featureFlagService } from "~/server/featureFlag";
-import { createLogger } from "../../../../../utils/logger/server";
 import type { Command, CommandHandler } from "../../../";
 import {
   createTenantId,

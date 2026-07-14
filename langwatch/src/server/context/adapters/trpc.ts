@@ -1,4 +1,4 @@
-import { type RequestContext } from "../core";
+import type { RequestContext } from "@langwatch/telemetry";
 
 /**
  * Creates a RequestContext from tRPC context and input.

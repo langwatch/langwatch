@@ -1,18 +1,18 @@
 import { performance } from "node:perf_hooks";
-import type { createLogger } from "~/utils/logger/server";
-import { mapZodIssuesToLogContext } from "~/utils/zod";
+import type { createLogger } from "@langwatch/telemetry";
 import {
   incrementEsCommandTotal,
   observeEsCommandDuration,
 } from "~/server/metrics";
+import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { Command, CommandHandler } from "../../commands/command";
 import { createCommand } from "../../commands/command";
 import type { CommandSchema } from "../../commands/commandSchema";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { CommandType } from "../../domain/commandType";
-import { createTenantId } from "../../domain/tenantId";
 import type { TenantId } from "../../domain/tenantId";
+import { createTenantId } from "../../domain/tenantId";
 import type { Event } from "../../domain/types";
 import { EventSchema } from "../../domain/types";
 import type { KillSwitchOptions } from "../../pipeline/staticBuilder.types";

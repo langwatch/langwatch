@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/telemetry";
 import { z } from "zod";
-import { createLogger } from "~/utils/logger/server";
 import {
   type AggregateType,
   createTenantId,

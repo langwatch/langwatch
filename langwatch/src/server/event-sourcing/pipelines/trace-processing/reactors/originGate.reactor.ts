@@ -1,7 +1,7 @@
-import type { ResolveOriginCommandData } from "../schemas/commands";
-import { createLogger } from "../../../../../utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
+import type { ResolveOriginCommandData } from "../schemas/commands";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 

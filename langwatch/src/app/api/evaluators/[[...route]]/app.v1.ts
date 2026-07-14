@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { Prisma } from "@prisma/client";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
@@ -5,12 +6,11 @@ import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { requires, type SecuredApp } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
-import { type SecuredApp, requires } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,

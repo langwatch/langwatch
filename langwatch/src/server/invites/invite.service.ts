@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import {
   type Organization,
   type OrganizationInvite,
@@ -6,18 +7,17 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
+import type { JsonArray } from "@prisma/client/runtime/library";
+import { nanoid } from "nanoid";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { LimitExceededError } from "../license-enforcement/errors";
+import { RoleService } from "../role/role.service";
 import {
   DuplicateInviteError,
   InviteNotFoundError,
   InviteNotReadyError,
   OrganizationNotFoundError,
 } from "./errors";
-import { LimitExceededError } from "../license-enforcement/errors";
-import { RoleService } from "../role/role.service";
-import { nanoid } from "nanoid";
-import type { JsonArray } from "@prisma/client/runtime/library";
 
 /** Duration in milliseconds before an invite expires (48 hours). */
 export const INVITE_EXPIRATION_MS = 2 * 24 * 60 * 60 * 1000;
@@ -32,18 +32,18 @@ export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
   [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
 } as const;
 
+import { createLogger } from "@langwatch/telemetry";
+import { TeamUserRole } from "@prisma/client";
 import { env } from "~/env.mjs";
+import type { Session } from "~/server/auth";
+import { getApp } from "../app-layer/app";
+import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
 } from "../license-enforcement/license-enforcement.repository";
 import { isViewOnlyCustomRole } from "../license-enforcement/member-classification";
 import { sendInviteEmail } from "../mailer/inviteEmail";
-import { TeamUserRole } from "@prisma/client";
-import type { Session } from "~/server/auth";
-import type { PlanProvider } from "../app-layer/subscription/plan-provider";
-import { getApp } from "../app-layer/app";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:invites");
 

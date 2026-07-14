@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { addEnvs } from "../../optimization_studio/server/addEnvs";
@@ -7,12 +8,11 @@ import type {
 } from "../../optimization_studio/types/dsl";
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
 import { getEntryInputs } from "../../optimization_studio/utils/nodeUtils";
-import { nlpgoFetch, type NLPOrigin } from "../nlpgo/nlpgoFetch";
 import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators";
 import type { MaybeStoredModelProvider } from "../modelProviders/registry";
-import { createLogger } from "../../utils/logger";
+import { type NLPOrigin, nlpgoFetch } from "../nlpgo/nlpgoFetch";
 import { stripUnsupportedLLMParamsFromWorkflow } from "./stripUnsupportedLLMParams";
 
 const logger = createLogger("langwatch:workflows:runWorkflow");

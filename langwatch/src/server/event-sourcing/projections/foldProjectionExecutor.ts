@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/telemetry";
 import { incrementEsFoldRefoldTotal } from "~/server/metrics";
-import { createLogger } from "~/utils/logger/server";
 import type { Event } from "../domain/types";
 import type { FoldProjectionDefinition } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";

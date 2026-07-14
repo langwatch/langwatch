@@ -11,8 +11,8 @@
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
+import { createLogger } from "@langwatch/telemetry";
 import type { ChildProcess } from "child_process";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");
 

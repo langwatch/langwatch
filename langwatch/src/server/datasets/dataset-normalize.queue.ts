@@ -20,9 +20,10 @@
  * service) means the service depends on a small dataset-owned accessor, not on
  * the whole event-sourcing graph.
  */
+
+import { createLogger } from "@langwatch/telemetry";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
-import { createLogger } from "~/utils/logger/server";
 import { DatasetRepository } from "./dataset.repository";
 import {
   createDatasetNormalizeHandler,

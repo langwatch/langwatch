@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { Context, MiddlewareHandler } from "hono";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
@@ -5,7 +6,6 @@ import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import type { LimitType } from "~/server/license-enforcement/types";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:middleware:resource-limit");
 

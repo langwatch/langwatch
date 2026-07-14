@@ -1,10 +1,9 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-
-import { TokenResolver } from "../token-resolver";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateApiKeyToken } from "../api-key-token.utils";
+import { TokenResolver } from "../token-resolver";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/telemetry", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     warn: vi.fn(),

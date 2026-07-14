@@ -1,4 +1,4 @@
-import type { createLogger } from "~/utils/logger/server";
+import type { createLogger } from "@langwatch/telemetry";
 
 /**
  * Error categories for standardized error handling.

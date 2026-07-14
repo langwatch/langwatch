@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { createLogger } from "~/utils/logger/server";
 import {
   RETENTION_MANAGED_TABLES,
   RETENTION_TABLE_CATEGORY_MAP,

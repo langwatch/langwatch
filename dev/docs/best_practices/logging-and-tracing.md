@@ -5,7 +5,7 @@ See [ADR-003](../adr/003-logging.md) for architectural decisions.
 ## Creating Loggers
 
 ```typescript
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "@langwatch/telemetry";
 
 const logger = createLogger("langwatch:my-module");
 
@@ -45,27 +45,17 @@ app.use("*", loggerMiddleware());
 
 Context is automatically set up via `loggerMiddleware` in `trpc.ts`.
 
-### Pages Router API Routes
-
-```typescript
-import { withPagesRouterLogger } from "~/middleware/pages-router-logger";
-
-export default withPagesRouterLogger(async (req, res) => {
-  // Context is available here
-});
-```
-
 ## Background Jobs
 
 ### Sending Context to Jobs
 
 ```typescript
-import { getJobContextMetadata } from "~/server/context/asyncContext";
+import { getJobContextMetadata } from "@langwatch/telemetry/context";
 
 const metadata = getJobContextMetadata();
 await queue.add("process-trace", {
   traceId: data.traceId,
-  _context: metadata,
+  __context: metadata,
 });
 ```
 
@@ -75,10 +65,10 @@ await queue.add("process-trace", {
 import {
   createContextFromJobData,
   runWithContext,
-} from "~/server/context/asyncContext";
+} from "@langwatch/telemetry/context";
 
 worker.process(async (job) => {
-  const ctx = createContextFromJobData(job.data._context);
+  const ctx = createContextFromJobData(job.data.__context);
 
   return runWithContext(ctx, async () => {
     logger.info({ jobId: job.id }, "Processing job");
@@ -89,7 +79,7 @@ worker.process(async (job) => {
 ## Updating Context After Authentication
 
 ```typescript
-import { updateCurrentContext } from "~/server/context/asyncContext";
+import { updateCurrentContext } from "@langwatch/telemetry/context";
 
 updateCurrentContext({
   userId: session.user.id,
@@ -113,7 +103,8 @@ updateCurrentContext({
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PINO_LOG_LEVEL` | Base logger level | "debug" |
-| `PINO_CONSOLE_LEVEL` | Console output level | "warn" (dev), "info" (prod) |
-| `PINO_OTEL_LEVEL` | OTel export level | "debug" |
+| `LOG_CONSOLE_LEVEL` | Console output level (`PINO_CONSOLE_LEVEL` fallback) | "info" |
+| `LOG_OTEL_LEVEL` | OTel export level (`PINO_OTEL_LEVEL` fallback) | "debug" |
+| `PINO_OTEL_ENABLED` | Enable OTel log export | "false" |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTel collector endpoint | - |
 | `OTEL_SERVICE_NAME` | Service name in traces | "langwatch-backend" |

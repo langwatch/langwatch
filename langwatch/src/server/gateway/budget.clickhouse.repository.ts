@@ -18,6 +18,8 @@
  * See: migration 00017_create_gateway_budget_ledger.sql
  * See: specs/ai-gateway/_shared/contract.md §4.5
  */
+
+import { createLogger } from "@langwatch/telemetry";
 import type {
   GatewayBudget,
   GatewayBudgetLedgerStatus,
@@ -25,7 +27,6 @@ import type {
   GatewayBudgetWindow,
 } from "@prisma/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;

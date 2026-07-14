@@ -26,46 +26,46 @@
  * Wire format is snake_case JSON to match RFC 8628 + every other OAuth
  * library out there (incl. the Go CLI's keyring-backed client).
  */
-import type { Context } from "hono";
-import { randomBytes } from "node:crypto";
-import { z } from "zod";
 
-import { env } from "~/env.mjs";
-import { connection as redisConnection } from "~/server/redis";
-import { prisma } from "~/server/db";
-import { getServerAuthSession } from "~/server/auth";
-import { hasOrganizationPermission, hasProjectPermission } from "~/server/api/rbac";
-import type { Permission } from "~/server/api/rbac";
+import { randomBytes } from "node:crypto";
+import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
+import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
+import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
 import {
-  PersonalVirtualKeyService,
   NoEligibleProvidersError,
   PersonalVirtualKeyAlreadyExistsError,
+  PersonalVirtualKeyService,
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
-import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
-import { featureFlagService } from "~/server/featureFlag";
-import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
-import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
+import { createLogger } from "@langwatch/telemetry";
+import type { Context } from "hono";
+import { z } from "zod";
+import { env } from "~/env.mjs";
 import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
-import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import type { Permission } from "~/server/api/rbac";
+import { hasOrganizationPermission, hasProjectPermission } from "~/server/api/rbac";
 import {
   createServiceApp,
   handlerManagedAuth,
 } from "~/server/api/security";
+import { getServerAuthSession } from "~/server/auth";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
+import { prisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import { connection as redisConnection } from "~/server/redis";
 
 const logger = createLogger("langwatch:auth-cli");
 

@@ -12,13 +12,12 @@
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 
+import { createLogger } from "@langwatch/telemetry";
 import type { PrismaClient } from "@prisma/client";
 import { randomBytes } from "crypto";
-
 import { env } from "~/env.mjs";
 import { connection } from "~/server/redis";
 import { decrypt, encrypt } from "~/utils/encryption";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:langy:github-token");
 

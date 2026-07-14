@@ -19,7 +19,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 import { ScenarioRunStatus } from "./scenario-event.enums";
 import { STALL_THRESHOLD_MS } from "./stall-detection";
 

@@ -26,6 +26,7 @@
  * `not_breached` outcome from the analytics data.
  */
 
+import { createLogger } from "@langwatch/telemetry";
 import type { PrismaClient } from "@prisma/client";
 import type { ActionParams } from "~/pages/api/cron/triggers/types";
 import {
@@ -45,7 +46,6 @@ import {
 } from "~/server/event-sourcing/outbox/payload";
 import { featureFlagService as defaultFeatureFlagService } from "~/server/featureFlag";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
-import { createLogger } from "~/utils/logger/server";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
 import { parseSeriesIndex } from "./seriesName";
 import type { TriggerService } from "./trigger.service";

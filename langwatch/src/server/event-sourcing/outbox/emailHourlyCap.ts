@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/telemetry";
 import { connection } from "~/server/redis";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:outbox:emailHourlyCap");
 

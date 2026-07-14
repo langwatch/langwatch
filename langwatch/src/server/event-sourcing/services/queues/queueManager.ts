@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { Command, CommandHandler } from "../../commands/command";
@@ -17,8 +17,8 @@ import type {
 import { resolveDeduplicationStrategy } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import {
-  processCommand,
   type CommandHandlerOptions,
+  processCommand,
 } from "../commands/commandDispatcher";
 import { ConfigurationError, ValidationError } from "../errorHandling";
 

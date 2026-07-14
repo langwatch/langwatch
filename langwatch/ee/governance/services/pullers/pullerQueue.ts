@@ -1,9 +1,8 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { ConnectionOptions } from "bullmq";
-
 import { prisma } from "~/server/db";
 import { QueueWithFallback } from "~/server/queues/queueWithFallback";
 import { connection } from "~/server/redis";
-import { createLogger } from "~/utils/logger/server";
 
 import { type IngestionPullerJob, PULLER_QUEUE } from "./pullerWorker";
 

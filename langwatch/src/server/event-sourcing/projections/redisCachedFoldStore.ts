@@ -1,11 +1,11 @@
 import { performance } from "node:perf_hooks";
+import { createLogger } from "@langwatch/telemetry";
 import type { Redis } from "ioredis";
-import { createLogger } from "~/utils/logger/server";
 import {
+  incrementEsFoldCacheRedisError,
   incrementEsFoldCacheTotal,
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
-  incrementEsFoldCacheRedisError,
 } from "~/server/metrics";
 import type { FoldProjectionStore } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";

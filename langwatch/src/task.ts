@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/telemetry";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
-import { createLogger } from "./utils/logger/server";
 
 dotenv.config();
 

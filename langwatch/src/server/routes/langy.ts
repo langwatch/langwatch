@@ -18,6 +18,8 @@
  * `release_langy_enabled`, which is the lever for opening Langy beyond staff
  * (see the middleware below). Staff therefore bypass the flag entirely.
  */
+
+import { createLogger } from "@langwatch/telemetry";
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -31,10 +33,8 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-
 import { featureFlagService } from "~/server/featureFlag";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
-
 import {
   LANGY_GITHUB_PRS_PER_DAY,
   recordExtraLangyGithubPrs,
@@ -57,7 +57,6 @@ import {
 } from "~/server/services/langy/LangyMessageService";
 import { stripLangySentinels } from "~/server/services/langy/langySentinels";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
-import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:langy");

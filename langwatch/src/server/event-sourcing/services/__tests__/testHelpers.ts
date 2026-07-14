@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { Logger } from "@langwatch/telemetry";
 import { vi } from "vitest";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { EventType } from "../../domain/eventType";

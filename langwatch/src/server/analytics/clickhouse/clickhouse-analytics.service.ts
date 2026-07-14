@@ -6,8 +6,8 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/telemetry";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../utils/logger/server";
 import { currentVsPreviousDates } from "../../api/routers/analytics/common";
 import {
   getClickHouseClientForProject,

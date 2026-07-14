@@ -1,10 +1,8 @@
+import { createLogger } from "@langwatch/telemetry";
 import type { IncomingHttpHeaders } from "http";
-import type { GetServerSidePropsContext, NextApiRequest } from "~/types/next-stubs";
-import type { NextRequest } from "~/types/next-stubs";
-
 import { auth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
-import { createLogger } from "../utils/logger/server";
+import type { GetServerSidePropsContext, NextApiRequest, NextRequest } from "~/types/next-stubs";
 
 const logger = createLogger("langwatch:auth");
 

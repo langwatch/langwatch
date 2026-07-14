@@ -1,8 +1,8 @@
+import { createLogger } from "@langwatch/telemetry";
 import {
   getDejaViewProjections,
   getProjectionMetadata,
 } from "~/server/event-sourcing/pipelineRegistry";
-import { createLogger } from "~/utils/logger/server";
 import type {
   AggregateSearchResult,
   EventExplorerRepository,

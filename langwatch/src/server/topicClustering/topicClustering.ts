@@ -1,9 +1,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/telemetry";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { env } from "../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../utils/constants";
-import { createLogger } from "../../utils/logger/server";
 import {
   getProjectModelProviders,
   prepareLitellmParams,

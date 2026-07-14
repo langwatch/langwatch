@@ -1,11 +1,11 @@
-import { createLogger } from "../../../../../utils/logger/server";
+import { createLogger } from "@langwatch/telemetry";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type {
   ReactorContext,
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TraceProcessingEvent } from "../schemas/events";
 import type { ComputeExperimentRunMetricsCommandData } from "../../experiment-run-processing/schemas/commands";
+import type { TraceProcessingEvent } from "../schemas/events";
 
 const logger = createLogger(
   "langwatch:trace-processing:experiment-metrics-publisher",

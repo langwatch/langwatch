@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { createLogger } from "@langwatch/telemetry";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
@@ -7,7 +8,6 @@ import {
   eventSourcingStoreDurationHistogram,
   getEventSourcingEventsStoredCounter,
 } from "~/server/metrics";
-import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../domain/aggregateType";
 import { createTenantId } from "../domain/tenantId";
 import type { Event, Projection } from "../domain/types";

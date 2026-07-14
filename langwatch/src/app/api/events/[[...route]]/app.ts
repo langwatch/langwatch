@@ -1,8 +1,8 @@
+import { createLogger } from "@langwatch/telemetry";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import {
@@ -16,7 +16,6 @@ import {
   trackEventRESTParamsValidatorSchema,
 } from "~/server/tracer/types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 import { baseResponses } from "../../shared/base-responses";

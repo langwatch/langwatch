@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/telemetry";
 import type { Cluster, Redis } from "ioredis";
-
 import { connection as defaultRedisConnection } from "~/server/redis";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:cli-token-revocation");
 
