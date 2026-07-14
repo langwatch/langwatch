@@ -48,4 +48,12 @@ describe("mapSpanSummaryPage", () => {
       expect(page.nextCursor).toBeNull();
     });
   });
+
+  describe("when a repository breaks the hasMore-implies-rows invariant", () => {
+    it("fails loudly instead of silently truncating the walk with a null cursor", () => {
+      expect(() => mapSpanSummaryPage({ rows: [], hasMore: true })).toThrow(
+        /hasMore without any rows/,
+      );
+    });
+  });
 });

@@ -40,6 +40,7 @@ const getQueryData = vi.fn();
 const setQueryData = vi.fn();
 
 let treeData: SpanTreeNode[] | undefined;
+let treeIsPreviousData = false;
 let sseConnectionState = "connected";
 let traceQueryArgs = {
   isLive: true,
@@ -50,7 +51,11 @@ let traceQueryArgs = {
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: TreeQueryOptions) => {
     capturedTreeOptions.push(options);
-    return { data: treeData, isLoading: false };
+    return {
+      data: treeData,
+      isLoading: false,
+      isPreviousData: treeIsPreviousData,
+    };
   },
   useQueryClient: () => ({ getQueryData, setQueryData }),
 }));
@@ -114,6 +119,7 @@ describe("useSpanTree", () => {
     getQueryData.mockReset();
     setQueryData.mockReset();
     treeData = [node("a", 100)];
+    treeIsPreviousData = false;
     sseConnectionState = "connected";
     traceQueryArgs = {
       isLive: true,
@@ -176,6 +182,15 @@ describe("useSpanTree", () => {
 
     it("waits for the tree to load before polling (no high-water mark yet)", () => {
       treeData = undefined;
+
+      renderHook(() => useSpanTree());
+
+      expect(lastDeltaCall().options.enabled).toBe(false);
+    });
+
+    it("does not poll from a previous trace's tree while keepPreviousData bridges a trace switch", () => {
+      treeData = [node("a", 100)];
+      treeIsPreviousData = true;
 
       renderHook(() => useSpanTree());
 

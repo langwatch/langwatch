@@ -67,6 +67,15 @@ export async function fetchSpanTreePages({
   // mid-walk could land on two pages — deduping here keeps it a single
   // waterfall row (and a single React key).
   const nodesById = new Map<string, SpanTreeNode>();
+  // Pages arrive in (startTimeMs, spanId) order, and `Map.set` keeps an
+  // updated key at its original position — so the assembled tree only falls
+  // out of order when a later page re-emits a span (corrected start time).
+  // Track that case instead of unconditionally re-sorting per page.
+  let needsSort = false;
+  const materialize = () => {
+    const nodes = [...nodesById.values()];
+    return needsSort ? nodes.sort(bySpanTreeOrder) : nodes;
+  };
   // Vanilla-client queries, not `utils.….fetch`: the abort signal reaches
   // the in-flight HTTP request (closing the drawer cancels mid-page, not
   // just between pages), and no throwaway per-page React Query cache
@@ -95,12 +104,15 @@ export async function fetchSpanTreePages({
     if (signal?.aborted) {
       throw new DOMException("span tree fetch aborted", "AbortError");
     }
-    for (const node of page.nodes) nodesById.set(node.spanId, node);
+    for (const node of page.nodes) {
+      if (nodesById.has(node.spanId)) needsSort = true;
+      nodesById.set(node.spanId, node);
+    }
     if (!page.nextCursor) break;
     cursor = page.nextCursor;
-    onPage?.([...nodesById.values()]);
+    onPage?.(materialize());
   }
-  return [...nodesById.values()];
+  return materialize();
 }
 
 /**

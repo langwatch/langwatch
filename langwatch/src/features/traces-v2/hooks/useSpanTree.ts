@@ -48,7 +48,10 @@ export function useSpanTree() {
   // exists for. Trade-off: a span re-emitted with an *earlier* corrected
   // start time is invisible to the delta filter until SSE reconnects and
   // its invalidation re-walks the full tree.
-  const tree = treeQuery.data;
+  // `keepPreviousData` means `data` can briefly be the PREVIOUS trace's
+  // tree right after a trace switch — its high-water mark would make the
+  // delta poll skip this trace's spans, so wait for current data.
+  const tree = treeQuery.isPreviousData ? undefined : treeQuery.data;
   api.tracesV2.spanTreeDelta.useQuery(
     {
       ...queryArgs,

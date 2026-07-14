@@ -143,7 +143,7 @@ describe("fetchSpanTreePages", () => {
       });
     });
 
-    it("keeps a single row for a span that reappears on a later page", async () => {
+    it("keeps a single row, re-sorted to its corrected position, for a span that reappears on a later page", async () => {
       const { utils } = makeUtils([
         {
           nodes: [node("a", 1), node("b", 2)],
@@ -155,7 +155,7 @@ describe("fetchSpanTreePages", () => {
 
       const nodes = await fetchSpanTreePages({ utils, input });
 
-      expect(nodes.map((n) => n.spanId)).toEqual(["a", "b"]);
+      expect(nodes.map((n) => n.spanId)).toEqual(["b", "a"]);
       expect(nodes.find((n) => n.spanId === "a")?.startTimeMs).toBe(3);
     });
   });

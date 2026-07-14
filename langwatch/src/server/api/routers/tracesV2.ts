@@ -187,6 +187,14 @@ export function mapSpanSummaryPage(page: SpanSummaryPage): {
   nextCursor: SpanTreeCursor | null;
 } {
   const last = page.hasMore ? page.rows.at(-1) : undefined;
+  if (page.hasMore && !last) {
+    // A null cursor here would read as end-of-trace and silently drop every
+    // remaining span — fail loudly instead if a repository ever breaks the
+    // "hasMore implies rows" invariant.
+    throw new Error(
+      "span-summary page reported hasMore without any rows to key the cursor from",
+    );
+  }
   return {
     nodes: page.rows.map(mapSpanSummaryToTreeNode),
     nextCursor: last
