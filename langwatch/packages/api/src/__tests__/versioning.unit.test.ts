@@ -32,22 +32,22 @@ describe("resolveVersions", () => {
   describe("when a version is invalid or duplicated", () => {
     it("rejects invalid calendar dates", () => {
       expect(() =>
-        resolveVersions(
-          [{ version: "2025-02-30", endpoints: [makeEndpoint()] }],
-          [],
-        ),
+        resolveVersions({
+          definitions: [{ version: "2025-02-30", endpoints: [makeEndpoint()] }],
+          previewEndpoints: [],
+        }),
       ).toThrow(/Invalid API version/);
     });
 
     it("rejects duplicate version definitions", () => {
       expect(() =>
-        resolveVersions(
-          [
+        resolveVersions({
+          definitions: [
             { version: "2025-03-15", endpoints: [makeEndpoint()] },
             { version: "2025-03-15", endpoints: [makeEndpoint()] },
           ],
-          [],
-        ),
+          previewEndpoints: [],
+        }),
       ).toThrow(/registered more than once/);
     });
   });
@@ -58,7 +58,7 @@ describe("resolveVersions", () => {
         { version: "2025-03-15", endpoints: [makeEndpoint()] },
       ];
 
-      const result = resolveVersions(definitions, []);
+      const result = resolveVersions({ definitions, previewEndpoints: [] });
 
       expect(result.has("2025-03-15")).toBe(true);
       expect(result.has("latest")).toBe(true);
@@ -78,7 +78,7 @@ describe("resolveVersions", () => {
         { version: "2025-06-01", endpoints: [getDetails] },
       ];
 
-      const result = resolveVersions(definitions, []);
+      const result = resolveVersions({ definitions, previewEndpoints: [] });
 
       // v1 has 2 endpoints
       expect(result.get("2025-01-01")).toHaveLength(2);
@@ -109,7 +109,7 @@ describe("resolveVersions", () => {
         },
       ];
 
-      const result = resolveVersions(definitions, []);
+      const result = resolveVersions({ definitions, previewEndpoints: [] });
 
       // v1 has the original handler
       const v1Endpoints = result.get("2025-01-01")!;
@@ -144,7 +144,7 @@ describe("resolveVersions", () => {
         },
       ];
 
-      const result = resolveVersions(definitions, []);
+      const result = resolveVersions({ definitions, previewEndpoints: [] });
       const endpoints = result.get("2025-06-01")!;
 
       expect(endpoints).toHaveLength(1);
@@ -177,7 +177,7 @@ describe("resolveVersions", () => {
         },
       ];
 
-      const result = resolveVersions(definitions, []);
+      const result = resolveVersions({ definitions, previewEndpoints: [] });
 
       // v1 is active
       const v1Ep = result.get("2025-01-01")![0]!;
@@ -198,7 +198,7 @@ describe("resolveVersions", () => {
         makeEndpoint({ method: "post", path: "/beta" }),
       ];
 
-      const result = resolveVersions(definitions, previewEndpoints);
+      const result = resolveVersions({ definitions, previewEndpoints });
 
       expect(result.has("preview")).toBe(true);
       expect(result.get("preview")).toHaveLength(1);
@@ -212,7 +212,7 @@ describe("resolveVersions", () => {
         makeEndpoint({ method: "post", path: "/beta" }),
       ];
 
-      const result = resolveVersions(definitions, previewEndpoints);
+      const result = resolveVersions({ definitions, previewEndpoints });
 
       const latest = result.get("latest")!;
       const preview = result.get("preview")!;
@@ -229,7 +229,7 @@ describe("resolveVersions", () => {
         makeEndpoint({ method: "sse", path: "/stream" }),
       ];
 
-      const result = resolveVersions([], previewEndpoints);
+      const result = resolveVersions({ definitions: [], previewEndpoints });
 
       expect(result.get("preview")).toHaveLength(1);
       expect(result.get("preview")?.[0]?.method).toBe("sse");
@@ -245,7 +245,7 @@ describe("resolveVersions", () => {
         }),
       ];
 
-      const result = resolveVersions([], previewEndpoints);
+      const result = resolveVersions({ definitions: [], previewEndpoints });
 
       expect(result.get("preview")).toEqual([
         expect.objectContaining({ path: "/beta", withdrawn: true }),
@@ -264,7 +264,7 @@ describe("resolveVersions", () => {
         { version: "2025-01-01", endpoints: [makeEndpoint()] },
       ];
 
-      const result = resolveVersions(definitions, []);
+      const result = resolveVersions({ definitions, previewEndpoints: [] });
 
       // Latest should be v2
       const latestEp = result.get("latest")![0]!;
@@ -298,11 +298,14 @@ describe("resolveRequestVersion", () => {
     },
   ];
   const previewEndpoints = [makeEndpoint({ method: "get", path: "/beta" })];
-  const versionMap = resolveVersions(definitions, previewEndpoints);
+  const versionMap = resolveVersions({ definitions, previewEndpoints });
 
   describe("when an exact dated version is requested", () => {
     it("returns the version with stable status", () => {
-      const result = resolveRequestVersion(versionMap, "2025-01-01");
+      const result = resolveRequestVersion({
+        versionMap,
+        requestVersion: "2025-01-01",
+      });
       expect(result.found).toBe(true);
       if (result.found) {
         expect(result.version).toBe("2025-01-01");
@@ -313,7 +316,10 @@ describe("resolveRequestVersion", () => {
 
   describe("when latest is requested", () => {
     it("returns the newest dated version with latest status", () => {
-      const result = resolveRequestVersion(versionMap, "latest");
+      const result = resolveRequestVersion({
+        versionMap,
+        requestVersion: "latest",
+      });
       expect(result.found).toBe(true);
       if (result.found) {
         expect(result.version).toBe("latest");
@@ -326,7 +332,10 @@ describe("resolveRequestVersion", () => {
 
   describe("when preview is requested", () => {
     it("returns preview endpoints with preview status", () => {
-      const result = resolveRequestVersion(versionMap, "preview");
+      const result = resolveRequestVersion({
+        versionMap,
+        requestVersion: "preview",
+      });
       expect(result.found).toBe(true);
       if (result.found) {
         expect(result.version).toBe("preview");
@@ -337,7 +346,10 @@ describe("resolveRequestVersion", () => {
 
   describe("when no version is provided (bare path)", () => {
     it("returns latest with unversioned status", () => {
-      const result = resolveRequestVersion(versionMap, undefined);
+      const result = resolveRequestVersion({
+        versionMap,
+        requestVersion: undefined,
+      });
       expect(result.found).toBe(true);
       if (result.found) {
         expect(result.status).toBe("unversioned");
@@ -347,14 +359,20 @@ describe("resolveRequestVersion", () => {
 
   describe("when an unknown version is requested", () => {
     it("returns not found", () => {
-      const result = resolveRequestVersion(versionMap, "2099-01-01");
+      const result = resolveRequestVersion({
+        versionMap,
+        requestVersion: "2099-01-01",
+      });
       expect(result.found).toBe(false);
     });
   });
 
   describe("when a non-date string is requested", () => {
     it("returns not found", () => {
-      const result = resolveRequestVersion(versionMap, "v1");
+      const result = resolveRequestVersion({
+        versionMap,
+        requestVersion: "v1",
+      });
       expect(result.found).toBe(false);
     });
   });

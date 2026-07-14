@@ -36,18 +36,27 @@ export type ResolvedEndpoint =
     };
 
 /** A composite key for de-duplicating endpoints within a version. */
-function endpointKey(method: string, path: string): string {
+function endpointKey({
+  method,
+  path,
+}: {
+  method: string;
+  path: string;
+}): string {
   const normalized = method === "sse" ? "get" : method;
   const normalizedPath = path === "" ? "/" : path;
   return `${normalized}:${normalizedPath}`;
 }
 
-function applyRegistrations(
-  target: Map<string, ResolvedEndpoint>,
-  endpoints: EndpointRegistration[],
-): void {
+function applyRegistrations({
+  target,
+  endpoints,
+}: {
+  target: Map<string, ResolvedEndpoint>;
+  endpoints: EndpointRegistration[];
+}): void {
   for (const ep of endpoints) {
-    const key = endpointKey(ep.method, ep.path);
+    const key = endpointKey({ method: ep.method, path: ep.path });
     if (ep.withdrawn) {
       const inherited = target.get(key);
       target.set(key, {
@@ -79,10 +88,13 @@ function applyRegistrations(
  *
  * @returns A map from version label to its resolved endpoint array.
  */
-export function resolveVersions(
-  definitions: VersionDefinition[],
-  previewEndpoints: EndpointRegistration[],
-): Map<string, ResolvedEndpoint[]> {
+export function resolveVersions({
+  definitions,
+  previewEndpoints,
+}: {
+  definitions: VersionDefinition[];
+  previewEndpoints: EndpointRegistration[];
+}): Map<string, ResolvedEndpoint[]> {
   const seenVersions = new Set<string>();
   for (const definition of definitions) {
     if (!isDateVersion(definition.version)) {
@@ -108,7 +120,7 @@ export function resolveVersions(
   for (const def of dated) {
     // Start with a copy of the previous version
     const currentMap = new Map(previousMap);
-    applyRegistrations(currentMap, def.endpoints);
+    applyRegistrations({ target: currentMap, endpoints: def.endpoints });
 
     result.set(def.version, Array.from(currentMap.values()));
     previousMap = currentMap;
@@ -124,7 +136,7 @@ export function resolveVersions(
   // `preview` endpoints are separate
   if (previewEndpoints.length > 0) {
     const previewMap = new Map<string, ResolvedEndpoint>();
-    applyRegistrations(previewMap, previewEndpoints);
+    applyRegistrations({ target: previewMap, endpoints: previewEndpoints });
     result.set(VERSION_PREVIEW, Array.from(previewMap.values()));
   }
 
@@ -153,10 +165,13 @@ export type ResolvedVersion =
  * - `undefined` (bare path, no version segment) -- resolves to latest, status `"unversioned"`.
  * - Anything else -- `{ found: false }`.
  */
-export function resolveRequestVersion(
-  versionMap: Map<string, ResolvedEndpoint[]>,
-  requestVersion: string | undefined,
-): ResolvedVersion {
+export function resolveRequestVersion({
+  versionMap,
+  requestVersion,
+}: {
+  versionMap: Map<string, ResolvedEndpoint[]>;
+  requestVersion: string | undefined;
+}): ResolvedVersion {
   if (requestVersion === undefined) {
     // Bare path -- alias for latest
     const latest = versionMap.get(VERSION_LATEST);

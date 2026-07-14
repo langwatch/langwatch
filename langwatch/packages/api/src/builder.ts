@@ -123,7 +123,10 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
       onError,
       providers: this._providers,
       serviceConfig: this._config,
-      versionMap: resolveVersions(this._versions, this._previewEndpoints),
+      versionMap: resolveVersions({
+        definitions: this._versions,
+        previewEndpoints: this._previewEndpoints,
+      }),
     });
     app.onError(onError);
     return app;
