@@ -34,7 +34,7 @@ describe("trace sharing page contracts", () => {
   /** @scenario An existing pre-migration share URL still resolves */
   it("backfills legacy ids as the new secret tokens", () => {
     const migration = readSource(
-      "../../../../prisma/migrations/20260711000001_rename_public_share_to_share_link/migration.sql",
+      "../../../../prisma/migrations/20260712000001_rename_public_share_to_share_link/migration.sql",
     );
 
     expect(migration).toContain(
