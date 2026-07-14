@@ -76,8 +76,13 @@ const logger = createLogger("langwatch:evaluations:inputs-offload");
  * that every existing `JSON.stringify(inputs)` / `JSON.parse(Inputs)` seam
  * keeps working; consumers that don't resolve it simply see an object with
  * one reserved key.
+ *
+ * A type alias (not an interface) on purpose: aliases get an implicit index
+ * signature, so a value narrowed by {@link isStoredObjectMarker} is directly
+ * assignable to the `Record<string, unknown>` seams it flows through - no
+ * cast at the call sites.
  */
-export interface StoredObjectInputsMarker {
+export type StoredObjectInputsMarker = {
   [STORED_OBJECT_MARKER_KEY]: {
     /** stored_objects id - resolve via StoredObjectsService.getById. */
     id: string;
@@ -104,7 +109,7 @@ export interface StoredObjectInputsMarker {
      */
     offloadFailed?: boolean;
   };
-}
+};
 
 /** Type guard: is this value an offload marker (not plain inputs)? */
 export function isStoredObjectMarker(
@@ -118,6 +123,57 @@ export function isStoredObjectMarker(
       "object" &&
     (value as Record<string, unknown>)[STORED_OBJECT_MARKER_KEY] !== null
   );
+}
+
+const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
+
+/** A lowercase 64-hex SHA-256, the only hash shape the write path produces. */
+function isWellFormedSha256(value: unknown): value is string {
+  return typeof value === "string" && SHA256_HEX_RE.test(value);
+}
+
+/** Reserved key carrying the compact, safe list projection of a marker. */
+export const OFFLOADED_INPUTS_PROJECTION_KEY = "_lw_offloaded" as const;
+
+/**
+ * Compact, safe projection of an offload marker for multi-trace / list reads.
+ * It exposes only the human-readable preview and whether it is truncated -
+ * never the internal storage plumbing (`id`, `sha256`, the raw marker key).
+ * List consumers cannot resolve the full inputs; they fetch those lazily
+ * through the single-evaluation seam (getEvaluationInputs) when needed.
+ *
+ * A type alias (not an interface) for the same reason as
+ * {@link StoredObjectInputsMarker}: aliases get an implicit index signature,
+ * so the projection is assignable to `Record<string, unknown>` at the service
+ * read boundaries.
+ */
+export type OffloadedInputsProjection = {
+  [OFFLOADED_INPUTS_PROJECTION_KEY]: {
+    /** First EVAL_INPUTS_PREVIEW_BYTES of the serialized inputs, as a string. */
+    preview: string;
+    /** True when `preview` is a prefix of longer inputs (always true here). */
+    truncated: boolean;
+    /** Byte length of the serialized inputs that were offloaded. */
+    sizeBytes: number;
+  };
+};
+
+/**
+ * Projects an offload marker to the compact, leak-free shape safe to ship on
+ * list/multi-trace read paths. Drops `id` and `sha256` so no internal storage
+ * reference ever crosses the service boundary on those paths.
+ */
+export function projectMarkerForList(
+  value: StoredObjectInputsMarker,
+): OffloadedInputsProjection {
+  const marker = value[STORED_OBJECT_MARKER_KEY];
+  return {
+    [OFFLOADED_INPUTS_PROJECTION_KEY]: {
+      preview: marker.preview,
+      truncated: marker.truncatedPreview,
+      sizeBytes: marker.sizeBytes,
+    },
+  };
 }
 
 function readByteEnv(name: string, fallback: number): number {
@@ -392,6 +448,20 @@ export async function resolveInputsMarker({
     return inputs;
   }
 
+  // Integrity: a resolvable marker must carry the exact content hash recorded
+  // at offload time (the write path always stores one alongside a non-empty
+  // id). A marker-shaped input with a missing or malformed hash could name any
+  // same-project object and have its bytes surfaced without proof they are the
+  // offloaded content, so the hash requirement cannot depend on the marker
+  // volunteering one. Fail safe to the marker/preview without fetching.
+  if (!isWellFormedSha256(marker.sha256)) {
+    logger.warn(
+      { projectId, storedObjectId: marker.id },
+      "Offloaded evaluation inputs marker lacks a well-formed sha256; returning marker with preview",
+    );
+    return inputs;
+  }
+
   try {
     const result = await storedObjects.getById({ projectId, id: marker.id });
     if (!result || !("stream" in result)) {
@@ -401,12 +471,39 @@ export async function resolveInputsMarker({
       );
       return inputs;
     }
+    // Integrity: the fetched row must be an evaluation-inputs object. A marker
+    // pointing (via a same-project id) at an object of another purpose is a
+    // misreference; surfacing its bytes would leak unrelated content, so fail
+    // safe to the marker/preview instead. Cross-tenant is already blocked by
+    // the project_id scoping on getById.
+    if (result.row.purpose !== EVAL_INPUTS_STORED_OBJECT_PURPOSE) {
+      logger.warn(
+        {
+          projectId,
+          storedObjectId: marker.id,
+          purpose: result.row.purpose,
+        },
+        "Offloaded evaluation inputs object has an unexpected purpose; returning marker with preview",
+      );
+      return inputs;
+    }
     // Bound the read: the object we wrote is at most the hard ceiling, so a
     // stream beyond it is a tampered/unexpected object and must not OOM.
     const buffer = await streamToBuffer(
       result.stream,
       EVAL_INPUTS_HARD_CEILING_BYTES,
     );
+    // Integrity: the fetched bytes must hash to the marker's content hash. A
+    // mismatch means the durable object diverged from what was offloaded
+    // (overwrite, corruption); fail safe to the marker/preview.
+    const actualSha256 = createHash("sha256").update(buffer).digest("hex");
+    if (actualSha256 !== marker.sha256) {
+      logger.warn(
+        { projectId, storedObjectId: marker.id },
+        "Offloaded evaluation inputs failed sha256 verification; returning marker with preview",
+      );
+      return inputs;
+    }
     const parsed: unknown = JSON.parse(buffer.toString("utf8"));
     if (
       typeof parsed === "object" &&

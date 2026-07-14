@@ -88,26 +88,35 @@ describe.skipIf(!hasTestcontainers)(
 
     const strikesKey = (name: string, groupId: string) =>
       `${name}:gq:group:${groupId}:strikes`;
+    const isolatingKey = (name: string, groupId: string) =>
+      `${name}:gq:group:${groupId}:isolating`;
     const blockedMembers = (name: string) =>
       redis.smembers(`${name}:gq:blocked`);
     const storedError = (name: string, groupId: string) =>
       redis.hget(`${name}:gq:group:${groupId}:error`, "message");
 
-    describe("given a group at the claim-strike threshold", () => {
+    /**
+     * Seeds the death-in-isolation signature: the marker a prior isolation run
+     * wrote (awaited) for a specific staged job before the process died
+     * without reaching its clear. `queue.send` stages a payload under its
+     * `id`, so the default matches the job the tests send next.
+     */
+    const seedIsolationDeath = (
+      name: string,
+      groupId: string,
+      stagedJobId = "job-1",
+    ) => redis.set(isolatingKey(name, groupId), stagedJobId);
+
+    describe("given a group whose isolation marker survived a worker death", () => {
       describe("when a worker claims the group again", () => {
-        /** @scenario a group whose jobs repeatedly kill the worker is parked at claim */
+        /** @scenario a group that dies during an isolation run is parked at its next claim */
         it("parks the group into the blocked set before decoding", async () => {
           const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
           processed.mockResolvedValue(undefined);
           const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
-          // Strikes left behind by prior claims whose process died before the
-          // clear could run - the crash-loop signature this guard detects.
-          await redis.set(
-            strikesKey(name, "poisoned"),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          await seedIsolationDeath(name, "poisoned");
 
           await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
 
@@ -121,24 +130,21 @@ describe.skipIf(!hasTestcontainers)(
           expect(processed).not.toHaveBeenCalled();
           const error = await storedError(name, "poisoned");
           expect(error).toContain("Poison guard");
-          expect(error).toContain("consecutive worker deaths");
+          expect(error).toContain("running in isolation");
           // The job is re-staged for inspection, not dropped.
           expect(
             await redis.zcard(`${name}:gq:group:poisoned:jobs`),
           ).toBeGreaterThan(0);
         });
 
-        /** @scenario a group whose jobs repeatedly kill the worker is parked at claim */
+        /** @scenario a group that dies during an isolation run is parked at its next claim */
         it("keeps dispatching other groups normally", async () => {
           const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
           processed.mockResolvedValue(undefined);
           const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
-          await redis.set(
-            strikesKey(name, "poisoned"),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          await seedIsolationDeath(name, "poisoned");
 
           await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
           await queue.send({ id: "job-2", groupId: "healthy", value: "y" });
@@ -152,6 +158,147 @@ describe.skipIf(!hasTestcontainers)(
           );
 
           expect(processed.mock.calls[0]![0].groupId).toBe("healthy");
+        });
+      });
+    });
+
+    describe("given a stale isolation marker naming a job that already completed", () => {
+      describe("when the group's next job is claimed", () => {
+        /** @scenario a marker from a completed isolation run cannot park the group's next job */
+        it("runs the job instead of parking and discards the stale marker", async () => {
+          // The post-completion crash window: the isolated job COMPLETED
+          // queue-side, then the process died before the marker clear (e.g.
+          // during blob release). The surviving marker names the completed
+          // job - not the group's next job - and must not condemn it.
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          await seedIsolationDeath(name, "recovered", "job-done");
+
+          await queue.send({ id: "job-next", groupId: "recovered", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(processed.mock.calls[0]![0].id).toBe("job-next");
+          expect(await blockedMembers(name)).not.toContain("recovered");
+          // The mismatching marker is discarded at claim time, atomically
+          // with the read - not left to linger until its TTL.
+          expect(await redis.get(isolatingKey(name, "recovered"))).toBeNull();
+        });
+      });
+    });
+
+    describe("given a group whose claim strikes exceed the poison threshold", () => {
+      describe("when a worker claims the group", () => {
+        /** @scenario a suspect group is run in isolation instead of being parked on strikes alone */
+        it("runs the job in isolation and does not park the group", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          // Strikes left behind by prior claims whose process died before the
+          // clear could run - a signature every co-in-flight bystander of a
+          // crash shares, so it selects for isolation, never parks directly.
+          await redis.set(
+            strikesKey(name, "suspect"),
+            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
+          );
+
+          await queue.send({ id: "job-1", groupId: "suspect", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(processed.mock.calls[0]![0].groupId).toBe("suspect");
+          expect(await blockedMembers(name)).not.toContain("suspect");
+        });
+
+        /** @scenario a bystander that inherited strikes from another group's crashes heals */
+        it("clears the strikes and the isolation marker after the solo run", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          await redis.set(
+            strikesKey(name, "bystander"),
+            String(DEFAULT_CLAIM_STRIKE_THRESHOLD + 2),
+          );
+
+          await queue.send({ id: "job-1", groupId: "bystander", value: "x" });
+
+          await vi.waitFor(
+            async () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+              expect(await redis.get(strikesKey(name, "bystander"))).toBeNull();
+              expect(
+                await redis.get(isolatingKey(name, "bystander")),
+              ).toBeNull();
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(await blockedMembers(name)).not.toContain("bystander");
+        });
+      });
+    });
+
+    describe("given two groups whose claim strikes exceed the poison threshold", () => {
+      describe("when the worker claims both", () => {
+        /** @scenario a second suspect defers while an isolation run is active */
+        it("processes both without parking either", async () => {
+          // Both suspects race for the single per-process isolation slot: the
+          // loser re-stages with backoff (a /iw/ deferral, not an /r/ retry)
+          // and takes its own solo run afterwards. Neither may park.
+          let release: () => void = () => void 0;
+          const firstRunGate = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockImplementation(async (payload) => {
+            if (payload.groupId === "suspect-a") await firstRunGate;
+          });
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          await redis.set(
+            strikesKey(name, "suspect-a"),
+            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
+          );
+          await redis.set(
+            strikesKey(name, "suspect-b"),
+            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
+          );
+
+          await queue.send({ id: "job-a", groupId: "suspect-a", value: "x" });
+          await queue.send({ id: "job-b", groupId: "suspect-b", value: "y" });
+
+          // Let the first suspect hold the isolation slot long enough for the
+          // second to observe it and defer, then release.
+          setTimeout(release, 500);
+
+          await vi.waitFor(
+            async () => {
+              expect(
+                processed.mock.calls.map((c) => c[0].groupId).sort(),
+              ).toEqual(["suspect-a", "suspect-b"]);
+              expect(await redis.get(strikesKey(name, "suspect-a"))).toBeNull();
+              expect(await redis.get(strikesKey(name, "suspect-b"))).toBeNull();
+            },
+            { timeout: 10000, interval: 100 },
+          );
+          const blocked = await blockedMembers(name);
+          expect(blocked).not.toContain("suspect-a");
+          expect(blocked).not.toContain("suspect-b");
         });
       });
     });
@@ -391,6 +538,7 @@ describe.skipIf(!hasTestcontainers)(
           const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
+          await seedIsolationDeath(name, "poisoned");
           await redis.set(
             strikesKey(name, "poisoned"),
             String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
@@ -411,6 +559,7 @@ describe.skipIf(!hasTestcontainers)(
           });
           expect(wasBlocked).toBe(true);
           expect(await redis.get(strikesKey(name, "poisoned"))).toBeNull();
+          expect(await redis.get(isolatingKey(name, "poisoned"))).toBeNull();
 
           await vi.waitFor(
             () => {
@@ -430,6 +579,7 @@ describe.skipIf(!hasTestcontainers)(
           const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
+          await seedIsolationDeath(name, "poisoned");
           await redis.set(
             strikesKey(name, "poisoned"),
             String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
@@ -450,6 +600,7 @@ describe.skipIf(!hasTestcontainers)(
           });
           expect(jobsRemoved).toBeGreaterThan(0);
           expect(await redis.get(strikesKey(name, "poisoned"))).toBeNull();
+          expect(await redis.get(isolatingKey(name, "poisoned"))).toBeNull();
           expect(await blockedMembers(name)).not.toContain("poisoned");
 
           // A new job under the same group id gets a fresh run instead of
@@ -474,6 +625,7 @@ describe.skipIf(!hasTestcontainers)(
           const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
+          await seedIsolationDeath(name, "poisoned");
           await redis.set(
             strikesKey(name, "poisoned"),
             String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
@@ -494,6 +646,7 @@ describe.skipIf(!hasTestcontainers)(
           });
           expect(jobsMoved).toBeGreaterThan(0);
           expect(await redis.get(strikesKey(name, "poisoned"))).toBeNull();
+          expect(await redis.get(isolatingKey(name, "poisoned"))).toBeNull();
           expect(await blockedMembers(name)).not.toContain("poisoned");
 
           await queue.send({ id: "job-2", groupId: "poisoned", value: "y" });

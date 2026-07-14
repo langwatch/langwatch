@@ -28,6 +28,7 @@ const metricNames = [
   "gq_envelope_gq2_downgrade_total",
   "gq_payload_too_large_total",
   "gq_groups_poison_parked_total",
+  "gq_poison_isolation_runs_total",
   "gq_retry_encode_failures_total",
 ] as const;
 
@@ -199,13 +200,32 @@ export const gqPayloadTooLargeTotal = new Counter({
 /**
  * Claim-side poison guard parked a group into the blocked set
  * (specs/event-sourcing/poison-group-park-guard.feature). reason:
- * "claim_strikes" = consecutive worker deaths while the group was in flight;
- * "oversized_payload" = staged value over the decode cap.
+ * "died_in_isolation" = the process died while this group's job ran solo
+ * behind an isolation marker (the only strike-driven park; strikes alone
+ * never park); "oversized_payload" = staged value over the decode cap.
+ * Alert on spikes: every park is a tenant's group stalled until an operator
+ * acts.
  */
 export const gqGroupsPoisonParkedTotal = new Counter({
   name: "gq_groups_poison_parked_total",
   help: "Groups parked into the blocked set by the claim-side poison guard",
   labelNames: ["queue_name", "reason"] as const,
+});
+
+/**
+ * Poison-guard isolation runs: a suspect group (claim strikes over the
+ * threshold) executed while the worker quiesced all other work.
+ * Outcomes: `cleared` (survived solo → innocent bystander healed),
+ * `unattributed` (quiesce or marker write failed, ran without a marker so a
+ * death could not be pinned on it), `deferred` (another isolation was in
+ * progress; re-staged for a later solo run). A death during a marked
+ * isolation run is observed on the NEXT claim as a park
+ * (`gq_groups_poison_parked_total{reason="died_in_isolation"}`).
+ */
+export const gqPoisonIsolationRunsTotal = new Counter({
+  name: "gq_poison_isolation_runs_total",
+  help: "Suspect-group isolation runs by the claim-side poison guard",
+  labelNames: ["queue_name", "outcome"] as const,
 });
 
 /**

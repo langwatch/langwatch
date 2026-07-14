@@ -396,10 +396,14 @@ export function registerTracesRoutes(
       // lookup all key off the real trace ID.
       const resolvedTraceId = trace.trace_id;
 
+      // Single-trace read: resolve offloaded-inputs markers (ADR-040) to the
+      // full inputs for parity with pre-offload behavior. Bounded - one
+      // trace's evaluations, each capped at the hard ceiling.
       const evaluationsMap = await traceService.getEvaluationsMultiple(
         project.id,
         [resolvedTraceId],
         protections,
+        { shouldResolveOffloadedInputs: true },
       );
       const evaluations = evaluationsMap[resolvedTraceId] ?? [];
 

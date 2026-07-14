@@ -38,10 +38,11 @@ local activeKey  = KEYS[2]
 local jobsKey    = KEYS[3]
 local readyKey   = KEYS[4]
 local signalKey  = KEYS[5]
-local errorKey   = KEYS[6]
-local strikesKey = KEYS[7]
-local groupId    = ARGV[1]
-local nowMs      = tonumber(ARGV[2])
+local errorKey     = KEYS[6]
+local strikesKey   = KEYS[7]
+local isolatingKey = KEYS[8]
+local groupId      = ARGV[1]
+local nowMs        = tonumber(ARGV[2])
 
 local wasBlocked = redis.call("SREM", blockedKey, groupId)
 
@@ -49,9 +50,11 @@ if wasBlocked > 0 then
   redis.call("DEL", activeKey)
   redis.call("DEL", errorKey)
   -- Unblocking is an operator's "try again": reset the poison guard's claim
-  -- strikes so the group gets a fresh run instead of re-parking on the next
-  -- claim (specs/event-sourcing/poison-group-park-guard.feature).
+  -- strikes and isolation-death marker so the group gets a fresh run instead
+  -- of re-parking on the next claim
+  -- (specs/event-sourcing/poison-group-park-guard.feature).
   redis.call("DEL", strikesKey)
+  redis.call("DEL", isolatingKey)
 
   local pendingCount = redis.call("ZCARD", jobsKey)
   if pendingCount > 0 then
@@ -87,6 +90,7 @@ local signalKey       = KEYS[6]
 local errorKey        = KEYS[7]
 local totalPendingKey = KEYS[8]
 local strikesKey      = KEYS[9]
+local isolatingKey    = KEYS[10]
 local groupId         = ARGV[1]
 
 -- Total dropped = staged jobs (ZCARD) only. Previously this also counted
@@ -103,10 +107,11 @@ redis.call("DEL", dataKey)
 redis.call("DEL", activeKey)
 redis.call("DEL", errorKey)
 -- Draining empties the group for a fresh start: clear the poison guard's
--- claim strikes too, or a re-created group with the same id would park on
--- its first claim within the strike TTL
+-- claim strikes and isolation-death marker too, or a re-created group with
+-- the same id would park on its first claim within the strike TTL
 -- (specs/event-sourcing/poison-group-park-guard.feature).
 redis.call("DEL", strikesKey)
+redis.call("DEL", isolatingKey)
 redis.call("ZREM", readyKey, groupId)
 redis.call("SREM", blockedKey, groupId)
 redis.call("LPUSH", signalKey, "1")
@@ -132,6 +137,7 @@ local dstDataKey   = KEYS[9]
 local dstErrorKey  = KEYS[10]
 local dlqIndexKey  = KEYS[11]
 local strikesKey   = KEYS[12]
+local isolatingKey = KEYS[13]
 local groupId      = ARGV[1]
 local ttl          = tonumber(ARGV[2])
 
@@ -166,9 +172,11 @@ redis.call("DEL", srcDataKey)
 redis.call("DEL", activeKey)
 redis.call("DEL", srcErrorKey)
 -- Moving to the DLQ empties the live group just like a drain: clear the
--- poison guard's claim strikes so a re-created group with the same id gets
--- a fresh run instead of parking on its first claim within the strike TTL.
+-- poison guard's claim strikes and isolation-death marker so a re-created
+-- group with the same id gets a fresh run instead of parking on its first
+-- claim within the strike TTL.
 redis.call("DEL", strikesKey)
+redis.call("DEL", isolatingKey)
 redis.call("ZREM", readyKey, groupId)
 redis.call("SREM", blockedKey, groupId)
 redis.call("LPUSH", signalKey, "1")
@@ -717,7 +725,7 @@ export class QueueRedisRepository implements QueueRepository {
     const prefix = `${params.queueName}:gq:`;
     const result = await this.redis.eval(
       UNBLOCK_LUA,
-      7,
+      8,
       `${prefix}blocked`,
       `${prefix}group:${params.groupId}:active`,
       `${prefix}group:${params.groupId}:jobs`,
@@ -725,6 +733,7 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}signal`,
       `${prefix}group:${params.groupId}:error`,
       `${prefix}group:${params.groupId}:strikes`,
+      `${prefix}group:${params.groupId}:isolating`,
       params.groupId,
       String(Date.now()),
     );
@@ -754,7 +763,7 @@ export class QueueRedisRepository implements QueueRepository {
       for (const groupId of members) {
         pipeline.eval(
           UNBLOCK_LUA,
-          7,
+          8,
           `${prefix}blocked`,
           `${prefix}group:${groupId}:active`,
           `${prefix}group:${groupId}:jobs`,
@@ -762,6 +771,7 @@ export class QueueRedisRepository implements QueueRepository {
           `${prefix}signal`,
           `${prefix}group:${groupId}:error`,
           `${prefix}group:${groupId}:strikes`,
+          `${prefix}group:${groupId}:isolating`,
           groupId,
           String(Date.now()),
         );
@@ -784,7 +794,7 @@ export class QueueRedisRepository implements QueueRepository {
     const prefix = `${params.queueName}:gq:`;
     const result = await this.redis.eval(
       DRAIN_GROUP_LUA,
-      9,
+      10,
       `${prefix}group:${params.groupId}:jobs`,
       `${prefix}group:${params.groupId}:data`,
       `${prefix}group:${params.groupId}:active`,
@@ -794,6 +804,7 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}group:${params.groupId}:error`,
       `${prefix}stats:total-pending`,
       `${prefix}group:${params.groupId}:strikes`,
+      `${prefix}group:${params.groupId}:isolating`,
       params.groupId,
     );
     return { jobsRemoved: Number(result) };
@@ -935,7 +946,7 @@ export class QueueRedisRepository implements QueueRepository {
       for (const groupId of matched) {
         pipeline.eval(
           DRAIN_GROUP_LUA,
-          9,
+          10,
           `${prefix}group:${groupId}:jobs`,
           `${prefix}group:${groupId}:data`,
           `${prefix}group:${groupId}:active`,
@@ -945,6 +956,7 @@ export class QueueRedisRepository implements QueueRepository {
           `${prefix}group:${groupId}:error`,
           totalPendingKey,
           `${prefix}group:${groupId}:strikes`,
+          `${prefix}group:${groupId}:isolating`,
           groupId,
         );
       }
@@ -969,7 +981,7 @@ export class QueueRedisRepository implements QueueRepository {
     const prefix = `${params.queueName}:gq:`;
     const result = await this.redis.eval(
       MOVE_TO_DLQ_LUA,
-      12,
+      13,
       `${prefix}group:${params.groupId}:jobs`,
       `${prefix}group:${params.groupId}:data`,
       `${prefix}group:${params.groupId}:active`,
@@ -982,6 +994,7 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}dlq:${params.groupId}:error`,
       `${prefix}dlq`,
       `${prefix}group:${params.groupId}:strikes`,
+      `${prefix}group:${params.groupId}:isolating`,
       params.groupId,
       String(DLQ_TTL_SECONDS),
     );
@@ -1026,7 +1039,7 @@ export class QueueRedisRepository implements QueueRepository {
       for (const groupId of groupsToMove) {
         pipeline.eval(
           MOVE_TO_DLQ_LUA,
-          12,
+          13,
           `${prefix}group:${groupId}:jobs`,
           `${prefix}group:${groupId}:data`,
           `${prefix}group:${groupId}:active`,
@@ -1039,6 +1052,7 @@ export class QueueRedisRepository implements QueueRepository {
           `${prefix}dlq:${groupId}:error`,
           `${prefix}dlq`,
           `${prefix}group:${groupId}:strikes`,
+          `${prefix}group:${groupId}:isolating`,
           groupId,
           String(DLQ_TTL_SECONDS),
         );
@@ -1251,7 +1265,7 @@ export class QueueRedisRepository implements QueueRepository {
     for (const groupId of groupsToUnblock) {
       unblockPipeline.eval(
         UNBLOCK_LUA,
-        7,
+        8,
         `${prefix}blocked`,
         `${prefix}group:${groupId}:active`,
         `${prefix}group:${groupId}:jobs`,
@@ -1259,6 +1273,7 @@ export class QueueRedisRepository implements QueueRepository {
         `${prefix}signal`,
         `${prefix}group:${groupId}:error`,
         `${prefix}group:${groupId}:strikes`,
+          `${prefix}group:${groupId}:isolating`,
         groupId,
         String(Date.now()),
       );

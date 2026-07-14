@@ -398,6 +398,7 @@ export class TraceService {
     projectId: string,
     traceIds: string[],
     protections: Protections,
+    options?: { shouldResolveOffloadedInputs?: boolean },
   ): Promise<Record<string, Evaluation[]>> {
     return this.tracer.withActiveSpan(
       "TraceService.getEvaluationsMultiple",
@@ -409,6 +410,7 @@ export class TraceService {
           projectId,
           traceIds,
           protections,
+          shouldResolveOffloadedInputs: options?.shouldResolveOffloadedInputs,
         });
 
         return mapTraceEvaluationsToLegacyEvaluations(result);

@@ -52,6 +52,7 @@ import {
 import {
   gqGroupsBlockedTotal,
   gqGroupsPoisonParkedTotal,
+  gqPoisonIsolationRunsTotal,
   gqJobDelayMilliseconds,
   gqJobDurationMilliseconds,
   gqJobsCompletedTotal,
@@ -97,6 +98,25 @@ const GROUP_QUEUE_CONFIG = {
 
 /** Default TTL for deduplication in milliseconds */
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
+
+/**
+ * Poison-guard isolation (specs/event-sourcing/poison-group-park-guard.feature):
+ * how long a suspect waits for every other in-flight job to settle before
+ * degrading to an unattributed run. Bounded so one slow neighbour cannot stall
+ * the pipeline behind a paused fastq; on timeout the suspect runs without an
+ * isolation marker (a death then cannot be pinned on it, and its strikes
+ * survive for a later isolation attempt).
+ */
+const ISOLATION_QUIESCE_TIMEOUT_MS = 60_000;
+const ISOLATION_QUIESCE_POLL_MS = 50;
+
+/**
+ * How many times a suspect is re-staged because another isolation run holds
+ * this process's slot, before it runs unattributed instead. Deferrals carry a
+ * `/iw/` staged-id suffix (distinct from the `/r/` retry suffix so they never
+ * consume the transient-decode retry budget).
+ */
+const MAX_ISOLATION_DEFERRALS = 5;
 
 /**
  * Decides whether a failed job attempt should be retried.
@@ -198,6 +218,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
+  /**
+   * True while this process runs a poison-guard suspect in isolation. One
+   * isolation at a time per process: a second suspect defers (re-stage with
+   * backoff) instead of waiting, or two quiesce loops would deadlock each
+   * other waiting to be the sole running task.
+   */
+  private isolationActive = false;
 
   constructor(
     definition: EventSourcedQueueDefinition<Payload>,
@@ -708,44 +735,262 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * it on every code path where the process survives (the finally below -
    * success, retry, exhausted-park, drop-to-replay, graceful drain all pass
    * through it). A job that seizes the event loop never reaches the finally:
-   * the liveness probe kills the process, the strike stays behind, and after
-   * enough consecutive deaths the next claim parks the group instead of
-   * re-running the killer (specs/event-sourcing/poison-group-park-guard.feature).
+   * the liveness probe kills the process and the strike stays behind.
+   *
+   * Strikes alone never park: every group co-in-flight with the killer shares
+   * the same uncleared-strike signature (up to globalConcurrency innocents per
+   * crash, and the cohort is redelivered together after the active TTL, so
+   * bystanders cannot be told apart from the poison by counting). A group over
+   * the threshold is instead run in ISOLATION - solo in this process, behind an
+   * awaited marker - so the next death is attributable beyond doubt. Only a
+   * marker that survives a process death parks the group
+   * (specs/event-sourcing/poison-group-park-guard.feature).
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
     const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
 
     const strikeThreshold = readClaimStrikeThreshold();
     if (strikeThreshold > 0) {
-      let strikes = 0;
+      let diedInIsolation = false;
       try {
-        strikes = await this.scripts.recordClaimStrike(groupId);
+        // Job-bound check: only a marker naming THIS staged job proves the
+        // process died during its solo run. A marker left by a completed
+        // job's run (death after the queue-side complete, before the marker
+        // clear) mismatches and is discarded instead of parking a successor.
+        diedInIsolation = await this.scripts.wasIsolationInterrupted(
+          groupId,
+          stagedJobId,
+        );
       } catch {
-        // Strike accounting is protective, never load-bearing: an unreadable
-        // counter must not stop the queue.
+        // Guard accounting is protective, never load-bearing: an unreadable
+        // marker must not stop the queue.
       }
-      if (strikes > strikeThreshold) {
+      if (diedInIsolation) {
+        // The marker is deliberately NOT cleared here: if this park fails and
+        // the slot is redelivered, the next claim must still see the death.
+        // The operator exits (unblock/drain/DLQ) delete the marker.
         await this.parkPoisonGroup({
           groupId,
           stagedJobId,
           jobDataJson,
           originalScore,
-          reason: "claim_strikes",
-          errorMessage: `Poison guard: ${strikes - 1} consecutive worker deaths while this group was in flight (threshold ${strikeThreshold}). Inspect the staged jobs, then unblock the group to retry.`,
+          reason: "died_in_isolation",
+          errorMessage: `Poison guard: this group's job killed the worker process while running in isolation (no other work was in flight, so the death is attributable to this group). Inspect the staged jobs via the ops peek, then drain the group or move it to the DLQ to discard them, or unblock to retry once.`,
         });
+        return;
+      }
+
+      let strikes = 0;
+      try {
+        strikes = await this.scripts.recordClaimStrike(groupId);
+      } catch {
+        // Same rationale as above.
+      }
+      if (strikes > strikeThreshold) {
+        await this.runSuspectInIsolation(dispatched, strikes - 1);
         return;
       }
     }
 
+    if (strikeThreshold > 0) {
+      await this.processAndClearStrikes(dispatched);
+    } else {
+      await this.processClaimedJob(dispatched);
+    }
+  }
+
+  /**
+   * Runs the claimed job and clears the group's claim strikes once the run has
+   * settled - reaching the finally proves the process survived this group's
+   * job, which is the guard's "clear on every survival path" rule. A job that
+   * seizes the event loop never reaches it.
+   */
+  private async processAndClearStrikes(
+    dispatched: DispatchResult,
+  ): Promise<void> {
     try {
       await this.processClaimedJob(dispatched);
     } finally {
-      if (strikeThreshold > 0) {
-        this.scripts.clearClaimStrikes(groupId).catch(() => {
-          // The TTL on the strike key bounds the damage of a failed clear.
+      this.scripts.clearClaimStrikes(dispatched.groupId).catch(() => {
+        // The TTL on the strike key bounds the damage of a failed clear.
+      });
+    }
+  }
+
+  /**
+   * Runs a suspect group's job in process-local isolation so that a death
+   * during the run is attributable to this group alone.
+   *
+   * Quiesce: pause fastq intake (queued tasks hold, no new starts) and wait
+   * until this task is the process's only running work; every other in-flight
+   * job settles and clears its own strike first. Then write the isolation
+   * marker (awaited, so it is durable before any decode/handler work) and run
+   * the job. A seizure/OOM now kills a process whose sole running job belongs
+   * to this group - the surviving marker parks it on the next claim. A healthy
+   * suspect (a bystander that accumulated strikes from someone else's crashes)
+   * survives the solo run, clears its marker and strikes, and never parks.
+   *
+   * Degraded paths keep attribution sound rather than guessing:
+   * - another isolation already active in this process → re-stage with backoff
+   *   (bounded; runs un-isolated after MAX_ISOLATION_DEFERRALS so a busy
+   *   process cannot starve the group) and keep the strikes;
+   * - quiesce timeout / marker write failure / shutdown → run WITHOUT a marker
+   *   (outcome `unattributed`): a death here cannot be pinned on this group
+   *   and leaves the strikes behind (a dead process never reaches the clear),
+   *   so the next claim re-attempts isolation. SURVIVING the run clears the
+   *   strikes like any other survival - strikes count consecutive claims that
+   *   died, and a survived claim breaks that chain; a genuinely poisonous
+   *   group re-accumulates them and converges on a marked solo run.
+   */
+  private async runSuspectInIsolation(
+    dispatched: DispatchResult,
+    priorDeaths: number,
+  ): Promise<void> {
+    const { groupId, stagedJobId, jobDataJson } = dispatched;
+
+    if (this.isolationActive) {
+      const deferrals = stagedJobId.match(/\/iw\//g)?.length ?? 0;
+      if (deferrals < MAX_ISOLATION_DEFERRALS) {
+        const backoffMs = getBackoffMs(deferrals + 1);
+        await this.scripts.retryRestage({
+          groupId,
+          stagedJobId,
+          newStagedJobId: `${stagedJobId}/iw/${deferrals + 1}`,
+          dispatchAfterMs: Date.now() + backoffMs,
+          jobDataJson,
+          backoffMs,
+        });
+        gqPoisonIsolationRunsTotal.inc({
+          queue_name: this.queueName,
+          outcome: "deferred",
+        });
+        this.logger.warn(
+          {
+            queueName: this.queueName,
+            projectId: tenantIdFromGroupId(groupId),
+            groupId,
+            stagedJobId,
+            priorDeaths,
+            backoffMs,
+          },
+          "Poison guard: another isolation run is active; suspect re-staged for a later solo run",
+        );
+        return;
+      }
+      // Deferral budget exhausted: run unattributed WITHOUT acquiring the
+      // isolation slot (the real holder still owns the pause/resume), rather
+      // than starving the group behind a permanently-busy isolation slot.
+      // Survival clears the strikes (a survived claim breaks the
+      // consecutive-deaths chain); a death leaves them for the next claim.
+      gqPoisonIsolationRunsTotal.inc({
+        queue_name: this.queueName,
+        outcome: "unattributed",
+      });
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          projectId: tenantIdFromGroupId(groupId),
+          groupId,
+          stagedJobId,
+          priorDeaths,
+          isolated: false,
+        },
+        "Poison guard: isolation slot busy and deferral budget exhausted; running suspect without attribution",
+      );
+      await this.processAndClearStrikes(dispatched);
+      return;
+    }
+
+    this.isolationActive = true;
+    this.processingQueue.pause();
+    try {
+      const quiesced = await this.waitForSoloExecution();
+
+      let marked = false;
+      if (quiesced) {
+        try {
+          await this.scripts.markIsolationStarted(groupId, stagedJobId);
+          marked = true;
+        } catch {
+          // Marker write failed: run unattributed rather than risking a park
+          // that cannot be traced back to a marked solo run.
+        }
+      }
+
+      if (!marked) {
+        gqPoisonIsolationRunsTotal.inc({
+          queue_name: this.queueName,
+          outcome: "unattributed",
         });
       }
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          projectId: tenantIdFromGroupId(groupId),
+          groupId,
+          stagedJobId,
+          priorDeaths,
+          isolated: marked,
+        },
+        marked
+          ? "Poison guard: running suspect group in isolation"
+          : "Poison guard: running suspect group without isolation attribution (quiesce or marker unavailable); a death keeps the strikes for a later attempt",
+      );
+
+      try {
+        await this.processAndClearStrikes(dispatched);
+      } finally {
+        if (marked) {
+          // Reaching this finally proves the process survived the solo run:
+          // the suspect was a bystander that inherited strikes from someone
+          // else's crashes. A death never gets here - it surfaces as the next
+          // claim's park.
+          gqPoisonIsolationRunsTotal.inc({
+            queue_name: this.queueName,
+            outcome: "cleared",
+          });
+          // Awaited with one retry: a marker that outlives a HEALTHY run is
+          // the one false-park hazard of this design. The TTL bounds a
+          // double failure.
+          try {
+            await this.scripts.clearIsolationMarker(groupId);
+          } catch {
+            try {
+              await this.scripts.clearIsolationMarker(groupId);
+            } catch (err) {
+              this.logger.error(
+                {
+                  queueName: this.queueName,
+                  projectId: tenantIdFromGroupId(groupId),
+                  groupId,
+                  err: err instanceof Error ? err.message : String(err),
+                },
+                "Poison guard: failed to clear isolation marker after a healthy run; the group may park on its next claim until the marker TTL expires",
+              );
+            }
+          }
+        }
+      }
+    } finally {
+      this.isolationActive = false;
+      this.processingQueue.resume();
     }
+  }
+
+  /**
+   * Waits until this task is the only one the fastq is running (intake is
+   * already paused by the caller). Returns false on timeout or shutdown so the
+   * caller degrades to an unattributed run instead of blocking the pipeline.
+   */
+  private async waitForSoloExecution(): Promise<boolean> {
+    const deadline = Date.now() + ISOLATION_QUIESCE_TIMEOUT_MS;
+    while (this.processingQueue.running() > 1) {
+      if (this.shutdownRequested || Date.now() >= deadline) return false;
+      await new Promise((resolve) =>
+        setTimeout(resolve, ISOLATION_QUIESCE_POLL_MS),
+      );
+    }
+    return true;
   }
 
   /**
@@ -783,7 +1028,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           jobDataJson,
           originalScore,
           reason: "oversized_payload",
-          errorMessage: `Poison guard: ${err.message}. The staged value was parked unparsed.`,
+          errorMessage: `Poison guard: ${err.message}. The staged value was parked unparsed. Unblocking would re-hit the decode cap and re-park immediately: inspect the value via the ops peek, then drain the group or move it to the DLQ to discard it.`,
         });
         return;
       }
@@ -893,7 +1138,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               jobDataJson,
               originalScore,
               reason: "oversized_payload",
-              errorMessage: `Poison guard: a coalesced sibling of this group is oversized (${err.message}). The batch was parked unparsed.`,
+              errorMessage: `Poison guard: a coalesced sibling of this group is oversized (${err.message}). The batch was parked unparsed. Unblocking would re-hit the decode cap and re-park immediately: inspect the values via the ops peek, then drain the group or move it to the DLQ to discard them.`,
             });
             return;
           }
@@ -1458,7 +1703,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     stagedJobId: string;
     jobDataJson: string;
     originalScore: number;
-    reason: "claim_strikes" | "oversized_payload";
+    reason: "died_in_isolation" | "oversized_payload";
     errorMessage: string;
   }): Promise<void> {
     const score =

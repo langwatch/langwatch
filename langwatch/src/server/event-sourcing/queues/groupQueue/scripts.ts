@@ -1620,12 +1620,14 @@ export function readTenantCap(): number {
 
 /**
  * Poison guard (specs/event-sourcing/poison-group-park-guard.feature): a group
- * is parked once this many consecutive claims ended with the process dying
- * before the strike could be cleared. Deaths tolerated = threshold; the claim
- * after that parks. Kept small: every extra strike is another fleet-wide
- * worker crash. Interleaved victims of someone else's poison clear their
- * single strike on their next healthy claim, so only the group that keeps
- * killing workers ever reaches the threshold.
+ * becomes a SUSPECT once this many consecutive claims ended with the process
+ * dying before the strike could be cleared. Strikes never park by themselves -
+ * every group co-in-flight with the killer shares the same uncleared-strike
+ * signature, so counting cannot tell the poison from its bystanders. A suspect
+ * is instead run in process-local isolation (solo, behind an awaited marker);
+ * only a marker that survives a process death parks the group. Kept small:
+ * every strike below the threshold is another fleet-wide worker crash before
+ * the first isolation attempt.
  */
 export const DEFAULT_CLAIM_STRIKE_THRESHOLD = 3;
 
@@ -1703,6 +1705,25 @@ const completeScript = new CachedLuaScript(COMPLETE_LUA);
 const refreshScript = new CachedLuaScript(REFRESH_LUA);
 const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
 const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);
+
+/**
+ * Poison-guard isolation marker check, run at claim time. The marker's value
+ * is the stagedJobId it was written for; only an exact match with the job
+ * being claimed proves the process died during THAT job's solo run. A
+ * mismatching marker was left by a run whose job completed queue-side before
+ * the process died (the post-completion crash window) - it must not condemn
+ * the group's next job, so it is deleted atomically with the read.
+ */
+const ISOLATION_INTERRUPTED_LUA = `
+local marker = redis.call("GET", KEYS[1])
+if not marker then return 0 end
+if marker == ARGV[1] then return 1 end
+redis.call("DEL", KEYS[1])
+return 0
+`;
+const isolationInterruptedScript = new CachedLuaScript(
+  ISOLATION_INTERRUPTED_LUA,
+);
 
 export class GroupStagingScripts {
   private readonly keyPrefix: string;
@@ -2260,6 +2281,69 @@ export class GroupStagingScripts {
     const raw = await this.redis.get(this.claimStrikesKey(groupId));
     const n = raw === null ? 0 : Number.parseInt(raw, 10);
     return Number.isFinite(n) ? n : 0;
+  }
+
+  private isolationKey(groupId: string): string {
+    return `${this.keyPrefix}group:${groupId}:isolating`;
+  }
+
+  /**
+   * Poison-guard isolation marker (specs/event-sourcing/poison-group-park-guard.feature).
+   *
+   * Written (awaited) immediately before a suspect group's job runs SOLO in the
+   * worker process - no other job in flight - and deleted when that run
+   * settles. The marker's value is the stagedJobId of the isolated run: a death
+   * mid-run redelivers that exact staged job (restage suffixes only happen on
+   * surviving paths), so a marker matching the claimed job proves the process
+   * died while executing exactly this job solo - the one death signature that
+   * is attributable beyond doubt, and the only condition under which the guard
+   * parks (claim strikes alone select a suspect for isolation; they never park
+   * by themselves, because every co-in-flight group of a crash shares the same
+   * strike pattern).
+   *
+   * The job binding closes the post-completion crash window: the queue-side
+   * COMPLETE runs inside the job before the marker clear, so a process death
+   * between the two leaves a marker naming a job that no longer exists. The
+   * group's NEXT job carries a different stagedJobId, mismatches, and runs
+   * instead of being falsely parked.
+   *
+   * Same TTL as the strike counter: a stale marker (e.g. a failed clear on a
+   * healthy run) self-expires instead of parking the group hours later.
+   */
+  async markIsolationStarted(
+    groupId: string,
+    stagedJobId: string,
+  ): Promise<void> {
+    await this.redis.set(
+      this.isolationKey(groupId),
+      stagedJobId,
+      "EX",
+      CLAIM_STRIKE_TTL_SECONDS,
+    );
+  }
+
+  async clearIsolationMarker(groupId: string): Promise<void> {
+    await this.redis.del(this.isolationKey(groupId));
+  }
+
+  /**
+   * True when a prior isolation run of THIS staged job never cleared its
+   * marker - i.e. the process died while this exact job was the only work in
+   * flight. A marker naming a different staged job is stale (its run completed
+   * queue-side before the process died); it is deleted here, atomically with
+   * the read, so it cannot condemn a successor job or linger until its TTL.
+   */
+  async wasIsolationInterrupted(
+    groupId: string,
+    stagedJobId: string,
+  ): Promise<boolean> {
+    const result = await isolationInterruptedScript.run(
+      this.redis,
+      1,
+      this.isolationKey(groupId),
+      stagedJobId,
+    );
+    return result === 1;
   }
 
   /**

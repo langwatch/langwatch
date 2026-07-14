@@ -1,6 +1,10 @@
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import { resolveInputsMarker } from "~/server/app-layer/evaluations/evaluation-inputs-offload";
+import {
+  isStoredObjectMarker,
+  projectMarkerForList,
+  resolveInputsMarker,
+} from "~/server/app-layer/evaluations/evaluation-inputs-offload";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
@@ -83,7 +87,9 @@ export class EvaluationService {
   private readonly tracer = getLangWatchTracer("langwatch.evaluations.service");
   private readonly resolveInputsMarker: ResolveEvaluationInputsMarker;
 
-  constructor(resolveInputsMarkerFn: ResolveEvaluationInputsMarker = defaultResolveInputsMarker) {
+  constructor(
+    resolveInputsMarkerFn: ResolveEvaluationInputsMarker = defaultResolveInputsMarker,
+  ) {
     this.resolveInputsMarker = resolveInputsMarkerFn;
   }
 
@@ -114,10 +120,20 @@ export class EvaluationService {
     projectId,
     traceIds,
     protections: _protections,
+    shouldResolveOffloadedInputs = false,
   }: {
     projectId: string;
     traceIds: string[];
     protections?: Protections;
+    /**
+     * How offloaded-inputs markers (ADR-040) are surfaced. Single-trace reads
+     * (the two REST trace endpoints) pass `true` to resolve markers to the
+     * FULL inputs - bounded because it is one trace's evaluations. Every other
+     * consumer (multi-trace list paths, tRPC) leaves this false and gets the
+     * compact, leak-free projection instead of the raw `__lw_stored_object`
+     * envelope. The raw marker never leaves this service.
+     */
+    shouldResolveOffloadedInputs?: boolean;
   }): Promise<Record<string, TraceEvaluation[]>> {
     return await this.tracer.withActiveSpan(
       "EvaluationService.getEvaluationsMultiple",
@@ -182,7 +198,19 @@ export class EvaluationService {
         };
 
         try {
-          return groupByTrace(await runQuery(EVAL_COLUMNS_WITH_INPUTS));
+          const grouped = groupByTrace(
+            await runQuery(EVAL_COLUMNS_WITH_INPUTS),
+          );
+          // ADR-040: rows may carry an offloaded-inputs marker. Never let the
+          // raw `__lw_stored_object` envelope leave the service - resolve it to
+          // the full inputs (single-trace reads) or the compact projection
+          // (list paths). The light-projection retry below drops Inputs
+          // entirely, so it can never contain a marker.
+          return await this.finalizeOffloadedInputs({
+            projectId,
+            grouped,
+            shouldResolveOffloadedInputs,
+          });
         } catch (error) {
           if (isMemoryLimitError(error)) {
             this.logger.warn(
@@ -220,6 +248,55 @@ export class EvaluationService {
         }
       },
     );
+  }
+
+  /**
+   * Replaces any offloaded-inputs marker (ADR-040) on the mapped evaluations
+   * so the raw `__lw_stored_object` envelope never leaves the service. When
+   * `shouldResolveOffloadedInputs` is set the marker is resolved to the full
+   * inputs (bounded single-trace reads); otherwise it degrades to the compact,
+   * leak-free projection (list paths). Non-marker inputs pass through.
+   */
+  private async finalizeOffloadedInputs({
+    projectId,
+    grouped,
+    shouldResolveOffloadedInputs,
+  }: {
+    projectId: string;
+    grouped: Record<string, TraceEvaluation[]>;
+    shouldResolveOffloadedInputs: boolean;
+  }): Promise<Record<string, TraceEvaluation[]>> {
+    for (const evaluations of Object.values(grouped)) {
+      for (const evaluation of evaluations) {
+        const inputs = evaluation.inputs;
+        if (!isStoredObjectMarker(inputs)) continue;
+        evaluation.inputs = shouldResolveOffloadedInputs
+          ? await this.resolveMarkerToNonMarker({ projectId, inputs })
+          : projectMarkerForList(inputs);
+      }
+    }
+    return grouped;
+  }
+
+  /**
+   * Resolves a marker to the full inputs while guaranteeing what leaves the
+   * service is never a raw `__lw_stored_object` envelope. The resolver
+   * fail-safes by returning its input marker (preview-only marker, missing
+   * object, purpose or hash mismatch, stream/parse error); at this boundary
+   * that degraded result is projected to the compact, leak-free shape instead
+   * of shipped raw with its internal `id`/`sha256`.
+   */
+  private async resolveMarkerToNonMarker({
+    projectId,
+    inputs,
+  }: {
+    projectId: string;
+    inputs: Record<string, unknown> | null;
+  }): Promise<Record<string, unknown> | null> {
+    const resolved = await this.resolveInputsMarker({ projectId, inputs });
+    return isStoredObjectMarker(resolved)
+      ? projectMarkerForList(resolved)
+      : resolved;
   }
 
   /**
@@ -273,8 +350,10 @@ export class EvaluationService {
           // ADR-040: when inputs were offloaded, `parsed` is a stored-object
           // marker. Resolve it to the full inputs here - the natural lazy seam
           // the UI already fetches through - so the caller cannot tell whether
-          // the inputs were inline or offloaded. Non-markers pass through.
-          return this.resolveInputsMarker({ projectId, inputs });
+          // the inputs were inline or offloaded. Non-markers pass through; a
+          // resolution failure degrades to the projection, never the raw
+          // marker.
+          return await this.resolveMarkerToNonMarker({ projectId, inputs });
         } catch (error) {
           if (isMemoryLimitError(error)) {
             this.logger.warn(
