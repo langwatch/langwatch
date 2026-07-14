@@ -141,11 +141,14 @@ import { SuiteRunService } from "./suites/suite-run.service";
 import { NullTopicRepository } from "./topics/null-topic.repository";
 import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
 import { TopicService } from "./topics/topic.service";
+import { CodingAgentSessionService } from "./traces/coding-agent-session.service";
 import { maybeSpool } from "./traces/edge-spool";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRecordStorageService } from "./traces/metric-record-storage.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
+import { CodingAgentSessionClickHouseRepository } from "./traces/repositories/coding-agent-session.clickhouse.repository";
+import { NullCodingAgentSessionRepository } from "./traces/repositories/coding-agent-session.repository";
 import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-record-storage.clickhouse.repository";
 import { NullLogRecordStorageRepository } from "./traces/repositories/log-record-storage.repository";
 import { MetricRecordStorageClickHouseRepository } from "./traces/repositories/metric-record-storage.clickhouse.repository";
@@ -153,8 +156,6 @@ import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
-import { CodingAgentSessionClickHouseRepository } from "./traces/repositories/coding-agent-session.clickhouse.repository";
-import { NullCodingAgentSessionRepository } from "./traces/repositories/coding-agent-session.repository";
 import { NullTraceAnalyticsRepository } from "./traces/repositories/trace-analytics.repository";
 import { TraceAnalyticsRollupClickHouseRepository } from "./traces/repositories/trace-analytics-rollup.clickhouse.repository";
 import { NullTraceAnalyticsRollupRepository } from "./traces/repositories/trace-analytics-rollup.repository";
@@ -163,7 +164,6 @@ import { NullTraceListRepository } from "./traces/repositories/trace-list.reposi
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
-import { CodingAgentSessionService } from "./traces/coding-agent-session.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
 import {
@@ -616,19 +616,18 @@ export function initializeDefaultApp(options?: {
   // EventSourcing`), so its `.withOutbox` reactors can enqueue settle
   // payloads. Web processes don't build this (no settle traffic; no consumer
   // to drain).
-  const outbox =
-    roleRunsWorkers(config.processRole)
-      ? buildOutboxRuntime({
-          prisma,
-          redis: redis ?? null,
-          triggers,
-          emailSuppressions,
-          projects,
-          evaluations: { runs: evaluations.runs },
-          traces: { spans: spanStorage },
-          traceSummaryRepository: repositories.traceSummaryFold,
-        })
-      : undefined;
+  const outbox = roleRunsWorkers(config.processRole)
+    ? buildOutboxRuntime({
+        prisma,
+        redis: redis ?? null,
+        triggers,
+        emailSuppressions,
+        projects,
+        evaluations: { runs: evaluations.runs },
+        traces: { spans: spanStorage },
+        traceSummaryRepository: repositories.traceSummaryFold,
+      })
+    : undefined;
 
   // EventSourcing must be constructed AFTER `outbox` and be given it here: the
   // reactor adapter (`.withOutbox` → enqueueSettle) and the global queue's
@@ -794,24 +793,47 @@ export function initializeDefaultApp(options?: {
     codingAgentSessions: traced(
       new CodingAgentSessionService(repositories.codingAgentSession, {
         listConversationTraces: async ({ tenantId, conversationId }) => {
-          const page = await traceList.getList({
-            tenantId,
-            timeRange: {
-              from: Date.now() - 365 * 24 * 60 * 60 * 1000,
-              to: Date.now(),
+          // getByTraceId merges what this returns as the COMPLETE session, so
+          // page until exhausted: a first-page-only read would silently report
+          // stale totals for a long session (and with ascending sort could
+          // even omit the trace the user has open). The page cap only guards
+          // against a pathological conversation id; hitting it is logged so
+          // the truncation is observable, never silent.
+          const pageSize = 200;
+          const maxPages = 20;
+          const items: Array<{ traceId: string; startedAtMs: number }> = [];
+          for (let page = 1; page <= maxPages; page++) {
+            const result = await traceList.getList({
+              tenantId,
+              timeRange: {
+                from: Date.now() - 365 * 24 * 60 * 60 * 1000,
+                to: Date.now(),
+              },
+              sort: { columnId: "time", direction: "asc" },
+              page,
+              pageSize,
+              filterWhere: {
+                sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
+                params: { threadConversationId: conversationId },
+              },
+            });
+            items.push(
+              ...result.items.map((item) => ({
+                traceId: item.traceId,
+                startedAtMs: item.timestamp,
+              })),
+            );
+            if (result.items.length < pageSize) return items;
+          }
+          createLogger("langwatch:traces:coding-agent-sessions").warn(
+            {
+              tenantId,
+              conversationId,
+              tracesListed: items.length,
             },
-            sort: { columnId: "time", direction: "asc" },
-            page: 1,
-            pageSize: 200,
-            filterWhere: {
-              sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
-              params: { threadConversationId: conversationId },
-            },
-          });
-          return page.items.map((item) => ({
-            traceId: item.traceId,
-            startedAtMs: item.timestamp,
-          }));
+            "Conversation membership truncated at the page cap; the merged session summary omits older traces",
+          );
+          return items;
         },
       }),
       "CodingAgentSessionService",

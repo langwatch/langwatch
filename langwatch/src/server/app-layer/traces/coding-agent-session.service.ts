@@ -88,15 +88,32 @@ export class CodingAgentSessionService {
       conversationId,
     });
 
-    const rows = await Promise.all(
-      siblings.map((sibling) =>
-        this.repository.getByTraceId({
-          tenantId: projectId,
-          traceId: sibling.traceId,
-          startedAtMs: sibling.startedAtMs,
-        }),
-      ),
-    );
+    // The opened trace is part of the merge no matter what the membership
+    // listing returned: if the listing was truncated (page cap) or lagged
+    // ingestion, dropping the very trace the user is looking at would be the
+    // worst possible omission.
+    const candidates = siblings.some((sibling) => sibling.traceId === traceId)
+      ? siblings
+      : [...siblings, { traceId, startedAtMs: startedAtMs ?? 0 }];
+
+    // Bounded fan-out: a long session lists hundreds of sibling traces, and
+    // firing every point read at once trips ClickHouse's simultaneous-query
+    // limit under drawer traffic.
+    const rows: Array<CodingAgentSessionRow | null> = [];
+    const readConcurrency = 10;
+    for (let i = 0; i < candidates.length; i += readConcurrency) {
+      rows.push(
+        ...(await Promise.all(
+          candidates.slice(i, i + readConcurrency).map((sibling) =>
+            this.repository.getByTraceId({
+              tenantId: projectId,
+              traceId: sibling.traceId,
+              startedAtMs: sibling.startedAtMs || undefined,
+            }),
+          ),
+        )),
+      );
+    }
     const found = rows.filter(
       (row): row is CodingAgentSessionRow => row !== null,
     );

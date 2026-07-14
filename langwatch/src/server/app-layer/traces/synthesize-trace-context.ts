@@ -40,7 +40,6 @@ export interface SynthesizeTraceContextArgs {
   wireTraceId: string;
   wireSpanId: string;
   attrs: Record<string, string>;
-  resourceAttrs?: Record<string, string>;
 }
 
 export interface SynthesizedTraceContext {
@@ -71,8 +70,13 @@ function combine(args: {
   derivedSpanId: string;
   derivedFrom: string;
 }): SynthesizedTraceContext {
-  const { wireTraceId, wireSpanId, derivedTraceId, derivedSpanId, derivedFrom } =
-    args;
+  const {
+    wireTraceId,
+    wireSpanId,
+    derivedTraceId,
+    derivedSpanId,
+    derivedFrom,
+  } = args;
   const syntheticTraceId = !wireTraceId;
   const syntheticSpanId = !wireSpanId;
   return {
@@ -112,21 +116,24 @@ function passthrough(
  *      on conversation.id; per-event span keyed on
  *      (conversation.id, event.name, event.sequence). derivedFrom =
  *      "conversation.id".
- *   4. Generic fallback (any other scope) -> first present of
- *      attrs["session.id"], attrs["conversation.id"],
- *      resourceAttrs["service.instance.id"]. trace = sha256(key);
- *      span = sha256(key:event.name:event.sequence). derivedFrom = that
- *      key's name.
- *   5. No correlation key -> passthrough of the (empty) wire ids. Never
- *      mint a random per-record id.
+ *   4. Anything else -> passthrough of the (empty) wire ids, uncorrelated.
+ *      Never mint a random per-record id, and never guess from generic
+ *      keys: synthesis is only for the documented coding-agent shapes
+ *      above, whose keys are verified session identities. A process-level
+ *      key like `service.instance.id` would fuse every standalone log an
+ *      application instance ever emits into one giant synthetic trace and
+ *      route it all to one command shard - the exact hot-lane shape the
+ *      ingest sharding exists to prevent. Agents whose emitters carry real
+ *      trace context (gemini CLI, opencode span exporters) never reach
+ *      synthesis at all.
  *
- * In branches 2-4 a present wire trace_id or span_id is preserved and
+ * In branches 2-3 a present wire trace_id or span_id is preserved and
  * only the missing id is synthesized.
  */
 export function synthesizeTraceContext(
   args: SynthesizeTraceContextArgs,
 ): SynthesizedTraceContext {
-  const { scopeName, wireTraceId, wireSpanId, attrs, resourceAttrs } = args;
+  const { scopeName, wireTraceId, wireSpanId, attrs } = args;
 
   // Real, complete OTLP context — never override, never mark.
   if (wireTraceId && wireSpanId) {
@@ -170,30 +177,7 @@ export function synthesizeTraceContext(
     });
   }
 
-  // Generic fallback for any other scope: group by the first correlation
-  // key present, most-specific first.
-  const genericCandidates: Array<[name: string, value: string | undefined]> = [
-    ["session.id", attrs["session.id"]],
-    ["conversation.id", attrs["conversation.id"]],
-    ["service.instance.id", resourceAttrs?.["service.instance.id"]],
-  ];
-  const genericKey = genericCandidates.find(([, value]) => Boolean(value));
-  if (genericKey) {
-    const [keyName, keyValue] = genericKey;
-    const key = keyValue as string;
-    return combine({
-      wireTraceId,
-      wireSpanId,
-      derivedTraceId: sha256Hex(key).slice(0, TRACE_ID_HEX_LENGTH),
-      derivedSpanId: sha256Hex(`${key}:${eventName}:${eventSequence}`).slice(
-        0,
-        SPAN_ID_HEX_LENGTH,
-      ),
-      derivedFrom: keyName,
-    });
-  }
-
-  // No useful correlation key — leave the (empty) wire ids unchanged
-  // rather than inventing a random per-record id.
+  // Not a documented coding-agent shape: leave the (empty) wire ids
+  // unchanged rather than guessing a grouping from generic keys.
   return passthrough(wireTraceId, wireSpanId);
 }

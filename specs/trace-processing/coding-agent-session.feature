@@ -117,6 +117,12 @@ Feature: Coding agent session summary
     Then the summary does not grow with the number of spans
     # This is what makes it safe to summarise an unbounded session at all.
 
+  # The columns are agent-generic, but Claude Code is the only adapter written:
+  # the span-name gate, the metric application, and the log fold all read
+  # Claude's names today. Other recognised agents (Codex, opencode, Gemini CLI,
+  # Copilot) pass the vocabulary layer but produce no session row until their
+  # adapters exist.
+  @unimplemented
   Scenario: A session from a different coding agent is summarised the same way
     Given the session came from a coding agent other than Claude Code
     When the session is summarised

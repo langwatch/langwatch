@@ -2,7 +2,7 @@ import type {
   LogRecordReceivedEventData,
   MetricRecordReceivedEventData,
 } from "../../schemas/events";
-import { NormalizedStatusCode, type NormalizedSpan } from "../../schemas/spans";
+import { type NormalizedSpan, NormalizedStatusCode } from "../../schemas/spans";
 import {
   detectCodingAgent,
   isCodingAgentMetricName,
@@ -29,10 +29,17 @@ import type {
  * so it has no span). Read only the logs and you cannot see how long anything
  * took. Read neither and you cannot see that the session produced two commits.
  *
- * AGENT-GENERIC. Every coding agent has a finish reason, tools, sub-agents, an
- * approval mode, retries, compaction. What differs is only WHERE each fact is
- * read from, and that lives in the {@link CLAUDE} adapter below. A Codex adapter
- * plugs in beside it and every consumer reads the same fields.
+ * AGENT-GENERIC in shape, CLAUDE CODE ONLY in coverage today. Every coding
+ * agent has a finish reason, tools, sub-agents, an approval mode, retries,
+ * compaction: the columns are generic, and what differs is only WHERE each
+ * fact is read from, which lives in the {@link CLAUDE} adapter below. But that
+ * is the only adapter that exists: {@link CODING_AGENT_SPAN_NAMES} matches
+ * claude_code.* span names, the metric application switches on Claude's metric
+ * names, and the log fold assumes Claude identity. Telemetry from the other
+ * agents the vocabulary layer recognises (Codex, opencode, Gemini CLI,
+ * Copilot) flows through the gates but produces NO session row until its
+ * adapter is written, so do not point product claims at them. The UI's
+ * no-summary state says this in customer words.
  *
  * PURE, LIGHT and BOUNDED — see `coding-agent-session.types.ts`.
  */
@@ -554,7 +561,6 @@ export function applySpanToCodingAgentSession({
   return withTool;
 }
 
-
 /**
  * Fold one LOG RECORD into the session.
  *
@@ -743,7 +749,8 @@ export function applyMetricToCodingAgentSession({
   switch (data.metricName) {
     case CLAUDE.METRIC.LINES_OF_CODE: {
       const type = str(attrs.type);
-      if (type === "added") return { ...base, linesAdded: base.linesAdded + value };
+      if (type === "added")
+        return { ...base, linesAdded: base.linesAdded + value };
       if (type === "removed") {
         return { ...base, linesRemoved: base.linesRemoved + value };
       }

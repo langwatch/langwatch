@@ -32,7 +32,12 @@ export function SessionTab({
   conversationId,
 }: SessionTabProps) {
   const query = api.tracesV2.codingAgentSession.useQuery(
-    { projectId, traceId, occurredAtMs, conversationId: conversationId ?? undefined },
+    {
+      projectId,
+      traceId,
+      occurredAtMs,
+      conversationId: conversationId ?? undefined,
+    },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
   // The token timeline reflects the trace currently open, not (yet) every
@@ -58,25 +63,30 @@ export function SessionTab({
   }
 
   // Null is the NORMAL answer for an ordinary LLM trace: the fold writes no row
-  // for one. The tab is only offered for coding-agent traces, so landing here
-  // means the session hasn't finished folding yet — say that, rather than
-  // showing an empty screen that reads as "nothing happened".
+  // for one. The tab is offered for every coding-agent trace, but only Claude
+  // Code sessions are summarised today (the projection has one adapter), so
+  // landing here means either a Claude session that hasn't finished folding
+  // yet, or another agent that has no summary at all, so the copy must not
+  // promise one that will never come.
   if (!query.data) {
     return (
       <Centered>
         <VStack gap={1}>
           <Text textStyle="sm" color="fg.muted">
-            No usage summary yet
+            No usage summary for this session
           </Text>
           <Text textStyle="xs" color="fg.subtle">
-            It appears shortly after the run finishes.
+            Claude Code sessions get one shortly after the run finishes. Other
+            coding agents are not summarized yet.
           </Text>
         </VStack>
       </Centered>
     );
   }
 
-  return <SessionView session={query.data} entries={transcriptQuery.data?.entries} />;
+  return (
+    <SessionView session={query.data} entries={transcriptQuery.data?.entries} />
+  );
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

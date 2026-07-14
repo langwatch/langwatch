@@ -4,8 +4,8 @@ import type { RecordLogCommandData } from "../../../event-sourcing/pipelines/tra
 import { LogRequestCollectionService } from "../log-request-collection.service";
 
 function makeService() {
-  const recordLog = vi.fn<(data: RecordLogCommandData) => Promise<void>>(
-    () => Promise.resolve(),
+  const recordLog = vi.fn<(data: RecordLogCommandData) => Promise<void>>(() =>
+    Promise.resolve(),
   );
   const service = new LogRequestCollectionService({ recordLog });
   return { service, recordLog };
@@ -103,7 +103,9 @@ describe("LogRequestCollectionService", () => {
         body: "in-span log",
       });
       // Real wire context is never marked synthetic.
-      expect(call?.[0]?.attributes["langwatch.trace.synthetic"]).toBeUndefined();
+      expect(
+        call?.[0]?.attributes["langwatch.trace.synthetic"],
+      ).toBeUndefined();
       expect(
         call?.[0]?.attributes["langwatch.trace.derived_from"],
       ).toBeUndefined();
@@ -256,12 +258,12 @@ describe("LogRequestCollectionService", () => {
       expect(c1![0]!.spanId).toBe(c2![0]!.spanId);
     });
 
-    it("synthesizes ids via the generic fallback for an unrecognized scope carrying session.id", async () => {
-      // A scope that is neither claude_code nor a `codex.*` event WITH a
-      // conversation.id still gets grouped through the generic fallback on
-      // the first present correlation key (session.id here), and the
-      // synthesized ids are marked so downstream can tell them apart from
-      // real wire context.
+    it("leaves a record uncorrelated when it matches no documented coding-agent shape", async () => {
+      // A `codex.*` event WITHOUT its documented conversation.id key does not
+      // get grouped by whatever other key happens to be present (session.id
+      // here): synthesis is only for the documented shapes, and guessing from
+      // generic keys would fuse unrelated standalone logs into one synthetic
+      // trace and route them all to one command shard.
       const { service, recordLog } = makeService();
       await service.handleOtlpLogRequest({
         tenantId: "project_test",
@@ -297,10 +299,10 @@ describe("LogRequestCollectionService", () => {
         piiRedactionLevel: "ESSENTIAL",
       });
       const r = recordLog.mock.calls[0]![0]!;
-      expect(r.traceId).toMatch(/^[0-9a-f]{32}$/);
-      expect(r.spanId).toMatch(/^[0-9a-f]{16}$/);
-      expect(r.attributes["langwatch.trace.synthetic"]).toBe("true");
-      expect(r.attributes["langwatch.trace.derived_from"]).toBe("session.id");
+      expect(r.traceId).toBe("");
+      expect(r.spanId).toBe("");
+      expect(r.attributes["langwatch.trace.synthetic"]).toBeUndefined();
+      expect(r.attributes["langwatch.trace.derived_from"]).toBeUndefined();
     });
 
     it("preserves the wire ids when the LogRecord already carries trace context", async () => {
@@ -567,7 +569,10 @@ describe("LogRequestCollectionService", () => {
             timeUnixNano: "1700000000000000000",
             body: { stringValue: "codex.user_prompt" },
             attributes: [
-              { key: "event.name", value: { stringValue: "codex.user_prompt" } },
+              {
+                key: "event.name",
+                value: { stringValue: "codex.user_prompt" },
+              },
               { key: "conversation.id", value: { stringValue: "conv_42" } },
               { key: "event.sequence", value: { stringValue: "1" } },
               { key: "prompt", value: { stringValue: "Hello" } },
@@ -604,7 +609,10 @@ describe("LogRequestCollectionService", () => {
               timeUnixNano: "1700000000000000000",
               body: { stringValue: "codex.sse_event" },
               attributes: [
-                { key: "event.name", value: { stringValue: "codex.sse_event" } },
+                {
+                  key: "event.name",
+                  value: { stringValue: "codex.sse_event" },
+                },
                 { key: "conversation.id", value: { stringValue: "c" } },
                 { key: "event.sequence", value: { stringValue: "1" } },
               ],

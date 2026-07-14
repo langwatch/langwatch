@@ -104,14 +104,14 @@ export class LogRequestCollectionService {
                 // string instead; downstream join-to-span queries simply
                 // find no correlation, which is the correct semantics.
                 const wireTraceId = logRecord.traceId
-                  ? TraceRequestUtils.normalizeOtlpId(
+                  ? (TraceRequestUtils.normalizeOtlpId(
                       logRecord.traceId as string | Uint8Array,
-                    ) ?? ""
+                    ) ?? "")
                   : "";
                 const wireSpanId = logRecord.spanId
-                  ? TraceRequestUtils.normalizeOtlpId(
+                  ? (TraceRequestUtils.normalizeOtlpId(
                       logRecord.spanId as string | Uint8Array,
-                    ) ?? ""
+                    ) ?? "")
                   : "";
 
                 const logAttrs = normalizeOtlpAttributeMap(
@@ -128,7 +128,6 @@ export class LogRequestCollectionService {
                   wireTraceId,
                   wireSpanId,
                   attrs: logAttrs,
-                  resourceAttrs,
                 });
 
                 const timeUnixMs = logRecord.timeUnixNano

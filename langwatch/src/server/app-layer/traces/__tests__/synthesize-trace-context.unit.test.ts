@@ -160,7 +160,12 @@ describe("synthesizeTraceContext", () => {
   });
 
   describe("when an unrecognized scope arrives without trace context", () => {
-    it("derives via the generic fallback from session.id", () => {
+    // Synthesis is only for the documented coding-agent shapes. Ordinary
+    // standalone application logs stay uncorrelated: fusing them by a generic
+    // key (session.id on an unknown emitter, or a process-level key like
+    // service.instance.id) would build one giant synthetic trace and route
+    // every record of that instance to one command shard.
+    it("leaves the ids empty even when a session.id attribute is present", () => {
       const result = synthesizeTraceContext({
         scopeName: "some.other.agent",
         wireTraceId: "",
@@ -173,42 +178,29 @@ describe("synthesizeTraceContext", () => {
       });
 
       expect(result).toEqual({
-        traceId: "043a718774c572bd8a25adbeb1bfcd5c",
-        spanId: "ba4e1dce4b0f8e32",
-        syntheticTraceId: true,
-        syntheticSpanId: true,
-        derivedFrom: "session.id",
+        traceId: "",
+        spanId: "",
+        syntheticTraceId: false,
+        syntheticSpanId: false,
+        derivedFrom: null,
       });
     });
 
-    it("derives via the generic fallback from resource service.instance.id", () => {
+    it("leaves the ids empty even when a conversation.id attribute is present", () => {
       const result = synthesizeTraceContext({
         scopeName: "some.other.agent",
         wireTraceId: "",
         wireSpanId: "",
-        attrs: {},
-        resourceAttrs: { "service.instance.id": "inst_1" },
+        attrs: { "conversation.id": "c", "event.name": "my.event" },
       });
 
       expect(result).toEqual({
-        traceId: "f4a0cf320b1d3887654815e51a1cd67c",
-        spanId: "0160b0e231bbca37",
-        syntheticTraceId: true,
-        syntheticSpanId: true,
-        derivedFrom: "service.instance.id",
+        traceId: "",
+        spanId: "",
+        syntheticTraceId: false,
+        syntheticSpanId: false,
+        derivedFrom: null,
       });
-    });
-
-    it("prefers session.id over conversation.id and service.instance.id", () => {
-      const result = synthesizeTraceContext({
-        scopeName: "some.other.agent",
-        wireTraceId: "",
-        wireSpanId: "",
-        attrs: { "session.id": "s", "conversation.id": "c" },
-        resourceAttrs: { "service.instance.id": "inst_1" },
-      });
-
-      expect(result.derivedFrom).toBe("session.id");
     });
 
     it("leaves the ids empty and not synthetic when no correlation key exists", () => {
@@ -217,7 +209,6 @@ describe("synthesizeTraceContext", () => {
         wireTraceId: "",
         wireSpanId: "",
         attrs: { "event.name": "my.event" },
-        resourceAttrs: { "service.name": "some-service" },
       });
 
       expect(result).toEqual({
@@ -244,7 +235,9 @@ describe("synthesizeTraceContext", () => {
         },
       };
 
-      expect(synthesizeTraceContext(args)).toEqual(synthesizeTraceContext(args));
+      expect(synthesizeTraceContext(args)).toEqual(
+        synthesizeTraceContext(args),
+      );
     });
   });
 });
