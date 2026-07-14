@@ -402,9 +402,13 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     );
     if (args !== null) {
       attrs.take(VERTEX_ADK_KEYS.TOOL_CALL_ARGS);
-      this.setIfMissing(ctx, ATTR_KEYS.LANGWATCH_INPUT, args);
-      this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS, args);
-      ctx.recordRule(`${this.id}:tool_call_args->input`);
+      const argsSet = [
+        this.setIfMissing(ctx, ATTR_KEYS.LANGWATCH_INPUT, args),
+        this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS, args),
+      ].some(Boolean);
+      if (argsSet) {
+        ctx.recordRule(`${this.id}:tool_call_args->input`);
+      }
     }
 
     const result = stringifyToolPayload(
@@ -412,9 +416,13 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     );
     if (result !== null) {
       attrs.take(VERTEX_ADK_KEYS.TOOL_RESPONSE);
-      this.setIfMissing(ctx, ATTR_KEYS.LANGWATCH_OUTPUT, result);
-      this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT, result);
-      ctx.recordRule(`${this.id}:tool_response->output`);
+      const resultSet = [
+        this.setIfMissing(ctx, ATTR_KEYS.LANGWATCH_OUTPUT, result),
+        this.setIfMissing(ctx, ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT, result),
+      ].some(Boolean);
+      if (resultSet) {
+        ctx.recordRule(`${this.id}:tool_response->output`);
+      }
     }
   }
 

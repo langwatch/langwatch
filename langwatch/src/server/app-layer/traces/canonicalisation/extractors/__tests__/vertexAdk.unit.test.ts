@@ -307,6 +307,23 @@ describe("VertexAdkExtractor", () => {
       });
     });
 
+    describe("when the response carries a finish reason", () => {
+      it("lifts it to gen_ai.response.finish_reasons", () => {
+        const attrs = llmSpanAttrs();
+        attrs["gcp.vertex.agent.llm_response"] = JSON.stringify({
+          content: { parts: [{ text: "Done." }], role: "model" },
+          finish_reason: "STOP",
+        });
+        const ctx = createExtractorContext(attrs);
+
+        extractor.apply(ctx);
+
+        expect(ctx.out[ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS]).toEqual([
+          "STOP",
+        ]);
+      });
+    });
+
     describe("when the response carries raw Gemini candidates", () => {
       it("extracts output messages from candidates[].content", () => {
         const attrs = llmSpanAttrs();
@@ -432,6 +449,28 @@ describe("VertexAdkExtractor", () => {
         );
         expect(ctx.bag.attrs.has("gcp.vertex.agent.llm_request")).toBe(false);
         expect(ctx.bag.attrs.has("gcp.vertex.agent.llm_response")).toBe(false);
+      });
+    });
+
+    describe("when the tool input/output were already set by an earlier source", () => {
+      it("does not record the tool lift rules", () => {
+        const ctx = createExtractorContext({
+          ...toolSpanAttrs(),
+          [ATTR_KEYS.LANGWATCH_INPUT]: "already set",
+          [ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS]: "already set",
+          [ATTR_KEYS.LANGWATCH_OUTPUT]: "already set",
+          [ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT]: "already set",
+        });
+
+        extractor.apply(ctx);
+
+        expect(ctx.recordRule).not.toHaveBeenCalledWith(
+          "vertex-adk:tool_call_args->input",
+        );
+        expect(ctx.recordRule).not.toHaveBeenCalledWith(
+          "vertex-adk:tool_response->output",
+        );
+        expect(ctx.out[ATTR_KEYS.LANGWATCH_INPUT]).toBeUndefined();
       });
     });
 
