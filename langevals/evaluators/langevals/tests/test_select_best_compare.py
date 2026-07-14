@@ -141,6 +141,33 @@ def test_returns_tie_when_judge_ties():
     assert result.score == 0.5
 
 
+def test_out_of_enum_winner_degrades_to_first_slot():
+    """Not every provider strictly enforces the tool-call `enum`, so the
+    judge can return a `winner` slot that was never presented (e.g. "Z" when
+    only slots A/B/C exist). The evaluator must not crash with a KeyError on
+    the slot lookup — it degrades to the first slot and still returns a
+    processed result naming a real candidate (mirrors legacy pairwise's
+    default-slot fallback)."""
+    evaluator = SelectBestCompareEvaluator(settings=SelectBestCompareSettings())
+    entry = _make_entry(num_candidates=3)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response("picked a phantom slot", "Z"),
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    # No exception: the phantom slot falls back to the first slot's candidate,
+    # which is one of the original ids — never the phantom "Z" or "tie".
+    assert result.status == "processed"
+    assert result.label in {"variant_0", "variant_1", "variant_2"}
+    assert result.label not in {"A", "B", "C", "Z", "tie"}
+    assert result.score == 1.0
+
+
 def test_deterministic_shuffle_by_row_index():
     """
     Same row_index -> identical slot-to-candidate ordering across
@@ -413,6 +440,44 @@ def test_default_prompt_carries_golden_slot_and_no_golden_variant_drops_it():
     assert "{candidates}" in DEFAULT_SELECT_BEST_PROMPT
     assert "{golden}" not in DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
     assert "{candidates}" in DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
+
+
+def test_custom_prompt_with_unknown_braces_does_not_crash():
+    """A customized judge prompt may contain unknown placeholders (e.g.
+    {candidate_notes}) or a stray literal brace (e.g. a rubric like "score
+    out of {10"). The evaluator substitutes known slots with str.replace,
+    NOT str.format, so unknown/unbalanced braces pass through verbatim
+    instead of raising KeyError/ValueError. This test crashes against the
+    old str.format() rendering and passes now."""
+    custom_prompt = (
+        "Pick the best.\n"
+        "Task: {input}\n"
+        "Notes: {candidate_notes}\n"  # unknown placeholder -> KeyError under str.format
+        "Rubric: score out of {10\n"  # stray literal brace -> ValueError under str.format
+        "Candidates:\n{candidates}"
+    )
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(prompt=custom_prompt)
+    )
+    entry = _make_entry(num_candidates=3)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response("ok", "A"),
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    # No exception raised while rendering the prompt.
+    assert result.status == "processed"
+    # The unknown placeholder survives verbatim in the rendered prompt, while
+    # the known {input}/{candidates} slots were substituted.
+    rendered = mock_completion.call_args.kwargs["messages"][1]["content"]
+    assert "{candidate_notes}" in rendered
+    assert "{input}" not in rendered
+    assert "{candidates}" not in rendered
 
 
 def test_slot_label_helper_covers_alphabet_and_overflow():

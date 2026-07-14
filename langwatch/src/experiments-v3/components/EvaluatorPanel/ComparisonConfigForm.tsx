@@ -454,6 +454,30 @@ function GoldenAnswerSection({
     update({ hasGoldenAnswer: on, ...(on ? {} : { goldenField: "" }) });
   };
 
+  // Reconcile the store's `hasGoldenAnswer` with the form's true source of
+  // truth on MOUNT too, not just on click (#5528). Selecting an EXISTING
+  // saved comparison evaluator as a new column target seeds `comparison`
+  // before this form ever mounts, independently of the evaluator's real
+  // persisted `settings.has_golden_answer` — the two can start out
+  // mismatched. The toggle above already renders correctly because it reads
+  // `watchedHasGoldenAnswer` (the form), which gives false confidence: the
+  // underlying store keeps the wrong seeded value until the user clicks the
+  // toggle themselves, and that stale value is what gets saved and read at
+  // execution time. `update()` only writes to the store/draft, never to the
+  // RHF form, so this cannot loop back into `watchedHasGoldenAnswer`.
+  useEffect(() => {
+    if (typeof watchedHasGoldenAnswer !== "boolean") return;
+    if (watchedHasGoldenAnswer === draft.hasGoldenAnswer) return;
+    update({
+      hasGoldenAnswer: watchedHasGoldenAnswer,
+      ...(watchedHasGoldenAnswer === false ? { goldenField: "" } : {}),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `update` is
+    // recreated every render; including it would re-run this effect on
+    // every keystroke elsewhere in the form for no benefit (it's a no-op
+    // once draft.hasGoldenAnswer matches the form).
+  }, [watchedHasGoldenAnswer, draft.hasGoldenAnswer]);
+
   return (
     <Box>
       <HStack justify="space-between" align="start">

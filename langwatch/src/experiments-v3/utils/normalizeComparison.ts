@@ -125,11 +125,17 @@ export const resolveVerdictLabel = ({
 /**
  * Whether a stored verdict label names this variant.
  *
- * A variant answers to three identifiers, and which one a run recorded depends
- * on what the orchestrator could resolve at execution time: the prompt handle
- * (`"concise-support-v2"`) when the prompt was loaded, the prompt's KSUID when
- * it wasn't, or the internal target id for non-prompt targets. `resolvedName`
- * is the handle as the UI knows it — pass "" when it hasn't loaded yet.
+ * Today's orchestrator (`variantIdentifierFor`) only ever records the prompt
+ * handle (`"concise-support-v2"`) when it could resolve one, or the internal
+ * target id otherwise — it deliberately never falls back to the prompt's
+ * KSUID. `resolvedName` is the handle as the UI knows it — pass "" when it
+ * hasn't loaded yet.
+ *
+ * The `target.promptId` check below is a compatibility shim, not a live path:
+ * an earlier version of the orchestrator did fall back to the raw promptId
+ * KSUID before that was found to break label matching and dropped. It stays
+ * here so verdicts recorded during that window still resolve; current runs
+ * never produce a label that hits it.
  *
  * Shared by every surface that maps a verdict back onto a column, so the
  * winner-by-identifier contract has exactly one interpretation.

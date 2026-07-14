@@ -465,14 +465,25 @@ export function EvaluationsV3Table({
       // evaluator-as-target keeps its current behavior.
       const config = (evaluator.config ?? null) as {
         evaluatorType?: string;
+        settings?: { has_golden_answer?: boolean };
       } | null;
       const isComparisonJudge =
         config?.evaluatorType === COMPARISON_EVALUATOR_TYPE ||
         config?.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
 
+      // An existing comparison evaluator's saved `has_golden_answer` setting
+      // is the source of truth for whether it needs a golden answer at all.
+      // Hardcoding `true` here regardless of what was actually saved left a
+      // "no golden answer" evaluator seeded with the wrong value: the column
+      // target got `hasGoldenAnswer: true, goldenField: ""`, which
+      // `isGoldenFieldSatisfied` reads as unsatisfied, silently skipping the
+      // column at execution (#5528). Only fall back to `true` when the
+      // evaluator has no saved setting at all (a genuinely new/
+      // never-configured comparison).
+      const savedHasGoldenAnswer = config?.settings?.has_golden_answer;
       const comparison = pendingComparisonRef.current ?? {
         variants: [],
-        hasGoldenAnswer: true,
+        hasGoldenAnswer: savedHasGoldenAnswer ?? true,
         goldenField: "",
         includeMetrics: [],
         randomizeOrder: true,

@@ -894,6 +894,12 @@ export const evaluatorsSchema = z.object({
         .default(
           'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n',
         ),
+      has_golden_answer: z
+        .boolean()
+        .describe(
+          "Compare each candidate against a reference answer. Turn off to have the judge compare the candidates directly on their own merits, with no reference answer involved.",
+        )
+        .default(true),
       randomize_order: z
         .boolean()
         .describe(
@@ -2362,6 +2368,11 @@ candidate's position never sways the verdict.
           "Judge prompt template. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
         default:
           'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n',
+      },
+      has_golden_answer: {
+        description:
+          "Compare each candidate against a reference answer. Turn off to have the judge compare the candidates directly on their own merits, with no reference answer involved.",
+        default: true,
       },
       randomize_order: {
         description:

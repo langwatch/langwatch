@@ -23,6 +23,7 @@ import {
   COMPARISON_EVALUATOR_TYPE,
   isComparisonEvaluator,
   isGoldenFieldSatisfied,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
 import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
@@ -359,6 +360,15 @@ export const generateComparisonCells = (
     Array<{ name: string; score?: number; label?: string; passed?: boolean }>
   >,
   loadedPrompts?: Map<string, VersionedPrompt>,
+  /**
+   * DB evaluators, keyed by id — used to detect a column-target whose backing
+   * evaluator row is still the legacy `pairwise_compare` judge (see
+   * `isLegacyPairwiseBacked` below). Optional so every existing call
+   * site (including every test in this file) keeps compiling unchanged; when
+   * omitted, column-targets are treated as current-shape comparisons, same as
+   * before this parameter existed.
+   */
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
 ): { cells: ExecutionCell[]; skipReasons: ComparisonSkipReason[] } => {
   const cells: ExecutionCell[] = [];
   const skipReasons: ComparisonSkipReason[] = [];
@@ -541,6 +551,37 @@ export const generateComparisonCells = (
   };
 
   /**
+   * Whether a column-target's BACKING DB evaluator is still the legacy
+   * two-slot `langevals/pairwise_compare` judge, as opposed to the current
+   * N-way `langevals/select_best_compare` one.
+   *
+   * Column-target cells build a synthetic in-memory EvaluatorConfig (below)
+   * rather than reading one out of `state.targets`/`state.evaluators`, so
+   * unlike a chip-style comparison (whose `evaluator.evaluatorType` is
+   * whatever was actually persisted) the synthetic's type has to be resolved
+   * explicitly. Getting this wrong matters: workflowBuilder's
+   * `buildEvaluatorNode` always dispatches column-targets via
+   * `evaluators/{dbEvaluatorId}`, and that route resolves the judge that
+   * actually runs from the DB row's OWN persisted `config.evaluatorType`
+   * (see evaluations-legacy.ts), ignoring whatever type we hand it here. An
+   * experiment saved before the pairwise/N-way merge still has a DB row
+   * whose evaluatorType is the legacy judge — nothing in this PR migrates
+   * existing rows — so the payload shape built for this cell must match
+   * that row's real type, not the type the workbench would create today.
+   *
+   * Returns false (current-shape) when there's nothing to resolve against
+   * (no `loadedEvaluators`, or the id isn't in it) — the safe default that
+   * matches this function's pre-existing behavior.
+   */
+  const isLegacyPairwiseBacked = (dbEvaluatorId: string | undefined): boolean => {
+    if (!dbEvaluatorId) return false;
+    const dbConfig = loadedEvaluators?.get(dbEvaluatorId)?.config as
+      | { evaluatorType?: string }
+      | undefined;
+    return dbConfig?.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+  };
+
+  /**
    * The candidate payload for one row, or the names of the variants that had
    * no output. Applies structured-output narrowing and score augmentation in
    * the config's variant order — that order is what the judge's deterministic
@@ -659,6 +700,13 @@ export const generateComparisonCells = (
 
     const variantIds = buildVariantIdentifiers(resolvedVariants);
 
+    // Resolved once per target (not per row): whether the DB evaluator this
+    // column dispatches to is still the legacy 2-slot judge. See
+    // isLegacyPairwiseBacked's JSDoc for why this can't just read
+    // COMPARISON_EVALUATOR_TYPE off the target/cfg.
+    const legacyPairwise =
+      isLegacyPairwiseBacked(target.targetEvaluatorId) && variantIds.length === 2;
+
     for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
@@ -695,6 +743,18 @@ export const generateComparisonCells = (
         );
       }
 
+      // Same #5378 gate buildEvaluatorInputs applies at runtime
+      // (hasGoldenAnswer !== false && goldenField). Without it here too, a
+      // legacy pairwise config folded in with hasGoldenAnswer false but a
+      // stale non-empty goldenField (fromPairwise copies it verbatim) would
+      // still bake a golden reference into this synthetic's static value
+      // mapping while the runtime path correctly omits it — the two
+      // disagreeing on the same config.
+      const goldenValue =
+        cfg.hasGoldenAnswer !== false && cfg.goldenField
+          ? datasetEntry[cfg.goldenField]
+          : undefined;
+
       // Per-row synthetic evaluator with PRE-RESOLVED value mappings for every
       // judge input. Pre-fix (#5131) the synthetic was shared across rows with
       // `mappings: {}`, leaving the candidate fields to be filled in by
@@ -706,40 +766,67 @@ export const generateComparisonCells = (
       // them into the workflow node's static inputs (and the mapping-branch
       // fallback in buildEvaluatorInputs sees them too), so they always reach
       // the judge regardless of which dispatch path is taken.
+      //
+      // The shape baked here must match whichever judge will ACTUALLY run —
+      // the legacy 2-slot `candidate_a_id/output` + `candidate_b_id/output`
+      // shape when `legacyPairwise`, or the N-way `candidates` shape
+      // otherwise. See isLegacyPairwiseBacked's JSDoc for why the DB row,
+      // not this cell's in-memory config, decides which judge runs.
+      const [candidateA, candidateB] = built.candidates!.candidates;
       const perRowMappings: Record<
         string,
         Record<string, Record<string, { type: "value"; value: unknown }>>
       > = {
         [datasetId]: {
-          [target.id]: {
-            candidates: {
-              type: "value",
-              value: built.candidates!.candidates,
-            },
-            row_index: { type: "value", value: rowIndex },
-            input: { type: "value", value: resolvedInput },
-            // Same #5378 gate buildEvaluatorInputs applies at runtime
-            // (hasGoldenAnswer !== false && goldenField). Without it here
-            // too, a legacy pairwise config folded in with hasGoldenAnswer
-            // false but a stale non-empty goldenField (fromPairwise copies
-            // it verbatim) would still bake a golden reference into this
-            // synthetic's static value mapping while the runtime path
-            // correctly omits it — the two disagreeing on the same config.
-            golden: {
-              type: "value",
-              value:
-                cfg.hasGoldenAnswer !== false && cfg.goldenField
-                  ? datasetEntry[cfg.goldenField]
-                  : undefined,
-            },
-          },
+          [target.id]: legacyPairwise
+            ? {
+                candidate_a_id: { type: "value", value: variantIds[0] },
+                candidate_a_output: {
+                  type: "value",
+                  value: candidateA?.output,
+                },
+                candidate_a_cost: { type: "value", value: candidateA?.cost },
+                candidate_a_duration: {
+                  type: "value",
+                  value: candidateA?.duration,
+                },
+                candidate_b_id: { type: "value", value: variantIds[1] },
+                candidate_b_output: {
+                  type: "value",
+                  value: candidateB?.output,
+                },
+                candidate_b_cost: { type: "value", value: candidateB?.cost },
+                candidate_b_duration: {
+                  type: "value",
+                  value: candidateB?.duration,
+                },
+                input: { type: "value", value: resolvedInput },
+                golden: { type: "value", value: goldenValue },
+              }
+            : {
+                candidates: {
+                  type: "value",
+                  value: built.candidates!.candidates,
+                },
+                row_index: { type: "value", value: rowIndex },
+                input: { type: "value", value: resolvedInput },
+                golden: { type: "value", value: goldenValue },
+              },
         },
       };
 
       const syntheticEvaluator = {
         id: target.id,
         dbEvaluatorId: target.targetEvaluatorId,
-        evaluatorType: COMPARISON_EVALUATOR_TYPE,
+        // Mirror the judge that will ACTUALLY run (see
+        // isLegacyPairwiseBacked), not what a freshly-created column would
+        // use — forcing COMPARISON_EVALUATOR_TYPE unconditionally here is
+        // what caused #5528's re-run regression for untouched legacy
+        // pairwise experiments (the payload above was always the N-way
+        // shape, dispatched to a judge that still expects the 2-slot one).
+        evaluatorType: legacyPairwise
+          ? LEGACY_PAIRWISE_EVALUATOR_TYPE
+          : COMPARISON_EVALUATOR_TYPE,
         comparison: cfg,
         inputs: target.inputs,
         mappings: perRowMappings,
@@ -1241,7 +1328,14 @@ const assignMappedInput = ({
  * Note: Dataset entries are normalized to use column NAMES as keys at the API boundary,
  * so we can use mapping.sourceField directly without ID-to-name translation.
  */
-const buildEvaluatorInputs = (
+/**
+ * Exported (in addition to being used internally by executeCell) so it can be
+ * unit-tested directly: it is the one place that assembles the actual
+ * per-evaluator dispatch payload at runtime, and the comparison branch is
+ * where #5528's legacy-pairwise/N-way payload-shape bug lives. See the
+ * `evaluator.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE` branch below.
+ */
+export const buildEvaluatorInputs = (
   cell: ExecutionCell,
   evaluatorId: string,
   targetOutput: Record<string, unknown>,
@@ -1282,14 +1376,43 @@ const buildEvaluatorInputs = (
       inputs.golden = cell.datasetEntry[comparisonConfig.goldenField];
     }
 
-    inputs.candidates = cell.comparison.candidates.map((c) => ({
-      id: c.id,
-      output: c.output,
-      cost: c.cost,
-      duration: c.duration,
-    }));
-    // Seeds the judge's deterministic candidate shuffle (randomize_order).
-    inputs.row_index = cell.rowIndex;
+    // The judge that ACTUALLY runs is resolved server-side from the DB
+    // evaluator row (workflowBuilder's buildEvaluatorNode always prefers
+    // `evaluators/{dbEvaluatorId}`, which ignores this in-memory
+    // evaluatorType — see evaluations-legacy.ts). For a column-target,
+    // generateComparisonCells resolves `evaluator.evaluatorType` from that
+    // same DB row (see isLegacyPairwiseBacked), so it's already accurate
+    // here; for a chip-style comparison, `evaluator` is the real persisted
+    // EvaluatorConfig, so its evaluatorType is accurate by construction.
+    // Either way: a legacy `pairwise_compare` judge expects the two-slot
+    // `candidate_a_id/output` + `candidate_b_id/output` shape, not
+    // `candidates` — sending the N-way shape 400s ("missing required field:
+    // candidate_a_id") on re-running an untouched legacy pairwise
+    // experiment.
+    if (evaluator.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE) {
+      const [candidateA, candidateB] = cell.comparison.candidates;
+      if (candidateA) {
+        inputs.candidate_a_id = candidateA.id;
+        inputs.candidate_a_output = candidateA.output;
+        inputs.candidate_a_cost = candidateA.cost;
+        inputs.candidate_a_duration = candidateA.duration;
+      }
+      if (candidateB) {
+        inputs.candidate_b_id = candidateB.id;
+        inputs.candidate_b_output = candidateB.output;
+        inputs.candidate_b_cost = candidateB.cost;
+        inputs.candidate_b_duration = candidateB.duration;
+      }
+    } else {
+      inputs.candidates = cell.comparison.candidates.map((c) => ({
+        id: c.id,
+        output: c.output,
+        cost: c.cost,
+        duration: c.duration,
+      }));
+      // Seeds the judge's deterministic candidate shuffle (randomize_order).
+      inputs.row_index = cell.rowIndex;
+    }
 
     // Defensive fallback: if a candidate value was lost between cell creation
     // and here, pull it from the per-row synthetic value mappings that
@@ -1994,6 +2117,7 @@ export async function* runOrchestrator(
           completedTargetOutputs,
           completedTargetEvaluatorScores,
           loadedPrompts,
+          loadedEvaluators,
         );
 
         // Fold Phase-2 cells into the run total now that we know how many

@@ -209,8 +209,13 @@ class SelectBestCompareEvaluator(
             label=winner_id,
             details=verdict["reasoning"],
             cost=(
+                # `is not None` (not a truthiness check) so a genuine $0.0
+                # cost — a real, free judge call — is preserved as Money(0.0)
+                # rather than being coerced to None. cost stays None only when
+                # completion_cost actually failed to compute (verdict["cost"]
+                # is None).
                 Money(amount=verdict["cost"], currency="USD")
-                if verdict["cost"]
+                if verdict.get("cost") is not None
                 else None
             ),
         )
@@ -322,8 +327,19 @@ class SelectBestCompareEvaluator(
         displayed = arguments["winner"]
         if displayed == "tie":
             winner_id = "tie"
-        else:
+        elif displayed in slot_to_candidate:
             winner_id = slot_to_candidate[displayed].id
+        else:
+            # Defensive fallback: not every provider strictly enforces the
+            # tool-call `enum`, so the judge can return a `winner` slot we
+            # never presented (e.g. "D" when only slots A/B/C exist). Rather
+            # than crash with a KeyError on the slot lookup, degrade
+            # gracefully to the first slot — mirrors legacy pairwise_compare,
+            # whose final else maps any unexpected winner onto a real slot
+            # instead of raising. There are always >= 2 candidates here (the
+            # <2 case skips earlier), so slot "A" always exists and the row
+            # still yields a processed result naming a real candidate.
+            winner_id = slot_to_candidate[_slot_label(0)].id
 
         try:
             call_cost = completion_cost(completion_response=response)

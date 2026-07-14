@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
-import { generateCells, generateComparisonCells } from "../orchestrator";
+import {
+  buildEvaluatorInputs,
+  generateCells,
+  generateComparisonCells,
+} from "../orchestrator";
 import type { ExecutionScope } from "../types";
 
 describe("orchestrator", () => {
@@ -397,6 +401,177 @@ describe("orchestrator", () => {
       expect(cells[0]?.evaluatorConfigs[0]?.comparison?.goldenField).toBe(
         "expected",
       );
+    });
+
+    // Regression (#5528 follow-up): an experiment saved BEFORE the
+    // pairwise/N-way merge still has an Evaluator DB row whose persisted
+    // config.evaluatorType is literally "langevals/pairwise_compare" — the
+    // merge never migrates existing rows. workflowBuilder's
+    // buildEvaluatorNode always dispatches column-targets via
+    // `evaluators/{dbEvaluatorId}`, and evaluations-legacy.ts resolves the
+    // judge that actually runs from THAT row's real evaluatorType, ignoring
+    // whatever type the orchestrator hands it. Forcing
+    // COMPARISON_EVALUATOR_TYPE onto the synthetic evaluator and always
+    // building the `candidates` payload therefore sent the N-way shape to a
+    // judge that still expects the legacy `candidate_a_id/output` +
+    // `candidate_b_id/output` shape — a bare Load -> Run of an untouched
+    // legacy pairwise experiment 400s ("missing required field:
+    // candidate_a_id") instead of re-running successfully.
+    describe("given a column-target whose backing DB evaluator is still the legacy pairwise_compare judge", () => {
+      const legacyPairwiseState = () => {
+        const state = createTestState(2, 0);
+        state.targets.push({
+          id: "pairwise-target",
+          type: "evaluator",
+          targetEvaluatorId: "db-pairwise-evaluator",
+          inputs: [
+            { identifier: "candidate_a_output", type: "str" },
+            { identifier: "candidate_b_output", type: "str" },
+            { identifier: "golden", type: "str" },
+          ],
+          outputs: [{ identifier: "label", type: "str" }],
+          mappings: {},
+          pairwise: {
+            variantA: "target-1",
+            variantB: "target-2",
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+          },
+        });
+        return state;
+      };
+
+      const legacyCompletedTargetOutputs = new Map([
+        [
+          "0:target-1",
+          { output: "answer from A", cost: 0.01, duration: 120 },
+        ],
+        [
+          "0:target-2",
+          { output: "answer from B", cost: 0.02, duration: 150 },
+        ],
+      ]);
+
+      // The realistic DB state for any comparison column created before this
+      // PR: the row's persisted config still says pairwise_compare.
+      const loadedEvaluators = new Map([
+        [
+          "db-pairwise-evaluator",
+          {
+            id: "db-pairwise-evaluator",
+            name: "Pairwise Compare",
+            config: { evaluatorType: "langevals/pairwise_compare" },
+          },
+        ],
+      ]);
+
+      it("resolves the synthetic evaluator's type from the DB row instead of forcing select_best_compare", () => {
+        const { cells } = generateComparisonCells(
+          legacyPairwiseState(),
+          createTestDataset(1),
+          legacyCompletedTargetOutputs,
+          undefined,
+          undefined,
+          loadedEvaluators,
+        );
+
+        expect(cells).toHaveLength(1);
+        expect(cells[0]?.evaluatorConfigs[0]?.evaluatorType).toBe(
+          "langevals/pairwise_compare",
+        );
+      });
+
+      it("bakes the legacy 2-slot mapping shape instead of `candidates`", () => {
+        const { cells } = generateComparisonCells(
+          legacyPairwiseState(),
+          createTestDataset(1),
+          legacyCompletedTargetOutputs,
+          undefined,
+          undefined,
+          loadedEvaluators,
+        );
+
+        const mappings = cells[0]?.evaluatorConfigs[0]?.mappings[
+          "dataset-1"
+        ]?.["pairwise-target"] as Record<string, { value: unknown }>;
+
+        expect(mappings.candidate_a_id?.value).toBe("target-1");
+        expect(mappings.candidate_a_output?.value).toBe("answer from A");
+        expect(mappings.candidate_b_id?.value).toBe("target-2");
+        expect(mappings.candidate_b_output?.value).toBe("answer from B");
+        expect(mappings.candidates).toBeUndefined();
+        expect(mappings.row_index).toBeUndefined();
+      });
+
+      // The end-to-end check: what actually gets dispatched at runtime via
+      // buildEvaluatorInputs (executeCell's payload assembler), not just the
+      // static mapping snapshot above.
+      it("dispatches the fields a pairwise_compare judge requires, not the N-way `candidates` shape", () => {
+        const { cells } = generateComparisonCells(
+          legacyPairwiseState(),
+          createTestDataset(1),
+          legacyCompletedTargetOutputs,
+          undefined,
+          undefined,
+          loadedEvaluators,
+        );
+        const cell = cells[0]!;
+        const evaluatorId = cell.evaluatorConfigs[0]!.id;
+
+        const dispatchedInputs = buildEvaluatorInputs(cell, evaluatorId, {});
+
+        // Matches "langevals/pairwise_compare".requiredFields in
+        // evaluators.generated.ts: candidate_a_id, candidate_a_output,
+        // candidate_b_id, candidate_b_output.
+        expect(dispatchedInputs.candidate_a_id).toBe("target-1");
+        expect(dispatchedInputs.candidate_a_output).toBe("answer from A");
+        expect(dispatchedInputs.candidate_b_id).toBe("target-2");
+        expect(dispatchedInputs.candidate_b_output).toBe("answer from B");
+        expect(dispatchedInputs.candidates).toBeUndefined();
+        expect(dispatchedInputs.row_index).toBeUndefined();
+      });
+
+      // Control: the SAME shape of column-target, but the backing DB row has
+      // already self-healed to select_best_compare (e.g. the user re-saved
+      // the column once) — must keep building the N-way payload, not regress
+      // to the legacy shape for every pairwise-originated column forever.
+      it("still builds the `candidates` payload once the DB row has self-healed to select_best_compare", () => {
+        const healedLoadedEvaluators = new Map([
+          [
+            "db-pairwise-evaluator",
+            {
+              id: "db-pairwise-evaluator",
+              name: "Comparison",
+              config: { evaluatorType: "langevals/select_best_compare" },
+            },
+          ],
+        ]);
+
+        const { cells } = generateComparisonCells(
+          legacyPairwiseState(),
+          createTestDataset(1),
+          legacyCompletedTargetOutputs,
+          undefined,
+          undefined,
+          healedLoadedEvaluators,
+        );
+
+        expect(cells[0]?.evaluatorConfigs[0]?.evaluatorType).toBe(
+          "langevals/select_best_compare",
+        );
+        const cell = cells[0]!;
+        const dispatchedInputs = buildEvaluatorInputs(
+          cell,
+          cell.evaluatorConfigs[0]!.id,
+          {},
+        );
+        expect(dispatchedInputs.candidates).toEqual([
+          { id: "target-1", output: "answer from A", cost: 0.01, duration: 120 },
+          { id: "target-2", output: "answer from B", cost: 0.02, duration: 150 },
+        ]);
+        expect(dispatchedInputs.candidate_a_id).toBeUndefined();
+      });
     });
 
     // #5101 is specifically about N-way (3+) comparisons, not just the

@@ -31,6 +31,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
+
 import type { BatchComparisonColumn } from "./types";
 
 /**
@@ -87,10 +89,28 @@ export function WinRateChart({
     );
   }
 
+  // Two variants can share a display name (e.g. the same prompt handle run
+  // twice with different configs) while still having distinct target ids and
+  // win tallies (see buildVariantIdentifiers in orchestrator.ts). Without
+  // disambiguation the chart would render two bars labeled identically —
+  // correct data, unreadable axis. Mirrors ComparisonColumnHeader's use of
+  // the same utility for the workbench column header.
+  //
+  // Trim BEFORE disambiguating, not after: two colliding names are still
+  // colliding once truncated to the same prefix (truncation is deterministic),
+  // so collision detection is unaffected — but disambiguating first and
+  // trimming second would truncate the " (1)"/" (2)" suffix right back off
+  // for any name within a few characters of the 10-char budget (e.g.
+  // "gpt-5-mini (1)" and "gpt-5-mini (2)" both collapse to the identical
+  // "gpt-5-min…", silently reintroducing the exact bug this fixes).
+  const variantNames = disambiguateNames(
+    column.variants.map((v) => trimAxisLabel(v.name)),
+  );
+
   const chartData = [
     ...column.variants.map((variant, index) => ({
       key: variant.id ?? `variant-${index}`,
-      name: trimAxisLabel(variant.name),
+      name: variantNames[index] ?? trimAxisLabel(variant.name),
       wins: variant.id ? (winsByVariantId.get(variant.id) ?? 0) : 0,
       color:
         (variant.id ? targetColors?.[variant.id] : undefined) ??

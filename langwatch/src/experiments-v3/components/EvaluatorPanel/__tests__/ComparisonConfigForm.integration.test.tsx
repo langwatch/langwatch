@@ -198,6 +198,103 @@ describe("ComparisonConfigForm", () => {
     });
   });
 
+  // #5528: selecting an EXISTING saved comparison evaluator as a new column
+  // target seeds `comparison.hasGoldenAnswer: true` regardless of what the
+  // evaluator was actually saved with (EvaluationsV3Table's
+  // handleSelectEvaluatorAsTarget). The toggle above reads the form's
+  // settings.has_golden_answer — which IS loaded correctly from the saved
+  // evaluator — so it renders correctly and gives false confidence, while
+  // the store's comparison.hasGoldenAnswer silently keeps the wrong seeded
+  // value until the user clicks the toggle themselves. That stale value is
+  // what actually gets saved and read at execution time.
+  describe("given the initial draft disagrees with the evaluator's saved setting", () => {
+    it("reconciles hasGoldenAnswer from the form on mount, without any click", async () => {
+      const onChange = vi.fn();
+      const MismatchedFormWrapper = ({ children }: { children: ReactNode }) => {
+        const methods = useForm({
+          defaultValues: {
+            settings: {
+              has_golden_answer: false,
+              include_metrics: [] as string[],
+            },
+          },
+        });
+        return (
+          <ChakraProvider value={defaultSystem}>
+            <FormProvider {...methods}>{children}</FormProvider>
+          </ChakraProvider>
+        );
+      };
+
+      render(
+        <MismatchedFormWrapper>
+          <ComparisonConfigForm
+            value={baseConfig({ hasGoldenAnswer: true, variants: ["t1", "t2"] })}
+            onChange={onChange}
+            targets={[target("t1"), target("t2")]}
+            datasetColumns={[{ id: "col-1", name: "expected_output" }]}
+          />
+        </MismatchedFormWrapper>,
+      );
+
+      // No user interaction whatsoever — mount alone must correct the
+      // mismatch so the persisted comparison config matches what the form
+      // (and the saved evaluator) actually say.
+      await waitFor(() => {
+        expect(onChange).toHaveBeenCalledWith(
+          expect.objectContaining({ hasGoldenAnswer: false, goldenField: "" }),
+        );
+      });
+
+      // The corrected state also keeps the golden field picker hidden,
+      // matching what the toggle already displayed.
+      expect(
+        screen.queryByTestId("comparison-golden-field"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("leaves goldenField untouched when the form says golden answer is on", async () => {
+      const onChange = vi.fn();
+      const AgreeingFormWrapper = ({ children }: { children: ReactNode }) => {
+        const methods = useForm({
+          defaultValues: {
+            settings: {
+              has_golden_answer: true,
+              include_metrics: [] as string[],
+            },
+          },
+        });
+        return (
+          <ChakraProvider value={defaultSystem}>
+            <FormProvider {...methods}>{children}</FormProvider>
+          </ChakraProvider>
+        );
+      };
+
+      render(
+        <AgreeingFormWrapper>
+          <ComparisonConfigForm
+            value={baseConfig({
+              hasGoldenAnswer: true,
+              goldenField: "expected_output",
+              variants: ["t1", "t2"],
+            })}
+            onChange={onChange}
+            targets={[target("t1"), target("t2")]}
+            datasetColumns={[{ id: "col-1", name: "expected_output" }]}
+          />
+        </AgreeingFormWrapper>,
+      );
+
+      // hasGoldenAnswer already agrees (true === true), so reconciliation
+      // must not fire and must not clobber the already-chosen golden field.
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByTestId("comparison-golden-field")).toHaveTextContent(
+        "expected_output",
+      );
+    });
+  });
+
   // Restored from PairwiseConfigForm, which had a per-variant output picker
   // before the forms merged. Without it a variant emitting a structured
   // output cannot be narrowed to a field. Which field is a per-variant call:
