@@ -66,11 +66,6 @@ describe("project.publicGetById", () => {
         slug: "test-project",
         language: "typescript",
         framework: "nextjs",
-        firstMessage: true as const,
-        apiKey: "" as const,
-        teamId: "" as const,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       };
       mockGetPublicProjectForGrant.mockResolvedValue({
         status: "granted",

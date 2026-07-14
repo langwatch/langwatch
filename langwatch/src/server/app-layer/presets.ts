@@ -132,6 +132,7 @@ import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
+import { PrismaShareLifecycleLocker } from "./share/share.lifecycleLock";
 import { ShareService } from "./share/share.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
@@ -535,7 +536,11 @@ export function initializeDefaultApp(options?: {
   };
 
   const share = traced(
-    new ShareService(shareRepo, pinnedTraceService),
+    new ShareService({
+      repo: shareRepo,
+      pinnedTraces: pinnedTraceService,
+      lifecycleLocker: new PrismaShareLifecycleLocker(prisma),
+    }),
     "ShareService",
   );
 
@@ -1136,10 +1141,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       retroactive: new RetroactiveUpdateService(null),
       metering: new StorageMeterService({ resolveClickHouseClient: null }),
     },
-    share: new ShareService(
-      new PrismaShareRepository(testPrisma),
-      testPinnedTraceService,
-    ),
+    share: new ShareService({
+      repo: new PrismaShareRepository(testPrisma),
+      pinnedTraces: testPinnedTraceService,
+      lifecycleLocker: new PrismaShareLifecycleLocker(testPrisma),
+    }),
     ...overrides,
   });
 }

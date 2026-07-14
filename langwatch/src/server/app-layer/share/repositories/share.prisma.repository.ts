@@ -107,14 +107,15 @@ export class PrismaShareRepository implements ShareRepository {
     projectId: string;
     maxViews: number | null;
   }): Promise<boolean> {
-    // Atomic conditional update: only increment if the link exists and either
-    // maxViews is null (unlimited) or viewCount < maxViews. This prevents race
-    // conditions where concurrent resolves could all pass the view-exhausted check
-    // and each consume a view beyond the cap.
+    // Atomic conditional update: only increment if the link still exists, has
+    // not expired, and either maxViews is null (unlimited) or viewCount is below
+    // the cap. Grant signing happens before this write, so an expiry race can
+    // neither spend a view nor leave the caller without a mintable grant.
     const result = await this.prisma.shareLink.updateMany({
       where: {
         id,
         projectId,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         ...(maxViews !== null ? { viewCount: { lt: maxViews } } : {}),
       },
       data: { viewCount: { increment: 1 } },

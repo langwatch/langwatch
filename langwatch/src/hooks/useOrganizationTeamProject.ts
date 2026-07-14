@@ -231,6 +231,14 @@ export const useOrganizationTeamProject = (
     return project;
   }, [isDemo, project, publicEnv.data?.DEMO_PROJECT_SLUG]);
 
+  // `publicGetById` deliberately returns only share-safe project chrome. The
+  // legacy hook's project type is wider because authenticated routes receive
+  // the organization projection; read-only share consumers use only the common
+  // id/name/slug/language/framework fields. Keep that compatibility assertion
+  // at this boundary without fabricating secret or ownership fields server-side.
+  const currentProject = (publicShareProject.data ??
+    finalProject) as typeof finalProject;
+
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
     { projectId: finalProject?.id ?? "" },
     {
@@ -372,7 +380,7 @@ export const useOrganizationTeamProject = (
   if (organizations.isLoading && !organizations.isFetched) {
     return {
       isLoading: true,
-      project: publicShareProject.data,
+      project: currentProject,
       hasPermission: () => false,
       hasOrgPermission: () => false,
       hasAnyPermission: () => false,
@@ -479,7 +487,7 @@ export const useOrganizationTeamProject = (
     organizations: organizations.data,
     organization,
     team,
-    project: publicShareProject.data ?? finalProject,
+    project: currentProject,
     projectId: finalProject?.id,
     hasPermission,
     hasOrgPermission,

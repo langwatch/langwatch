@@ -9,10 +9,7 @@ import {
 
 import { getApp } from "~/server/app-layer/app";
 import type { ShareViewer } from "~/server/app-layer/share/share.service";
-import {
-  buildShareGrantCookie,
-  signShareGrant,
-} from "~/server/app-layer/share/shareGrant";
+import { buildShareGrantCookie } from "~/server/app-layer/share/shareGrant";
 
 import {
   checkProjectPermission,
@@ -80,7 +77,7 @@ export const shareRouter = createTRPCRouter({
             message: "You do not have access to this shared item.",
           });
         case "granted": {
-          const { share } = result;
+          const { share, grant } = result;
           // Without the grant cookie the viewer cannot read anything, so a
           // transport that cannot set it must fail loudly rather than hand back
           // a 200 that silently grants nothing.
@@ -90,17 +87,7 @@ export const shareRouter = createTRPCRouter({
               message: "Cannot issue a share grant on this transport.",
             });
           }
-          const { jwt } = signShareGrant(
-            {
-              share_id: share.id,
-              project_id: share.projectId,
-              resource_type: share.resourceType,
-              resource_id: share.resourceId,
-              thread_id: share.threadId,
-            },
-            share.expiresAt,
-          );
-          ctx.resHeaders.append("set-cookie", buildShareGrantCookie(jwt));
+          ctx.resHeaders.append("set-cookie", buildShareGrantCookie(grant.jwt));
           return {
             shareId: share.id,
             projectId: share.projectId,

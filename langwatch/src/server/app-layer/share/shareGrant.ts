@@ -28,6 +28,10 @@ export type ShareGrantClaims = {
   thread_id: string | null;
 };
 
+export class ShareGrantExpiredError extends Error {
+  readonly name = "ShareGrantExpiredError" as const;
+}
+
 function getSecret(): string {
   const secret = process.env.NEXTAUTH_SECRET ?? env.NEXTAUTH_SECRET;
   if (!secret) {
@@ -53,7 +57,9 @@ export function signShareGrant(
       (shareExpiresAt.getTime() - nowInMilliseconds) / 1000,
     );
     if (shareExpiresInSeconds <= 0) {
-      throw new Error("Cannot sign a share grant for an expired share");
+      throw new ShareGrantExpiredError(
+        "Cannot sign a share grant for an expired share",
+      );
     }
     ttl = Math.min(SHARE_GRANT_TTL_SECONDS, shareExpiresInSeconds);
   }

@@ -1,13 +1,18 @@
 import { createLogger } from "@langwatch/observability";
-import type { Project, ShareLink, ShareVisibility } from "@prisma/client";
+import type { ShareLink, ShareVisibility } from "@prisma/client";
 import type { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
 import type {
   ShareRepository,
   ShareResourceType,
   ShareWithProject,
 } from "./repositories/share.repository";
+import type { ShareLifecycleLocker } from "./share.lifecycleLock";
 import { generateShareToken } from "./share.token";
-import type { ShareGrantClaims } from "./shareGrant";
+import {
+  type ShareGrantClaims,
+  ShareGrantExpiredError,
+  signShareGrant,
+} from "./shareGrant";
 
 const logger = createLogger("langwatch:share-service");
 
@@ -26,7 +31,12 @@ export function isShareViewExhausted(
 
 /** Outcome of resolving a share token for a specific viewer. */
 export type ShareResolveResult =
-  | { status: "granted"; share: ShareWithProject; isConsumed: boolean }
+  | {
+      status: "granted";
+      share: ShareWithProject;
+      isConsumed: boolean;
+      grant: ReturnType<typeof signShareGrant>;
+    }
   | { status: "not_found" }
   | { status: "sharing_disabled" }
   | { status: "expired" }
@@ -46,15 +56,47 @@ export type ShareAudienceViewer = Pick<
 >;
 
 export type PublicShareProjectResult =
-  | { status: "granted"; project: Project }
+  | { status: "granted"; project: PublicShareProject }
   | { status: "not_found" }
   | { status: "forbidden" };
 
+export interface PublicShareProject {
+  id: string;
+  name: string;
+  slug: string;
+  language: string;
+  framework: string;
+}
+
+export interface CreateShareParams {
+  projectId: string;
+  resourceType: ShareResourceType;
+  resourceId: string;
+  threadId?: string | null;
+  visibility?: ShareVisibility;
+  expiresAt?: Date | null;
+  maxViews?: number | null;
+  userId?: string | null;
+}
+
 export class ShareService {
-  constructor(
-    private readonly repo: ShareRepository,
-    private readonly pinnedTraces: PinnedTraceService,
-  ) {}
+  private readonly repo: ShareRepository;
+  private readonly pinnedTraces: PinnedTraceService;
+  private readonly lifecycleLocker: ShareLifecycleLocker;
+
+  constructor({
+    repo,
+    pinnedTraces,
+    lifecycleLocker,
+  }: {
+    repo: ShareRepository;
+    pinnedTraces: PinnedTraceService;
+    lifecycleLocker: ShareLifecycleLocker;
+  }) {
+    this.repo = repo;
+    this.pinnedTraces = pinnedTraces;
+    this.lifecycleLocker = lifecycleLocker;
+  }
 
   async getById(id: string): Promise<ShareWithProject | null> {
     const share = await this.repo.findById(id);
@@ -144,12 +186,7 @@ export class ShareService {
         slug: share.project.slug,
         language: share.project.language,
         framework: share.project.framework,
-        firstMessage: true,
-        apiKey: "",
-        teamId: "",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Project,
+      },
     };
   }
 
@@ -174,7 +211,7 @@ export class ShareService {
     }
     if (isShareExpired(share)) return false;
 
-    return this.checkAudience(share, viewer);
+    return this.checkAudience({ share, viewer });
   }
 
   /**
@@ -200,14 +237,37 @@ export class ShareService {
 
     if (isShareExpired(share)) return { status: "expired" };
 
-    const isAudienceAllowed = await this.checkAudience(share, viewer);
+    const isAudienceAllowed = await this.checkAudience({ share, viewer });
     if (!isAudienceAllowed) return { status: "forbidden" };
+
+    // Mint before consuming. If the link crosses its expiry boundary here,
+    // no view has been spent. The repository's conditional increment repeats
+    // the expiry predicate atomically, so a token that expires between this
+    // signing step and the database write is not consumed either.
+    let grant: ReturnType<typeof signShareGrant>;
+    try {
+      grant = signShareGrant(
+        {
+          share_id: share.id,
+          project_id: share.projectId,
+          resource_type: share.resourceType,
+          resource_id: share.resourceId,
+          thread_id: share.threadId,
+        },
+        share.expiresAt,
+      );
+    } catch (error) {
+      if (error instanceof ShareGrantExpiredError) {
+        return { status: "expired" };
+      }
+      throw error;
+    }
 
     // In-window refresh: the viewer already spent their view for this share, so
     // the page's several data calls and reloads within the grant window don't
     // re-consume. One view == one grant issuance.
     if (viewer.grantedShareId === share.id) {
-      return { status: "granted", share, isConsumed: false };
+      return { status: "granted", share, isConsumed: false, grant };
     }
 
     const isConsumed = await this.repo.incrementViewCount({
@@ -217,15 +277,21 @@ export class ShareService {
     });
 
     if (!isConsumed) {
+      if (isShareExpired(share)) {
+        return { status: "expired" };
+      }
       return { status: "exhausted" };
     }
-    return { status: "granted", share, isConsumed: true };
+    return { status: "granted", share, isConsumed: true, grant };
   }
 
-  private async checkAudience(
-    share: ShareWithProject,
-    viewer: ShareAudienceViewer,
-  ): Promise<boolean> {
+  private async checkAudience({
+    share,
+    viewer,
+  }: {
+    share: ShareWithProject;
+    viewer: ShareAudienceViewer;
+  }): Promise<boolean> {
     const visibility: ShareVisibility = share.visibility;
     switch (visibility) {
       case "PUBLIC":
@@ -239,7 +305,16 @@ export class ShareService {
     }
   }
 
-  async createShare({
+  async createShare(params: CreateShareParams): Promise<ShareLink> {
+    return this.lifecycleLocker.run({
+      projectId: params.projectId,
+      resourceType: params.resourceType,
+      resourceId: params.resourceId,
+      operation: () => this.createShareWithinLock(params),
+    });
+  }
+
+  private async createShareWithinLock({
     projectId,
     resourceType,
     resourceId,
@@ -248,16 +323,7 @@ export class ShareService {
     expiresAt,
     maxViews,
     userId,
-  }: {
-    projectId: string;
-    resourceType: ShareResourceType;
-    resourceId: string;
-    threadId?: string | null;
-    visibility?: ShareVisibility;
-    expiresAt?: Date | null;
-    maxViews?: number | null;
-    userId?: string | null;
-  }): Promise<ShareLink> {
+  }: CreateShareParams): Promise<ShareLink> {
     const share = await this.repo.create({
       token: generateShareToken(),
       projectId,
@@ -299,6 +365,24 @@ export class ShareService {
     const share = await this.repo.findById(id);
     if (!share || share.projectId !== projectId) return;
 
+    await this.lifecycleLocker.run({
+      projectId,
+      resourceType: share.resourceType,
+      resourceId: share.resourceId,
+      operation: () => this.revokeByIdWithinLock({ id, projectId }),
+    });
+  }
+
+  private async revokeByIdWithinLock({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<void> {
+    const share = await this.repo.findById(id);
+    if (!share || share.projectId !== projectId) return;
+
     await this.repo.deleteById({ id, projectId });
 
     if (share.resourceType === "TRACE") {
@@ -322,12 +406,12 @@ export class ShareService {
           );
         }
 
-        const replacementExists = await this.repo.hasActiveShareForResource({
+        const hasReplacement = await this.repo.hasActiveShareForResource({
           projectId,
           resourceType: "TRACE",
           resourceId: share.resourceId,
         });
-        if (replacementExists) {
+        if (hasReplacement) {
           await this.pinnedTraces.autoPin({
             projectId,
             traceId: share.resourceId,
@@ -339,6 +423,24 @@ export class ShareService {
 
   /** Revoke every link for a resource (thread unshare, kill switch fan-out). */
   async unshare({
+    projectId,
+    resourceType,
+    resourceId,
+  }: {
+    projectId: string;
+    resourceType: ShareResourceType;
+    resourceId: string;
+  }): Promise<void> {
+    await this.lifecycleLocker.run({
+      projectId,
+      resourceType,
+      resourceId,
+      operation: () =>
+        this.unshareWithinLock({ projectId, resourceType, resourceId }),
+    });
+  }
+
+  private async unshareWithinLock({
     projectId,
     resourceType,
     resourceId,

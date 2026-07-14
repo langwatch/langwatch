@@ -14,6 +14,7 @@ import type { ChipDef } from "./ChipBar";
  */
 export interface ScenarioChipData {
   scenarioRunId: string;
+  isReadOnly: boolean;
   name: string | null;
   isLoading: boolean;
   status:
@@ -57,6 +58,7 @@ export function useScenarioChipData(
 
   return {
     scenarioRunId,
+    isReadOnly: readOnly,
     name: activeData?.name ?? null,
     isLoading: readOnly ? false : isLoading,
     status,
@@ -139,18 +141,22 @@ export function buildScenarioChipDef(d: ScenarioChipData): ChipDef {
             {d.reasoning}
           </Text>
         )}
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          paddingTop={1}
-          borderTopWidth="1px"
-          borderColor="border.muted"
-        >
-          Click to open the scenario run
-        </Text>
+        {!d.isReadOnly && (
+          <Text
+            textStyle="2xs"
+            color="fg.subtle"
+            paddingTop={1}
+            borderTopWidth="1px"
+            borderColor="border.muted"
+          >
+            Click to open the scenario run
+          </Text>
+        )}
       </VStack>
     ),
-    ariaLabel: `Open scenario run ${d.name ?? d.scenarioRunId}`,
+    ariaLabel: d.isReadOnly
+      ? `Scenario run ${d.name ?? d.scenarioRunId}`
+      : `Open scenario run ${d.name ?? d.scenarioRunId}`,
   };
 }
 

@@ -4,6 +4,7 @@ import type {
   ShareRepository,
   ShareWithProject,
 } from "../repositories/share.repository";
+import type { ShareLifecycleLocker } from "../share.lifecycleLock";
 import { ShareService, type ShareViewer } from "../share.service";
 
 const ORG_ID = "org_1";
@@ -48,6 +49,28 @@ function buildViewer(overrides: Partial<ShareViewer> = {}): ShareViewer {
   };
 }
 
+function buildSerialLifecycleLocker(): ShareLifecycleLocker {
+  const tails = new Map<string, Promise<void>>();
+  return {
+    async run({ projectId, resourceType, resourceId, operation }) {
+      const key = `${projectId}:${resourceType}:${resourceId}`;
+      const previous = tails.get(key) ?? Promise.resolve();
+      let release!: () => void;
+      const current = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      tails.set(key, current);
+      await previous;
+      try {
+        return await operation();
+      } finally {
+        release();
+        if (tails.get(key) === current) tails.delete(key);
+      }
+    },
+  };
+}
+
 describe("ShareService", () => {
   let repo: ShareRepository;
   let pinnedTraces: Pick<PinnedTraceService, "autoUnpin" | "autoPin">;
@@ -70,7 +93,11 @@ describe("ShareService", () => {
       autoUnpin: vi.fn().mockResolvedValue(undefined),
       autoPin: vi.fn().mockResolvedValue(undefined),
     };
-    service = new ShareService(repo, pinnedTraces as PinnedTraceService);
+    service = new ShareService({
+      repo,
+      pinnedTraces: pinnedTraces as PinnedTraceService,
+      lifecycleLocker: buildSerialLifecycleLocker(),
+    });
   });
 
   describe("when validating an existing grant", () => {
@@ -179,10 +206,13 @@ describe("ShareService", () => {
           id: PROJECT_ID,
           name: "Test project",
           slug: "test-project",
-          apiKey: "",
-          teamId: "",
+          language: "typescript",
+          framework: "nextjs",
         },
       });
+      expect(result).not.toHaveProperty("project.apiKey");
+      expect(result).not.toHaveProperty("project.teamId");
+      expect(result).not.toHaveProperty("project.createdAt");
     });
 
     it("reports not_found after the share is revoked", async () => {
@@ -280,6 +310,24 @@ describe("ShareService", () => {
         expect(result.status).toBe("expired");
         expect(repo.incrementViewCount).not.toHaveBeenCalled();
       });
+
+      it("does not grant when the link expires during the atomic consume", async () => {
+        const share = buildShare({
+          expiresAt: new Date(Date.now() + 60_000),
+        });
+        vi.mocked(repo.findByToken).mockResolvedValue(share);
+        vi.mocked(repo.incrementViewCount).mockImplementationOnce(async () => {
+          share.expiresAt = new Date(Date.now() - 1);
+          return false;
+        });
+
+        const result = await service.resolveForViewer({
+          token: "tok_abc",
+          viewer: buildViewer(),
+        });
+
+        expect(result).toEqual({ status: "expired" });
+      });
     });
 
     describe("given a public link", () => {
@@ -292,7 +340,10 @@ describe("ShareService", () => {
         });
 
         expect(result.status).toBe("granted");
-        expect(result).toMatchObject({ isConsumed: true });
+        expect(result).toMatchObject({
+          isConsumed: true,
+          grant: { jwt: expect.any(String) },
+        });
         expect(repo.incrementViewCount).toHaveBeenCalledWith({
           id: "share_1",
           projectId: PROJECT_ID,
@@ -487,12 +538,10 @@ describe("ShareService", () => {
       });
     });
 
-    describe("when a replacement link is created during auto-unpin", () => {
-      it("restores the share pin after the concurrent create wins the race", async () => {
+    describe("when a replacement link is created while revoke is unpinning", () => {
+      it("serializes the lifecycle operations and leaves the replacement pinned", async () => {
         vi.mocked(repo.findById).mockResolvedValue(buildShare());
-        vi.mocked(repo.hasActiveShareForResource)
-          .mockResolvedValueOnce(false)
-          .mockResolvedValueOnce(true);
+        vi.mocked(repo.hasActiveShareForResource).mockResolvedValue(false);
         vi.mocked(repo.create).mockResolvedValue(
           buildShare({ id: "share_2", token: "tok_replacement" }),
         );
@@ -516,19 +565,53 @@ describe("ShareService", () => {
         });
         await unpinStarted;
 
-        await service.createShare({
+        const create = service.createShare({
           projectId: PROJECT_ID,
           resourceType: "TRACE",
           resourceId: "trace_a",
         });
         allowUnpinToFinish();
-        await revoke;
+        await Promise.all([revoke, create]);
 
-        expect(pinnedTraces.autoPin).toHaveBeenCalledTimes(2);
-        expect(pinnedTraces.autoPin).toHaveBeenLastCalledWith({
+        expect(pinnedTraces.autoPin).toHaveBeenCalledOnce();
+        expect(pinnedTraces.autoPin).toHaveBeenCalledWith({
           projectId: PROJECT_ID,
           traceId: "trace_a",
         });
+      });
+    });
+
+    describe("when two links for the same trace are revoked concurrently", () => {
+      it("serializes reconciliation and leaves no orphan share pin", async () => {
+        const activeShareIds = new Set(["share_1", "share_2"]);
+        vi.mocked(repo.findById).mockImplementation(async (id) =>
+          activeShareIds.has(id)
+            ? buildShare({ id, token: `token_${id}` })
+            : null,
+        );
+        vi.mocked(repo.deleteById).mockImplementation(async ({ id }) => {
+          activeShareIds.delete(id);
+        });
+        vi.mocked(repo.hasActiveShareForResource).mockImplementation(
+          async () => activeShareIds.size > 0,
+        );
+        let hasSharePin = true;
+        vi.mocked(pinnedTraces.autoUnpin).mockImplementation(async () => {
+          hasSharePin = false;
+        });
+        vi.mocked(pinnedTraces.autoPin).mockImplementation(async () => {
+          hasSharePin = true;
+          return undefined as never;
+        });
+
+        await Promise.all([
+          service.revokeById({ id: "share_1", projectId: PROJECT_ID }),
+          service.revokeById({ id: "share_2", projectId: PROJECT_ID }),
+        ]);
+
+        expect(activeShareIds.size).toBe(0);
+        expect(hasSharePin).toBe(false);
+        expect(pinnedTraces.autoPin).not.toHaveBeenCalled();
       });
     });
 

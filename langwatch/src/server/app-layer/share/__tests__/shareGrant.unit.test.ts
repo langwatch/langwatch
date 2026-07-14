@@ -101,7 +101,7 @@ describe("share grant", () => {
     });
   });
 
-  describe("given a share that expires before the normal grant TTL", () => {
+  describe("when the share expires before the normal grant TTL", () => {
     it("caps the grant expiry at the share expiry", () => {
       const shareExpiresAt = new Date(Date.now() + 30_000);
 
