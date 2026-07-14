@@ -24,6 +24,7 @@ import type {
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
+  SpanSummaryPage,
   SpanSummaryPageCursor,
   SpanSummaryRow,
 } from "./span-storage.repository";
@@ -1524,8 +1525,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               -- same earliest-starting prefix; an unordered LIMIT would let
               -- ClickHouse return an arbitrary subset that varies with merges
               -- and part ordering, making which spans carry signals
-              -- nondeterministic across calls.
-              ORDER BY StartTimeMs ASC
+              -- nondeterministic across calls. Must be the raw StartTime
+              -- column — this subquery computes no StartTimeMs alias.
+              ORDER BY StartTime ASC
               LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             )
           `,
@@ -1684,79 +1686,112 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     limit: number;
     cursor?: SpanSummaryPageCursor;
-  } & OccurredAtHint): Promise<SpanSummaryRow[]> {
+  } & OccurredAtHint): Promise<SpanSummaryPage> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpanSummariesPage",
     );
 
-    const effectiveLimit = Math.min(
-      Math.max(1, Math.trunc(limit)),
-      MAX_LIGHT_SPAN_READ_ROWS,
-    );
+    const effectiveLimit = clampSpanReadLimit(limit, {
+      max: MAX_LIGHT_SPAN_READ_ROWS,
+    });
 
-    return this.readTraceSpans<SpanSummaryRow[]>(
-      { tenantId, traceId, occurredAtMs },
-      (rows) => rows.length === 0,
-      async (window) => {
-        const partition = partitionFragment(window);
-        const client = await this.resolveClient(tenantId);
-        // Keyed pagination over (StartTimeMs, SpanId): the tuple compare uses
-        // the same millisecond expression the rows are ordered (and returned)
-        // by, so page boundaries are exact even though StartTime itself has
-        // sub-ms precision.
-        //
-        // The coarse `StartTime >=` bound restates the tuple predicate on the
-        // raw partition key: `toYearWeek(StartTime)` partition pruning can't
-        // see through `toUnixTimestamp64Milli(...)`, so without it every page
-        // re-scans the partitions pagination already moved past — exactly the
-        // long-running multi-week traces that need paging, and the only
-        // pruning at all when no occurredAtMs hint was threaded. It goes into
-        // the dedup subquery too (else the inner scan stays unpruned), same
-        // trade the `since` readers make: a span's versions share its
-        // StartTime, so bounding the version scan by it is safe. The exact
-        // tuple predicate stays OUT of the dedup subquery — dedup must pick
-        // the latest version per span; if the winning version sorts before
-        // the cursor, the span belongs to an earlier page and is correctly
-        // excluded by the outer filter rather than re-emitted stale.
-        const cursorCoarseBound = cursor
-          ? `AND StartTime >= fromUnixTimestamp64Milli({cursorStartTimeMs:Int64})`
+    // This reader deliberately does NOT go through readTraceSpans /
+    // withPartitionHint — a paged read breaks both of that seam's
+    // assumptions:
+    //
+    //   - Its ±2-day window has an UPPER bound, and a page that runs into it
+    //     comes back short-but-non-empty, which the router would read as
+    //     end-of-trace: every span a long-running trace produced past
+    //     `occurredAt + 2d` would be silently dropped. Pages therefore bound
+    //     StartTime from below only; forward partitions cost one primary-key
+    //     probe each (TraceId is 2nd in the ORDER BY key), not a scan.
+    //   - Its empty-means-hint-missed fallback can't tell a missed hint from
+    //     an exhausted cursor, so a legitimately empty page would rerun as an
+    //     unhinted rescan. Cursor pages carry an exact lower bound (the
+    //     cursor itself), so their result is authoritative and never falls
+    //     back; only the first page keeps the empty→unbounded retry, because
+    //     its lower bound comes from a hint that can be plain wrong (stale
+    //     URL, clock skew).
+    const runPage = async (
+      lowerBoundMs: number | undefined,
+    ): Promise<SpanSummaryPage> => {
+      const client = await this.resolveClient(tenantId);
+      const pageLowerBound =
+        lowerBoundMs !== undefined
+          ? `AND StartTime >= fromUnixTimestamp64Milli({pageFromMs:Int64})`
           : "";
-        const cursorFilter = cursor
-          ? `${cursorCoarseBound}
-              AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStartTimeMs:Int64}, {cursorSpanId:String})`
-          : "";
-        const result = await client.query({
-          query: `
-            SELECT ${SUMMARY_SPAN_SELECT}
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-              ${partition.sqlAnd}
-              ${cursorFilter}
-              AND ${dedupInTuple(`${partition.sqlAndInner} ${cursorCoarseBound}`)}
-            ORDER BY StartTimeMs ASC, SpanId ASC
-            LIMIT {limit:UInt32}
-          `,
-          query_params: {
-            tenantId,
-            traceId,
-            limit: effectiveLimit,
-            ...(cursor
-              ? {
-                  cursorStartTimeMs: Math.trunc(cursor.startTimeMs),
-                  cursorSpanId: cursor.spanId,
-                }
-              : {}),
-            ...partition.params,
-          },
-          format: "JSONEachRow",
-        });
+      // Keyed pagination over (StartTimeMs, SpanId): the tuple compare uses
+      // the same millisecond expression the rows are ordered (and returned)
+      // by, so page boundaries are exact even though StartTime itself has
+      // sub-ms precision.
+      //
+      // The coarse `StartTime >=` bound restates the tuple predicate on the
+      // raw partition key: `toYearWeek(StartTime)` partition pruning can't
+      // see through `toUnixTimestamp64Milli(...)`, so without it every page
+      // re-scans the partitions pagination already moved past — exactly the
+      // long-running multi-week traces that need paging. It goes into the
+      // dedup subquery too (else the inner scan stays unpruned), same trade
+      // the `since` readers make: a span's versions share its StartTime, so
+      // bounding the version scan by it is safe. The exact tuple predicate
+      // stays OUT of the dedup subquery — dedup must pick the latest version
+      // per span; if the winning version sorts before the cursor, the span
+      // belongs to an earlier page and is correctly excluded by the outer
+      // filter rather than re-emitted stale.
+      const cursorCoarseBound = cursor
+        ? `AND StartTime >= fromUnixTimestamp64Milli({cursorStartTimeMs:Int64})`
+        : "";
+      const cursorFilter = cursor
+        ? `${cursorCoarseBound}
+            AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStartTimeMs:Int64}, {cursorSpanId:String})`
+        : "";
+      // Over-fetch one row past the page: `hasMore` comes from that row's
+      // existence, so an exact-multiple-of-page-size trace terminates without
+      // a follow-up empty fetch.
+      const result = await client.query({
+        query: `
+          SELECT ${SUMMARY_SPAN_SELECT}
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            ${pageLowerBound}
+            ${cursorFilter}
+            AND ${dedupInTuple(`${pageLowerBound} ${cursorCoarseBound}`)}
+          ORDER BY StartTimeMs ASC, SpanId ASC
+          LIMIT {limit:UInt32}
+        `,
+        query_params: {
+          tenantId,
+          traceId,
+          limit: effectiveLimit + 1,
+          ...(lowerBoundMs !== undefined ? { pageFromMs: lowerBoundMs } : {}),
+          ...(cursor
+            ? {
+                cursorStartTimeMs: Math.trunc(cursor.startTimeMs),
+                cursorSpanId: cursor.spanId,
+              }
+            : {}),
+        },
+        format: "JSONEachRow",
+      });
 
-        const rows = await result.json<SpanSummaryQueryRow>();
-        return rows.map(mapSpanSummaryRow);
-      },
-    );
+      const rows = (await result.json<SpanSummaryQueryRow>()).map(
+        mapSpanSummaryRow,
+      );
+      return {
+        rows: rows.slice(0, effectiveLimit),
+        hasMore: rows.length > effectiveLimit,
+      };
+    };
+
+    if (cursor) return runPage(undefined);
+
+    const hintMs =
+      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+    if (hintMs === undefined) return runPage(undefined);
+    const bounded = await runPage(hintMs - PARTITION_WINDOW_MS);
+    if (bounded.rows.length > 0) return bounded;
+    return runPage(undefined);
   }
 
   async findSpanSummariesSince({

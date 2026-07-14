@@ -15,6 +15,7 @@ import type {
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
+  SpanSummaryPage,
   SpanSummaryPageCursor,
   SpanSummaryRow,
 } from "./repositories/span-storage.repository";
@@ -205,7 +206,7 @@ export class SpanStorageService {
 
   async getSpanSummariesPage(
     params: ByTraceId & { limit: number; cursor?: SpanSummaryPageCursor },
-  ): Promise<SpanSummaryRow[]> {
+  ): Promise<SpanSummaryPage> {
     return this.repository.findSpanSummariesPage(params);
   }
 

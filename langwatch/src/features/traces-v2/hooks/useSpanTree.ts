@@ -1,8 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
 import { useSseStatusStore } from "../stores/sseStatusStore";
-import { spanTreeQueryFn, spanTreeQueryKey } from "./spanTreePagedQuery";
+import {
+  mergeSpanTreeDelta,
+  spanTreeDeltaSinceMs,
+  spanTreeQueryFn,
+  spanTreeQueryKey,
+} from "./spanTreePagedQuery";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 export function useSpanTree() {
@@ -21,7 +27,7 @@ export function useSpanTree() {
   // seeding / invalidation machinery pointed at it) is unchanged, but the
   // fetch pages through `spanTreePaginated` so huge traces stream in page
   // by page instead of arriving as one unbounded response.
-  return useQuery({
+  const treeQuery = useQuery({
     queryKey: spanTreeQueryKey(queryArgs),
     queryFn: spanTreeQueryFn({ utils, queryClient, input: queryArgs }),
     // Disable the real fetch when the traceId is a preview-mode
@@ -33,6 +39,39 @@ export function useSpanTree() {
     cacheTime: 1_800_000,
     keepPreviousData: true,
     refetchOnWindowFocus: true,
-    refetchInterval: isLive && !sseConnected ? LIVE_REFETCH_MS : false,
   });
+
+  // Live fallback while SSE is down: poll `spanTreeDelta` from the loaded
+  // tree's high-water mark and merge new spans in place. Re-running the
+  // tree query instead would restart the whole page walk every interval —
+  // hundreds of requests per poll on exactly the huge live traces paging
+  // exists for. Trade-off: a span re-emitted with an *earlier* corrected
+  // start time is invisible to the delta filter until SSE reconnects and
+  // its invalidation re-walks the full tree.
+  const tree = treeQuery.data;
+  api.tracesV2.spanTreeDelta.useQuery(
+    {
+      ...queryArgs,
+      sinceStartTimeMs: tree !== undefined ? spanTreeDeltaSinceMs(tree) : 0,
+    },
+    {
+      // Gated on the tree having loaded: until then the main query's own
+      // fetch (and its retries) is the source of truth, and there is no
+      // high-water mark to poll from.
+      enabled: isReady && isLive && !sseConnected && tree !== undefined,
+      refetchInterval: LIVE_REFETCH_MS,
+      // Deltas are throwaway transport into the spanTree cache entry —
+      // don't retain per-poll entries of their own.
+      cacheTime: 0,
+      onSuccess: (delta) => {
+        const queryKey = spanTreeQueryKey(queryArgs);
+        const existing = queryClient.getQueryData<SpanTreeNode[]>(queryKey);
+        if (!existing) return;
+        const merged = mergeSpanTreeDelta(existing, delta);
+        if (merged !== existing) queryClient.setQueryData(queryKey, merged);
+      },
+    },
+  );
+
+  return treeQuery;
 }

@@ -13,7 +13,10 @@ import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
-import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type {
+  SpanSummaryPage,
+  SpanSummaryRow,
+} from "~/server/app-layer/traces/repositories/span-storage.repository";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
@@ -170,6 +173,25 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     lastUsedPromptVersionId: summary.lastUsedPromptVersionId ?? null,
     lastUsedPromptSpanId: summary.lastUsedPromptSpanId ?? null,
     attributes: summary.attributes,
+  };
+}
+
+/**
+ * Maps one repository span-summary page onto the wire shape of
+ * `tracesV2.spanTreePaginated`. `nextCursor` comes from the repository's
+ * over-fetch-derived `hasMore` — never from comparing the page length to the
+ * requested limit, which would misread a repository-clamped page as final.
+ */
+export function mapSpanSummaryPage(page: SpanSummaryPage): {
+  nodes: SpanTreeNode[];
+  nextCursor: SpanTreeCursor | null;
+} {
+  const last = page.hasMore ? page.rows.at(-1) : undefined;
+  return {
+    nodes: page.rows.map(mapSpanSummaryToTreeNode),
+    nextCursor: last
+      ? { startTimeMs: last.startTimeMs, spanId: last.spanId }
+      : null,
   };
 }
 
@@ -1248,23 +1270,14 @@ export const tracesV2Router = createTRPCRouter({
         nextCursor: SpanTreeCursor | null;
       }> => {
         const app = getApp();
-        const rows = await app.traces.spans.getSpanSummariesPage({
+        const page = await app.traces.spans.getSpanSummariesPage({
           tenantId: input.projectId,
           traceId: input.traceId,
           limit: input.limit,
           cursor: input.cursor,
           ...occurredAtFromInput(input),
         });
-        // A short page means the trace is exhausted. A full page may be too
-        // (exact multiple of `limit`) — the follow-up fetch returns empty and
-        // closes the loop.
-        const last = rows.length === input.limit ? rows.at(-1) : undefined;
-        return {
-          nodes: rows.map(mapSpanSummaryToTreeNode),
-          nextCursor: last
-            ? { startTimeMs: last.startTimeMs, spanId: last.spanId }
-            : null,
-        };
+        return mapSpanSummaryPage(page);
       },
     ),
 

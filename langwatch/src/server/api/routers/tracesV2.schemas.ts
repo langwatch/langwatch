@@ -177,8 +177,10 @@ export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;
  * pages stay stable while spans are still being ingested.
  */
 export const spanTreeCursorSchema = z.object({
-  startTimeMs: z.number(),
-  spanId: z.string(),
+  // Bound to a ClickHouse Int64 param — reject Infinity / floats / negatives
+  // so a hand-crafted cursor can't turn into an unparseable bind and a 500.
+  startTimeMs: z.number().int().min(0),
+  spanId: z.string().min(1).max(128),
 });
 
 export type SpanTreeCursor = z.infer<typeof spanTreeCursorSchema>;

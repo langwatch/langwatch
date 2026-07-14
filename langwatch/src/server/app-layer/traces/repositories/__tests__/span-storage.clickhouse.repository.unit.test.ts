@@ -9,6 +9,7 @@ import {
 import {
   clampSpanReadLimit,
   MAX_DERIVATION_SPANS,
+  MAX_LIGHT_SPAN_READ_ROWS,
 } from "../span-storage.repository";
 
 describe("serializeAttributes", () => {
@@ -226,6 +227,15 @@ describe("given a requested span-read limit", () => {
       expect(clampSpanReadLimit(Infinity)).toBe(MAX_DERIVATION_SPANS);
     });
   });
+
+  describe("when a caller supplies its own ceiling", () => {
+    it("clamps to that ceiling instead of the derivation default", () => {
+      expect(
+        clampSpanReadLimit(50_000, { max: MAX_LIGHT_SPAN_READ_ROWS }),
+      ).toBe(MAX_LIGHT_SPAN_READ_ROWS);
+      expect(clampSpanReadLimit(undefined, { max: 100 })).toBe(100);
+    });
+  });
 });
 
 describe("SpanStorageClickHouseRepository single-trace reads", () => {
@@ -278,6 +288,235 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
 
       const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
       expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
+    });
+  });
+});
+
+describe("SpanStorageClickHouseRepository span-summary pages", () => {
+  const summaryRow = (
+    spanId: string,
+    startTimeMs = 1_700_000_000_000,
+  ): SpanSummaryQueryRow => ({
+    SpanId: spanId,
+    ParentSpanId: null,
+    SpanName: spanId,
+    DurationMs: 1,
+    StatusCode: null,
+    SpanType: "llm",
+    Model: "",
+    ResponseModel: "",
+    Cost: "",
+    InputTokens: "",
+    OutputTokens: "",
+    CacheReadTokens: "",
+    CacheCreationTokens: "",
+    CustomInputRate: "",
+    CustomOutputRate: "",
+    CustomCacheReadRate: "",
+    CustomCacheCreationRate: "",
+    LwSpanCost: "",
+    StartTimeMs: startTimeMs,
+  });
+
+  function repoWithSpyClient(pages: SpanSummaryQueryRow[][] = [[]]) {
+    const query = vi.fn();
+    for (const rows of pages) {
+      query.mockResolvedValueOnce({ json: async () => rows });
+    }
+    query.mockResolvedValue({ json: async () => [] });
+    const repo = new SpanStorageClickHouseRepository((async () => ({
+      query,
+    })) as unknown as ConstructorParameters<
+      typeof SpanStorageClickHouseRepository
+    >[0]);
+    return { repo, query };
+  }
+
+  describe("when a page fills to the requested limit and more spans exist", () => {
+    it("over-fetches one row to derive hasMore and returns only the page", async () => {
+      const { repo, query } = repoWithSpyClient([
+        [summaryRow("s-1"), summaryRow("s-2"), summaryRow("s-3")],
+      ]);
+
+      const page = await repo.findSpanSummariesPage({
+        tenantId: "p-1",
+        traceId: "t-1",
+        limit: 2,
+        occurredAtMs: Date.now(),
+      });
+
+      expect(query.mock.calls[0]?.[0]?.query_params?.limit).toBe(3);
+      expect(page.rows.map((r) => r.spanId)).toEqual(["s-1", "s-2"]);
+      expect(page.hasMore).toBe(true);
+    });
+  });
+
+  describe("when the page comes back short of the limit", () => {
+    it("reports hasMore false without any follow-up fetch", async () => {
+      const { repo, query } = repoWithSpyClient([
+        [summaryRow("s-1"), summaryRow("s-2")],
+      ]);
+
+      const page = await repo.findSpanSummariesPage({
+        tenantId: "p-1",
+        traceId: "t-1",
+        limit: 2,
+        occurredAtMs: Date.now(),
+      });
+
+      expect(page.rows).toHaveLength(2);
+      expect(page.hasMore).toBe(false);
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when reading a cursor page", () => {
+    it("bounds StartTime from below only — an upper bound would truncate long-running traces at the hint window's edge", async () => {
+      const { repo, query } = repoWithSpyClient([[summaryRow("s-2")]]);
+
+      await repo.findSpanSummariesPage({
+        tenantId: "p-1",
+        traceId: "t-1",
+        limit: 2,
+        cursor: { startTimeMs: 1_700_000_000_000, spanId: "s-1" },
+        occurredAtMs: Date.now(),
+      });
+
+      const sql = query.mock.calls[0]?.[0]?.query as string;
+      expect(sql).toContain(
+        "(toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStartTimeMs:Int64}, {cursorSpanId:String})",
+      );
+      expect(sql).toContain("StartTime >=");
+      expect(sql).not.toContain("StartTime <=");
+    });
+
+    it("treats an empty cursor page as authoritative end-of-trace instead of rescanning unhinted", async () => {
+      const { repo, query } = repoWithSpyClient([[]]);
+
+      const page = await repo.findSpanSummariesPage({
+        tenantId: "p-1",
+        traceId: "t-1",
+        limit: 2,
+        cursor: { startTimeMs: 1_700_000_000_000, spanId: "s-1" },
+        occurredAtMs: Date.now(),
+      });
+
+      expect(page).toEqual({ rows: [], hasMore: false });
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when reading the first page with an occurredAtMs hint", () => {
+    it("prunes partitions with the hint as a lower bound only", async () => {
+      const occurredAtMs = 1_700_000_000_000;
+      const { repo, query } = repoWithSpyClient([[summaryRow("s-1")]]);
+
+      await repo.findSpanSummariesPage({
+        tenantId: "p-1",
+        traceId: "t-1",
+        limit: 2,
+        occurredAtMs,
+      });
+
+      const call = query.mock.calls[0]?.[0];
+      expect(call?.query as string).toContain(
+        "StartTime >= fromUnixTimestamp64Milli({pageFromMs:Int64})",
+      );
+      expect(call?.query as string).not.toContain("StartTime <=");
+      expect(call?.query_params?.pageFromMs).toBe(
+        occurredAtMs - 2 * 24 * 60 * 60 * 1000,
+      );
+    });
+
+    it("retries unbounded when the hinted read is empty (stale or skewed hint)", async () => {
+      const { repo, query } = repoWithSpyClient([[], [summaryRow("s-1")]]);
+
+      const page = await repo.findSpanSummariesPage({
+        tenantId: "p-1",
+        traceId: "t-1",
+        limit: 2,
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      expect(query).toHaveBeenCalledTimes(2);
+      expect(query.mock.calls[1]?.[0]?.query as string).not.toContain(
+        "pageFromMs",
+      );
+      expect(page.rows.map((r) => r.spanId)).toEqual(["s-1"]);
+    });
+  });
+});
+
+describe("SpanStorageClickHouseRepository bounded light readers", () => {
+  function repoWithSpyClient() {
+    const query = vi.fn().mockResolvedValue({ json: async () => [] });
+    const repo = new SpanStorageClickHouseRepository((async () => ({
+      query,
+    })) as unknown as ConstructorParameters<
+      typeof SpanStorageClickHouseRepository
+    >[0]);
+    return { repo, query };
+  }
+
+  const byTrace = {
+    tenantId: "p-1",
+    traceId: "t-1",
+    occurredAtMs: Date.now(),
+  };
+
+  describe("when reading the whole-tree span summary anchor", () => {
+    it("caps the read at the light-row ceiling", async () => {
+      const { repo, query } = repoWithSpyClient();
+      await repo.getSpanSummaryByTraceId(byTrace);
+
+      expect(query.mock.calls[0]?.[0]?.query as string).toContain(
+        `LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}`,
+      );
+    });
+  });
+
+  describe("when reading per-span langwatch signals", () => {
+    it("caps the scan at the light-row ceiling, ordered by the raw StartTime column the subquery actually has", async () => {
+      const { repo, query } = repoWithSpyClient();
+      await repo.findLangwatchSignalsByTraceId(byTrace);
+
+      const sql = query.mock.calls[0]?.[0]?.query as string;
+      expect(sql).toContain(`LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}`);
+      // The signals subquery selects only SpanId + mapKeys(SpanAttributes);
+      // ordering by the StartTimeMs alias (which it never computes) makes
+      // ClickHouse reject the whole query with UNKNOWN_IDENTIFIER.
+      expect(sql).toContain("ORDER BY StartTime ASC");
+      expect(sql).not.toContain("ORDER BY StartTimeMs");
+    });
+  });
+
+  describe("when reading the span-summary delta since a high-water mark", () => {
+    it("caps the read at the light-row ceiling", async () => {
+      const { repo, query } = repoWithSpyClient();
+      await repo.findSpanSummariesSince({
+        tenantId: "p-1",
+        traceId: "t-1",
+        sinceStartTimeMs: Date.now(),
+      });
+
+      expect(query.mock.calls[0]?.[0]?.query as string).toContain(
+        `LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}`,
+      );
+    });
+  });
+
+  describe("when reading the full-span delta since a high-water mark", () => {
+    it("caps the read at the derivation ceiling", async () => {
+      const { repo, query } = repoWithSpyClient();
+      await repo.findSpansSince({
+        tenantId: "p-1",
+        traceId: "t-1",
+        sinceStartTimeMs: Date.now(),
+      });
+
+      expect(query.mock.calls[0]?.[0]?.query as string).toContain(
+        `LIMIT ${MAX_DERIVATION_SPANS}`,
+      );
     });
   });
 });

@@ -4,9 +4,9 @@ import type {
   SpanTreeCursor,
   SpanTreeNode,
 } from "~/server/api/routers/tracesV2.schemas";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 
-/**
+/*
  * Traces can carry 20k–100k+ spans, so the span tree is never fetched as a
  * single response. The tRPC `spanTree` procedure remains the cache-key anchor
  * — preview-mode seeding, SSE invalidation, refresh, and close-time cancel all
@@ -14,6 +14,13 @@ import { api } from "~/utils/api";
  * more: the query function built here pages through `spanTreePaginated` and
  * assembles the tree client-side, publishing pages progressively so the
  * waterfall starts painting after the first page.
+ */
+
+/**
+ * Rows per `spanTreePaginated` page: large enough that the common trace
+ * (p999 ≈ 312 spans) still loads in one round trip, small enough that a
+ * 100k-span trace streams into the waterfall instead of stalling on one
+ * giant response.
  */
 export const SPAN_TREE_PAGE_SIZE = 500;
 
@@ -34,6 +41,16 @@ export function spanTreeQueryKey(input: SpanTreeQueryInput) {
   return getQueryKey(api.tracesV2.spanTree, input, "query");
 }
 
+/**
+ * Ascending `(startTimeMs, spanId)` — the order pages arrive in and the order
+ * the assembled tree is kept in. SpanId ties break bytewise to match the
+ * ClickHouse `SpanId ASC` collation.
+ */
+function bySpanTreeOrder(a: SpanTreeNode, b: SpanTreeNode): number {
+  if (a.startTimeMs !== b.startTimeMs) return a.startTimeMs - b.startTimeMs;
+  return a.spanId < b.spanId ? -1 : a.spanId > b.spanId ? 1 : 0;
+}
+
 export async function fetchSpanTreePages({
   utils,
   input,
@@ -45,28 +62,45 @@ export async function fetchSpanTreePages({
   signal?: AbortSignal;
   onPage?: (nodes: SpanTreeNode[]) => void;
 }): Promise<SpanTreeNode[]> {
-  const nodes: SpanTreeNode[] = [];
+  // Accumulate by spanId, last write wins: pages are keyed by
+  // (startTimeMs, spanId), so a span re-emitted with a corrected start time
+  // mid-walk could land on two pages — deduping here keeps it a single
+  // waterfall row (and a single React key).
+  const nodesById = new Map<string, SpanTreeNode>();
+  // Vanilla-client queries, not `utils.….fetch`: the abort signal reaches
+  // the in-flight HTTP request (closing the drawer cancels mid-page, not
+  // just between pages), and no throwaway per-page React Query cache
+  // entries are created — the assembled tree lives under the spanTree key.
+  //
+  // Dot-path form with a pinned signature: the typed proxy
+  // (`createTRPCClientProxy`) cannot wrap this router (its `subscription`
+  // procedure collides with the proxy's reserved method names), and
+  // `utils.client.query`'s own generic is keyed to the empty v10 legacy
+  // `_def.queries` interop shape, so neither types this call natively.
+  const queryPage = utils.client.query.bind(utils.client) as (
+    path: "tracesV2.spanTreePaginated",
+    input: SpanTreeQueryInput & { limit: number; cursor?: SpanTreeCursor },
+    opts?: { signal?: AbortSignal },
+  ) => Promise<RouterOutputs["tracesV2"]["spanTreePaginated"]>;
   let cursor: SpanTreeCursor | undefined;
   for (;;) {
     if (signal?.aborted) {
       throw new DOMException("span tree fetch aborted", "AbortError");
     }
-    const page = await utils.tracesV2.spanTreePaginated.fetch(
+    const page = await queryPage(
+      "tracesV2.spanTreePaginated",
       { ...input, limit: SPAN_TREE_PAGE_SIZE, cursor },
-      // Pages are throwaway transport: the assembled tree lives under the
-      // spanTree key, so don't keep per-page cache entries around (for a
-      // 100k-span trace they would double the client-side footprint).
-      { cacheTime: 0 },
+      { signal },
     );
     if (signal?.aborted) {
       throw new DOMException("span tree fetch aborted", "AbortError");
     }
-    nodes.push(...page.nodes);
+    for (const node of page.nodes) nodesById.set(node.spanId, node);
     if (!page.nextCursor) break;
     cursor = page.nextCursor;
-    onPage?.([...nodes]);
+    onPage?.([...nodesById.values()]);
   }
-  return nodes;
+  return [...nodesById.values()];
 }
 
 /**
@@ -97,4 +131,57 @@ export function spanTreeQueryFn({
         queryClient.setQueryData(queryKey, partial);
       },
     });
+}
+
+/**
+ * Lower bound for the live-delta poll over a loaded tree: 1ms before the
+ * newest span start. `spanTreeDelta` filters `StartTime > since` at sub-ms
+ * precision while tree rows carry ms-truncated times, so polling from the
+ * exact high-water mark could permanently miss a span that started later
+ * within the same millisecond; backing off 1ms re-fetches the boundary rows
+ * instead, and {@link mergeSpanTreeDelta} dedupes them. 0 for an empty tree,
+ * so a live trace whose spans haven't been ingested yet still picks them up.
+ */
+export function spanTreeDeltaSinceMs(nodes: SpanTreeNode[]): number {
+  let highWaterMs: number | undefined;
+  for (const node of nodes) {
+    if (highWaterMs === undefined || node.startTimeMs > highWaterMs) {
+      highWaterMs = node.startTimeMs;
+    }
+  }
+  return highWaterMs === undefined ? 0 : Math.max(0, highWaterMs - 1);
+}
+
+/** Every field of SpanTreeNode is a scalar (or null), so shallow works. */
+function sameNode(a: SpanTreeNode, b: SpanTreeNode): boolean {
+  if (a === b) return true;
+  const keysA = Object.keys(a) as (keyof SpanTreeNode)[];
+  const keysB = Object.keys(b) as (keyof SpanTreeNode)[];
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((key) => a[key] === b[key]);
+}
+
+/**
+ * Merges a `spanTreeDelta` result into the assembled tree: dedupes by spanId
+ * (a delta row is the span's latest version, so it wins), keeps the tree in
+ * `(startTimeMs, spanId)` order, and returns the SAME array reference when
+ * nothing actually changed — the delta poll re-fetches boundary rows every
+ * cycle, and an unchanged reference keeps React Query consumers from
+ * re-rendering on quiet polls.
+ */
+export function mergeSpanTreeDelta(
+  existing: SpanTreeNode[],
+  delta: SpanTreeNode[],
+): SpanTreeNode[] {
+  if (delta.length === 0) return existing;
+  const byId = new Map(existing.map((node) => [node.spanId, node]));
+  let changed = false;
+  for (const node of delta) {
+    const prev = byId.get(node.spanId);
+    if (prev !== undefined && sameNode(prev, node)) continue;
+    byId.set(node.spanId, node);
+    changed = true;
+  }
+  if (!changed) return existing;
+  return [...byId.values()].sort(bySpanTreeOrder);
 }

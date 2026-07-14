@@ -16,17 +16,18 @@ import type { SpanInsertData } from "../types";
 export const MAX_DERIVATION_SPANS = 512;
 
 /**
- * Clamps a requested span-read limit to the `[1, MAX_DERIVATION_SPANS]` range.
- * `MAX_DERIVATION_SPANS` is a hard ceiling a caller can only lower, never raise,
- * so every full-span / derivation read is bounded even for a leaked trace_id.
+ * Clamps a requested span-read limit to the `[1, max]` range (default ceiling
+ * `MAX_DERIVATION_SPANS`). The ceiling is hard — a caller can only lower it,
+ * never raise it — so every span read is bounded even for a leaked trace_id.
  * A missing or non-finite limit (undefined, NaN, Infinity) defaults to the
  * ceiling so the value never propagates into a ClickHouse `UInt32` param.
  */
-export function clampSpanReadLimit(limit?: number): number {
-  const requested = Number.isFinite(limit)
-    ? (limit as number)
-    : MAX_DERIVATION_SPANS;
-  return Math.min(Math.max(1, Math.trunc(requested)), MAX_DERIVATION_SPANS);
+export function clampSpanReadLimit(
+  limit?: number,
+  { max = MAX_DERIVATION_SPANS }: { max?: number } = {},
+): number {
+  const requested = Number.isFinite(limit) ? (limit as number) : max;
+  return Math.min(Math.max(1, Math.trunc(requested)), max);
 }
 
 /**
@@ -50,6 +51,17 @@ export const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
 export interface SpanSummaryPageCursor {
   startTimeMs: number;
   spanId: string;
+}
+
+/**
+ * One page of the keyed span-summary walk. `hasMore` is derived from an
+ * over-fetched `limit + 1`-th row, so exhaustion is known without a follow-up
+ * empty fetch — the extra fetch would both waste a round trip and (on the
+ * repository side) be indistinguishable from a missed partition hint.
+ */
+export interface SpanSummaryPage {
+  rows: SpanSummaryRow[];
+  hasMore: boolean;
 }
 
 export interface SpanSummaryRow {
@@ -222,7 +234,8 @@ export interface SpanStorageRepository {
   /**
    * One page of span summaries in `(StartTimeMs, SpanId)` order, starting
    * strictly after `cursor` (or from the beginning when omitted). Callers
-   * derive the next cursor from the last row when a full page came back.
+   * derive the next cursor from the last row when `hasMore` is set; a page
+   * with `hasMore: false` is authoritative end-of-trace.
    */
   findSpanSummariesPage(
     params: {
@@ -231,7 +244,7 @@ export interface SpanStorageRepository {
       limit: number;
       cursor?: SpanSummaryPageCursor;
     } & OccurredAtHint,
-  ): Promise<SpanSummaryRow[]>;
+  ): Promise<SpanSummaryPage>;
   findSpanSummariesSince(
     params: {
       tenantId: string;
@@ -359,8 +372,8 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
       limit: number;
       cursor?: SpanSummaryPageCursor;
     } & OccurredAtHint,
-  ): Promise<SpanSummaryRow[]> {
-    return [];
+  ): Promise<SpanSummaryPage> {
+    return { rows: [], hasMore: false };
   }
 
   async findSpanSummariesSince(
