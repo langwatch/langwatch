@@ -20,7 +20,9 @@ function fakeIo(existing = new Set<string>()) {
   for (const f of existing) files.set(f, "");
   const runs: { cmd: string; args: string[] }[] = [];
   const io: AgentIo = {
-    mkdirp: () => {},
+    mkdirp: () => {
+      /* no real directories are created in tests */
+    },
     writeFile: (file, content) => void files.set(file, content),
     removeFile: (file) => void files.delete(file),
     fileExists: (file) => files.has(file),
