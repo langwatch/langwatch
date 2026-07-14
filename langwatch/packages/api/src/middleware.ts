@@ -200,8 +200,13 @@ function runAfterSSECompletion({
     return;
   }
 
-  void streamCompletion.then(({ error }) => {
-    if (error) onStreamError(error);
-    onSettled();
-  });
+  void streamCompletion
+    .then(({ error }) => {
+      if (error) onStreamError(error);
+      onSettled();
+    })
+    .catch(() => {
+      // Instrumentation finalizers run after the response has started and must
+      // never surface as an unhandled rejection in the application process.
+    });
 }
