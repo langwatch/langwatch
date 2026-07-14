@@ -83,7 +83,18 @@ Feature: Deja View normalisation preview
     Given the operator is writing an expression rule
     Then unparseable expressions are flagged as they are typed
     And completions suggest the selected event's attribute keys and available transforms
-    And example expressions can be inserted as starting points
+    And a generic reference snippet and insertable examples show how expressions work
+
+  Scenario: The playground evaluates free-form expressions live
+    Given the operator writes any expression in the playground
+    Then the result is shown as they type, without a server round-trip
+    And the expression evaluates against the selected event's attributes
+    And evaluation failures are shown in place
+
+  Scenario: Failing rules are highlighted where they are edited
+    Given an expression rule fails at runtime on some spans
+    When the preview runs
+    Then the failing rule's editor is highlighted with how many spans it failed on
 
   Scenario: Nothing is written
     When the operator runs the normalisation preview
