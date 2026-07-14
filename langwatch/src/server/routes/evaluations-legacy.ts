@@ -961,36 +961,43 @@ async function handleEvaluatorCall(
 
   let settings: any = ((evaluatorSettings ?? monitor?.parameters) as any) ?? {};
 
-  // Drop a legacy pairwise `prompt` that can't render on the new judge (see
-  // stripIncompatiblePairwisePrompt), so getEvaluatorDefaultSettings' good
-  // default wins the merge below instead of being overridden by unrendered
-  // pairwise placeholders.
-  const rawEvaluatorSettings =
-    ((evaluatorSettings ?? (monitor ? (monitor.parameters as object) : {})) as
-      | Record<string, unknown>
-      | undefined) ?? {};
-  const { settings: legacyPairwiseSettings, droppedPrompt } =
-    isLegacyPairwiseDispatch
-      ? stripIncompatiblePairwisePrompt(rawEvaluatorSettings)
-      : { settings: rawEvaluatorSettings, droppedPrompt: false };
-  if (droppedPrompt) {
-    logger.warn(
-      { projectId: project.id, checkType },
-      "legacy pairwise_compare dispatch had a customized prompt with no {candidates} placeholder — dropping it in favor of select_best_compare's default rather than forwarding unrendered pairwise placeholders",
-    );
-  }
-
   try {
-    settings = evaluatorSettingSchema?.parse({
+    // NB: `select_best_compare`'s settings schema is non-strict, so a legacy
+    // `swap_and_confirm` key with no equivalent field is silently dropped by
+    // the parse below rather than translated — `randomize_order` then falls
+    // back to its own default (`true`). Both fields default `true`, so this
+    // only differs for a legacy row that explicitly set
+    // `swap_and_confirm: false`; that row's candidate-ordering behavior
+    // flips silently on reroute. Narrow enough (and low-impact enough) to
+    // document rather than special-case.
+    const mergedSettings = {
       ...(!workflowEvaluatorDef
         ? getEvaluatorDefaultSettings(
             evaluatorDefinition as any,
             await resolveEvaluatorSettingsDefaults(project.id),
           )
         : {}),
-      ...legacyPairwiseSettings,
+      ...(settings as Record<string, unknown>),
       ...(params.settings ? params.settings : {}),
-    });
+    };
+
+    // Drop a legacy pairwise `prompt` that can't render on the new judge (see
+    // stripIncompatiblePairwisePrompt), so select_best_compare's own default
+    // wins instead of forwarding unrendered pairwise placeholders. Stripped
+    // AFTER the full merge — including `params.settings` — so a prompt
+    // arriving via the request body can't bypass the strip the way stripping
+    // only the pre-merge DB/monitor settings would.
+    const { settings: finalSettings, droppedPrompt } = isLegacyPairwiseDispatch
+      ? stripIncompatiblePairwisePrompt(mergedSettings)
+      : { settings: mergedSettings, droppedPrompt: false };
+    if (droppedPrompt) {
+      logger.warn(
+        { projectId: project.id, checkType: LEGACY_PAIRWISE_EVALUATOR_TYPE },
+        "legacy pairwise_compare dispatch had a customized prompt with no {candidates} placeholder — dropping it in favor of select_best_compare's default rather than forwarding unrendered pairwise placeholders",
+      );
+    }
+
+    settings = evaluatorSettingSchema?.parse(finalSettings);
   } catch (error) {
     const message =
       error instanceof ZodErrorClass
