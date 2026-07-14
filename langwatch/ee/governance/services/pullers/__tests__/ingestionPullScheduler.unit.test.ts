@@ -73,4 +73,15 @@ describe("ingestionPullScheduler — in-process cron scheduling", () => {
       });
     });
   });
+
+  describe("given a malformed pull schedule", () => {
+    describe("when the scheduler computes the next pull", () => {
+      /** @scenario "Malformed schedules are rejected without stopping the existing recurrence" */
+      it("throws instead of manufacturing a delay", () => {
+        expect(() =>
+          computeNextDelayMs("definitely not cron", Date.now()),
+        ).toThrow();
+      });
+    });
+  });
 });

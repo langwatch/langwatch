@@ -94,13 +94,16 @@ export function computeNextDelayMs(cron: string, nowMs: number): number {
 
 function dedupForSource(
   delayMs: number,
+  shouldReplace: boolean,
 ): DeduplicationConfig<IngestionPullPayload> {
   return {
     makeId: (payload) => payload.ingestionSourceId,
     ttlMs: delayMs + DEDUP_BUFFER_MS,
-    // Squash a duplicate seed without disturbing the pending job's schedule.
-    extend: false,
-    replace: false,
+    // A normal seed squashes without disturbing the pending schedule. An
+    // explicit schedule change updates both the staged payload and its score;
+    // GroupQueue uses `extend` to move the dispatch score on a dedup hit.
+    extend: shouldReplace,
+    replace: shouldReplace,
   };
 }
 
@@ -108,15 +111,20 @@ async function stagePull({
   facade,
   source,
   nowMs,
+  shouldReplace = false,
 }: {
   facade: PullJobFacade;
   source: SchedulableSource;
   nowMs: number;
+  shouldReplace?: boolean;
 }): Promise<void> {
   const delayMs = computeNextDelayMs(source.pullSchedule, nowMs);
   await facade.send(
     { ingestionSourceId: source.id, tenantId: source.organizationId },
-    { delay: delayMs, deduplication: dedupForSource(delayMs) },
+    {
+      delay: delayMs,
+      deduplication: dedupForSource(delayMs, shouldReplace),
+    },
   );
 }
 
@@ -269,14 +277,20 @@ export async function seedIngestionPullers(): Promise<void> {
 }
 
 /**
- * Seeds a single source immediately (e.g. right after create) so a new schedule
- * starts without waiting for a worker restart. No-op when the source has no
- * schedule or event sourcing is disabled.
+ * Seeds or reschedules a single source immediately (e.g. after create or a
+ * schedule update) without waiting for a worker restart. No-op when the source
+ * has no schedule or event sourcing is disabled.
  */
-export async function armIngestionPullForSource(source: {
-  id: string;
-  pullSchedule: string | null;
-  organizationId: string;
+export async function armIngestionPullForSource({
+  source,
+  shouldReplace = false,
+}: {
+  source: {
+    id: string;
+    pullSchedule: string | null;
+    organizationId: string;
+  };
+  shouldReplace?: boolean;
 }): Promise<void> {
   const facade = pullJobFacade;
   if (!facade || !source.pullSchedule) return;
@@ -289,6 +303,7 @@ export async function armIngestionPullForSource(source: {
         organizationId: source.organizationId,
       },
       nowMs: Date.now(),
+      shouldReplace,
     });
   } catch (error) {
     logger.error(
@@ -297,7 +312,7 @@ export async function armIngestionPullForSource(source: {
         pullSchedule: source.pullSchedule,
         error,
       },
-      "failed to arm ingestion pull for new source",
+      "failed to arm ingestion pull for source",
     );
   }
 }

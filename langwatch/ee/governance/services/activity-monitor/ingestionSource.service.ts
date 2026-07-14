@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
-import { armIngestionPullForSource } from "@ee/governance/services/pullers/ingestionPullScheduler";
+import {
+  armIngestionPullForSource,
+  computeNextDelayMs,
+} from "@ee/governance/services/pullers/ingestionPullScheduler";
 import type { IngestionSource, Prisma, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 /**
@@ -82,6 +85,7 @@ export interface UpdateIngestionSourceInput {
   parserConfig?: Record<string, unknown>;
   status?: "active" | "disabled" | "awaiting_first_event";
   teamId?: string | null;
+  pullSchedule?: string | null;
 }
 
 export interface CreatedIngestionSource {
@@ -91,6 +95,21 @@ export interface CreatedIngestionSource {
 }
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
+
+function assertValidPullSchedule(
+  pullSchedule: string | null | undefined,
+): void {
+  if (pullSchedule == null) return;
+  try {
+    computeNextDelayMs(pullSchedule, Date.now());
+  } catch (cause) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Invalid pullSchedule cron expression: ${pullSchedule}`,
+      cause,
+    });
+  }
+}
 
 export class IngestionSourceService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -174,6 +193,8 @@ export class IngestionSourceService {
   async createSource(
     input: CreateIngestionSourceInput,
   ): Promise<CreatedIngestionSource> {
+    assertValidPullSchedule(input.pullSchedule);
+
     // Defense-in-depth plan gate. Non-enterprise orgs can create up to
     // NON_ENTERPRISE_INGESTION_SOURCE_CAP active sources (composer
     // separately restricts source TYPE to otel_generic for them). This
@@ -241,9 +262,11 @@ export class IngestionSourceService {
     // A schedule on a new pull-mode source starts immediately, without waiting
     // for a worker restart to re-seed it (event-sourcing pull scheduler).
     await armIngestionPullForSource({
-      id: source.id,
-      pullSchedule: source.pullSchedule,
-      organizationId: source.organizationId,
+      source: {
+        id: source.id,
+        pullSchedule: source.pullSchedule,
+        organizationId: source.organizationId,
+      },
     });
 
     return { source, ingestSecret };
@@ -258,6 +281,8 @@ export class IngestionSourceService {
         `IngestionSource ${input.id} not found in org ${input.organizationId}`,
       );
     }
+    assertValidPullSchedule(input.pullSchedule);
+
     const data: Prisma.IngestionSourceUpdateInput = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
@@ -267,6 +292,9 @@ export class IngestionSourceService {
       ) as Prisma.InputJsonValue;
     }
     if (input.status !== undefined) data.status = input.status;
+    if (input.pullSchedule !== undefined) {
+      data.pullSchedule = input.pullSchedule;
+    }
     if (input.teamId !== undefined) {
       data.team = input.teamId
         ? { connect: { id: input.teamId } }
@@ -276,6 +304,10 @@ export class IngestionSourceService {
       where: { id: existing.id },
       data,
     });
+    const shouldReplacePendingPull =
+      input.pullSchedule !== undefined &&
+      input.pullSchedule !== null &&
+      existing.pullSchedule !== source.pullSchedule;
 
     // A disabled source has no recurring job after its pending pull observes
     // that state. Re-arm it when an update makes it schedulable again.
@@ -284,9 +316,12 @@ export class IngestionSourceService {
       source.status === "awaiting_first_event"
     ) {
       await armIngestionPullForSource({
-        id: source.id,
-        pullSchedule: source.pullSchedule,
-        organizationId: source.organizationId,
+        source: {
+          id: source.id,
+          pullSchedule: source.pullSchedule,
+          organizationId: source.organizationId,
+        },
+        shouldReplace: shouldReplacePendingPull,
       });
     }
 

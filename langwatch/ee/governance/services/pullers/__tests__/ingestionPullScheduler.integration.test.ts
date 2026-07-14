@@ -99,6 +99,7 @@ describe.skipIf(!hasTestcontainers)(
     let eventSourcing: EventSourcing;
     let pullJob: ReturnType<typeof registerIngestionPullJob>;
     let organizationId: string;
+    let actorUserId: string;
     const createdSourceIds: string[] = [];
 
     beforeAll(async () => {
@@ -138,6 +139,21 @@ describe.skipIf(!hasTestcontainers)(
         },
       });
       organizationId = organization.id;
+
+      await prisma.team.create({
+        data: {
+          name: `pull-sched team ${nanoid(6)}`,
+          slug: `--pull-sched-team-${nanoid(8)}`,
+          organizationId,
+        },
+      });
+      const actor = await prisma.user.create({
+        data: {
+          name: "Pull scheduler test actor",
+          email: `pull-sched-${nanoid(8)}@example.com`,
+        },
+      });
+      actorUserId = actor.id;
     });
 
     beforeEach(() => {
@@ -153,11 +169,21 @@ describe.skipIf(!hasTestcontainers)(
         const keys = await redis.keys(`*${id}*`);
         if (keys.length > 0) await redis.del(...keys);
       }
+      await prisma.ingestionSource.deleteMany({
+        where: { id: { in: createdSourceIds } },
+      });
       createdSourceIds.length = 0;
     });
 
     afterAll(async () => {
       await eventSourcing.close().catch(() => {});
+      await prisma.ingestionSource.deleteMany({ where: { organizationId } });
+      await prisma.project.deleteMany({
+        where: { team: { organizationId } },
+      });
+      await prisma.team.deleteMany({ where: { organizationId } });
+      await prisma.organization.delete({ where: { id: organizationId } });
+      await prisma.user.delete({ where: { id: actorUserId } });
       await stopTestContainers();
     });
 
@@ -194,6 +220,20 @@ describe.skipIf(!hasTestcontainers)(
         total += await redis.zcard(key);
       }
       return total;
+    }
+
+    async function pendingPullDispatchAtMs(
+      sourceId: string,
+    ): Promise<number | null> {
+      const keys = await redis.keys(`*${sourceId}:jobs`);
+      const scores: number[] = [];
+      for (const key of keys) {
+        const values = await redis.zrange(key, 0, -1, "WITHSCORES");
+        for (let index = 1; index < values.length; index += 2) {
+          scores.push(Number(values[index]));
+        }
+      }
+      return scores.length > 0 ? Math.min(...scores) : null;
     }
 
     function send(
@@ -234,15 +274,86 @@ describe.skipIf(!hasTestcontainers)(
       describe("when the create path arms the pull", () => {
         /** @scenario "Saving a source with a schedule seeds it immediately" */
         it("stages a pull without waiting for a worker restart", async () => {
-          const sourceId = await createSource({ pullSchedule: "*/10 * * * *" });
-
-          await armIngestionPullForSource({
-            id: sourceId,
-            pullSchedule: "*/10 * * * *",
+          const { source } = await IngestionSourceService.create(
+            prisma,
+          ).createSource({
             organizationId,
+            sourceType: "claude_compliance",
+            name: `service-created-pull-source-${nanoid(8)}`,
+            parserConfig: { adapter: FIXTURE_ADAPTER_ID },
+            pullSchedule: "*/10 * * * *",
+            actorUserId,
+          });
+          createdSourceIds.push(source.id);
+
+          expect(await pendingPullCount(source.id)).toBe(1);
+        });
+      });
+    });
+
+    describe("given an active source with a pending scheduled pull", () => {
+      describe("when its pull schedule is updated", () => {
+        /** @scenario "Updating an active source schedule replaces its pending pull" */
+        it("keeps one job and moves its dispatch score to the new cron", async () => {
+          const sourceId = await createSource({
+            pullSchedule: "0 0 1 1 *",
+          });
+          await armIngestionPullForSource({
+            source: {
+              id: sourceId,
+              pullSchedule: "0 0 1 1 *",
+              organizationId,
+            },
+          });
+          const oldDispatchAtMs = await pendingPullDispatchAtMs(sourceId);
+
+          const source = await IngestionSourceService.create(
+            prisma,
+          ).updateSource({
+            id: sourceId,
+            organizationId,
+            pullSchedule: "* * * * *",
           });
 
+          const newDispatchAtMs = await pendingPullDispatchAtMs(sourceId);
+          expect(source.pullSchedule).toBe("* * * * *");
           expect(await pendingPullCount(sourceId)).toBe(1);
+          expect(oldDispatchAtMs).not.toBeNull();
+          expect(newDispatchAtMs).not.toBeNull();
+          expect(newDispatchAtMs!).toBeLessThan(oldDispatchAtMs!);
+        });
+      });
+
+      describe("when an update supplies a malformed pull schedule", () => {
+        /** @scenario "Malformed schedules are rejected without stopping the existing recurrence" */
+        it("rejects the update and preserves the valid pending pull", async () => {
+          const validSchedule = "0 0 1 1 *";
+          const sourceId = await createSource({
+            pullSchedule: validSchedule,
+          });
+          await armIngestionPullForSource({
+            source: {
+              id: sourceId,
+              pullSchedule: validSchedule,
+              organizationId,
+            },
+          });
+          const oldDispatchAtMs = await pendingPullDispatchAtMs(sourceId);
+
+          await expect(
+            IngestionSourceService.create(prisma).updateSource({
+              id: sourceId,
+              organizationId,
+              pullSchedule: "definitely not cron",
+            }),
+          ).rejects.toThrow("Invalid pullSchedule cron expression");
+
+          const source = await prisma.ingestionSource.findUniqueOrThrow({
+            where: { id: sourceId },
+          });
+          expect(source.pullSchedule).toBe(validSchedule);
+          expect(await pendingPullCount(sourceId)).toBe(1);
+          expect(await pendingPullDispatchAtMs(sourceId)).toBe(oldDispatchAtMs);
         });
       });
     });

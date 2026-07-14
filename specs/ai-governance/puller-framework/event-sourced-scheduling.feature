@@ -73,6 +73,20 @@ Feature: Event-sourced scheduling for pull-mode ingestion sources
     Then an ingestion-pull job is staged without waiting for a worker restart
 
   @integration
+  Scenario: Updating an active source schedule replaces its pending pull
+    Given an active pull-mode source with a pending ingestion-pull job
+    When its `pullSchedule` is changed through the source update service
+    Then the source keeps exactly one pending ingestion-pull job
+    And that job is rescheduled using the new cron expression
+
+  @integration @unit
+  Scenario: Malformed schedules are rejected without stopping the existing recurrence
+    Given an active pull-mode source with a valid pending ingestion-pull job
+    When an update supplies a malformed `pullSchedule`
+    Then the update is rejected before the malformed schedule is persisted
+    And the existing pending ingestion-pull job remains scheduled
+
+  @integration
   Scenario: Saving a source with a schedule seeds it immediately
     Given a new pull-mode source is created with `pullSchedule = "*/10 * * * *"`
     When the create mutation succeeds
