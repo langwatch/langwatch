@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/observability";
+
 /**
  * Event-sourced scheduler for pull-mode ingestion sources.
  *
@@ -32,7 +34,6 @@ import type {
   EventSourcedQueueProcessor,
 } from "~/server/event-sourcing/queues";
 import type { EventSourcingService } from "~/server/event-sourcing/services/eventSourcingService";
-import { createLogger } from "~/utils/logger/server";
 
 import { runIngestionPullForSource } from "./pullerWorker";
 
