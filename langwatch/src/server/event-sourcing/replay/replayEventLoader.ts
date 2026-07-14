@@ -304,6 +304,53 @@ export async function batchGetCutoffEventIds({
 }
 
 /**
+ * Compute occurred-at bounds for a batch of aggregates, then fetch their
+ * cutoff event IDs bounded by those bounds — the shared "bounds first, then
+ * cutoffs" sequence every replay batch path runs before loading events.
+ *
+ * Undefined bounds means the aggregates have zero events — the cutoff query
+ * is skipped entirely, since it would otherwise scan every partition
+ * unbounded just to return empty. In that case this returns empty cutoffs
+ * plus `occurredAtBounds: undefined`, routing every aggregate down the
+ * caller's without-cutoff/unmark path.
+ */
+export async function getBoundedCutoffs({
+  client,
+  tenantId,
+  aggregateTypes,
+  aggregateIds,
+  eventTypes,
+}: {
+  client: ClickHouseClient;
+  tenantId: string;
+  aggregateTypes: string[];
+  aggregateIds: string[];
+  eventTypes: readonly string[];
+}): Promise<{
+  cutoffs: Map<string, CutoffInfo>;
+  occurredAtBounds: OccurredAtBounds | undefined;
+}> {
+  const occurredAtBounds = await getAggregateOccurredAtBounds({
+    client,
+    tenantId,
+    aggregateTypes,
+    aggregateIds,
+  });
+  if (!occurredAtBounds) {
+    return { cutoffs: new Map<string, CutoffInfo>(), occurredAtBounds: undefined };
+  }
+
+  const cutoffs = await batchGetCutoffEventIds({
+    client,
+    tenantId,
+    aggregateIds,
+    eventTypes,
+    occurredAtBounds,
+  });
+  return { cutoffs, occurredAtBounds };
+}
+
+/**
  * Load ALL events for a set of aggregates in a single ClickHouse query.
  * No eventTypes filter — different projections may need different event types,
  * so we load everything and let callers filter by cutoff per aggregate.
