@@ -1,7 +1,6 @@
 import { on } from "node:events";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
 import { z } from "zod";
@@ -33,77 +32,6 @@ import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
 export { getAllForProjectInput };
 
 const logger = createLogger("langwatch:traces:sse-subscription");
-
-/**
- * Reads a thread on behalf of an ANONYMOUS public-share caller, who is entitled
- * to only the individually-shared traces within it — not the whole thread.
- *
- * Order matters here, and it is a security property (#4991, #5082): resolving
- * `{ full: true }` de-offloads the entire IO value out of `event_log`, so doing
- * it before authorization narrows the set would let one valid share link amplify
- * unbounded `event_log` reads across every other trace in the thread — traces
- * this caller may not read. That is the ClickHouse connection-pool exhaustion
- * the ADR-022 offload exists to prevent, reachable unauthenticated.
- *
- * So: read PREVIEW-only (zero `event_log` reads), authorize down to the shared
- * trace ids, and only then resolve full IO — for those ids alone.
- */
-async function readPubliclySharedThread({
-  traceService,
-  prisma,
-  projectId,
-  threadId,
-  protections,
-}: {
-  traceService: TraceService;
-  prisma: PrismaClient;
-  projectId: string;
-  threadId: string;
-  protections: Protections;
-}): Promise<Trace[]> {
-  const previewTraces = await traceService.getTracesByThreadId(
-    projectId,
-    threadId,
-    protections,
-    { full: false },
-  );
-
-  const publicShares = await prisma.publicShare.findMany({
-    where: {
-      projectId,
-      resourceType: PublicShareResourceTypes.TRACE,
-      resourceId: { in: previewTraces.map((trace) => trace.trace_id) },
-    },
-  });
-
-  const authorizedTraceIds = previewTraces
-    .filter((trace) =>
-      publicShares.some((share) => share.resourceId === trace.trace_id),
-    )
-    .map((trace) => trace.trace_id);
-
-  if (authorizedTraceIds.length === 0) {
-    return [];
-  }
-
-  const authorizedTraces = await traceService.getTracesWithSpans(
-    projectId,
-    authorizedTraceIds,
-    protections,
-    undefined,
-    { full: true },
-  );
-
-  // `authorizedTraceIds` already carries the thread's canonical order — the
-  // preview read returned it sorted, and filter/map preserve that. A direct
-  // getTracesWithSpans call comes back in trace-id order instead, so re-project
-  // onto the ids rather than re-deriving an ordering here; the thread read stays
-  // the single owner of what "thread order" means.
-  const resolvedById = new Map(
-    authorizedTraces.map((trace) => [trace.trace_id, trace]),
-  );
-  return authorizedTraceIds.flatMap((id) => resolvedById.get(id) ?? []);
-}
 
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -306,25 +234,12 @@ export const tracesRouter = createTRPCRouter({
       );
 
       // An authorized caller owns the whole thread, so resolve it full up front.
-      // An anonymous public-share caller does not — see readPubliclySharedThread.
-      if (!ctx.publiclyShared) {
-        return traceService.getTracesByThreadId(
-          projectId,
-          threadId,
-          protections,
-          { full: true },
-        );
-      }
-
-      return readPubliclySharedThread({
-        traceService,
-        prisma: ctx.prisma,
+      // An anonymous public-share caller uses grant-based filtering.
+      const tracesGrouped = await traceService.getTracesByThreadId(
         projectId,
         threadId,
         protections,
-<<<<<<< HEAD
-      });
-=======
+        { full: true },
       );
 
       if (!ctx.publiclyShared) {
@@ -340,7 +255,6 @@ export const tracesRouter = createTRPCRouter({
       return tracesGrouped.filter(
         (trace) => trace.trace_id === grant?.resource_id,
       );
->>>>>>> dc9fd71e0 (feat(sharing): token-gated share links with audience + expiry (ADR-039))
     }),
 
   getTracesWithSpans: protectedProcedure

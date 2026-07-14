@@ -1519,9 +1519,15 @@ export const checkPermissionOrPubliclyShared =
 
     if (!allowed) {
       const grant = ctx.shareGrant;
+      // Resolve the expected resource type (could be a function for dynamic lookup)
+      const expectedResourceType =
+        typeof resourceType === "function"
+          ? resourceType(input)
+          : resourceType;
       const grantCoversResource =
         !!grant &&
         grant.project_id === input.projectId &&
+        grant.resource_type === expectedResourceType &&
         grant.resource_id === input[resourceParam];
       if (!grantCoversResource) {
         throw new TRPCError({
@@ -1564,6 +1570,7 @@ export const checkPermissionOrSharedThread =
       const grant = ctx.shareGrant;
       const grantCoversThread =
         !!grant &&
+        grant.resource_type === "THREAD" &&
         grant.project_id === input.projectId &&
         !!grant.thread_id &&
         grant.thread_id === input.conversationId;

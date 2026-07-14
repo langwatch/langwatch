@@ -2,7 +2,6 @@ import { createLogger } from "@langwatch/observability";
 import {
   type AnnotationQueueItem,
   type PrismaClient,
-  PublicShareResourceTypes,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";

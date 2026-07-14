@@ -36,17 +36,36 @@ function getSecret(): string {
   return secret;
 }
 
-export function signShareGrant(claims: ShareGrantClaims): {
+export function signShareGrant(
+  claims: ShareGrantClaims,
+  shareExpiresAt?: Date | null,
+): {
   jwt: string;
   expiresAt: number;
 } {
   const secret = getSecret();
-  const expiresAt = Math.floor(Date.now() / 1000) + SHARE_GRANT_TTL_SECONDS;
+  const now = Math.floor(Date.now() / 1000);
+  
+  // If the share has an expiry, cap the grant TTL to the share's remaining time
+  // (minimum 60 seconds to avoid tiny windows). This ensures grants don't outlive
+  // their parent share link.
+  let ttl = SHARE_GRANT_TTL_SECONDS;
+  if (shareExpiresAt) {
+    const shareExpiresInSeconds = Math.floor(
+      (shareExpiresAt.getTime() - Date.now()) / 1000,
+    );
+    ttl = Math.min(
+      SHARE_GRANT_TTL_SECONDS,
+      Math.max(shareExpiresInSeconds, 60), // minimum 60 seconds
+    );
+  }
+  
+  const expiresAt = now + ttl;
   const signedJwt = jwt.sign(claims, secret, {
     algorithm: "HS256",
     issuer: ISSUER,
     audience: AUDIENCE,
-    expiresIn: SHARE_GRANT_TTL_SECONDS,
+    expiresIn: ttl,
   });
   return { jwt: signedJwt, expiresAt };
 }

@@ -90,13 +90,16 @@ export const shareRouter = createTRPCRouter({
               message: "Cannot issue a share grant on this transport.",
             });
           }
-          const { jwt } = signShareGrant({
-            share_id: share.id,
-            project_id: share.projectId,
-            resource_type: share.resourceType,
-            resource_id: share.resourceId,
-            thread_id: share.threadId,
-          });
+          const { jwt } = signShareGrant(
+            {
+              share_id: share.id,
+              project_id: share.projectId,
+              resource_type: share.resourceType,
+              resource_id: share.resourceId,
+              thread_id: share.threadId,
+            },
+            share.expiresAt,
+          );
           ctx.resHeaders.append("set-cookie", buildShareGrantCookie(jwt));
           return {
             shareId: share.id,

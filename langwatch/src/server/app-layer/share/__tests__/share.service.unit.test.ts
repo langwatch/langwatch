@@ -53,7 +53,7 @@ describe("ShareService", () => {
       listByResource: vi.fn(),
       hasActiveShareForResource: vi.fn().mockResolvedValue(false),
       create: vi.fn(),
-      incrementViewCount: vi.fn().mockResolvedValue(undefined),
+      incrementViewCount: vi.fn().mockResolvedValue(true),
       deleteById: vi.fn(),
       deleteByResource: vi.fn(),
       findAllTraceShareResourceIds: vi.fn(),

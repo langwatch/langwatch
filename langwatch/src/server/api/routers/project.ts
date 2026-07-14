@@ -47,11 +47,11 @@ export const projectRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
-      const publicShare = await prisma.shareLink.findUnique({
-        where: { id: input.shareId, projectId: input.id },
-      });
+      // Validate the share link is still active (not expired, sharing enabled)
+      // This prevents anonymous access after a link expires or is disabled
+      const share = await getApp().share.getShareableById(input.shareId);
 
-      if (!publicShare) {
+      if (!share || share.projectId !== input.id) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Public share not found",
