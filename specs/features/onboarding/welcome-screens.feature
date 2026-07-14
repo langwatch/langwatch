@@ -7,8 +7,8 @@ Feature: Welcome Onboarding Screen for Scenarios
     Given I am logged into project "my-project"
 
   # All 4 scenarios are bound to existing tests in
-  # langwatch/src/hooks/scenarios/__tests__/useNewScenarioFlow.unit.test.ts
-  # and langwatch/src/components/scenarios/__tests__/ScenarioWelcomeScreen.integration.test.tsx.
+  # platform/app/src/hooks/scenarios/__tests__/useNewScenarioFlow.unit.test.ts
+  # and platform/app/src/components/scenarios/__tests__/ScenarioWelcomeScreen.integration.test.tsx.
 
   # ============================================================================
   # Welcome Screen Trigger

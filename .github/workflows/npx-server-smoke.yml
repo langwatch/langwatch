@@ -32,13 +32,13 @@ on:
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - "packages/server/**"
-      - "langevals/pyproject.toml"
-      - "langevals/uv.lock"
+      - "services/langevals/pyproject.toml"
+      - "services/langevals/uv.lock"
       - "services/aigateway/**"
       - "cmd/service/**"
-      - "langwatch/package.json"
-      - "langwatch/scripts/start.sh"
-      - "langwatch/scripts/check-ports.sh"
+      - "platform/app/package.json"
+      - "platform/app/scripts/start.sh"
+      - "platform/app/scripts/check-ports.sh"
       - ".github/workflows/npx-server-smoke.yml"
 
 concurrency:
@@ -125,7 +125,7 @@ jobs:
           ls -lh "$tarball"
           # Belt-and-suspenders: tarball must NOT ship Go source (silent
           # local-build foot-gun from beta.8 era).
-          if tar -tzf "$tarball" | grep -qE "^package/(go\.mod|cmd/|pkg/|services/)"; then
+          if tar -tzf "$tarball" | grep -qE "^package/(go\.mod|cmd/|pkg/|services/(nlpgo|aigateway|langy-agent)/)"; then
             echo "✗ tarball ships Go source dirs — local-build fallback regression."
             exit 1
           fi

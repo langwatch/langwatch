@@ -65,12 +65,12 @@ include boxd.mk
 # must be evaluated after they are defined. See the include at end of file.
 
 # =============================================================================
-# DOCKER DEV ENVIRONMENT (compose.dev.yml)
+# DOCKER DEV ENVIRONMENT (infra/compose.dev.yml)
 # =============================================================================
 # All services run in Docker with resource limits.
 # App is volume-mounted for hot reload.
 
-COMPOSE = docker compose -f compose.dev.yml
+COMPOSE = docker compose -f infra/compose.dev.yml --project-directory .
 
 # Sources scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
 # NEXTAUTH_URL / BASE_HOST exports to the compose-derived APP_PORT (default
@@ -86,7 +86,7 @@ setup-hooks:
 # Run a Go service via the mono-binary.
 # Usage: make service svc=aigateway
 #
-# Sources every var from langwatch/.env into the Go process's environment.
+# Sources every var from platform/app/.env into the Go process's environment.
 # The gateway + control-plane intentionally share secrets (LW_GATEWAY_*,
 # LW_VIRTUAL_KEY_PEPPER etc.) — one flat .env is simpler than namespace
 # prefixes. Vars the Go service doesn't need are ignored.
@@ -100,7 +100,7 @@ setup-hooks:
 # launching the gateway, but a flat `. .env` would clobber it back to
 # the hardcoded default and the gateway would hit a dead control-plane
 # port (every VK call → 401 invalid_api_key).
-DEV_ENV_FILE ?= langwatch/.env
+DEV_ENV_FILE ?= platform/app/.env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@_snap=$$(export -p) && \
@@ -115,7 +115,7 @@ service:
 # Usage: make service-watch svc=aigateway
 service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
-	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed platform/app/.env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
 	@_snap=$$(export -p) && \
 		set -a && . $(DEV_ENV_FILE) && set +a && \
@@ -131,12 +131,12 @@ service-watch:
 # all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
 # migration, full-local.
 
-# Refresh AWS SSO credentials in langwatch/.env so `make quickstart
+# Refresh AWS SSO credentials in platform/app/.env so `make quickstart
 # dev-storage` can talk to runtime-storage-dev. SSO temporary tokens
 # expire ~hourly; this rotates the three S3_*_KEY/TOKEN lines in
-# langwatch/.env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
+# platform/app/.env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
 refresh-dev-s3:
-	@bash langwatch/scripts/refresh-dev-s3-env.sh
+	@bash platform/app/scripts/refresh-dev-s3-env.sh
 
 # Run all *.unit.bats tests under scripts/__tests__/. Dev-only — these
 # tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /
@@ -188,7 +188,7 @@ clean:
 # is the first goal this recipe is a no-op. Plain `make install` is unaffected.
 install:
 ifneq (haven,$(firstword $(MAKECMDGOALS)))
-	cd langwatch && pnpm install
+	cd platform/app && pnpm install
 else
 	@:
 endif
@@ -201,16 +201,16 @@ endif
 # LANGWATCH_ENDPOINT points nlpgo's evaluator/agent-workflow callbacks back at
 # the local app.
 start:
-	cd langwatch && pnpm concurrently --kill-others \
+	cd platform/app && pnpm concurrently --kill-others \
 		'pnpm dev' \
 		'SERVER_ADDR=:5561 LANGWATCH_ENDPOINT=http://localhost:5560 make -C .. service svc=nlpgo'
 
 start/postgres:
 	@echo "Starting Postgres..."
-	@docker compose up -d postgres
+	@docker compose -f infra/compose.yml --project-directory . up -d postgres
 
 tsc-watch:
-	cd langwatch && pnpm tsc-watch
+	cd platform/app && pnpm tsc-watch
 
 # Single entry point — interactive launcher or non-interactive mode runner.
 # (#3860 AC#1, AC#2). Positional usage via MAKECMDGOALS:
@@ -261,7 +261,7 @@ dev-down: _dev-up-deprecation-warning
 
 # Tail logs for isolated instance
 dev-logs: _dev-up-deprecation-warning
-	@if [ -f .dev-port ]; then . ./.dev-port && COMPOSE_PROJECT_NAME=$$COMPOSE_PROJECT_NAME VOLUME_PREFIX=$$VOLUME_PREFIX docker compose -f compose.dev.yml --profile full logs -f; \
+	@if [ -f .dev-port ]; then . ./.dev-port && COMPOSE_PROJECT_NAME=$$COMPOSE_PROJECT_NAME VOLUME_PREFIX=$$VOLUME_PREFIX docker compose -f infra/compose.dev.yml --project-directory . --profile full logs -f; \
 	else echo "No .dev-port found. Is the instance running?"; fi
 
 # Create a git worktree from issue number or feature name
@@ -275,8 +275,8 @@ worktree:
 
 sync-all-openapi:
 	pnpm run task generateOpenAPISpec
-	cd typescript-sdk && pnpm run generate:openapi-types
-	cd python-sdk && make generate/api-client
+	cd sdks/typescript && pnpm run generate:openapi-types
+	cd sdks/python && make generate/api-client
 
 # Included last on purpose (see the note next to `include boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real

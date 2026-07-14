@@ -32,28 +32,28 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'langwatch/**'
+              - 'platform/app/**'
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
             # The parity scanner binds @scenario annotations from test files
-            # across many roots, not just specs/ and langwatch/. This list MUST
+            # across many roots, not just specs/ and platform/app/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
             # DEFAULT_GO_TEST_ROOTS, DEFAULT_PYTHON_TEST_ROOTS,
-            # DEFAULT_BATS_TEST_ROOTS in langwatch/scripts/check-feature-parity.ts),
+            # DEFAULT_BATS_TEST_ROOTS in platform/app/scripts/check-feature-parity.ts),
             # otherwise a binding change in an unlisted root merges without the
             # gate ever running and silently breaks parity on main (e.g. #5143
             # edited only scripts/__tests__/*.bats and slipped through).
             feature-parity:
               - 'specs/**'
-              - 'langwatch/**'
+              - 'platform/app/**'
               - 'tools/**'
-              - 'mcp-server/**'
-              - 'typescript-sdk/**'
-              - 'python-sdk/**'
+              - 'mcp/typescript/**'
+              - 'sdks/typescript/**'
+              - 'sdks/python/**'
               - 'services/**'
               - 'pkg/**'
-              - 'langevals/**'
+              - 'services/langevals/**'
               - 'langwatch_server/**'
               - 'scripts/**'
               - '.github/workflows/langwatch-app-ci.yml'
@@ -68,11 +68,11 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          cache-dependency-path: "platform/app/pnpm-lock.yaml"
+          install-dir: platform/app
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       # tsgo (and tsc) write incremental .tsbuildinfo caches to explicit paths
@@ -92,11 +92,11 @@ jobs:
             ${{ runner.os }}-tsbuildinfo-
 
       - name: Run typecheck
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm typecheck
 
       - name: Run typecheck (tests)
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm run typecheck:tests
 
       - name: Notify Slack on failure
@@ -134,16 +134,16 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          cache-dependency-path: "platform/app/pnpm-lock.yaml"
+          install-dir: platform/app
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       - name: Run unit tests with coverage (shard ${{ matrix.shard }}/4)
         id: unit-tests
-        working-directory: langwatch
+        working-directory: platform/app
         run: |
           pnpm test:unit --run --shard=${{ matrix.shard }}/4 \
             --coverage --coverage.reporter=lcov --coverage.reporter=text \
@@ -152,22 +152,22 @@ jobs:
 
       - name: Extract test failures
         if: failure()
-        working-directory: langwatch
-        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+        working-directory: platform/app
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        working-directory: langwatch
-        run: bash ../.github/scripts/notify-slack-test-failure.sh test-unit
+        working-directory: platform/app
+        run: bash ../../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
-        if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
+        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
-          files: langwatch/coverage/lcov.info
+          files: platform/app/coverage/lcov.info
           flags: unit
           name: unit-tests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
@@ -239,15 +239,15 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          cache-dependency-path: "platform/app/pnpm-lock.yaml"
+          install-dir: platform/app
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       - name: Setup database
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Install Goose migration tool
@@ -259,7 +259,7 @@ jobs:
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
       - name: Run ClickHouse migrations
-        working-directory: langwatch
+        working-directory: platform/app
         # ClickHouse's HTTP probe can answer SELECT 1 via curl while the
         # Node @clickhouse/client still sees ECONNREFUSED on its first
         # connect (IPv6/IPv4 dual-stack bind race under --network host).
@@ -279,7 +279,7 @@ jobs:
 
       - name: Run integration tests with coverage (shard ${{ matrix.shard }}/6)
         id: integration-tests
-        working-directory: langwatch
+        working-directory: platform/app
         # Integration files run sequentially in a single long-lived fork worker
         # (fileParallelism:false, for Redis contention), so v8 coverage data
         # accumulates across every file in the shard. Two levers keep that
@@ -296,22 +296,22 @@ jobs:
 
       - name: Extract test failures
         if: failure()
-        working-directory: langwatch
-        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+        working-directory: platform/app
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        working-directory: langwatch
-        run: bash ../.github/scripts/notify-slack-test-failure.sh test-integration
+        working-directory: platform/app
+        run: bash ../../.github/scripts/notify-slack-test-failure.sh test-integration
 
       - name: Upload integration test coverage to Codecov
-        if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
+        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
-          files: langwatch/coverage/lcov.info
+          files: platform/app/coverage/lcov.info
           flags: integration
           name: integration-tests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
@@ -333,7 +333,7 @@ jobs:
           fail_level: error
           # The action resolves the Biome version (from the lockfile) and runs
           # Biome inside workdir, so biome_flags paths are relative to it.
-          workdir: langwatch
+          workdir: platform/app
           biome_flags: "./src"
 
       - name: Notify Slack on failure
@@ -353,11 +353,11 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          cache-dependency-path: "platform/app/pnpm-lock.yaml"
+          install-dir: platform/app
 
       - name: Check feature-file parity
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm check:feature-parity
 
       - name: Notify Slack on failure
@@ -399,7 +399,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('platform/app/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
@@ -407,18 +407,18 @@ jobs:
       - name: Cache Prisma client
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: langwatch/node_modules/.prisma
-          key: ${{ runner.os }}-prisma-${{ hashFiles('langwatch/prisma/schema.prisma') }}
+          path: platform/app/node_modules/.prisma
+          key: ${{ runner.os }}-prisma-${{ hashFiles('platform/app/prisma/schema.prisma') }}
 
       # Cache Vite build artifacts
       - name: Cache Vite
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            langwatch/node_modules/.vite
-          key: ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'langwatch/vite.config.ts') }}
+            platform/app/node_modules/.vite
+          key: ${{ runner.os }}-vite-${{ hashFiles('platform/app/pnpm-lock.yaml') }}-${{ hashFiles('platform/app/src/**/*', 'platform/app/vite.config.ts') }}
           restore-keys: |
-            ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-vite-${{ hashFiles('platform/app/pnpm-lock.yaml') }}-
             ${{ runner.os }}-vite-
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
@@ -430,15 +430,15 @@ jobs:
         run: npm install -g node-gyp@12.3.0
 
       - name: Build mcp-server
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         run: pnpm install --frozen-lockfile && pnpm run build
 
       - name: Install dependencies
-        working-directory: langwatch
+        working-directory: platform/app
         run: CI=true pnpm install --frozen-lockfile
 
       - name: Build
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm build
 
       # A successful `vite build` only proves the bundle compiles, not that it
@@ -446,7 +446,7 @@ jobs:
       # catch runtime boot failures (white screens from chunk-init errors).
       # Uses the runner's preinstalled Google Chrome (no browser download).
       - name: Boot smoke test
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           SMOKE_BROWSER_CHANNEL: chrome
         run: |
@@ -492,25 +492,25 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          cache-dependency-path: "platform/app/pnpm-lock.yaml"
+          install-dir: platform/app
 
       - name: Stage canary fixture inside vitest root
-        working-directory: langwatch
-        run: cp ../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
+        working-directory: platform/app
+        run: cp ../../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
 
       - name: Run intentional failure
         id: canary
         continue-on-error: true
-        working-directory: langwatch
+        working-directory: platform/app
         run: |
           pnpm vitest run _ci_canary.test.ts \
             --reporter=default --reporter=json --outputFile=test-results.json
 
       - name: Extract failures
         if: always()
-        working-directory: langwatch
-        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+        working-directory: platform/app
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Assert detection worked
         if: always()
@@ -519,12 +519,12 @@ jobs:
             echo "FAIL: canary step should have failed (vitest should exit non-zero for a failing test), got outcome=${{ steps.canary.outcome }}"
             exit 1
           fi
-          if [ ! -s langwatch/test-failures.txt ]; then
+          if [ ! -s platform/app/test-failures.txt ]; then
             echo "FAIL: test-failures.txt is missing or empty — failure extraction did not work"
             exit 1
           fi
           echo "PASS: canary failed as expected and failures were extracted"
-          cat langwatch/test-failures.txt
+          cat platform/app/test-failures.txt
 
   langwatch-app-complete:
     needs: [changes, typecheck, test-unit, test-integration, lint, feature-parity, build, ci-scripts-test, ci-self-test]

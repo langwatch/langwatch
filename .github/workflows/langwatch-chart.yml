@@ -3,18 +3,18 @@ name: langwatch-chart
 on:
   pull_request:
     paths:
-      - "charts/langwatch/**"
-      - "charts/clickhouse-serverless/**"
-      - "charts/gateway/**"
-      - "charts/lib/**"
+      - "infra/charts/langwatch/**"
+      - "infra/charts/clickhouse-serverless/**"
+      - "infra/charts/gateway/**"
+      - "infra/charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
   push:
     branches: [main]
     paths:
-      - "charts/langwatch/**"
-      - "charts/clickhouse-serverless/**"
-      - "charts/gateway/**"
-      - "charts/lib/**"
+      - "infra/charts/langwatch/**"
+      - "infra/charts/clickhouse-serverless/**"
+      - "infra/charts/gateway/**"
+      - "infra/charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: charts/langwatch
+        working-directory: infra/charts/langwatch
     strategy:
       fail-fast: false
       matrix:
@@ -79,7 +79,7 @@ jobs:
             build_app: false
     defaults:
       run:
-        working-directory: charts/langwatch
+        working-directory: infra/charts/langwatch
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
@@ -95,12 +95,12 @@ jobs:
           echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
       - name: Build app image
         if: matrix.build_app
-        run: docker build -t "$APP_IMAGE" ../..
+        run: docker build -t "$APP_IMAGE" -f ../../docker/Dockerfile ../../..
       # The gateway image isn't published to ghcr yet — build it locally so
       # the chart e2e can install. values-e2e.yaml overrides
       # gateway.image.{repository,tag,pullPolicy} to match.
       - name: Build gateway image
-        run: docker build -t langwatch/ai-gateway:e2e -f ../../Dockerfile.go_service ../..
+        run: docker build -t langwatch/ai-gateway:e2e -f ../../docker/Dockerfile.go_service ../../..
       - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ${{ matrix.cluster }}

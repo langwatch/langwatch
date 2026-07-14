@@ -9,12 +9,12 @@
 // Stubs landed alongside the spec so the feature-parity binder
 // (langwatch/scripts/check-feature-parity.ts) is satisfied. The Skip
 // markers are replaced with real rendering assertions in this same
-// PR once Lane A (sdk-go/prompts) + Lane B (engine emission) have
+// PR once Lane A (sdks/go/prompts) + Lane B (engine emission) have
 // produced real fixture traces to drive them.
 
 import { describe, it } from "vitest";
 
-const PENDING = "pending: nlpgo prompt-span emission + sdk-go/prompts wiring in this PR";
+const PENDING = "pending: nlpgo prompt-span emission + sdks/go/prompts wiring in this PR";
 
 describe("prompt-spans trace-UI consumer parity", () => {
   /** @scenario 'trace drawer surfaces "Open in Prompts" with the exact handle and version' */

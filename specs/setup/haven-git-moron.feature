@@ -13,7 +13,7 @@ Feature: Git inspection across worktrees via haven
   # (`go test ./...` in tools/thuishaven): `app/git_test.go`
   # (TestResolveGitTarget), `app/prune_test.go` (drop --all keeps lw_main),
   # `cmd/guard_test.go` + `domain/guard_test.go` (the local-dev refusal).
-  # The parity checker (`langwatch/scripts/check-feature-parity.ts`) scans
+  # The parity checker (`platform/app/scripts/check-feature-parity.ts`) scans
   # tools/thuishaven's Go tests: @unit scenarios are bound by `// @scenario`
   # annotations above the Go test funcs; TUI-launch and end-to-end prune
   # flows remain `@unimplemented`.

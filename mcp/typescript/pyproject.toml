@@ -25,4 +25,4 @@ constraint-dependencies = [
 ]
 
 [tool.uv.sources]
-langwatch = { path = "../python-sdk", editable = true }
+langwatch = { path = "../../sdks/python", editable = true }

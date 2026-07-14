@@ -27,7 +27,7 @@ WORKDIR /src
 # Cache go module downloads in a layer that only invalidates when go.mod/
 # go.sum changes — the rest of the source tree is a churnier input.
 COPY go.mod go.sum ./
-COPY sdk-go ./sdk-go
+COPY sdks/go ./sdks/go
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go mod download
@@ -91,7 +91,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 #
 # The npm/tsup build is untouched and remains how the public `langwatch`
 # package is produced; this stage only compiles an extra artifact for this
-# image. See typescript-sdk/scripts/build-cli-binary.ts.
+# image. See sdks/typescript/scripts/build-cli-binary.ts.
 FROM oven/bun:1.3.13-debian AS cli-builder
 
 WORKDIR /src
@@ -104,31 +104,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     && npm install -g pnpm@10.24.0 \
     && rm -rf /var/lib/apt/lists/*
 
-# typescript-sdk/pnpm-workspace.yaml declares `.` + `../packages/cli-cards`, so
+# sdks/typescript/pnpm-workspace.yaml declares `.` + `../packages/cli-cards`, so
 # both trees must be present for `workspace:*` to resolve. cli-cards is
 # source-only (its `main` points at src/index.ts) and is bundled into the binary.
 COPY packages/cli-cards ./packages/cli-cards
-COPY typescript-sdk ./typescript-sdk
+COPY sdks/typescript ./sdks/typescript
 
-WORKDIR /src/typescript-sdk
+WORKDIR /src/sdks/typescript
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # The CLI imports types GENERATED from the platform source: copy-types.sh copies
-# the Zod-first modules out of langwatch/ + langevals/ and derives
+# the Zod-first modules out of platform/app/ + services/langevals/ and derives
 # default-prompt-model.generated.ts from llmModels.json, and the OpenAPI client is
-# generated from the app's OpenAPI json. Those sources live OUTSIDE typescript-sdk/
+# generated from the app's OpenAPI json. Those sources live OUTSIDE sdks/typescript/
 # and the install ran with --ignore-scripts, so the generated tree is absent and
 # the Bun compile fails to resolve `internal/generated/*`. Bring in exactly the
-# files the generators read (at the ../langwatch, ../langevals paths copy-types.sh
-# expects relative to /src/typescript-sdk), then run the generators. These are
+# files the generators read (at the ../../platform/app, ../../services/langevals paths copy-types.sh
+# expects relative to /src/sdks/typescript), then run the generators. These are
 # written INTO the image, so .dockerignore's `*.generated.*` filter (a host→context
 # rule) does not strip them.
-COPY langwatch/src/server/tracer/types.ts             /src/langwatch/src/server/tracer/types.ts
-COPY langwatch/src/server/filters/types.ts            /src/langwatch/src/server/filters/types.ts
-COPY langwatch/src/server/evaluations/types.ts        /src/langwatch/src/server/evaluations/types.ts
-COPY langwatch/src/server/modelProviders/llmModels.json /src/langwatch/src/server/modelProviders/llmModels.json
-COPY langwatch/src/app/api/openapiLangWatch.json      /src/langwatch/src/app/api/openapiLangWatch.json
-COPY langevals/ts-integration/evaluators.generated.ts /src/langevals/ts-integration/evaluators.generated.ts
+COPY platform/app/src/server/tracer/types.ts             /src/platform/app/src/server/tracer/types.ts
+COPY platform/app/src/server/filters/types.ts            /src/platform/app/src/server/filters/types.ts
+COPY platform/app/src/server/evaluations/types.ts        /src/platform/app/src/server/evaluations/types.ts
+COPY platform/app/src/server/modelProviders/llmModels.json /src/platform/app/src/server/modelProviders/llmModels.json
+COPY platform/app/src/app/api/openapiLangWatch.json      /src/platform/app/src/app/api/openapiLangWatch.json
+COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts
 RUN pnpm run prepare
 
 # BuildKit fills TARGETARCH from the target platform. Map it to Bun's target
@@ -223,7 +223,7 @@ RUN set -eux; \
     opencode --version
 
 # The `langwatch` CLI as a single self-contained native binary, compiled from
-# THIS repo's typescript-sdk/ by the cli-builder stage — no longer
+# THIS repo's sdks/typescript/ by the cli-builder stage — no longer
 # `npm install -g langwatch@<pinned>`. Two consequences worth knowing:
 #
 #   1. SPEED. Every tool call the model makes spawns this process; a Node boot

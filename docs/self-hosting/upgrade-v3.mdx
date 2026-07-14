@@ -38,7 +38,7 @@ Add ClickHouse to your existing infrastructure. Your Elasticsearch instance stay
 
 ### Docker Compose
 
-Add the ClickHouse service to your `compose.yml`:
+Add the ClickHouse service to your `infra/compose.yml`:
 
 ```yaml
 services:
@@ -74,7 +74,7 @@ The v3 Helm chart includes the `clickhouse-serverless` subchart automatically. N
 
 Update your environment variables and pull the v3 images:
 
-Add `CLICKHOUSE_URL` to your app and workers environment in `compose.yml`:
+Add `CLICKHOUSE_URL` to your app and workers environment in `infra/compose.yml`:
 
 ```yaml
 services:
@@ -131,7 +131,7 @@ The `es-migration` tool reads documents from Elasticsearch and writes them to Cl
 git clone https://github.com/langwatch/langwatch.git
 
 # Navigate to the langwatch workspace
-cd langwatch
+cd platform/app
 
 # Install dependencies from the langwatch pnpm workspace
 pnpm install
@@ -329,14 +329,14 @@ Once you've verified the migration:
    - `ELASTICSEARCH_NODE_URL`
    - `ELASTICSEARCH_API_KEY`
 
-2. **Remove the Elasticsearch service** from your `compose.yml` or Helm values
+2. **Remove the Elasticsearch service** from your `infra/compose.yml` or Helm values
 
 3. **Restart LangWatch** to apply the changes
 
 ### Docker Compose
 
 ```bash
-# After removing the elasticsearch service from compose.yml
+# After removing the elasticsearch service from infra/compose.yml
 docker compose up -d
 ```
 

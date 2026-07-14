@@ -5,7 +5,7 @@
 .pytest_cache
 .venv
 *.generated.*
-!langevals/ts-integration/evaluators.generated.ts
+!services/langevals/ts-integration/evaluators.generated.ts
 .DS_Store
 .github
 .env
@@ -17,9 +17,9 @@ langwatch_nlp/.pytest_cache
 langwatch_nlp/.ipynb_checkpoints
 
 dist
-python-sdk/dist
-python-sdk/.ipynb_checkpoints
-python-sdk/.pytest_cache
-python-sdk/.chainlit
-python-sdk/.files
-python-sdk/examples
+sdks/python/dist
+sdks/python/.ipynb_checkpoints
+sdks/python/.pytest_cache
+sdks/python/.chainlit
+sdks/python/.files
+sdks/python/examples

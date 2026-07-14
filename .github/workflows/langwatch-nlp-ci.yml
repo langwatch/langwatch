@@ -2,7 +2,7 @@
 # Branch protection requires `langwatch-nlp-complete`.
 #
 # nlpgo is the sole NLP engine: the self-hosted `langwatch_nlp` image is
-# built Go-only from Dockerfile.langwatch_nlp (a subcommand of the
+# built Go-only from infra/docker/Dockerfile.langwatch_nlp (a subcommand of the
 # cmd/service monobinary). The Go source itself (build/test/lint/vet for
 # services/nlpgo) is covered by go-ci.yaml; this workflow is the PR-time
 # smoke check that the published image actually builds.
@@ -32,7 +32,7 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'Dockerfile.langwatch_nlp'
+              - 'infra/docker/Dockerfile.langwatch_nlp'
               - 'services/nlpgo/**'
               - 'cmd/service/**'
               - 'pkg/**'
@@ -58,7 +58,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: Dockerfile.langwatch_nlp
+          file: infra/docker/Dockerfile.langwatch_nlp
           push: false
           tags: langwatch/langwatch_nlp:test
           cache-from: type=gha

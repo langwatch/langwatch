@@ -4,7 +4,7 @@ Feature: Code Block Editor component
   I want a reusable CodeBlockEditor component
   So that code editing is consistent across agents, workflows, and other features
 
-  # The CodeBlockEditor component (langwatch/src/components/blocks/
+  # The CodeBlockEditor component (platform/app/src/components/blocks/
   # CodeBlockEditor.tsx) is implemented and used by AgentCodeEditorDrawer
   # and CodePropertiesPanel. Both consumers have integration tests
   # that *mock* CodeBlockEditor as a simple textarea

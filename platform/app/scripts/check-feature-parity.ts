@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const REPO_ROOT = resolve(__dirname, "../..");
+const REPO_ROOT = resolve(__dirname, "../../..");
 const SPECS_ROOT = resolve(REPO_ROOT, "specs");
 
 /**
@@ -35,13 +35,13 @@ const SPECS_ROOT = resolve(REPO_ROOT, "specs");
  * is not required — any test in these roots can bind any scenario.
  */
 const DEFAULT_TEST_ROOTS: string[] = [
-  "langwatch/src",
-  "langwatch/ee",
-  "langwatch/packages",
-  "langwatch/scripts",
-  "mcp-server/src",
-  "typescript-sdk/src",
-  "python-sdk/src",
+  "platform/app/src",
+  "platform/app/ee",
+  "platform/app/packages",
+  "platform/app/scripts",
+  "mcp/typescript/src",
+  "sdks/typescript/src",
+  "sdks/python/src",
 ];
 
 /**
@@ -55,7 +55,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
  */
 const DEFAULT_BATS_TEST_ROOTS: string[] = [
   "scripts/__tests__",
-  "langwatch/scripts/__tests__",
+  "platform/app/scripts/__tests__",
 ];
 
 /**
@@ -82,7 +82,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
  * misleading TS stub.
  */
 const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
-  "langevals",
+  "services/langevals",
   "langwatch_server",
 ];
 

@@ -38,7 +38,7 @@ const NLPGO_PORT = 55620;
 // /langwatch/src/server/routes/__tests__  → up 5 = repo root.
 // Was 6 historically; "directory not found" on `go run ./cmd/service`
 // whenever OPENAI_API_KEY happened to be set in the test env.
-const REPO_ROOT = path.resolve(__dirname, "../../../../..");
+const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
 
 let nlpgoProcess: ChildProcess | null = null;
 

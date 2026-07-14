@@ -29,7 +29,7 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'sdk-go/**'
+              - 'sdks/go/**'
               - '.github/workflows/sdk-go-ci.yml'
               - '.github/.release-please-manifest.json'
 
@@ -40,6 +40,10 @@ jobs:
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
+    # The repo-root go.work targets a newer Go than the SDK's floor; the SDK
+    # must build standalone at its declared go directive, so ignore the workspace.
+    env:
+      GOWORK: off
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
@@ -52,23 +56,23 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        working-directory: ./sdk-go
+        working-directory: ./sdks/go
         run: go mod download
 
       - name: Run tests
-        working-directory: ./sdk-go
+        working-directory: ./sdks/go
         run: go test -v ./...
 
       - name: Install examples dependencies
-        working-directory: ./sdk-go/examples
+        working-directory: ./sdks/go/examples
         run: go mod download
 
       - name: Run filtering example
-        working-directory: ./sdk-go/examples
+        working-directory: ./sdks/go/examples
         run: go run ./filtering
 
       - name: Install e2e dependencies
-        working-directory: ./sdk-go/e2e
+        working-directory: ./sdks/go/e2e
         run: go mod download
 
       - name: Run e2e examples
@@ -80,7 +84,7 @@ jobs:
            || github.event.pull_request.head.repo.full_name == github.repository)
           && (github.event_name != 'pull_request'
            || github.actor != 'dependabot[bot]')
-        working-directory: ./sdk-go/e2e
+        working-directory: ./sdks/go/e2e
         run: go run cmd/main.go --ci run-examples
         env:
           LANGWATCH_API_KEY: ${{ secrets.GO_SDK_LANGWATCH_API_KEY }}
@@ -103,6 +107,10 @@ jobs:
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
+    # The repo-root go.work targets a newer Go than the SDK's floor; the SDK
+    # must build standalone at its declared go directive, so ignore the workspace.
+    env:
+      GOWORK: off
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
@@ -115,11 +123,11 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        working-directory: ./sdk-go
+        working-directory: ./sdks/go
         run: go mod download
 
       - name: Build
-        working-directory: ./sdk-go
+        working-directory: ./sdks/go
         run: go build -v ./...
 
   sdk-go-complete:

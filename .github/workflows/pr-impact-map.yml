@@ -44,37 +44,39 @@ jobs:
           script: |
             const MARKER = "<!-- pr-impact-map -->";
 
-            // First match wins, so order is load-bearing: `langwatch/**` would
+            // First match wins, so order is load-bearing: `platform/app/**` would
             // otherwise swallow migrations, specs and tests. Lockfiles are
             // pulled out above the language buckets so a dependency bump does
             // not masquerade as a large Go or app change — but `go.mod` and
             // `package.json` stay with their language, because those express
             // intent rather than churn.
             const CATEGORIES = [
-              ["Migrations",     p => /^langwatch\/(prisma|scripts|elastic)\/migrations\//.test(p)],
+              ["Migrations",     p => /^platform\/app\/(prisma|scripts|elastic)\/migrations\//.test(p)],
               ["Specs",          p => p.startsWith("specs/")],
               ["Tests",          p => /(^|\/)__tests__\//.test(p)
                                    || /\.(test|spec)\.[cm]?[jt]sx?$/.test(p)
                                    || /_test\.go$/.test(p)
                                    || /(^|\/)test_[^/]+\.py$/.test(p)
-                                   || p.startsWith("agentic-e2e-tests/")],
+                                   || p.startsWith("tests/agentic-e2e/")],
               ["CI/CD",          p => p.startsWith(".github/")],
-              ["Deploy",         p => p.startsWith("charts/")
-                                   || /^Dockerfile/.test(p)
-                                   || /^compose[.\w-]*\.ya?ml$/.test(p)],
+              ["Deploy",         p => p.startsWith("infra/charts/")
+                                   || /^infra\/docker\/Dockerfile/.test(p)
+                                   || /^infra\/compose[.\w-]*\.ya?ml$/.test(p)],
               ["Docs",           p => p.startsWith("docs/")
                                    || p.startsWith("dev/docs/")
                                    || p.startsWith("skills/")
                                    || p.endsWith(".md")],
               ["Deps",           p => /(^|\/)(pnpm-lock\.yaml|go\.sum|uv\.lock|poetry\.lock)$/.test(p)
                                    || p.endsWith(".lock")],
-              ["SDKs",           p => /^(python-sdk|typescript-sdk|sdk-go|mcp-server|packages)\//.test(p)],
+              ["SDKs",           p => /^(sdks\/python|sdks\/typescript|sdks\/go|mcp\/typescript|packages)\//.test(p)],
+              // Python must precede "Go services": services/langevals starts with
+              // `services/`, which the Go-services regex would otherwise claim first.
+              ["Python",         p => /^(langwatch_nlp|services\/langevals|langwatch_server)\//.test(p)],
               ["Go services",    p => /^(services|pkg|cmd)\//.test(p) || p === "go.mod"],
-              ["Python",         p => /^(langwatch_nlp|langevals|langwatch_server)\//.test(p)],
-              ["App · Server",   p => p.startsWith("langwatch/src/server/")
+              ["App · Server",   p => p.startsWith("platform/app/src/server/")
                                    || p.endsWith("schema.prisma")
-                                   || /^langwatch\/src\/(mcp|tasks|workers)/.test(p)],
-              ["App · Frontend", p => /^langwatch\/src\/(components|pages|app|hooks|stores|styles|features|optimization_studio)\//.test(p)
+                                   || /^platform\/app\/src\/(mcp|tasks|workers)/.test(p)],
+              ["App · Frontend", p => /^platform\/app\/src\/(components|pages|app|hooks|stores|styles|features|optimization_studio)\//.test(p)
                                    || p.endsWith(".tsx")],
               ["Other",          () => true],
             ];

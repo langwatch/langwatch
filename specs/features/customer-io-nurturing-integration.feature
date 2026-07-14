@@ -4,18 +4,18 @@ Feature: Customer.io nurturing integration
   So that customer nurturing workflows trigger automatically as users progress through the platform
 
   # All scenarios bound to existing tests in:
-  #   langwatch/ee/billing/nurturing/nurturing.service.unit.test.ts
-  #   langwatch/ee/billing/nurturing/nurturing.service.wiring.unit.test.ts
-  #   langwatch/ee/billing/nurturing/hooks/signupIdentification.unit.test.ts
-  #   langwatch/ee/billing/nurturing/hooks/featureAdoption.unit.test.ts
-  #   langwatch/ee/billing/nurturing/hooks/activityTracking.unit.test.ts
-  #   langwatch/ee/billing/nurturing/hooks/productInterest.unit.test.ts
-  #   langwatch/ee/billing/nurturing/hooks/promptCreation.unit.test.ts
-  #   langwatch/ee/billing/nurturing/hooks/promptCreation.integration.test.ts
-  #   langwatch/src/hooks/__tests__/useAttributionCapture.unit.test.ts
-  #   langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/__tests__/customerIoTraceSync.reactor.unit.test.ts
-  #   langwatch/src/server/event-sourcing/pipelines/evaluation-processing/reactors/__tests__/customerIoEvaluationSync.reactor.unit.test.ts
-  #   langwatch/src/server/event-sourcing/pipelines/simulation-processing/reactors/__tests__/customerIoSimulationSync.reactor.unit.test.ts
+  #   platform/app/ee/billing/nurturing/nurturing.service.unit.test.ts
+  #   platform/app/ee/billing/nurturing/nurturing.service.wiring.unit.test.ts
+  #   platform/app/ee/billing/nurturing/hooks/signupIdentification.unit.test.ts
+  #   platform/app/ee/billing/nurturing/hooks/featureAdoption.unit.test.ts
+  #   platform/app/ee/billing/nurturing/hooks/activityTracking.unit.test.ts
+  #   platform/app/ee/billing/nurturing/hooks/productInterest.unit.test.ts
+  #   platform/app/ee/billing/nurturing/hooks/promptCreation.unit.test.ts
+  #   platform/app/ee/billing/nurturing/hooks/promptCreation.integration.test.ts
+  #   platform/app/src/hooks/__tests__/useAttributionCapture.unit.test.ts
+  #   platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/__tests__/customerIoTraceSync.reactor.unit.test.ts
+  #   platform/app/src/server/event-sourcing/pipelines/evaluation-processing/reactors/__tests__/customerIoEvaluationSync.reactor.unit.test.ts
+  #   platform/app/src/server/event-sourcing/pipelines/simulation-processing/reactors/__tests__/customerIoSimulationSync.reactor.unit.test.ts
   # Six scenarios were rewritten to match shipped implementation (was UPDATE-class):
   #   - "Null service resolves..." dropped (impl uses `undefined`, not null pattern)
   #   - "Region defaults to US" → "Region defaults to EU" (matches impl)

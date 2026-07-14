@@ -48,7 +48,7 @@ The CLI shows a multi-select that **lists every pre-dep but does not allow de-se
 | postgres   | Prisma data store                    | `embedded-postgres` npm package (binary embed) | `~/.langwatch/postgres/` (data + binary)                  |
 | redis      | queues, caches                       | official binary build via `redis-server.zip`   | `~/.langwatch/redis/`                                     |
 | clickhouse | analytics + traces                   | langwatch/clickhouse-serverless tarball (~100MB) | `~/.langwatch/clickhouse/`                                |
-| go-gateway | AI Gateway (data plane)              | prebuilt monobinary from GH Releases           | `~/.langwatch/bin/aigateway-{os}-{arch}` |
+| go-gateway | AI Gateway (data plane)              | prebuilt monobinary from GH Releases           | `~/.platform/app/bin/aigateway-{os}-{arch}` |
 
 **Skipped:** Go toolchain (we ship monobinaries built per platform — same matrix the helm/release pipeline already builds). Pnpm (npm/pnpm workspace install handles it transitively when `npx` resolves the package).
 
@@ -133,7 +133,7 @@ The resolved port-base is persisted to `install-manifest.json.lastPortBase`. `BA
 
 ---
 
-## 6. Generated secrets and `.env` (`~/.langwatch/.env`)
+## 6. Generated secrets and `.env` (`~/.platform/app/.env`)
 
 Authoritative in code: `packages/server/src/shared/env.ts` (function `buildEnv`). Generated on **first run**, persisted, never overwritten on subsequent runs unless explicitly forced.
 
@@ -183,7 +183,7 @@ The CLI flow (smith) is:
 const runtime = await loadRuntime(); // dynamic import of services/runtime.ts, falls back to placeholder
 const ctx: RuntimeContext = { ports, paths, predeps, envFile, version };
 
-await runtime.scaffoldEnv(ctx);            // (1) write ~/.langwatch/.env if missing
+await runtime.scaffoldEnv(ctx);            // (1) write ~/.platform/app/.env if missing
 await runtime.installServices(ctx);        // (2) uv sync for langwatch_nlp + langevals (parallel)
 const handles = await runtime.startAll(ctx); // (3) spawn every service, return handles
 await runtime.waitForHealth(ctx, { timeoutMs: 60_000 }); // (4) block until every health check passes
@@ -283,7 +283,7 @@ Auto-open browser on macOS (`open`) and Linux (`xdg-open`). Skip if `--no-open` 
 Triggers:
 - `workflow_dispatch` (manual)
 - `schedule: '0 4 * * *'` (nightly 04:00 UTC)
-- `push` paths: `package.json`, `pnpm-workspace.yaml`, `packages/server/**`, `langwatch_nlp/pyproject.toml`, `langevals/**/pyproject.toml`, `services/aigateway/**`, `langwatch/package.json`, `langwatch/scripts/**`
+- `push` paths: `package.json`, `pnpm-workspace.yaml`, `packages/server/**`, `langwatch_nlp/pyproject.toml`, `langevals/**/pyproject.toml`, `services/aigateway/**`, `platform/app/package.json`, `platform/app/scripts/**`
 
 Matrix:
 - `macos-latest` (arm64)
@@ -321,7 +321,7 @@ Steps:
 3. `pnpm --filter @langwatch/server build` (which builds langwatch app + monobinary references)
 4. `pnpm --filter @langwatch/server publish --access public --no-git-checks`
 
-Version is read from `langwatch/package.json`. The `@langwatch/server` package version is **always equal** to the langwatch app version. A pre-publish step asserts both versions match the GH release tag, fails fast if not.
+Version is read from `platform/app/package.json`. The `@langwatch/server` package version is **always equal** to the langwatch app version. A pre-publish step asserts both versions match the GH release tag, fails fast if not.
 
 ---
 
@@ -342,8 +342,8 @@ Version is read from `langwatch/package.json`. The `@langwatch/server` package v
 
 ## 12. Open questions
 
-- [x] Postgres in or out of pre-deps? **In** — Prisma needs it, helm chart has it, compose.dev.yml has it.
-- [ ] Quickwit/Elasticsearch? Currently not in compose.dev.yml — test if app boots without it. If yes, skip; if no, add as a fifth predep or shim with a no-op.
+- [x] Postgres in or out of pre-deps? **In** — Prisma needs it, helm chart has it, infra/compose.dev.yml has it.
+- [ ] Quickwit/Elasticsearch? Currently not in infra/compose.dev.yml — test if app boots without it. If yes, skip; if no, add as a fifth predep or shim with a no-op.
 - [ ] Should we ship the langwatch next.js app **prebuilt** in the npm tarball, or build on first run? Prebuilt = faster first-run, larger tarball. **Recommend prebuilt** (build at publish, not at install).
 - [ ] When the user has an `OPENAI_API_KEY` in env, should the CLI propagate it into `~/.langwatch/langwatch.env`? **Yes**, but read-only — don't persist user secrets to disk.
 

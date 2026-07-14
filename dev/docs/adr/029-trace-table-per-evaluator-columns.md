@@ -6,7 +6,7 @@
 
 ## Context
 
-The trace table (`langwatch/src/features/traces-v2/components/TraceTable/`)
+The trace table (`platform/app/src/features/traces-v2/components/TraceTable/`)
 surfaces evaluations through a single `"evaluations"` column — the "Evals"
 summary, which renders every evaluator's latest chip for a trace
 (`registry/cells/trace/EvaluationsCell.tsx`). There is no way to pull one

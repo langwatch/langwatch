@@ -112,7 +112,7 @@ several GitHub accounts (each installation is listed separately in settings).
 
 ## 4. NetworkPolicy / egress
 
-The Langy agent's stock chart (`charts/langyagent`) ships with
+The Langy agent's stock chart (`infra/charts/langyagent`) ships with
 `networkPolicy.allowExternalHttps: true`, which allows `0.0.0.0/0:443` —
 `github.com`, `api.github.com`, and `codeload.github.com` work without further
 changes. Hardened installs that flip `allowExternalHttps` to `false` should add

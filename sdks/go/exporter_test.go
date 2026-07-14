@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/langwatch/langwatch/sdk-go/internal/testutil"
+	"github.com/langwatch/langwatch/sdks/go/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"

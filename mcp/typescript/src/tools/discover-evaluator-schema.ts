@@ -1,5 +1,5 @@
-import { AVAILABLE_EVALUATORS } from "../../../langevals/ts-integration/evaluators.generated.js";
-import type { EvaluatorDefinition, EvaluatorTypes } from "../../../langevals/ts-integration/evaluators.generated.js";
+import { AVAILABLE_EVALUATORS } from "../../../../services/langevals/ts-integration/evaluators.generated.js";
+import type { EvaluatorDefinition, EvaluatorTypes } from "../../../../services/langevals/ts-integration/evaluators.generated.js";
 
 /**
  * Formats evaluator schema information for the discover_schema tool.

@@ -141,7 +141,7 @@ A few non-obvious consequences:
 
 ### Layers
 
-**Chart** (`charts/clickhouse-serverless/values.yaml`): one boolean
+**Chart** (`infra/charts/clickhouse-serverless/values.yaml`): one boolean
 (`cold.enabled`) plus a shared `objectStorage` block (bucket / region /
 endpoint, IRSA-capable credentials). Helm `fail`s the install if
 `cold.enabled || backup.enabled` and `bucket` + (`region` or `endpoint`)
@@ -149,7 +149,7 @@ aren't set (`templates/_helpers.tpl`). When cold is on, the statefulset
 gets `COLD_STORAGE_ENABLED=true` plus the shared S3 env (`S3_ENDPOINT`,
 `S3_BUCKET`, `S3_REGION`).
 
-**Image** (`clickhouse-serverless/internal/storage/storage.go`): Go
+**Image** (`infra/clickhouse-serverless/internal/storage/storage.go`): Go
 program in the entrypoint renders the CH `storage_configuration` YAML
 from env, writes
 `/etc/clickhouse-server/config.d/storage.yaml`, then execs CH. For
@@ -157,7 +157,7 @@ from env, writes
 (with a local SSD cache sized to 25% of pod RAM) and a `local_primary`
 policy with `hot` + `cold` volumes (move_factor default 0.9).
 
-**Bootstrap + reconciler** (`langwatch/src/server/clickhouse/`):
+**Bootstrap + reconciler** (`platform/app/src/server/clickhouse/`):
 `goose.ts:320` queries `system.storage_policies` at startup. If
 `local_primary` is present, migrations get `SETTINGS storage_policy =
 'local_primary'`; otherwise the setting is left empty. Same migrations
@@ -276,16 +276,16 @@ plays out over hours, but throttled — not as a thundering herd.
 
 - Related ADRs: ADR-022 (data retention, umbrella), ADR-023
   (orphan-sweep reactor + chain — superseded), ADR-025 (orphan sweep removed)
-- Chart: `charts/clickhouse-serverless/{values.yaml,
+- Chart: `infra/charts/clickhouse-serverless/{values.yaml,
   templates/statefulset.yaml, templates/_helpers.tpl}`
-- Image: `clickhouse-serverless/internal/{config,storage,render}/`
-- Bootstrap: `langwatch/src/server/clickhouse/goose.ts`
-- Reconciler: `langwatch/src/server/clickhouse/ttlReconciler.ts`
+- Image: `infra/clickhouse-serverless/internal/{config,storage,render}/`
+- Bootstrap: `platform/app/src/server/clickhouse/goose.ts`
+- Reconciler: `platform/app/src/server/clickhouse/ttlReconciler.ts`
 - Tests:
-  - `langwatch/src/server/clickhouse/__tests__/ttlReconciler.{unit,regression.unit}.test.ts`
-  - `clickhouse-serverless/internal/storage/storage_test.go`
-  - `clickhouse-serverless/tests/e2e-cold{,-move}-test.sh`
-  - `charts/clickhouse-serverless/tests/e2e.sh` (`test_cold_storage`)
+  - `platform/app/src/server/clickhouse/__tests__/ttlReconciler.{unit,regression.unit}.test.ts`
+  - `infra/clickhouse-serverless/internal/storage/storage_test.go`
+  - `infra/clickhouse-serverless/tests/e2e-cold{,-move}-test.sh`
+  - `infra/charts/clickhouse-serverless/tests/e2e.sh` (`test_cold_storage`)
 - CH docs: [Multiple volumes](https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#table_engine-mergetree-multiple-volumes),
   [MOVE partitions](https://clickhouse.com/docs/en/sql-reference/statements/alter/partition#move-partition-part)
 - PR: #4147

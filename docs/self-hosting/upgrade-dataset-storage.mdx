@@ -14,7 +14,7 @@ The migration **never deletes your data**. All dataset rows are kept in PostgreS
 - **Dataset storage**: dataset content is written to object storage (a persistent volume by default, or S3-compatible storage if configured)
 - **Migration Job**: a Helm post-install/post-upgrade Job migrates existing datasets automatically
 - **Local storage constraints**: with the default local storage, the app and workers now restart together during upgrades, and workers are limited to a single replica
-- **New chart values**: see the [chart README](https://github.com/langwatch/langwatch/blob/main/charts/langwatch/README.md) for the full `app.dataplane`, `app.storedObjects`, and `datasetS3Migration` parameter reference
+- **New chart values**: see the [chart README](https://github.com/langwatch/langwatch/blob/main/infra/charts/langwatch/README.md) for the full `app.dataplane`, `app.storedObjects`, and `datasetS3Migration` parameter reference
 
 ## Before You Upgrade
 
@@ -199,6 +199,6 @@ If the Job reports that it is waiting for schema migrations, it means the databa
 
 ## Getting Help
 
-- Full parameter reference: [chart README](https://github.com/langwatch/langwatch/blob/main/charts/langwatch/README.md)
+- Full parameter reference: [chart README](https://github.com/langwatch/langwatch/blob/main/infra/charts/langwatch/README.md)
 - Check the [Troubleshooting guide](/self-hosting/troubleshooting)
 - Open an issue at [github.com/langwatch/langwatch/issues](https://github.com/langwatch/langwatch/issues)

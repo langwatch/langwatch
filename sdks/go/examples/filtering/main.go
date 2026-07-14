@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	"github.com/langwatch/langwatch/sdk-go/internal/testutil"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	"github.com/langwatch/langwatch/sdks/go/internal/testutil"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -150,9 +150,9 @@ func main() {
 		scope string
 		name  string
 	}{
-		{"github.com/langwatch/langwatch/sdk-go/instrumentation/openai", "openai.completions"},
+		{"github.com/langwatch/langwatch/sdks/go/instrumentation/openai", "openai.completions"},
 		{"langwatch", "custom-span"},
-		{"github.com/langwatch/langwatch/sdk-go", "tracer-span"},
+		{"github.com/langwatch/langwatch/sdks/go", "tracer-span"},
 		{"database/sql", "query"},
 		{"net/http", "GET /api"},
 		{"my-service", "process"},

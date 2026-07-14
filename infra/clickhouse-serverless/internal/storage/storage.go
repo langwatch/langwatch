@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/langwatch/langwatch/clickhouse-serverless/internal/config"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 	"gopkg.in/yaml.v3"
 )
 

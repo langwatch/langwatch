@@ -23,7 +23,7 @@ Feature: Model resolver and feature registry
   #                   needed (today: topic clustering vectors).
   #
   # Feature registry:
-  #   - Code-side declarations under `langwatch/src/server/modelProviders/
+  #   - Code-side declarations under `platform/app/src/server/modelProviders/
   #     featureRegistry.ts`. Each declaration is { key, role, displayName,
   #     description }. Keys are snake_case, area-prefixed, and stable forever
   #     (never renamed, only deprecated).

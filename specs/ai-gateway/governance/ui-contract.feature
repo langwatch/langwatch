@@ -154,7 +154,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
     Then it filters out kind == "internal_governance" rows
     And any leak of the hidden project to a user surface is treated
       as a bug (regression test in
-      langwatch/src/components/__tests__/projectFilter.invariant.test.ts
+      platform/app/src/components/__tests__/projectFilter.invariant.test.ts
       asserts every Project consumer applies the filter)
 
   # ---------------------------------------------------------------------------
@@ -293,7 +293,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
             viewer (does NOT build a bespoke event renderer)
     When the admin navigates to a per-source detail page with events
     Then the events feed reuses the existing
-      langwatch/src/components/messages/MessagesList component
+      platform/app/src/components/messages/MessagesList component
       (or the equivalent feed renderer used at /messages)
     And NO bespoke "EventsTable" / "GovernanceEventRow" component
       exists for governance — the existing components handle
@@ -323,7 +323,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   Scenario: Lane-B test suite asserts every Project consumer filters
             kind=internal_governance
     When the test suite runs
-      langwatch/src/components/__tests__/projectFilter.invariant.test.ts
+      platform/app/src/components/__tests__/projectFilter.invariant.test.ts
     Then it enumerates every component / API / hook / repository
       method that loads or renders Projects
     And for each, asserts that a Project with kind="internal_governance"

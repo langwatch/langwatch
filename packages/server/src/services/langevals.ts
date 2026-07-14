@@ -20,7 +20,7 @@ export async function startLangevals(
 
   const sp = servicePaths(ctx.paths);
   const venvDir = sp.venv("langevals");
-  const projectDir = locateProject("langevals");
+  const projectDir = locateProject("services/langevals");
   if (!projectDir) throw new Error("langevals project dir not found");
 
   const handle = supervise({

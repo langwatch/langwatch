@@ -3,7 +3,7 @@ package render
 import (
 	"path/filepath"
 
-	"github.com/langwatch/langwatch/clickhouse-serverless/internal/config"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
 
 // renderProfiles writes profiles.yaml with the default user profile settings.

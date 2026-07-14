@@ -291,26 +291,26 @@ all of them.
 ## Where each piece lives in the repo
 
 ```
-langwatch/src/server/governance/                     # Personal workspace, VK, RoutingPolicy services
-langwatch/src/server/gateway/                        # AI Gateway (Bifrost-embedded), virtual keys, budgets
-langwatch/src/server/routes/auth-cli.ts              # Device-flow + access tokens + budget/status
-langwatch/src/server/routes/ingest/                  # IngestionSource receivers (this iter)
-langwatch/src/server/governance/activity-monitor/    # OCSF normalisation + adapters (this iter)
-langwatch/src/server/api/routers/personalVirtualKeys.ts
-langwatch/src/server/api/routers/routingPolicies.ts
-langwatch/src/server/api/routers/user.ts             # personalContext + personalUsage + personalBudget
-langwatch/src/components/me/                         # /me layout + dashboard
-langwatch/src/components/WorkspaceSwitcher.tsx       # Single context switcher
-langwatch/src/components/BudgetExceededBanner.tsx    # Cross-surface 402 renderer
-langwatch/src/pages/me/                              # /me + /me/settings
-langwatch/src/pages/settings/                        # Admin routing policies, ingestion sources, activity monitor
-langwatch/src/pages/cli/auth.tsx                     # Device-flow approval UX
+platform/app/src/server/governance/                     # Personal workspace, VK, RoutingPolicy services
+platform/app/src/server/gateway/                        # AI Gateway (Bifrost-embedded), virtual keys, budgets
+platform/app/src/server/routes/auth-cli.ts              # Device-flow + access tokens + budget/status
+platform/app/src/server/routes/ingest/                  # IngestionSource receivers (this iter)
+platform/app/src/server/governance/activity-monitor/    # OCSF normalisation + adapters (this iter)
+platform/app/src/server/api/routers/personalVirtualKeys.ts
+platform/app/src/server/api/routers/routingPolicies.ts
+platform/app/src/server/api/routers/user.ts             # personalContext + personalUsage + personalBudget
+platform/app/src/components/me/                         # /me layout + dashboard
+platform/app/src/components/WorkspaceSwitcher.tsx       # Single context switcher
+platform/app/src/components/BudgetExceededBanner.tsx    # Cross-surface 402 renderer
+platform/app/src/pages/me/                              # /me + /me/settings
+platform/app/src/pages/settings/                        # Admin routing policies, ingestion sources, activity monitor
+platform/app/src/pages/cli/auth.tsx                     # Device-flow approval UX
 
-typescript-sdk/src/cli/commands/                     # Unified langwatch CLI
-typescript-sdk/src/cli/utils/governance/             # Device-flow client, config, wrappers
+sdks/typescript/src/cli/commands/                     # Unified langwatch CLI
+sdks/typescript/src/cli/utils/governance/             # Device-flow client, config, wrappers
 
-charts/langwatch/                                    # Umbrella chart with NOTES.txt
-charts/gateway/                                      # AI Gateway sub-chart
+infra/charts/langwatch/                                    # Umbrella chart with NOTES.txt
+infra/charts/gateway/                                      # AI Gateway sub-chart
 
 specs/ai-gateway/governance/                         # All BDD specs
 docs/ai-gateway/governance/                          # User-facing docs

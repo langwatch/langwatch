@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/langwatch/langwatch/sdk-go/internal/testutil"
+	"github.com/langwatch/langwatch/sdks/go/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -209,9 +209,9 @@ func TestLangWatchOnly(t *testing.T) {
 	filter := LangWatchOnly()
 
 	spans := []sdktrace.ReadOnlySpan{
-		testutil.CreateMockSpan("openai.chat", "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"),
+		testutil.CreateMockSpan("openai.chat", "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"),
 		testutil.CreateMockSpan("custom-span", "langwatch"),
-		testutil.CreateMockSpan("tracer-span", "github.com/langwatch/langwatch/sdk-go"),
+		testutil.CreateMockSpan("tracer-span", "github.com/langwatch/langwatch/sdks/go"),
 		testutil.CreateMockSpan("query", "database/sql"),
 		testutil.CreateMockSpan("GET /api", "net/http"),
 		testutil.CreateMockSpan("process", "my-service"),
@@ -225,9 +225,9 @@ func TestLangWatchOnly(t *testing.T) {
 	for i, s := range result {
 		names[i] = s.InstrumentationScope().Name
 	}
-	assert.Contains(t, names, "github.com/langwatch/langwatch/sdk-go/instrumentation/openai")
+	assert.Contains(t, names, "github.com/langwatch/langwatch/sdks/go/instrumentation/openai")
 	assert.Contains(t, names, "langwatch")
-	assert.Contains(t, names, "github.com/langwatch/langwatch/sdk-go")
+	assert.Contains(t, names, "github.com/langwatch/langwatch/sdks/go")
 }
 
 func TestApplyFilters_ANDSemantics(t *testing.T) {

@@ -7,7 +7,7 @@ Feature: MCP Prompt Tools
   # All scenarios describe MCP-side prompt list/get/update tool calls.
   # The underlying prompts service has unit + integration coverage; the
   # MCP wrapper around it needs targeted cases in
-  # `mcp-server/src/__tests__/all-tools.integration.test.ts`. Cheap to
+  # `mcp/typescript/src/__tests__/all-tools.integration.test.ts`. Cheap to
   # add when the prompt-tools wrapper changes.
 
   Background:

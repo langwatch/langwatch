@@ -1,10 +1,10 @@
 # Span reference buttons — jump to the Trace tab and open the span
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/TraceDrawer/ExceptionsContent.tsx            (header exceptions)
-#   langwatch/src/features/traces-v2/components/TraceDrawer/traceAccordions/TraceSummaryAccordions.tsx  (summary tab)
-#   langwatch/src/features/traces-v2/components/TraceDrawer/waterfallView/WaterfallView.tsx   (selected span)
-#   langwatch/src/features/traces-v2/stores/drawerStore.ts  (viewMode, selectSpan)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/ExceptionsContent.tsx            (header exceptions)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/TraceSummaryAccordions.tsx  (summary tab)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/waterfallView/WaterfallView.tsx   (selected span)
+#   platform/app/src/features/traces-v2/stores/drawerStore.ts  (viewMode, selectSpan)
 #
 # Motivation (round 5): span reference buttons (an error span in the
 # header, eval/event/exception spans in the Summary tab, span refs in the

@@ -53,52 +53,52 @@ jobs:
       matrix:
         include:
           - image: langwatch
-            dockerfile: Dockerfile
+            dockerfile: infra/docker/Dockerfile
             platform: linux/amd64
             runner: ubuntu-latest
             arch: amd64
           - image: langwatch
-            dockerfile: Dockerfile
+            dockerfile: infra/docker/Dockerfile
             platform: linux/arm64/v8
             runner: arm64-runner-32gb
             arch: arm64
           - image: langwatch_nlp
-            dockerfile: Dockerfile.langwatch_nlp
+            dockerfile: infra/docker/Dockerfile.langwatch_nlp
             platform: linux/amd64
             runner: ubuntu-latest
             arch: amd64
           - image: langwatch_nlp
-            dockerfile: Dockerfile.langwatch_nlp
+            dockerfile: infra/docker/Dockerfile.langwatch_nlp
             platform: linux/arm64/v8
             runner: ubuntu-24.04-arm
             arch: arm64
           - image: langevals
-            dockerfile: Dockerfile.langevals
+            dockerfile: infra/docker/Dockerfile.langevals
             platform: linux/amd64
             runner: ubuntu-latest
             arch: amd64
           - image: langevals
-            dockerfile: Dockerfile.langevals
+            dockerfile: infra/docker/Dockerfile.langevals
             platform: linux/arm64/v8
             runner: ubuntu-24.04-arm
             arch: arm64
           - image: ai-gateway
-            dockerfile: Dockerfile.go_service
+            dockerfile: infra/docker/Dockerfile.go_service
             platform: linux/amd64
             runner: ubuntu-latest
             arch: amd64
           - image: ai-gateway
-            dockerfile: Dockerfile.go_service
+            dockerfile: infra/docker/Dockerfile.go_service
             platform: linux/arm64/v8
             runner: ubuntu-24.04-arm
             arch: arm64
           - image: langyagent
-            dockerfile: Dockerfile.langyagent
+            dockerfile: infra/docker/Dockerfile.langyagent
             platform: linux/amd64
             runner: ubuntu-latest
             arch: amd64
           - image: langyagent
-            dockerfile: Dockerfile.langyagent
+            dockerfile: infra/docker/Dockerfile.langyagent
             platform: linux/arm64/v8
             runner: ubuntu-24.04-arm
             arch: arm64

@@ -23,7 +23,7 @@ Run the full LangWatch stack locally on a [Kind](https://kind.sigs.k8s.io/) clus
 
 ```bash
 git clone https://github.com/langwatch/langwatch.git
-cd langwatch/charts/langwatch
+cd langwatch/infra/charts/langwatch
 make example-up
 ```
 
@@ -43,7 +43,7 @@ If you prefer to run each step manually:
 
 ```bash
 kind create cluster --name lw-local \
-  --config charts/lib/kind-config.yaml \
+  --config infra/charts/lib/kind-config.yaml \
   --wait 60s
 ```
 
@@ -52,7 +52,7 @@ The Kind config maps port 30560 on your host to a NodePort inside the cluster.
 ### 2. Build and Load Images
 
 ```bash
-cd charts/langwatch
+cd infra/charts/langwatch
 
 # Build all images
 make images
@@ -63,7 +63,7 @@ make images-local
 
 This builds four images:
 - `langwatch/langwatch:local`, App
-- `langwatch/langwatch_nlp:local`, NLP service
+- `platform/app/langwatch_nlp:local`, NLP service
 - `langwatch/langevals:local`, Evaluators
 - `langwatch/clickhouse-serverless:next`, ClickHouse
 
@@ -139,7 +139,7 @@ make clean
 Images haven't been loaded into Kind. Run `make images-local`.
 
 **Port 30560 not accessible:**
-Ensure the Kind cluster was created with the port mapping config (`charts/lib/kind-config.yaml`). Recreate the cluster if needed: `make clean && make example-up`.
+Ensure the Kind cluster was created with the port mapping config (`infra/charts/lib/kind-config.yaml`). Recreate the cluster if needed: `make clean && make example-up`.
 
 **Pods stuck in `Pending`:**
 Check if your Docker daemon has enough resources. Kind needs at least 4 CPU and 8 GB RAM allocated to Docker (16 GB if building images locally).

@@ -95,7 +95,7 @@ const PARENT_TRACE_ID = "0123456789abcdef0123456789abcdef";
 const PARENT_SPAN_ID = "0011223344556677";
 
 // /langwatch/src/server/nlpgo/__tests__  → up 5 = repo root
-const REPO_ROOT = path.resolve(__dirname, "../../../../..");
+const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
@@ -114,7 +114,7 @@ const shouldRun = hasTestcontainers && hasGo();
 // single CI shard or local re-run reuses the build artifact across
 // vitest restarts. `os.tmpdir()` would work too, but keeping it inside
 // the repo means `make clean` / artifact cleanup picks it up.
-const NLPGO_TEST_BIN_DIR = path.join(REPO_ROOT, "langwatch", ".vitest-tmp");
+const NLPGO_TEST_BIN_DIR = path.join(REPO_ROOT, "platform", "app", ".vitest-tmp");
 const NLPGO_TEST_BIN = path.join(
   NLPGO_TEST_BIN_DIR,
   process.platform === "win32" ? "nlpgo-test.exe" : "nlpgo-test",

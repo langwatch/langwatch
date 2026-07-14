@@ -33,7 +33,7 @@ Built for teams that need regression testing, simulations, and production observ
   OpenTelemetry/OTLP-native. Framework- and LLM-provider agnostic by design.
 
 - [**AI Gateway for governance + cost control**](https://docs.langwatch.ai/ai-gateway/overview)
-  OpenAI/Anthropic-compatible proxy with virtual keys, hierarchical budgets, inline guardrails, automatic fallback across providers, and Anthropic `cache_control` passthrough. ~700 ns hot-path overhead. Ships as a separate Go binary (`services/gateway/`) + Helm sub-chart (`charts/gateway/`).
+  OpenAI/Anthropic-compatible proxy with virtual keys, hierarchical budgets, inline guardrails, automatic fallback across providers, and Anthropic `cache_control` passthrough. ~700 ns hot-path overhead. Ships as a separate Go binary (`services/gateway/`) + Helm sub-chart (`infra/charts/gateway/`).
 
 - [**Collaboration that doesn't slow shipping**](https://docs.langwatch.ai/features/annotations)
   Review runs, annotate failures, and ship fixes faster. Let domain experts label edge cases with [annotations & queues](https://docs.langwatch.ai/features/annotations), keep prompts in Git with the [GitHub integration](https://docs.langwatch.ai/prompt-management/features/essential/github-integration), and [link prompt versions to traces](https://docs.langwatch.ai/prompt-management/features/advanced/link-to-traces).
@@ -62,8 +62,8 @@ Prefer Docker? You can still use docker compose:
 
 ```bash
 git clone https://github.com/langwatch/langwatch.git
-cd langwatch
-cp langwatch/.env.example langwatch/.env
+cd platform/app
+cp platform/app/.env.example platform/app/.env
 docker compose up -d --wait --build
 ```
 Once running, LangWatch will be available at `http://localhost:5560`, where you can create your first project and API key.
@@ -162,9 +162,9 @@ Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch
 
 ## ✍️ License — open-core split
 
-LangWatch is Apache 2.0, except for the enterprise modules (SCIM, audit logs, license and billing management, etc.) which live under `langwatch/ee/` and need a commercial license for production use. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
+LangWatch is Apache 2.0, except for the enterprise modules (SCIM, audit logs, license and billing management, etc.) which live under `platform/app/ee/` and need a commercial license for production use. The SDKs (`sdks/typescript`, `sdks/python`, `mcp/typescript`) are MIT.
 
-See [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), and [`langwatch/ee/LICENSE.md`](/langwatch/ee/LICENSE.md) for the full text and the per-folder breakdown.
+See [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), and [`platform/app/ee/LICENSE.md`](/platform/app/ee/LICENSE.md) for the full text and the per-folder breakdown.
 
 ## 👮‍♀️ Security + Compliance
 

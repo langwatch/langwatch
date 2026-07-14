@@ -18,7 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  */
 function locatePackageSource(): string | null {
   const candidate = join(__dirname, "..", "..", "..");
-  if (existsSync(join(candidate, "langwatch", "package.json"))) {
+  if (existsSync(join(candidate, "platform", "app", "package.json"))) {
     return candidate;
   }
   return null;
@@ -39,9 +39,9 @@ function isUnderNodeModules(p: string): boolean {
  * dies on the first `pnpm clickhouse:migrate` boot. Moving the tree to
  * ~/.langwatch/app/ takes the source out of any node_modules ancestry.
  *
- * Copies langwatch/, langevals/, python-sdk/, services/, etc. as siblings —
- * preserves the relative `editable+../python-sdk` references that
- * langevals/ts-integration's generators rely on.
+ * Copies platform/app/, services/langevals/, sdks/python/, etc. as siblings —
+ * preserves the relative `editable+../../sdks/python` references that
+ * services/langevals/ts-integration's generators rely on.
  *
  * Skips node_modules subtrees: those are reinstalled by ensureLangwatchDeps
  * directly in the relocated dir. Idempotent via a .installed-version

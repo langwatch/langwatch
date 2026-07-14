@@ -1,5 +1,5 @@
 # Trims python-sdk/ for the @langwatch/server tarball. langwatch_nlp's
-# pyproject pins langwatch via `editable = true` against ../python-sdk/,
+# pyproject pins langwatch via `editable = true` against this package/,
 # so at runtime uv needs nothing more than pyproject.toml + src/. Tests,
 # examples, specs, and docs are dropped here to keep the tarball lean.
 #

@@ -76,12 +76,12 @@ jobs:
         uses: ./.github/actions/setup-pnpm-node
         with:
           cache-dependency-path: |
-            langwatch/pnpm-lock.yaml
+            platform/app/pnpm-lock.yaml
             skills/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        working-directory: langwatch
+        working-directory: platform/app
 
       # `--ignore-workspace`: same gotcha as agentic-e2e-tests in e2e-ci.yml.
       # The repo-root pnpm-workspace.yaml introduced by @langwatch/server in

@@ -13,10 +13,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Repo root containing both `langwatch/` and `charts/`. `process.cwd()`
-// is the langwatch/ package dir when vitest runs (per package.json), so
-// one level up lands on the repo root reliably across worktrees and CI.
-const REPO_ROOT = path.resolve(process.cwd(), "..");
+// Repo root containing both `platform/app/` and `infra/charts/`. `process.cwd()`
+// is the platform/app/ package dir when vitest runs (per package.json), so
+// two levels up lands on the repo root reliably across worktrees and CI.
+const REPO_ROOT = path.resolve(process.cwd(), "..", "..");
 
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
@@ -26,7 +26,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when the env block emits dataplane storage variables", () => {
     /** @scenario "Helm chart emits S3_BUCKET_NAME (not legacy S3_BUCKET) so the app and stored-objects find the bucket" */
     it("emits S3_BUCKET_NAME and never emits a bare S3_BUCKET env line", () => {
-      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
+      const helpers = readRepoFile("infra/charts/langwatch/templates/_helpers.tpl");
 
       // The new name must appear in the rendered env list
       expect(helpers).toContain("- name: S3_BUCKET_NAME");
@@ -40,7 +40,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when the chart describes the dataplane object-storage block", () => {
     /** @scenario "Helm chart exposes a single dataplane object-storage config block covering datasets and stored-objects together" */
     it("documents that the dataplane bucket is shared between datasets and stored-objects", () => {
-      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
+      const helpers = readRepoFile("infra/charts/langwatch/templates/_helpers.tpl");
 
       // The shared-dataplane explainer must live near the env emission so
       // future readers find it at the moment they're configuring the bucket.
@@ -56,8 +56,8 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when localFilesystem.enabled is combined with multi-replica", () => {
     /** @scenario "Single-replica helm install can opt into a PVC-backed local-FS storage path" */
     it("renders a PVC bound to LANGWATCH_LOCAL_STORAGE_PATH and refuses multi-replica", () => {
-      const pvc = readRepoFile("charts/langwatch/templates/app/stored-objects-pvc.yaml");
-      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
+      const pvc = readRepoFile("infra/charts/langwatch/templates/app/stored-objects-pvc.yaml");
+      const helpers = readRepoFile("infra/charts/langwatch/templates/_helpers.tpl");
 
       // PVC template is gated on the "local-FS is the active backend" helper
       // (renders only when localFilesystem.enabled AND NOT dataplane.enabled).
@@ -82,9 +82,9 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when dataplane is enabled alongside localFilesystem default-on", () => {
     /** @scenario "Multi-replica install with dataplane on does NOT create the local-FS PVC, even when localFilesystem.enabled defaults to true" */
     it("PVC and volume mount only render when dataplane is OFF", () => {
-      const pvc = readRepoFile("charts/langwatch/templates/app/stored-objects-pvc.yaml");
+      const pvc = readRepoFile("infra/charts/langwatch/templates/app/stored-objects-pvc.yaml");
       const deployment = readRepoFile(
-        "charts/langwatch/templates/app/deployment.yaml",
+        "infra/charts/langwatch/templates/app/deployment.yaml",
       );
 
       // Both the PVC and the volume mount must go through the
@@ -105,7 +105,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when neither dataplane S3 nor local-FS is configured", () => {
     /** @scenario "Vanilla helm install with no object storage configured surfaces the unconfigured-storage condition diagnostically and renders anyway" */
     it("the chart surfaces the unconfigured-storage condition diagnostically", () => {
-      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
+      const helpers = readRepoFile("infra/charts/langwatch/templates/_helpers.tpl");
 
       // Earlier in the PR this was a hard-fail; it was relaxed to a soft
       // condition so existing single-pod installs keep working on upgrade,
@@ -156,7 +156,7 @@ describe(".env.example carries the local storage path config", () => {
   describe("when the example env file is loaded", () => {
     /** @scenario ".env.example carries LANGWATCH_LOCAL_STORAGE_PATH with a sensible local default" */
     it("contains LANGWATCH_LOCAL_STORAGE_PATH with the make-quickstart default and a multi-pod warning", () => {
-      const example = readRepoFile("langwatch/.env.example");
+      const example = readRepoFile("platform/app/.env.example");
 
       expect(example).toContain("LANGWATCH_LOCAL_STORAGE_PATH");
       // The default that maps to the LocalFilesystemDriver fallback in
@@ -175,7 +175,7 @@ describe("Route handlers delegate to the service and never touch the repository 
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
     it("imports the service factory and does not import the repository", () => {
       const route = readRepoFile(
-        "langwatch/src/app/api/scenario-events/[[...route]]/app.ts",
+        "platform/app/src/app/api/scenario-events/[[...route]]/app.ts",
       );
 
       expect(route).toContain('from "~/server/stored-objects/stored-objects-factory"');
@@ -187,7 +187,7 @@ describe("Route handlers delegate to the service and never touch the repository 
   describe("when /api/files/:id route imports are inspected", () => {
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
     it("imports the service factory and does not import the repository", () => {
-      const route = readRepoFile("langwatch/src/app/api/files/[[...route]]/app.ts");
+      const route = readRepoFile("platform/app/src/app/api/files/[[...route]]/app.ts");
 
       expect(route).toContain('from "~/server/stored-objects/stored-objects-factory"');
       expect(route).not.toContain('from "~/server/stored-objects/stored-objects.repository"');
@@ -204,7 +204,7 @@ describe("storage_uri persisted on the stored_objects row is the authoritative b
       // even after S3_BUCKET_NAME changes. The read path receives the row
       // and hands `row.storage_uri` to the registry — never the env.
       const service = readRepoFile(
-        "langwatch/src/server/stored-objects/stored-objects.service.ts",
+        "platform/app/src/server/stored-objects/stored-objects.service.ts",
       );
 
       // The read code path must use row.storage_uri (the URI written at
@@ -238,7 +238,7 @@ describe("Stored objects migration is idempotent at the SQL level", () => {
     /** @scenario "Stored objects migration is idempotent" */
     it("uses CREATE TABLE IF NOT EXISTS so a second run is a no-op", () => {
       const migration = readRepoFile(
-        "langwatch/src/server/clickhouse/migrations/00023_create_stored_objects.sql",
+        "platform/app/src/server/clickhouse/migrations/00023_create_stored_objects.sql",
       );
 
       // The IF NOT EXISTS clause makes the migration safe to re-run.

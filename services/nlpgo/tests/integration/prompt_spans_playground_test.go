@@ -10,7 +10,7 @@
 // Stubs landed alongside the spec so /** @scenario */ doc comments
 // satisfy the parity binder (after the binder patch lands to scan Go
 // test roots). The Skip markers go away as the engine emission +
-// sdk-go/prompts/ helpers land in this PR.
+// sdks/go/prompts/ helpers land in this PR.
 
 package integration_test
 
@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const promptSpansPendingMsg = "pending: sdk-go/prompts wiring + nlpgo engine emission in this PR"
+const promptSpansPendingMsg = "pending: sdks/go/prompts wiring + nlpgo engine emission in this PR"
 
 /** @scenario "playground send on a saved prompt version emits a get+compile span pair" */
 func TestPromptSpansPlayground_SavedVersionEmitsGetCompilePair(t *testing.T) {

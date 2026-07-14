@@ -62,7 +62,7 @@ Concentrations:
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
-| specs/scenarios/ai-create-modal.feature | "Open AI create modal from scenarios list" | KEEP | Modal exists at langwatch/src/components/scenarios/ScenarioCreateModal.tsx; no integration test covers full open-from-list flow yet |
+| specs/scenarios/ai-create-modal.feature | "Open AI create modal from scenarios list" | KEEP | Modal exists at platform/app/src/components/scenarios/ScenarioCreateModal.tsx; no integration test covers full open-from-list flow yet |
 | specs/scenarios/ai-create-modal.feature | "Generate scenario with AI using custom description" | KEEP | E2E flow described; modal calls /api/scenario/generate then opens drawer; no E2E test exists yet |
 | specs/scenarios/ai-create-modal.feature | "Use example template to generate scenario" | KEEP | Pills exist (Customer Support, RAG Q&A, Tool-calling Agent in ScenarioCreateModal.tsx:32-45); no end-to-end test |
 | specs/scenarios/ai-create-modal.feature | "Skip AI generation and create blank scenario" | UPDATE | handleSkip in ScenarioCreateModal.tsx:122-128 opens drawer with empty form; spec says "new empty scenario is created" but no DB record is created until save |
@@ -184,7 +184,7 @@ Concentrations:
 | specs/scenarios/stalled-scenario-runs.feature | "Stalled run displays warning badge in previous runs list" | DUPLICATE | Covered by stalled-status-display.integration.test.ts getStatusBadgeProps yellow + label "stalled" |
 | specs/scenarios/stalled-scenario-runs.feature | "Status display shows STALLED text in simulation console" | DUPLICATE | Covered by stalled-status-display.integration.test.ts STATUS_DISPLAY_TEXT_MAP[STALLED]="STALLED" |
 | specs/scenarios/stalled-scenario-runs.feature | "Stalled run is treated as complete for overlay purposes" | DUPLICATE | Covered by stalled-status-display.integration.test.ts getOverlayConfig isComplete=true for STALLED |
-| specs/scenarios/stalled-scenario-runs.feature | "User sees stalled indicator for a run that never completed" | KEEP | E2E user flow not covered; no e2e tests under langwatch/e2e for this surface |
+| specs/scenarios/stalled-scenario-runs.feature | "User sees stalled indicator for a run that never completed" | KEEP | E2E user flow not covered; no e2e tests under platform/app/e2e for this surface |
 | specs/scenarios/model-params-error-feedback.feature | "Reject model string without provider prefix" | KEEP | Factory createDataPrefetcherDependencies returns invalid_model_format but no direct unit test for the factory branch |
 | specs/scenarios/model-params-error-feedback.feature | "Reject model when provider is not found in project" | KEEP | Factory returns provider_not_found in production code; no test exercises this exact reason code path |
 | specs/scenarios/model-params-error-feedback.feature | "Reject model when provider exists but is not enabled" | DUPLICATE | data-prefetcher.unit.test.ts "model params preparation fails... provider_not_enabled" forwards this exact reason |

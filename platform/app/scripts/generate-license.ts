@@ -168,7 +168,7 @@ async function main() {
   if (!privateKey) {
     process.stderr.write(
       "Error: LANGWATCH_LICENSE_PRIVATE_KEY is not set in env. " +
-        "Add it to langwatch/.env (paired with LANGWATCH_LICENSE_PUBLIC_KEY) " +
+        "Add it to platform/app/.env (paired with LANGWATCH_LICENSE_PUBLIC_KEY) " +
         "and re-run.\n",
     );
     process.exit(2);

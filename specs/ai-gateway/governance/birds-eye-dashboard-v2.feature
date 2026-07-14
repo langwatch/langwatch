@@ -25,7 +25,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
 
   This is a v2 over the same `/governance` page (canonical Overview;
   `/settings/governance` is registered as a back-compat alias per
-  `langwatch/src/routes.tsx` comment) — the v1
+  `platform/app/src/routes.tsx` comment) — the v1
   shape continues to ship as a regression invariant for orgs that
   haven't seeded multi-team data yet.
 
@@ -35,10 +35,10 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     - specs/ai-gateway/governance/persona-home-content.feature (page wrap)
 
   Implementation lives under:
-    - langwatch/src/pages/settings/governance.tsx                   (page)
-    - langwatch/src/server/governance/activity-monitor/             (service)
-    - langwatch/src/components/governance/charts/                   (Recharts wrappers — Phase B)
-    - langwatch/src/utils/colorFromName.ts                          (Phase C util)
+    - platform/app/src/pages/settings/governance.tsx                   (page)
+    - platform/app/src/server/governance/activity-monitor/             (service)
+    - platform/app/src/components/governance/charts/                   (Recharts wrappers — Phase B)
+    - platform/app/src/utils/colorFromName.ts                          (Phase C util)
 
   Background:
     Given the user is signed in as an org admin of "acme-corp"
@@ -59,7 +59,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     Then the lastActivity cell renders "just now"
     And no row anywhere on the page renders a string starting with "-"
       followed by digits + "s ago" / "m ago" / "h ago" / "d ago"
-    And the seed scripts under langwatch/scripts/ also clamp seeded
+    And the seed scripts under platform/app/scripts/ also clamp seeded
       OccurredAt to "now - 1s" minimum so re-seeding cannot reintroduce
       the bug
 
@@ -299,7 +299,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     Then all three surfaces show that team in the SAME color
     And the color is derived deterministically from the team name
       (same algorithm ProjectAvatar uses today via
-       langwatch/src/utils/rotatingColors.ts → getColorForString)
+       platform/app/src/utils/rotatingColors.ts → getColorForString)
     And a different team named "marketing" renders in a different
       color (palette spread is a function of the name, not row order)
     And renaming a team changes its color (acceptable trade-off — the
@@ -308,7 +308,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
   @bdd @ui @birds-eye-v2 @color
   Scenario: Color util is hoisted to a shared module
     Given Phase C ships
-    Then a shared util exists at langwatch/src/utils/colorFromName.ts
+    Then a shared util exists at platform/app/src/utils/colorFromName.ts
       (or equivalent shared path) exporting at minimum:
         | export                  | shape                                |
         | colorFromName(name)     | (name: string) => string (CSS color) |

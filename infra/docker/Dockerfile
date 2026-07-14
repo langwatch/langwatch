@@ -26,34 +26,34 @@ WORKDIR /app
 # Skip Prisma checksum verification for air-gapped builds
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
-# mcp-server is a workspace member — copy it early so pnpm install can link it.
-# Its build runs automatically as part of langwatch's `pnpm run build`
+# mcp/typescript is a workspace member — copy it early so pnpm install can link it.
+# Its build runs automatically as part of the app's `pnpm run build`
 # (via start:prepare:files → build:mcp-server).
-COPY mcp-server ./mcp-server
-COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+COPY mcp/typescript ./mcp/typescript
+COPY services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY packages ./packages
 COPY skills ./skills
-COPY Dockerfile.langyagent ./Dockerfile.langyagent
+COPY infra/docker/Dockerfile.langyagent ./infra/docker/Dockerfile.langyagent
 COPY feature-map.json ./feature-map.json
 
-COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
+COPY platform/app/package.json platform/app/pnpm-lock.yaml platform/app/pnpm-workspace.yaml ./platform/app/
 # The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
 # are consumed as source, so pnpm install must see their package.json to link them
 # and install their own dependencies (pino, pino-pretty, ...) into
 # packages/*/node_modules. Without this the app bundle build fails to resolve those
 # deps (e.g. "Rolldown failed to resolve import 'pino'"). Same reason mcp-server is
 # copied early above. node_modules is dockerignored, so only source is copied here.
-COPY langwatch/packages ./langwatch/packages
-COPY langwatch/vendor ./langwatch/vendor
+COPY platform/app/packages ./platform/app/packages
+COPY platform/app/vendor ./platform/app/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
-RUN cd langwatch && CI=true pnpm install --frozen-lockfile
-COPY langwatch ./langwatch
-RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
+RUN cd platform/app && CI=true pnpm install --frozen-lockfile
+COPY platform/app ./platform/app
+RUN cd platform/app && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 
 # Remove dev dependencies — not needed at runtime
-RUN cd langwatch && CI=true pnpm prune --prod
+RUN cd platform/app && CI=true pnpm prune --prod
 # Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
-RUN cd langwatch && pnpm prisma generate
+RUN cd platform/app && pnpm prisma generate
 
 # ── Stage 2: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
@@ -65,19 +65,19 @@ COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 WORKDIR /app
 
 # Copy built artifacts from builder.
-# mcp-server must be copied alongside langwatch because pnpm workspace
-# symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
+# mcp/typescript must be copied alongside platform/app because pnpm workspace
+# symlinks platform/app/node_modules/@langwatch/mcp-server -> the mcp/typescript tree.
 # cli-cards is another root workspace package linked the same way and is loaded
 # by migration tasks as well as the running server.
-COPY --from=builder /app/langwatch ./langwatch
-COPY --from=builder /app/mcp-server ./mcp-server
+COPY --from=builder /app/platform/app ./platform/app
+COPY --from=builder /app/mcp/typescript ./mcp/typescript
 COPY --from=builder /app/packages/cli-cards/package.json ./packages/cli-cards/package.json
 COPY --from=builder /app/packages/cli-cards/src ./packages/cli-cards/src
 # cli-cards deliberately declares zod as a peer. Because the workspace package
-# lives outside /app/langwatch, expose the app's production zod at the nearest
+# lives outside /app/platform/app, expose the app's production zod at the nearest
 # shared node_modules boundary after dev dependencies have been pruned.
-RUN mkdir -p ./node_modules && ln -s ../langwatch/node_modules/zod ./node_modules/zod
-COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+RUN mkdir -p ./node_modules && ln -s ../platform/app/node_modules/zod ./node_modules/zod
+COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
@@ -86,4 +86,4 @@ EXPOSE 5560
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-CMD cd langwatch && pnpm start
+CMD cd platform/app && pnpm start

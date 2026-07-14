@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
@@ -92,7 +92,7 @@ func setupOtel(ctx context.Context) func() {
 					// This is the scope name of the LangWatch tracer
 					langwatch.Equals("examples.filtered-spans"),
 					// This is the scope name of the OpenAI instrumentation
-					langwatch.StartsWith("github.com/langwatch/langwatch/sdk-go/instrumentation/"),
+					langwatch.StartsWith("github.com/langwatch/langwatch/sdks/go/instrumentation/"),
 				},
 			}),
 		),

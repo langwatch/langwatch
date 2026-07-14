@@ -28,7 +28,7 @@ func (r Repo) Inputs(ctx context.Context, baseRef string) ([]Input, error) {
 
 	inputs := make([]Input, 0, len(Sets))
 	for _, set := range Sets {
-		base, err := r.entriesAt(ctx, baseRef, set.Directory)
+		base, err := r.entriesAtAny(ctx, baseRef, set)
 		if err != nil {
 			return nil, err
 		}
@@ -36,7 +36,7 @@ func (r Repo) Inputs(ctx context.Context, baseRef string) ([]Input, error) {
 		if err != nil {
 			return nil, err
 		}
-		forked, err := r.entriesAt(ctx, mergeBase, set.Directory)
+		forked, err := r.entriesAtAny(ctx, mergeBase, set)
 		if err != nil {
 			return nil, err
 		}
@@ -54,6 +54,25 @@ func (r Repo) Inputs(ctx context.Context, baseRef string) ([]Input, error) {
 		})
 	}
 	return inputs, nil
+}
+
+// entriesAtAny reads the set's entries at ref from its current directory and
+// every previous one, so a branch that only relocates merged migrations (a repo
+// restructure) does not see them as newly added.
+func (r Repo) entriesAtAny(ctx context.Context, ref string, set Set) ([]string, error) {
+	entries, err := r.entriesAt(ctx, ref, set.Directory)
+	if err != nil {
+		return nil, err
+	}
+	for _, dir := range set.PreviousDirectories {
+		previous, err := r.entriesAt(ctx, ref, dir)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, previous...)
+	}
+	slices.Sort(entries)
+	return slices.Compact(entries), nil
 }
 
 func (r Repo) entriesAt(ctx context.Context, ref, directory string) ([]string, error) {

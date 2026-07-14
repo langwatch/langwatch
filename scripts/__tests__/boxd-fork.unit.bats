@@ -157,15 +157,15 @@ setup() {
 setup_env_fixture() {
   TMP="$(mktemp -d)"
   pushd "$TMP" > /dev/null
-  mkdir -p langwatch langevals node_modules/foo .next dist build vendor coverage
-  : > langwatch/.env
-  : > langevals/.env
+  mkdir -p platform/app services/langevals node_modules/foo .next dist build vendor coverage
+  : > platform/app/.env
+  : > services/langevals/.env
   : > .env
   # Excluded by suffix
-  : > langwatch/.env.example
-  : > langwatch/.env.template
-  : > langwatch/.env.sample
-  : > langwatch/.env.local
+  : > platform/app/.env.example
+  : > platform/app/.env.template
+  : > platform/app/.env.sample
+  : > platform/app/.env.local
   # Excluded by directory
   : > node_modules/foo/.env
   : > .next/.env
@@ -180,12 +180,12 @@ teardown_env_fixture() {
   rm -rf "$TMP"
 }
 
-@test "boxd_env_files: lists top-level .env files in monorepo subdirs" {
+@test "boxd_env_files: lists .env files in monorepo subdirs at any depth" {
   setup_env_fixture
   result=$(boxd_env_files | sort)
   [[ "$result" == *"./.env"* ]]
-  [[ "$result" == *"./langwatch/.env"* ]]
-  [[ "$result" == *"./langevals/.env"* ]]
+  [[ "$result" == *"./platform/app/.env"* ]]
+  [[ "$result" == *"./services/langevals/.env"* ]]
   teardown_env_fixture
 }
 

@@ -23,7 +23,7 @@
  *
  * Pairs with:
  *   - user.personalBudget.integration.test.ts (budget service shape)
- *   - typescript-sdk/src/cli/utils/governance/__tests__ (CLI consumer
+ *   - sdks/typescript/src/cli/utils/governance/__tests__ (CLI consumer
  *     side renders the wire shape returned here)
  */
 import {

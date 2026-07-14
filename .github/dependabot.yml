@@ -34,9 +34,9 @@ version: 2
 updates:
   - package-ecosystem: "npm"
     directories:
-      - "/langwatch"
-      - "/typescript-sdk"
-      - "/mcp-server"
+      - "/platform/app"
+      - "/sdks/typescript"
+      - "/mcp/typescript"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -105,7 +105,7 @@ updates:
           - "patch"
 
   - package-ecosystem: "uv"
-    directory: "/python-sdk"
+    directory: "/sdks/python"
     schedule:
       interval: "weekly"
       day: "monday"

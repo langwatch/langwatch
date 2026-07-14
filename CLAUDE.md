@@ -17,7 +17,7 @@ If no feature file exists for your task, create one before writing code.
 
 ## Development Environment
 
-`make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
+`make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `platform/app/.env` is the source of truth for everything else.
 
 ### Local dev by hostname — thuishaven / portless (recommended)
 
@@ -46,7 +46,7 @@ make haven doctor       # proxy / daemon / observability health
 Open `https://langwatch.localhost` for the cross-worktree dashboard;
 `observability.langwatch.localhost` proxies the local Grafana LGTM stack;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. haven's
-resolved config lands in `langwatch/.env.portless` (loaded last with
+resolved config lands in `platform/app/.env.portless` (loaded last with
 `override: true` so it beats `.env`). Agent-driving haven? Add `--agent` (or
 `HAVEN_AGENT=1`) for plain, token-free output; `haven list --json` is
 machine-readable. See `tools/thuishaven/README.md`.
@@ -66,7 +66,7 @@ make service svc=aigateway             # Start the Go AI Gateway data plane on :
 make help                              # Full target list including boxd workflows
 ```
 
-The preset-picker writes `langwatch/.env.dev-up` listing only the URLs to override; everything else comes from your `langwatch/.env`. **Credentials never go in the overlay** — only non-rotating infrastructure shape (bucket / endpoint / region / connection-host). For `dev-storage`, refresh AWS SSO credentials in `.env` first via `bash langwatch/scripts/refresh-dev-s3-env.sh` (the launcher hard-fails without S3_SESSION_TOKEN).
+The preset-picker writes `platform/app/.env.dev-up` listing only the URLs to override; everything else comes from your `platform/app/.env`. **Credentials never go in the overlay** — only non-rotating infrastructure shape (bucket / endpoint / region / connection-host). For `dev-storage`, refresh AWS SSO credentials in `.env` first via `bash platform/app/scripts/refresh-dev-s3-env.sh` (the launcher hard-fails without S3_SESSION_TOKEN).
 
 The legacy `make dev` / `make dev-nlp` / `make dev-scenarios` / `make dev-test` / `make dev-full` aliases were removed in #4053. Use the preset names directly. `make dev-up` / `make dev-down` / `make dev-logs` still exist for per-worktree isolated stacks (the `dev-up.sh` use case — separate from `quickstart`).
 
@@ -82,7 +82,7 @@ See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
 ### AI Gateway (Go, services/aigateway/)
 
-The gateway is a separate Go service (not in `compose.dev.yml`) that terminates
+The gateway is a separate Go service (not in `infra/compose.dev.yml`) that terminates
 virtual-key traffic, fans out to providers via Bifrost, and reports usage back to
 the control plane. `pnpm dev` auto-starts it alongside vite + api when the Go
 toolchain is on PATH; the process appears as `gateway` in the concurrent output
@@ -95,9 +95,9 @@ make service svc=aigateway       # run once
 make service-watch svc=aigateway # live reload via air
 ```
 
-Requires `langwatch/.env` with `LW_GATEWAY_INTERNAL_SECRET`,
+Requires `platform/app/.env` with `LW_GATEWAY_INTERNAL_SECRET`,
 `LW_GATEWAY_JWT_SECRET`, and `LW_GATEWAY_BASE_URL` set — see the
-"AI GATEWAY" block at the bottom of `langwatch/.env.example`. Generate
+"AI GATEWAY" block at the bottom of `platform/app/.env.example`. Generate
 secrets with `openssl rand -hex 32`. The Go gateway and the TS
 control-plane both source the same `.env`, so each secret lives in
 exactly one place (no prefix duplication). Set
@@ -120,7 +120,7 @@ make service-watch svc=nlpgo # live reload via air
 
 ## Commands
 
-Inside langwatch/
+Inside platform/app/
 
 ```bash
 pnpm typecheck        # Type check (uses tsgo, fast)
@@ -129,18 +129,18 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
-When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven doctor` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
+When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven doctor` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `platform/app/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `platform/app/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
 
 ```
-langwatch/           # Next.js app (main product)
+platform/app/        # Vite app (main product)
 langwatch_server/    # Python server
-services/nlpgo/      # Go NLP engine (:5561, built as langwatch/langwatch_nlp)
+services/nlpgo/      # Go NLP engine (:5561, built as platform/app/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
-charts/gateway/      # Helm sub-chart for the gateway
-python-sdk/          # Python SDK
-typescript-sdk/      # TypeScript SDK
+infra/charts/gateway/ # Helm sub-chart for the gateway
+sdks/python/         # Python SDK
+sdks/typescript/     # TypeScript SDK
 specs/               # BDD feature specs
 ```
 
@@ -213,4 +213,4 @@ specs/               # BDD feature specs
 | Not filtering on the partition key column in WHERE | Always include `StartedAt`/`OccurredAt`/`StartTime` range in WHERE when a date range is available — this enables partition pruning. Without it, ClickHouse scans ALL partitions including cold storage on S3, turning 100ms queries into 1-2s |
 | Writing down migrations in ClickHouse migration files | Always comment out down migrations to prevent accidental data loss. Add a note: "To roll back, uncomment and run manually" |
 | Putting multiple ALTER TABLE statements in one StatementBegin block | ClickHouse does not support multi-statement queries. Each ALTER TABLE needs its own `-- +goose StatementBegin` / `-- +goose StatementEnd` block |
-| Getting "Cannot find module" errors for generated files (.prisma/client, types.generated, evaluators.generated) | Run `pnpm start:prepare:files` in the `langwatch/` directory to regenerate all generated types (Prisma, Zod, SDK versions, langevals). This is needed after fresh clones, worktree creation, or any schema changes |
+| Getting "Cannot find module" errors for generated files (.prisma/client, types.generated, evaluators.generated) | Run `pnpm start:prepare:files` in the `langwatch/` directory to regenerate all generated types (Prisma, Zod, SDK versions, langevals) — run it in the `platform/app/` directory. This is needed after fresh clones, worktree creation, or any schema changes |

@@ -109,7 +109,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
 
   @e2e @track2 @unimplemented
   # Python SDK default raised to 32 KB (constructor + public factory:
-  # python-sdk/src/langwatch/telemetry/tracing.py:96, 786). TS SDK has no
+  # sdks/python/src/langwatch/telemetry/tracing.py:96, 786). TS SDK has no
   # transport-layer cap (grep confirms only CLI display helpers). Go gateway
   # has no sdktrace.WithSpanLimits and no manual truncation in
   # customertracebridge/emitter.go (OTel Go SDK v1.43.0 defaults to unlimited).

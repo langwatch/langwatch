@@ -26,7 +26,7 @@ const id = generate(KSUID_RESOURCES.MODEL_PROVIDER).toString();
 
 ## Where to add a new resource type
 
-`langwatch/src/utils/constants.ts`:
+`platform/app/src/utils/constants.ts`:
 
 ```typescript
 export const KSUID_RESOURCES = {

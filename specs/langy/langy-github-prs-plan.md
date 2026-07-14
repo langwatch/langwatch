@@ -37,17 +37,17 @@ an error. Tokens never touch disk.
 
 | Thing | Where | Reuse for |
 |---|---|---|
-| Credential handoff seam | `LangyCredentialService.getOrProvision()` (`langwatch/src/server/services/langy/LangyCredentialService.ts:72`) → `/api/langy/chat` body (`langwatch/src/server/routes/langy.ts:310-326`) → `spawnWorker()` env (`services/langy-agent/server.js:321-350`) | `githubToken` + `githubLogin` ride the same path; **no second secrets channel** |
+| Credential handoff seam | `LangyCredentialService.getOrProvision()` (`platform/app/src/server/services/langy/LangyCredentialService.ts:72`) → `/api/langy/chat` body (`platform/app/src/server/routes/langy.ts:310-326`) → `spawnWorker()` env (`services/langy-agent/server.js:321-350`) | `githubToken` + `githubLogin` ride the same path; **no second secrets channel** |
 | Provisioning module pattern | `langyApiKey.ts`, `langyVirtualKey.ts` (idempotent provision + `findFirst` read + P2002 race handling) | New `langyGithubToken.ts` mirrors the shape |
-| Encrypted secret storage | `ProjectSecret` model + `encrypt()`/`decrypt()` from `langwatch/src/utils/encryption.ts` (aes-256-gcm, `CREDENTIALS_SECRET`) | Same encryption for the new `UserGitHubCredential` model (new model because this is **per-user**, not per-project) |
-| GitHub OAuth *login* provider | `langwatch/src/server/better-auth/index.ts:63-72` (`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`) | Callback-route conventions only. **Do not reuse the login app** — identity login ≠ App user-to-server auth |
+| Encrypted secret storage | `ProjectSecret` model + `encrypt()`/`decrypt()` from `platform/app/src/utils/encryption.ts` (aes-256-gcm, `CREDENTIALS_SECRET`) | Same encryption for the new `UserGitHubCredential` model (new model because this is **per-user**, not per-project) |
+| GitHub OAuth *login* provider | `platform/app/src/server/better-auth/index.ts:63-72` (`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`) | Callback-route conventions only. **Do not reuse the login app** — identity login ≠ App user-to-server auth |
 | Worker skills | `services/langy-agent/skills/*.md`, seeded by `entrypoint.sh:19-21`, symlinked per-worker in `setupWorkerHome()` | New `skills/github.md` |
-| CLI install point | `Dockerfile.langy_agent` apt block (~line 23) | Add `gh` |
-| Egress policy | `charts/langy-agent/templates/networkpolicy.yaml` + `values.networkPolicy.*` | `github.com`/`api.github.com`/`codeload.github.com` egress |
+| CLI install point | `infra/docker/Dockerfile.langy_agent` apt block (~line 23) | Add `gh` |
+| Egress policy | `infra/charts/langy-agent/templates/networkpolicy.yaml` + `values.networkPolicy.*` | `github.com`/`api.github.com`/`codeload.github.com` egress |
 | Idle reaper | `server.js:393-400` (30s sweep, 10 min TTL, kills worker + home dir) | Clone dir lives inside worker home → cleaned for free |
 | Rate limiting | `checkLangyMessageRateLimit` (`rate-limit-langy.ts`, 30 msg/min, Redis sliding window) | PR creation already behind it; add per-user daily PR cap in skill/manager |
 | Audit log | `auditLog(...)` pattern (`routes/langy.ts:501-508`) | `langy.github.connect` / `.disconnect` / `.pr_created` actions |
-| Scenario tests | `langwatch/src/tests/langy/langy.scenario.test.ts` (judge + Layer-2 REST verification) | New github scenario |
+| Scenario tests | `platform/app/src/tests/langy/langy.scenario.test.ts` (judge + Layer-2 REST verification) | New github scenario |
 
 ## Locked decisions
 
@@ -134,7 +134,7 @@ exception.
   }
   ```
 - [ ] Migration dir `YYYYMMDDHHmmss_user_github_credential` (mirror `20260508153928_langy_memory` conventions)
-- [ ] Register model with the multitenancy guard (`langwatch/src/utils/dbMultiTenancyProtection.ts`): org-scoped via `organizationId`, plus always-filter-by-`userId` predicate. **Gotcha:** guard rejects compound-key `findUnique` — use `findFirst({ where: { userId, organizationId } })` like `langyApiKey.ts:62` does.
+- [ ] Register model with the multitenancy guard (`platform/app/src/utils/dbMultiTenancyProtection.ts`): org-scoped via `organizationId`, plus always-filter-by-`userId` predicate. **Gotcha:** guard rejects compound-key `findUnique` — use `findFirst({ where: { userId, organizationId } })` like `langyApiKey.ts:62` does.
 - [ ] Env plumbing: `GITHUB_LANGY_APP_ID`, `GITHUB_LANGY_CLIENT_ID`, `GITHUB_LANGY_CLIENT_SECRET` in `env.mjs` + `.env.example` (all optional — feature silently off when unset)
 
 ### PR 2 — Connect/disconnect (settings + popup) + OAuth callback
@@ -142,14 +142,14 @@ exception.
 
 - [ ] `GET /api/github-langy/connect?mode=popup|redirect&return=...` — redirects to `https://github.com/login/oauth/authorize` with the App's client_id + CSRF `state` (signed, short-lived, carries `mode`)
 - [ ] `GET /api/github-langy/callback` — exchanges code → `{access_token, refresh_token, expires_in}`; fetches `/user` for `githubLogin`/`githubUserId`; upserts `UserGitHubCredential` with `encrypt(refresh_token)`. **`mode=popup`** → tiny HTML shim that calls `window.opener.postMessage({type:"github-connected", login})` and closes; **`mode=redirect`** → 302 back to `return` URL (defaults to settings deep link).
-- [ ] Settings UI in `langwatch/src/pages/settings/` — "Connect GitHub" card: connected state shows `githubLogin` + Disconnect button; disconnect deletes the row AND calls GitHub's token-revocation API (`DELETE /applications/{client_id}/grant`)
+- [ ] Settings UI in `platform/app/src/pages/settings/` — "Connect GitHub" card: connected state shows `githubLogin` + Disconnect button; disconnect deletes the row AND calls GitHub's token-revocation API (`DELETE /applications/{client_id}/grant`)
 - [ ] `auditLog` on connect (`langy.github.connect`) and disconnect (`langy.github.disconnect`)
 - [ ] Deep link constant (e.g. `/settings/integrations#github`) exported for the skill to reference
 
 ### PR 3 — Token minting in the credential handoff
 *Branch `langy/github-prs-3-credentials`*
 
-- [ ] `langwatch/src/server/services/langy/langyGithubToken.ts`:
+- [ ] `platform/app/src/server/services/langy/langyGithubToken.ts`:
   - `getGithubTokenForUser({ prisma, userId, organizationId })` → `{ token, githubLogin } | null`
   - Decrypts refresh token → `POST https://github.com/login/oauth/access_token` (`grant_type=refresh_token`) → returns 8h access token
   - **Rotation:** GitHub rotates refresh tokens on use — persist the new one in the same transaction. Guard the refresh with a short Redis lock (`langy:gh:refresh:${userId}`) so two concurrent chats don't race the single-use rotation.
@@ -168,7 +168,7 @@ exception.
 ### PR 4 — Worker side: gh CLI, env injection, github skill
 *Branch `langy/github-prs-4-worker`*
 
-- [ ] `Dockerfile.langy_agent` — install `gh` (GitHub's apt repo, pinned version; ubuntu 24.04 base at line 11)
+- [ ] `infra/docker/Dockerfile.langy_agent` — install `gh` (GitHub's apt repo, pinned version; ubuntu 24.04 base at line 11)
 - [ ] `services/langy-agent/server.js`:
   - Accept optional `credentials.githubToken`/`githubLogin` in the `/chat` body schema (lines 56-76)
   - `spawnWorker()` env (next to `OPENAI_API_KEY`, line ~330): `...(credentials.githubToken ? { GH_TOKEN: credentials.githubToken, GITHUB_LOGIN: credentials.githubLogin } : {})`
@@ -179,7 +179,7 @@ exception.
   - Workflow: `gh repo clone owner/repo -- --depth 1` into `$HOME/work/` → branch → edit → commit → push → `gh pr create --title ... --body ...`
   - Hard rules: never `gh auth login`, never echo `$GH_TOKEN`, never write it to any file, clone only inside `$HOME`
 - [ ] `AGENTS.md.template` — one line announcing the github capability + skill pointer
-- [ ] `charts/langy-agent/templates/networkpolicy.yaml` + `values.yaml` — `networkPolicy.allowGithub` toggle. **Reality check:** the chart already ships `allowExternalHttps: true` (0.0.0.0/0:443) so GitHub works today; the new toggle matters for hardened installs that turn that off. NetworkPolicy is L3/L4 — true FQDN-bounded egress needs the issue's follow-up, document as such.
+- [ ] `infra/charts/langy-agent/templates/networkpolicy.yaml` + `values.yaml` — `networkPolicy.allowGithub` toggle. **Reality check:** the chart already ships `allowExternalHttps: true` (0.0.0.0/0:443) so GitHub works today; the new toggle matters for hardened installs that turn that off. NetworkPolicy is L3/L4 — true FQDN-bounded egress needs the issue's follow-up, document as such.
 
 ### PR 6 — Sidebar UX (chat cards + popup + acting-as chip)
 *Branch `langy/github-prs-6-ux`, depends on PR 2 (endpoints) + PR 4 (structured events)*
@@ -188,7 +188,7 @@ exception.
   - `connect_github` — `{repoHint?, attribution: githubLogin}` → rendered as a card with a Connect button
   - `github_pr` — `{owner, repo, number, title, url, additions, deletions, authorLogin}` → rendered as a PR card
   - `status` — `{phase: "cloning"|"branching"|"committing"|"opening_pr", detail?}` → rendered as a muted progress line
-- [ ] `LangyGitHubConnectCard.tsx` + `LangyGitHubPrCard.tsx` (under `langwatch/src/components/langy/`); existing `LangySidebar` switches on message type
+- [ ] `LangyGitHubConnectCard.tsx` + `LangyGitHubPrCard.tsx` (under `platform/app/src/components/langy/`); existing `LangySidebar` switches on message type
 - [ ] `useGitHubConnectPopup()` hook — opens `/api/github-langy/connect?mode=popup`, listens for `postMessage`, resolves with `{login}`; the connect card calls it on click
 - [ ] After successful connect, the sidebar replays the user's last prompt automatically (so "open a PR" → connect → PR opens, all in one flow)
 - [ ] "Acting as @login" chip in the sidebar footer (tRPC `langy.getGithubConnection` returns `{login} | null`); hover → Disconnect
@@ -199,7 +199,7 @@ exception.
 
 - [ ] Unit: `langyGithubToken` (mock GitHub token endpoint — refresh rotation persisted, race lock, revoked → row deleted)
 - [ ] Integration: connect callback upserts encrypted row; disconnect deletes + revokes; multitenancy guard accepts/blocks correctly
-- [ ] Scenario test (`langwatch/src/tests/langy/`): unconnected user asks "open a PR on repo X" → judge criteria: replies with connect link, does NOT error, does NOT hallucinate a PR
+- [ ] Scenario test (`platform/app/src/tests/langy/`): unconnected user asks "open a PR on repo X" → judge criteria: replies with connect link, does NOT error, does NOT hallucinate a PR
 - [ ] E2E on sandbox repo (manual, checklist below): real PR attributed correctly; `grep -r "$TOKEN" <worker-home>` finds nothing
 - [ ] `auditLog` `langy.github.pr_created` (skill instructs Langy to report the PR URL; manager parses or app-side hook — pick simplest: log on the app side when the reply contains a PR URL, revisit later)
 - [ ] Docs: `.env.example`, self-host note (App registration steps), `specs/langy/` tag flips to `@integration`
@@ -233,12 +233,12 @@ exception.
 
 ```bash
 # from full-langy worktree
-docker compose -f compose.dev.yml up -d   # infra
-cd langwatch && pnpm dev                  # app on :5560
+docker compose -f infra/compose.dev.yml up -d   # infra
+cd platform/app && pnpm dev                  # app on :5560
 # langy-agent locally:
 node services/langy-agent/server.js
 # scenario tests:
-cd langwatch && pnpm vitest run src/tests/langy/
+cd platform/app && pnpm vitest run src/tests/langy/
 ```
 
 Conventions: CLAUDE.md, outside-in TDD from the feature file, every Prisma query includes its tenant column.
