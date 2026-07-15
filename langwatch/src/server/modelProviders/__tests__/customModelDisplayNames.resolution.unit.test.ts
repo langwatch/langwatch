@@ -597,6 +597,44 @@ describe("given a row whose custom models column is not an array", () => {
   });
 });
 
+describe("given a row whose custom models array mixes malformed entries with a valid one", () => {
+  describe("when display names are built for it", () => {
+    // AC5b's own wording is "a customModels array containing one
+    // malformed entry ... alongside valid entries" — entries sharing ONE
+    // row's array. The two blocks above prove a related but different
+    // property: a malformed row doesn't clobber a valid entry on ANOTHER
+    // row. This is the same-row case AC5b actually specifies, covering
+    // every malformed shape this JSON column can hold: a missing
+    // `modelId`, a non-string `displayName`, a null `displayName`, a null
+    // entry, and an entry that isn't even an object. The valid entry is
+    // listed LAST so a naive loop that returns or throws on the first bad
+    // entry — instead of skipping it and continuing — would also fail
+    // this test.
+    it("resolves the valid entry despite malformed entries earlier in the same array", () => {
+      const row = makeProvider({
+        provider: "vendorZ",
+        id: "mp_1",
+        customModels: [
+          { displayName: "No Model Id", mode: "chat" }, // missing modelId
+          { modelId: "m2", displayName: 42, mode: "chat" }, // non-string displayName
+          { modelId: "m3", displayName: null, mode: "chat" }, // null displayName
+          null, // null entry
+          "a-bare-string", // wrong element type entirely
+          { modelId: "m6", displayName: "Valid Name", mode: "chat" }, // the valid one, last
+        ] as unknown as CustomModelEntry[],
+      });
+
+      // An uncaught throw here fails the test before the assertion below
+      // runs — the same implicit proof of non-throwing the two malformed-
+      // entry blocks above rely on, neither of which asserts it
+      // separately either.
+      const result = buildCustomModelDisplayNames([row]);
+
+      expect(result["vendorZ/m6"]).toBe("Valid Name");
+    });
+  });
+});
+
 describe("given a provider with only a legacy-converted custom model", () => {
   describe("when the display name is resolved", () => {
     /** @scenario A legacy-only provider renders the same label as before display names existed */
