@@ -46,8 +46,8 @@ Then, in any worktree (hostname routing is opt-in — `pnpm dev` uses the plain
 `PORT` scheme):
 
 ```bash
-pnpm dev:haven           # == haven up: registers hostnames, starts + supervises the stack
-pnpm dev:single:haven    # …with the workers hosted in-process (one Node process)
+haven up                 # registers hostnames, starts + supervises the stack
+WORKERS_IN_PROCESS=0 haven up  # …with a standalone workers lane (two Node processes)
 ```
 
 Open <https://langwatch.localhost> to see every stack across your worktrees.
@@ -58,7 +58,14 @@ Open <https://langwatch.localhost> to see every stack across your worktrees.
 haven setup      one-time bootstrap — verify/install portless, trust its CA
 haven            the hub: every stack + actions on the selected one — open its
                  git view, shut it down, destroy the worktree (haven hub / ps)
-haven up         what `pnpm dev:haven` runs — resolve slug, register, supervise
+haven up         resolve slug, register hostnames, start + supervise;
+                 refuses if already running (-f/--force replaces it); -w watches
+                 the Go services via air; -d detaches (logs to a file)
+haven restart    bounce one supervised service (or all) in place — the fix for
+                 services without hot module reloading (haven rs)
+haven logs       print/follow a detached stack's log file (-f)
+haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)"`
+                 in your rc it becomes a real cd, tab-completed (haven sw)
 haven list       every stack: slug, branch, worktree, hostnames (--json too)
 haven doctor     proxy / daemon / observability / stack health + memory footprints
 haven seed       reseed this stack's database (refuses non-local database URLs);
@@ -68,7 +75,9 @@ haven git        embedded git TUI (moron) for any worktree — `haven git <slug>
                  `--list`/`--json` print the per-worktree overview instead
 haven prune      reclaim disk + drop pruned worktrees' databases (dry-run
                  without --yes; the standing lw_main database is always kept)
-haven down       tear this worktree's routes + registry entry down
+haven down       stop this worktree's stack (launcher, routes, registry entry);
+                 databases are kept — --drop-db for a fresh one, and the daemon
+                 background-prunes databases idle past HAVEN_DB_TTL (14d)
 haven watch      passive live view (the hub without the actions)
 haven help       exhaustive, copy-pasteable reference
 ```
@@ -152,7 +161,8 @@ registry, and dashboard stay the same.
   gives every worktree its own database (`lw_<slug>`) on it — so migration counts
   are always this worktree's own. Light local config (memory cap, no S3 tiering,
   no zero-copy). `haven clickhouse status|up|url|stop|drop`; `haven up` migrates
-  the per-slug DB and `haven down` drops it.
+  the per-slug DB, `haven down --drop-db` drops it, and the daemon prunes
+  databases whose worktree hasn't been up for `HAVEN_DB_TTL` (default 14 days).
 - **Always migrate + seed, fully static identity.** Every `up` migrates *and*
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API

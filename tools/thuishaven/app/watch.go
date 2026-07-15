@@ -37,7 +37,7 @@ func (o *Orchestrator) renderWatch() {
 	b.WriteString("\x1b[1m thuishaven \x1b[0m\x1b[2m— LangWatch local stacks · Ctrl-C to quit\x1b[0m\n\n")
 	stacks := o.store.Stacks()
 	if len(stacks) == 0 {
-		b.WriteString("  \x1b[2mno stacks running — run 'pnpm dev' in a worktree\x1b[0m\n")
+		b.WriteString("  \x1b[2mno stacks running — run 'haven up' in a worktree\x1b[0m\n")
 	}
 	for _, s := range stacks {
 		badge := "\x1b[32m live \x1b[0m"

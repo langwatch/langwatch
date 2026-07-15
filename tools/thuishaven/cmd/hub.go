@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 
 	"github.com/0xdeafcafe/moron/tui"
 
@@ -43,7 +45,7 @@ func (d deps) hubActions() hubtui.Actions {
 		Rows: func() []hubtui.Row {
 			var rows []hubtui.Row
 			for _, hs := range d.orch.HubStacks() {
-				rows = append(rows, hubtui.Row{
+				row := hubtui.Row{
 					Slug:          hs.Stack.Slug,
 					Branch:        hs.Stack.Branch,
 					Dir:           hs.Stack.WorktreeDir,
@@ -51,13 +53,42 @@ func (d deps) hubActions() hubtui.Actions {
 					RSS:           hs.RSS,
 					ServicesUp:    hs.PortsUp,
 					ServicesTotal: len(hs.Stack.Services),
-				})
+				}
+				for _, svc := range hs.Stack.Services {
+					if svc.Name == "app" {
+						row.AppURL = svc.URL
+					}
+					row.Services = append(row.Services, hubtui.ServiceRow{
+						Name: svc.Name, Port: svc.Port, URL: svc.URL,
+						IsUp: hs.ServiceUp[svc.Name], IsFallback: svc.IsFallback,
+					})
+				}
+				rows = append(rows, row)
 			}
 			return rows
 		},
 		Down: d.orch.DownStack,
+		Restart: func(ctx context.Context, slug string) error {
+			return d.orch.RestartStack(ctx, slug, "")
+		},
+		OpenURL: openInBrowser,
 		Destroy: func(ctx context.Context, dir string) error {
 			return d.orch.DestroyWorktree(ctx, d.worktree, dir, d.worktree)
 		},
 	}
+}
+
+func openInBrowser(url string) error {
+	opener := "open" // macOS
+	if runtime.GOOS != "darwin" {
+		opener = "xdg-open"
+	}
+	cmd := exec.Command(opener, url)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	// Reap in the background so repeated opens don't accumulate zombies while
+	// the hub stays up.
+	go func() { _ = cmd.Wait() }()
+	return nil
 }

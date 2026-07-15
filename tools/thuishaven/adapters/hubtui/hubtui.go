@@ -16,6 +16,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// ServiceRow is one service of a stack, as the detail panel shows it.
+type ServiceRow struct {
+	Name       string
+	Port       int
+	URL        string
+	IsUp       bool
+	IsFallback bool
+}
+
 // Row is one stack as the hub shows it.
 type Row struct {
 	Slug, Branch, Dir string
@@ -23,14 +32,20 @@ type Row struct {
 	RSS               uint64
 	ServicesUp        int
 	ServicesTotal     int
+	AppURL            string
+	Services          []ServiceRow
 }
 
 // Actions wires the hub to the world. Rows is re-read on every refresh tick;
 // Down and Destroy run against the selected row when the user confirms.
+// Restart bounces the selected stack's supervised services in place; OpenURL
+// opens the stack's app URL in the browser. Either may be nil (action hidden).
 type Actions struct {
 	Rows    func() []Row
 	Down    func(ctx context.Context, slug string) error
 	Destroy func(ctx context.Context, dir string) error
+	Restart func(ctx context.Context, slug string) error
+	OpenURL func(url string) error
 }
 
 // Run blocks in the hub TUI. It returns a non-empty directory when the user
@@ -168,6 +183,22 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.mode = modeConfirmDown
 			m.pending = &r
 		}
+	case "r":
+		if r, ok := m.selected(); ok && m.actions.Restart != nil && r.IsLive {
+			m.busy = true
+			slug := r.Slug
+			return m, func() tea.Msg {
+				return actionDoneMsg{verb: "restart", slug: slug, err: m.actions.Restart(m.ctx, slug)}
+			}
+		}
+	case "o":
+		if r, ok := m.selected(); ok && m.actions.OpenURL != nil && r.AppURL != "" {
+			if err := m.actions.OpenURL(r.AppURL); err != nil {
+				m.flash = fmt.Sprintf("open %s failed: %v", r.AppURL, err)
+			} else {
+				m.flash = "opened " + r.AppURL
+			}
+		}
 	case "x":
 		if r, ok := m.selected(); ok {
 			m.mode = modeConfirmDestroy
@@ -275,27 +306,57 @@ var (
 
 func (m model) View() string {
 	var b strings.Builder
-	b.WriteString(styleTitle.Render(" thuishaven hub "))
-	b.WriteString(styleDim.Render("— every stack, and what to do with it\n\n"))
+
+	live := 0
+	var totalRSS uint64
+	for _, r := range m.rows {
+		if r.IsLive {
+			live++
+		}
+		totalRSS += r.RSS
+	}
+	summary := fmt.Sprintf("%d stack(s) · %d live", len(m.rows), live)
+	if totalRSS > 0 {
+		summary += " · " + humanBytes(totalRSS)
+	}
+	b.WriteString(styleTitle.Render(" ⌂ thuishaven hub "))
+	b.WriteString(styleDim.Render("  " + summary))
+	b.WriteString("\n" + styleDim.Render(" "+strings.Repeat("─", 66)) + "\n\n")
 
 	if len(m.rows) == 0 {
-		b.WriteString(styleDim.Render("  no stacks running — run `pnpm dev:haven` in a worktree\n"))
+		b.WriteString(styleDim.Render("  no stacks running — run `haven up` in a worktree\n"))
 	}
 	for i, r := range m.rows {
+		isSelected := i == m.cursor
 		marker, style := "  ", lipgloss.NewStyle()
-		if i == m.cursor {
+		if isSelected {
 			marker, style = "▸ ", styleSel
 		}
-		badge := styleLive.Render("live ")
+		dot := styleLive.Render("●")
 		if !r.IsLive {
-			badge = styleStale.Render("stale")
+			dot = styleStale.Render("○")
 		}
-		facts := fmt.Sprintf("%s · %d/%d services", r.Branch, r.ServicesUp, r.ServicesTotal)
+		facts := fmt.Sprintf("%-28s %d/%d up", truncate(r.Branch, 28), r.ServicesUp, r.ServicesTotal)
 		if r.RSS > 0 {
-			facts += " · " + humanBytes(r.RSS)
+			facts += fmt.Sprintf("  %7s", humanBytes(r.RSS))
 		}
-		b.WriteString(fmt.Sprintf("%s%s %s  %s\n", marker, style.Render(fmt.Sprintf("%-18s", r.Slug)), badge, styleDim.Render(facts)))
-		b.WriteString(styleDim.Render("      "+r.Dir) + "\n")
+		b.WriteString(fmt.Sprintf("%s%s %s  %s\n", marker, dot, style.Render(fmt.Sprintf("%-20s", truncate(r.Slug, 20))), styleDim.Render(facts)))
+		// The selected stack unfolds: where it lives, and each service's health +
+		// hostname — the detail you'd otherwise dig out of `haven list`.
+		if isSelected {
+			b.WriteString(styleDim.Render("       "+r.Dir) + "\n")
+			for _, svc := range r.Services {
+				sdot := styleLive.Render("●")
+				if !svc.IsUp {
+					sdot = styleStale.Render("○")
+				}
+				note := svc.URL
+				if svc.IsFallback {
+					note += styleDim.Render("  (baseline)")
+				}
+				b.WriteString(fmt.Sprintf("       %s %-12s %s\n", sdot, svc.Name, styleDim.Render(note)))
+			}
+		}
 	}
 
 	b.WriteString("\n")
@@ -312,9 +373,29 @@ func (m model) View() string {
 	case m.flash != "":
 		b.WriteString("  " + m.flash + "\n")
 	default:
-		b.WriteString(styleDim.Render("  ↑↓ select · enter/g git · d down · x destroy · q quit") + "\n")
+		keys := "  ↑↓ select · enter/g git"
+		if r, ok := m.selected(); ok {
+			if m.actions.OpenURL != nil && r.AppURL != "" {
+				keys += " · o open"
+			}
+			if m.actions.Restart != nil && r.IsLive {
+				keys += " · r restart"
+			}
+		}
+		keys += " · d down · x destroy · q quit"
+		b.WriteString(styleDim.Render(keys) + "\n")
 	}
 	return b.String()
+}
+
+// truncate bounds a cell to n runes so one long branch name can't shear the
+// table out of alignment.
+func truncate(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n-1]) + "…"
 }
 
 func humanBytes(b uint64) string {

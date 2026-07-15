@@ -58,6 +58,33 @@ func (System) Terminate(pid int) {
 	}
 }
 
+// TerminateGroup SIGTERMs pid's whole process group — the shape every
+// supervised child has (Setpgid), so one signal takes the child and its tree.
+// Falls back to signalling just the pid when the group can't be resolved.
+func (System) TerminateGroup(pid int) {
+	if pgid, err := syscall.Getpgid(pid); err == nil && pgid > 1 {
+		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+		return
+	}
+	System{}.Terminate(pid)
+}
+
+// PIDsOnPort lists the pids LISTENing on a TCP port, via lsof (macOS has no
+// /proc; lsof is the same "ask the OS's own tool" approach used elsewhere).
+func (System) PIDsOnPort(port int) []int {
+	out, err := exec.Command("lsof", "-nP", "-ti", fmt.Sprintf("tcp:%d", port), "-sTCP:LISTEN").Output()
+	if err != nil {
+		return nil
+	}
+	var pids []int
+	for _, f := range strings.Fields(string(out)) {
+		if pid, err := strconv.Atoi(f); err == nil {
+			pids = append(pids, pid)
+		}
+	}
+	return pids
+}
+
 // SpawnDetached starts a process in its own session so it outlives the caller —
 // used to bring the singleton daemon up from `up`.
 func (System) SpawnDetached(argv []string, dir, logPath string) error {

@@ -79,6 +79,15 @@ function getSharedTransport(): DestinationStream | null {
     return null;
   }
 
+  // Console format follows LOG_FORMAT (the same var the Go services' clog reads),
+  // so one signal makes every dev lane — TS and Go — read as pretty prose. An
+  // explicit LOG_FORMAT wins in both directions ("pretty"/"json"); unset falls back
+  // to the NODE_ENV default (pretty in dev, JSON in prod), so nothing changes for
+  // anyone who never sets it.
+  const logFormat = process.env.LOG_FORMAT;
+  const usePretty =
+    logFormat === "pretty" || (logFormat !== "json" && isDevelopment);
+
   const isOtelExportEnabled = process.env.PINO_OTEL_ENABLED === "true";
   const consoleLevel =
     process.env.LOG_CONSOLE_LEVEL ?? process.env.PINO_CONSOLE_LEVEL ?? "info";
@@ -87,7 +96,7 @@ function getSharedTransport(): DestinationStream | null {
 
   try {
     sharedTransport = buildTransport({
-      isDevelopment,
+      usePretty,
       isOtelExportEnabled,
       consoleLevel,
       otelLevel,
@@ -171,19 +180,19 @@ function createNodeLogger(
 }
 
 function buildTransport({
-  isDevelopment,
+  usePretty,
   isOtelExportEnabled,
   consoleLevel,
   otelLevel,
 }: {
-  isDevelopment: boolean;
+  usePretty: boolean;
   isOtelExportEnabled: boolean;
   consoleLevel: string;
   otelLevel: string;
 }): DestinationStream {
   const targets: pino.TransportTargetOptions[] = [
     buildConsoleTransport({
-      isDevelopment,
+      usePretty,
       level: consoleLevel,
       isOtelExportEnabled,
     }),
@@ -211,15 +220,15 @@ export function consoleIgnoreFields(isOtelExportEnabled: boolean): string {
 }
 
 function buildConsoleTransport({
-  isDevelopment,
+  usePretty,
   level,
   isOtelExportEnabled,
 }: {
-  isDevelopment: boolean;
+  usePretty: boolean;
   level: string;
   isOtelExportEnabled: boolean;
 }): pino.TransportTargetOptions {
-  if (isDevelopment) {
+  if (usePretty) {
     return {
       target: "pino-pretty",
       options: {

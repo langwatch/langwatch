@@ -210,6 +210,42 @@ test_langwatch_endpoint() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITE: backup metrics gate — CLICKHOUSE_BACKUP_METRICS_ENABLED must follow the
+# backup config so the "Backup Reporting Absent" signal cannot silently drift
+# from whether backups actually run (PR #5814).
+# ─────────────────────────────────────────────────────────────────────────────
+test_backup_metrics_gate() {
+  sep; info "Suite: CLICKHOUSE_BACKUP_METRICS_ENABLED gate follows backup config"
+
+  local backup_flags="--set autogen.enabled=true --set clickhouse.objectStorage.bucket=b --set clickhouse.objectStorage.region=us-east-1"
+
+  # Off by default: no backups configured -> no backup-log querying.
+  local off
+  off=$(tmpl_only "templates/workers/deployment.yaml" --set autogen.enabled=true)
+  assert_not_contains "default: workers do not set backup metrics" \
+    "$off" "CLICKHOUSE_BACKUP_METRICS_ENABLED"
+
+  # Chart-managed backups on -> metrics auto-enabled on the workers (which emit
+  # the gauges), so the alert never fires spuriously against a live backup setup.
+  local on
+  # shellcheck disable=SC2086
+  on=$(tmpl_only "templates/workers/deployment.yaml" $backup_flags --set clickhouse.backup.enabled=true \
+    | grep -A1 "name: CLICKHOUSE_BACKUP_METRICS_ENABLED")
+  assert_contains "backup.enabled: workers set backup metrics" \
+    "$on" "name: CLICKHOUSE_BACKUP_METRICS_ENABLED"
+  assert_contains "backup.enabled: backup metrics value true" "$on" '"true"'
+
+  # Explicit override for out-of-band backups (backups run elsewhere, but we
+  # still want the signal).
+  local forced
+  forced=$(tmpl_only "templates/workers/deployment.yaml" --set autogen.enabled=true \
+    --set clickhouse.backup.metricsEnabled=true \
+    | grep -A1 "name: CLICKHOUSE_BACKUP_METRICS_ENABLED")
+  assert_contains "metricsEnabled override: workers set backup metrics" \
+    "$forced" "name: CLICKHOUSE_BACKUP_METRICS_ENABLED"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: size overlays — verify replica counts and resource sizing
 # ─────────────────────────────────────────────────────────────────────────────
 test_size_overlays() {
@@ -552,6 +588,7 @@ main() {
   test_access_nodeport
   test_access_ingress
   test_langwatch_endpoint
+  test_backup_metrics_gate
   test_size_overlays
   test_infra_overlays
   test_overlay_stacking

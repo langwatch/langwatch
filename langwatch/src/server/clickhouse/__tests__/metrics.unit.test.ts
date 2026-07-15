@@ -224,6 +224,13 @@ describe("ClickHouse metrics", () => {
     });
 
     describe("given backup status collection", () => {
+      beforeEach(() => {
+        process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED = "true";
+      });
+      afterEach(() => {
+        delete process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
+      });
+
       describe("when system.backup_log returns data", () => {
         it("queries system.backup_log for backup status", async () => {
           const partsResult = {
@@ -432,13 +439,12 @@ describe("ClickHouse metrics", () => {
         return typeof arg === "string" && arg.includes(needle);
       }).length;
 
-    describe("when running in production", () => {
-      const originalNodeEnv = process.env.NODE_ENV;
+    describe("when backup metrics are enabled", () => {
       beforeEach(() => {
-        process.env.NODE_ENV = "production";
+        process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED = "true";
       });
       afterEach(() => {
-        process.env.NODE_ENV = originalNodeEnv;
+        delete process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
       });
 
       describe("when system.backup_log fails repeatedly", () => {
@@ -481,22 +487,20 @@ describe("ClickHouse metrics", () => {
       });
     });
 
-    describe("when not in production (local dev)", () => {
-      // NODE_ENV is "test" here, exercising the off-prod path: local dev has no
-      // system.backup_log, so the repeated failure must never reach the console.
-      it("never warns and keeps backup-log failures at debug", async () => {
-        const client = buildMockClient(() => true);
+    describe("when backup metrics are not enabled (the default)", () => {
+      // system.backup_log only exists where backups are configured, so anywhere
+      // that hasn't opted in the collector must skip it entirely, leaving only
+      // parts + disks.
+      it("skips the system.backup_log query entirely", async () => {
+        const client = buildMockClient(() => false);
 
         await metrics.collectStorageStats(client);
-        await metrics.collectStorageStats(client);
-        await metrics.collectStorageStats(client);
 
-        expect(
-          countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
-        ).toBe(0);
-        expect(
-          countCallsMatching(loggerMocks.debug.mock.calls, 1, "system.backup_log"),
-        ).toBeGreaterThanOrEqual(1);
+        expect(client.query).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.stringContaining("system.backup_log"),
+          }),
+        );
       });
     });
   });

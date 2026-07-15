@@ -42,7 +42,27 @@ COMMANDS
                   tell you how to install it if not), start the proxy, trust its
                   CA. Idempotent — safe to re-run. (Run it via make haven setup.)
     up            Resolve this worktree's slug, allocate ports, register the
-                  hostnames, start + supervise the stack. (What pnpm dev:haven runs.)
+                  hostnames, start + supervise the stack.
+                  Refuses when this worktree's stack is already running. Flags:
+                  -w/--watch (air hot-reload for the Go services — TypeScript
+                  already hot-reloads via Vite), -f/--force (tear the running
+                  stack down first and take its place), -d/--detach (run in the
+                  background, logs to a file — follow with "haven logs -f",
+                  stop with "haven down").
+    restart [svc] Bounce one supervised service (app, api, gateway, nlp,
+                  langyagent, workers) — or all of them with no argument —
+                  without tearing the stack down. Kills the service's process
+                  group; the supervisor restarts it in ~1s. The go-to for
+                  services without hot reloading. Alias: rs.
+    logs [-f]     Print (or follow, with -f/--follow) the log file of a stack
+                  started with "haven up -d".
+    switch [name] Print a worktree's directory by stack slug / worktree name
+                  (prefix and substring matches work). With no name, list the
+                  switchable worktrees. Add eval "$(haven shell-init)" to your
+                  ~/.zshrc to make "haven switch <name>" actually cd your shell,
+                  with tab-completion of the names. Alias: sw.
+    shell-init    Emit the shell function + completion that turns "haven
+                  switch" into a real cd (eval it from your shell rc).
     pr <ref>      Try a GitHub PR locally in seconds: clone it into a worktree,
                   install deps, and bring its stack up on a hostname. <ref> is a
                   PR number or URL (works for fork PRs too). A reused worktree is
@@ -70,9 +90,11 @@ COMMANDS
                   plain list. Aliases: ps, active.
     watch         Passive live view of every running stack + service health
                   (no actions). --agent gives a plain snapshot.
-    down          Tear this worktree's routes + registry entry down, and drop this
-                  stack's ClickHouse + Postgres databases (pass --keep-db to keep
-                  them).
+    down          Stop this worktree's stack from anywhere: terminate a live
+                  launcher, remove the routes + registry entry. Databases are
+                  KEPT — pass --drop-db for a fresh DB on the next up. Databases
+                  idle past HAVEN_DB_TTL (default 14 days) are pruned in the
+                  background by the daemon.
     clickhouse    Manage the shared ClickHouse (haven runs one Altinity container
                   on colima, one database per slug). Subcommands: status | up |
                   url | stop | drop [--all]. "haven clickhouse url" prints this
@@ -95,6 +117,15 @@ COMMANDS
                   already past onboarding and ingests deterministic sample
                   traces through the running stack's collector, so the UI opens
                   on real-looking data (the stack must be up for the traces).
+                  Model providers are seeded from the environment by default:
+                  every provider whose API-key variable is set (process env,
+                  langwatch/.env, or the repo-root .env) gets an enabled
+                  org-scoped credential — disable with --skip-model-providers
+                  (HAVEN_SEED_MODEL_PROVIDERS=0). More à-la-carte extras:
+                  --traces (ingest the sample traces without the full demo
+                  preset; HAVEN_SEED_TRACES=1), --first-message /
+                  --no-first-message (force the project's "has received its
+                  first trace" onboarding flag; HAVEN_SEED_FIRST_MESSAGE=1|0).
     git [target]  Open the embedded git TUI (moron) for a worktree: no target
                   is this worktree; a stack slug, worktree name, or directory
                   opens that one — inspect branches, diffs, and worktrees
@@ -140,6 +171,10 @@ ENVIRONMENT
                                  dev:single:haven sets).
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
+    HAVEN_DB_TTL=336h            Background-prune databases whose worktree has not
+                                 been up for this long (default 14 days; 0 disables).
+                                 Only databases haven itself created are considered,
+                                 and lw_main is always kept.
     HAVEN_WORKTREE_DIR=<dir>     Where haven pr creates PR worktrees (default: the
                                  sibling worktrees/ dir next to the checkout).
     LANGWATCH_HAVEN_CH=0         Do not manage ClickHouse (use .env CLICKHOUSE_URL).
@@ -179,13 +214,19 @@ ENVIRONMENT
 
 EXAMPLES
     haven setup                  # one-time: install/verify portless, trust the CA
-    pnpm dev:haven               # up, through haven, in this worktree
-    pnpm dev:single:haven        # …with workers hosted in-process (one Node proc)
+    haven up                     # bring this worktree's stack up
+    WORKERS_IN_PROCESS=0 haven up # …with a standalone workers lane
     haven pr 4913                # try PR #4913 locally in a fresh worktree
     haven                        # the hub: every stack + actions (git/down/destroy)
     haven git                    # git TUI for this worktree (haven git <slug> for another)
     haven seed --preset demo     # reseed past onboarding, with sample traces
     haven list --json            # machine-readable inventory of every stack
     haven doctor                 # is everything wired up?
-    LANGWATCH_GO_WATCH=1 pnpm dev:haven # air hot-reload for gateway + nlp
+    LANGWATCH_GO_WATCH=1 haven up # air hot-reload for gateway + nlp
+    haven up -w                  # same, as a flag
+    haven up -d                  # background the stack; haven logs -f to follow
+    haven restart nlp            # bounce one Go service without hot reload
+    haven down                   # stop the stack, keep the databases
+    haven down --drop-db         # stop AND get a fresh DB next up
+    haven switch otel            # print the otel-* worktree's dir (cd via shell-init)
 `

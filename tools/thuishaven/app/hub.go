@@ -218,18 +218,22 @@ type HubStack struct {
 	IsLive  bool
 	RSS     uint64
 	PortsUp int
+	// ServiceUp is the per-service port probe, keyed by service name.
+	ServiceUp map[string]bool
 }
 
 // HubStacks assembles the hub rows from the registry + live probes.
 func (o *Orchestrator) HubStacks() []HubStack {
 	var rows []HubStack
 	for _, st := range o.store.Stacks() {
-		row := HubStack{Stack: st, IsLive: o.sys.ProcessAlive(st.LauncherPID)}
+		row := HubStack{Stack: st, IsLive: o.sys.ProcessAlive(st.LauncherPID), ServiceUp: map[string]bool{}}
 		if row.IsLive {
 			row.RSS = o.sys.GroupRSS(st.LauncherPID)
 		}
 		for _, svc := range st.Services {
-			if svc.Port != 0 && o.sys.PortInUse(svc.Port) {
+			up := svc.Port != 0 && o.sys.PortInUse(svc.Port)
+			row.ServiceUp[svc.Name] = up
+			if up {
 				row.PortsUp++
 			}
 		}

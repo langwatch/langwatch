@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -121,6 +122,48 @@ func (s *Store) ReadHMRGate(lwDir string) (int64, bool) {
 
 // ClearHMRGate removes the marker so HMR resumes immediately.
 func (s *Store) ClearHMRGate(lwDir string) { _ = os.Remove(s.hmrGatePath(lwDir)) }
+
+// dbActivityPath is the machine-wide last-seen clock for per-slug databases.
+func (s *Store) dbActivityPath() string { return filepath.Join(s.home, "db-activity.json") }
+
+func (s *Store) TouchDBActivity(slug string) error {
+	if slug == "" {
+		return nil
+	}
+	if err := os.MkdirAll(s.home, 0o755); err != nil {
+		return err
+	}
+	m := s.DBActivity()
+	m[slug] = time.Now()
+	return s.writeDBActivity(m)
+}
+
+func (s *Store) DBActivity() map[string]time.Time {
+	m := map[string]time.Time{}
+	b, err := os.ReadFile(s.dbActivityPath())
+	if err != nil {
+		return m
+	}
+	_ = json.Unmarshal(b, &m)
+	return m
+}
+
+func (s *Store) RemoveDBActivity(slug string) {
+	m := s.DBActivity()
+	if _, ok := m[slug]; !ok {
+		return
+	}
+	delete(m, slug)
+	_ = s.writeDBActivity(m)
+}
+
+func (s *Store) writeDBActivity(m map[string]time.Time) error {
+	b, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(s.dbActivityPath(), append(b, '\n'), 0o644)
+}
 
 // ClaimDaemon / Daemon / ClearDaemon manage the singleton daemon record.
 

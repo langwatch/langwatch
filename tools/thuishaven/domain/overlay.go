@@ -61,6 +61,13 @@ func (s Stack) OverlayEnv() []string {
 		"LW_GATEWAY_PUBLIC_URL=" + gw.URL,
 		"LW_GATEWAY_INTERNAL_URL=" + gw.URL,
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
+		// Pretty, human-readable console logging for the Go services (clog reads
+		// LOG_FORMAT; the TS app's pino is already pretty in dev via NODE_ENV). Haven
+		// is always a human at the console, so the dev lanes should read like prose,
+		// not JSON. Haven-dev only — this overlay never exists in prod, where the Go
+		// services keep their JSON default. The collector still receives structured
+		// records regardless of the console format (clog tees the two).
+		"LOG_FORMAT=pretty",
 	}
 	// A stable local API key so the seed always mints the same credential and any
 	// agent can authenticate without rediscovering it per worktree. Emitted as
