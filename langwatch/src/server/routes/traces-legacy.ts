@@ -166,6 +166,18 @@ secured
 
     const traceId = c.req.param("id");
 
+    // Honour the project's trace-sharing kill switch here too — the tRPC
+    // share.createShare route guards on this, and the service is deliberately
+    // not given a projects dependency (avoids a construction cycle), so each
+    // HTTP entry point enforces it.
+    const projectRecord = await getApp().projects.getById(project.id);
+    if (!projectRecord?.traceSharingEnabled) {
+      return c.json(
+        { message: "Trace sharing is disabled for this project" },
+        403,
+      );
+    }
+
     const share = await getApp().share.createShare({
       projectId: project.id,
       resourceType: "TRACE",
@@ -173,7 +185,10 @@ secured
     });
 
     markUsed();
-    return c.json({ status: "success", path: `/share/${share.id}` });
+    // The /share page resolves by the secret token, not the row id. For links
+    // minted after the ShareLink migration the two differ, so returning the id
+    // would hand back a URL that never resolves.
+    return c.json({ status: "success", path: `/share/${share.token}` });
   });
 
 // ---------- POST /api/trace/:id/unshare ----------
