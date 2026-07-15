@@ -194,10 +194,63 @@ The app exports to the same `/api/otel` as the CLI Path B but under sourceType `
 - If the `context_*_tokens` breakdown is ever wanted, enrich from `session-store.db` keyed on `service_request_id` — deferred, not blocking.
 
 ### Roadmap
-- VS Code extension — via `github.copilot.chat.otel.*` settings.
+- VS Code Copilot Chat — now locked below as its own §Extension.
 - Enterprise fleet with per-user identity.
+
+## Extension: GitHub Copilot in VS Code (Copilot Chat)
+
+Adds the built-in GitHub Copilot Chat extension in VS Code as a tracked surface, on the same `/api/otel` ingest as the CLI and app. Status: Proposed. Scope: the VS Code Copilot Chat surface; cost is out of scope for v1 (see V4).
+
+### V1. Capture by native settings + direct OTLP
+The Copilot Chat extension (built into VS Code) honors the `github.copilot.chat.otel.*` settings and the standard `OTEL_*` env, and — given an endpoint plus an auth header — POSTs one `gen_ai.*` OTLP record per LLM call straight to `/api/otel`. Empirically validated on VS Code 1.128.1 / Copilot Chat 0.56.0: a real Chat turn was captured — the `panel/editAgent` span carried the typed prompt, token usage, and content, and landed in the project under `service.name = copilot-chat`. (VS Code Copilot shares the same `~/.copilot` engine as the CLI and app.)
+
+### V2. Config split — settings native, token env-only
+The extension's enable / exporter / endpoint / content-capture all configure through **VS Code settings** (`github.copilot.chat.otel.enabled`, `exporterType`, `otlpEndpoint`, `captureContent`) — writable, no launch injection. The one exception is the ingest token: Copilot exposes **no settings key for the auth header** (verified), so it must ride the `OTEL_EXPORTER_OTLP_HEADERS` env var. This is the only piece settings cannot hold.
+
+### V3. Delivery — a login agent owns the `code` launch
+Because the token is env-only and a GUI editor inherits no shell, a user-level login agent owns the `code` launch and injects `OTEL_EXPORTER_OTLP_HEADERS` **scoped to the VS Code process it starts** — no global env, so the ingest key never leaks to other OTLP-aware apps. It reuses the app extension's per-OS agent (launchd / systemd `--user` / Task Scheduler), self-installed when the user connects VS Code and removed by `langwatch logout`. This is not a `langwatch code` process wrapper; it is the same launch-owning agent pattern accepted for the app.
+
+### V4. Scope, source, and cost
+sourceType `copilot_vscode`, minted as a key distinct from `copilot_cli` / `copilot_app` and stamped at the receiver. v1 is **tokens-only**: dollar cost and AI-unit consumption are deferred. VS Code emits AI-units as `copilot_usage_nano_aiu` (its own attribute name, ≠ the CLI/app's `github.copilot.nano_aiu`) under obfuscated model codenames (`oswe-vscode-prime`, `raptor mini`) with no `github.copilot.cost` — both are brittle to price, so they are out of v1. No VS-Code-specific extractor code is required in v1: the shared GenAI core already canonicalizes the `copilot-chat` `gen_ai.*` spans (model, tokens, input/output).
+
+### Constants
+| Name | Value |
+|---|---|
+| sourceType | `copilot_vscode` |
+| capture | native direct OTLP push to `/api/otel/v1/traces` |
+| settings keys | `github.copilot.chat.otel.{enabled,exporterType,otlpEndpoint,captureContent}` |
+| token var | `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`) |
+| service.name | `copilot-chat` |
+| host | user login agent (reuses the app's per-OS agent; launches `code`) |
+| lifecycle | self-installed at connect; removed by `langwatch logout` |
+| cost | deferred (tokens-only v1) |
+
+### Invariants
+| Invariant | Satisfied by |
+|---|---|
+| Config is native | enable / exporter / endpoint / capture via `settings.json`; only the token via env |
+| Token not set globally | login agent injects the header only into the `code` process it launches — never a session/shell-global export. It does reach VS Code's own integrated terminals; our CLI wrappers override `OTEL_EXPORTER_OTLP_HEADERS` per-invocation, so wrapped tools are unaffected (see Open questions for un-wrapped tools) |
+| Each call ingested once | native per-call `gen_ai.*` records; standard `/api/otel` dedup |
+| No cross-surface double-capture | `copilot_vscode` key distinct from `copilot_cli` / `copilot_app`; stamped at receiver |
+| One extractor | `copilot-chat` `gen_ai.*` canonicalized by the shared GenAI core; no VS-Code-specific extractor code in v1 |
+| Content protected | ESSENTIAL PII redaction on `/api/otel` |
+| Automatic, no manual | connect writes settings + installs the agent; no hand-edited settings, no typed env |
+
+### Consequences
+- Prompts, responses, model, and token usage stream live from a real Chat turn — validated end-to-end (`panel/editAgent`, model `oswe-vscode-prime`, tokens, content landed).
+- Reuses `/api/otel`, the GenAI core, `IngestionKeyService`, and the app's login agent — minimal new code (a VS Code settings writer + the `code`-launching agent target).
+- The login agent owns the `code` launch, so VS Code opens at login — more intrusive for an editor than for the app; accepted for always-on capture. A lighter shell-rc mode for terminal-only users is an open question.
+- Tokens-only v1: no dollar cost or AI-unit metadata for VS Code until pricing is designed.
+- One Chat turn fans out into several sub-agent spans (`panel/editAgent` + `progressMessages` + `title`), each its own trace — not grouped.
+
+### Open questions
+- Cost for VS Code: lift `copilot_usage_nano_aiu` as AI-unit metadata and/or map codenames (`oswe-vscode-prime`, `raptor mini`) to prices — deferred; both brittle, revisit when GitHub documents the codenames.
+- Login-at-launch intrusiveness: whether to offer a lighter shell-rc delivery mode for terminal-only (`code .`) users — the same mode would also keep the token out of the integrated-terminal env.
+- Integrated-terminal exposure: an un-wrapped OTLP tool run in VS Code's integrated terminal inherits the `copilot_vscode` header. Decide whether to clear it via `terminal.integrated.env` in the settings writer, or accept it (wrapped tools already override).
+- Turn/usage accounting: one Chat turn emits several sub-agent traces (`panel/editAgent` + `progressMessages` + `title`); analytics must not count internal sub-agent spans as user turns or double-count tokens against the `panel/*` root — needs a filter or a root-span marker before VS Code usage is surfaced.
 
 ## Changelog
 
 - 2026-07-10 — CLI integration (§Decision 1–10): both paths, ingestion-first default, sourceType `copilot_cli`, `copilot.ts` extractor. Accepted, shipped in PR #5605.
-- 2026-07-14 — GitHub Copilot app extension (§Extension): capture by direct OTLP export — the app POSTs one `gen_ai.*` record per call straight to `/api/otel`, the same transport shipped for the CLI (Path B), enabled by injecting the OTLP-endpoint + Bearer env at app launch via a user login agent; sourceType `copilot_app`. Empirically validated on the shipped app (1.0.71): injected env reaches the app's spawned runtime, which posts authenticated `gen_ai.*` OTLP carrying tokens, `github.copilot.cost`/`nano_aiu`, and full messages. Supersedes two earlier drafts — the `session-store.db` + `events.jsonl` scrape-and-pair design, and the native file-exporter + tail design — both dropped: no file, no tail, no SQLite. Accepted, PR #5784.
+- 2026-07-14 — GitHub Copilot app extension (§Extension: app): capture by direct OTLP export — the app POSTs one `gen_ai.*` record per call straight to `/api/otel`, the same transport shipped for the CLI (Path B), enabled by injecting the OTLP-endpoint + Bearer env at app launch via a user login agent; sourceType `copilot_app`. Empirically validated on the shipped app (1.0.71): injected env reaches the app's spawned runtime, which posts authenticated `gen_ai.*` OTLP carrying tokens, `github.copilot.cost`/`nano_aiu`, and full messages. Supersedes two earlier drafts — the `session-store.db` + `events.jsonl` scrape-and-pair design, and the native file-exporter + tail design — both dropped: no file, no tail, no SQLite. Accepted, PR #5784.
+- 2026-07-15 — GitHub Copilot in VS Code (§Extension: Copilot Chat): native `github.copilot.chat.otel.*` settings carry enable/exporter/endpoint/capture; the ingest token — the only piece with no settings key — rides `OTEL_EXPORTER_OTLP_HEADERS`, delivered by a login agent that owns the `code` launch (env scoped to that process, no leak); sourceType `copilot_vscode`, tokens-only v1 (cost + AI-units deferred as codenames are obfuscated). Empirically validated on VS Code 1.128.1 / Copilot Chat 0.56.0: a real Chat turn (`panel/editAgent`, model `oswe-vscode-prime`) landed with prompt, tokens, and content. Proposed, PR on the #5784 stack (issue #5813).
