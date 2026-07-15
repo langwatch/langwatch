@@ -23,3 +23,17 @@ Feature: ClickHouse backup status metrics are opt-in
     When the backup log query fails on consecutive ticks
     Then a single warning is logged for the failure streak
     And a recovery is logged once collection succeeds again
+
+  # The opt-in must not let production silently stop emitting the gauges the
+  # "Backup Reporting Absent" alert depends on. The Helm chart couples the toggle
+  # to the backup config so the signal can never drift from whether backups run.
+  Scenario: the Helm chart enables backup metrics wherever it runs backups
+    Given the langwatch chart is deployed with clickhouse.backup.enabled true
+    When the app and worker deployments are rendered
+    Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to true on them
+
+  Scenario: an operator forces backup metrics for out-of-band backups
+    Given the langwatch chart is deployed with clickhouse.backup.metricsEnabled true
+    And chart-managed backups are disabled
+    When the app and worker deployments are rendered
+    Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to true on them

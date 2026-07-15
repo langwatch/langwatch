@@ -1535,6 +1535,8 @@ clickhouse:
   backup:
     ## @param clickhouse.backup.enabled [default: false] Enable automated native ClickHouse backups.
     enabled: false
+    ## @param clickhouse.backup.metricsEnabled [default: false] Force backup-status metrics (system.backup_log gauges) on even when backups run out-of-band (e.g. a separate CronJob). Metrics are already emitted automatically when backup.enabled is true; set this only when this chart is not the one running the backups.
+    metricsEnabled: false
     ## @param clickhouse.backup.database [string, default: langwatch] Database to back up.
     database: "langwatch"
     ## @extra clickhouse.backup.full Full backup schedule.

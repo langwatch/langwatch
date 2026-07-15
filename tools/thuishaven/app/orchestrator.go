@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -101,6 +102,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
 		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
+		// Mirror planChildren: a separate `workers` lane exists only when workers
+		// are requested AND not hosted in-process. Persist it so restart targets
+		// the workers' own group rather than the API's when they share a process.
+		HasStandaloneWorkers: opts.ShouldStartWorkers && !opts.ShouldRunWorkersInProcess,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
@@ -340,10 +345,16 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldDropDB bool) 
 	}
 	o.proxy.Remove(domain.ClickHouseService, slug)
 	o.proxy.Remove(domain.PostgresService, slug)
+	// Attempt every drop even if one fails, so route/registry cleanup always
+	// completes, but AGGREGATE the failures and return them. A dropped-DB request
+	// that silently retained the old database would let `haven down --drop-db &&
+	// haven up` reuse stale state while reporting a clean reset.
+	var dropErrs []error
 	if o.ch != nil && o.cfg.ShouldManageClickHouse && shouldDropDB {
 		db := domain.DatabaseForSlug(slug)
 		if err := o.ch.DropDatabase(ctx, db); err != nil {
 			o.log.Warn("could not drop clickhouse database", zap.String("db", db), zap.Error(err))
+			dropErrs = append(dropErrs, fmt.Errorf("dropping clickhouse database %q: %w", db, err))
 		} else {
 			fmt.Printf("dropped clickhouse database %q\n", db)
 		}
@@ -352,11 +363,15 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldDropDB bool) 
 		db := domain.DatabaseForSlug(slug)
 		if err := o.pg.DropDatabase(ctx, db); err != nil {
 			o.log.Warn("could not drop postgres database", zap.String("db", db), zap.Error(err))
+			dropErrs = append(dropErrs, fmt.Errorf("dropping postgres database %q: %w", db, err))
 		} else {
 			fmt.Printf("dropped postgres database %q\n", db)
 		}
 	}
 	o.store.RemoveStack(slug)
+	if len(dropErrs) > 0 {
+		return fmt.Errorf("stack %q stopped but database drop failed — state may be stale: %w", slug, errors.Join(dropErrs...))
+	}
 	fmt.Printf("stack %q torn down\n", slug)
 	return nil
 }

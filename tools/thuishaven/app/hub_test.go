@@ -103,13 +103,14 @@ func (f *fakeProxy) Endpoint() (string, int)            { return "https", 443 }
 type fakeDBServer struct {
 	databases []string
 	dropped   []string
+	dropErr   error // when set, DropDatabase records the attempt then fails
 }
 
 func (f *fakeDBServer) Ensure(context.Context) (int, error)               { return 1, nil }
 func (f *fakeDBServer) EnsureDatabase(_ context.Context, db string) error { return nil }
 func (f *fakeDBServer) DropDatabase(_ context.Context, db string) error {
 	f.dropped = append(f.dropped, db)
-	return nil
+	return f.dropErr
 }
 func (f *fakeDBServer) Databases(context.Context) ([]string, error) { return f.databases, nil }
 func (f *fakeDBServer) HTTPPort() int                               { return 0 }

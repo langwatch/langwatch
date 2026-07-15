@@ -65,7 +65,10 @@ func (o *Orchestrator) RestartStack(ctx context.Context, slug, name string) erro
 // restartTargets resolves which children to bounce. Only supervised children
 // qualify: the routed per-worktree services this stack runs itself (not
 // baseline fallbacks), plus the API (a backend of app, on its own port) and the
-// standalone workers lane when it exists. name=="" means all of them.
+// standalone workers lane when it exists. The workers lane is a target only when
+// the stack actually runs one (HasStandaloneWorkers); in the default in-process
+// mode the API child holds WorkerMetricsPort, so exposing `workers` there would
+// bounce the API instead. name=="" means all of them.
 func restartTargets(st domain.Stack, name string) []restartTarget {
 	var all []restartTarget
 	for _, r := range domain.PerWorktreeServices {
@@ -78,7 +81,7 @@ func restartTargets(st domain.Stack, name string) []restartTarget {
 	if st.APIPort != 0 {
 		all = append(all, restartTarget{Name: "api", Port: st.APIPort})
 	}
-	if st.WorkerMetricsPort != 0 {
+	if st.HasStandaloneWorkers && st.WorkerMetricsPort != 0 {
 		all = append(all, restartTarget{Name: "workers", Port: st.WorkerMetricsPort})
 	}
 	if name == "" {

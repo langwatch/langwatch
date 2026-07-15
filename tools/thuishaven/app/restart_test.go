@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 func restartStack() domain.Stack {
 	return domain.Stack{
 		Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42,
-		APIPort: 9100, WorkerMetricsPort: 9200,
+		APIPort: 9100, WorkerMetricsPort: 9200, HasStandaloneWorkers: true,
 		Services: []domain.Service{
 			{Name: "app", Port: 9000},
 			{Name: "gateway", Port: 9001},
@@ -21,6 +22,15 @@ func restartStack() domain.Stack {
 			{Name: "clickhouse", Port: 8123},            // shared DB server — never a restart target
 		},
 	}
+}
+
+// inProcessWorkersStack is restartStack in the default in-process worker mode:
+// WorkerMetricsPort is set (the API child binds it) but HasStandaloneWorkers is
+// false, so there is no separate workers lane to bounce.
+func inProcessWorkersStack() domain.Stack {
+	st := restartStack()
+	st.HasStandaloneWorkers = false
+	return st
 }
 
 func restartOrch(store *fakeStore, sys *fakeSystem) *Orchestrator {
@@ -109,6 +119,42 @@ func TestRestart(t *testing.T) {
 			}
 			if len(sys.groupTerminated) != 0 {
 				t.Errorf("the launcher's own pid must never be group-terminated, got %v", sys.groupTerminated)
+			}
+		})
+
+		t.Run("when workers run in-process, `workers` is not a restart target", func(t *testing.T) {
+			// Default haven mode: the API child hosts the workers and holds
+			// WorkerMetricsPort itself, so `restart workers` must refuse rather than
+			// terminate the API's group; `restart` (all) must not touch it either.
+			store := &fakeStore{
+				stacks:    []domain.Stack{inProcessWorkersStack()},
+				slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+			}
+			sys := &fakeSystem{
+				alive:      map[int]bool{42: true},
+				pidsByPort: map[int][]int{9000: {100}, 9001: {101}, 9100: {102}, 9200: {102}},
+			}
+			o := restartOrch(store, sys)
+
+			if err := o.Restart(ctx, params, "workers"); err == nil {
+				t.Error("restart workers should refuse in in-process mode")
+			}
+			if len(sys.groupTerminated) != 0 {
+				t.Errorf("restart workers must terminate nothing in in-process mode, got %v", sys.groupTerminated)
+			}
+
+			if err := o.Restart(ctx, params, ""); err != nil {
+				t.Fatalf("Restart(all): %v", err)
+			}
+			// app, gateway, api — NOT workers (its port belongs to the API child).
+			for _, pid := range sys.groupTerminated {
+				if pid == 103 {
+					t.Errorf("workers group must not be bounced in in-process mode")
+				}
+			}
+			want := map[int]bool{100: true, 101: true, 102: true}
+			if len(sys.groupTerminated) != len(want) {
+				t.Fatalf("expected %d groups terminated, got %v", len(want), sys.groupTerminated)
 			}
 		})
 	})
@@ -218,6 +264,45 @@ func TestDownDatabaseSemantics(t *testing.T) {
 		}
 		if len(pg.dropped) != 1 || pg.dropped[0] != "lw_feat_x" {
 			t.Errorf("--drop-db should drop the postgres db, got %v", pg.dropped)
+		}
+	})
+
+	t.Run("when --drop-db and the clickhouse drop fails, Down attempts both and returns an error", func(t *testing.T) {
+		store, ch, pg := &fakeStore{
+			stacks:    []domain.Stack{restartStack()},
+			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+		}, &fakeDBServer{databases: []string{"lw_feat_x"}, dropErr: errors.New("ch boom")}, &fakeDBServer{databases: []string{"lw_feat_x"}}
+		o := &Orchestrator{
+			cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
+			store: store, sys: &fakeSystem{alive: map[int]bool{42: true}}, proxy: &fakeProxy{}, ch: ch, pg: pg, log: zap.NewNop(),
+		}
+		err := o.Down(ctx, params, true)
+		if err == nil {
+			t.Fatal("Down should return an error when a database drop fails")
+		}
+		// Cleanup still completes: the postgres drop is attempted and the stack is removed.
+		if len(pg.dropped) != 1 {
+			t.Errorf("postgres drop must still be attempted after a clickhouse drop failure, got %v", pg.dropped)
+		}
+		if len(store.stacks) != 0 {
+			t.Errorf("the stack entry must still be removed, got %v", store.stacks)
+		}
+	})
+
+	t.Run("when --drop-db and the postgres drop fails, Down returns an error", func(t *testing.T) {
+		store, ch, pg := &fakeStore{
+			stacks:    []domain.Stack{restartStack()},
+			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+		}, &fakeDBServer{databases: []string{"lw_feat_x"}}, &fakeDBServer{databases: []string{"lw_feat_x"}, dropErr: errors.New("pg boom")}
+		o := &Orchestrator{
+			cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
+			store: store, sys: &fakeSystem{alive: map[int]bool{42: true}}, proxy: &fakeProxy{}, ch: ch, pg: pg, log: zap.NewNop(),
+		}
+		if err := o.Down(ctx, params, true); err == nil {
+			t.Fatal("Down should return an error when the postgres drop fails")
+		}
+		if len(ch.dropped) != 1 {
+			t.Errorf("clickhouse drop must still be attempted, got %v", ch.dropped)
 		}
 	})
 }
