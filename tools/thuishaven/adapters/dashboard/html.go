@@ -13,7 +13,7 @@ import (
 // numbers renderHTML aggregates into the page-level stats.
 type stackCard struct {
 	view          cardView
-	live          bool
+	isLive        bool
 	rss           uint64
 	servicesUp    int
 	servicesTotal int
@@ -33,12 +33,12 @@ type cardView struct {
 }
 
 type chipView struct {
-	Label    string
-	Value    string
-	Baseline bool
+	Label      string
+	Value      string
+	IsBaseline bool
 }
 
-// rowView is one service line. Sub marks the api sub-row rendered under the
+// rowView is one service line. IsSub marks the api sub-row rendered under the
 // app service (the API shares app's origin, so it has no hostname of its own).
 type rowView struct {
 	DotClass string
@@ -46,11 +46,11 @@ type rowView struct {
 	URL      string
 	Host     string
 	Port     int
-	Sub      bool
+	IsSub    bool
 }
 
 type statView struct {
-	N     template.HTML
+	Value template.HTML
 	Label string
 }
 
@@ -59,22 +59,22 @@ type pageView struct {
 	TelURL, TelHost string
 	Stats           []statView
 	Cards           []cardView
-	Empty           bool
+	IsEmpty         bool
 }
 
 // renderCard builds one stack's view data and per-stack aggregates.
 func renderCard(s domain.Stack, probes Probes) stackCard {
 	var c stackCard
-	c.live = s.LauncherPID != 0
-	if c.live && probes.ProcessAlive != nil {
-		c.live = probes.ProcessAlive(s.LauncherPID)
+	c.isLive = s.LauncherPID != 0
+	if c.isLive && probes.ProcessAlive != nil {
+		c.isLive = probes.ProcessAlive(s.LauncherPID)
 	}
 	badge := "stale"
-	if c.live {
+	if c.isLive {
 		badge = "live"
 	}
 
-	if c.live && probes.GroupRSS != nil {
+	if c.isLive && probes.GroupRSS != nil {
 		c.rss = probes.GroupRSS(s.LauncherPID)
 	}
 
@@ -90,7 +90,7 @@ func renderCard(s domain.Stack, probes Probes) stackCard {
 		// The API shares app's origin — show it as a sub-row so the single URL
 		// is unmistakable (no separate api.<slug> hostname).
 		if svc.Name == "app" && s.APIPort != 0 {
-			rows = append(rows, rowView{Sub: true, Name: "└ api", URL: svc.URL + "/api", Host: svc.Hostname + "/api", Port: s.APIPort})
+			rows = append(rows, rowView{IsSub: true, Name: "└ api", URL: svc.URL + "/api", Host: svc.Hostname + "/api", Port: s.APIPort})
 		}
 	}
 
@@ -106,7 +106,7 @@ func renderCard(s domain.Stack, probes Probes) stackCard {
 		chips = append(chips, chipView{Label: "heartbeat", Value: shortAge(time.Since(s.UpdatedAt))})
 	}
 	if s.IsBaseline {
-		chips = append(chips, chipView{Baseline: true})
+		chips = append(chips, chipView{IsBaseline: true})
 	}
 
 	// The card's primary action: open the app. Present whenever the stack has a
@@ -146,7 +146,7 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string, probes Pro
 	for _, s := range stacks {
 		c := renderCard(s, probes)
 		cards = append(cards, c.view)
-		if c.live {
+		if c.isLive {
 			a.live++
 		}
 		a.rss += c.rss
@@ -178,13 +178,13 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string, probes Pro
 		ObsURL: sharedURL("observability"), ObsHost: hostFromURL(sharedURL("observability")),
 		TelURL: sharedURL("telemetry"), TelHost: hostFromURL(sharedURL("telemetry")),
 		Stats: []statView{
-			{N: ofN(a.live, len(stacks)), Label: "stacks live"},
-			{N: ofN(a.servicesUp, a.servicesTotal), Label: "services up"},
-			{N: ramStat, Label: "stack ram"},
-			{N: template.HTML(fmt.Sprintf("%d", a.databases)), Label: "databases"},
+			{Value: ofN(a.live, len(stacks)), Label: "stacks live"},
+			{Value: ofN(a.servicesUp, a.servicesTotal), Label: "services up"},
+			{Value: ramStat, Label: "stack ram"},
+			{Value: template.HTML(fmt.Sprintf("%d", a.databases)), Label: "databases"},
 		},
-		Cards: cards,
-		Empty: len(stacks) == 0,
+		Cards:   cards,
+		IsEmpty: len(stacks) == 0,
 	}
 
 	var b strings.Builder
@@ -330,16 +330,16 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
 </header>
 <div id="live">
 <div class="stats">{{range .Stats}}
-    <div class="stat"><span class="n">{{.N}}</span><span class="l">{{.Label}}</span></div>{{end}}</div>
-<main>{{if .Empty}}<div class="empty"><div class="glyph">⌂</div><h2>No stacks running</h2>
+    <div class="stat"><span class="n">{{.Value}}</span><span class="l">{{.Label}}</span></div>{{end}}</div>
+<main>{{if .IsEmpty}}<div class="empty"><div class="glyph">⌂</div><h2>No stacks running</h2>
       <p>Bring one up from any worktree and it appears here, on its own hostname.</p>
       <code>haven up</code></div>{{end}}{{range .Cards}}
       <section class="card">
         <header><span class="slug">{{.Slug}}</span><span class="spacer"></span>{{if .OpenURL}}<a class="open" href="{{.OpenURL}}">open ↗</a>{{end}}<span class="pill {{.BadgeClass}}">{{.Badge}}</span></header>
         <div class="branch">⎇ {{.Branch}}</div>
-        <div class="chips">{{range .Chips}}{{if .Baseline}}<span class="chip baseline">baseline</span>{{else}}<span class="chip">{{.Label}} <code>{{.Value}}</code></span>{{end}}{{end}}</div>
+        <div class="chips">{{range .Chips}}{{if .IsBaseline}}<span class="chip baseline">baseline</span>{{else}}<span class="chip">{{.Label}} <code>{{.Value}}</code></span>{{end}}{{end}}</div>
         <div class="dir">{{.Dir}}</div>
-        <table>{{range .Rows}}{{if .Sub}}<tr><td class="dot-cell"></td><td class="svc dim">{{.Name}}</td><td><a href="{{.URL}}">{{.Host}}</a></td><td class="dim mono">:{{.Port}}</td></tr>{{else}}<tr><td class="dot-cell"><span class="dot {{.DotClass}}"></span></td><td class="svc">{{.Name}}</td><td><a href="{{.URL}}">{{.Host}}</a></td><td class="dim mono">:{{.Port}}</td></tr>{{end}}{{end}}</table>
+        <table>{{range .Rows}}{{if .IsSub}}<tr><td class="dot-cell"></td><td class="svc dim">{{.Name}}</td><td><a href="{{.URL}}">{{.Host}}</a></td><td class="dim mono">:{{.Port}}</td></tr>{{else}}<tr><td class="dot-cell"><span class="dot {{.DotClass}}"></span></td><td class="svc">{{.Name}}</td><td><a href="{{.URL}}">{{.Host}}</a></td><td class="dim mono">:{{.Port}}</td></tr>{{end}}{{end}}</table>
       </section>{{end}}</main>
 </div>
 <footer><span id="beat"></span><span id="stamp">live — refreshes every 3s</span></footer>
