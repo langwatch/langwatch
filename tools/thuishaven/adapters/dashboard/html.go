@@ -57,7 +57,6 @@ func renderCard(s domain.Stack, probes Probes) stackCard {
 	}
 
 	var chips strings.Builder
-	chips.WriteString(chip("branch", s.Branch))
 	if s.ClickHouseDatabase != "" {
 		chips.WriteString(chip("clickhouse", s.ClickHouseDatabase))
 	}
@@ -72,13 +71,24 @@ func renderCard(s domain.Stack, probes Probes) stackCard {
 		chips.WriteString(`<span class="chip baseline">baseline</span>`)
 	}
 
+	// The card's primary action: open the app. Present whenever the stack has a
+	// routed app URL, regardless of health — a booting stack is still one click.
+	var action string
+	for _, svc := range s.Services {
+		if svc.Name == "app" && svc.URL != "" {
+			action = fmt.Sprintf(`<a class="open" href="%s">open ↗</a>`, html.EscapeString(svc.URL))
+			break
+		}
+	}
+
 	c.html = fmt.Sprintf(`
       <section class="card">
-        <header><span class="slug">%s</span><span class="pill %s">%s</span></header>
+        <header><span class="slug">%s</span><span class="spacer"></span>%s<span class="pill %s">%s</span></header>
+        <div class="branch">⎇ %s</div>
         <div class="chips">%s</div>
         <div class="dir">%s</div>
         <table>%s</table>
-      </section>`, html.EscapeString(s.Slug), badgeClass, badge, chips.String(), html.EscapeString(s.WorktreeDir), rows.String())
+      </section>`, html.EscapeString(s.Slug), action, badgeClass, badge, html.EscapeString(s.Branch), chips.String(), html.EscapeString(s.WorktreeDir), rows.String())
 	return c
 }
 
@@ -94,7 +104,9 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string, probes Pro
 
 	var cards strings.Builder
 	if len(stacks) == 0 {
-		cards.WriteString(`<p class="empty">No stacks running — start one with <code>pnpm dev</code> in a worktree.</p>`)
+		cards.WriteString(`<div class="empty"><div class="glyph">⌂</div><h2>No stacks running</h2>
+      <p>Bring one up from any worktree and it appears here, on its own hostname.</p>
+      <code>haven up</code></div>`)
 	}
 	for _, s := range stacks {
 		c := renderCard(s, probes)
@@ -130,10 +142,10 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string, probes Pro
 		a.live, len(stacks), a.servicesUp, a.servicesTotal, ramStat, a.databases)
 
 	return fmt.Sprintf(pageTemplate,
-		stats,
-		cards.String(),
 		sharedURL("observability"), hostFromURL(sharedURL("observability")),
-		sharedURL("telemetry"), hostFromURL(sharedURL("telemetry")))
+		sharedURL("telemetry"), hostFromURL(sharedURL("telemetry")),
+		stats,
+		cards.String())
 }
 
 func chip(label, value string) string {
@@ -177,7 +189,6 @@ func hostFromURL(u string) string {
 
 const pageTemplate = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="5">
 <title>haven — LangWatch local stacks</title>
 <style>
   :root { color-scheme: light dark;
@@ -201,10 +212,18 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   @keyframes drift2 { from{ transform:translate(0,0) scale(1);} to{ transform:translate(5vw,-4vh) scale(1.08);} }
   @media (prefers-reduced-motion: reduce){ body::before, body::after{ animation:none; } .dot.up::after{ animation:none; } }
 
-  header.top { padding:22px 30px 8px; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  header.top { position:sticky; top:0; z-index:10; padding:14px 30px; display:flex; align-items:center;
+    gap:14px; flex-wrap:wrap; background:color-mix(in oklab, var(--bg) 72%%, transparent);
+    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid var(--line); }
   header.top h1 { margin:0; font-size:19px; letter-spacing:.01em; font-weight:700; }
   header.top h1 .mark { color:var(--accent); }
   header.top .tag { color:var(--dim); font-size:13px; }
+  header.top .links { margin-left:auto; display:flex; gap:14px; align-items:center; font-size:12.5px; color:var(--dim); }
+  header.top .links a { color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:3px 11px;
+    transition:color .15s ease, border-color .15s ease; }
+  header.top .links a:hover { color:var(--accent); border-color:color-mix(in oklab, var(--accent) 45%%, var(--line)); text-decoration:none; }
+  #beat { width:7px; height:7px; border-radius:50%%; background:var(--live); display:inline-block; }
+  #beat.off { background:var(--stale); }
 
   .stats { display:flex; gap:12px; flex-wrap:wrap; padding:10px 30px 4px; }
   .stat { background:var(--card); border:1px solid var(--line); border-radius:14px;
@@ -219,8 +238,13 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
     transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease; }
   .card:hover { transform:translateY(-2px); box-shadow:0 12px 32px -16px color-mix(in oklab, var(--accent) 42%%, transparent);
     border-color:color-mix(in oklab, var(--accent) 36%%, var(--line)); }
-  .card header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .card header { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .card header .spacer { flex:1; }
   .slug { font-weight:700; font-size:15.5px; }
+  .branch { color:var(--dim); font-size:12px; margin-bottom:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .open { font-size:12px; font-weight:600; color:var(--accent); border:1px solid color-mix(in oklab, var(--accent) 38%%, var(--line));
+    background:var(--accent-soft); border-radius:999px; padding:2px 11px; transition:background .15s ease; }
+  .open:hover { background:color-mix(in oklab, var(--accent) 26%%, transparent); text-decoration:none; }
   .pill { font-size:11px; padding:2px 9px; border-radius:999px; text-transform:uppercase; letter-spacing:.06em; font-weight:600; }
   .pill.live { background:color-mix(in oklab,var(--live) 18%%,transparent); color:var(--live); }
   .pill.stale { background:color-mix(in oklab,var(--stale) 18%%,transparent); color:var(--stale); }
@@ -245,11 +269,44 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
   .dim { color:var(--dim); font-size:12px; } .mono { font-variant-numeric:tabular-nums; }
   code { background:color-mix(in oklab,var(--fg) 8%%,transparent); padding:1px 5px; border-radius:5px; font-size:12px; }
-  .empty { grid-column:1/-1; color:var(--dim); }
-  .shared { padding:14px 30px 30px; color:var(--dim); font-size:12.5px; } .shared a { color:var(--accent); }
+  .empty { grid-column:1/-1; color:var(--dim); text-align:center; padding:56px 0 64px; }
+  .empty .glyph { font-size:40px; color:var(--accent); opacity:.8; }
+  .empty h2 { margin:10px 0 6px; color:var(--fg); font-size:17px; }
+  .empty code { font-size:13px; padding:5px 12px; }
+  footer { padding:16px 30px 30px; color:var(--dim); font-size:12px; display:flex; gap:8px; align-items:center; }
 </style></head><body>
-<header class="top"><h1><span class="mark">●</span> haven</h1><span class="tag">LangWatch local stacks — hostname routing via portless</span></header>
+<header class="top">
+  <h1><span class="mark">●</span> haven</h1><span class="tag">LangWatch local stacks — hostname routing via portless</span>
+  <span class="links">
+    <a href="%s">observability · %s</a>
+    <a href="%s">telemetry · %s</a>
+  </span>
+</header>
+<div id="live">
 <div class="stats">%s</div>
 <main>%s</main>
-<div class="shared">shared &middot; observability <a href="%s">%s</a> &middot; telemetry fan-out <a href="%s">%s</a></div>
+</div>
+<footer><span id="beat"></span><span id="stamp">live — refreshes every 3s</span></footer>
+<script>
+(() => {
+  let failures = 0;
+  const beat = document.getElementById('beat'), stamp = document.getElementById('stamp');
+  async function refresh() {
+    if (document.hidden) return;
+    try {
+      const res = await fetch('/', {cache: 'no-store'});
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const next = doc.getElementById('live');
+      if (next) document.getElementById('live').replaceChildren(...next.children);
+      failures = 0;
+      beat.classList.remove('off');
+      stamp.textContent = 'live — updated ' + new Date().toLocaleTimeString();
+    } catch {
+      if (++failures >= 2) { beat.classList.add('off'); stamp.textContent = 'daemon unreachable — retrying'; }
+    }
+  }
+  setInterval(refresh, 3000);
+  document.addEventListener('visibilitychange', refresh);
+})();
+</script>
 </body></html>`

@@ -43,6 +43,15 @@ type Store interface {
 	WriteHMRGate(lwDir string, expiryUnixMs int64) error
 	ReadHMRGate(lwDir string) (int64, bool)
 	ClearHMRGate(lwDir string)
+	// TouchDBActivity records "slug's databases were in use now" — the clock the
+	// daemon's idle-database pruning reads. Touched on every `up` and refreshed
+	// by the daemon while a stack stays registered.
+	TouchDBActivity(slug string) error
+	// DBActivity returns the last-seen time per slug (empty map when none).
+	DBActivity() map[string]time.Time
+	// RemoveDBActivity drops a slug's activity record (after its databases are
+	// pruned, or when they no longer exist).
+	RemoveDBActivity(slug string)
 	// ClaimDaemon atomically records this process as the singleton daemon, but
 	// only if no record exists yet (O_EXCL). It returns false without overwriting
 	// when one already does, so two daemons racing to start can never both win.
@@ -88,6 +97,11 @@ type System interface {
 	PortInUse(port int) bool
 	ProcessAlive(pid int) bool
 	Terminate(pid int)
+	// TerminateGroup SIGTERMs pid's whole process group — how `haven restart`
+	// bounces one supervised child (its supervisor restarts it on exit).
+	TerminateGroup(pid int)
+	// PIDsOnPort lists the pids listening on a loopback TCP port (empty when none).
+	PIDsOnPort(port int) []int
 	SpawnDetached(argv []string, dir, logPath string) error
 	Now() time.Time
 	Getpid() int

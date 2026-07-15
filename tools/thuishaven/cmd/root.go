@@ -147,6 +147,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		Naming:                   naming,
 		Home:                     havenHome(),
 		IdleTTL:                  envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
+		DBIdleTTL:                envDuration("HAVEN_DB_TTL", 14*24*time.Hour),
 		HeartbeatEvery:           30 * time.Second,
 		DaemonArgv:               selfArgv(worktree, "daemon"),
 		IsAgent:                  isAgent,
@@ -184,11 +185,24 @@ type command func(ctx context.Context, d deps, rest []string) error
 // commands is the subcommand table. A table rather than a switch so adding a
 // command is one line and dispatch itself stays branch-free.
 var commands = map[string]command{
-	"up": func(ctx context.Context, d deps, _ []string) error {
+	"up": func(ctx context.Context, d deps, rest []string) error {
+		if hasFlag(rest, "-w") || hasFlag(rest, "--watch") {
+			d.opts.ShouldGoWatch = true
+		}
+		d.opts.ShouldForce = hasFlag(rest, "-f") || hasFlag(rest, "--force")
 		if d.opts.IsStub {
 			return d.orch.UpStub(ctx, d.params, dashboard.StartEcho)
 		}
+		if hasFlag(rest, "-d") || hasFlag(rest, "--detach") {
+			return runUpDetached(d, rest)
+		}
 		return d.orch.Up(ctx, d.params, d.opts)
+	},
+	"restart": func(ctx context.Context, d deps, rest []string) error {
+		return d.orch.Restart(ctx, d.params, firstNonFlag(rest))
+	},
+	"logs": func(ctx context.Context, d deps, rest []string) error {
+		return runLogs(ctx, d, hasFlag(rest, "-f") || hasFlag(rest, "--follow"))
 	},
 	"pr": func(ctx context.Context, d deps, rest []string) error {
 		return app.TryPR(ctx, app.TryPRParams{
@@ -206,7 +220,9 @@ var commands = map[string]command{
 	"watch":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Watch(ctx) },
 	"daemon": func(ctx context.Context, d deps, _ []string) error { return d.orch.RunDaemon(ctx, d.dash) },
 	"down": func(ctx context.Context, d deps, rest []string) error {
-		return d.orch.Down(ctx, d.params, hasFlag(rest, "--keep-db"))
+		// Databases are kept by default; --drop-db is the explicit fresh-DB ask.
+		// --keep-db (the old flag) is accepted as a no-op — it now IS the default.
+		return d.orch.Down(ctx, d.params, hasFlag(rest, "--drop-db"))
 	},
 	"clickhouse": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.RunClickHouse(ctx, d.params, rest)
@@ -237,6 +253,13 @@ var commands = map[string]command{
 	"list": func(_ context.Context, d deps, rest []string) error {
 		return d.orch.List(d.isAgent || hasFlag(rest, "--json"))
 	},
+	"switch": func(_ context.Context, d deps, rest []string) error {
+		return runSwitch(d, rest)
+	},
+	"shell-init": func(_ context.Context, _ deps, _ []string) error {
+		fmt.Print(shellInitScript)
+		return nil
+	},
 	"git":    runGitUI,
 	"hub":    runHub,
 	"doctor": func(_ context.Context, d deps, _ []string) error { return d.orch.Doctor() },
@@ -251,6 +274,8 @@ var aliases = map[string]string{
 	"ls":     "list",
 	"status": "list",
 	"moron":  "git",
+	"rs":     "restart",
+	"sw":     "switch",
 	"ps":     "hub",
 	"active": "hub",
 }
@@ -397,6 +422,128 @@ func runHavenUpIn(ctx context.Context, dir string) error {
 	// WaitDelay bounds that grace so a wedged child can't hang the shell forever.
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.WaitDelay = 10 * time.Second
+	return cmd.Run()
+}
+
+// runSwitch resolves a worktree by name and prints its directory. A process
+// cannot change its parent shell's cwd, so the actual cd happens in the shell
+// function `haven shell-init` emits — this command just answers "where".
+func runSwitch(d deps, rest []string) error {
+	if hasFlag(rest, "--list") {
+		for _, t := range d.orch.SwitchTargets(d.worktree) {
+			fmt.Println(t.Name)
+		}
+		return nil
+	}
+	query := firstNonFlag(rest)
+	if query == "" {
+		fmt.Println("Switchable worktrees (● = up):")
+		for _, t := range d.orch.SwitchTargets(d.worktree) {
+			mark := " "
+			if t.IsUp {
+				mark = "●"
+			}
+			fmt.Printf("  %s %-28s %s\n", mark, t.Name, t.Dir)
+		}
+		fmt.Println("\nTo make `haven switch <name>` cd your shell, add to ~/.zshrc:")
+		fmt.Println(`  eval "$(haven shell-init)"`)
+		return nil
+	}
+	dir, err := d.orch.ResolveSwitch(d.worktree, query)
+	if err != nil {
+		return err
+	}
+	fmt.Println(dir)
+	return nil
+}
+
+// shellInitScript is what `eval "$(haven shell-init)"` installs: a haven()
+// wrapper that turns `haven switch <name>` into a real cd, plus zsh completion
+// of the worktree names.
+const shellInitScript = `haven() {
+  case "$1" in
+    switch|sw|cd)
+      shift
+      if [ $# -eq 0 ]; then command haven switch; return; fi
+      local dir
+      dir="$(command haven switch "$@")" || return
+      cd "$dir"
+      ;;
+    *) command haven "$@" ;;
+  esac
+}
+if [ -n "$ZSH_VERSION" ]; then
+  _haven_complete() {
+    if [ "${words[2]}" = "switch" ] || [ "${words[2]}" = "sw" ] || [ "${words[2]}" = "cd" ]; then
+      local -a targets
+      targets=(${(f)"$(command haven switch --list 2>/dev/null)"})
+      compadd -a targets
+    fi
+  }
+  compdef _haven_complete haven
+fi
+`
+
+// stackLogPath is where a detached `haven up -d` streams its output.
+func stackLogPath(slug string) string {
+	return filepath.Join(havenHome(), "logs", slug+".log")
+}
+
+// runUpDetached backgrounds `haven up`: it re-invokes haven's own up in a new
+// session with stdout/stderr streaming to a per-slug log file, then returns
+// immediately. Follow with `haven logs -f`; stop with `haven down`.
+func runUpDetached(d deps, rest []string) error {
+	slug, err := d.orch.ResolveSlug(d.params)
+	if err != nil {
+		return err
+	}
+	logPath := stackLogPath(slug)
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return err
+	}
+	argv := selfArgv(d.worktree, "up")
+	for _, a := range rest {
+		if a != "-d" && a != "--detach" {
+			argv = append(argv, a)
+		}
+	}
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Dir = d.worktree
+	cmd.Env = os.Environ()
+	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if ferr != nil {
+		return fmt.Errorf("opening log file %s: %w", logPath, ferr)
+	}
+	cmd.Stdout, cmd.Stderr = f, f
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := cmd.Start(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	_ = f.Close()
+	go func() { _ = cmd.Wait() }() // reap if it exits while we're still around
+	fmt.Printf("stack %q starting detached (pid %d)\n", slug, cmd.Process.Pid)
+	fmt.Printf("  logs:   haven logs -f    (%s)\n", logPath)
+	fmt.Printf("  stop:   haven down\n")
+	return nil
+}
+
+// runLogs prints (or follows, with -f) the detached stack's log file via tail.
+func runLogs(ctx context.Context, d deps, shouldFollow bool) error {
+	slug, err := d.orch.ResolveSlug(d.params)
+	if err != nil {
+		return err
+	}
+	logPath := stackLogPath(slug)
+	if _, err := os.Stat(logPath); err != nil {
+		return fmt.Errorf("no log file for stack %q (%s) — logs are captured when the stack is started with `haven up -d`", slug, logPath)
+	}
+	args := []string{"-n", "200"}
+	if shouldFollow {
+		args = append(args, "-f")
+	}
+	cmd := exec.CommandContext(ctx, "tail", append(args, logPath)...)
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	return cmd.Run()
 }
 

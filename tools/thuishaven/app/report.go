@@ -26,7 +26,7 @@ func (o *Orchestrator) List(asJSON bool) error {
 		})
 	}
 	if len(stacks) == 0 {
-		fmt.Println("no stacks running — start one with `pnpm dev` in a worktree")
+		fmt.Println("no stacks running — start one with `haven up` in a worktree")
 		return nil
 	}
 	for _, s := range stacks {

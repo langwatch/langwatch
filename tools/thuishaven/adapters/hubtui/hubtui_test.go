@@ -162,7 +162,7 @@ func TestHubModel(t *testing.T) {
 
 		t.Run("when rendered, it explains how to start one", func(t *testing.T) {
 			m := newModel(context.Background(), empty)
-			if !strings.Contains(m.View(), "pnpm dev:haven") {
+			if !strings.Contains(m.View(), "haven up") {
 				t.Error("empty hub should say how to start a stack")
 			}
 		})

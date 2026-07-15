@@ -15,9 +15,11 @@ import (
 // --- fakes -------------------------------------------------------------------
 
 type fakeStore struct {
-	stacks    []domain.Stack
-	removed   []string
-	slugCache map[string]string
+	stacks     []domain.Stack
+	removed    []string
+	slugCache  map[string]string
+	dbActivity map[string]time.Time
+	touched    []string
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -42,13 +44,32 @@ func (f *fakeStore) WriteOverlay(string, domain.Stack) error { return nil }
 func (f *fakeStore) WriteHMRGate(string, int64) error        { return nil }
 func (f *fakeStore) ReadHMRGate(string) (int64, bool)        { return 0, false }
 func (f *fakeStore) ClearHMRGate(string)                     {}
-func (f *fakeStore) ClaimDaemon(DaemonInfo) (bool, error)    { return true, nil }
-func (f *fakeStore) Daemon() (DaemonInfo, bool)              { return DaemonInfo{}, false }
-func (f *fakeStore) ClearDaemon()                            {}
+func (f *fakeStore) TouchDBActivity(slug string) error {
+	f.touched = append(f.touched, slug)
+	if f.dbActivity == nil {
+		f.dbActivity = map[string]time.Time{}
+	}
+	f.dbActivity[slug] = time.Now()
+	return nil
+}
+func (f *fakeStore) DBActivity() map[string]time.Time {
+	m := map[string]time.Time{}
+	for k, v := range f.dbActivity {
+		m[k] = v
+	}
+	return m
+}
+func (f *fakeStore) RemoveDBActivity(slug string)         { delete(f.dbActivity, slug) }
+func (f *fakeStore) ClaimDaemon(DaemonInfo) (bool, error) { return true, nil }
+func (f *fakeStore) Daemon() (DaemonInfo, bool)           { return DaemonInfo{}, false }
+func (f *fakeStore) ClearDaemon()                         {}
 
 type fakeSystem struct {
-	alive      map[int]bool
-	terminated []int
+	alive           map[int]bool
+	terminated      []int
+	groupTerminated []int
+	pidsByPort      map[int][]int
+	now             time.Time
 }
 
 func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
@@ -62,8 +83,10 @@ func (f *fakeSystem) Terminate(pid int) {
 		f.alive[pid] = false
 	}
 }
+func (f *fakeSystem) TerminateGroup(pid int)                       { f.groupTerminated = append(f.groupTerminated, pid) }
+func (f *fakeSystem) PIDsOnPort(port int) []int                    { return f.pidsByPort[port] }
 func (f *fakeSystem) SpawnDetached([]string, string, string) error { return nil }
-func (f *fakeSystem) Now() time.Time                               { return time.Time{} }
+func (f *fakeSystem) Now() time.Time                               { return f.now }
 func (f *fakeSystem) Getpid() int                                  { return 1 }
 func (f *fakeSystem) TotalMemory() uint64                          { return 0 }
 func (f *fakeSystem) GroupRSS(int) uint64                          { return 0 }

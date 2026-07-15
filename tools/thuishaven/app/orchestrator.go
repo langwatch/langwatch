@@ -141,6 +141,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if err := o.store.SaveStack(st); err != nil {
 		return domain.Stack{}, nil, err
 	}
+	// Start (or refresh) the databases' idle clock: the daemon prunes databases
+	// whose slug has not been up for DBIdleTTL, and this is what "up" means.
+	_ = o.store.TouchDBActivity(st.Slug)
 	o.printStack(st)
 	go o.heartbeat(ctx, st)
 
@@ -191,7 +194,7 @@ func (o *Orchestrator) Setup(ctx context.Context) error {
 	scheme, port := o.proxy.Endpoint()
 	fmt.Println("thuishaven ready.")
 	fmt.Printf("  proxy:     %s://…langwatch.localhost (port %d)\n", scheme, port)
-	fmt.Println("  next:      `pnpm dev:haven` (or `make haven up`) in any worktree")
+	fmt.Println("  next:      `haven up` in any worktree")
 	fmt.Println("  dashboard: https://langwatch.localhost")
 	return nil
 }
@@ -200,6 +203,9 @@ func (o *Orchestrator) Setup(ctx context.Context) error {
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
 	if err := o.proxy.EnsureReady(); err != nil {
 		return fmt.Errorf("could not start the portless proxy automatically (%w) — run `haven setup` once to bootstrap it by hand", err)
+	}
+	if err := o.replaceRunningStack(p, opts.ShouldForce); err != nil {
+		return err
 	}
 	o.ensureDaemon(p.WorktreeDir)
 	st, cleanup, err := o.provision(ctx, p, opts, true)
@@ -262,21 +268,52 @@ func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports [
 	return nil
 }
 
-// Down tears the current worktree's routes + registry entry down without needing
-// the launcher process (useful after a crash). Unless shouldKeepDB is set it also drops
-// this stack's ClickHouse database — the "give me a fresh DB" affordance — so the
-// next `up` re-runs migrations into a clean, correctly-counted schema.
-func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldKeepDB bool) error {
+// replaceRunningStack is `up`'s already-running guard: when a live launcher
+// already runs this worktree's stack it refuses (the second `up` would fight the
+// first over routes and the registry entry) unless shouldForce is set, in which
+// case the old launcher is terminated — and waited on — so the new `up` takes
+// over cleanly.
+func (o *Orchestrator) replaceRunningStack(p UpParams, shouldForce bool) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
+	}
+	st, ok := o.stackBySlug(slug)
+	if !ok || st.LauncherPID == o.sys.Getpid() || !o.sys.ProcessAlive(st.LauncherPID) {
+		return nil
+	}
+	if !shouldForce {
+		return fmt.Errorf("stack %q is already running (launcher pid %d) — `haven restart [service]` to bounce a service, `haven down` to stop it, or `haven up --force` to replace it", slug, st.LauncherPID)
+	}
+	fmt.Printf("haven: stack %q is already running (pid %d) — replacing it (--force)\n", slug, st.LauncherPID)
+	o.sys.Terminate(st.LauncherPID)
+	o.waitForProcessesDead([]int{st.LauncherPID})
+	return nil
+}
+
+// Down tears the current worktree's stack down from anywhere: it stops a live
+// launcher (the supervised children die with their process group), removes the
+// routes, and drops the registry entry. Databases are KEPT by default — tearing
+// a stack down must not silently discard data; pass shouldDropDB (--drop-db) for
+// the "give me a fresh DB" affordance, so the next `up` re-runs migrations into
+// a clean, correctly-counted schema. Long-unused databases are pruned in the
+// background by the daemon (DBIdleTTL) or explicitly via `haven prune`.
+func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldDropDB bool) error {
+	slug, err := o.resolveSlug(p)
+	if err != nil {
+		return err
+	}
+	if st, ok := o.stackBySlug(slug); ok && st.LauncherPID != o.sys.Getpid() && o.sys.ProcessAlive(st.LauncherPID) {
+		o.sys.Terminate(st.LauncherPID)
+		o.waitForProcessesDead([]int{st.LauncherPID})
+		fmt.Printf("stopped launcher (pid %d)\n", st.LauncherPID)
 	}
 	for _, r := range domain.PerWorktreeServices {
 		o.proxy.Remove(r.Name, slug)
 	}
 	o.proxy.Remove(domain.ClickHouseService, slug)
 	o.proxy.Remove(domain.PostgresService, slug)
-	if o.ch != nil && o.cfg.ShouldManageClickHouse && !shouldKeepDB {
+	if o.ch != nil && o.cfg.ShouldManageClickHouse && shouldDropDB {
 		db := domain.DatabaseForSlug(slug)
 		if err := o.ch.DropDatabase(ctx, db); err != nil {
 			o.log.Warn("could not drop clickhouse database", zap.String("db", db), zap.Error(err))
@@ -284,7 +321,7 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldKeepDB bool) 
 			fmt.Printf("dropped clickhouse database %q\n", db)
 		}
 	}
-	if o.pg != nil && o.cfg.ShouldManagePostgres && !shouldKeepDB {
+	if o.pg != nil && o.cfg.ShouldManagePostgres && shouldDropDB {
 		db := domain.DatabaseForSlug(slug)
 		if err := o.pg.DropDatabase(ctx, db); err != nil {
 			o.log.Warn("could not drop postgres database", zap.String("db", db), zap.Error(err))
@@ -467,7 +504,7 @@ func (o *Orchestrator) seedSampleTraces(ctx context.Context, p UpParams) error {
 	}
 	st, ok := o.stackBySlug(slug)
 	if !ok || !o.sys.ProcessAlive(st.LauncherPID) {
-		return fmt.Errorf("stack %q is not running — sample traces go through the real collector, so start it (pnpm dev:haven) and re-run `haven seed --preset demo`", slug)
+		return fmt.Errorf("stack %q is not running — sample traces go through the real collector, so start it (haven up) and re-run `haven seed --preset demo`", slug)
 	}
 	var appPort int
 	for _, svc := range st.Services {

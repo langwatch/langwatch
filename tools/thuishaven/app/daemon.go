@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"go.uber.org/zap"
@@ -121,6 +122,15 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			if o.hyg != nil && o.cfg.RepoRoot != "" && cycles%60 == 1 {
 				o.hyg.PruneGitWorktrees(o.cfg.RepoRoot)
 			}
+			// Every ~10 min, refresh the idle clock of every registered stack's
+			// databases, and prune databases whose worktree has not been up in
+			// DBIdleTTL — the unattended counterpart of `haven down --drop-db`.
+			if cycles%60 == 1 {
+				for _, s := range o.store.Stacks() {
+					_ = o.store.TouchDBActivity(s.Slug)
+				}
+				o.pruneIdleDatabases(ctx)
+			}
 			now := o.sys.Now()
 			for _, s := range o.store.Stacks() {
 				dead := s.LauncherPID != 0 && !o.sys.ProcessAlive(s.LauncherPID)
@@ -139,6 +149,71 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			}
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
+		}
+	}
+}
+
+// pruneIdleDatabases drops per-slug ClickHouse + Postgres databases whose
+// worktree has not been up for DBIdleTTL (0 disables). It only ever considers
+// databases haven itself put on the idle clock (touched by every `up`), never
+// one owned by a currently-registered stack, and never the protected main
+// database. A record whose database no longer exists on either server is
+// dropped from the clock so it does not accumulate.
+func (o *Orchestrator) pruneIdleDatabases(ctx context.Context) {
+	ttl := o.cfg.DBIdleTTL
+	if ttl <= 0 {
+		return
+	}
+	activity := o.store.DBActivity()
+	if len(activity) == 0 {
+		return
+	}
+	registered := map[string]bool{}
+	for _, st := range o.store.Stacks() {
+		registered[st.Slug] = true
+	}
+	var chDBs, pgDBs []string
+	if o.ch != nil && o.cfg.ShouldManageClickHouse {
+		if dbs, err := o.ch.Databases(ctx); err == nil {
+			chDBs = dbs
+		} else {
+			return // server unreachable — can't tell what exists, touch nothing
+		}
+	}
+	if o.pg != nil && o.cfg.ShouldManagePostgres {
+		if dbs, err := o.pg.Databases(ctx); err == nil {
+			pgDBs = dbs
+		} else {
+			return
+		}
+	}
+	now := o.sys.Now()
+	for slug, lastSeen := range activity {
+		if registered[slug] || now.Sub(lastSeen) <= ttl || !domain.ValidSlug(slug) {
+			continue
+		}
+		db := domain.DatabaseForSlug(slug)
+		if domain.IsProtectedDatabase(db) {
+			continue
+		}
+		existsSomewhere := false
+		if o.ch != nil && o.cfg.ShouldManageClickHouse && slices.Contains(chDBs, db) {
+			existsSomewhere = true
+			if err := o.ch.DropDatabase(ctx, db); err != nil {
+				o.log.Warn("idle-db prune: clickhouse drop failed", zap.String("db", db), zap.Error(err))
+				continue
+			}
+		}
+		if o.pg != nil && o.cfg.ShouldManagePostgres && slices.Contains(pgDBs, db) {
+			existsSomewhere = true
+			if err := o.pg.DropDatabase(ctx, db); err != nil {
+				o.log.Warn("idle-db prune: postgres drop failed", zap.String("db", db), zap.Error(err))
+				continue
+			}
+		}
+		o.store.RemoveDBActivity(slug)
+		if existsSomewhere {
+			o.log.Info("pruned idle databases", zap.String("slug", slug), zap.String("db", db), zap.Duration("idle", now.Sub(lastSeen)))
 		}
 	}
 }

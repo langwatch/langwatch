@@ -14,7 +14,7 @@ func TestRenderHTML(t *testing.T) {
 	t.Run("given no stacks", func(t *testing.T) {
 		t.Run("when rendered, it explains how to start one", func(t *testing.T) {
 			page := renderHTML(nil, sharedURL, Probes{})
-			if !strings.Contains(page, "pnpm dev") {
+			if !strings.Contains(page, "haven up") {
 				t.Error("empty state should tell the user how to start a stack")
 			}
 		})
@@ -70,8 +70,13 @@ func TestRenderHTML(t *testing.T) {
 		})
 
 		t.Run("when rendered, branch names are HTML-escaped", func(t *testing.T) {
-			if strings.Contains(page, "<script>") {
+			// The page has its own legitimate <script> block (live refresh), so pin
+			// the branch value specifically: raw absent, escaped present.
+			if strings.Contains(page, "feat/x <script>") {
 				t.Error("unescaped branch name reached the page")
+			}
+			if !strings.Contains(page, "feat/x &lt;script&gt;") {
+				t.Error("branch name should be rendered HTML-escaped")
 			}
 		})
 	})

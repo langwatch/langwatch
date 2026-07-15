@@ -47,7 +47,7 @@ func (o *Orchestrator) observabilityUp(ctx context.Context) error {
 	}
 	if n := len(o.store.Stacks()); n > 0 {
 		fmt.Printf("\n%d stack(s) are already running and were wired before this existed.\n", n)
-		fmt.Printf("Restart them (`pnpm dev`) to export into it.\n")
+		fmt.Printf("Restart them (`haven restart`) to export into it.\n")
 	}
 	fmt.Printf("\nNext: make observability-connect   # mint a Grafana token + configure gcx\n")
 	return nil
