@@ -117,6 +117,15 @@ COMMANDS
                   already past onboarding and ingests deterministic sample
                   traces through the running stack's collector, so the UI opens
                   on real-looking data (the stack must be up for the traces).
+                  Model providers are seeded from the environment by default:
+                  every provider whose API-key variable is set (process env,
+                  langwatch/.env, or the repo-root .env) gets an enabled
+                  org-scoped credential — disable with --skip-model-providers
+                  (HAVEN_SEED_MODEL_PROVIDERS=0). More à-la-carte extras:
+                  --traces (ingest the sample traces without the full demo
+                  preset; HAVEN_SEED_TRACES=1), --first-message /
+                  --no-first-message (force the project's "has received its
+                  first trace" onboarding flag; HAVEN_SEED_FIRST_MESSAGE=1|0).
     git [target]  Open the embedded git TUI (moron) for a worktree: no target
                   is this worktree; a stack slug, worktree name, or directory
                   opens that one — inspect branches, diffs, and worktrees

@@ -430,10 +430,25 @@ func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
 // through the running stack's collector, so the UI opens on real-looking data.
 var SeedPresets = []string{"demo"}
 
+// SeedOptions tune what `haven seed` layers on top of the stable identity.
+// Every extra is individually controllable: the flags map to HAVEN_SEED_*
+// env vars the seed script reads, so env-driven setups work identically.
+type SeedOptions struct {
+	Preset string
+	// ShouldIngestTraces ingests the deterministic sample traces through the
+	// running stack's collector after the seed (--traces / HAVEN_SEED_TRACES=1;
+	// always on for the demo preset).
+	ShouldIngestTraces bool
+	// ExtraEnv is appended to the seed child's environment — the HAVEN_SEED_*
+	// switches resolved from CLI flags (--first-message, --skip-model-providers).
+	ExtraEnv []string
+}
+
 // Seed reseeds the current stack's database — the "give me a fresh DB"
 // affordance. A preset layers a variant on top of the stable identity; the
 // empty preset is the unchanged default.
-func (o *Orchestrator) Seed(ctx context.Context, p UpParams, preset string) error {
+func (o *Orchestrator) Seed(ctx context.Context, p UpParams, opts SeedOptions) error {
+	preset := opts.Preset
 	if preset != "" && !slices.Contains(SeedPresets, preset) {
 		return fmt.Errorf("unknown seed preset %q — available: %s", preset, strings.Join(SeedPresets, ", "))
 	}
@@ -446,10 +461,11 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams, preset string) erro
 	if preset != "" {
 		env = append(env, "HAVEN_SEED_PRESET="+preset)
 	}
+	env = append(env, opts.ExtraEnv...)
 	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
 		return err
 	}
-	if preset != "demo" {
+	if preset != "demo" && !opts.ShouldIngestTraces {
 		return nil
 	}
 	return o.seedSampleTraces(ctx, p)

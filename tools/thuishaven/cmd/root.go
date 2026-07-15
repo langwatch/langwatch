@@ -248,7 +248,11 @@ var commands = map[string]command{
 		if err != nil {
 			return err
 		}
-		return d.orch.Seed(ctx, d.params, preset)
+		return d.orch.Seed(ctx, d.params, app.SeedOptions{
+			Preset:             preset,
+			ShouldIngestTraces: hasFlag(rest, "--traces") || os.Getenv("HAVEN_SEED_TRACES") == "1",
+			ExtraEnv:           seedExtraEnv(rest),
+		})
 	},
 	"list": func(_ context.Context, d deps, rest []string) error {
 		return d.orch.List(d.isAgent || hasFlag(rest, "--json"))
@@ -608,6 +612,23 @@ func flagValue(args []string, name string) string {
 		}
 	}
 	return ""
+}
+
+// seedExtraEnv maps `haven seed`'s extra flags to the HAVEN_SEED_* switches
+// the seed script reads. Only explicit flags are emitted — env vars the user
+// already exported flow through the child's inherited environment untouched.
+func seedExtraEnv(rest []string) []string {
+	var env []string
+	if hasFlag(rest, "--first-message") {
+		env = append(env, "HAVEN_SEED_FIRST_MESSAGE=1")
+	}
+	if hasFlag(rest, "--no-first-message") {
+		env = append(env, "HAVEN_SEED_FIRST_MESSAGE=0")
+	}
+	if hasFlag(rest, "--skip-model-providers") {
+		env = append(env, "HAVEN_SEED_MODEL_PROVIDERS=0")
+	}
+	return env
 }
 
 // seedPresetArg extracts --preset for `haven seed`, rejecting the two silent
