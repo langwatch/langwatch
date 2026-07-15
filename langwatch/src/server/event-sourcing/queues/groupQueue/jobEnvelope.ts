@@ -90,18 +90,18 @@ async function decodeBody(data: Buffer): Promise<Record<string, unknown>> {
     inflated = await boundedDecompress(data);
   } catch (err) {
     if (err instanceof PayloadTooLargeError) throw err;
-    throw new DecodeFailureError(
-      `Job envelope body failed to decompress: ${errText(err)}`,
-      "body_unreadable",
-    );
+    throw new DecodeFailureError({
+      message: `Job envelope body failed to decompress: ${errText(err)}`,
+      reason: "body_unreadable",
+    });
   }
   try {
     return decodePayload(inflated);
   } catch (err) {
-    throw new DecodeFailureError(
-      `Job envelope body failed to parse: ${safeParseErrText(err)}`,
-      "body_unreadable",
-    );
+    throw new DecodeFailureError({
+      message: `Job envelope body failed to parse: ${safeParseErrText(err)}`,
+      reason: "body_unreadable",
+    });
   }
 }
 
@@ -110,10 +110,10 @@ function parseInlineBody(body: string): Record<string, unknown> {
   try {
     return JSON.parse(body) as Record<string, unknown>;
   } catch (err) {
-    throw new DecodeFailureError(
-      `Job envelope inline body failed to parse: ${safeParseErrText(err)}`,
-      "body_unreadable",
-    );
+    throw new DecodeFailureError({
+      message: `Job envelope inline body failed to parse: ${safeParseErrText(err)}`,
+      reason: "body_unreadable",
+    });
   }
 }
 
@@ -427,7 +427,13 @@ export type DecodeFailureReason =
  */
 export class DecodeFailureError extends Error {
   readonly reason: DecodeFailureReason;
-  constructor(message: string, reason: DecodeFailureReason) {
+  constructor({
+    message,
+    reason,
+  }: {
+    message: string;
+    reason: DecodeFailureReason;
+  }) {
     super(message);
     this.name = "DecodeFailureError";
     this.reason = reason;
@@ -454,6 +460,22 @@ export interface EnvelopeDescriptor {
  * Deliberately shape-only. The body may hold tenant PII; the header holds routing
  * and storage machinery, and blob ids are content hashes / UUIDs.
  */
+/**
+ * A blob id only if it LOOKS like one. This reader runs on envelopes we already
+ * know are malformed, so `header.r` / `header.ref.hash` are attacker-shaped
+ * strings by that point and the value goes straight to a log. Anything off-shape
+ * becomes null rather than a free-text field in the drop record (#5538, review).
+ *
+ * One alphabet covers both id shapes, because GQ1's is a subset of GQ2's:
+ * - **GQ1** — `randomUUID()`: 36 chars of `[0-9a-f-]`.
+ * - **GQ2** — `sha256(bytes).subarray(0,16).toString("base64url")`
+ *   (`tieredBlobStore.ts`): 22 chars of `[A-Za-z0-9_-]`. **Not hex** — an earlier
+ *   hex-only guard here nulled every legitimate GQ2 id and broke the AC1
+ *   descriptor. The unit tests caught it; do not narrow this to hex.
+ */
+const safeBlobId = (id: string | null): string | null =>
+  id && /^[A-Za-z0-9_-]{8,128}$/.test(id) ? id : null;
+
 export function readEnvelopeDescriptor(value: string): EnvelopeDescriptor {
   try {
     if (!isEnvelope(value)) {
@@ -463,7 +485,9 @@ export function readEnvelopeDescriptor(value: string): EnvelopeDescriptor {
     return {
       format: typeof header.e === "string" ? header.e : null,
       version: typeof header.v === "number" ? header.v : null,
-      blobId: readEnvelopeBlobIdFromHeader(header) ?? header.ref?.hash ?? null,
+      blobId: safeBlobId(
+        readEnvelopeBlobIdFromHeader(header) ?? header.ref?.hash ?? null,
+      ),
     };
   } catch {
     return { format: null, version: null, blobId: null };
@@ -654,10 +678,10 @@ export async function decodeJobEnvelope({
   // GQ2: content-addressed tiered blob.
   if (header.e === "redis" || header.e === "s3") {
     if (!header.ref) {
-      throw new DecodeFailureError(
-        "Malformed job envelope: tiered body without a blob ref",
-        "malformed_envelope",
-      );
+      throw new DecodeFailureError({
+      message: "Malformed job envelope: tiered body without a blob ref",
+      reason: "malformed_envelope",
+    });
     }
     if (!tieredBlobs) {
       throw new Error(
@@ -669,10 +693,10 @@ export async function decodeJobEnvelope({
         ? await tieredBlobs.peek(header.ref)
         : await tieredBlobs.get(header.ref);
     if (!data) {
-      throw new DecodeFailureError(
-        "Job envelope tiered blob is missing (deleted or expired)",
-        "missing_blob",
-      );
+      throw new DecodeFailureError({
+      message: "Job envelope tiered blob is missing (deleted or expired)",
+      reason: "missing_blob",
+    });
     }
     const parsedBody = await decodeBody(data);
     return mergeMachinery(parsedBody, header);
@@ -681,10 +705,10 @@ export async function decodeJobEnvelope({
   // GQ1: randomUUID offloaded blob.
   if (header.e === "ref") {
     if (typeof header.r !== "string" || header.r.length === 0) {
-      throw new DecodeFailureError(
-        "Malformed job envelope: ref body without a blob id",
-        "malformed_envelope",
-      );
+      throw new DecodeFailureError({
+      message: "Malformed job envelope: ref body without a blob id",
+      reason: "malformed_envelope",
+    });
     }
     if (!blobs) {
       throw new Error(
@@ -696,10 +720,10 @@ export async function decodeJobEnvelope({
         ? await blobs.peek({ id: header.r })
         : await blobs.get({ id: header.r });
     if (!data) {
-      throw new DecodeFailureError(
-        `Job envelope blob ${header.r} is missing (deleted or expired)`,
-        "missing_blob",
-      );
+      throw new DecodeFailureError({
+      message: `Job envelope blob ${header.r} is missing (deleted or expired)`,
+      reason: "missing_blob",
+    });
     }
     return await decodeBody(data);
   }
@@ -840,24 +864,24 @@ export function splitEnvelope(value: string): {
 } {
   const lenEnd = value.indexOf("|", ENVELOPE_PREFIX_LEN);
   if (lenEnd === -1) {
-    throw new DecodeFailureError(
-      "Malformed job envelope: missing header length delimiter",
-      "malformed_envelope",
-    );
+    throw new DecodeFailureError({
+      message: "Malformed job envelope: missing header length delimiter",
+      reason: "malformed_envelope",
+    });
   }
   const lenDigits = value.slice(ENVELOPE_PREFIX_LEN, lenEnd);
   if (!/^\d+$/.test(lenDigits)) {
-    throw new DecodeFailureError(
-      "Malformed job envelope: invalid header length",
-      "malformed_envelope",
-    );
+    throw new DecodeFailureError({
+      message: "Malformed job envelope: invalid header length",
+      reason: "malformed_envelope",
+    });
   }
   const headerLen = Number(lenDigits);
   if (headerLen <= 0) {
-    throw new DecodeFailureError(
-      "Malformed job envelope: invalid header length",
-      "malformed_envelope",
-    );
+    throw new DecodeFailureError({
+      message: "Malformed job envelope: invalid header length",
+      reason: "malformed_envelope",
+    });
   }
   // Prefix and length digits are ASCII, so lenEnd is the same offset in bytes
   // and code units; the header itself must be sliced as bytes to match Lua.
@@ -875,10 +899,10 @@ export function splitEnvelope(value: string): {
   try {
     header = JSON.parse(headerJson) as EnvelopeHeader;
   } catch (err) {
-    throw new DecodeFailureError(
-      `Malformed job envelope: header failed to parse: ${safeParseErrText(err)}`,
-      "malformed_envelope",
-    );
+    throw new DecodeFailureError({
+      message: `Malformed job envelope: header failed to parse: ${safeParseErrText(err)}`,
+      reason: "malformed_envelope",
+    });
   }
   return {
     header,

@@ -1283,7 +1283,7 @@ local nowMs = tonumber(ARGV[6])
 -- park — but a discarded job is not a completion: it must not INCR the completed
 -- counters and must not clear the group's stored error. Absent/"" = a genuine
 -- success, so older call sites keep their exact behaviour.
-local dropped = ARGV[7] == "1"
+local isDropped = ARGV[7] == "1"
 
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
@@ -1338,7 +1338,7 @@ redis.call("LTRIM", signalKey, 0, 999)
 -- A discarded job is not a completion. Counting it as one made the drop worse
 -- than invisible: it inflated the success rate AND wiped the group's stored
 -- error, so ops saw a win where an event had just been thrown away (#5538).
-if not dropped then
+if not isDropped then
   -- Increment completed counter for Skynet
   redis.call("INCR", statsKey)
 
