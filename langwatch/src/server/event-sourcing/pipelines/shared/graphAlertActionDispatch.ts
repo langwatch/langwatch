@@ -1,7 +1,10 @@
 import type { Project, Trigger } from "@prisma/client";
 import { createHash } from "crypto";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
-import type { WebhookActionParams } from "~/automations/providers/definitions/webhook/shared";
+import {
+  decryptWebhookHeaders,
+  type WebhookStoredActionParams,
+} from "~/automations/providers/definitions/webhook/secret";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import type { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
 import {
@@ -534,7 +537,10 @@ export async function dispatchGraphAlertAction({
   if (trigger.action === "SEND_WEBHOOK") {
     // The whole webhook config, body template included, lives in
     // `actionParams` (ADR-040 §1) — no evaluator pre-extraction to thread.
-    const params = (trigger.actionParams ?? {}) as Partial<WebhookActionParams>;
+    // Header values are stored as one ciphertext blob (ADR-040 §3),
+    // decrypted just before the send below.
+    const params = (trigger.actionParams ??
+      {}) as Partial<WebhookStoredActionParams>;
     if (!params.url) {
       logger.info(
         { triggerId: trigger.id, projectId: project.id },
@@ -580,7 +586,7 @@ export async function dispatchGraphAlertAction({
     const result = await deps.sendWebhook({
       url: params.url,
       method: params.method,
-      headers: params.headers,
+      headers: decryptWebhookHeaders(params),
       body: rendered.body,
       triggerName: trigger.name,
     });

@@ -1,4 +1,5 @@
 import { TriggerAction } from "@prisma/client";
+import { isDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import { dispatchGraphAlertAction } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { TriggerContext } from "../types";
@@ -15,8 +16,11 @@ import {
  * deliver identically — the firing flag only decides who calls it.
  *
  * Dispatch errors are captured (never thrown — a cron batch must not die on
- * one alert) and reported as `didSend: false`, so an undelivered alert does
- * NOT open an incident and the next tick retries.
+ * one alert). A RETRYABLE failure reports `didSend: false`, so no incident
+ * opens and the next tick retries. A TERMINAL failure (SSRF block, non-retry
+ * HTTP status — ADR-040 §5) reports `didSend: true` to consume the fire:
+ * re-posting to a misconfigured endpoint every tick just spams it, which is
+ * exactly what the terminal classification exists to prevent.
  */
 export const handleSendWebhookRequest = async (
   context: TriggerContext,
@@ -37,6 +41,7 @@ export const handleSendWebhookRequest = async (
         action: TriggerAction.SEND_WEBHOOK,
       },
     });
-    return { didSend: false };
+    const terminal = isDispatchError(error) && !error.retryable;
+    return { didSend: terminal };
   }
 };

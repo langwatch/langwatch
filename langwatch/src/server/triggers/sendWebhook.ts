@@ -2,6 +2,7 @@ import { isIP } from "node:net";
 import {
   sanitizeWebhookHeaders,
   validateWebhookUrlShape,
+  WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
 } from "~/automations/providers/definitions/webhook/shared";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
@@ -99,11 +100,19 @@ export async function sendWebhook({
       retryable: false,
     });
   }
+  // An unresolved kept sentinel means "the saved value" and should have been
+  // resolved by the caller (save / test-fire / decrypt-at-dispatch) — never
+  // send the literal marker to the customer's endpoint.
+  const resolvedHeaders = Object.fromEntries(
+    Object.entries(headers).filter(
+      ([, value]) => value !== WEBHOOK_HEADER_VALUE_KEPT,
+    ),
+  );
   return sendHttpDestination({
     url,
     method,
     headers: {
-      ...sanitizeWebhookHeaders(headers),
+      ...sanitizeWebhookHeaders(resolvedHeaders),
       "Content-Type": "application/json",
       ...(testFire ? { "X-LangWatch-Test-Fire": "true" } : {}),
     },

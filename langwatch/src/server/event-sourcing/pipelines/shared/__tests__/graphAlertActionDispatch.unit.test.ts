@@ -1,6 +1,13 @@
 import type { Project, Trigger } from "@prisma/client";
 import { TriggerAction } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+
+// Fake cipher so the webhook-headers tests exercise the decrypt-at-dispatch
+// seam (ADR-040 §3) without real AES/env plumbing.
+vi.mock("~/utils/encryption", () => ({
+  encrypt: (s: string) => `enc(${s})`,
+  decrypt: (s: string) => s.replace(/^enc\(/, "").replace(/\)$/, ""),
+}));
 import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
 import {
   dispatchGraphAlertAction,
@@ -735,6 +742,36 @@ describe("dispatchGraphAlertAction", () => {
       expect(call.url).toBe("https://example.com/hook");
       const body = JSON.parse(call.body) as { event: string };
       expect(body.event).toBe("alert.fired");
+    });
+
+    describe("when header secrets are stored encrypted", () => {
+      it("decrypts them just before the send", async () => {
+        const { deps, sendWebhook } = makeDeps();
+        await dispatchGraphAlertAction({
+          deps,
+          input: {
+            trigger: makeTrigger({
+              action: TriggerAction.SEND_WEBHOOK,
+              actionParams: {
+                url: "https://example.com/hook",
+                method: "POST",
+                headersEncrypted: `enc(${JSON.stringify({
+                  Authorization: "Bearer secret",
+                })})`,
+              },
+            }),
+            project: makeProject(),
+            context: makeContext(),
+            recipients: [],
+            slackWebhook: null,
+            fireDigest: FIRE_DIGEST,
+          },
+        });
+        const call = sendWebhook.mock.calls[0]?.[0] as {
+          headers: Record<string, string>;
+        };
+        expect(call.headers).toEqual({ Authorization: "Bearer secret" });
+      });
     });
 
     describe("when the URL is not configured", () => {

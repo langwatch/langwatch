@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   sanitizeWebhookHeaders,
   validateWebhookUrlShape,
+  WEBHOOK_HEADER_VALUE_KEPT,
   webhookActionParamsSchema,
 } from "../shared";
 
@@ -74,6 +75,14 @@ describe("sanitizeWebhookHeaders", () => {
   describe("when entries are empty", () => {
     it("drops blank names and blank values", () => {
       expect(sanitizeWebhookHeaders({ "": "x", "X-Empty": "  " })).toEqual({});
+    });
+  });
+
+  describe("when a value carries the kept sentinel", () => {
+    it("passes it through for the persist layer to resolve", () => {
+      expect(
+        sanitizeWebhookHeaders({ Authorization: WEBHOOK_HEADER_VALUE_KEPT }),
+      ).toEqual({ Authorization: WEBHOOK_HEADER_VALUE_KEPT });
     });
   });
 });

@@ -35,7 +35,8 @@ export interface HttpDestinationRequest {
    * the global BLOCK_LOCAL_HTTP_CALLS toggle (ADR-040 §4). When set, redirects
    * are NOT followed: hop re-validation inside `fetchWithResolvedIp` uses the
    * default (env-gated) validator, so following a redirect would silently drop
-   * back to the weaker policy. A 3xx is returned to the caller to classify.
+   * back to the weaker policy. A 3xx with a Location throws terminally; a
+   * bare 3xx is returned to the caller to classify.
    */
   validateUrl?: (url: string) => Promise<SSRFValidationResult>;
 }
@@ -132,12 +133,11 @@ export async function sendHttpDestination({
     };
     if (validateUrl) {
       const validated = await validateUrl(url);
-      // MAX_SAFE_INTEGER pre-exhausts the redirect budget: the first 3xx with
-      // a Location throws instead of hopping through the weaker default
-      // validator (see `validateUrl` on the request type).
+      // Redirects are refused outright: a hop would re-validate through the
+      // weaker default policy (see `validateUrl` on the request type).
       response = await fetchWithResolvedIp(validated, {
         ...init,
-        _redirectCount: Number.MAX_SAFE_INTEGER,
+        followRedirects: false,
       });
     } else {
       response = await ssrfSafeFetch(url, init);
@@ -148,7 +148,7 @@ export async function sendHttpDestination({
     // the strict-validator path — the endpoint's shape, not a blip); DNS /
     // connection / timeout failures are transient and worth a retry.
     const ssrfBlocked =
-      /ssrf|blocked|not allowed|private|loopback|metadata|link-local|disallowed|too many redirects/i.test(
+      /ssrf|blocked|not allowed|private|loopback|metadata|link-local|disallowed|redirects are not followed|too many redirects/i.test(
         message,
       );
     throw new DispatchError({

@@ -34,6 +34,7 @@ import {
   assertWebhookDelivered,
   sendWebhook,
 } from "~/server/triggers/sendWebhook";
+import { decryptWebhookHeaders } from "~/automations/providers/definitions/webhook/secret";
 import type { WebhookMethod } from "~/automations/providers/definitions/webhook/shared";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import { renderWebhookBody } from "~/shared/templating/renderWebhookBody";
@@ -73,9 +74,12 @@ interface ActionParams {
   slackBotToken?: string;
   slackChannelId?: string;
   /** ADR-040 SEND_WEBHOOK destination — the whole config, body included,
-   *  lives in actionParams (not the Trigger template columns). */
+   *  lives in actionParams (not the Trigger template columns). Header values
+   *  are secrets, stored as one ciphertext blob (ADR-040 §3) and decrypted
+   *  just before dispatch. */
   url?: string;
   method?: WebhookMethod;
+  headersEncrypted?: string;
   headers?: Record<string, string>;
   bodyTemplate?: string | null;
 }
@@ -857,7 +861,7 @@ async function handleCadenceBatch(
         const result = await sendWebhook({
           url: params.url,
           method: params.method,
-          headers: params.headers,
+          headers: decryptWebhookHeaders(params),
           body: rendered.body,
           triggerName: trigger.name,
         });

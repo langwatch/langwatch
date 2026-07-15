@@ -509,6 +509,34 @@ path" rule.
 - **Deferred to fast-follow:** OAuth client-credentials, mTLS, dual-secret rotation,
   non-JSON content types, and a receiver-side "verify signature" doc snippet.
 
+## Amendment: what PR #5807 shipped vs deferred (2026-07)
+
+The first implementation PR (#5807, "Phases 1–3") lands the provider, the
+SSRF-fenced sender, dispatch on all three paths, the retry/terminal
+classification, and per-fire idempotency on the graph-alert path. Two
+deliberate deltas against the text above:
+
+- **Header secrets ship encrypted, but as headers — not the §3 auth union.**
+  Instead of the auth-mode selector + `ProjectSecret` ref, v1 keeps the plain
+  key/value headers editor and applies the secrecy discipline directly:
+  values are AES-256-GCM encrypted into `actionParams.headersEncrypted`
+  (`definitions/webhook/secret.ts`, same `encrypt`/`decrypt` as the Slack bot
+  token), never returned to the client (reads echo names with a
+  `__kept__` sentinel), and decrypted just before dispatch. The
+  `ProjectSecret`-ref auth union remains the target shape for when HMAC
+  signing lands.
+- **Graph alerts no longer dead-letter `SEND_WEBHOOK`** — the third notify
+  branch in `dispatchGraphAlertAction`, gated per-fire on the endpoint
+  identity. On the cron parity path, a terminal failure CONSUMES the fire
+  (no per-tick re-post to a misconfigured endpoint); only retryable failures
+  leave it open for the next tick.
+
+**Still deferred (unchanged decisions, not yet built):** HMAC request signing
+(§3, including the signing toggle UI), `Retry-After` →
+`DispatchError.retryAfterMs`, the stable `X-LangWatch-Event-Id` header,
+the per-project dispatch rate limit (test fires ARE rate-limited per user),
+and the Phase 4 `WebhookDelivery` log + report UI.
+
 ## References
 
 - [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) —

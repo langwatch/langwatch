@@ -30,6 +30,7 @@ import type {
 import {
   isReservedWebhookHeader,
   validateWebhookUrlShape,
+  WEBHOOK_HEADER_VALUE_KEPT,
   WEBHOOK_METHODS,
   type WebhookActionParams,
   type WebhookMethod,
@@ -44,8 +45,26 @@ interface FieldDraft {
 }
 
 interface HeaderRow {
+  /** Stable client-side identity for React keys — rows are added/removed. */
+  id: string;
   name: string;
   value: string;
+  /** True when the value is a saved secret the server kept back (ADR-040 §3):
+   *  the input shows a masked placeholder, and the save sends the kept
+   *  sentinel so the stored value survives. Typing or renaming clears it. */
+  kept: boolean;
+}
+
+let headerRowSeq = 0;
+function newHeaderRow(partial?: Partial<Omit<HeaderRow, "id">>): HeaderRow {
+  headerRowSeq += 1;
+  return {
+    id: `hdr_${headerRowSeq}`,
+    name: "",
+    value: "",
+    kept: false,
+    ...partial,
+  };
 }
 
 export interface WebhookSlice {
@@ -79,8 +98,12 @@ function summary(slice: WebhookSlice, identity: SummaryIdentity): string {
 
 function fromTriggerRow(row: SavedTriggerRow): WebhookSlice {
   const params = (row.actionParams ?? {}) as Partial<WebhookActionParams>;
-  const headers = Object.entries(params.headers ?? {}).map(
-    ([name, value]) => ({ name, value }),
+  // Saved header VALUES never reach the client (ADR-040 §3) — the server
+  // echoes names with the kept sentinel, which renders as a masked row.
+  const headers = Object.entries(params.headers ?? {}).map(([name, value]) =>
+    value === WEBHOOK_HEADER_VALUE_KEPT
+      ? newHeaderRow({ name, kept: true })
+      : newHeaderRow({ name, value }),
   );
   return {
     url: typeof params.url === "string" ? params.url : "",
@@ -100,7 +123,9 @@ function headersRecord(rows: HeaderRow[]): Record<string, string> {
   for (const row of rows) {
     const name = row.name.trim();
     if (!name) continue;
-    out[name] = row.value;
+    // A kept row sends the sentinel; the server resolves it against the
+    // stored ciphertext (save) or drops it if unresolvable (test fire).
+    out[name] = row.kept ? WEBHOOK_HEADER_VALUE_KEPT : row.value;
   }
   return out;
 }
@@ -197,7 +222,7 @@ function HeadersEditor({
           const reserved =
             row.name.trim() !== "" && isReservedWebhookHeader(row.name);
           return (
-            <VStack key={index} align="stretch" gap={1}>
+            <VStack key={row.id} align="stretch" gap={1}>
               <HStack gap={2}>
                 <Input
                   size="sm"
@@ -205,16 +230,26 @@ function HeadersEditor({
                   value={row.name}
                   placeholder="Authorization"
                   onChange={(e) =>
-                    setRow(index, { ...row, name: e.target.value })
+                    // The saved value is keyed by the old name server-side, so
+                    // renaming a kept row means re-entering its value.
+                    setRow(index, {
+                      ...row,
+                      name: e.target.value,
+                      kept: false,
+                    })
                   }
                 />
                 <Input
                   size="sm"
                   flex="2"
                   value={row.value}
-                  placeholder="Bearer …"
+                  placeholder={row.kept ? "•••••• (saved)" : "Bearer …"}
                   onChange={(e) =>
-                    setRow(index, { ...row, value: e.target.value })
+                    setRow(index, {
+                      ...row,
+                      value: e.target.value,
+                      kept: false,
+                    })
                   }
                 />
                 <IconButton
@@ -241,7 +276,7 @@ function HeadersEditor({
           onClick={() =>
             onChange({
               ...slice,
-              headers: [...slice.headers, { name: "", value: "" }],
+              headers: [...slice.headers, newHeaderRow()],
             })
           }
         >
@@ -250,7 +285,7 @@ function HeadersEditor({
       </VStack>
       <Field.HelperText>
         Sent with every request — for example an Authorization header your
-        endpoint expects.
+        endpoint expects. Values are stored encrypted and never shown again.
       </Field.HelperText>
     </Field.Root>
   );

@@ -36,6 +36,23 @@ Feature: Webhook (generic HTTP) automation action
       Then the delivery picker does not offer the Webhook card
       And saving a webhook automation through the API is rejected
 
+  Rule: Header values are secrets
+
+    Scenario: Header values are stored encrypted at rest
+      When a webhook automation is saved with an Authorization header
+      Then the stored automation does not contain the header value in plaintext
+
+    Scenario: Saved header values never return to the browser
+      Given a webhook automation saved with an Authorization header
+      When the automation is opened for editing
+      Then the header name is shown but its saved value is not
+      And saving with the value left untouched keeps the saved secret
+
+    Scenario: Renaming a saved header requires re-entering its value
+      Given a webhook automation saved with an Authorization header
+      When the user renames that header while editing
+      Then the header's value must be typed again before it is sent
+
   Rule: Testing a webhook from the drawer
 
     Scenario: A test fire sends the rendered request to the configured endpoint
@@ -54,6 +71,11 @@ Feature: Webhook (generic HTTP) automation action
       When the test fire completes
       Then an inline error appears next to the test button naming what went wrong
       And the error includes the HTTP status or transport failure
+
+    Scenario: Test fires are rate limited
+      Given a user has sent many webhook test fires within the last minute
+      When they press "Send a test" again
+      Then the test fire is rejected asking them to retry later
 
   Rule: Delivery is SSRF-fenced
 
@@ -76,6 +98,11 @@ Feature: Webhook (generic HTTP) automation action
       Then the dispatch is retried by the outbox
       When the endpoint answers any other 4xx
       Then the dispatch fails terminally without retry
+
+    Scenario: A terminally failing endpoint is not re-posted every evaluation
+      Given a graph alert webhook whose endpoint answers a terminal error
+      When the alert fires and delivery fails terminally
+      Then the fire is consumed and the endpoint is not contacted again for it
 
     Scenario: A graph alert can deliver to a webhook
       Given a graph alert automation with the Webhook delivery
