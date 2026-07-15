@@ -2,12 +2,12 @@
  * Renders a model identifier ("openai/gpt-5.5") with the provider's
  * icon and the family name in mono font — the same primitive
  * `ProviderModelSelector` uses inside its dropdown items. Used in the
- * Default Models table cells and in the override drawer so the page
- * reads consistent with the model-provider list above it.
+ * Default Models table cells (DefaultModelsSection.tsx).
  */
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 import { Tooltip } from "../ui/tooltip";
+import { modelDisplayLabel } from "~/server/modelProviders/customModelDisplayNames";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import {
   isLatestAlias,
@@ -29,6 +29,9 @@ interface Props {
    *  reading this default will fail at runtime until the user re-adds
    *  the provider or picks a different model. */
   invalid?: boolean;
+  /** Configured custom-model display names, keyed by `<provider>/<modelId>`.
+   *  Falls back to the id-derived family name for any model without an entry. */
+  displayNames?: Record<string, string>;
 }
 
 export function ModelChip({
@@ -36,9 +39,10 @@ export function ModelChip({
   size = "md",
   inherited = false,
   invalid = false,
+  displayNames,
 }: Props) {
   const providerKey = model.split("/")[0] ?? "";
-  const family = model.split("/").slice(1).join("/");
+  const family = modelDisplayLabel(model, displayNames);
   const icon =
     modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
   const iconSlot = size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE;

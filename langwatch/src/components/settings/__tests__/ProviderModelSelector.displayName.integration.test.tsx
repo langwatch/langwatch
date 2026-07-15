@@ -51,6 +51,10 @@ function trigger() {
   return screen.getByRole("combobox");
 }
 
+function inheritItem() {
+  return screen.getByTestId("provider-model-selector-inherit");
+}
+
 const MODEL_ID = "gpt-5.1";
 const DISPLAY_NAME = "Ada Prod Model";
 const PROVIDER = "custom";
@@ -265,7 +269,10 @@ describe("<ProviderModelSelector/>", () => {
           />,
         );
 
-        expect(within(listbox()).getByText(DISPLAY_NAME)).toBeInTheDocument();
+        // Scoped to the inherit entry, not the whole listbox: the
+        // inherited model is also a real option here, so both legitimately
+        // render the display name and an unscoped getByText matches twice.
+        expect(within(inheritItem()).getByText(DISPLAY_NAME)).toBeInTheDocument();
       });
 
       it("renders the collapsed selector's placeholder as the display name", () => {

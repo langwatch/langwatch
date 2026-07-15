@@ -28,6 +28,7 @@ import { Menu } from "../../components/ui/menu";
 import { TriggerAnchor } from "../../components/ui/TriggerAnchor";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
 import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
@@ -82,6 +83,22 @@ export default function ModelsPage() {
     () => new Set(allEnabledProviders.map((p) => p.provider)),
     [allEnabledProviders],
   );
+
+  // Configured custom-model display names, keyed by `<provider>/<modelId>`,
+  // for the Default Models table's chips. Built from the ALL set (not the
+  // scope-filtered one) for the same reason as `enabledProviderKeys` above,
+  // and merged per row so a provider stored at two scopes doesn't lose one
+  // row's custom models to the other's.
+  const defaultModelsDisplayNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const provider of allProvidersList) {
+      Object.assign(
+        map,
+        buildCustomModelDisplayNames({ [provider.provider]: provider }),
+      );
+    }
+    return map;
+  }, [allProvidersList]);
 
   // Client-side filter for the scope dropdown at the top of the page.
   // The list query returns every provider the caller can see; this just
@@ -396,6 +413,7 @@ export default function ModelsPage() {
           enabledProviderKeys={enabledProviderKeys}
           noProvidersConfigured={!isLoading && enabledProviders.length === 0}
           hierarchy={hierarchy}
+          displayNames={defaultModelsDisplayNames}
         />
 
         <Dialog.Root
