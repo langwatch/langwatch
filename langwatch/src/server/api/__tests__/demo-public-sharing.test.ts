@@ -9,6 +9,19 @@ import {
 } from "../rbac";
 import type { ShareGrantClaims } from "~/server/app-layer/share/shareGrant";
 
+const { mockValidateGrantForViewer } = vi.hoisted(() => ({
+  mockValidateGrantForViewer: vi.fn(),
+}));
+
+// The grant branch of checkPermissionOrPubliclyShared revalidates the grant
+// against the live share via getApp().share.validateGrantForViewer. Stub it so
+// these middleware unit tests don't need the whole app singleton initialized.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    share: { validateGrantForViewer: mockValidateGrantForViewer },
+  }),
+}));
+
 // Mock Prisma client
 const mockPrisma = {
   project: {
@@ -42,6 +55,9 @@ describe("Demo Project and Public Sharing Tests", () => {
     mockPrisma.groupMembership.findMany.mockResolvedValue([]);
     mockPrisma.roleBinding.findMany.mockResolvedValue([]);
     mockPrisma.teamUser.findFirst.mockResolvedValue(null);
+    // A grant that covers the resource is treated as active unless a test says
+    // otherwise; the non-covering-grant cases deny before this is ever called.
+    mockValidateGrantForViewer.mockResolvedValue(true);
   });
 
   afterEach(() => {
