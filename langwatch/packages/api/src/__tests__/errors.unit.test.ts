@@ -125,6 +125,32 @@ describe("formatError", () => {
         expect(body.error).toBe("Not Found");
       });
     });
+
+    describe("back-compat `kind` alias", () => {
+      it("emits `kind` equal to `code` for a HandledError (versioned)", () => {
+        const err = makeHandledError({ code: "not_found", httpStatus: 404 });
+        const { body } = formatError({ err, isVersioned: true });
+        expect(body.kind).toBe("not_found");
+        expect(body.kind).toBe(body.code);
+      });
+
+      it("emits `kind` for synthesized error bodies too", () => {
+        const zodErr = (() => {
+          try {
+            z.object({ name: z.string() }).parse({});
+            throw new Error("should not reach");
+          } catch (e) {
+            return e as ZodError;
+          }
+        })();
+        expect(formatError({ err: zodErr, isVersioned: true }).body.kind).toBe(
+          "validation_error",
+        );
+        expect(
+          formatError({ err: new Error("oops"), isVersioned: true }).body.kind,
+        ).toBe("internal_error");
+      });
+    });
   });
 
   // -------------------------------------------------------------------------

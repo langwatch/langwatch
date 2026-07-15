@@ -88,6 +88,13 @@ interface ErrorResponseBody {
   /** Present only for unversioned (backwards-compat) responses. */
   error?: string;
   code: string;
+  /**
+   * @deprecated Back-compat alias of `code`, emitted during the
+   * `DomainError` → `HandledError` transition so clients still reading the old
+   * `kind` discriminant keep working. Read `code` in new code; removed once no
+   * consumer reads `kind`.
+   */
+  kind?: string;
   message: string;
   meta?: Record<string, unknown>;
   reasons?: unknown[];
@@ -106,6 +113,10 @@ function finalizeErrorResponse({
   isVersioned: boolean;
 }): { status: ContentfulStatusCode; body: ErrorResponseBody } {
   if (!isVersioned) body.error = httpStatusText(status);
+  // Emit the deprecated `kind` alias alongside `code` so clients still reading
+  // the old discriminant keep working through the transition. See
+  // ErrorResponseBody.kind.
+  body.kind = body.code;
   return { status, body };
 }
 

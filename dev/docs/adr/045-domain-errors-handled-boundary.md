@@ -160,6 +160,14 @@ the reference.
 - **"Unknown" is a first-class, intended outcome.** An unhandled error producing
   a generic client response with a trace id is the system working as designed,
   not a gap to be filled by inventing a handled error for it.
+- **The `kind` → `code` rename ships non-breaking.** Renaming the wire
+  discriminant from the old `DomainError.kind` to `HandledError.code` would break
+  any client still reading `kind` during a rolling deploy. To avoid that,
+  serialisation emits **both**: `code` plus a deprecated `kind` alias holding the
+  same value (top-level and in nested `reasons`), and the client readers resolve
+  the discriminant from `code ?? kind`. This makes both rollout directions safe
+  (old client ↔ new server, new client ↔ old server). The `kind` alias is
+  transitional — remove it once no consumer reads `kind`.
 
 ## References
 

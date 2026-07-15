@@ -3,16 +3,18 @@ import { HandledError } from "~/server/app-layer/handled-error";
 /**
  * Domain errors raised by the automation authoring path (ADR-036). Each is a
  * concrete `HandledError` subclass so the existing tRPC `errorFormatter`
- * serialises it onto the wire as `error.data.domainError` with the `kind`
- * discriminator plus structured `meta`. The client matches on `kind` and
+ * serialises it onto the wire as `error.data.domainError` with the `code`
+ * discriminator plus structured `meta`. The client matches on `code` and
  * renders field-targeted, actionable errors (highlight the offending field,
  * list the offending recipient, etc.) rather than a generic toast.
  *
- * `kind` strings stay stable across versions — the client uses them as a
+ * `code` strings stay stable across versions — the client uses them as a
  * discriminator, exactly like the existing `EvaluationNotFoundError` flow.
  */
 
 export class TemplateValidationError extends HandledError {
+  declare readonly code: "template_validation_error";
+
   constructor(
     /** Template field that failed to parse — `emailSubjectTemplate`,
      *  `emailBodyTemplate`, `slackTemplate`, or `slackTemplateType`. */
@@ -33,6 +35,8 @@ export class TemplateValidationError extends HandledError {
 }
 
 export class TestFireUnavailableError extends HandledError {
+  declare readonly code: "test_fire_unavailable";
+
   constructor(
     public readonly channel: "email" | "slack",
     /** Why the test fire can't be sent (no recipients, no webhook, …). */
@@ -51,6 +55,8 @@ export class TestFireUnavailableError extends HandledError {
  * recipient so the UI can highlight the chip that needs fixing.
  */
 export class InvalidEmailRecipientError extends HandledError {
+  declare readonly code: "invalid_email_recipient";
+
   constructor(public readonly recipient: string) {
     super(
       "invalid_email_recipient",
@@ -65,6 +71,8 @@ export class InvalidEmailRecipientError extends HandledError {
 }
 
 export class MissingSlackWebhookError extends HandledError {
+  declare readonly code: "missing_slack_webhook";
+
   constructor() {
     super(
       "missing_slack_webhook",
@@ -84,6 +92,8 @@ export class MissingSlackWebhookError extends HandledError {
  * generic 500. `field` targets the channel input, the most common fix.
  */
 export class NotificationDeliveryError extends HandledError {
+  declare readonly code: "notification_delivery_error";
+
   constructor(message: string) {
     super("notification_delivery_error", message, {
       meta: { field: "slackChannelId" },
@@ -94,6 +104,8 @@ export class NotificationDeliveryError extends HandledError {
 }
 
 export class MissingAnnotatorError extends HandledError {
+  declare readonly code: "missing_annotator";
+
   constructor() {
     super(
       "missing_annotator",
@@ -105,6 +117,8 @@ export class MissingAnnotatorError extends HandledError {
 }
 
 export class ProjectNotFoundError extends HandledError {
+  declare readonly code: "project_not_found";
+
   constructor(public readonly projectId: string) {
     super("project_not_found", `Project not found: ${projectId}`, {
       meta: { projectId },

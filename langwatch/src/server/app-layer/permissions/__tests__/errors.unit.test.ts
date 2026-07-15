@@ -49,5 +49,13 @@ describe("LiteMemberRestrictedError", () => {
         reasons: [],
       });
     });
+
+    it("emits the deprecated `kind` alias equal to `code` for back-compat", () => {
+      const error = new LiteMemberRestrictedError("evaluations");
+      const serialized = error.serialize();
+
+      expect(serialized.kind).toBe("lite_member_restricted");
+      expect(serialized.kind).toBe(serialized.code);
+    });
   });
 });

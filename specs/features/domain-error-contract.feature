@@ -129,3 +129,21 @@ Feature: Handled errors — the handled-error boundary
     Given a serialised handled error crosses a worker or process boundary
     Then consumers branch on `error.code`, not `instanceof`
     And identity survives the boundary intact
+
+  # ==========================================================================
+  # Transition: `kind` → `code` rename stays non-breaking during rollout
+  # ==========================================================================
+
+  @bdd @domain-errors
+  Scenario: A serialised handled error carries `code` and a deprecated `kind` alias
+    Given a HandledError is serialised for the wire
+    Then the payload carries the discriminant as `code`
+    And it also carries the same value as a deprecated `kind` alias
+    And nested reasons carry the same `code`/`kind` pair
+    So an older client still reading `kind` keeps working through the rollout
+
+  @bdd @domain-errors
+  Scenario: A client resolves a handled error from either discriminant field
+    Given a client reads the discriminant off `data.domainError`
+    When the payload carries only the deprecated `kind` (an older server)
+    Then the client resolves the same handled error as if it had read `code`

@@ -25,14 +25,24 @@ export function readHandledError(err: unknown): HandledErrorShape | null {
 
   const value = candidate as {
     code?: unknown;
+    // `kind` is the deprecated pre-`HandledError` discriminant — read it as a
+    // fallback so a payload from an older server (or an older client reading a
+    // newer server) still resolves during the transition.
+    kind?: unknown;
     meta?: unknown;
     httpStatus?: unknown;
   };
-  if (typeof value.code !== "string") return null;
+  const code =
+    typeof value.code === "string"
+      ? value.code
+      : typeof value.kind === "string"
+        ? value.kind
+        : null;
+  if (code === null) return null;
   if (typeof value.httpStatus !== "number") return null;
 
   return {
-    code: value.code,
+    code,
     httpStatus: value.httpStatus,
     meta:
       value.meta && typeof value.meta === "object"

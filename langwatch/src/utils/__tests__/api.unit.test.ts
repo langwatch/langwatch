@@ -283,6 +283,27 @@ describe("Global mutation error handler", () => {
         resource: undefined,
       });
     });
+
+    it("extracts resource from the deprecated `kind` discriminant (old server)", () => {
+      const error = new TRPCClientError("Unauthorized", {
+        result: {
+          error: {
+            data: {
+              code: "UNAUTHORIZED",
+              httpStatus: 401,
+              // A pre-HandledError server serialises the discriminant as `kind`.
+              domainError: {
+                kind: "lite_member_restricted",
+                meta: { resource: "prompts" },
+              },
+            },
+          },
+        },
+      });
+      expect(extractLiteMemberRestrictionInfo(error)).toEqual({
+        resource: "prompts",
+      });
+    });
   });
 
   describe("isHandledByLiteMemberHandler", () => {

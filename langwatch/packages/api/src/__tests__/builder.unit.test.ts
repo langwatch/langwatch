@@ -395,6 +395,8 @@ describe("output validation", () => {
       expect(res.status).toBe(500);
       expect(await jsonBody(res)).toEqual({
         code: "internal_error",
+        // Deprecated back-compat alias of `code` (see ErrorResponseBody.kind).
+        kind: "internal_error",
         message: "Internal server error",
       });
     });

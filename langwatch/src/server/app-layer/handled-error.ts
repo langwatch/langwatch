@@ -5,6 +5,13 @@ import { grafanaTraceUrlFromEnv } from "~/utils/grafanaLinks";
 
 export interface SerializedReason {
   code: string;
+  /**
+   * @deprecated Back-compat alias of `code`, emitted during the
+   * `DomainError` → `HandledError` transition so clients still reading the old
+   * `kind` discriminant keep working. Read `code` in new code; this alias is
+   * removed once no consumer reads `kind`.
+   */
+  kind: string;
   meta?: Record<string, unknown>;
   reasons?: SerializedReason[];
 }
@@ -18,6 +25,13 @@ export interface SerializedReason {
  */
 export interface SerializedHandledError {
   code: string;
+  /**
+   * @deprecated Back-compat alias of `code`, emitted during the
+   * `DomainError` → `HandledError` transition so clients still reading the old
+   * `kind` discriminant keep working. Read `code` in new code; this alias is
+   * removed once no consumer reads `kind`.
+   */
+  kind: string;
   meta: Record<string, unknown>;
   traceId: string | undefined;
   spanId: string | undefined;
@@ -98,6 +112,8 @@ export abstract class HandledError extends Error {
     const traceUrl = grafanaTraceUrlFromEnv(this.traceId);
     return {
       code: this.code,
+      // Deprecated back-compat alias — see SerializedHandledError.kind.
+      kind: this.code,
       meta: this.meta,
       traceId: this.traceId,
       spanId: this.spanId,
@@ -159,13 +175,15 @@ function serializeReason(error: Error): SerializedReason {
   if (error instanceof HandledError) {
     return {
       code: error.code,
+      // Deprecated back-compat alias — see SerializedReason.kind.
+      kind: error.code,
       ...(Object.keys(error.meta).length > 0 && { meta: error.meta }),
       ...(error.reasons.length > 0 && {
         reasons: error.reasons.map(serializeReason),
       }),
     };
   }
-  return { code: "unknown" };
+  return { code: "unknown", kind: "unknown" };
 }
 
 

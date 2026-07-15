@@ -98,12 +98,15 @@ export function extractLiteMemberRestrictionInfo(
   if (error.data?.code !== "UNAUTHORIZED") return null;
 
   const handledError = error.data?.domainError as
-    | { code?: string; meta?: { resource?: string } }
+    | { code?: string; kind?: string; meta?: { resource?: string } }
     | undefined;
 
-  if (handledError?.code !== "lite_member_restricted") return null;
+  // `kind` is the deprecated pre-`HandledError` discriminant, read as a
+  // fallback so this resolves across the transition (see SerializedHandledError).
+  const handledCode = handledError?.code ?? handledError?.kind;
+  if (handledCode !== "lite_member_restricted") return null;
 
-  return { resource: handledError.meta?.resource };
+  return { resource: handledError?.meta?.resource };
 }
 
 export function extractLimitExceededInfo(
