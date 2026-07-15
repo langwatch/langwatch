@@ -97,7 +97,10 @@ export function buildScenarioChipDef(d: ScenarioChipData): ChipDef {
         <HStack gap={2}>
           <Circle size="8px" bg={dotColor} flexShrink={0} />
           <Text textStyle="sm" fontWeight="semibold" truncate>
-            {d.name ?? "Untitled scenario"}
+            {/* A read-only share viewer can't load the scenario's name (it
+                comes from a permission-gated read), so don't imply the
+                scenario is untitled — it just isn't visible here. */}
+            {d.name ?? (d.isReadOnly ? "Scenario run" : "Untitled scenario")}
           </Text>
         </HStack>
         {d.status && (
