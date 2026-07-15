@@ -1,19 +1,120 @@
+# Single pnpm workspace for the whole monorepo. Every TypeScript package —
+# the app, its internal packages, the SDK, the MCP server, the installer CLI,
+# skills tooling and the agentic e2e suite — resolves out of one lockfile with
+# one shared store. Filter with package names, e.g.:
+#   pnpm --filter @langwatch/app typecheck
+#   pnpm --filter langwatch build            # the published SDK
+#   pnpm --filter @langwatch/mcp-server test
 packages:
   - packages/*
-  # The langwatch/ next.js app keeps its own pnpm-workspace.yaml for its
-  # internal sub-packages (saas-src, langwatch/packages/*, mcp-server). We do
-  # NOT include it here — the @langwatch/server tarball ships langwatch/'s
-  # pre-built dist + a copy of the source so a fresh `pnpm install` runs at
-  # ~/.langwatch/app on first boot. Treating it as a peer workspace would
-  # double-install React/Next/etc. across the dev environment.
+  - platform/app
+  - platform/app/packages/*
+  - mcp/typescript
+  - sdks/typescript
+  - skills
+  - tests/agentic-e2e
 
+# Supply-chain freshness gate: only install versions published at least 7 days
+# ago. @langwatch/scenario is our own package — exclude it so dogfooding new
+# releases isn't blocked by the gate.
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - "vite"
+  - "node-releases"
+  - "browserslist"
+  - "@langwatch/scenario"
+  # Version-pinned bypasses carried from platform/app's former workspace file:
+  # fresh releases inside the age gate with no older satisfying version.
+  - ws@8.21.1
+  - "@browserbasehq/sdk@2.16.0"
+  - postcss@8.5.19
+
+# OTel require/import-in-the-middle must be hoisted where Node's resolver finds
+# them from the app's instrumentation bootstrap (was platform/app/.npmrc).
+publicHoistPattern:
+  - "*import-in-the-middle*"
+  - "*require-in-the-middle*"
+
+# The single override set for the whole workspace. This is the app's
+# previously-effective set (pnpm.overrides in its package.json — the source the
+# lockfile actually recorded), carried verbatim, plus entries the other former
+# workspace roots needed (node-pty build approval comes via
+# onlyBuiltDependencies below).
 overrides:
-  # Security: shell-quote quote() newline escaping (CRITICAL)
-  shell-quote@<1.8.4: '>=1.8.4'
-  # Security: esbuild Deno binary integrity RCE + dev-server file read (GHSA-gv7w-rqvm-qjhr / GHSA-g7r4-m6w7-qqqr)
-  esbuild@<0.28.1: '>=0.28.1'
-  # Security: vite dev-server file read / middleware path bypass
-  vite@<6.4.3: '>=6.4.3'
+  "@elastic/elasticsearch": "-"
+  "@opensearch-project/opensearch": "-"
+  "@aws-sdk/xml-builder>fast-xml-parser": ^5.7.0
+  "@langchain/community>fast-xml-parser": ^5.7.0
+  ai: ^6.0.161
+  liquidjs: ">=10.26.0 <11"
+  protobufjs: ">=7.5.6 <8.0.0 || >=8.6.0"
+  langsmith@<0.6.0: 0.6.0
+  postcss: ^8.5.13
+  lodash: ^4.18.1
+  merge: ">=2.1.1 <3.0.0"
+  picomatch: ">=4.0.4"
+  vite@<7.3.2: 8.0.16
+  vite@>=8.0.0 <8.0.16: ">=8.0.16"
+  form-data@<4.0.6: ">=4.0.6"
+  axios@>=1.0.0 <1.16.0: 1.16.0
+  fast-xml-builder@<1.1.7: 1.1.7
+  fast-uri@<3.1.2: 3.1.2
+  braces: ^3.0.3
+  cross-spawn: ^7.0.6
+  exec-sh: ^0.4.0
+  glob: ^11.1.0
+  react: ^19.2.7
+  react-dom: ^19.2.7
+  react-is: ^19.2.7
+  pino: ^10.3.1
+  pino-pretty: ^13.1.3
+  thread-stream: ^4.0.0
+  kysely: 0.28.17
+  "@opentelemetry/exporter-prometheus": ">=0.217.0"
+  "@opentelemetry/sdk-node": ">=0.217.0"
+  tmp: ">=0.2.6"
+  hono@<4.12.25: ">=4.12.25"
+  "@hono/node-server@<1.19.13": ">=1.19.13"
+  undici@>=6.0.0 <6.27.0: ">=6.27.0 <7"
+  undici@>=7.0.0 <7.28.0: ">=7.28.0 <8"
+  uuid@<11.1.1: ">=11.1.1 <12"
+  vitest@<4.1.0: ">=4.1.0"
+  brace-expansion@>=4.0.0 <5.0.6: ">=5.0.6"
+  file-type@>=13.0.0 <21.3.1: ">=21.3.1 <22"
+  prismjs@<1.30.0: ">=1.30.0"
+  ip-address@<=10.1.0: ">=10.1.1"
+  qs@>=6.11.1 <=6.15.1: ">=6.15.2"
+  shell-quote@<1.8.4: ">=1.8.4"
+  "@grpc/grpc-js@<1.14.4": ">=1.14.4"
+  esbuild@<0.28.1: ">=0.28.1"
+  js-yaml@>=3.0.0 <3.15.0: ">=3.15.0 <4"
+  js-yaml@>=4.0.0 <4.2.0: ">=4.2.0 <5"
+  dompurify@<3.4.11: ">=3.4.11 <4"
+
+packageExtensions:
+  bullmq-otel:
+    dependencies:
+      tslib: "^2.6.0"
+  "@google-cloud/dlp":
+    dependencies:
+      protobufjs: "^7.5.4"
 
 onlyBuiltDependencies:
+  - "@anthropic-ai/claude-code"
+  - "@parcel/watcher"
+  - ffmpeg-static
+  - msw
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "@scarf/scarf"
+  - bcrypt
+  - bufferutil
+  - core-js
+  - cpu-features
   - esbuild
+  - msgpackr-extract
+  - node-pty
+  - prisma
+  - protobufjs
+  - sharp
+  - ssh2

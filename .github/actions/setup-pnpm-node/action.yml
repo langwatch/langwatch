@@ -5,7 +5,7 @@
 # Usage:
 #   - uses: ./.github/actions/setup-pnpm-node
 #     with:
-#       cache-dependency-path: "platform/app/pnpm-lock.yaml"
+#       cache-dependency-path: "pnpm-lock.yaml"
 #       # optional: set install-dir to also run `pnpm install --frozen-lockfile`
 #       install-dir: platform/app
 name: setup-pnpm-node

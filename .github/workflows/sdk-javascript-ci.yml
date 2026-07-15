@@ -55,7 +55,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "sdks/typescript/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           install-dir: sdks/typescript
 
       - name: Install TypeScript Native Preview
@@ -168,9 +168,9 @@ jobs:
           node-version: 24
           cache: "pnpm"
           cache-dependency-path: |
-            sdks/typescript/pnpm-lock.yaml
-            platform/app/pnpm-lock.yaml
-            mcp/typescript/pnpm-lock.yaml
+            pnpm-lock.yaml
+            pnpm-lock.yaml
+            pnpm-lock.yaml
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With

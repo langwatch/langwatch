@@ -39,7 +39,9 @@
     "mcp/typescript/",
     "scripts/",
     "README.md",
-    "LICENSE.md"
+    "LICENSE.md",
+    "pnpm-workspace.yaml",
+    "pnpm-lock.yaml"
   ],
   "scripts": {
     "build:cli": "pnpm --filter @langwatch/server-cli build",

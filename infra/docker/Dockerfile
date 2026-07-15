@@ -26,6 +26,11 @@ WORKDIR /app
 # Skip Prisma checksum verification for air-gapped builds
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
+# The repo is a single pnpm workspace rooted at /app. Copy the workspace
+# manifests plus the member manifests this image needs; members that are in
+# pnpm-workspace.yaml but absent from the build context (sdks/typescript,
+# skills, tests/agentic-e2e, packages/server) are simply skipped by pnpm.
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 # mcp/typescript is a workspace member — copy it early so pnpm install can link it.
 # Its build runs automatically as part of the app's `pnpm run build`
 # (via start:prepare:files → build:mcp-server).
@@ -36,22 +41,19 @@ COPY skills ./skills
 COPY infra/docker/Dockerfile.langyagent ./infra/docker/Dockerfile.langyagent
 COPY feature-map.json ./feature-map.json
 
-COPY platform/app/package.json platform/app/pnpm-lock.yaml platform/app/pnpm-workspace.yaml ./platform/app/
-# The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
-# are consumed as source, so pnpm install must see their package.json to link them
-# and install their own dependencies (pino, pino-pretty, ...) into
-# packages/*/node_modules. Without this the app bundle build fails to resolve those
-# deps (e.g. "Rolldown failed to resolve import 'pino'"). Same reason mcp-server is
-# copied early above. node_modules is dockerignored, so only source is copied here.
-COPY platform/app/packages ./platform/app/packages
+COPY platform/app/package.json ./platform/app/
 COPY platform/app/vendor ./platform/app/vendor
+# The nested workspace packages must be present at install time or pnpm skips
+# their importers and their dependencies never land in node_modules.
+COPY platform/app/packages ./platform/app/packages
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
-RUN cd platform/app && CI=true pnpm install --frozen-lockfile
+RUN CI=true pnpm install --frozen-lockfile
 COPY platform/app ./platform/app
 RUN cd platform/app && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 
-# Remove dev dependencies — not needed at runtime
-RUN cd platform/app && CI=true pnpm prune --prod
+# Remove dev dependencies — not needed at runtime. `install --prod` against the
+# same frozen lockfile is the workspace-wide prune.
+RUN CI=true pnpm install --frozen-lockfile --prod
 # Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
 RUN cd platform/app && pnpm prisma generate
 
@@ -65,18 +67,19 @@ COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 WORKDIR /app
 
 # Copy built artifacts from builder.
-# mcp/typescript must be copied alongside platform/app because pnpm workspace
-# symlinks platform/app/node_modules/@langwatch/mcp-server -> the mcp/typescript tree.
-# cli-cards is another root workspace package linked the same way and is loaded
-# by migration tasks as well as the running server.
+# The workspace root manifests and the shared virtual store (/app/node_modules)
+# must come along: member node_modules are symlink farms pointing back into
+# ../../node_modules/.pnpm. mcp/typescript must be copied alongside
+# platform/app because the workspace symlinks
+# platform/app/node_modules/@langwatch/mcp-server -> the mcp/typescript tree.
+COPY --from=builder /app/pnpm-workspace.yaml /app/pnpm-lock.yaml /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/platform/app ./platform/app
 COPY --from=builder /app/mcp/typescript ./mcp/typescript
-COPY --from=builder /app/packages/cli-cards/package.json ./packages/cli-cards/package.json
-COPY --from=builder /app/packages/cli-cards/src ./packages/cli-cards/src
-# cli-cards deliberately declares zod as a peer. Because the workspace package
-# lives outside /app/platform/app, expose the app's production zod at the nearest
-# shared node_modules boundary after dev dependencies have been pruned.
-RUN mkdir -p ./node_modules && ln -s ../platform/app/node_modules/zod ./node_modules/zod
+# Root workspace packages (cli-cards, handled-error, ...) are consumed as
+# source at runtime (migration tasks and the running server); their
+# node_modules symlink farms resolve into the copied root virtual store.
+COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
 

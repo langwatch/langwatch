@@ -76,23 +76,16 @@ jobs:
         uses: ./.github/actions/setup-pnpm-node
         with:
           cache-dependency-path: |
-            platform/app/pnpm-lock.yaml
-            skills/pnpm-lock.yaml
+            pnpm-lock.yaml
+            pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         working-directory: platform/app
 
-      # `--ignore-workspace`: same gotcha as agentic-e2e-tests in e2e-ci.yml.
-      # The repo-root pnpm-workspace.yaml introduced by @langwatch/server in
-      # packages/ shadows skills/ unless we tell pnpm to ignore it. Without
-      # this, `pnpm install` here does "Scope: all N workspace projects"
-      # (only `packages/*`) and skills/node_modules never gets `unified`,
-      # `tsx` deps, etc. — the next sync-prompts.sh step then dies with
-      # ERR_MODULE_NOT_FOUND on `unified` from skills/_lib/mdx-inline.ts.
-      - name: Install skill tooling
-        run: pnpm install --frozen-lockfile --ignore-workspace
-        working-directory: skills
+      # skills/ is a member of the single root pnpm workspace, so the
+      # workspace-wide install above already resolved its deps (`unified`,
+      # `tsx`, ...) into skills/node_modules. Nothing extra to install here.
 
       - name: Regenerate prompts-data.jsx
         run: bash docs/scripts/sync-prompts.sh

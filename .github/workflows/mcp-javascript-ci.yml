@@ -49,7 +49,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "mcp/typescript/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           install-dir: mcp/typescript
 
       - name: Run typecheck
@@ -71,7 +71,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "mcp/typescript/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           install-dir: mcp/typescript
 
       - name: Build

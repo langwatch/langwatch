@@ -168,14 +168,13 @@ jobs:
       # this, end users see vite chunder past at startup on first run —
       # exactly the bureaucracy we're trying to eliminate.
       #
-      # platform/app/ is its own pnpm workspace (not in the root pnpm-workspace
-      # `packages/*` glob), so we install + build it explicitly here.
-      # node_modules/ is excluded from the tarball by platform/app/.npmignore,
-      # so end users still run `pnpm install` once on first start (which
-      # generates the platform-specific Prisma client via prisma's
-      # postinstall hook).
+      # The repo is a single pnpm workspace, so the root install above already
+      # covers platform/app + its packages + mcp/typescript. node_modules/ is
+      # excluded from the tarball, so end users still run `pnpm install` once
+      # on first start (which generates the platform-specific Prisma client
+      # via prisma's postinstall hook).
       - name: Install langwatch app deps
-        run: pnpm -C platform/app install --frozen-lockfile --prod=false
+        run: pnpm install --frozen-lockfile --prod=false
 
       - name: Build langwatch app (vite + scenario + mcp + generated types)
         run: pnpm -C platform/app run build
@@ -213,6 +212,10 @@ jobs:
             # crashes loading "@langwatch/mcp-server/create-mcp-server".
             "package/mcp/typescript/package.json"
             "package/mcp/typescript/dist/create-mcp-server.js"
+            # single-workspace root manifests: first-boot `pnpm install` at
+            # ~/.langwatch/app runs against these.
+            "package/pnpm-workspace.yaml"
+            "package/pnpm-lock.yaml"
           )
           forbidden=(
             "package/platform/app/node_modules"

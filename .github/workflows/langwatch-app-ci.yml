@@ -68,7 +68,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "platform/app/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           install-dir: platform/app
 
       - name: Prepare files
@@ -134,7 +134,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "platform/app/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           install-dir: platform/app
 
       - name: Prepare files
@@ -239,7 +239,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "platform/app/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           install-dir: platform/app
 
       - name: Prepare files
@@ -353,7 +353,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "platform/app/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           install-dir: platform/app
 
       - name: Check feature-file parity
@@ -399,7 +399,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('platform/app/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
@@ -416,9 +416,9 @@ jobs:
         with:
           path: |
             platform/app/node_modules/.vite
-          key: ${{ runner.os }}-vite-${{ hashFiles('platform/app/pnpm-lock.yaml') }}-${{ hashFiles('platform/app/src/**/*', 'platform/app/vite.config.ts') }}
+          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('platform/app/src/**/*', 'platform/app/vite.config.ts') }}
           restore-keys: |
-            ${{ runner.os }}-vite-${{ hashFiles('platform/app/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-vite-
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
@@ -492,7 +492,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "platform/app/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           install-dir: platform/app
 
       - name: Stage canary fixture inside vitest root

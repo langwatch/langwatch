@@ -1,8 +1,0 @@
-packages:
-  - .
-  # The CLI's card/domain-error contract, shared with the app. Source-only and
-  # bundled into dist by tsup (see `noExternal`), so the published `langwatch`
-  # tarball carries the schemas inline and has no dependency to resolve.
-  - ../packages/cli-cards
-
-minimumReleaseAge: 10080

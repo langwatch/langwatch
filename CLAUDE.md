@@ -120,6 +120,23 @@ make service-watch svc=nlpgo # live reload via air
 
 ## Commands
 
+The repo is a **single pnpm workspace** rooted at the repo root: one
+`pnpm-workspace.yaml`, one `pnpm-lock.yaml`, one shared store for the app
+(`@langwatch/app`), its internal packages (`@langwatch/api`,
+`@langwatch/observability`), the published SDK (`langwatch` —
+sdks/typescript), the MCP server (`@langwatch/mcp-server`), the installer CLI
+(`@langwatch/server-cli`), skills and the agentic e2e suite. `pnpm install`
+anywhere installs everything; target one package with filtering:
+
+```bash
+pnpm --filter @langwatch/app typecheck
+pnpm --filter langwatch build          # the published TypeScript SDK
+pnpm --filter @langwatch/mcp-server test
+```
+
+Overrides/settings live ONLY in the root `pnpm-workspace.yaml` — a `pnpm`
+section in a member package.json is ignored by pnpm and must not be added.
+
 Inside platform/app/
 
 ```bash
