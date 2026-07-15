@@ -293,6 +293,22 @@ program
     }
   });
 
+program
+  .command("code", { hidden: true })
+  .description("Run `code` (VS Code) with LangWatch telemetry for GitHub Copilot Chat (direct OTLP).")
+  .allowUnknownOption(true)
+  .allowExcessArguments(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapCode } = await import("./commands/wrap.js");
+      await wrapCode(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
 const copilotAppCmd = program
   .command("copilot-app")
   .description(
