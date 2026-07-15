@@ -16,7 +16,9 @@ import { streamSSE } from "hono/streaming";
 import type { z } from "zod";
 import {
   createInitialUIState,
+  type DatasetReference,
   type EvaluationsV3State,
+  type TargetConfig,
 } from "~/experiments-v3/types";
 import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
 import type { TypedAgent } from "~/server/agents/agent.repository";
@@ -47,6 +49,11 @@ import {
   runInputsBodySchema,
 } from "~/server/experiments-v3/execution/types";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
+import {
+  attachComparison,
+  attachComparisonBodySchema,
+  ComparisonTargetError,
+} from "~/server/experiments-v3/comparisonTargetService";
 import { trackServerEvent } from "~/server/posthog";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { createLogger } from "~/utils/logger/server";
@@ -514,6 +521,98 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
 
   return c.json({ runId, status: "running", total, runUrl });
 });
+
+// ── POST /:slug/comparison (attach a comparison target via API key) ─
+
+secured
+  .access(apiKeyAuth)
+  .post(
+    "/:slug/comparison",
+    zValidator("json", attachComparisonBodySchema),
+    async (c) => {
+      const { slug } = c.req.param();
+
+      const authResult = await authenticateRequest(c, "evaluations:manage");
+      if ("error" in authResult) {
+        return c.json(
+          { error: authResult.error },
+          { status: authResult.status },
+        );
+      }
+      const { project, markUsed } = authResult;
+
+      const experiment = await ExperimentService.create(
+        prisma,
+      ).findBySlugAndType({
+        projectId: project.id,
+        slug,
+        type: ExperimentType.EVALUATIONS_V3,
+      });
+
+      if (!experiment) {
+        return c.json({ error: "Experiment not found" }, { status: 404 });
+      }
+
+      const parseResult = persistedEvaluationsV3StateSchema.safeParse(
+        experiment.workbenchState,
+      );
+      if (!parseResult.success) {
+        logger.error(
+          { slug, errors: parseResult.error.errors },
+          "Invalid workbenchState",
+        );
+        return c.json(
+          { error: "Invalid experiment configuration" },
+          { status: 400 },
+        );
+      }
+      const workbenchState = parseResult.data;
+
+      const body = c.req.valid("json");
+
+      try {
+        const { targets, comparisonTargetId, createdTargetIds, reusedTargetIds } =
+          await attachComparison({
+            prisma,
+            projectId: project.id,
+            targets: workbenchState.targets as TargetConfig[],
+            datasets: workbenchState.datasets as DatasetReference[],
+            activeDatasetId:
+              workbenchState.datasets[0]?.id ?? "dataset-1",
+            body,
+          });
+
+        await ExperimentService.create(prisma).updateWorkbenchState({
+          projectId: project.id,
+          id: experiment.id,
+          workbenchState: { ...workbenchState, targets },
+        });
+
+        logger.info(
+          { projectId: project.id, slug, comparisonTargetId, createdTargetIds },
+          "Attached comparison target via API key",
+        );
+        markUsed();
+
+        return c.json({ comparisonTargetId, createdTargetIds, reusedTargetIds, targets });
+      } catch (error) {
+        if (error instanceof ComparisonTargetError) {
+          return c.json({ error: error.message }, { status: error.status });
+        }
+        logger.error(
+          { error, projectId: project.id, slug },
+          "Failed to attach comparison target",
+        );
+        captureException(toError(error), {
+          extra: { projectId: project.id, slug },
+        });
+        return c.json(
+          { error: "Failed to attach comparison target" },
+          { status: 400 },
+        );
+      }
+    },
+  );
 
 // ── GET /runs?experimentSlug=... (list runs for an experiment) ──────
 
