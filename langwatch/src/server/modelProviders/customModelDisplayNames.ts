@@ -14,7 +14,7 @@ const SCOPE_RANK = {
   PROJECT: 0,
   TEAM: 1,
   ORGANIZATION: 2,
-} satisfies Record<ScopeTier, number>;
+} as const satisfies Record<ScopeTier, number>;
 const UNSCOPED_RANK = 3;
 
 /**
@@ -106,9 +106,9 @@ const customEntriesOf = (
 
 /**
  * The Display Name a user chose for this entry, or null when the entry
- * carries none. An entry names nothing when its `modelId` is not a
- * non-empty string, when its `displayName` is not a string or is blank,
- * or when the name merely repeats the `modelId`.
+ * carries none. An entry names nothing when its `modelId` is not a string
+ * or is blank, when its `displayName` is not a string or is blank, or
+ * when the name merely repeats the `modelId`.
  *
  * That last case is what `toLegacyCompatibleCustomModels` synthesizes for
  * a legacy `string[]` row: an artifact of the conversion rather than a
@@ -117,10 +117,23 @@ const customEntriesOf = (
  * Where it does decide something — deliberately — is when another row
  * names the same model: the artifact never competes, so the real name
  * wins the key even from a row the artifact's row would outrank.
+ *
+ * `modelId` is rejected on the same terms as `displayName` — blank after
+ * trimming, not merely empty. `customModelEntrySchema`'s `min(1)` does not
+ * screen `"   "` out (it is three characters long), and
+ * `toLegacyCompatibleCustomModels` casts its elements through unchecked,
+ * so an all-whitespace id reaches here from a hand-edited or migrated JSON
+ * row. Naming it would key the map `<provider>/   ` — a key no caller can
+ * ever hold, since a full model id is built from a real id.
+ *
+ * Only the all-whitespace case is rejected; the id is NOT trimmed for the
+ * key. An id with real content and incidental spaces keys on its stored
+ * form, because the value a picker holds comes from that same stored
+ * field — trimming here would name a model the caller never asks about.
  */
 const configuredDisplayName = (entry: CustomModelEntry): string | null => {
   const modelId = entry?.modelId;
-  if (typeof modelId !== "string" || !modelId) return null;
+  if (typeof modelId !== "string" || !modelId.trim()) return null;
   if (typeof entry.displayName !== "string") return null;
 
   const displayName = entry.displayName.trim();

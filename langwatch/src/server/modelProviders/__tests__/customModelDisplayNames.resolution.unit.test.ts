@@ -635,6 +635,48 @@ describe("given a row whose custom models array mixes malformed entries with a v
   });
 });
 
+describe("given a row whose custom entry has a whitespace-only model id, alongside a valid entry", () => {
+  describe("when display names are built for it", () => {
+    // `customModelEntrySchema` declares `modelId: z.string().min(1)`, which
+    // an all-whitespace id passes on length — it is three characters long —
+    // and `toLegacyCompatibleCustomModels` casts the elements through
+    // unchecked, so this shape reaches the resolver from a hand-edited or
+    // migrated JSON row exactly like the malformed entries above.
+    //
+    // The entry's display name is REAL ("Ghost Model", not blank), so the
+    // display-name guard cannot explain the ghost keys' absence — only a
+    // model-id guard that rejects blank-after-trimming can. A falsy-only
+    // guard (`!modelId`) lets "   " through and writes `vendorQ/   ` and
+    // `mp_ws/   `: keys no caller can ever hold, since a full model id is
+    // built from a real id. The row carries an `id` so BOTH key forms are
+    // exercised — a guard covering only one would still leak the other.
+    // The valid entry is listed LAST, so a loop that returned on the first
+    // rejected entry instead of skipping it would fail the `toBe` too.
+    it("keys the map by the valid entry alone, never by the whitespace-only model id", () => {
+      const row = makeProvider({
+        provider: "vendorQ",
+        id: "mp_ws",
+        customModels: [
+          { modelId: "   ", displayName: "Ghost Model", mode: "chat" },
+          { modelId: "aurora-8", displayName: "Aurora Eight", mode: "chat" },
+        ],
+      });
+
+      const result = buildCustomModelDisplayNames([row]);
+
+      expect(result["vendorQ/aurora-8"]).toBe("Aurora Eight");
+      expect(result["mp_ws/aurora-8"]).toBe("Aurora Eight");
+      // Asserts the whole key space positively rather than probing the ghost
+      // keys for absence: a bare `toBeUndefined()` would also pass against a
+      // map that came back empty for some unrelated reason.
+      expect(Object.keys(result).sort()).toEqual([
+        "mp_ws/aurora-8",
+        "vendorQ/aurora-8",
+      ]);
+    });
+  });
+});
+
 describe("given a provider with only a legacy-converted custom model", () => {
   describe("when the display name is resolved", () => {
     /** @scenario A legacy-only provider renders the same label as before display names existed */
