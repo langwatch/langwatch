@@ -29,6 +29,8 @@ const { mockCreate, mockGetTracesWithSpans, mockBuildDeps, BLOB_DEPS } =
   });
 
 const mockAnnotationFindMany = vi.fn().mockResolvedValue([]);
+const mockQueueItemFindMany = vi.fn();
+const mockQueueItemCount = vi.fn().mockResolvedValue(1);
 
 vi.mock("~/server/traces/trace.service", () => ({
   TraceService: { create: mockCreate },
@@ -79,16 +81,22 @@ function makePrismaStub(): PrismaClient {
     createdByUser: null,
     annotationQueue: null,
   };
+  mockQueueItemFindMany.mockResolvedValue([queueItem]);
   return {
     annotationQueueItem: {
-      findMany: vi.fn().mockResolvedValue([queueItem]),
-      count: vi.fn().mockResolvedValue(1),
+      findMany: mockQueueItemFindMany,
+      count: mockQueueItemCount,
     },
     annotation: {
       findMany: mockAnnotationFindMany,
     },
     annotationQueue: {
       findMany: vi.fn().mockResolvedValue([]),
+    },
+    project: {
+      findUnique: vi.fn().mockResolvedValue({
+        team: { organizationId: "org_123" },
+      }),
     },
   } as unknown as PrismaClient;
 }
@@ -128,6 +136,33 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
     it("constructs with deps and resolves trace IO full", async () => {
       await caller.getQueueItems({ projectId: "project_123" });
       expectFullResolution();
+      expect(mockQueueItemFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            projectId: "project_123",
+            AND: expect.arrayContaining([
+              {
+                OR: [
+                  { annotationQueueId: null },
+                  { annotationQueue: { projectId: "project_123" } },
+                ],
+              },
+              {
+                OR: [
+                  { userId: null },
+                  {
+                    user: {
+                      orgMemberships: {
+                        some: { organizationId: "org_123" },
+                      },
+                    },
+                  },
+                ],
+              },
+            ]),
+          }),
+        }),
+      );
     });
   });
 
@@ -140,6 +175,29 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
         pageOffset: 0,
       });
       expectFullResolution();
+    });
+
+    it("scopes an explicit queue to the project", async () => {
+      await caller.getOptimizedAnnotationQueues({
+        projectId: "project_123",
+        selectedAnnotations: "pending",
+        pageSize: 10,
+        pageOffset: 0,
+        queueId: "queue_123",
+      });
+
+      expect(mockQueueItemCount).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            {
+              annotationQueue: {
+                id: "queue_123",
+                projectId: "project_123",
+              },
+            },
+          ]),
+        }),
+      });
     });
   });
 });
