@@ -90,7 +90,7 @@ Feature: `langwatch code` captures VS Code Copilot Chat via a scoped shell funct
 
   Rule: logout removes the VS Code capture
 
-    @integration @unimplemented
+    @integration
     Scenario: Logout removes the scoped code() function
       Given the scoped `code()` function is installed
       When the user runs `langwatch logout`

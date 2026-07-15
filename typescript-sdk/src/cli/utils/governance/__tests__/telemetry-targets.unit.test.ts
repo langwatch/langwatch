@@ -120,6 +120,36 @@ describe("scanTelemetryTargets", () => {
     });
   });
 
+  describe("when a scoped code() function is installed (VS Code)", () => {
+    beforeEach(() => {
+      persistBlockToRc(
+        "zsh",
+        buildScopedToolFunction(
+          "code",
+          {
+            COPILOT_OTEL_ENABLED: "true",
+            OTEL_EXPORTER_OTLP_ENDPOINT: "http://app/api/otel",
+          },
+          "zsh",
+        ),
+        toolMarkers("code"),
+      );
+    });
+
+    /** @scenario Logout removes the scoped code() function */
+    it("reports the code function target and removes it on logout, leaving the rc clean", () => {
+      expect(
+        presentLabels().some((l) => l.startsWith("code shell function")),
+      ).toBe(true);
+
+      for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+        expect(t.remove()).toBe(true);
+      }
+
+      expect(presentLabels()).toEqual([]);
+    });
+  });
+
   describe("when the codex gateway (Path A) profile is installed", () => {
     it("reports the gateway block and profile file, then removes both", () => {
       writeCodexGatewayBlock({ gatewayUrl: "https://gateway.langwatch.ai" });
