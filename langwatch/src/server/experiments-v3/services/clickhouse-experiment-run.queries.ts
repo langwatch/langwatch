@@ -56,6 +56,66 @@ export const WARN_OLD_RUN_AGE_MS = 30 * 24 * 60 * 60 * 1000;
  * `Math.min(...[])` → `Infinity`) which ClickHouse would reject with an
  * opaque parse error.
  */
+/**
+ * Business dedup key for `experiment_run_items`, a ReplacingMergeTree
+ * versioned on `OccurredAt`.
+ *
+ * One constant because the key appears in three positions that must agree: the
+ * left side of the IN-tuple, the subquery projection, and the subquery GROUP
+ * BY. If those drift apart the filter silently stops deduplicating and
+ * superseded rows are counted twice.
+ */
+const RUN_ITEMS_DEDUP_KEY =
+  "TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')";
+
+/**
+ * Scope shared by the multi-run `experiment_run_items` reads: the tenant, the
+ * OccurredAt bound that lets ClickHouse prune the weekly partitions, and the
+ * exact (ExperimentId, RunId) pairs.
+ *
+ * Filtering by exact pairs rather than `ExperimentId IN (...) AND RunId IN
+ * (...)` avoids matching the cartesian product of the two sets whenever a
+ * runId is reused across experiments.
+ */
+const RUN_ITEMS_SCOPE = `TenantId = {tenantId:String}
+          AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+          AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+          AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}`;
+
+/**
+ * Build the WHERE clause that scopes an `experiment_run_items` read to a set of
+ * runs and keeps only the latest version of each business key.
+ *
+ * Dedup uses an IN-tuple subquery on (key columns, OccurredAt) rather than the
+ * per-row dedup anti-pattern. That pattern reads every selected column
+ * (including heavy payloads like EvaluationDetails / EvaluationInputs) before
+ * deduplicating, which can OOM on large parts. The IN-tuple pattern resolves
+ * dedup using only lightweight key columns and the ReplacingMergeTree version
+ * column. See `dev/docs/best_practices/clickhouse-queries.md`.
+ *
+ * `extraFilters` narrow the outer read only, never the dedup subquery. The
+ * subquery has to see every version of a row to pick the latest one; narrowing
+ * it by, say, EvaluationStatus would resolve `max(OccurredAt)` against a
+ * filtered subset and resurrect superseded rows.
+ */
+export function buildDedupedRunItemsWhere({
+  extraFilters = [],
+}: { extraFilters?: string[] } = {}): string {
+  const extra = extraFilters
+    .map((filter) => `\n          AND ${filter}`)
+    .join("");
+
+  return `WHERE ${RUN_ITEMS_SCOPE}${extra}
+          AND (${RUN_ITEMS_DEDUP_KEY}, OccurredAt) IN (
+            SELECT
+              ${RUN_ITEMS_DEDUP_KEY},
+              max(OccurredAt)
+            FROM experiment_run_items
+            WHERE ${RUN_ITEMS_SCOPE}
+            GROUP BY ${RUN_ITEMS_DEDUP_KEY}
+          )`;
+}
+
 export function computeOccurredAtRangeForRuns(
   runs: Pick<ClickHouseExperimentRunRow, "CreatedAt" | "UpdatedAt">[],
 ): { minOccurredAt: string; maxOccurredAt: string; minMs: number } {
