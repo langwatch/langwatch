@@ -39,7 +39,7 @@ Feature: Copilot app OTLP spans canonicalize on the unified substrate
       Then the recorded span carries the model name
       And the recorded span carries input and output token counts
 
-    @unit @unimplemented
+    @unit
     Scenario: An app tool-execution span canonicalizes as a tool span
       Given a copilot OTLP span named "execute_tool" with gen_ai tool attributes
       When the span is ingested with the copilot_app ingest key

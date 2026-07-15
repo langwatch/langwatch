@@ -123,6 +123,24 @@ describe("resolveWrapperMode", () => {
       expect(out.vars.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=codex");
     });
 
+    it("clears inherited Copilot BYOK provider vars so ingestion preserves the seat", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-test-token",
+        prefix: "sk-lw-test",
+        endpoint: "http://app.example.com/api/otel",
+      });
+
+      const out = await resolveWrapperMode(baseCfg(), "copilot", {});
+
+      expect(out.mode).toBe("ingestion");
+      // an inherited COPILOT_PROVIDER_BASE_URL would keep BYOK active and
+      // route traffic off the seat — ingestion must scrub it from the child
+      expect(out.clears).toContain("COPILOT_PROVIDER_BASE_URL");
+      expect(out.clears).toContain("COPILOT_PROVIDER_TYPE");
+      expect(out.clears).toContain("COPILOT_PROVIDER_API_KEY");
+    });
+
     it("writes the [otel] block to the codex config.toml as a side effect", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
       (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({

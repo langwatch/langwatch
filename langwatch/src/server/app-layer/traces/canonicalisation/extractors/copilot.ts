@@ -44,8 +44,15 @@ import type {
 
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 
-/** Copilot CLI's instrumentation scope name (verified, copilot 1.0.69). */
-export const COPILOT_SCOPE = "@github/copilot";
+/**
+ * Copilot's instrumentation scope name. Verified on the wire: build
+ * 1.0.71 emits `github.copilot` (the documented `COPILOT_OTEL_SOURCE_NAME`
+ * default); `@github/copilot` is kept as a legacy alias for older builds.
+ * Matching by scope — not only by a `github.copilot.*` attribute — is what
+ * lets an `execute_tool` span (which may carry no vendor attribute) still
+ * be recognized as copilot and classified as a tool span.
+ */
+export const COPILOT_SCOPES = ["github.copilot", "@github/copilot"];
 
 /** Copilot's gen_ai.operation.name values → langwatch span types. */
 const OPERATION_TO_SPAN_TYPE: Record<string, string> = {
@@ -74,7 +81,8 @@ export class CopilotExtractor implements CanonicalAttributesExtractor {
     // wire) or a github.copilot.* attribute.
     const scopeName = ctx.span.instrumentationScope?.name ?? "";
     const hasCopilotProvenance =
-      scopeName === COPILOT_SCOPE || attrs.hasByPrefix(COPILOT_ATTR_PREFIX);
+      COPILOT_SCOPES.includes(scopeName) ||
+      attrs.hasByPrefix(COPILOT_ATTR_PREFIX);
     if (!hasCopilotProvenance) return;
 
     if (typeof operation === "string" && OPERATION_TO_SPAN_TYPE[operation]) {

@@ -90,6 +90,21 @@ describe("CopilotExtractor", () => {
       expect(ctx.out["langwatch.span.type"]).toBe("tool");
     });
 
+    /** @scenario An app tool-execution span canonicalizes as a tool span */
+    it("classifies an execute_tool span carrying only the github.copilot scope (no vendor attribute) as a tool", () => {
+      // The real 1.0.71 scope is "github.copilot"; an execute_tool span
+      // may carry no github.copilot.* attribute, so provenance must be
+      // recognized from the scope alone or the span is misclassified.
+      const ctx = createExtractorContext(
+        { "gen_ai.operation.name": "execute_tool" },
+        { instrumentationScope: { name: "github.copilot", version: "1.0.71-0" } },
+      );
+
+      new CopilotExtractor().apply(ctx);
+
+      expect(ctx.out["langwatch.span.type"]).toBe("tool");
+    });
+
     it("infers the agent span type from invoke_agent", () => {
       const ctx = createExtractorContext({
         "gen_ai.operation.name": "invoke_agent",
