@@ -202,7 +202,7 @@ export const workflowRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.workflow.findMany({
+      const workflows = await ctx.prisma.workflow.findMany({
         where: { projectId: input.projectId, archivedAt: null },
         orderBy: { updatedAt: "desc" },
         select: {
@@ -246,16 +246,54 @@ export const workflowRouter = createTRPCRouter({
               },
             },
           },
-          _count: {
-            select: {
-              copiedWorkflows: {
-                where: {
-                  archivedAt: null,
-                },
-              },
-            },
+          copiedWorkflows: {
+            where: { archivedAt: null },
+            select: { projectId: true },
           },
         },
+      });
+
+      const relatedProjectIds = [
+        ...new Set(
+          workflows.flatMap((workflow) => [
+            ...(workflow.copiedFrom ? [workflow.copiedFrom.projectId] : []),
+            ...workflow.copiedWorkflows.map((copy) => copy.projectId),
+          ]),
+        ),
+      ];
+      const visibleProjects = new Map(
+        await Promise.all(
+          relatedProjectIds.map(
+            async (projectId) =>
+              [
+                projectId,
+                projectId === input.projectId ||
+                  (await hasProjectPermission(
+                    ctx,
+                    projectId,
+                    "workflows:view",
+                  )),
+              ] as const,
+          ),
+        ),
+      );
+
+      return workflows.map(({ copiedWorkflows, ...workflow }) => {
+        const canSeeSource =
+          workflow.copiedFrom &&
+          visibleProjects.get(workflow.copiedFrom.projectId);
+        return {
+          ...workflow,
+          copiedFromWorkflowId: canSeeSource
+            ? workflow.copiedFromWorkflowId
+            : null,
+          copiedFrom: canSeeSource ? workflow.copiedFrom : null,
+          _count: {
+            copiedWorkflows: copiedWorkflows.filter((copy) =>
+              visibleProjects.get(copy.projectId),
+            ).length,
+          },
+        };
       });
     }),
 
