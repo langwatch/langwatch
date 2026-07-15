@@ -36,6 +36,7 @@ import {
   convertHttpComponentConfig,
 } from "~/experiments-v3/utils/httpAgentUtils";
 import { AgentService } from "~/server/agents/agent.service";
+import { AgentNotFoundError } from "~/server/agents/errors";
 import { EvaluatorService } from "~/server/evaluators/evaluator.service";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 
@@ -51,9 +52,13 @@ export const variantSpecSchema = z.discriminatedUnion("kind", [
 export type VariantSpec = z.infer<typeof variantSpecSchema>;
 
 export const attachComparisonBodySchema = z.object({
-  variants: z
-    .array(variantSpecSchema)
-    .min(2, "At least two variants are required to build a comparison"),
+  // Deliberately no .min(2) here: a zod schema failure returns Hono's raw
+  // { success: false, error: ZodError } envelope, a different shape from
+  // every other error this route returns ({ error: string }). The <2 check
+  // (covering both "too few given" and "resolved to fewer than 2 distinct
+  // targets") happens in attachComparison() instead, so callers only ever
+  // see one error shape.
+  variants: z.array(variantSpecSchema),
   goldenField: z.string().optional(),
   hasGoldenAnswer: z.boolean().optional(),
   inputField: z.string().optional(),
@@ -163,10 +168,15 @@ const resolveVariant = async ({
   }
 
   // spec.kind === "agent"
-  const agent = await agentService.getByIdOrThrow({
-    id: spec.agentId,
-    projectId,
-  });
+  let agent: Awaited<ReturnType<AgentLookup["getByIdOrThrow"]>>;
+  try {
+    agent = await agentService.getByIdOrThrow({ id: spec.agentId, projectId });
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) {
+      throw new ComparisonTargetError(`Agent "${spec.agentId}" not found`, 404);
+    }
+    throw error;
+  }
 
   const existing = allTargets.find(
     (t) => t.type === "agent" && t.dbAgentId === agent.id,
@@ -269,6 +279,15 @@ export const attachComparison = async ({
     evaluatorService?: EvaluatorLookup;
   };
 }): Promise<AttachComparisonResult> => {
+  if (datasets.length === 0) {
+    throw new ComparisonTargetError("No dataset configured");
+  }
+  if (body.variants.length < 2) {
+    throw new ComparisonTargetError(
+      "At least two variants are required to build a comparison",
+    );
+  }
+
   const activeDataset =
     datasets.find((d) => d.id === activeDatasetId) ?? datasets[0];
 
@@ -301,13 +320,40 @@ export const attachComparison = async ({
     variantTargetIds.push(resolved.id);
   }
 
+  // Two --variant specs can resolve to the same underlying target (e.g. an
+  // explicit duplicate, or a `prompt:`/`agent:` spec that reuses a target
+  // already referenced via `target:`). Dedupe rather than silently building
+  // a "compare X against itself" comparison, then require at least two
+  // distinct candidates remain — a comparison needs real variety.
+  const uniqueVariantIds = [...new Set(variantTargetIds)];
+  if (uniqueVariantIds.length < 2) {
+    throw new ComparisonTargetError(
+      "At least two distinct variants are required to build a comparison — the given variants resolved to the same target.",
+    );
+  }
+
+  // goldenField/inputField are free-text in the request (unlike the UI's
+  // dropdown, which can only ever offer real columns). A typo here would
+  // otherwise persist silently and only surface as a missing value at run
+  // time, well after the caller has moved on.
+  for (const [label, field] of [
+    ["goldenField", body.goldenField],
+    ["inputField", body.inputField],
+  ] as const) {
+    if (field && !activeDataset!.columns.some((c) => c.name === field)) {
+      throw new ComparisonTargetError(
+        `${label} "${field}" is not a column on dataset "${activeDataset!.id}". Available columns: ${activeDataset!.columns.map((c) => c.name).join(", ") || "none"}`,
+      );
+    }
+  }
+
   const hasGoldenAnswer = body.hasGoldenAnswer ?? !!body.goldenField;
   const comparisonConfig: ComparisonEvaluatorConfig = {
-    variants: variantTargetIds,
+    variants: uniqueVariantIds,
     hasGoldenAnswer,
     goldenField: body.goldenField,
     inputField: body.inputField,
-    includeMetrics: body.includeMetrics ?? [],
+    includeMetrics: [...new Set(body.includeMetrics ?? [])],
     randomizeOrder: body.randomizeOrder ?? true,
   };
 

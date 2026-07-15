@@ -93,6 +93,11 @@ export const addComparisonCommand = async (
         .filter((m): m is "cost" | "duration" => m === "cost" || m === "duration")
     : undefined;
 
+  // An empty string (e.g. `--golden-field ""`) is not a real column
+  // reference — treat it the same as omitting the flag entirely.
+  const goldenField = options.goldenField || undefined;
+  const inputField = options.inputField || undefined;
+
   const service = new ExperimentsApiService();
   const spinner = ora(`Attaching comparison to "${slug}"...`).start();
 
@@ -101,8 +106,8 @@ export const addComparisonCommand = async (
       slug,
       body: {
         variants,
-        goldenField: options.goldenField,
-        inputField: options.inputField,
+        goldenField,
+        inputField,
         includeMetrics,
         randomizeOrder: options.randomize,
       },

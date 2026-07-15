@@ -195,6 +195,24 @@ describe.skipIf(process.env.CI)("POST /api/experiments/:slug/comparison", () => 
       expect(body.error).toContain("target-a");
       expect(body.error).toContain("target-b");
     });
+
+    it("rejects a goldenField that isn't a real dataset column", async () => {
+      const response = await post(
+        testSlug,
+        {
+          variants: [
+            { kind: "existingTarget", targetId: "target-a" },
+            { kind: "existingTarget", targetId: "target-b" },
+          ],
+          goldenField: "not-a-real-column",
+        },
+        authHeaders(),
+      );
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toMatch(/not a column on dataset/i);
+    });
   });
 
   describe("attaching a comparison to existing targets", () => {
@@ -293,6 +311,65 @@ describe.skipIf(process.env.CI)("POST /api/experiments/:slug/comparison", () => 
       expect(response.status).toBe(400);
       const body = await response.json();
       expect(body.error).toMatch(/comparison/i);
+    });
+  });
+
+  describe("rejecting variants that resolve to the same target", () => {
+    it("rejects a duplicate existingTarget reference", async () => {
+      const response = await post(
+        testSlug,
+        {
+          variants: [
+            { kind: "existingTarget", targetId: "target-a" },
+            { kind: "existingTarget", targetId: "target-a" },
+          ],
+        },
+        authHeaders(),
+      );
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toMatch(/at least two distinct variants/i);
+    });
+  });
+
+  describe("referencing an agent that does not exist", () => {
+    it("returns a 404 rather than a generic failure", async () => {
+      const response = await post(
+        testSlug,
+        {
+          variants: [
+            { kind: "existingTarget", targetId: "target-a" },
+            { kind: "agent", agentId: "does-not-exist" },
+          ],
+        },
+        authHeaders(),
+      );
+
+      expect(response.status).toBe(404);
+      const body = await response.json();
+      expect(body.error).toMatch(/does-not-exist.*not found/i);
+    });
+  });
+
+  describe("malformed request body", () => {
+    it("returns 400 for invalid JSON", async () => {
+      const response = await fetch(
+        `${getBaseUrl()}/api/experiments/${testSlug}/comparison`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: "{not valid json",
+        },
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it("returns 400 when variants is missing", async () => {
+      const response = await post(testSlug, {}, authHeaders());
+
+      expect(response.status).toBe(400);
     });
   });
 });
