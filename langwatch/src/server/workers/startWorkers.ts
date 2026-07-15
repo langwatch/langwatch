@@ -42,11 +42,11 @@ async function verifyDatabaseReady(): Promise<void> {
 }
 
 async function bootIngestionPuller(): Promise<void> {
-  const { seedIngestionPullers } = await import(
+  const { reconcileIngestionPullSchedules } = await import(
     "@ee/governance/services/pullers/ingestionPullScheduler"
   );
-  await seedIngestionPullers();
-  logger.info("ingestion pull scheduler ready");
+  await reconcileIngestionPullSchedules();
+  logger.info("ingestion pull calendar reconciled");
 }
 
 async function bootTopicClustering(

@@ -3,45 +3,59 @@
 import { createLogger } from "@langwatch/observability";
 
 /**
- * Event-sourced scheduler for pull-mode ingestion sources.
+ * Calendar-scheduled pull-mode ingestion sources (ADR-044 consumer).
  *
- * Recurrence with no BullMQ and no Linux cron: the source's `pullSchedule`
- * cron string is parsed in-process (cron-parser) to compute the next fire
- * time, and a self-re-arming job on the event-sourcing global queue fires the
- * pull at that moment.
+ * Recurrence and execution are two deliberately separate layers:
  *
- *   - `registerIngestionPullJob` registers the `ingestionPull` job once during
- *     event-sourcing setup. Its `process` re-arms the NEXT pull (at the cron's
- *     next fire time) BEFORE running the current pull, so a crash mid-pull
- *     still leaves the next pull scheduled.
- *   - `seedIngestionPullers` stages one pull per active pull-mode source at
- *     worker start. Idempotent via per-source dedup, so restarts and duplicate
- *     calls never pile up; it is also the crash-recovery net for the re-arm
- *     chain.
- *   - `armIngestionPullForSource` seeds a single source immediately on create,
- *     so a new schedule starts without waiting for a worker restart.
+ *   - WHEN a pull fires is owned by one durable `ScheduledJob` calendar row
+ *     per pull-mode source (Postgres, survives Redis loss and restarts).
+ *     `syncIngestionPullSchedule` / `removeIngestionPullSchedule` keep the row
+ *     in step with the source's lifecycle, and `reconcileIngestionPullSchedules`
+ *     repairs rows a crash between the two writes left missing (worker boot).
+ *   - HOW a pull runs is owned by the event-sourcing GroupQueue:
+ *     `handleIngestionPullFire` (the registered calendar handler) enqueues an
+ *     `ingestionPull` job and returns, so the serial scheduler loop is never
+ *     blocked by a slow pull. The job gives per-source serialization (group
+ *     key = source id) and the bulkhead bounds global pull concurrency.
  *
- * Per-source group serialization (group key = source id) guarantees two pulls
- * for the same source never overlap.
+ * Pulls are cursor-based, so a fire is a self-contained "catch up from the
+ * cursor": a missed or deferred slot delays data, never loses it.
  *
- * Spec: specs/ai-governance/puller-framework/event-sourced-scheduling.feature
+ * Spec: specs/ai-governance/puller-framework/calendar-scheduled-pulls.feature
  */
-import { parseExpression } from "cron-parser";
+import type { PrismaClient } from "@prisma/client";
+import { Cron } from "croner";
 import fastq from "fastq";
 
-import { prisma } from "~/server/db";
+import { PrismaScheduledJobRepository } from "~/server/app-layer/scheduler/scheduled-job.repository";
+import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
+import { prisma as defaultPrisma } from "~/server/db";
 import type {
   DeduplicationConfig,
   EventSourcedQueueProcessor,
 } from "~/server/event-sourcing/queues";
 import type { EventSourcingService } from "~/server/event-sourcing/services/eventSourcingService";
 
+import { ensureHiddenGovernanceProject } from "../governanceProject.service";
+
 import { runIngestionPullForSource } from "./pullerWorker";
 
 const logger = createLogger("langwatch:governance:ingestionPullScheduler");
 
-/** Event-sourcing job name for the recurring pull. */
+/** Calendar consumer key: `ScheduledJob.targetType` for ingestion pulls. */
+export const INGESTION_PULL_TARGET_TYPE = "ingestionPull";
+
+/** Event-sourcing job name for the pull execution. */
 const INGESTION_PULL_JOB = "ingestionPull";
+
+/**
+ * Pull schedules are wall-clock polling cadences, not user-local calendars,
+ * so every source's cron is evaluated in UTC.
+ */
+const PULL_SCHEDULE_TIMEZONE = "UTC";
+
+/** Standard cron: minute, hour, day-of-month, month, day-of-week. */
+const CRON_FIELD_COUNT = 5;
 
 /**
  * Bounded global pull concurrency on this node. The removed BullMQ puller
@@ -61,27 +75,14 @@ export const PULL_CONCURRENCY_LIMIT = Math.max(
 
 /**
  * fastq bulkhead that caps how many pull bodies run at once across all sources
- * on this node. The re-arm is deliberately *outside* it (re-arming is cheap and
- * must never be starved by a saturated pull pool); only the pull body — the
- * upstream fetch + ClickHouse write — is gated.
+ * on this node. Only the pull body — the upstream fetch + ClickHouse write —
+ * is gated.
  */
 const pullBulkhead = fastq.promise<unknown, string, void>(
-  (ingestionSourceId: string) => runIngestionPullForSource({ ingestionSourceId }),
+  (ingestionSourceId: string) =>
+    runIngestionPullForSource({ ingestionSourceId }),
   PULL_CONCURRENCY_LIMIT,
 );
-
-/**
- * Dedup TTL is the wait until the next fire plus a buffer: long enough that a
- * duplicate seed (a second worker boot while a pull is still pending) squashes
- * into the pending job, and self-expiring afterwards. A dispatched job's dedup
- * key goes stale the moment it dispatches (the staging Lua cleans it on the
- * next send for that source), so the re-arm chain is never blocked by it
- * regardless of TTL.
- */
-const DEDUP_BUFFER_MS = 60_000;
-
-/** Floor so a cron expression that resolves to "now" never busy-loops. */
-const MIN_DELAY_MS = 1_000;
 
 /**
  * How long a tick that found the pull bulkhead saturated waits before its
@@ -90,6 +91,16 @@ const MIN_DELAY_MS = 1_000;
  */
 const SATURATION_DEFER_BASE_MS = 2_000;
 const SATURATION_DEFER_JITTER_MS = 3_000;
+
+/**
+ * Dedup TTL for a staged pull job. Fires enqueue with no delay, so the TTL
+ * only needs to cover the window in which a duplicate enqueue could happen
+ * (a calendar re-fire racing an undispatched job, or a saturation deferral).
+ * A dispatched job's dedup key goes stale the moment it dispatches (the
+ * staging Lua cleans it on the next send for that source), so recurrence is
+ * never blocked by it.
+ */
+const DEDUP_TTL_MS = 10 * 60_000;
 
 /**
  * Payload for an `ingestionPull` job. `tenantId` (the org id) drives the
@@ -103,7 +114,57 @@ export type IngestionPullPayload = {
 
 type PullJobFacade = EventSourcedQueueProcessor<IngestionPullPayload>;
 
-/** A schedulable source: enough to compute the next fire and address the job. */
+/**
+ * Set once during `registerIngestionPullJob`. Shared by the calendar fire
+ * handler so it enqueues onto the same registered job. Null when event
+ * sourcing is disabled (the job never registers) — callers then no-op.
+ */
+let pullJobFacade: PullJobFacade | null = null;
+
+// ---------------------------------------------------------------------------
+// Cron validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate a `pullSchedule` as a standard five-field cron with a reachable
+ * next fire, evaluated by croner — the same evaluator the calendar scheduler
+ * fires it with, so "validates" and "fires" can never disagree. Throws on
+ * anything else; callers translate into their error surface.
+ *
+ * Six-field (seconds-resolution) expressions are rejected explicitly: croner
+ * would accept them, and `* * * * * *` would poll an upstream audit-log API
+ * every second.
+ */
+export function assertValidPullSchedule(cron: string): void {
+  if (cron.trim().split(/\s+/).length !== CRON_FIELD_COUNT) {
+    throw new Error(
+      `pullSchedule must be a 5-field cron expression (minute hour day-of-month month day-of-week), got "${cron}"`,
+    );
+  }
+  const next = new Cron(cron, { timezone: PULL_SCHEDULE_TIMEZONE }).nextRun();
+  if (!next) {
+    throw new Error(`pullSchedule "${cron}" has no reachable future fire`);
+  }
+}
+
+/** Next fire instant for a valid pull schedule, strictly after `after`. */
+function nextPullRunAt(cron: string, after: Date): Date {
+  const next = new Cron(cron, { timezone: PULL_SCHEDULE_TIMEZONE }).nextRun(
+    after,
+  );
+  if (!next) {
+    throw new Error(
+      `pullSchedule "${cron}" has no run after ${after.toISOString()}`,
+    );
+  }
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// Calendar sync (recurrence ownership)
+// ---------------------------------------------------------------------------
+
+/** A schedulable source: enough to compute the next fire and key the row. */
 type SchedulableSource = {
   id: string;
   pullSchedule: string;
@@ -111,62 +172,188 @@ type SchedulableSource = {
 };
 
 /**
- * Set once during `registerIngestionPullJob`. Shared by the seeder and the
- * create-time arm so they enqueue onto the same registered job. Null when event
- * sourcing is disabled (the job never registers) — callers then no-op.
+ * The `ScheduledJob` writes are project-scoped (multitenancy guard); an
+ * ingestion source is org-scoped, so its calendar rows live under the org's
+ * hidden governance project — the same tenant key its OCSF events land under.
  */
-let pullJobFacade: PullJobFacade | null = null;
+async function pullScheduleProjectId(
+  prisma: PrismaClient,
+  organizationId: string,
+): Promise<string> {
+  const project = await ensureHiddenGovernanceProject(prisma, organizationId);
+  return project.id;
+}
 
 /**
- * Next fire delay (ms from `nowMs`) for a cron string, parsed in-process with
- * cron-parser. Throws on an invalid cron string (callers log + skip).
+ * Create-or-refresh the source's calendar row: one `ScheduledJob` per source
+ * (`targetId` = source id), next fire computed from the cron. An upsert
+ * re-activates a deactivated row, so this is also the re-enable path.
  */
-export function computeNextDelayMs(cron: string, nowMs: number): number {
-  const nextFireMs = parseExpression(cron, { currentDate: new Date(nowMs) })
-    .next()
-    .toDate()
-    .getTime();
-  return Math.max(MIN_DELAY_MS, nextFireMs - nowMs);
-}
-
-function dedupForSource(
-  delayMs: number,
-  shouldReplace: boolean,
-): DeduplicationConfig<IngestionPullPayload> {
-  return {
-    makeId: (payload) => payload.ingestionSourceId,
-    ttlMs: delayMs + DEDUP_BUFFER_MS,
-    // A normal seed squashes without disturbing the pending schedule. An
-    // explicit schedule change updates both the staged payload and its score;
-    // GroupQueue uses `extend` to move the dispatch score on a dedup hit.
-    extend: shouldReplace,
-    replace: shouldReplace,
-  };
-}
-
-async function stagePull({
-  facade,
+export async function syncIngestionPullSchedule({
   source,
-  nowMs,
-  shouldReplace = false,
+  prisma = defaultPrisma,
 }: {
-  facade: PullJobFacade;
   source: SchedulableSource;
-  nowMs: number;
-  shouldReplace?: boolean;
+  prisma?: PrismaClient;
 }): Promise<void> {
-  const delayMs = computeNextDelayMs(source.pullSchedule, nowMs);
+  const repo = new PrismaScheduledJobRepository(prisma);
+  await repo.upsertForTarget({
+    projectId: await pullScheduleProjectId(prisma, source.organizationId),
+    targetType: INGESTION_PULL_TARGET_TYPE,
+    targetId: source.id,
+    cron: source.pullSchedule,
+    timezone: PULL_SCHEDULE_TIMEZONE,
+    nextRunAt: nextPullRunAt(source.pullSchedule, new Date()),
+  });
+}
+
+/** Deactivate the source's calendar row so the due-scan skips it. */
+export async function removeIngestionPullSchedule({
+  source,
+  prisma = defaultPrisma,
+}: {
+  source: { id: string; organizationId: string };
+  prisma?: PrismaClient;
+}): Promise<void> {
+  const repo = new PrismaScheduledJobRepository(prisma);
+  await repo.deactivateForTarget({
+    projectId: await pullScheduleProjectId(prisma, source.organizationId),
+    targetType: INGESTION_PULL_TARGET_TYPE,
+    targetId: source.id,
+  });
+}
+
+/**
+ * Boot-time repair (durable self-heal): the source row and its calendar row
+ * are written in two non-atomic steps, so a crash between them leaves an
+ * active pull-mode source that silently never fires. This pass creates the
+ * missing rows. Create-if-MISSING only — a source that already has a row
+ * (active or deactivated) is left untouched, so reconciliation never
+ * resurrects a schedule that disable/archive intentionally deactivated.
+ */
+export async function reconcileIngestionPullSchedules({
+  prisma = defaultPrisma,
+}: { prisma?: PrismaClient } = {}): Promise<{ repaired: number }> {
+  let sources: SchedulableSource[];
+  try {
+    const rows = await prisma.ingestionSource.findMany({
+      where: {
+        pullSchedule: { not: null },
+        archivedAt: null,
+        status: { in: ["active", "awaiting_first_event"] },
+      },
+      select: { id: true, pullSchedule: true, organizationId: true },
+    });
+    sources = rows.filter(
+      (row): row is SchedulableSource => row.pullSchedule !== null,
+    );
+  } catch (error) {
+    logger.error({ error }, "failed to enumerate sources for pull reconcile");
+    return { repaired: 0 };
+  }
+  if (sources.length === 0) return { repaired: 0 };
+
+  const repo = new PrismaScheduledJobRepository(prisma);
+  let repaired = 0;
+  for (const source of sources) {
+    try {
+      const projectId = await pullScheduleProjectId(
+        prisma,
+        source.organizationId,
+      );
+      const existing = await repo.findAllForProject({
+        projectId,
+        targetType: INGESTION_PULL_TARGET_TYPE,
+      });
+      if (existing.some((job) => job.targetId === source.id)) continue;
+      await syncIngestionPullSchedule({ source, prisma });
+      repaired += 1;
+    } catch (error) {
+      logger.error(
+        { ingestionSourceId: source.id, error },
+        "failed to reconcile ingestion pull schedule",
+      );
+    }
+  }
+
+  logger.info(
+    { repaired, candidates: sources.length },
+    "ingestion pull calendar rows reconciled",
+  );
+  return { repaired };
+}
+
+// ---------------------------------------------------------------------------
+// Calendar fire → event-sourcing execution
+// ---------------------------------------------------------------------------
+
+/**
+ * The registered calendar handler for `INGESTION_PULL_TARGET_TYPE`. The
+ * scheduler loop fires jobs serially, so this only ENQUEUES the pull onto the
+ * event-sourcing GroupQueue and returns — the pull body (upstream fetch +
+ * ClickHouse write) runs on the queue's workers, serialized per source.
+ *
+ * A fire for a source that is no longer schedulable deactivates its calendar
+ * row (self-heal for lifecycle transitions that bypassed the service layer).
+ */
+export async function handleIngestionPullFire(
+  fire: ScheduledJobFire,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  const source = await prisma.ingestionSource.findUnique({
+    where: { id: fire.targetId },
+    select: {
+      id: true,
+      organizationId: true,
+      archivedAt: true,
+      status: true,
+      pullSchedule: true,
+    },
+  });
+
+  if (
+    !source ||
+    source.archivedAt !== null ||
+    !source.pullSchedule ||
+    (source.status !== "active" && source.status !== "awaiting_first_event")
+  ) {
+    logger.info(
+      { ingestionSourceId: fire.targetId },
+      "ingestion source not schedulable; deactivating its calendar row",
+    );
+    if (source) {
+      await removeIngestionPullSchedule({ source, prisma });
+    }
+    return;
+  }
+
+  const facade = pullJobFacade;
+  if (!facade) {
+    logger.warn(
+      { ingestionSourceId: source.id },
+      "event-sourcing pull job not registered; skipping calendar fire",
+    );
+    return;
+  }
+
   await facade.send(
     { ingestionSourceId: source.id, tenantId: source.organizationId },
-    {
-      delay: delayMs,
-      deduplication: dedupForSource(delayMs, shouldReplace),
-    },
+    { delay: 0, deduplication: pullDedup(DEDUP_TTL_MS) },
   );
 }
 
+function pullDedup(ttlMs: number): DeduplicationConfig<IngestionPullPayload> {
+  return {
+    makeId: (payload) => payload.ingestionSourceId,
+    ttlMs,
+    // Squash a duplicate enqueue without disturbing the pending job.
+    extend: false,
+    replace: false,
+  };
+}
+
 /**
- * Registers the recurring `ingestionPull` job on the event-sourcing global
+ * Registers the `ingestionPull` execution job on the event-sourcing global
  * queue. Call once during event-sourcing setup. Returns null when event
  * sourcing is disabled.
  */
@@ -178,9 +365,9 @@ export function registerIngestionPullJob(
     // One group per source: the queue serializes a source's pulls, so two pulls
     // for the same source never overlap.
     groupKeyFn: (payload) => payload.ingestionSourceId,
-    // Score = send time, so `dispatchAfter = now + delay` is the absolute next
-    // fire. (The default scoreFn reads payload.occurredAt and would resolve to
-    // epoch+delay, firing immediately.)
+    // Score = send time, so `dispatchAfter = now + delay` is the absolute
+    // dispatch instant. (The default scoreFn reads payload.occurredAt and
+    // would resolve to epoch+delay, firing immediately.)
     scoreFn: () => Date.now(),
     process: processIngestionPull,
   });
@@ -189,21 +376,31 @@ export function registerIngestionPullJob(
 }
 
 /**
- * Runs one scheduled pull and re-arms the next. The re-arm happens FIRST so a
- * crash during the pull body still leaves the next pull scheduled. An archived
- * or no-longer-active source stops the recurrence (no re-arm, no pull).
+ * Runs one pull, gated through the bounded bulkhead so a burst of same-minute
+ * sources cannot fan out into unbounded upstream + ClickHouse load. An
+ * archived or no-longer-active source is skipped (the calendar handler is the
+ * primary lifecycle gate; this re-check covers jobs already in flight when
+ * the source was archived).
+ *
+ * Parking on `push` while saturated would hold a global GroupQueue worker
+ * slot, letting a due-pull burst crowd out unrelated event-sourcing work; and
+ * throwing would spend the queue's bounded retry budget on ordinary
+ * backpressure — enough consecutive saturated attempts would park the
+ * source's group in the operator-managed blocked set. So a saturated tick
+ * re-stages itself a few jittered seconds out and acks; the calendar row
+ * still owns the recurrence either way.
  */
 async function processIngestionPull(
   payload: IngestionPullPayload,
 ): Promise<void> {
-  const source = await prisma.ingestionSource.findUnique({
+  const source = await defaultPrisma.ingestionSource.findUnique({
     where: { id: payload.ingestionSourceId },
     select: {
       id: true,
-      pullSchedule: true,
       organizationId: true,
       archivedAt: true,
       status: true,
+      pullSchedule: true,
     },
   });
 
@@ -215,168 +412,26 @@ async function processIngestionPull(
   ) {
     logger.info(
       { ingestionSourceId: payload.ingestionSourceId },
-      "ingestion source not schedulable; stopping pull recurrence",
+      "ingestion source not schedulable; skipping pull",
     );
     return;
   }
 
-  // Re-arm the next pull BEFORE running this one (crash-safe recurrence). The
-  // failure is intentionally NOT swallowed: if the re-arm write fails, letting
-  // it escape fails this job so the GroupQueue retry path re-runs it (re-arm +
-  // pull) with backoff. Swallowing it would ack a tick with no successor
-  // staged, silently ending the recurrence until a worker restart — exactly the
-  // ingestion-gap failure this migration exists to avoid. The pull body is left
-  // unreached until the successor is staged.
   const facade = pullJobFacade;
-  if (facade) {
-    await stagePull({
-      facade,
-      source: {
-        id: source.id,
-        pullSchedule: source.pullSchedule,
-        organizationId: source.organizationId,
-      },
-      nowMs: Date.now(),
-    });
-  }
-
-  // Gate the pull body through the bounded bulkhead so a burst of same-minute
-  // sources cannot fan out into unbounded upstream + ClickHouse load.
-  //
-  // Parking on `push` here would hold a global GroupQueue worker slot while
-  // waiting, letting a due-pull burst crowd out unrelated event-sourcing work.
-  // When the bulkhead is saturated, defer instead: re-stage this source's pull
-  // a few seconds out (replace-dedup moves the successor staged above, so the
-  // source still has exactly one pending job) and ack the tick. Deferring
-  // rather than throwing matters — saturation is ordinary backpressure, and a
-  // thrown error would spend the queue's bounded retry budget on it; enough
-  // consecutive saturated attempts would exhaust the budget and park the
-  // source's group in the operator-managed blocked set, silently ending the
-  // recurrence. Acking is safe because the successor is already staged.
-  const bulkheadRunning = pullBulkhead.running();
-  if (facade && bulkheadRunning >= PULL_CONCURRENCY_LIMIT) {
+  if (facade && pullBulkhead.running() >= PULL_CONCURRENCY_LIMIT) {
     const deferMs =
       SATURATION_DEFER_BASE_MS +
       Math.floor(Math.random() * SATURATION_DEFER_JITTER_MS);
     logger.debug(
-      { ingestionSourceId: source.id, bulkheadRunning, deferMs },
+      { ingestionSourceId: source.id, deferMs },
       "pull bulkhead saturated; deferring this tick without spending the retry budget",
     );
     await facade.send(
       { ingestionSourceId: source.id, tenantId: source.organizationId },
-      {
-        delay: deferMs,
-        deduplication: dedupForSource(deferMs, true),
-      },
+      { delay: deferMs, deduplication: pullDedup(deferMs + 60_000) },
     );
     return;
   }
 
   await pullBulkhead.push(source.id);
-}
-
-/**
- * Stages one pull per active pull-mode source. Idempotent (per-source dedup),
- * so worker restarts and duplicate calls never pile up. Also the crash-recovery
- * net for the re-arm chain: a source whose chain was interrupted is re-seeded
- * here on the next boot.
- */
-export async function seedIngestionPullers(): Promise<void> {
-  const facade = pullJobFacade;
-  if (!facade) {
-    logger.info("event-sourcing pull job not registered; skipping seed");
-    return;
-  }
-
-  let sources: {
-    id: string;
-    pullSchedule: string | null;
-    organizationId: string;
-  }[];
-  try {
-    sources = await prisma.ingestionSource.findMany({
-      where: {
-        pullSchedule: { not: null },
-        archivedAt: null,
-        status: { in: ["active", "awaiting_first_event"] },
-      },
-      select: { id: true, pullSchedule: true, organizationId: true },
-    });
-  } catch (error) {
-    logger.error({ error }, "failed to enumerate sources for pull seeding");
-    return;
-  }
-
-  const nowMs = Date.now();
-  let seeded = 0;
-  for (const source of sources) {
-    if (!source.pullSchedule) continue;
-    try {
-      await stagePull({
-        facade,
-        source: {
-          id: source.id,
-          pullSchedule: source.pullSchedule,
-          organizationId: source.organizationId,
-        },
-        nowMs,
-      });
-      seeded += 1;
-    } catch (error) {
-      logger.error(
-        {
-          ingestionSourceId: source.id,
-          pullSchedule: source.pullSchedule,
-          error,
-        },
-        "failed to seed ingestion pull",
-      );
-    }
-  }
-
-  logger.info(
-    { seeded, candidates: sources.length },
-    "ingestion pullers seeded onto the event-sourcing queue",
-  );
-}
-
-/**
- * Seeds or reschedules a single source immediately (e.g. after create or a
- * schedule update) without waiting for a worker restart. No-op when the source
- * has no schedule or event sourcing is disabled.
- */
-export async function armIngestionPullForSource({
-  source,
-  shouldReplace = false,
-}: {
-  source: {
-    id: string;
-    pullSchedule: string | null;
-    organizationId: string;
-  };
-  shouldReplace?: boolean;
-}): Promise<void> {
-  const facade = pullJobFacade;
-  if (!facade || !source.pullSchedule) return;
-  try {
-    await stagePull({
-      facade,
-      source: {
-        id: source.id,
-        pullSchedule: source.pullSchedule,
-        organizationId: source.organizationId,
-      },
-      nowMs: Date.now(),
-      shouldReplace,
-    });
-  } catch (error) {
-    logger.error(
-      {
-        ingestionSourceId: source.id,
-        pullSchedule: source.pullSchedule,
-        error,
-      },
-      "failed to arm ingestion pull for source",
-    );
-  }
 }

@@ -1,6 +1,10 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import {
+  handleIngestionPullFire,
+  INGESTION_PULL_TARGET_TYPE,
+} from "@ee/governance/services/pullers/ingestionPullScheduler";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
@@ -825,6 +829,17 @@ export function initializeDefaultApp(options?: {
           },
           fire,
         }),
+    });
+
+    // ADR-044 second consumer: a due ingestion-pull calendar row enqueues the
+    // pull onto the event-sourcing GroupQueue and returns — execution is
+    // serialized per source with bounded concurrency on the queue, so the
+    // serial scheduler loop is never blocked by a slow pull. Calendar rows are
+    // kept in sync by IngestionSourceService; the boot-time reconcile pass
+    // lives in the worker bootstrap (startWorkers.ts).
+    schedulerRegistry.register({
+      targetType: INGESTION_PULL_TARGET_TYPE,
+      handler: (fire) => handleIngestionPullFire(fire),
     });
 
     // ADR-044 durable self-heal: the report upsert route writes the Trigger row

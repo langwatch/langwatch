@@ -2,8 +2,9 @@
 
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import {
-  armIngestionPullForSource,
-  computeNextDelayMs,
+  assertValidPullSchedule as assertParseablePullSchedule,
+  removeIngestionPullSchedule,
+  syncIngestionPullSchedule,
 } from "@ee/governance/services/pullers/ingestionPullScheduler";
 import type { IngestionSource, Prisma, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -101,7 +102,7 @@ function assertValidPullSchedule(
 ): void {
   if (pullSchedule == null) return;
   try {
-    computeNextDelayMs(pullSchedule, Date.now());
+    assertParseablePullSchedule(pullSchedule);
   } catch (cause) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -259,15 +260,18 @@ export class IngestionSourceService {
       },
     });
 
-    // A schedule on a new pull-mode source starts immediately, without waiting
-    // for a worker restart to re-seed it (event-sourcing pull scheduler).
-    await armIngestionPullForSource({
-      source: {
-        id: source.id,
-        pullSchedule: source.pullSchedule,
-        organizationId: source.organizationId,
-      },
-    });
+    // A schedule on a new pull-mode source gets its durable calendar row
+    // immediately, without waiting for the worker-boot reconcile pass.
+    if (source.pullSchedule) {
+      await syncIngestionPullSchedule({
+        source: {
+          id: source.id,
+          pullSchedule: source.pullSchedule,
+          organizationId: source.organizationId,
+        },
+        prisma: this.prisma,
+      });
+    }
 
     return { source, ingestSecret };
   }
@@ -304,25 +308,29 @@ export class IngestionSourceService {
       where: { id: existing.id },
       data,
     });
-    const shouldReplacePendingPull =
-      input.pullSchedule !== undefined &&
-      input.pullSchedule !== null &&
-      existing.pullSchedule !== source.pullSchedule;
-
-    // A disabled source has no recurring job after its pending pull observes
-    // that state. Re-arm it when an update makes it schedulable again.
-    if (
-      source.status === "active" ||
-      source.status === "awaiting_first_event"
-    ) {
-      await armIngestionPullForSource({
-        source: {
-          id: source.id,
-          pullSchedule: source.pullSchedule,
-          organizationId: source.organizationId,
-        },
-        shouldReplace: shouldReplacePendingPull,
-      });
+    // Keep the calendar row in step with the update: a schedulable source
+    // gets a fresh (or reactivated) row — this covers both schedule changes
+    // and re-enabling a disabled source — and anything else is deactivated so
+    // the due-scan skips it. Sources that never had a schedule (push-mode)
+    // have no calendar row to maintain.
+    if (existing.pullSchedule !== null || source.pullSchedule !== null) {
+      const schedulable =
+        source.status === "active" || source.status === "awaiting_first_event";
+      if (source.pullSchedule && schedulable) {
+        await syncIngestionPullSchedule({
+          source: {
+            id: source.id,
+            pullSchedule: source.pullSchedule,
+            organizationId: source.organizationId,
+          },
+          prisma: this.prisma,
+        });
+      } else {
+        await removeIngestionPullSchedule({
+          source: { id: source.id, organizationId: source.organizationId },
+          prisma: this.prisma,
+        });
+      }
     }
 
     return source;
@@ -371,10 +379,17 @@ export class IngestionSourceService {
         `IngestionSource ${id} not found in org ${organizationId}`,
       );
     }
-    return this.prisma.ingestionSource.update({
+    const source = await this.prisma.ingestionSource.update({
       where: { id: existing.id },
       data: { archivedAt: new Date(), status: "disabled" },
     });
+    if (existing.pullSchedule !== null) {
+      await removeIngestionPullSchedule({
+        source: { id: source.id, organizationId: source.organizationId },
+        prisma: this.prisma,
+      });
+    }
+    return source;
   }
 
   /**

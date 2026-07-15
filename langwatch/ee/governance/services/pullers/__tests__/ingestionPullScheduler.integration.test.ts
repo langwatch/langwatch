@@ -4,12 +4,14 @@ import { UNLIMITED_PLAN } from "@ee/licensing/constants";
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 /**
- * Integration coverage for the event-sourced pull scheduler against a REAL
- * GroupQueue (Redis) + REAL Postgres. Proves seeding, idempotency, crash-safe
- * re-arm-before-work, per-source serialization, and stop-on-archive on the same
- * durable queue everything else uses — no BullMQ, no Linux cron.
+ * Integration coverage for calendar-scheduled ingestion pulls against a REAL
+ * Postgres (`ScheduledJob` rows) + a REAL GroupQueue (Redis). Proves the
+ * calendar row lifecycle (create / reschedule / deactivate / reactivate /
+ * boot reconcile), the fire handler's enqueue-and-return contract, and the
+ * execution properties the GroupQueue owns (per-source serialization,
+ * bounded global concurrency) — no BullMQ, no Linux cron, no self-re-arm.
  *
- * Spec: specs/ai-governance/puller-framework/event-sourced-scheduling.feature
+ * Spec: specs/ai-governance/puller-framework/calendar-scheduled-pulls.feature
  */
 import {
   afterAll,
@@ -37,13 +39,16 @@ import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
 import { EventStoreClickHouse } from "~/server/event-sourcing/stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
 import { IngestionSourceService } from "../../activity-monitor/ingestionSource.service";
+import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
 
 import {
-  armIngestionPullForSource,
+  handleIngestionPullFire,
+  INGESTION_PULL_TARGET_TYPE,
   type IngestionPullPayload,
   PULL_CONCURRENCY_LIMIT,
+  reconcileIngestionPullSchedules,
   registerIngestionPullJob,
-  seedIngestionPullers,
+  syncIngestionPullSchedule,
 } from "../ingestionPullScheduler";
 import { type PullResult, pullerAdapterRegistry } from "../pullerAdapter";
 
@@ -98,12 +103,13 @@ class FixturePullerAdapter {
 }
 
 describe.skipIf(!hasTestcontainers)(
-  "ingestionPullScheduler — event-sourced scheduling end-to-end",
+  "ingestionPullScheduler — calendar-scheduled pulls end-to-end",
   () => {
     let redis: Redis;
     let eventSourcing: EventSourcing;
     let pullJob: ReturnType<typeof registerIngestionPullJob>;
     let organizationId: string;
+    let govProjectId: string;
     let actorUserId: string;
     const createdSourceIds: string[] = [];
 
@@ -128,8 +134,8 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       // A minimal pipeline just to obtain a service bound to the global queue,
-      // then register the recurring pull job on it (the same call pipelineRegistry
-      // makes in production).
+      // then register the pull execution job on it (the same call
+      // pipelineRegistry makes in production).
       const registered = eventSourcing.register(
         definePipeline()
           .withName(`ingestion_pull_scheduler_test_${nanoid(6)}`)
@@ -165,6 +171,10 @@ describe.skipIf(!hasTestcontainers)(
         },
       });
       actorUserId = actor.id;
+
+      // The calendar rows live under the org's hidden governance project.
+      govProjectId = (await ensureHiddenGovernanceProject(prisma, organizationId))
+        .id;
     });
 
     beforeEach(() => {
@@ -172,14 +182,21 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     // Per-source cleanup: every test creates sources with unique ids, so
-    // deleting only those sources' event-sourcing keys (group ZSET, data, dedup)
-    // isolates tests without a global FLUSHALL and without matching any key from
-    // another test or tenant.
+    // deleting only those sources' event-sourcing keys (group ZSET, data,
+    // dedup) and calendar rows isolates tests without a global FLUSHALL and
+    // without matching any key from another test or tenant.
     afterEach(async () => {
       for (const id of createdSourceIds) {
         const keys = await redis.keys(`*${id}*`);
         if (keys.length > 0) await redis.del(...keys);
       }
+      await prisma.scheduledJob.deleteMany({
+        where: {
+          projectId: govProjectId,
+          targetType: INGESTION_PULL_TARGET_TYPE,
+          targetId: { in: createdSourceIds },
+        },
+      });
       await prisma.ingestionSource.deleteMany({
         where: { id: { in: createdSourceIds } },
       });
@@ -189,6 +206,9 @@ describe.skipIf(!hasTestcontainers)(
     afterAll(async () => {
       await resetApp();
       await eventSourcing.close().catch(() => {});
+      await prisma.scheduledJob.deleteMany({
+        where: { projectId: govProjectId },
+      });
       await prisma.ingestionSource.deleteMany({ where: { organizationId } });
       await prisma.project.deleteMany({
         where: { team: { organizationId } },
@@ -223,6 +243,35 @@ describe.skipIf(!hasTestcontainers)(
       return source.id;
     }
 
+    async function calendarRow(sourceId: string) {
+      return prisma.scheduledJob.findFirst({
+        where: {
+          projectId: govProjectId,
+          targetType: INGESTION_PULL_TARGET_TYPE,
+          targetId: sourceId,
+        },
+      });
+    }
+
+    async function calendarRowCount(sourceId: string): Promise<number> {
+      return prisma.scheduledJob.count({
+        where: {
+          projectId: govProjectId,
+          targetType: INGESTION_PULL_TARGET_TYPE,
+          targetId: sourceId,
+        },
+      });
+    }
+
+    function fireFor(sourceId: string) {
+      return {
+        projectId: govProjectId,
+        targetType: INGESTION_PULL_TARGET_TYPE,
+        targetId: sourceId,
+        slot: new Date(),
+      };
+    }
+
     // Count jobs pending in the source's group ZSET. The group key embeds the
     // source id, so this scans precisely that group's staging set.
     async function pendingPullCount(sourceId: string): Promise<number> {
@@ -232,20 +281,6 @@ describe.skipIf(!hasTestcontainers)(
         total += await redis.zcard(key);
       }
       return total;
-    }
-
-    async function pendingPullDispatchAtMs(
-      sourceId: string,
-    ): Promise<number | null> {
-      const keys = await redis.keys(`*${sourceId}:jobs`);
-      const scores: number[] = [];
-      for (const key of keys) {
-        const values = await redis.zrange(key, 0, -1, "WITHSCORES");
-        for (let index = 1; index < values.length; index += 2) {
-          scores.push(Number(values[index]));
-        }
-      }
-      return scores.length > 0 ? Math.min(...scores) : null;
     }
 
     function send(
@@ -259,33 +294,10 @@ describe.skipIf(!hasTestcontainers)(
       return pullJob!.send(payload, { delay: options?.delay ?? 0 });
     }
 
-    describe("given an active pull-mode source at worker start", () => {
-      describe("when the seeder runs", () => {
-        /** @scenario "A pull-mode source is seeded onto the event-sourcing queue at worker start" */
-        it("stages exactly one ingestion-pull job for the source", async () => {
-          const sourceId = await createSource();
-
-          await seedIngestionPullers();
-
-          expect(await pendingPullCount(sourceId)).toBe(1);
-        });
-
-        /** @scenario "Seeding is idempotent across restarts and duplicate calls" */
-        it("keeps exactly one pending job when the seeder runs again", async () => {
-          const sourceId = await createSource();
-
-          await seedIngestionPullers();
-          await seedIngestionPullers();
-
-          expect(await pendingPullCount(sourceId)).toBe(1);
-        });
-      });
-    });
-
     describe("given a source created with a schedule", () => {
-      describe("when the create path arms the pull", () => {
-        /** @scenario "Saving a source with a schedule seeds it immediately" */
-        it("stages a pull without waiting for a worker restart", async () => {
+      describe("when the create mutation succeeds", () => {
+        /** @scenario "Saving a source with a schedule creates its calendar entry" */
+        it("creates an active ScheduledJob row with the cron's next fire", async () => {
           const { source } = await IngestionSourceService.create(
             prisma,
           ).createSource({
@@ -298,26 +310,62 @@ describe.skipIf(!hasTestcontainers)(
           });
           createdSourceIds.push(source.id);
 
-          expect(await pendingPullCount(source.id)).toBe(1);
+          const row = await calendarRow(source.id);
+          expect(row).not.toBeNull();
+          expect(row!.active).toBe(true);
+          expect(row!.cron).toBe("*/10 * * * *");
+          expect(row!.timezone).toBe("UTC");
+          // The next fire is a real */10 boundary in the future.
+          expect(row!.nextRunAt.getTime()).toBeGreaterThan(Date.now() - 1000);
+          expect(row!.nextRunAt.getUTCMinutes() % 10).toBe(0);
+          expect(row!.nextRunAt.getUTCSeconds()).toBe(0);
+
+          // No BullMQ queue backs ingestion pulls.
+          const bullKeys = await redis.keys("bull:*puller*");
+          expect(bullKeys).toEqual([]);
         });
       });
     });
 
-    describe("given an active source with a pending scheduled pull", () => {
-      describe("when its pull schedule is updated", () => {
-        /** @scenario "Updating an active source schedule replaces its pending pull" */
-        it("keeps one job and moves its dispatch score to the new cron", async () => {
-          const sourceId = await createSource({
-            pullSchedule: "0 0 1 1 *",
+    describe("given an active pull-mode source with a schedule but no calendar row", () => {
+      describe("when the boot-time reconcile pass runs", () => {
+        /** @scenario "Worker boot repairs sources missing a calendar entry" */
+        it("creates the missing row and leaves existing rows untouched", async () => {
+          const sourceId = await createSource();
+          expect(await calendarRow(sourceId)).toBeNull();
+
+          await reconcileIngestionPullSchedules();
+
+          const created = await calendarRow(sourceId);
+          expect(created).not.toBeNull();
+          expect(created!.active).toBe(true);
+
+          // A row that disable/archive deactivated is NOT resurrected.
+          await prisma.scheduledJob.update({
+            where: { id: created!.id, projectId: govProjectId },
+            data: { active: false },
           });
-          await armIngestionPullForSource({
+          await reconcileIngestionPullSchedules();
+          const afterSecondPass = await calendarRow(sourceId);
+          expect(afterSecondPass!.active).toBe(false);
+          expect(await calendarRowCount(sourceId)).toBe(1);
+        });
+      });
+    });
+
+    describe("given an active source with a calendar row", () => {
+      describe("when its pull schedule is updated", () => {
+        /** @scenario "Updating the pull schedule reschedules the calendar entry" */
+        it("keeps one row and moves its next fire to the new cron", async () => {
+          const sourceId = await createSource({ pullSchedule: "0 0 1 1 *" });
+          await syncIngestionPullSchedule({
             source: {
               id: sourceId,
               pullSchedule: "0 0 1 1 *",
               organizationId,
             },
           });
-          const oldDispatchAtMs = await pendingPullDispatchAtMs(sourceId);
+          const before = await calendarRow(sourceId);
 
           const source = await IngestionSourceService.create(
             prisma,
@@ -327,30 +375,29 @@ describe.skipIf(!hasTestcontainers)(
             pullSchedule: "* * * * *",
           });
 
-          const newDispatchAtMs = await pendingPullDispatchAtMs(sourceId);
           expect(source.pullSchedule).toBe("* * * * *");
-          expect(await pendingPullCount(sourceId)).toBe(1);
-          expect(oldDispatchAtMs).not.toBeNull();
-          expect(newDispatchAtMs).not.toBeNull();
-          expect(newDispatchAtMs!).toBeLessThan(oldDispatchAtMs!);
+          expect(await calendarRowCount(sourceId)).toBe(1);
+          const after = await calendarRow(sourceId);
+          expect(after!.cron).toBe("* * * * *");
+          expect(after!.nextRunAt.getTime()).toBeLessThan(
+            before!.nextRunAt.getTime(),
+          );
         });
       });
 
       describe("when an update supplies a malformed pull schedule", () => {
-        /** @scenario "Malformed schedules are rejected without stopping the existing recurrence" */
-        it("rejects the update and preserves the valid pending pull", async () => {
+        /** @scenario "Malformed schedules are rejected without touching the calendar" */
+        it("rejects the update and preserves the valid calendar row", async () => {
           const validSchedule = "0 0 1 1 *";
-          const sourceId = await createSource({
-            pullSchedule: validSchedule,
-          });
-          await armIngestionPullForSource({
+          const sourceId = await createSource({ pullSchedule: validSchedule });
+          await syncIngestionPullSchedule({
             source: {
               id: sourceId,
               pullSchedule: validSchedule,
               organizationId,
             },
           });
-          const oldDispatchAtMs = await pendingPullDispatchAtMs(sourceId);
+          const before = await calendarRow(sourceId);
 
           await expect(
             IngestionSourceService.create(prisma).updateSource({
@@ -362,37 +409,103 @@ describe.skipIf(!hasTestcontainers)(
 
           const source = await prisma.ingestionSource.findUniqueOrThrow({
             where: { id: sourceId },
+            select: { pullSchedule: true },
           });
           expect(source.pullSchedule).toBe(validSchedule);
-          expect(await pendingPullCount(sourceId)).toBe(1);
-          expect(await pendingPullDispatchAtMs(sourceId)).toBe(oldDispatchAtMs);
+          const after = await calendarRow(sourceId);
+          expect(after!.cron).toBe(validSchedule);
+          expect(after!.nextRunAt.getTime()).toBe(before!.nextRunAt.getTime());
+        });
+      });
+
+      describe("when the source is disabled or archived", () => {
+        /** @scenario "Disabling or archiving a source deactivates its calendar entry" */
+        it("deactivates the calendar row so the due-scan skips it", async () => {
+          const service = IngestionSourceService.create(prisma);
+
+          const disabledId = await createSource();
+          await syncIngestionPullSchedule({
+            source: {
+              id: disabledId,
+              pullSchedule: "*/15 * * * *",
+              organizationId,
+            },
+          });
+          await service.updateSource({
+            id: disabledId,
+            organizationId,
+            status: "disabled",
+          });
+          expect((await calendarRow(disabledId))!.active).toBe(false);
+
+          const archivedId = await createSource();
+          await syncIngestionPullSchedule({
+            source: {
+              id: archivedId,
+              pullSchedule: "*/15 * * * *",
+              organizationId,
+            },
+          });
+          await service.archive(archivedId, organizationId);
+          expect((await calendarRow(archivedId))!.active).toBe(false);
         });
       });
     });
 
-    describe("given a due ingestion-pull job", () => {
-      describe("when it is processed", () => {
-        /** @scenario "Each pull re-arms the next pull at the cron expression's next fire time, before doing the work" */
-        it("stages the next pull before running the pull body", async () => {
+    describe("given a disabled source with a deactivated calendar row", () => {
+      describe("when the source is re-enabled", () => {
+        /** @scenario "Re-enabling a disabled source reactivates its calendar entry" */
+        it("reactivates the row with a fresh next fire", async () => {
+          const sourceId = await createSource({ status: "disabled" });
+          await syncIngestionPullSchedule({
+            source: {
+              id: sourceId,
+              pullSchedule: "*/15 * * * *",
+              organizationId,
+            },
+          });
+          await prisma.scheduledJob.updateMany({
+            where: {
+              projectId: govProjectId,
+              targetType: INGESTION_PULL_TARGET_TYPE,
+              targetId: sourceId,
+            },
+            data: { active: false },
+          });
+
+          await IngestionSourceService.create(prisma).updateSource({
+            id: sourceId,
+            organizationId,
+            status: "active",
+          });
+
+          const row = await calendarRow(sourceId);
+          expect(row!.active).toBe(true);
+          expect(row!.nextRunAt.getTime()).toBeGreaterThan(Date.now() - 1000);
+        });
+      });
+    });
+
+    describe("given an active pull-mode source with a calendar row", () => {
+      describe("when the source's calendar fire is handled", () => {
+        /** @scenario "A due calendar fire enqueues the pull onto the event-sourcing queue" */
+        it("stages the pull job and the queue runs the pull body", async () => {
           const sourceId = await createSource();
           let release!: () => void;
           control.gate = new Promise<void>((resolve) => {
             release = resolve;
           });
 
-          await send(sourceId, { delay: 0 });
+          await handleIngestionPullFire(fireFor(sourceId));
 
-          // Wait until the pull body has been entered. Re-arm happens first, so
-          // by the time runOnce is in flight the next pull must already be staged.
+          // The handler returned after enqueueing; the pull body runs on the
+          // queue's workers.
           await vi.waitFor(() => expect(control.calls).toBe(1), {
             timeout: 8000,
             interval: 50,
           });
-          expect(await pendingPullCount(sourceId)).toBe(1);
-
           release();
 
-          // The body completes and advances the cursor.
           await vi.waitFor(
             async () => {
               const row = await prisma.ingestionSource.findUnique({
@@ -407,6 +520,32 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    describe("given a source archived after its calendar row was created", () => {
+      describe("when its calendar fire is handled", () => {
+        /** @scenario "A fire for a source that is no longer schedulable stops the recurrence" */
+        it("does not run the pull body and deactivates the calendar row", async () => {
+          const sourceId = await createSource();
+          await syncIngestionPullSchedule({
+            source: {
+              id: sourceId,
+              pullSchedule: "*/15 * * * *",
+              organizationId,
+            },
+          });
+          await prisma.ingestionSource.update({
+            where: { id: sourceId },
+            data: { archivedAt: new Date(), status: "disabled" },
+          });
+
+          await handleIngestionPullFire(fireFor(sourceId));
+
+          expect(await pendingPullCount(sourceId)).toBe(0);
+          expect(control.calls).toBe(0);
+          expect((await calendarRow(sourceId))!.active).toBe(false);
+        });
+      });
+    });
+
     describe("given a pull body slower than the gap to the next fire", () => {
       describe("when a second pull becomes due while one is running", () => {
         /** @scenario "Per-source serialization prevents overlapping pulls" */
@@ -417,104 +556,26 @@ describe.skipIf(!hasTestcontainers)(
             release = resolve;
           });
 
-          // Two due jobs for the same source. The group key serializes them, so
-          // the second waits for the first to finish before its body runs.
           await send(sourceId, { delay: 0 });
-          await send(sourceId, { delay: 0 });
-
-          await vi.waitFor(() => expect(control.calls).toBe(1), {
+          await vi.waitFor(() => expect(control.inFlight).toBe(1), {
             timeout: 8000,
-            interval: 50,
+            interval: 25,
           });
-          // Give the queue room to (incorrectly) start the second one.
+
+          // A second pull for the SAME source becomes due while the first is
+          // still in flight: the group serializes, so it must not start.
+          await send(sourceId, { delay: 0 });
           await new Promise((r) => setTimeout(r, 300));
-          expect(control.inFlight).toBe(1);
+          expect(control.maxInFlight).toBe(1);
 
           release();
+          control.gate = null;
 
           await vi.waitFor(() => expect(control.calls).toBe(2), {
             timeout: 8000,
             interval: 50,
           });
           expect(control.maxInFlight).toBe(1);
-        });
-      });
-    });
-
-    describe("given an archived source", () => {
-      describe("when its in-flight ingestion-pull job is processed", () => {
-        /** @scenario "Archiving or disabling a source stops the recurrence" */
-        it("does not run the pull body and stages no follow-up", async () => {
-          const sourceId = await createSource({ archivedAt: new Date() });
-
-          await send(sourceId, { delay: 0 });
-
-          // The job dispatches and is consumed, leaving the staging set empty.
-          await vi.waitFor(
-            async () => expect(await pendingPullCount(sourceId)).toBe(0),
-            { timeout: 8000, interval: 50 },
-          );
-          await new Promise((r) => setTimeout(r, 300));
-
-          expect(control.calls).toBe(0);
-          expect(await pendingPullCount(sourceId)).toBe(0);
-        });
-      });
-    });
-
-    describe("given a disabled source whose recurrence has stopped", () => {
-      describe("when the source is re-enabled", () => {
-        /** @scenario "Re-enabling a disabled source restarts the recurrence" */
-        it("stages a new pull without waiting for a worker restart", async () => {
-          const sourceId = await createSource({ status: "disabled" });
-
-          await IngestionSourceService.create(prisma).updateSource({
-            id: sourceId,
-            organizationId,
-            status: "active",
-          });
-
-          expect(await pendingPullCount(sourceId)).toBe(1);
-        });
-      });
-    });
-
-    describe("given a re-arm write that fails once", () => {
-      describe("when the ingestion-pull job is processed", () => {
-        /** @scenario "A failed re-arm retries the pull instead of silently ending the recurrence" */
-        it("retries on the event-sourcing queue and recovers without a worker restart", async () => {
-          const sourceId = await createSource();
-
-          // Fail exactly the re-arm send. Send #1 is the initial enqueue below;
-          // send #2 is the re-arm inside processIngestionPull, which we make
-          // throw. If the re-arm failure were swallowed, the job would ack with
-          // no successor staged and the recurrence would silently end. Instead
-          // the throw must escape, the GroupQueue must retry the whole job, and
-          // send #3 (the re-arm on retry) must succeed.
-          const realSend = pullJob!.send.bind(pullJob);
-          let sendCalls = 0;
-          const sendSpy = vi
-            .spyOn(pullJob!, "send")
-            .mockImplementation(async (payload, options) => {
-              sendCalls += 1;
-              if (sendCalls === 2) {
-                throw new Error("injected re-arm write failure");
-              }
-              return realSend(payload, options);
-            });
-
-          await send(sourceId, { delay: 0 }); // send #1
-
-          // The pull body must not run until a successor is staged, so it only
-          // runs after the retry's re-arm (send #3) succeeds.
-          await vi.waitFor(() => expect(control.calls).toBe(1), {
-            timeout: 15000,
-            interval: 50,
-          });
-          expect(sendCalls).toBeGreaterThanOrEqual(3);
-          expect(await pendingPullCount(sourceId)).toBe(1);
-
-          sendSpy.mockRestore();
         });
       });
     });
@@ -538,8 +599,8 @@ describe.skipIf(!hasTestcontainers)(
           // them fully in parallel; only the puller bulkhead caps the fan-out.
           await Promise.all(ids.map((id) => send(id, { delay: 0 })));
 
-          // Exactly the limit enters the gated body; the rest wait on the
-          // bulkhead.
+          // Exactly the limit enters the gated body; the rest are deferred by
+          // the saturation guard.
           await vi.waitFor(
             () => expect(control.inFlight).toBe(PULL_CONCURRENCY_LIMIT),
             { timeout: 15000, interval: 25 },

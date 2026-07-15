@@ -1,86 +1,71 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * Unit coverage for the in-process cron parsing that drives the event-sourced
- * pull scheduler. The recurrence fires on the event-sourcing global queue, not
- * Linux cron and not BullMQ — the cron string is only a schedule expression we
- * parse ourselves.
+ * Unit coverage for pull-schedule validation and the structural guarantee
+ * that puller scheduling goes through the durable ScheduledJob calendar
+ * (croner-evaluated) — no BullMQ, no Linux cron, no self-re-arming chain.
  *
- * Spec: specs/ai-governance/puller-framework/event-sourced-scheduling.feature
+ * Spec: specs/ai-governance/puller-framework/calendar-scheduled-pulls.feature
  */
 import { readFileSync } from "fs";
 import { join } from "path";
 
 import { describe, expect, it } from "vitest";
 
-import { computeNextDelayMs } from "../ingestionPullScheduler";
+import { assertValidPullSchedule } from "../ingestionPullScheduler";
 
-describe("ingestionPullScheduler — in-process cron scheduling", () => {
-  describe("given a source with pullSchedule '*/15 * * * *'", () => {
-    describe("when the scheduler computes when the next pull should fire", () => {
-      /** @scenario "The cron schedule is parsed in-process and fired by event-sourcing, not Linux cron" */
-      it("returns a delay equal to the cron's next fire time minus now", () => {
-        const nowMs = Date.parse("2026-06-19T10:07:00Z");
-        const expectedNextMs = Date.parse("2026-06-19T10:15:00Z");
+describe("ingestionPullScheduler — pull-schedule validation", () => {
+  describe("given a five-field cron pullSchedule", () => {
+    describe("when the source service validates it", () => {
+      /** @scenario "Pull schedules are validated as five-field cron expressions" */
+      it.each(["*/15 * * * *", "0 9 * * 1", "0 0 1 1 *"])(
+        "accepts %s",
+        (cron) => {
+          expect(() => assertValidPullSchedule(cron)).not.toThrow();
+        },
+      );
+    });
+  });
 
-        const delayMs = computeNextDelayMs("*/15 * * * *", nowMs);
-
-        expect(delayMs).toBe(expectedNextMs - nowMs);
+  describe("given a malformed or seconds-resolution pullSchedule", () => {
+    describe("when the source service validates it", () => {
+      /** @scenario "Pull schedules are validated as five-field cron expressions" */
+      it.each([
+        "definitely not cron",
+        "* * * * * *", // 6-field: croner would poll every second
+        "",
+        "0 25 * * *", // hour out of range
+      ])("rejects %j", (cron) => {
+        expect(() => assertValidPullSchedule(cron)).toThrow();
       });
 
-      /** @scenario "The cron schedule is parsed in-process and fired by event-sourcing, not Linux cron" */
-      it("schedules in-process with cron-parser, never Linux cron or a BullMQ repeatable job", () => {
+      /** @scenario "Malformed schedules are rejected without touching the calendar" */
+      it("throws before any calendar write can happen", () => {
+        expect(() => assertValidPullSchedule("definitely not cron")).toThrow(
+          /5-field cron expression/,
+        );
+      });
+    });
+  });
+
+  describe("given the puller scheduling module", () => {
+    describe("when its implementation is inspected", () => {
+      /** @scenario "Scheduling uses the durable calendar, not Linux cron or BullMQ" */
+      it("schedules through ScheduledJob rows with croner, never BullMQ or Linux cron", () => {
         const source = readFileSync(
           join(__dirname, "..", "ingestionPullScheduler.ts"),
           "utf8",
         );
 
-        // Parsed in-process with cron-parser.
-        expect(source).toContain('from "cron-parser"');
-        // No BullMQ, no Linux-cron runtime anywhere in the scheduler.
+        // Recurrence is owned by the durable calendar, evaluated by croner.
+        expect(source).toMatch(/from ["']croner["']/);
+        expect(source).toContain("PrismaScheduledJobRepository");
+        expect(source).toContain("upsertForTarget");
+
+        // No BullMQ, no Linux cron, no repeatable-job registration.
         expect(source).not.toMatch(/from ["']bullmq["']/);
-        expect(source).not.toMatch(/from ["']node-cron["']/);
-        expect(source).not.toMatch(/\bcrontab\b/);
-      });
-    });
-  });
-
-  describe("given a current time and a cron expression", () => {
-    describe.each([
-      {
-        now: "2026-06-19T10:00:00Z",
-        cron: "*/15 * * * *",
-        next: "2026-06-19T10:15:00Z",
-      },
-      {
-        now: "2026-06-19T10:07:00Z",
-        cron: "*/15 * * * *",
-        next: "2026-06-19T10:15:00Z",
-      },
-      {
-        now: "2026-06-19T10:30:00Z",
-        cron: "0 * * * *",
-        next: "2026-06-19T11:00:00Z",
-      },
-    ])("when now is $now and pullSchedule is $cron", ({ now, cron, next }) => {
-      /** @scenario "The next fire time is derived from the cron expression" */
-      it(`derives the next fire time as ${next}`, () => {
-        const nowMs = Date.parse(now);
-
-        const nextFireMs = nowMs + computeNextDelayMs(cron, nowMs);
-
-        expect(nextFireMs).toBe(Date.parse(next));
-      });
-    });
-  });
-
-  describe("given a malformed pull schedule", () => {
-    describe("when the scheduler computes the next pull", () => {
-      /** @scenario "Malformed schedules are rejected without stopping the existing recurrence" */
-      it("throws instead of manufacturing a delay", () => {
-        expect(() =>
-          computeNextDelayMs("definitely not cron", Date.now()),
-        ).toThrow();
+        expect(source).not.toMatch(/node-cron|crontab/);
+        expect(source).not.toMatch(/repeat(able)?\s*:/);
       });
     });
   });
