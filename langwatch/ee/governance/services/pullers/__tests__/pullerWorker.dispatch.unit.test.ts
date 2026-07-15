@@ -18,13 +18,49 @@
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { runIngestionPullForSource } from "../pullerWorker";
 
-const sourceFindUnique = vi.fn();
-const sourceUpdate = vi.fn();
-const ocsfInsert = vi.fn();
-const fetchStub = vi.fn();
-const ensureGovProject = vi.fn();
+const {
+  sourceFindUnique,
+  sourceUpdate,
+  ocsfInsert,
+  fetchStub,
+  ensureGovProject,
+} = vi.hoisted(() => ({
+  sourceFindUnique: vi.fn(),
+  sourceUpdate: vi.fn(),
+  ocsfInsert: vi.fn(),
+  fetchStub: vi.fn(),
+  ensureGovProject: vi.fn(),
+}));
+
+vi.mock("~/server/db", () => ({
+  prisma: {
+    ingestionSource: {
+      findUnique: sourceFindUnique,
+      update: sourceUpdate,
+    },
+  },
+}));
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  getClickHouseClientForProject: async () => ({}),
+}));
+vi.mock("../../governanceOcsfEvents.clickhouse.repository", () => ({
+  GovernanceOcsfEventsClickHouseRepository: class {
+    async insertEvent(row: unknown) {
+      return ocsfInsert(row);
+    }
+  },
+  OCSF_ACTIVITY: { CREATE: 1, READ: 2, UPDATE: 3, DELETE: 4, INVOKE: 6 },
+  OCSF_SEVERITY: { INFO: 1, LOW: 3, MEDIUM: 4, HIGH: 5, CRITICAL: 6 },
+}));
+vi.mock("../../governanceProject.service", () => ({
+  ensureHiddenGovernanceProject: ensureGovProject,
+}));
+vi.mock("~/utils/ssrfProtection", () => ({
+  ssrfSafeFetch: fetchStub,
+}));
 
 beforeEach(() => {
   sourceFindUnique.mockReset();
@@ -33,37 +69,9 @@ beforeEach(() => {
   fetchStub.mockReset();
   ensureGovProject.mockReset();
   ensureGovProject.mockResolvedValue({ id: "gov-proj-1" });
-
-  vi.doMock("~/server/db", () => ({
-    prisma: {
-      ingestionSource: {
-        findUnique: sourceFindUnique,
-        update: sourceUpdate,
-      },
-    },
-  }));
-  vi.doMock("~/server/clickhouse/clickhouseClient", () => ({
-    getClickHouseClientForProject: async () => ({}),
-  }));
-  vi.doMock("../../governanceOcsfEvents.clickhouse.repository", () => ({
-    GovernanceOcsfEventsClickHouseRepository: class {
-      async insertEvent(row: unknown) {
-        return ocsfInsert(row);
-      }
-    },
-    OCSF_ACTIVITY: { CREATE: 1, READ: 2, UPDATE: 3, DELETE: 4, INVOKE: 6 },
-    OCSF_SEVERITY: { INFO: 1, LOW: 3, MEDIUM: 4, HIGH: 5, CRITICAL: 6 },
-  }));
-  vi.doMock("../../governanceProject.service", () => ({
-    ensureHiddenGovernanceProject: ensureGovProject,
-  }));
-  vi.doMock("~/utils/ssrfProtection", () => ({
-    ssrfSafeFetch: fetchStub,
-  }));
 });
 
 afterEach(() => {
-  vi.resetModules();
   vi.clearAllMocks();
 });
 
@@ -129,7 +137,6 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
           { status: 200, headers: { "content-type": "application/json" } },
         ),
       );
-
 
       await runIngestionPullForSource({ ingestionSourceId: sourceId });
 
