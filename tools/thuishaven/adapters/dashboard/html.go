@@ -2,41 +2,83 @@ package dashboard
 
 import (
 	"fmt"
-	"html"
+	"html/template"
 	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// stackCard is renderCard's result: the card markup plus the per-stack
+// stackCard is renderCard's result: the card's view data plus the per-stack
 // numbers renderHTML aggregates into the page-level stats.
 type stackCard struct {
-	html          string
+	view          cardView
 	live          bool
 	rss           uint64
 	servicesUp    int
 	servicesTotal int
 }
 
-// renderCard draws one stack card — slug, live/stale pill, chips, worktree
-// dir, and a row per service with a liveness dot.
+// cardView is one stack card as the template sees it — slug, live/stale pill,
+// chips, worktree dir, and a row per service with a liveness dot.
+type cardView struct {
+	Slug       string
+	Badge      string
+	BadgeClass string
+	Branch     string
+	Dir        string
+	OpenURL    string // the card's primary action; empty hides it
+	Chips      []chipView
+	Rows       []rowView
+}
+
+type chipView struct {
+	Label    string
+	Value    string
+	Baseline bool
+}
+
+// rowView is one service line. Sub marks the api sub-row rendered under the
+// app service (the API shares app's origin, so it has no hostname of its own).
+type rowView struct {
+	DotClass string
+	Name     string
+	URL      string
+	Host     string
+	Port     int
+	Sub      bool
+}
+
+type statView struct {
+	N     template.HTML
+	Label string
+}
+
+type pageView struct {
+	ObsURL, ObsHost string
+	TelURL, TelHost string
+	Stats           []statView
+	Cards           []cardView
+	Empty           bool
+}
+
+// renderCard builds one stack's view data and per-stack aggregates.
 func renderCard(s domain.Stack, probes Probes) stackCard {
 	var c stackCard
 	c.live = s.LauncherPID != 0
 	if c.live && probes.ProcessAlive != nil {
 		c.live = probes.ProcessAlive(s.LauncherPID)
 	}
-	badge, badgeClass := "stale", "stale"
+	badge := "stale"
 	if c.live {
-		badge, badgeClass = "live", "live"
+		badge = "live"
 	}
 
 	if c.live && probes.GroupRSS != nil {
 		c.rss = probes.GroupRSS(s.LauncherPID)
 	}
 
-	var rows strings.Builder
+	var rows []rowView
 	for _, svc := range s.Services {
 		c.servicesTotal++
 		dotClass := "down"
@@ -44,51 +86,49 @@ func renderCard(s domain.Stack, probes Probes) stackCard {
 			dotClass = "up"
 			c.servicesUp++
 		}
-		rows.WriteString(fmt.Sprintf(
-			`<tr><td class="dot-cell"><span class="dot %s"></span></td><td class="svc">%s</td><td><a href="%s">%s</a></td><td class="dim mono">:%d</td></tr>`,
-			dotClass, html.EscapeString(svc.Name), html.EscapeString(svc.URL), html.EscapeString(svc.Hostname), svc.Port))
+		rows = append(rows, rowView{DotClass: dotClass, Name: svc.Name, URL: svc.URL, Host: svc.Hostname, Port: svc.Port})
 		// The API shares app's origin — show it as a sub-row so the single URL
 		// is unmistakable (no separate api.<slug> hostname).
 		if svc.Name == "app" && s.APIPort != 0 {
-			rows.WriteString(fmt.Sprintf(
-				`<tr><td class="dot-cell"></td><td class="svc dim">└ api</td><td><a href="%s/api">%s/api</a></td><td class="dim mono">:%d</td></tr>`,
-				html.EscapeString(svc.URL), html.EscapeString(svc.Hostname), s.APIPort))
+			rows = append(rows, rowView{Sub: true, Name: "└ api", URL: svc.URL + "/api", Host: svc.Hostname + "/api", Port: s.APIPort})
 		}
 	}
 
-	var chips strings.Builder
+	var chips []chipView
 	if s.ClickHouseDatabase != "" {
-		chips.WriteString(chip("clickhouse", s.ClickHouseDatabase))
+		chips = append(chips, chipView{Label: "clickhouse", Value: s.ClickHouseDatabase})
 	}
-	chips.WriteString(chip("redis db", fmt.Sprintf("%d", s.RedisDB)))
+	chips = append(chips, chipView{Label: "redis db", Value: fmt.Sprintf("%d", s.RedisDB)})
 	if c.rss > 0 {
-		chips.WriteString(chip("ram", humanBytesU(c.rss)))
+		chips = append(chips, chipView{Label: "ram", Value: humanBytesU(c.rss)})
 	}
 	if !s.UpdatedAt.IsZero() {
-		chips.WriteString(chip("heartbeat", shortAge(time.Since(s.UpdatedAt))))
+		chips = append(chips, chipView{Label: "heartbeat", Value: shortAge(time.Since(s.UpdatedAt))})
 	}
 	if s.IsBaseline {
-		chips.WriteString(`<span class="chip baseline">baseline</span>`)
+		chips = append(chips, chipView{Baseline: true})
 	}
 
 	// The card's primary action: open the app. Present whenever the stack has a
 	// routed app URL, regardless of health — a booting stack is still one click.
-	var action string
+	var openURL string
 	for _, svc := range s.Services {
 		if svc.Name == "app" && svc.URL != "" {
-			action = fmt.Sprintf(`<a class="open" href="%s">open ↗</a>`, html.EscapeString(svc.URL))
+			openURL = svc.URL
 			break
 		}
 	}
 
-	c.html = fmt.Sprintf(`
-      <section class="card">
-        <header><span class="slug">%s</span><span class="spacer"></span>%s<span class="pill %s">%s</span></header>
-        <div class="branch">⎇ %s</div>
-        <div class="chips">%s</div>
-        <div class="dir">%s</div>
-        <table>%s</table>
-      </section>`, html.EscapeString(s.Slug), action, badgeClass, badge, html.EscapeString(s.Branch), chips.String(), html.EscapeString(s.WorktreeDir), rows.String())
+	c.view = cardView{
+		Slug:       s.Slug,
+		Badge:      badge,
+		BadgeClass: badge,
+		Branch:     s.Branch,
+		Dir:        s.WorktreeDir,
+		OpenURL:    openURL,
+		Chips:      chips,
+		Rows:       rows,
+	}
 	return c
 }
 
@@ -102,15 +142,10 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string, probes Pro
 	}
 	var a agg
 
-	var cards strings.Builder
-	if len(stacks) == 0 {
-		cards.WriteString(`<div class="empty"><div class="glyph">⌂</div><h2>No stacks running</h2>
-      <p>Bring one up from any worktree and it appears here, on its own hostname.</p>
-      <code>haven up</code></div>`)
-	}
+	var cards []cardView
 	for _, s := range stacks {
 		c := renderCard(s, probes)
-		cards.WriteString(c.html)
+		cards = append(cards, c.view)
 		if c.live {
 			a.live++
 		}
@@ -125,32 +160,41 @@ func renderHTML(stacks []domain.Stack, sharedURL func(string) string, probes Pro
 		a.databases++
 	}
 
-	ramStat := "—"
+	ramStat := template.HTML("—")
 	if a.rss > 0 {
-		ramStat = humanBytesU(a.rss)
+		ram := template.HTML(template.HTMLEscapeString(humanBytesU(a.rss)))
 		if probes.TotalMemory != nil {
 			if total := probes.TotalMemory(); total > 0 {
-				ramStat += fmt.Sprintf(`<span class="of"> / %s</span>`, humanBytesU(total))
+				ram += template.HTML(`<span class="of"> / ` + template.HTMLEscapeString(humanBytesU(total)) + `</span>`)
 			}
 		}
+		ramStat = ram
 	}
-	stats := fmt.Sprintf(`
-    <div class="stat"><span class="n">%d<span class="of"> / %d</span></span><span class="l">stacks live</span></div>
-    <div class="stat"><span class="n">%d<span class="of"> / %d</span></span><span class="l">services up</span></div>
-    <div class="stat"><span class="n">%s</span><span class="l">stack ram</span></div>
-    <div class="stat"><span class="n">%d</span><span class="l">databases</span></div>`,
-		a.live, len(stacks), a.servicesUp, a.servicesTotal, ramStat, a.databases)
+	ofN := func(n, of int) template.HTML {
+		return template.HTML(fmt.Sprintf(`%d<span class="of"> / %d</span>`, n, of))
+	}
 
-	return fmt.Sprintf(pageTemplate,
-		sharedURL("observability"), hostFromURL(sharedURL("observability")),
-		sharedURL("telemetry"), hostFromURL(sharedURL("telemetry")),
-		stats,
-		cards.String())
-}
+	page := pageView{
+		ObsURL: sharedURL("observability"), ObsHost: hostFromURL(sharedURL("observability")),
+		TelURL: sharedURL("telemetry"), TelHost: hostFromURL(sharedURL("telemetry")),
+		Stats: []statView{
+			{N: ofN(a.live, len(stacks)), Label: "stacks live"},
+			{N: ofN(a.servicesUp, a.servicesTotal), Label: "services up"},
+			{N: ramStat, Label: "stack ram"},
+			{N: template.HTML(fmt.Sprintf("%d", a.databases)), Label: "databases"},
+		},
+		Cards: cards,
+		Empty: len(stacks) == 0,
+	}
 
-func chip(label, value string) string {
-	return fmt.Sprintf(`<span class="chip">%s <code>%s</code></span>`,
-		html.EscapeString(label), html.EscapeString(value))
+	var b strings.Builder
+	if err := pageTmpl.Execute(&b, page); err != nil {
+		// The template is static and the data is plain values, so this cannot
+		// fail at runtime — but a page saying so beats a blank one if it ever does.
+		return "<!doctype html><title>haven</title><p>dashboard render error: " +
+			template.HTMLEscapeString(err.Error())
+	}
+	return b.String()
 }
 
 func shortAge(d time.Duration) string {
@@ -187,6 +231,8 @@ func hostFromURL(u string) string {
 	return u
 }
 
+var pageTmpl = template.Must(template.New("page").Parse(pageTemplate))
+
 const pageTemplate = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>haven — LangWatch local stacks</title>
@@ -202,18 +248,18 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   body { margin:0; font:14px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;
     background:var(--bg); color:var(--fg); min-height:100vh; }
   /* fluid gradient field behind everything */
-  body::before, body::after { content:""; position:fixed; z-index:-1; border-radius:50%%;
+  body::before, body::after { content:""; position:fixed; z-index:-1; border-radius:50%;
     filter:blur(90px); opacity:.35; pointer-events:none; }
-  body::before { width:52vw; height:52vw; background:radial-gradient(circle at center, var(--accent), transparent 65%%);
+  body::before { width:52vw; height:52vw; background:radial-gradient(circle at center, var(--accent), transparent 65%);
     top:-18vw; right:-12vw; animation:drift1 26s ease-in-out infinite alternate; }
-  body::after { width:44vw; height:44vw; background:radial-gradient(circle at center, var(--violet), transparent 65%%);
+  body::after { width:44vw; height:44vw; background:radial-gradient(circle at center, var(--violet), transparent 65%);
     bottom:-16vw; left:-10vw; opacity:.22; animation:drift2 32s ease-in-out infinite alternate; }
   @keyframes drift1 { from{ transform:translate(0,0) scale(1);} to{ transform:translate(-6vw,5vh) scale(1.12);} }
   @keyframes drift2 { from{ transform:translate(0,0) scale(1);} to{ transform:translate(5vw,-4vh) scale(1.08);} }
   @media (prefers-reduced-motion: reduce){ body::before, body::after{ animation:none; } .dot.up::after{ animation:none; } }
 
   header.top { position:sticky; top:0; z-index:10; padding:14px 30px; display:flex; align-items:center;
-    gap:14px; flex-wrap:wrap; background:color-mix(in oklab, var(--bg) 72%%, transparent);
+    gap:14px; flex-wrap:wrap; background:color-mix(in oklab, var(--bg) 72%, transparent);
     backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid var(--line); }
   header.top h1 { margin:0; font-size:19px; letter-spacing:.01em; font-weight:700; }
   header.top h1 .mark { color:var(--accent); }
@@ -221,8 +267,8 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   header.top .links { margin-left:auto; display:flex; gap:14px; align-items:center; font-size:12.5px; color:var(--dim); }
   header.top .links a { color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:3px 11px;
     transition:color .15s ease, border-color .15s ease; }
-  header.top .links a:hover { color:var(--accent); border-color:color-mix(in oklab, var(--accent) 45%%, var(--line)); text-decoration:none; }
-  #beat { width:7px; height:7px; border-radius:50%%; background:var(--live); display:inline-block; }
+  header.top .links a:hover { color:var(--accent); border-color:color-mix(in oklab, var(--accent) 45%, var(--line)); text-decoration:none; }
+  #beat { width:7px; height:7px; border-radius:50%; background:var(--live); display:inline-block; }
   #beat.off { background:var(--stale); }
 
   .stats { display:flex; gap:12px; flex-wrap:wrap; padding:10px 30px 4px; }
@@ -236,39 +282,39 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px 18px;
     backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
     transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease; }
-  .card:hover { transform:translateY(-2px); box-shadow:0 12px 32px -16px color-mix(in oklab, var(--accent) 42%%, transparent);
-    border-color:color-mix(in oklab, var(--accent) 36%%, var(--line)); }
+  .card:hover { transform:translateY(-2px); box-shadow:0 12px 32px -16px color-mix(in oklab, var(--accent) 42%, transparent);
+    border-color:color-mix(in oklab, var(--accent) 36%, var(--line)); }
   .card header { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
   .card header .spacer { flex:1; }
   .slug { font-weight:700; font-size:15.5px; }
   .branch { color:var(--dim); font-size:12px; margin-bottom:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .open { font-size:12px; font-weight:600; color:var(--accent); border:1px solid color-mix(in oklab, var(--accent) 38%%, var(--line));
+  .open { font-size:12px; font-weight:600; color:var(--accent); border:1px solid color-mix(in oklab, var(--accent) 38%, var(--line));
     background:var(--accent-soft); border-radius:999px; padding:2px 11px; transition:background .15s ease; }
-  .open:hover { background:color-mix(in oklab, var(--accent) 26%%, transparent); text-decoration:none; }
+  .open:hover { background:color-mix(in oklab, var(--accent) 26%, transparent); text-decoration:none; }
   .pill { font-size:11px; padding:2px 9px; border-radius:999px; text-transform:uppercase; letter-spacing:.06em; font-weight:600; }
-  .pill.live { background:color-mix(in oklab,var(--live) 18%%,transparent); color:var(--live); }
-  .pill.stale { background:color-mix(in oklab,var(--stale) 18%%,transparent); color:var(--stale); }
+  .pill.live { background:color-mix(in oklab,var(--live) 18%,transparent); color:var(--live); }
+  .pill.stale { background:color-mix(in oklab,var(--stale) 18%,transparent); color:var(--stale); }
 
   .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
-  .chip { color:var(--dim); font-size:11.5px; background:color-mix(in oklab, var(--fg) 4%%, transparent);
+  .chip { color:var(--dim); font-size:11.5px; background:color-mix(in oklab, var(--fg) 4%, transparent);
     border:1px solid var(--line); border-radius:999px; padding:2px 9px; }
   .chip code { background:none; padding:0; color:var(--fg); font-size:11.5px; }
-  .chip.baseline { color:var(--accent); border-color:color-mix(in oklab, var(--accent) 42%%, var(--line));
+  .chip.baseline { color:var(--accent); border-color:color-mix(in oklab, var(--accent) 42%, var(--line));
     background:var(--accent-soft); font-weight:600; }
   .dir { color:var(--dim); font-size:11.5px; word-break:break-all; margin-bottom:10px; }
 
-  table { width:100%%; border-collapse:collapse; } td { padding:3.5px 0; }
+  table { width:100%; border-collapse:collapse; } td { padding:3.5px 0; }
   .dot-cell { width:16px; }
-  .dot { display:inline-block; width:8px; height:8px; border-radius:50%%; position:relative; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; position:relative; }
   .dot.up { background:var(--live); }
-  .dot.up::after { content:""; position:absolute; inset:-3px; border-radius:50%%;
+  .dot.up::after { content:""; position:absolute; inset:-3px; border-radius:50%;
     border:1.5px solid var(--live); opacity:.5; animation:ping 2.2s ease-out infinite; }
-  @keyframes ping { 0%%{ transform:scale(.6); opacity:.6; } 80%%,100%%{ transform:scale(1.5); opacity:0; } }
+  @keyframes ping { 0%{ transform:scale(.6); opacity:.6; } 80%,100%{ transform:scale(1.5); opacity:0; } }
   .dot.down { background:var(--down); opacity:.75; }
   .svc { width:78px; color:var(--dim); }
   a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
   .dim { color:var(--dim); font-size:12px; } .mono { font-variant-numeric:tabular-nums; }
-  code { background:color-mix(in oklab,var(--fg) 8%%,transparent); padding:1px 5px; border-radius:5px; font-size:12px; }
+  code { background:color-mix(in oklab,var(--fg) 8%,transparent); padding:1px 5px; border-radius:5px; font-size:12px; }
   .empty { grid-column:1/-1; color:var(--dim); text-align:center; padding:56px 0 64px; }
   .empty .glyph { font-size:40px; color:var(--accent); opacity:.8; }
   .empty h2 { margin:10px 0 6px; color:var(--fg); font-size:17px; }
@@ -278,13 +324,23 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
 <header class="top">
   <h1><span class="mark">●</span> haven</h1><span class="tag">LangWatch local stacks — hostname routing via portless</span>
   <span class="links">
-    <a href="%s">observability · %s</a>
-    <a href="%s">telemetry · %s</a>
+    <a href="{{.ObsURL}}">observability · {{.ObsHost}}</a>
+    <a href="{{.TelURL}}">telemetry · {{.TelHost}}</a>
   </span>
 </header>
 <div id="live">
-<div class="stats">%s</div>
-<main>%s</main>
+<div class="stats">{{range .Stats}}
+    <div class="stat"><span class="n">{{.N}}</span><span class="l">{{.Label}}</span></div>{{end}}</div>
+<main>{{if .Empty}}<div class="empty"><div class="glyph">⌂</div><h2>No stacks running</h2>
+      <p>Bring one up from any worktree and it appears here, on its own hostname.</p>
+      <code>haven up</code></div>{{end}}{{range .Cards}}
+      <section class="card">
+        <header><span class="slug">{{.Slug}}</span><span class="spacer"></span>{{if .OpenURL}}<a class="open" href="{{.OpenURL}}">open ↗</a>{{end}}<span class="pill {{.BadgeClass}}">{{.Badge}}</span></header>
+        <div class="branch">⎇ {{.Branch}}</div>
+        <div class="chips">{{range .Chips}}{{if .Baseline}}<span class="chip baseline">baseline</span>{{else}}<span class="chip">{{.Label}} <code>{{.Value}}</code></span>{{end}}{{end}}</div>
+        <div class="dir">{{.Dir}}</div>
+        <table>{{range .Rows}}{{if .Sub}}<tr><td class="dot-cell"></td><td class="svc dim">{{.Name}}</td><td><a href="{{.URL}}">{{.Host}}</a></td><td class="dim mono">:{{.Port}}</td></tr>{{else}}<tr><td class="dot-cell"><span class="dot {{.DotClass}}"></span></td><td class="svc">{{.Name}}</td><td><a href="{{.URL}}">{{.Host}}</a></td><td class="dim mono">:{{.Port}}</td></tr>{{end}}{{end}}</table>
+      </section>{{end}}</main>
 </div>
 <footer><span id="beat"></span><span id="stamp">live — refreshes every 3s</span></footer>
 <script>
