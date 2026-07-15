@@ -25,14 +25,14 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
 
   Rule: the standard GenAI attributes canonicalize without VS-Code-specific code
 
-    @unit @unimplemented
+    @unit
     Scenario: A copilot-chat span yields model and token usage on the canonical trace
       Given a copilot-chat OTLP span named "chat" with gen_ai request model and token usage attributes
       When the span is ingested with the copilot_vscode ingest key
       Then the recorded span carries the model name
       And the recorded span carries input and output token counts
 
-    @unit @unimplemented
+    @unit
     Scenario: Captured prompt content is lifted as span input
       Given a copilot-chat span whose attributes carry captured prompt content
       When the span is ingested with the copilot_vscode ingest key

@@ -225,4 +225,67 @@ describe("CopilotExtractor", () => {
       expect(result.attributes["gen_ai.output.messages"]).toBeDefined();
     });
   });
+
+  describe("when a VS Code copilot-chat span runs through the chain", () => {
+    // VS Code Copilot Chat emits under the `copilot-chat` instrumentation
+    // scope (not `github.copilot`), so the shared GenAI core canonicalizes
+    // it and the copilot extractor stays inert — ADR-039 §Extension #2's
+    // "no VS-Code-specific extractor code in v1".
+    const canonicalizeVscode = (attrs: Record<string, unknown>) =>
+      new CanonicalizeSpanAttributesService().canonicalize(
+        attrs as Parameters<
+          CanonicalizeSpanAttributesService["canonicalize"]
+        >[0],
+        [],
+        {
+          name: "chat",
+          kind: 0,
+          instrumentationScope: { name: "copilot-chat" },
+          statusMessage: null,
+          statusCode: null,
+          parentSpanId: null,
+        } as unknown as Parameters<
+          CanonicalizeSpanAttributesService["canonicalize"]
+        >[2],
+      );
+
+    /** @scenario A copilot-chat span yields model and token usage on the canonical trace */
+    it("GenAI lifts model and token usage from a copilot-chat span with no copilot-specific code", () => {
+      const result = canonicalizeVscode({
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "oswe-vscode-prime",
+        "gen_ai.usage.input_tokens": 618820,
+        "gen_ai.usage.output_tokens": 11348,
+        // VS Code's own AI-unit attr (not github.copilot.nano_aiu) — v1
+        // ignores it (tokens-only); asserted below via the absence of
+        // copilot: rules.
+        copilot_usage_nano_aiu: 230235000,
+      });
+
+      expect(
+        result.appliedRules.some((r) => r.startsWith("genai:")),
+      ).toBe(true);
+      expect(result.attributes["gen_ai.request.model"]).toBe(
+        "oswe-vscode-prime",
+      );
+      expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(618820);
+      expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(11348);
+      // the copilot extractor gates on the github.copilot scope, so it never
+      // fires for copilot-chat — no VS-Code-specific extractor code.
+      expect(
+        result.appliedRules.some((r) => r.startsWith("copilot:")),
+      ).toBe(false);
+    });
+
+    /** @scenario Captured prompt content is lifted as span input */
+    it("lifts captured prompt content as span input", () => {
+      const result = canonicalizeVscode({
+        "gen_ai.input.messages": JSON.stringify([
+          { role: "user", content: "langwatch vscode probe" },
+        ]),
+      });
+
+      expect(result.attributes["gen_ai.input.messages"]).toBeDefined();
+    });
+  });
 });
