@@ -26,7 +26,10 @@ import {
   maybeOfferIngestionShellRcPersist,
   SHELL_FUNCTION_TOOLS,
 } from "./shell-rc";
-import { copilotPrespawnWarnings } from "./copilot-prespawn";
+import {
+  copilotGatewayModelPreflight,
+  copilotPrespawnWarnings,
+} from "./copilot-prespawn";
 import {
   copilotSeatBypassSuffix,
   resolveWrapperMode,
@@ -590,6 +593,19 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   if (tool === "copilot") {
     for (const warning of copilotPrespawnWarnings()) {
       process.stderr.write(`${warning}\n`);
+    }
+  }
+
+  // Copilot BYOK (gateway) requires a model; fail fast with an actionable
+  // message instead of copilot's opaque downstream error.
+  if (modeResult.mode === "gateway" && tool === "copilot") {
+    const modelError = copilotGatewayModelPreflight({
+      args: toolArgs,
+      env: process.env,
+    });
+    if (modelError) {
+      process.stderr.write(`${lwTag()} ${modelError}\n`);
+      process.exit(1);
     }
   }
 
