@@ -253,9 +253,9 @@ export interface GraphAlertDispatchResult {
  * (`sendRenderedTriggerEmail` / `sendRenderedSlackMessage`) — same ones
  * the trace cadence dispatcher uses; sender signatures are unchanged.
  *
- * Both dispatchers call it: the event-sourced evaluator when
- * `release_es_graph_triggers_firing` is on, and the cron when it is off. The
- * flag decides WHO evaluates, never what the customer receives.
+ * The event-sourced evaluator (real-time reactor + heartbeat) is the sole
+ * caller — the K8s cron that used to share this dispatcher was removed once
+ * every project cut over (ADR-034).
  */
 export async function dispatchGraphAlertAction({
   deps,
@@ -320,12 +320,10 @@ export async function dispatchGraphAlertAction({
       };
     }
     // ADR-031: the two hard email caps, consumed HERE — inside the shared
-    // dispatcher — so the cron and the event-sourced evaluator cannot drift
-    // (the parity contract: `release_es_graph_triggers_firing` decides WHO
-    // evaluates, never what the customer receives). Both claims are keyed on
-    // the fire digest, so an outbox retry of THIS fire re-reads the count
-    // instead of burning a second slot, and the next incident (new digest)
-    // gets a fresh slot.
+    // dispatcher — so the real-time reactor and heartbeat callers cannot
+    // drift. Both claims are keyed on the fire digest, so an outbox retry of
+    // THIS fire re-reads the count instead of burning a second slot, and the
+    // next incident (new digest) gets a fresh slot.
     //
     // Over either cap the dispatch is a terminal drop: no send, no throw —
     // throwing would let the outbox retry the spam. `didSend` stays true so

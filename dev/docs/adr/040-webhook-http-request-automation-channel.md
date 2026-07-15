@@ -558,6 +558,13 @@ the drawer's "Recent deliveries" drill-down, and a 30-day prune cron
 **Still deferred:** HMAC request signing (§3, including the signing toggle UI)
 and the `ProjectSecret`-ref auth union — the only remaining Phase 2 gap.
 
+> **Note (2026-07):** the "cron parity" webhook action this ADR's migration
+> plan describes (§7, `pages/api/cron/triggers/actions/sendWebhookRequest.ts`)
+> was removed shortly after, when the K8s graph-alert cron itself was retired
+> (ADR-034 — the event-sourced path is now the sole graph-alert path). Webhook
+> dispatch rides only the outbox + `dispatchGraphAlertAction` now; the
+> planning references to a cron action above are historical.
+
 ## References
 
 - [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) —

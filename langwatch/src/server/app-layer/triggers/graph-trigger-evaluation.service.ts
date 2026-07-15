@@ -11,14 +11,12 @@
  *     no-data / firing-resolve absence cases the event-driven path
  *     structurally cannot reach.
  *
- * Mirrors the cron's `processCustomGraphTrigger` for the evaluation
- * side (fetch trigger + graph, build TimeseriesInput, call
+ * The evaluation side (fetch trigger + graph, build TimeseriesInput, call
  * `analyticsService.getTimeseries(...)`, compute current value via
  * the same aggregation rules, apply `evaluateCustomGraphThreshold` /
- * `isNoDataPredicate`, insert / resolve `TriggerSent` with the same
- * dedup pattern). Phase 8.1 replaces the cron's hardcoded
- * `handleSendEmail` / `handleSendSlackMessage` notify hop with the
- * Liquid pipeline — `buildGraphAlertTemplateContext` +
+ * `isNoDataPredicate`, insert / resolve `TriggerSent` with the
+ * dedup pattern). The notify hop uses the Liquid pipeline —
+ * `buildGraphAlertTemplateContext` +
  * `dispatchGraphAlertAction` — so per-trigger custom templates and
  * the alert-default Liquid templates both apply.
  *
@@ -29,7 +27,7 @@
 
 import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
-import type { ActionParams } from "~/pages/api/cron/triggers/types";
+import type { ActionParams } from "~/server/app-layer/triggers/trigger.types";
 import { decryptSlackBotToken } from "~/automations/providers/definitions/slack/secret";
 import {
   type SlackActionParams,

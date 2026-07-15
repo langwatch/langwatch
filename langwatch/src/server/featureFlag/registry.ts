@@ -182,25 +182,9 @@ export const FEATURE_FLAGS = [
     description:
       "Tripwire for ADR-034 Phase 3: when ON alongside release_event_sourced_analytics_read, runs the routed and legacy trace_summaries queries in parallel and logs divergence beyond a small tolerance. Returns the routed result either way.",
   },
-  // ADR-034 Phase 5 — moves custom-graph threshold-alert firing off the K8s
-  // cron onto the event-sourced path (real-time outbox reactor on
-  // trace-processing + 30s heartbeat for no-data / firing-resolve absence
-  // cases). SYSTEM scope: self-hosted (env + /ops/feature-flags store),
-  // never consults PostHog — the rollout is operator-driven per project
-  // rather than %-targeted, and we don't want PostHog outages or quota
-  // to flip trigger delivery. OFF (default) = cron handles the project's
-  // graph triggers as today. ON = cron skips that project's graph
-  // triggers; the event-sourced path takes over. The cron loop and the
-  // new path coexist per-project — graph triggers either fire from one
-  // OR the other for a given project, never both.
-  {
-    key: "release_es_graph_triggers_firing",
-    scope: "SYSTEM",
-    defaultValue: false,
-    description:
-      "Moves custom-graph threshold-alert firing off the K8s cron onto the event-sourced path (ADR-034 Phase 5). Self-hosted flag; toggle globally via RELEASE_ES_GRAPH_TRIGGERS_FIRING=1 or per-project from /ops/feature-flags. On = cron skips this project's graph triggers; real-time outbox reactor + heartbeat fire them. Off = cron handles as today.",
-    family: "Event sourcing",
-  },
+  // NOTE: `release_es_graph_triggers_firing` (ADR-034 Phase 5) was retired —
+  // the event-sourced graph-alert path is now unconditional and the K8s cron
+  // was removed, so there is no longer a cron/ES choice to gate.
   {
     key: "release_langy_enabled",
     scope: "PRODUCT",

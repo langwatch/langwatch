@@ -5,10 +5,10 @@
  * 30 seconds (the locked Phase 5 cadence). Worker-only at runtime; the
  * scheduler no-ops on web. Every tick:
  *
- *   1. For each project with `release_es_graph_triggers_firing` ON,
- *      load (a) active triggers whose operator/threshold combination
- *      matches `isNoDataPredicate`, plus (b) active triggers with at
- *      least one unresolved `TriggerSent` row. Union = candidates.
+ *   1. For each project with graph triggers, load (a) active triggers
+ *      whose operator/threshold combination matches `isNoDataPredicate`,
+ *      plus (b) active triggers with at least one unresolved `TriggerSent`
+ *      row. Union = candidates.
  *   2. Pre-filter (LOCKED by the Phase 5 spec): one batched
  *      `max(OccurredAt)` query against the slim `trace_analytics`
  *      table per project per tick — bounded by `max(windowMs)` across
@@ -28,7 +28,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import type { ActionParams } from "~/pages/api/cron/triggers/types";
+import type { ActionParams } from "~/server/app-layer/triggers/trigger.types";
 import {
   type AnalyticsMetricSource,
   getMetricSource,
@@ -44,8 +44,6 @@ import {
   graphEvalDedupId,
   graphEvalGroupKey,
 } from "~/server/event-sourcing/outbox/payload";
-import { featureFlagService as defaultFeatureFlagService } from "~/server/featureFlag";
-import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
 import { parseSeriesIndex } from "./seriesName";
 import type { TriggerService } from "./trigger.service";
@@ -80,7 +78,6 @@ export interface GraphTriggerHeartbeatDeps {
    *  tests can stub a single client and the prod path uses the default
    *  per-project resolver. */
   resolveClickHouseClient: ClickHouseClientResolver;
-  featureFlagService: FeatureFlagServiceInterface;
   /**
    * ADR-034 Phase 6: look up the upstream pipeline source for a graph
    * trigger by reading the metric key of the series the trigger actually
@@ -89,8 +86,7 @@ export interface GraphTriggerHeartbeatDeps {
    * points the recency probe at the wrong slim table. Returns `undefined`
    * when the source can't be determined (graph missing, series index out of
    * range, metric not in field-availability) — the heartbeat treats those as
-   * `"trace"` so behaviour is unchanged for unknown-source triggers (the cron
-   * has always handled them).
+   * `"trace"` so behaviour is unchanged for unknown-source triggers.
    */
   lookupTriggerSource(params: {
     triggerId: string;
@@ -102,14 +98,12 @@ export interface GraphTriggerHeartbeatDeps {
 }
 
 export interface HeartbeatCandidateSources {
-  /** Project ids with `release_es_graph_triggers_firing` ON. The
-   *  heartbeat must NOT bombard the operator-flag table — the
-   *  cron-equivalent project read covers this in one query. */
+  /** Project ids that have at least one active graph trigger. */
   loadProjectsWithGraphTriggers(): Promise<string[]>;
   /** Project ids that have at least one unresolved graph-alert
    *  `TriggerSent` (the "resolve-when-traffic-stops" candidate set).
    *  Returns a Set so the heartbeat can intersect cheaply with the
-   *  flagged-projects set. */
+   *  graph-trigger project set. */
   loadProjectsWithOpenGraphTriggerSent(): Promise<Set<string>>;
 }
 
@@ -243,7 +237,8 @@ export async function decideGraphTriggerHeartbeat({
   now: Date;
 }): Promise<OutboxEnqueueRequest[]> {
   // Step 1: load the union of "has graph triggers" + "has open sent"
-  // projects, then intersect with flag-ON projects.
+  // projects. Every such project is processed — the event-sourced path is
+  // the sole graph-alert path (ADR-034: the K8s cron was removed).
   const [graphProjects, openSentProjects] = await Promise.all([
     sources.loadProjectsWithGraphTriggers(),
     sources.loadProjectsWithOpenGraphTriggerSent(),
@@ -251,32 +246,10 @@ export async function decideGraphTriggerHeartbeat({
   const projectIds = Array.from(
     new Set<string>([...graphProjects, ...openSentProjects]),
   );
-
-  const flaggedProjects: string[] = [];
-  for (const projectId of projectIds) {
-    try {
-      const enabled = await deps.featureFlagService.isEnabled(
-        "release_es_graph_triggers_firing",
-        { distinctId: projectId, projectId },
-      );
-      if (enabled) flaggedProjects.push(projectId);
-    } catch (error) {
-      // Treat an unreadable flag as OFF: the cron still owns this project
-      // (it fails the same way, in the same direction), so the alert is
-      // evaluated by exactly one path rather than none.
-      logger.error(
-        {
-          projectId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "graphTriggerHeartbeat: flag lookup failed, leaving project on the cron path",
-      );
-    }
-  }
-  if (flaggedProjects.length === 0) return [];
+  if (projectIds.length === 0) return [];
 
   const requests: OutboxEnqueueRequest[] = [];
-  for (const projectId of flaggedProjects) {
+  for (const projectId of projectIds) {
     try {
       requests.push(
         ...(await collectRequestsForProject({
@@ -583,7 +556,6 @@ export function defaultGraphTriggerHeartbeatDeps({
       }
       return client;
     },
-    featureFlagService: defaultFeatureFlagService,
     lookupTriggerSource: async ({ customGraphId, projectId, seriesName }) => {
       // The graph is the only place the metric key lives; the trigger's
       // `actionParams.seriesName` carries the series INDEX. Classify from the
