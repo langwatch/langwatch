@@ -49,7 +49,6 @@ import {
   decodeJobEnvelope,
   encodeJobEnvelope,
   PayloadTooLargeError,
-  readEnvelopeBlobId,
   readEnvelopeDescriptor,
   readJobRoutingMeta,
 } from "./jobEnvelope";
@@ -191,7 +190,7 @@ type DropReason =
  * and not ours to own, so an alert built on substrings breaks under a runtime
  * upgrade.
  */
-const dropReasonOf = (err: unknown): DropReason =>
+const dropReasonOf = (err: unknown): DecodeFailureReason | "unknown" =>
   err instanceof DecodeFailureError ? err.reason : "unknown";
 
 export class GroupQueueProcessor<Payload extends Record<string, unknown>>
@@ -1516,7 +1515,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     stagedJobId: string;
     jobDataJson: string;
     err: unknown;
-    reason: DropReason;
+    /**
+     * Narrower than {@link DropReason} on purpose. The release rule below is only
+     * sound for reasons where "was the body still there?" is the right question —
+     * `sibling_restage_failed` and `retry_encode_failed` are discards for reasons
+     * unrelated to the body, and they handle their own values. Narrowing makes
+     * that a compile error rather than a silent behaviour question.
+     */
+    reason: DecodeFailureReason | "transient_exhausted" | "unknown";
     message: string;
   }): Promise<void> {
     this.recordDrop({ groupId, stagedJobId, jobDataJson, err, reason, message });

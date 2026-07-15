@@ -61,6 +61,7 @@ describe("jobEnvelope decode failures", () => {
 
   describe("given an envelope whose referenced blob is gone", () => {
     describe("when it is decoded", () => {
+      /** @scenario an envelope whose referenced blob is gone is classified as a missing blob */
       it("names the failure missing_blob", async () => {
         const { tieredBlobs, redisBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({
@@ -115,6 +116,7 @@ describe("jobEnvelope decode failures", () => {
 
     for (const { name, value } of cases) {
       describe(`when it has ${name}`, () => {
+        /** @scenario an envelope that cannot be parsed is classified as malformed */
         it("names the failure malformed_envelope", async () => {
           const err = await decodeJobEnvelope({ value })
             .then(() => null)
@@ -129,6 +131,7 @@ describe("jobEnvelope decode failures", () => {
 
   describe("given an envelope whose body will not decompress", () => {
     describe("when it is decoded", () => {
+      /** @scenario a body that cannot be decompressed is classified as a decompress failure */
       it("names the failure decompress_failure", async () => {
         const { tieredBlobs, redisBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({
@@ -150,6 +153,7 @@ describe("jobEnvelope decode failures", () => {
         expect((err as DecodeFailureError).reason).toBe("decompress_failure");
       });
 
+      /** @scenario classification survives an exception message it does not own */
       it("classifies by error type, not by the zlib message text", async () => {
         const { tieredBlobs, redisBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({

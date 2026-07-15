@@ -52,7 +52,13 @@ Feature: GroupQueue decode-drop durability and attribution
 
   # --- AC1: diagnosability — the descriptor half (the err half shipped in #5736)
 
-  @integration
+  @integration @unimplemented
+  # UNBOUND, deliberately and visibly (#5538). The descriptor READER is proven by
+  # `readEnvelopeDescriptor` unit tests below (incl. that it still reports after
+  # the blob is gone, and never throws). What is NOT asserted is the last inch:
+  # that `recordDrop` puts those fields on the emitted log record. That needs a
+  # logger-capture harness the groupQueue integration suite does not have yet.
+  # Tracked by #5817. Do not read the green suite as covering this.
   Scenario: a non-transient decode failure names the envelope it could not read
     Given a staged job whose decode throws a non-transient error
     When a worker claims the group and the decode fails
@@ -120,7 +126,12 @@ Feature: GroupQueue decode-drop durability and attribution
 
   # --- AC4: @regression — every supported format still decodes
 
-  @integration
+  @integration @unimplemented
+  # UNBOUND by choice: every format here is already covered by the existing
+  # jobEnvelope suites (34 tests, green on this branch — bare JSON, gz, GQ1+blob,
+  # GQ2+blob; zstd/msgpack via jobEnvelope.codec.unit.test.ts). Re-binding them to
+  # this outline would duplicate coverage the spec step forbids. What is NOT yet
+  # asserted is the drop counter staying ZERO across a clean run of all formats.
   Scenario Outline: a well-formed envelope of every supported format still decodes
     Given a well-formed staged job encoded as <format>
     When a worker claims the group
@@ -154,7 +165,12 @@ Feature: GroupQueue decode-drop durability and attribution
 
   # --- AC7: all four discarding sites; the false replay premise removed
 
-  @integration
+  @integration @unimplemented
+  # UNBOUND: no single test drives all five discard sites. Three ARE covered
+  # individually (dispatch decode, transient exhaustion, and AC8's pair) by
+  # groupQueue.decodeDrop.integration.test.ts. The sibling-drain and
+  # sibling-re-stage sites are not, and the "no path claims replay recovery" half
+  # is proven by AC7's grep rather than by an executing test. Tracked by #5817.
   Scenario Outline: every path that discards a job counts the loss
     Given a job that is discarded by the <site> path
     When the discard happens
