@@ -224,6 +224,13 @@ describe("ClickHouse metrics", () => {
     });
 
     describe("given backup status collection", () => {
+      beforeEach(() => {
+        process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED = "true";
+      });
+      afterEach(() => {
+        delete process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
+      });
+
       describe("when system.backup_log returns data", () => {
         it("queries system.backup_log for backup status", async () => {
           const partsResult = {
@@ -432,13 +439,12 @@ describe("ClickHouse metrics", () => {
         return typeof arg === "string" && arg.includes(needle);
       }).length;
 
-    describe("when running in production", () => {
-      const originalNodeEnv = process.env.NODE_ENV;
+    describe("when backup metrics are enabled", () => {
       beforeEach(() => {
-        process.env.NODE_ENV = "production";
+        process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED = "true";
       });
       afterEach(() => {
-        process.env.NODE_ENV = originalNodeEnv;
+        delete process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
       });
 
       describe("when system.backup_log fails repeatedly", () => {
@@ -481,37 +487,10 @@ describe("ClickHouse metrics", () => {
       });
     });
 
-    describe("when off-prod but not local dev (NODE_ENV=test / staging)", () => {
-      // NODE_ENV is "test" here: the query still runs (only local dev skips it), so
-      // this exercises the off-prod logging path — a repeated failure must never
-      // reach the console, it stays at debug.
-      it("never warns and keeps backup-log failures at debug", async () => {
-        const client = buildMockClient(() => true);
-
-        await metrics.collectStorageStats(client);
-        await metrics.collectStorageStats(client);
-        await metrics.collectStorageStats(client);
-
-        expect(
-          countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
-        ).toBe(0);
-        expect(
-          countCallsMatching(loggerMocks.debug.mock.calls, 1, "system.backup_log"),
-        ).toBeGreaterThanOrEqual(1);
-      });
-    });
-
-    describe("when running in local dev (NODE_ENV=development)", () => {
-      const originalNodeEnv = process.env.NODE_ENV;
-      beforeEach(() => {
-        process.env.NODE_ENV = "development";
-      });
-      afterEach(() => {
-        process.env.NODE_ENV = originalNodeEnv;
-      });
-
-      // system.backup_log never exists locally, so querying it every 15s tick is
-      // pointless — the collector must skip it entirely, leaving only parts + disks.
+    describe("when backup metrics are not enabled (the default)", () => {
+      // system.backup_log only exists where backups are configured, so anywhere
+      // that hasn't opted in the collector must skip it entirely, leaving only
+      // parts + disks.
       it("skips the system.backup_log query entirely", async () => {
         const client = buildMockClient(() => false);
 

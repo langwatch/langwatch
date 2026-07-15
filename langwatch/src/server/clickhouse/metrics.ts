@@ -233,7 +233,8 @@ const MONITORED_TABLES = [
 
 /**
  * Collects ClickHouse backup status from system.backup_log into the backup gauges.
- * Extracted so collectStorageStats can gate it out in local dev (see the call site).
+ * Extracted so collectStorageStats can gate it behind the explicit opt-in (see the
+ * call site).
  *
  * We deliberately query system.backup_log instead of system.backups: system.backups
  * is an in-memory table that gets wiped on CH restart, which happens on every app
@@ -289,13 +290,11 @@ async function collectBackupStats(client: ClickHouseClient): Promise<void> {
       backupStatsCollectionFailing = false;
     }
   } catch (backupError) {
-    // Even where it IS collected the table can be transiently unavailable (a CH
-    // restart mid-tick), so a failure is handled, not fatal. Only production
-    // surfaces it — edge-triggered, once, until it recovers; elsewhere (the
-    // test/staging path) it stays at debug, below the console floor. Local dev never
-    // reaches here — the caller skips the query entirely.
-    const isProd = process.env.NODE_ENV === "production";
-    if (isProd && !backupStatsCollectionFailing) {
+    // Even where backups ARE configured the table can be transiently unavailable
+    // (a CH restart mid-tick), so a failure is handled, not fatal. Only
+    // deployments that opted in reach here, and they care — surface it
+    // edge-triggered, once, until it recovers.
+    if (!backupStatsCollectionFailing) {
       logger.warn(
         { error: backupError },
         "Failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
@@ -349,13 +348,15 @@ export async function collectStorageStats(
       setClickHouseTableParts(row.table, parseInt(row.parts_count, 10));
     }
 
-    // Backup status is a production concern: system.backup_log only exists once
-    // backups are configured, which never happens locally — so on a dev box this
-    // query just fails on every 15s tick for nothing. Skip it in local dev; every
-    // other environment (prod, and the test/staging path) still collects it. The app
-    // runs this collector too under haven's in-process workers, so gating here (not
-    // at one call site) covers both the app and the standalone worker.
-    if (process.env.NODE_ENV !== "development") {
+    // Backup status only exists where backups are configured (the production
+    // cluster, via clickhouse-serverless's backup cronjobs) — everywhere else this
+    // query just fails on every 15s tick for nothing, and NODE_ENV can't tell
+    // "has backups" from "staging/self-hosted production build". So the deployment
+    // that has backups opts in explicitly (set on the worker alongside the backup
+    // cronjobs). Gating here (not at one call site) covers both the app under
+    // haven's in-process workers and the standalone worker.
+    // See specs/ops/clickhouse-backup-metrics.feature.
+    if (process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED === "true") {
       await collectBackupStats(client);
     }
 
