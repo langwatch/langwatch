@@ -23,12 +23,6 @@ export function isShareExpired(
   return share.expiresAt != null && share.expiresAt.getTime() <= now.getTime();
 }
 
-export function isShareViewExhausted(
-  share: Pick<ShareLink, "maxViews" | "viewCount">,
-): boolean {
-  return share.maxViews != null && share.viewCount >= share.maxViews;
-}
-
 /** Outcome of resolving a share token for a specific viewer. */
 export type ShareResolveResult =
   | {

@@ -13,8 +13,7 @@ import { buildShareGrantCookie } from "~/server/app-layer/share/shareGrant";
 
 import {
   checkProjectPermission,
-  hasOrganizationPermission,
-  hasProjectPermission,
+  createShareAudienceViewer,
   skipPermissionCheck,
 } from "../rbac";
 
@@ -34,19 +33,9 @@ export const shareRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const viewer: ShareViewer = {
         grantedShareId: ctx.shareGrant?.share_id ?? null,
-        isOrgMember: async (organizationId) =>
-          !!ctx.session?.user &&
-          hasOrganizationPermission(
-            { prisma: ctx.prisma, session: ctx.session },
-            organizationId,
-            "organization:view",
-          ),
-        isProjectMember: async (projectId) =>
-          hasProjectPermission(
-            { prisma: ctx.prisma, session: ctx.session },
-            projectId,
-            "traces:view",
-          ),
+        // Same audience closures the grant-revalidation path uses; keep them
+        // in one place so resolve and validate can't drift apart.
+        ...createShareAudienceViewer(ctx),
       };
 
       const result = await getApp().share.resolveForViewer({
