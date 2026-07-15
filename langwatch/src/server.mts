@@ -1,6 +1,7 @@
 import { setEnvironment } from "@langwatch/ksuid";
 import dotenv from "dotenv";
 import events from "events";
+import { existsSync } from "fs";
 import Module from "module";
 
 // `override: true` lets `.env` win over values that scripts/start.sh exported
@@ -12,11 +13,23 @@ import Module from "module";
 // reaches the running process (and Langy can't reach the gateway from inside
 // the OpenCode pod). NODE_ENV / PORT / similar process-level vars stay
 // shell-only because .env shouldn't carry them.
-dotenv.config({ override: true, quiet: true });
+//
+// dotenv's "injected env (N) from .env" line stays LOUD in local dev — it's the
+// one confirmation of which env files actually loaded (and it prints before any
+// logger exists; dotenv has no logger hook, only quiet). Prod and tests silence
+// it: there it's a stray non-JSON stdout line on every boot.
+const quiet = process.env.NODE_ENV !== "development";
+dotenv.config({ override: true, quiet });
 // Portless (haven) overlay: loaded LAST with override so the resolved hostname
 // URLs + ports win over anything pinned in .env. In non-portless runs the file
-// is absent and this is a no-op. See tools/thuishaven + ADR-048.
-dotenv.config({ path: ".env.portless", override: true, quiet: true });
+// is absent and this is a no-op — and stays quiet, or dotenv would announce
+// "injected env (0)" from a file that isn't there.
+// See tools/thuishaven + ADR-048.
+dotenv.config({
+  path: ".env.portless",
+  override: true,
+  quiet: quiet || !existsSync(".env.portless"),
+});
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
 if (process.env.NODE_ENV === "production") {
