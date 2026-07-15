@@ -84,6 +84,14 @@ const DEDUP_BUFFER_MS = 60_000;
 const MIN_DELAY_MS = 1_000;
 
 /**
+ * How long a tick that found the pull bulkhead saturated waits before its
+ * re-staged attempt dispatches again: base + up to `JITTER` of spread so a
+ * burst of deferred sources doesn't re-dispatch as a single thundering herd.
+ */
+const SATURATION_DEFER_BASE_MS = 2_000;
+const SATURATION_DEFER_JITTER_MS = 3_000;
+
+/**
  * Payload for an `ingestionPull` job. `tenantId` (the org id) drives the
  * event-sourcing tenant fairness + per-source group key; `ingestionSourceId`
  * is the row the pull targets.
@@ -235,18 +243,33 @@ async function processIngestionPull(
   // Gate the pull body through the bounded bulkhead so a burst of same-minute
   // sources cannot fan out into unbounded upstream + ClickHouse load.
   //
-  // This await holds a global GroupQueue worker slot while waiting. To avoid
-  // blocking unrelated event-sourcing work, check if we are already at or above
-  // the pull limit. If the bulkhead is saturated, return early to release the
-  // global slot; GroupQueue will retry this job, and by then a slot may be free.
-  const bulkheadLength = pullBulkhead.length();
+  // Parking on `push` here would hold a global GroupQueue worker slot while
+  // waiting, letting a due-pull burst crowd out unrelated event-sourcing work.
+  // When the bulkhead is saturated, defer instead: re-stage this source's pull
+  // a few seconds out (replace-dedup moves the successor staged above, so the
+  // source still has exactly one pending job) and ack the tick. Deferring
+  // rather than throwing matters — saturation is ordinary backpressure, and a
+  // thrown error would spend the queue's bounded retry budget on it; enough
+  // consecutive saturated attempts would exhaust the budget and park the
+  // source's group in the operator-managed blocked set, silently ending the
+  // recurrence. Acking is safe because the successor is already staged.
   const bulkheadRunning = pullBulkhead.running();
-  if (bulkheadLength + bulkheadRunning >= PULL_CONCURRENCY_LIMIT) {
+  if (facade && bulkheadRunning >= PULL_CONCURRENCY_LIMIT) {
+    const deferMs =
+      SATURATION_DEFER_BASE_MS +
+      Math.floor(Math.random() * SATURATION_DEFER_JITTER_MS);
     logger.debug(
-      { ingestionSourceId: source.id, bulkheadLength, bulkheadRunning },
-      "pull bulkhead saturated; releasing global slot to allow unrelated jobs",
+      { ingestionSourceId: source.id, bulkheadRunning, deferMs },
+      "pull bulkhead saturated; deferring this tick without spending the retry budget",
     );
-    throw new Error("Pull bulkhead saturated; will retry");
+    await facade.send(
+      { ingestionSourceId: source.id, tenantId: source.organizationId },
+      {
+        delay: deferMs,
+        deduplication: dedupForSource(deferMs, true),
+      },
+    );
+    return;
   }
 
   await pullBulkhead.push(source.id);
