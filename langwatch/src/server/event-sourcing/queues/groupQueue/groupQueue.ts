@@ -158,17 +158,6 @@ const INTERNAL_FIELDS = [
 ] as const;
 
 /**
- * Group Queue Processor that provides per-group FIFO with cross-group parallelism.
- *
- * Architecture:
- * - A Redis staging layer coordinates job storage, per-group FIFO, weighted round-robin,
- *   dedup, group blocking, heartbeats, and crash recovery via Lua scripts
- * - Jobs flow: send() → staging → dispatch → fastq → processWithRetries → completion callback → dispatch next
- * - Per-group sequential processing eliminates ordering errors and distributed lock contention
- * - Weighted round-robin (sqrt(pendingCount)) provides fair scheduling across groups
- * - fastq provides concurrency-limited async task execution with backpressure
- */
-/**
  * Why a staged job was discarded. Extends {@link DecodeFailureReason} (what went
  * wrong inside the decoder) with this module's own terminal reasons.
  *
@@ -193,6 +182,17 @@ type DropReason =
 const dropReasonOf = (err: unknown): DecodeFailureReason | "unknown" =>
   err instanceof DecodeFailureError ? err.reason : "unknown";
 
+/**
+ * Group Queue Processor that provides per-group FIFO with cross-group parallelism.
+ *
+ * Architecture:
+ * - A Redis staging layer coordinates job storage, per-group FIFO, weighted round-robin,
+ *   dedup, group blocking, heartbeats, and crash recovery via Lua scripts
+ * - Jobs flow: send() → staging → dispatch → fastq → processWithRetries → completion callback → dispatch next
+ * - Per-group sequential processing eliminates ordering errors and distributed lock contention
+ * - Weighted round-robin (sqrt(pendingCount)) provides fair scheduling across groups
+ * - fastq provides concurrency-limited async task execution with backpressure
+ */
 export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   implements EventSourcedQueueProcessor<Payload>
 {
@@ -1113,6 +1113,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     reason: "retry_encode_failed",
                     message:
                       "Retry re-encode failed; releasing old hold and discarding job",
+                    // Released below, deliberately: the body was already read, so
+                    // keeping it buys a later worker nothing.
+                    bodyPreserved: false,
                   });
                   await this.blobLifecycle.release({
                     values: [jobDataJson],
@@ -1325,6 +1328,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         err,
         reason: dropReasonOf(err),
         message: "Failed to parse drained sibling job data — dropping",
+        // We do not release a sibling's value, so the body outlives the drop
+        // unless it was already gone.
+        bodyPreserved: !(err instanceof DecodeFailureError
+          ? err.reason === "missing_blob"
+          : false),
       });
       return null;
     }
@@ -1363,6 +1371,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           err,
           reason: "sibling_restage_failed",
           message: "Failed to re-stage drained sibling after batch failure",
+          // Not released — the value is intact, it simply never got re-staged.
+          bodyPreserved: true,
         });
       }
     }
@@ -1468,13 +1478,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Claim-side poison park (specs/event-sourcing/poison-group-park-guard.feature):
-   * re-stage the SAME staged value (no decode, no re-encode, hold token
-   * unchanged - the transient-decode rationale applies) and move the group to
-   * the blocked set with a stored error. The value stays inspectable via the
-   * ops peek path; operators recover with the existing unblock/drain surface.
-   */
-  /**
    * Give up on a staged job we cannot process — and say so out loud (#5538).
    *
    * The code this replaced justified itself with "recover via event replay". It
@@ -1525,14 +1528,26 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     reason: DecodeFailureReason | "transient_exhausted" | "unknown";
     message: string;
   }): Promise<void> {
-    this.recordDrop({ groupId, stagedJobId, jobDataJson, err, reason, message });
+    // The release rule, named once. Everything below reads off this predicate so
+    // the log cannot claim one thing while the code does another.
+    const bodyIsGone = reason === "missing_blob";
+
+    this.recordDrop({
+      groupId,
+      stagedJobId,
+      jobDataJson,
+      err,
+      reason,
+      message,
+      bodyPreserved: !bodyIsGone,
+    });
 
     // `dropped: true` keeps the group advancing WITHOUT counting a thrown-away
     // job as a completion or clearing the group's stored error (#5538).
     await this.scripts.complete({ groupId, stagedJobId, dropped: true });
 
-    // Only retire a value whose body is already gone. See the note above.
-    if (reason === "missing_blob") {
+    if (bodyIsGone) {
+      // Nothing left to preserve — releasing just drops the stale holder.
       await this.blobLifecycle.release({ values: [jobDataJson], groupId });
     }
   }
@@ -1553,6 +1568,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     err,
     reason,
     message,
+    bodyPreserved,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -1560,6 +1576,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     err: unknown;
     reason: DropReason;
     message: string;
+    /**
+     * Whether the staged value's body is still retrievable after this drop.
+     *
+     * The CALLER states it; this method must not derive it. Only the caller knows
+     * whether it released — and `retry_encode_failed` releases deliberately (the
+     * body was already read; what failed is the re-encode), so deriving it from
+     * `reason` made the log assert `bodyPreserved: true` one line before
+     * destroying the body. That is the same defect this whole change exists to
+     * remove — a claim that isn't true — so it does not get to live in the
+     * structured field oncall filters on.
+     */
+    bodyPreserved: boolean;
   }): void {
     const { pipelineName, jobType, jobName } = readJobRoutingMeta(jobDataJson);
     const descriptor = readEnvelopeDescriptor(jobDataJson);
@@ -1589,7 +1617,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         envelopeFormat: descriptor.e,
         envelopeVersion: descriptor.v,
         blobId: descriptor.blobId,
-        bodyPreserved: reason !== "missing_blob",
+        bodyPreserved,
         err: redactStorageUrisInText(
           err instanceof Error ? err.message : String(err),
         ),
@@ -1598,6 +1626,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     );
   }
 
+  /**
+   * Claim-side poison park (specs/event-sourcing/poison-group-park-guard.feature):
+   * re-stage the SAME staged value (no decode, no re-encode, hold token
+   * unchanged - the transient-decode rationale applies) and move the group to
+   * the blocked set with a stored error. The value stays inspectable via the
+   * ops peek path; operators recover with the existing unblock/drain surface.
+   */
   private async parkPoisonGroup({
     groupId,
     stagedJobId,
