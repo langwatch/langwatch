@@ -27,7 +27,7 @@ Feature: `langwatch code` captures VS Code Copilot Chat via a scoped shell funct
 
   Rule: `langwatch code` resolves to ingestion (direct OTLP) only
 
-    @unit @unimplemented
+    @unit
     Scenario: VS Code has no gateway path
       When the user runs `langwatch code`
       Then it resolves to ingestion mode (direct OTLP)
@@ -35,24 +35,24 @@ Feature: `langwatch code` captures VS Code Copilot Chat via a scoped shell funct
 
   Rule: the code env carries the full VS Code OTLP telemetry set
 
-    @unit @unimplemented
+    @unit
     Scenario: The code env enables the extension's OTel and points it at LangWatch
       When `langwatch code` resolves to ingestion
       Then the code env sets COPILOT_OTEL_ENABLED to "true"
       And OTEL_EXPORTER_OTLP_ENDPOINT is the LangWatch /api/otel base
       And OTEL_EXPORTER_OTLP_HEADERS carries the personal ingest key as a Bearer
 
-    @unit @unimplemented
+    @unit
     Scenario: The surface is labelled copilot-chat
       When `langwatch code` resolves to ingestion
       Then OTEL_RESOURCE_ATTRIBUTES sets service.name to "copilot-chat"
 
-    @unit @unimplemented
+    @unit
     Scenario: Content capture is on by default
       When `langwatch code` resolves to ingestion
       Then the code env enables message-content capture
 
-    @unit @unimplemented
+    @unit
     Scenario: An explicit opt-out yields a loud tokens-only notice, never silent
       Given the user opted out of content capture
       When `langwatch code` resolves to ingestion
@@ -77,7 +77,7 @@ Feature: `langwatch code` captures VS Code Copilot Chat via a scoped shell funct
 
   Rule: the VS Code key is distinct and minted for copilot_vscode
 
-    @integration @unimplemented
+    @integration
     Scenario: `langwatch code` mints a copilot_vscode ingest key
       When `langwatch code` resolves to ingestion for the first time
       Then a personal ingest key of sourceType "copilot_vscode" is minted for org "acme"
