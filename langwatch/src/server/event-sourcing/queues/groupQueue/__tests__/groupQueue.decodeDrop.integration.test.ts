@@ -163,6 +163,75 @@ describe.skipIf(!hasTestcontainers)(
       });
     }
 
+    /**
+     * Serves and stores normally, but starts rejecting `put` after N writes — so
+     * the initial stage succeeds and a LATER re-encode fails. That is the only
+     * way to reach the retry-re-encode discard site.
+     */
+    class PutFailsAfterObjectStore extends InMemoryObjectStore {
+      private putsLeft: number;
+      constructor(putsBeforeFailing: number) {
+        super();
+        this.putsLeft = putsBeforeFailing;
+      }
+      override async put(uri: string, bytes: Buffer): Promise<void> {
+        if (this.putsLeft <= 0) throw new Error("blob store unavailable on write");
+        this.putsLeft--;
+        return super.put(uri, bytes);
+      }
+    }
+
+    describe("given a job whose retry cannot re-encode its payload", () => {
+      describe("when the retry's re-encode fails", () => {
+        it("counts the discard with the retry-encode-failed reason", async () => {
+          // The 5th discard site, and the only one that had NO test and no
+          // @unimplemented marker until a review counted them (#5538). It decodes
+          // fine, then process() throws, then the retry's re-encode dies — so it
+          // never reaches the decode drop branch the other tests exercise.
+          const name = freshName();
+          const groupId = `${TENANT}/retry-encode-fails`;
+          const objectStore = new PutFailsAfterObjectStore(1); // stage ok, re-encode fails
+
+          const consumer = newQueue({
+            name,
+            // A plain Error is retryable (isRetryableJobError → not CRITICAL), so
+            // this drives the job into the retry path rather than the fail-safe.
+            processFn: async () => {
+              throw new Error("handler blew up");
+            },
+            consumerEnabled: true,
+            objectStore,
+          });
+          await consumer.waitUntilReady();
+          await consumer.send({
+            id: "retry-victim",
+            groupId,
+            value: OFFLOADABLE_S3_VALUE(),
+          });
+
+          await vi.waitFor(
+            async () => {
+              expect(await dropsFor(name)).toHaveLength(1);
+            },
+            { timeout: 15000, interval: 100 },
+          );
+
+          const [entry] = await dropsFor(name);
+          // Revert-check: before #5538 this site logged, INCR'd stats:completed as
+          // a SUCCESS, and incremented only gqRetryEncodeFailuresTotal — nothing
+          // named it a drop. Reverting removes gq_jobs_dropped_total entirely, so
+          // dropsFor() stays empty and the waitFor above times out.
+          expect(entry!.labels.reason).toBe("retry_encode_failed");
+          // Unlike every other reason, this one SHOULD release: the body was
+          // already read, so keeping it buys a later worker nothing — and holding
+          // it would leak the hold to the 4-day TTL backstop.
+          expect(objectStore.deleted.length).toBeGreaterThan(0);
+          // AC8 still holds here: a discard is not a completion.
+          expect(await completedStat(name)).toBeNull();
+        });
+      });
+    });
+
     describe("given a staged job whose body is present but cannot be decoded", () => {
       describe("when a worker claims the group and the decode fails", () => {
         /** @scenario a body-present decode failure does not destroy the body it could not read */

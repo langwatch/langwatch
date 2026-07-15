@@ -1495,11 +1495,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * drives `config.projections` + `config.mapProjections`). The false part is
    * reactor-specific.
    *
-   * **Why `complete()` and not `parkPoisonGroup()`** — parking blocks the whole
-   * group. Right for an oversized payload (the value is intact; a raised cap
-   * could process it later); wrong here, because a missing blob never comes back,
-   * so parking would freeze that aggregate forever on a job that can never
-   * succeed. Liveness is the one thing the old drop got right; keep it.
+   * **Why `complete()`** — there are THREE options here, not two, and an earlier
+   * draft of this comment argued a false binary:
+   * - `parkPoisonGroup()` blocks the whole group. Right for an oversized payload
+   *   (value intact; a raised cap could process it later); wrong here, because a
+   *   missing blob never comes back, so parking would freeze that aggregate
+   *   forever on a job that can never succeed.
+   * - `retryRestage` (the ladder `handleTransientDecode` rides, 40 lines below) is
+   *   the third option, and for `body_unreadable` it is arguably the RIGHT one:
+   *   `JOB_RETRY_CONFIG`'s own doc says the budget exists to "ride out a rolling
+   *   restart… without parking the group", which is precisely the codec-skew case.
+   *   Retrying would hand the job to a newer worker that can read it, instead of
+   *   leaving bytes nobody re-reads. **Deliberately deferred (#5823), not
+   *   overlooked** — it changes delivery behaviour for every unreadable body and
+   *   deserves its own change; this one only stops the loss being silent.
+   *   Preserving without retrying is admittedly a half-measure: it keeps the body
+   *   alive to its TTL backstop and names it, but nothing re-delivers it.
+   * - `complete()` — chosen. Liveness is the one thing the old drop got right.
    *
    * **Why `release()` is conditional** — release reclaims the blob and deletes
    * the s3 object out-of-band: this module's retire-forever signal. Only
@@ -1703,10 +1715,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // The retry ladder is out of rungs. This is a discard like any other, and
       // it used to claim replay would recover it — it does not (#5538).
       //
-      // It also used to release() the value. Eight failed READS mean the STORE
-      // is unreachable, not that the blob is gone — most likely it is still
-      // there. Retiring it here would delete a body that exists, so this drop
-      // preserves like every other non-missing_blob reason.
+      // It also used to release() the value. Reaching here means every one of
+      // `JOB_RETRY_CONFIG.maxAttempts` READS failed — ~2h27m of sustained
+      // unreachability (`queues/shared.ts`) — which says the STORE is down, not
+      // that the blob is gone. It is most likely still there, so retiring it
+      // would delete a body that exists; this drop preserves like every other
+      // non-missing_blob reason.
       await this.dropStagedJob({
         groupId,
         stagedJobId,
