@@ -327,7 +327,7 @@ describe.skipIf(!hasTestcontainers)(
             pipeline_name: "billing",
             job_type: "fold",
             job_name: "gatewayBudgetSync",
-            reason: "decompress_failure",
+            reason: "body_unreadable",
           });
         });
       });

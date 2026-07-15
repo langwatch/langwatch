@@ -112,10 +112,10 @@ Feature: GroupQueue decode-drop durability and attribution
     Then the failure carries the malformed-envelope reason
 
   @unit
-  Scenario: a body that cannot be decompressed is classified as a decompress failure
+  Scenario: a body that cannot be read back is classified as body-unreadable
     Given an envelope whose compressed body is corrupt
     When the envelope is decoded
-    Then the failure carries the decompress-failure reason
+    Then the failure carries the body-unreadable reason
 
   @integration
   Scenario: classification survives an exception message it does not own
@@ -213,7 +213,7 @@ Feature: GroupQueue decode-drop durability and attribution
 # AC3 "structured closed-enum reason derived from error TYPE, never message-text matching"
 #   -> Scenario: an envelope whose referenced blob is gone is classified as a missing blob
 #   -> Scenario: an envelope that cannot be parsed is classified as malformed
-#   -> Scenario: a body that cannot be decompressed is classified as a decompress failure
+#   -> Scenario: a body that cannot be read back is classified as body-unreadable
 #   -> Scenario: classification survives an exception message it does not own
 #
 # AC4 "@regression — bare JSON / gz / GQ1+blob / GQ2+blob / zstd / msgpack still decode; counter stays zero"

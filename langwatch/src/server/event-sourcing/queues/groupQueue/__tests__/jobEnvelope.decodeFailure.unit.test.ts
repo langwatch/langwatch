@@ -131,8 +131,8 @@ describe("jobEnvelope decode failures", () => {
 
   describe("given an envelope whose body will not decompress", () => {
     describe("when it is decoded", () => {
-      /** @scenario a body that cannot be decompressed is classified as a decompress failure */
-      it("names the failure decompress_failure", async () => {
+      /** @scenario a body that cannot be read back is classified as body-unreadable */
+      it("names the failure body_unreadable", async () => {
         const { tieredBlobs, redisBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({
           jobData: offloadable(),
@@ -150,7 +150,7 @@ describe("jobEnvelope decode failures", () => {
           .catch((e: unknown) => e);
 
         expect(err).toBeInstanceOf(DecodeFailureError);
-        expect((err as DecodeFailureError).reason).toBe("decompress_failure");
+        expect((err as DecodeFailureError).reason).toBe("body_unreadable");
       });
 
       /** @scenario classification survives an exception message it does not own */
@@ -172,7 +172,7 @@ describe("jobEnvelope decode failures", () => {
         // The whole point of AC3: the reason is readable as a field, so no
         // consumer has to substring-match a message it does not own. Pin that
         // the discriminator survives regardless of what zlib chose to say.
-        expect(err.reason).toBe("decompress_failure");
+        expect(err.reason).toBe("body_unreadable");
         expect(Object.hasOwn(err, "reason")).toBe(true);
       });
     });
@@ -183,7 +183,7 @@ describe("jobEnvelope decode failures", () => {
       it("still raises PayloadTooLargeError rather than a decode failure", async () => {
         // Regression guard on #5538 itself: readBody() must let this through
         // untouched. It is the poison-PARK signal (#5661) — if it were recast as
-        // decompress_failure the group would be dropped instead of parked, and
+        // body_unreadable the group would be dropped instead of parked, and
         // replay would re-materialize the same over-cap value forever.
         const { tieredBlobs, redisBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({

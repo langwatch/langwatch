@@ -243,7 +243,7 @@ export const gqRetryEncodeFailuresTotal = new Counter({
  * `reason` (see `DecodeFailureReason`, plus this module's terminal reasons):
  * - `missing_blob` — the body is GONE. Irreducible loss: no retry, park, or
  *   replay resurrects it.
- * - `malformed_envelope` / `decompress_failure` — the body is PRESENT but
+ * - `malformed_envelope` / `body_unreadable` — the body is PRESENT but
  *   unreadable to this worker. Its value is deliberately NOT released, so a
  *   later worker (post-rollout) can still read it.
  * - `transient_exhausted` — the blob store stayed unreachable for every retry.

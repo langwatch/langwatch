@@ -78,7 +78,7 @@ async function boundedDecompress(data: Buffer): Promise<Buffer> {
  * worker does not know, a parse that fails — is NOT the same event as a blob that
  * is gone, and this is the exact rolling-deploy vector described at the top of
  * this file: an old worker meeting a body written by a new one. Naming it
- * `decompress_failure` is what lets the caller keep the value instead of retiring
+ * `body_unreadable` is what lets the caller keep the value instead of retiring
  * it, so the next worker can read what this one could not.
  *
  * {@link PayloadTooLargeError} passes through untouched — that is the park signal,
@@ -92,7 +92,7 @@ async function decodeBody(data: Buffer): Promise<Record<string, unknown>> {
     if (err instanceof PayloadTooLargeError) throw err;
     throw new DecodeFailureError(
       `Job envelope body failed to decompress: ${errText(err)}`,
-      "decompress_failure",
+      "body_unreadable",
     );
   }
   try {
@@ -100,7 +100,7 @@ async function decodeBody(data: Buffer): Promise<Record<string, unknown>> {
   } catch (err) {
     throw new DecodeFailureError(
       `Job envelope body failed to parse: ${safeParseErrText(err)}`,
-      "decompress_failure",
+      "body_unreadable",
     );
   }
 }
@@ -112,7 +112,7 @@ function parseInlineBody(body: string): Record<string, unknown> {
   } catch (err) {
     throw new DecodeFailureError(
       `Job envelope inline body failed to parse: ${safeParseErrText(err)}`,
-      "decompress_failure",
+      "body_unreadable",
     );
   }
 }
@@ -383,12 +383,15 @@ export class PayloadTooLargeError extends Error {
  *   no retry, park, or replay resurrects it. Irreducible loss at this layer.
  * - `malformed_envelope` — the envelope's own structure is unreadable, so we
  *   cannot even find the body.
- * - `decompress_failure` — we found the body and could not turn it back into an
+ * - `body_unreadable` — we found the body and could not turn it back into an
  *   object: a bad compression frame, a codec this worker does not know, or a
- *   parse that failed. All three are the same event operationally (these bytes
- *   are unreadable *to this worker*) and the same fix (do not retire them).
+ *   parse that failed. One name for all three because they are one event
+ *   operationally (these bytes are unreadable *to this worker*) with one fix
+ *   (do not retire them). Named for the CONDITION, not one of its mechanisms —
+ *   it also fires on an inline, never-compressed body, where nothing was
+ *   decompressed at all.
  *
- * `malformed_envelope` and `decompress_failure` are body-PRESENT: the value is
+ * `malformed_envelope` and `body_unreadable` are body-PRESENT: the value is
  * intact and a later worker may decode it fine (a rolling-deploy format skew is
  * exactly this — see the codec note at the top of this file). Callers must not
  * retire such a value; see `GroupQueue`'s drop branch.
@@ -396,7 +399,7 @@ export class PayloadTooLargeError extends Error {
 export type DecodeFailureReason =
   | "missing_blob"
   | "malformed_envelope"
-  | "decompress_failure";
+  | "body_unreadable";
 
 /**
  * A decode failure we can name. Distinct from {@link PayloadTooLargeError} (park,
