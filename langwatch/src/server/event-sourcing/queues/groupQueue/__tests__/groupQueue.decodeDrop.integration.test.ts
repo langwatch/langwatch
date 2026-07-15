@@ -18,7 +18,8 @@ import {
 } from "../../../__tests__/integration/testContainers";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
-import { encodeJobEnvelope } from "../jobEnvelope";
+import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
+import { encodeJobEnvelope, readEnvelopeHold } from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
 import { GroupStagingScripts } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -669,6 +670,21 @@ describe.skipIf(!hasTestcontainers)(
             writesEnabled: true,
             queueName: name,
           });
+
+          // Acquire the holder that `send()` would have. Staging via
+          // encodeJobEnvelope + stageBatch bypasses `blobLifecycle.acquire()`, so
+          // WITHOUT this there is no holder — release() would delete nothing and
+          // `flaky.deleted === []` would pass even with the fix reverted. Caught
+          // by review after I shipped exactly that vacuous assertion; verified by
+          // reverting the release rule and watching this test stay green.
+          const lifecycle = new EnvelopeBlobLifecycle({
+            redis,
+            queueName: name,
+            objectStoreFor: () => flaky,
+            resolveStorageDestination: STORAGE_DESTINATION,
+          });
+          await lifecycle.acquire(envelope);
+          expect(readEnvelopeHold(envelope)).not.toBeNull(); // the holder is real
 
           const scripts = new GroupStagingScripts(redis, name);
           await scripts.stageBatch([
