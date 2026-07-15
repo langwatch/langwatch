@@ -80,6 +80,9 @@ describe("annotation queue references", () => {
       code: "BAD_REQUEST",
     });
 
+    expect(organizationUserCount).toHaveBeenCalledWith({
+      where: { organizationId: "org_1", userId: { in: ["user_1"] } },
+    });
     expect(annotationQueueCreate).not.toHaveBeenCalled();
   });
 
@@ -92,6 +95,9 @@ describe("annotation queue references", () => {
       code: "BAD_REQUEST",
     });
 
+    expect(annotationScoreCount).toHaveBeenCalledWith({
+      where: { projectId: "project_1", id: { in: ["score_1"] } },
+    });
     expect(annotationQueueCreate).not.toHaveBeenCalled();
   });
 
@@ -108,6 +114,9 @@ describe("annotation queue references", () => {
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
+    expect(annotationQueueCount).toHaveBeenCalledWith({
+      where: { id: { in: ["foreign-queue"] }, projectId: "project_1" },
+    });
     expect(queueItemUpsert).not.toHaveBeenCalled();
   });
 
@@ -124,6 +133,9 @@ describe("annotation queue references", () => {
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
+    expect(organizationUserCount).toHaveBeenCalledWith({
+      where: { organizationId: "org_1", userId: { in: ["foreign-user"] } },
+    });
     expect(queueItemUpsert).not.toHaveBeenCalled();
   });
 
