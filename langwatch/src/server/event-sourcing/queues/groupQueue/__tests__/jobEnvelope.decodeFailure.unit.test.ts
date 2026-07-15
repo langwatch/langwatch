@@ -271,8 +271,8 @@ describe("jobEnvelope decode failures", () => {
 
         const d = readEnvelopeDescriptor(encoded);
 
-        expect(d.e === "redis" || d.e === "s3").toBe(true);
-        expect(d.v).toBe(2);
+        expect(d.format === "redis" || d.format === "s3").toBe(true);
+        expect(d.version).toBe(2);
         expect(typeof d.blobId).toBe("string");
         expect(d.blobId).not.toBe("");
       });
@@ -290,7 +290,7 @@ describe("jobEnvelope decode failures", () => {
 
         const d = readEnvelopeDescriptor(encoded);
 
-        expect(d.v).toBe(2);
+        expect(d.version).toBe(2);
         expect(typeof d.blobId).toBe("string");
       });
     });
@@ -306,7 +306,7 @@ describe("jobEnvelope decode failures", () => {
 
         const d = readEnvelopeDescriptor(encoded);
 
-        expect(d.e).toBe("ref");
+        expect(d.format).toBe("ref");
         expect(typeof d.blobId).toBe("string");
       });
     });

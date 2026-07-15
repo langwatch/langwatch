@@ -1614,8 +1614,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         // tenant PII, and the whole point is that we could not read it anyway.
         // The header survives what the body does not, so a value we could not
         // decode can still say what it WAS.
-        envelopeFormat: descriptor.e,
-        envelopeVersion: descriptor.v,
+        envelopeFormat: descriptor.format,
+        envelopeVersion: descriptor.version,
         blobId: descriptor.blobId,
         bodyPreserved,
         err: redactStorageUrisInText(

@@ -70,6 +70,10 @@ async function boundedDecompress(data: Buffer): Promise<Buffer> {
 /**
  * Inflate + parse a body, naming the failure if it will not read.
  *
+ * Named `decode*`, not `read*`: every `read*` in this file contractually never
+ * throws (`readJobRoutingMeta`, `readEnvelopeDescriptor`, `readEnvelopeHold`…),
+ * and this throws the `DecodeFailureError`s the drop path dispatches on.
+ *
  * A body that is present but unreadable — bad compression frame, a codec this
  * worker does not know, a parse that fails — is NOT the same event as a blob that
  * is gone, and this is the exact rolling-deploy vector described at the top of
@@ -80,7 +84,7 @@ async function boundedDecompress(data: Buffer): Promise<Buffer> {
  * {@link PayloadTooLargeError} passes through untouched — that is the park signal,
  * and an oversized body must keep parking rather than be recast as corrupt.
  */
-async function readBody(data: Buffer): Promise<Record<string, unknown>> {
+async function decodeBody(data: Buffer): Promise<Record<string, unknown>> {
   let inflated: Buffer;
   try {
     inflated = await boundedDecompress(data);
@@ -94,7 +98,6 @@ async function readBody(data: Buffer): Promise<Record<string, unknown>> {
   try {
     return decodePayload(inflated);
   } catch (err) {
-    if (err instanceof PayloadTooLargeError) throw err;
     throw new DecodeFailureError(
       `Job envelope body failed to parse: ${safeParseErrText(err)}`,
       "decompress_failure",
@@ -102,7 +105,7 @@ async function readBody(data: Buffer): Promise<Record<string, unknown>> {
   }
 }
 
-/** Inline uncompressed body — named the same way {@link readBody} names a blob body. */
+/** Inline uncompressed body — named the same way {@link decodeBody} names a blob body. */
 function parseInlineBody(body: string): Record<string, unknown> {
   try {
     return JSON.parse(body) as Record<string, unknown>;
@@ -415,10 +418,10 @@ export class DecodeFailureError extends Error {
 
 /** A drop-log-safe description of an envelope: shape only, never body or PII. */
 export interface EnvelopeDescriptor {
-  /** Body encoding (`header.e`) — "redis"/"s3"/"ref"/"gz"/"j"… */
-  e: string | null;
-  /** Envelope version (`header.v`). */
-  v: number | null;
+  /** Body encoding — "redis" | "s3" | "ref" | "gz" | "j" (wire: `header.e`). */
+  format: string | null;
+  /** Envelope version (wire: `header.v`). */
+  version: number | null;
   /** GQ1 blob id or GQ2 tiered blob hash, whichever the envelope carries. */
   blobId: string | null;
 }
@@ -436,16 +439,16 @@ export interface EnvelopeDescriptor {
 export function readEnvelopeDescriptor(value: string): EnvelopeDescriptor {
   try {
     if (!isEnvelope(value)) {
-      return { e: null, v: null, blobId: null };
+      return { format: null, version: null, blobId: null };
     }
     const { header } = splitEnvelope(value);
     return {
-      e: typeof header.e === "string" ? header.e : null,
-      v: typeof header.v === "number" ? header.v : null,
+      format: typeof header.e === "string" ? header.e : null,
+      version: typeof header.v === "number" ? header.v : null,
       blobId: readEnvelopeBlobIdFromHeader(header) ?? header.ref?.hash ?? null,
     };
   } catch {
-    return { e: null, v: null, blobId: null };
+    return { format: null, version: null, blobId: null };
   }
 }
 
@@ -653,7 +656,7 @@ export async function decodeJobEnvelope({
         "missing_blob",
       );
     }
-    const parsedBody = await readBody(data);
+    const parsedBody = await decodeBody(data);
     return mergeMachinery(parsedBody, header);
   }
 
@@ -680,7 +683,7 @@ export async function decodeJobEnvelope({
         "missing_blob",
       );
     }
-    return await readBody(data);
+    return await decodeBody(data);
   }
 
   // Raw inline bodies never went through the bounded decompressor, so cap them
@@ -691,7 +694,7 @@ export async function decodeJobEnvelope({
   }
   const parsedBody =
     header.e === "gz"
-      ? await readBody(Buffer.from(body, "base64"))
+      ? await decodeBody(Buffer.from(body, "base64"))
       : parseInlineBody(body);
   // GQ2 inline lifted machinery into header.m too; GQ1 (v=1) never did.
   return header.v === 2 ? mergeMachinery(parsedBody, header) : parsedBody;
