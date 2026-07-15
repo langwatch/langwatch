@@ -36,7 +36,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [042](./042-local-observability-stack.md) | Local observability stack (logs, traces, metrics → Grafana) | Accepted |
 | [043](./043-automation-facet-model.md) | Automations as orthogonal facets (name / type / subject / cadence / severity / delivery) | Proposed |
 | [044](./044-scheduled-reports-automation-kind.md) | Scheduled reports — a schedule-triggered automation kind + generic event-sourcing scheduler | Proposed |
-| [045](./045-domain-errors-handled-boundary.md) | Domain errors as the handled-error boundary (TS `DomainError` ⇔ Go `herr`) | Accepted |
+| [045](./045-domain-errors-handled-boundary.md) | Handled errors as the handled-error boundary (TS `HandledError` ⇔ Go `herr`) | Accepted |
 
 ## When to Write an ADR
 

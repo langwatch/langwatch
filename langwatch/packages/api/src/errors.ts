@@ -5,38 +5,40 @@ import { ZodError } from "zod";
 import { httpStatusText } from "./types.js";
 
 // ---------------------------------------------------------------------------
-// Duck-typed interfaces for DomainError (no imports from langwatch app)
+// Duck-typed interfaces for HandledError (no imports from langwatch app)
 // ---------------------------------------------------------------------------
 
 /**
- * Shape that a DomainError-like object must satisfy for the framework error
+ * Shape that a HandledError-like object must satisfy for the framework error
  * handler to use its `serialize()` output.
  *
  * We duck-type rather than import so this package stays standalone.
  */
-interface DomainErrorLike {
-  kind: string;
+interface HandledErrorLike {
+  code: string;
   message: string;
   httpStatus: number;
   meta: Record<string, unknown>;
   serialize(): {
-    kind: string;
+    code: string;
     meta: Record<string, unknown>;
-    telemetry?: { traceId?: string; spanId?: string };
+    traceId?: string;
+    spanId?: string;
+    traceUrl?: string;
     httpStatus: number;
     reasons: Array<{
-      kind: string;
+      code: string;
       meta?: Record<string, unknown>;
       reasons?: unknown[];
     }>;
   };
 }
 
-function isDomainErrorLike(err: unknown): err is DomainErrorLike {
+function isHandledErrorLike(err: unknown): err is HandledErrorLike {
   if (typeof err !== "object" || err === null) return false;
   const obj = err as Record<string, unknown>;
   return (
-    typeof obj["kind"] === "string" &&
+    typeof obj["code"] === "string" &&
     typeof obj["httpStatus"] === "number" &&
     typeof obj["serialize"] === "function"
   );
@@ -56,7 +58,7 @@ interface ValidationReason {
 }
 
 interface ValidationErrorPayload {
-  kind: "validation_error";
+  code: "validation_error";
   message: string;
   reasons: ValidationReason[];
   httpStatus: 422;
@@ -64,7 +66,7 @@ interface ValidationErrorPayload {
 
 function zodErrorToPayload(err: ZodError): ValidationErrorPayload {
   return {
-    kind: "validation_error",
+    code: "validation_error",
     message: "Validation error",
     reasons: err.issues.map((issue) => ({
       code: "schema_failure" as const,
@@ -85,11 +87,20 @@ function zodErrorToPayload(err: ZodError): ValidationErrorPayload {
 interface ErrorResponseBody {
   /** Present only for unversioned (backwards-compat) responses. */
   error?: string;
-  kind: string;
+  code: string;
+  /**
+   * @deprecated Back-compat alias of `code`, emitted during the
+   * `DomainError` → `HandledError` transition so clients still reading the old
+   * `kind` discriminant keep working. Read `code` in new code; removed once no
+   * consumer reads `kind`.
+   */
+  kind?: string;
   message: string;
   meta?: Record<string, unknown>;
   reasons?: unknown[];
-  telemetry?: { traceId?: string; spanId?: string };
+  traceId?: string;
+  spanId?: string;
+  traceUrl?: string;
 }
 
 function finalizeErrorResponse({
@@ -102,6 +113,10 @@ function finalizeErrorResponse({
   isVersioned: boolean;
 }): { status: ContentfulStatusCode; body: ErrorResponseBody } {
   if (!isVersioned) body.error = httpStatusText(status);
+  // Emit the deprecated `kind` alias alongside `code` so clients still reading
+  // the old discriminant keep working through the transition. See
+  // ErrorResponseBody.kind.
+  body.kind = body.code;
   return { status, body };
 }
 
@@ -119,19 +134,21 @@ function formatError({
   err: unknown;
   isVersioned: boolean;
 }): { status: ContentfulStatusCode; body: ErrorResponseBody } {
-  // 1. DomainError-like errors
-  if (isDomainErrorLike(err)) {
+  // 1. HandledError-like errors
+  if (isHandledErrorLike(err)) {
     const serialized = err.serialize();
     const status = serialized.httpStatus as ContentfulStatusCode;
     return finalizeErrorResponse({
       status,
       isVersioned,
       body: {
-        kind: serialized.kind,
-        message: err.message ?? serialized.kind,
+        code: serialized.code,
+        message: err.message ?? serialized.code,
         meta: serialized.meta,
         reasons: serialized.reasons,
-        telemetry: serialized.telemetry,
+        traceId: serialized.traceId,
+        spanId: serialized.spanId,
+        ...(serialized.traceUrl ? { traceUrl: serialized.traceUrl } : {}),
       },
     });
   }
@@ -144,7 +161,7 @@ function formatError({
       status,
       isVersioned,
       body: {
-        kind: payload.kind,
+        code: payload.code,
         message: payload.message,
         reasons: payload.reasons,
       },
@@ -158,7 +175,7 @@ function formatError({
     return finalizeErrorResponse({
       status,
       isVersioned,
-      body: { kind: "http_error", message: err.message },
+      body: { code: "http_error", message: err.message },
     });
   }
 
@@ -172,7 +189,7 @@ function formatError({
   return finalizeErrorResponse({
     status,
     isVersioned,
-    body: { kind: "internal_error", message },
+    body: { code: "internal_error", message },
   });
 }
 
@@ -196,4 +213,4 @@ export function createErrorHandler(): (
   };
 }
 
-export { formatError, isDomainErrorLike, zodErrorToPayload };
+export { formatError, isHandledErrorLike, zodErrorToPayload };

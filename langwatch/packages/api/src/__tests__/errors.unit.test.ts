@@ -1,55 +1,58 @@
 import { describe, it, expect } from "vitest";
 import { ZodError, z } from "zod";
 
-import { formatError, isDomainErrorLike } from "../errors.js";
+import { formatError, isHandledErrorLike } from "../errors.js";
 
 // ---------------------------------------------------------------------------
-// Helpers -- fake DomainError-like object (duck-typed)
+// Helpers -- fake HandledError-like object (duck-typed)
 // ---------------------------------------------------------------------------
 
-function makeDomainError(
+function makeHandledError(
   overrides: {
-    kind?: string;
+    code?: string;
     message?: string;
     httpStatus?: number;
     meta?: Record<string, unknown>;
   } = {},
 ): Error & {
-  kind: string;
+  code: string;
   httpStatus: number;
   meta: Record<string, unknown>;
   serialize: () => {
-    kind: string;
+    code: string;
     meta: Record<string, unknown>;
-    telemetry: { traceId: undefined; spanId: undefined };
+    traceId: undefined;
+    spanId: undefined;
     httpStatus: number;
-    reasons: Array<{ kind: string }>;
+    reasons: Array<{ code: string }>;
   };
 } {
-  const kind = overrides.kind ?? "test_error";
+  const code = overrides.code ?? "test_error";
   const httpStatus = overrides.httpStatus ?? 422;
   const meta = overrides.meta ?? {};
   const message = overrides.message ?? "Test error message";
 
   const error = new Error(message) as Error & {
-    kind: string;
+    code: string;
     httpStatus: number;
     meta: Record<string, unknown>;
     serialize: () => {
-      kind: string;
+      code: string;
       meta: Record<string, unknown>;
-      telemetry: { traceId: undefined; spanId: undefined };
+      traceId: undefined;
+      spanId: undefined;
       httpStatus: number;
-      reasons: Array<{ kind: string }>;
+      reasons: Array<{ code: string }>;
     };
   };
-  error.kind = kind;
+  error.code = code;
   error.httpStatus = httpStatus;
   error.meta = meta;
   error.serialize = () => ({
-    kind,
+    code,
     meta,
-    telemetry: { traceId: undefined, spanId: undefined },
+    traceId: undefined,
+    spanId: undefined,
     httpStatus,
     reasons: [],
   });
@@ -58,40 +61,40 @@ function makeDomainError(
 }
 
 // ---------------------------------------------------------------------------
-// isDomainErrorLike
+// isHandledErrorLike
 // ---------------------------------------------------------------------------
 
-describe("isDomainErrorLike", () => {
-  describe("when given a DomainError-like object", () => {
+describe("isHandledErrorLike", () => {
+  describe("when given a HandledError-like object", () => {
     it("returns true", () => {
-      const err = makeDomainError();
-      expect(isDomainErrorLike(err)).toBe(true);
+      const err = makeHandledError();
+      expect(isHandledErrorLike(err)).toBe(true);
     });
   });
 
   describe("when given a plain Error", () => {
     it("returns false", () => {
-      expect(isDomainErrorLike(new Error("plain"))).toBe(false);
+      expect(isHandledErrorLike(new Error("plain"))).toBe(false);
     });
   });
 
   describe("when given null", () => {
     it("returns false", () => {
-      expect(isDomainErrorLike(null)).toBe(false);
+      expect(isHandledErrorLike(null)).toBe(false);
     });
   });
 });
 
 // ---------------------------------------------------------------------------
-// formatError -- DomainError-like
+// formatError -- HandledError-like
 // ---------------------------------------------------------------------------
 
 describe("formatError", () => {
-  describe("when given a DomainError-like error", () => {
+  describe("when given a HandledError-like error", () => {
     describe("when the request is versioned", () => {
       it("returns the new format without the error field", () => {
-        const err = makeDomainError({
-          kind: "not_found",
+        const err = makeHandledError({
+          code: "not_found",
           message: "Resource not found",
           httpStatus: 404,
           meta: { id: "abc" },
@@ -100,7 +103,7 @@ describe("formatError", () => {
         const { status, body } = formatError({ err, isVersioned: true });
 
         expect(status).toBe(404);
-        expect(body.kind).toBe("not_found");
+        expect(body.code).toBe("not_found");
         expect(body.message).toBe("Resource not found");
         expect(body.meta).toEqual({ id: "abc" });
         expect(body.error).toBeUndefined();
@@ -109,8 +112,8 @@ describe("formatError", () => {
 
     describe("when the request is unversioned", () => {
       it("returns the union format with the error field", () => {
-        const err = makeDomainError({
-          kind: "not_found",
+        const err = makeHandledError({
+          code: "not_found",
           message: "Resource not found",
           httpStatus: 404,
         });
@@ -118,8 +121,34 @@ describe("formatError", () => {
         const { status, body } = formatError({ err, isVersioned: false });
 
         expect(status).toBe(404);
-        expect(body.kind).toBe("not_found");
+        expect(body.code).toBe("not_found");
         expect(body.error).toBe("Not Found");
+      });
+    });
+
+    describe("back-compat `kind` alias", () => {
+      it("emits `kind` equal to `code` for a HandledError (versioned)", () => {
+        const err = makeHandledError({ code: "not_found", httpStatus: 404 });
+        const { body } = formatError({ err, isVersioned: true });
+        expect(body.kind).toBe("not_found");
+        expect(body.kind).toBe(body.code);
+      });
+
+      it("emits `kind` for synthesized error bodies too", () => {
+        const zodErr = (() => {
+          try {
+            z.object({ name: z.string() }).parse({});
+            throw new Error("should not reach");
+          } catch (e) {
+            return e as ZodError;
+          }
+        })();
+        expect(formatError({ err: zodErr, isVersioned: true }).body.kind).toBe(
+          "validation_error",
+        );
+        expect(
+          formatError({ err: new Error("oops"), isVersioned: true }).body.kind,
+        ).toBe("internal_error");
       });
     });
   });
@@ -149,7 +178,7 @@ describe("formatError", () => {
       });
 
       expect(status).toBe(422);
-      expect(body.kind).toBe("validation_error");
+      expect(body.code).toBe("validation_error");
       expect(body.message).toBe("Validation error");
       expect(body.reasons).toEqual(
         expect.arrayContaining([
@@ -198,7 +227,7 @@ describe("formatError", () => {
       const { status, body } = formatError({ err, isVersioned: true });
 
       expect(status).toBe(403);
-      expect(body.kind).toBe("http_error");
+      expect(body.code).toBe("http_error");
       expect(body.message).toBe("Forbidden");
     });
   });
@@ -216,7 +245,7 @@ describe("formatError", () => {
         const { status, body } = formatError({ err, isVersioned: true });
 
         expect(status).toBe(500);
-        expect(body.kind).toBe("internal_error");
+        expect(body.code).toBe("internal_error");
         expect(body.message).toBe("Internal server error");
       } finally {
         process.env["NODE_ENV"] = originalEnv;
@@ -231,7 +260,7 @@ describe("formatError", () => {
         const { status, body } = formatError({ err, isVersioned: true });
 
         expect(status).toBe(500);
-        expect(body.kind).toBe("internal_error");
+        expect(body.code).toBe("internal_error");
         expect(body.message).toBe("secret internal details");
       } finally {
         process.env["NODE_ENV"] = originalEnv;

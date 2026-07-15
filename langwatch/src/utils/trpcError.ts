@@ -97,13 +97,16 @@ export function extractLiteMemberRestrictionInfo(
   if (!(error instanceof TRPCClientError)) return null;
   if (error.data?.code !== "UNAUTHORIZED") return null;
 
-  const domainError = error.data?.domainError as
-    | { kind?: string; meta?: { resource?: string } }
+  const handledError = error.data?.domainError as
+    | { code?: string; kind?: string; meta?: { resource?: string } }
     | undefined;
 
-  if (domainError?.kind !== "lite_member_restricted") return null;
+  // `kind` is the deprecated pre-`HandledError` discriminant, read as a
+  // fallback so this resolves across the transition (see SerializedHandledError).
+  const handledCode = handledError?.code ?? handledError?.kind;
+  if (handledCode !== "lite_member_restricted") return null;
 
-  return { resource: domainError.meta?.resource };
+  return { resource: handledError?.meta?.resource };
 }
 
 export function extractLimitExceededInfo(

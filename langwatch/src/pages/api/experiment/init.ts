@@ -130,7 +130,7 @@ export default async function handler(
       }
 
       return res.status(403).json({
-        error: error.kind,
+        error: error.code,
         message,
         limitType: error.limitType,
         current: error.current,

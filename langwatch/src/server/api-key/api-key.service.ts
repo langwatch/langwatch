@@ -3,8 +3,11 @@ import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import type { Permission } from "~/server/api/rbac";
-import { DomainError } from "~/server/app-layer/domain-error";
-import { parseCustomRolePermissions, permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
+import {
+  MalformedCustomRolePermissionsError,
+  parseCustomRolePermissions,
+  permissionFormatSchema,
+} from "~/server/rbac/custom-role-permissions";
 import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
 import { CUSTOM_ROLE_KIND, RoleRepository } from "~/server/role/repositories/role.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -548,7 +551,7 @@ export class ApiKeyService {
         permissions: customRole.permissions,
       });
     } catch (err) {
-      if (DomainError.isHandled(err) && err.kind === "malformed_custom_role_permissions") {
+      if (err instanceof MalformedCustomRolePermissionsError) {
         throw new ApiKeyScopeViolationError(
           `Custom role ${customRoleId} has malformed permissions`,
           {

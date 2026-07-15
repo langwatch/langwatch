@@ -1,5 +1,5 @@
 /**
- * Unit tests for the REST handler that maps system-prompt DomainErrors
+ * Unit tests for the REST handler that maps system-prompt HandledErrors
  * thrown by the prompt service to Hono HTTP exceptions.
  *
  * Pinned by Issue #3196 so a future refactor of either error class can
@@ -16,15 +16,15 @@ import {
   SystemPromptRequiredError,
 } from "~/server/prompt-config/errors";
 
-import { handleSystemPromptDomainErrors } from "../handle-system-prompt-domain-errors";
+import { handleSystemPromptHandledErrors } from "../handle-system-prompt-handled-errors";
 
-describe("handleSystemPromptDomainErrors", () => {
+describe("handleSystemPromptHandledErrors", () => {
   describe("when given a SystemPromptRequiredError (Issue #3196)", () => {
     /** @scenario "Toast on server-side validation failure shows a friendly message" */
     it("throws an HTTPException(400) with the friendly user-facing message", () => {
       const domainError = new SystemPromptRequiredError();
       try {
-        handleSystemPromptDomainErrors(domainError);
+        handleSystemPromptHandledErrors(domainError);
       } catch (err) {
         expect(err).toBeInstanceOf(HTTPException);
         const httpError = err as HTTPException;
@@ -37,7 +37,7 @@ describe("handleSystemPromptDomainErrors", () => {
         expect(httpError.cause).toBe(domainError);
         return;
       }
-      throw new Error("Expected handleSystemPromptDomainErrors to throw");
+      throw new Error("Expected handleSystemPromptHandledErrors to throw");
     });
   });
 
@@ -45,7 +45,7 @@ describe("handleSystemPromptDomainErrors", () => {
     it("throws an HTTPException(409) with the friendly user-facing message", () => {
       const domainError = new SystemPromptConflictError();
       try {
-        handleSystemPromptDomainErrors(domainError);
+        handleSystemPromptHandledErrors(domainError);
       } catch (err) {
         expect(err).toBeInstanceOf(HTTPException);
         const httpError = err as HTTPException;
@@ -56,22 +56,22 @@ describe("handleSystemPromptDomainErrors", () => {
         expect(httpError.cause).toBe(domainError);
         return;
       }
-      throw new Error("Expected handleSystemPromptDomainErrors to throw");
+      throw new Error("Expected handleSystemPromptHandledErrors to throw");
     });
   });
 
   describe("when given any other error", () => {
     it("returns without throwing so the global error middleware can handle it", () => {
       expect(() =>
-        handleSystemPromptDomainErrors(new Error("Unrelated")),
+        handleSystemPromptHandledErrors(new Error("Unrelated")),
       ).not.toThrow();
     });
 
     it("returns without throwing for non-Error inputs", () => {
-      expect(() => handleSystemPromptDomainErrors(null)).not.toThrow();
-      expect(() => handleSystemPromptDomainErrors(undefined)).not.toThrow();
+      expect(() => handleSystemPromptHandledErrors(null)).not.toThrow();
+      expect(() => handleSystemPromptHandledErrors(undefined)).not.toThrow();
       expect(() =>
-        handleSystemPromptDomainErrors("string error"),
+        handleSystemPromptHandledErrors("string error"),
       ).not.toThrow();
     });
   });

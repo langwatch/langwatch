@@ -1,6 +1,6 @@
 import { APICallError, RetryError } from "ai";
 import { describe, expect, it } from "vitest";
-import { DomainError } from "../../app-layer/domain-error";
+import { HandledError } from "../../app-layer/handled-error";
 import { isAbortLikeError, nlpgoHandledErrorFrom } from "../goHandledError";
 
 /** The exact envelope nlpgo returned for an unroutable provider prefix. */
@@ -31,14 +31,14 @@ function makeAPICallError({
 
 describe("nlpgoHandledErrorFrom", () => {
   describe("given an APICallError carrying nlpgo's handled-error envelope", () => {
-    it("maps it to a DomainError keyed by meta.reason", () => {
+    it("maps it to a HandledError keyed by meta.reason", () => {
       const error = nlpgoHandledErrorFrom(
         makeAPICallError({ responseBody: MISSING_PROVIDER_BODY }),
       );
 
       expect(error).not.toBeNull();
-      expect(DomainError.isHandled(error)).toBe(true);
-      expect(error?.kind).toBe("missing_provider");
+      expect(HandledError.isHandled(error)).toBe(true);
+      expect(error?.code).toBe("missing_provider");
       expect(error?.httpStatus).toBe(400);
       expect(error?.meta).toEqual({ reason: "missing_provider" });
     });
@@ -53,7 +53,7 @@ describe("nlpgoHandledErrorFrom", () => {
         }),
       );
 
-      expect(error?.kind).toBe("upstream_timeout");
+      expect(error?.code).toBe("upstream_timeout");
       expect(error?.httpStatus).toBe(504);
     });
   });
@@ -67,7 +67,7 @@ describe("nlpgoHandledErrorFrom", () => {
         errors: [inner],
       });
 
-      expect(nlpgoHandledErrorFrom(retry)?.kind).toBe("missing_provider");
+      expect(nlpgoHandledErrorFrom(retry)?.code).toBe("missing_provider");
     });
   });
 

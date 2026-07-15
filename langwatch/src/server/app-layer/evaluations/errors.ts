@@ -1,7 +1,7 @@
-import { DomainError, NotFoundError } from "../domain-error";
+import { HandledError, NotFoundError } from "../handled-error";
 
 export class EvaluationNotFoundError extends NotFoundError {
-  declare readonly kind: "evaluation_not_found";
+  declare readonly code: "evaluation_not_found";
 
   constructor(
     evaluationId: string,
@@ -15,8 +15,8 @@ export class EvaluationNotFoundError extends NotFoundError {
   }
 }
 
-export class TraceNotEvaluatableError extends DomainError {
-  declare readonly kind: "trace_not_evaluatable";
+export class TraceNotEvaluatableError extends HandledError {
+  declare readonly code: "trace_not_evaluatable";
 
   constructor(
     traceId: string,
@@ -31,8 +31,8 @@ export class TraceNotEvaluatableError extends DomainError {
   }
 }
 
-export class EvaluatorConfigError extends DomainError {
-  declare readonly kind: "evaluator_config_error";
+export class EvaluatorConfigError extends HandledError {
+  declare readonly code: "evaluator_config_error";
 
   constructor(
     message: string,
@@ -46,8 +46,8 @@ export class EvaluatorConfigError extends DomainError {
   }
 }
 
-export class EvaluatorExecutionError extends DomainError {
-  declare readonly kind: "evaluator_execution_error";
+export class EvaluatorExecutionError extends HandledError {
+  declare readonly code: "evaluator_execution_error";
 
   constructor(
     message: string,
@@ -68,8 +68,8 @@ export class EvaluatorExecutionError extends DomainError {
  * carries the raw field name so the client can translate it into
  * user-facing language ("Variant A") instead of showing the wire identifier.
  */
-export class EvaluatorMissingFieldError extends DomainError {
-  declare readonly kind: "evaluator_missing_field";
+export class EvaluatorMissingFieldError extends HandledError {
+  declare readonly code: "evaluator_missing_field";
 
   constructor(
     field: string,
@@ -93,7 +93,7 @@ export class EvaluatorMissingFieldError extends DomainError {
 }
 
 export class EvaluatorNotFoundError extends NotFoundError {
-  declare readonly kind: "evaluator_not_found";
+  declare readonly code: "evaluator_not_found";
 
   constructor(
     evaluatorType: string,

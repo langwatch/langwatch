@@ -48,7 +48,7 @@ import {
   buildStandardSuccessResponse,
   handlePossibleConflictError,
 } from "./utils";
-import { handleSystemPromptDomainErrors } from "./utils/handle-system-prompt-domain-errors";
+import { handleSystemPromptHandledErrors } from "./utils/handle-system-prompt-handled-errors";
 
 const logger = createLogger("langwatch:api:prompts");
 
@@ -1035,7 +1035,7 @@ export function registerPromptRoutes(
           });
         }
         handlePossibleConflictError(error, data.scope);
-        handleSystemPromptDomainErrors(error);
+        handleSystemPromptHandledErrors(error);
 
         // Re-throw other errors to be handled by the error middleware
         throw error;

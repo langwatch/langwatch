@@ -57,7 +57,7 @@ describe("handleError()", () => {
   }
 
   describe("when error is a LimitExceededError", () => {
-    it("returns 403 with DomainError shape", async () => {
+    it("returns 403 with HandledError shape", async () => {
       const error = new LimitExceededError("prompts", 5, 5);
       const app = createTestApp(error);
 

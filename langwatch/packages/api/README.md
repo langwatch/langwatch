@@ -78,7 +78,7 @@ export { GET, POST, PUT, PATCH, DELETE } from "./things.service";
 - **Tracing + logging** via `@langwatch/observability` (automatic, disable with `tracer: false` / `logger: false`)
 - **Auth, org, resource limits** applied in the right order per-endpoint
 - **Input/output/params/query validation** from Zod schemas, auto-wired to OpenAPI
-- **Error formatting** that duck-types `DomainError` (kind, meta, reasons, telemetry) and catches Zod errors
+- **Error formatting** that duck-types `HandledError` (code, meta, reasons, traceId/spanId) and catches Zod errors
 - **Versioned routing** at `/api/{name}/{date}/...` with forward-copying from previous versions
 
 ## Handler signature
@@ -186,9 +186,9 @@ v.sse(
 
 ## Error handling
 
-Throw `DomainError` subclasses (from `~/server/app-layer/domain-error`). The framework:
+Throw `HandledError` subclasses (from `~/server/app-layer/handled-error`). The framework:
 
-1. Catches and serializes them with `kind`, `meta`, `reasons`, `telemetry`
+1. Catches and serializes them with `code`, `meta`, `reasons`, `traceId`/`spanId`
 2. Catches `ZodError` and maps each issue to a `schema_failure` reason (cher-style)
 3. Returns union format for unversioned requests (includes legacy `error` field)
 4. Returns clean format for versioned requests
@@ -197,7 +197,7 @@ Validation error example:
 
 ```json
 {
-  "kind": "validation_error",
+  "code": "validation_error",
   "message": "Validation error",
   "reasons": [
     {
@@ -240,7 +240,7 @@ src/
   builder.ts          # createService(), ServiceBuilder, VersionBuilder
   versioning.ts       # Forward-copy algorithm + request-time resolution
   middleware.ts       # Built-in tracer + logger (uses @langwatch/observability)
-  errors.ts           # Error handler (DomainError, ZodError, version-gated format)
+  errors.ts           # Error handler (HandledError, ZodError, version-gated format)
   sse.ts              # v.sse() with typed events
   types.ts            # ServiceConfig, EndpointConfig, Handler, BaseApp
   index.ts            # Public re-exports + routeHandlers()
@@ -257,6 +257,6 @@ When creating a new API service using this framework:
 5. Use `.provide()` for service-layer dependencies — factories get `{ project, _legacy: { organization, prisma } }`
 6. Define Zod schemas for input/output/params next to the service, not in a shared types file
 7. Handlers return raw data when `output` is set; the framework validates and serializes
-8. Throw `NotFoundError` / `DomainError` for error responses — don't return `c.json({ error }, 404)` manually
+8. Throw `NotFoundError` / `HandledError` for error responses — don't return `c.json({ error }, 404)` manually
 9. Use `status: 201` in endpoint config for creation endpoints
 10. Use the Quick start in this README as the reference until an existing service has been migrated to the package

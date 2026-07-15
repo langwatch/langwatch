@@ -343,7 +343,7 @@ describe("input validation", () => {
 
       expect(res.status).toBe(422);
       expect(await jsonBody(res)).toMatchObject({
-        kind: "validation_error",
+        code: "validation_error",
         reasons: [
           {
             code: "schema_failure",
@@ -394,6 +394,8 @@ describe("output validation", () => {
 
       expect(res.status).toBe(500);
       expect(await jsonBody(res)).toEqual({
+        code: "internal_error",
+        // Deprecated back-compat alias of `code` (see ErrorResponseBody.kind).
         kind: "internal_error",
         message: "Internal server error",
       });
@@ -678,7 +680,7 @@ describe("version forward-copying via builder", () => {
       const oldRes = await makeRequest(app, "/api/test/2025-06-01/old");
       expect(oldRes.status).toBe(410);
       const oldBody = await jsonBody(oldRes);
-      expect((oldBody as { kind: string }).kind).toBe("endpoint_withdrawn");
+      expect((oldBody as { code: string }).code).toBe("endpoint_withdrawn");
       expect(oldRes.headers.get("X-API-Version")).toBe("2025-06-01");
       expect(oldRes.headers.get("X-API-Version-Status")).toBe("stable");
 
@@ -906,25 +908,26 @@ describe("error handling", () => {
 
       const res = await makeRequest(app, "/api/test/2025-03-15/fail");
       expect(res.status).toBe(500);
-      const body = (await jsonBody(res)) as { kind: string };
-      expect(body.kind).toBe("internal_error");
+      const body = (await jsonBody(res)) as { code: string };
+      expect(body.code).toBe("internal_error");
     });
   });
 
-  describe("when a handler throws a DomainError-like error", () => {
+  describe("when a handler throws a HandledError-like error", () => {
     it("serializes it correctly", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
           v.get("/fail", {}, async () => {
             const err = Object.assign(new Error("Not found"), {
-              kind: "thing_not_found",
+              code: "thing_not_found",
               httpStatus: 404,
               meta: { id: "123" },
               serialize() {
                 return {
-                  kind: "thing_not_found",
+                  code: "thing_not_found",
                   meta: { id: "123" },
-                  telemetry: { traceId: undefined, spanId: undefined },
+                  traceId: undefined,
+                  spanId: undefined,
                   httpStatus: 404,
                   reasons: [],
                 };
@@ -938,10 +941,10 @@ describe("error handling", () => {
       const res = await makeRequest(app, "/api/test/2025-03-15/fail");
       expect(res.status).toBe(404);
       const body = (await jsonBody(res)) as {
-        kind: string;
+        code: string;
         meta: { id: string };
       };
-      expect(body.kind).toBe("thing_not_found");
+      expect(body.code).toBe("thing_not_found");
       expect(body.meta.id).toBe("123");
     });
   });

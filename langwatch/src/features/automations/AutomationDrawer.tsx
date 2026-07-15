@@ -77,7 +77,7 @@ import {
 } from "./logic/draftReducer";
 import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
 import { REPORT_TEMPLATE_VARIABLES } from "./editors/reportVariables";
-import { explainDomainError, readDomainError } from "./logic/errorExplainer";
+import { explainHandledError, readHandledError } from "./logic/errorExplainer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
 import {
@@ -718,9 +718,9 @@ export function AutomationDrawer({
           });
         },
         onError: (err) => {
-          const domain = readDomainError(err);
+          const domain = readHandledError(err);
           const { title, description } = domain
-            ? explainDomainError(domain)
+            ? explainHandledError(domain)
             : { title: "Test fire failed", description: err.message };
           pushAttempt({
             at: Date.now(),
@@ -803,9 +803,9 @@ export function AutomationDrawer({
         },
         onError: (err) => {
           if (isHandledByGlobalHandler(err)) return;
-          const domain = readDomainError(err);
+          const domain = readHandledError(err);
           const { title, description } = domain
-            ? explainDomainError(domain)
+            ? explainHandledError(domain)
             : { title: "Could not save automation", description: err.message };
           toaster.create({
             title,
