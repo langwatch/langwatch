@@ -543,6 +543,28 @@ describe.skipIf(!hasTestcontainers)(
           expect(control.calls).toBe(0);
           expect((await calendarRow(sourceId))!.active).toBe(false);
         });
+
+        // ScheduledJob has no FK to the source, so a hard-deleted source
+        // would otherwise leave an active orphan row re-firing every slot.
+        it("deactivates the orphan row when the source no longer exists", async () => {
+          const ghostSourceId = `ghost-${nanoid(8)}`;
+          createdSourceIds.push(ghostSourceId);
+          await prisma.scheduledJob.create({
+            data: {
+              projectId: govProjectId,
+              targetType: INGESTION_PULL_TARGET_TYPE,
+              targetId: ghostSourceId,
+              cron: "*/15 * * * *",
+              timezone: "UTC",
+              nextRunAt: new Date(),
+            },
+          });
+
+          await handleIngestionPullFire(fireFor(ghostSourceId));
+
+          expect(control.calls).toBe(0);
+          expect((await calendarRow(ghostSourceId))!.active).toBe(false);
+        });
       });
     });
 

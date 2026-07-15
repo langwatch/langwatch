@@ -40,7 +40,7 @@ describe("ingestionPullScheduler — pull-schedule validation", () => {
       });
 
       /** @scenario "Malformed schedules are rejected without touching the calendar" */
-      it("throws before any calendar write can happen", () => {
+      it("rejects with a message naming the five-field format", () => {
         expect(() => assertValidPullSchedule("definitely not cron")).toThrow(
           /5-field cron expression/,
         );
@@ -58,14 +58,12 @@ describe("ingestionPullScheduler — pull-schedule validation", () => {
         );
 
         // Recurrence is owned by the durable calendar, evaluated by croner.
+        // (The integration suite proves the behavior — rows in ScheduledJob,
+        // no bull:* keys; this guards only the load-bearing imports.)
         expect(source).toMatch(/from ["']croner["']/);
         expect(source).toContain("PrismaScheduledJobRepository");
-        expect(source).toContain("upsertForTarget");
-
-        // No BullMQ, no Linux cron, no repeatable-job registration.
         expect(source).not.toMatch(/from ["']bullmq["']/);
         expect(source).not.toMatch(/node-cron|crontab/);
-        expect(source).not.toMatch(/repeat(able)?\s*:/);
       });
     });
   });

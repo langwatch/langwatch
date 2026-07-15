@@ -188,6 +188,10 @@ async function pullScheduleProjectId(
  * Create-or-refresh the source's calendar row: one `ScheduledJob` per source
  * (`targetId` = source id), next fire computed from the cron. An upsert
  * re-activates a deactivated row, so this is also the re-enable path.
+ *
+ * No cross-pod scheduler wake (unlike report upserts): pull crons are
+ * minute-granular and background, so the loop's poll backstop picks a new
+ * row up well within one cron period — there is no "run now" UX to serve.
  */
 export async function syncIngestionPullSchedule({
   source,
@@ -254,18 +258,27 @@ export async function reconcileIngestionPullSchedules({
   if (sources.length === 0) return { repaired: 0 };
 
   const repo = new PrismaScheduledJobRepository(prisma);
+  // One project resolution + one row-set fetch per org, not per source.
+  const projectIdByOrg = new Map<string, string>();
+  const scheduledTargetIdsByProject = new Map<string, Set<string>>();
   let repaired = 0;
   for (const source of sources) {
     try {
-      const projectId = await pullScheduleProjectId(
-        prisma,
-        source.organizationId,
-      );
-      const existing = await repo.findAllForProject({
-        projectId,
-        targetType: INGESTION_PULL_TARGET_TYPE,
-      });
-      if (existing.some((job) => job.targetId === source.id)) continue;
+      let projectId = projectIdByOrg.get(source.organizationId);
+      if (!projectId) {
+        projectId = await pullScheduleProjectId(prisma, source.organizationId);
+        projectIdByOrg.set(source.organizationId, projectId);
+      }
+      let scheduledTargetIds = scheduledTargetIdsByProject.get(projectId);
+      if (!scheduledTargetIds) {
+        const existing = await repo.findAllForProject({
+          projectId,
+          targetType: INGESTION_PULL_TARGET_TYPE,
+        });
+        scheduledTargetIds = new Set(existing.map((job) => job.targetId));
+        scheduledTargetIdsByProject.set(projectId, scheduledTargetIds);
+      }
+      if (scheduledTargetIds.has(source.id)) continue;
       await syncIngestionPullSchedule({ source, prisma });
       repaired += 1;
     } catch (error) {
@@ -321,9 +334,14 @@ export async function handleIngestionPullFire(
       { ingestionSourceId: fire.targetId },
       "ingestion source not schedulable; deactivating its calendar row",
     );
-    if (source) {
-      await removeIngestionPullSchedule({ source, prisma });
-    }
+    // The fire carries the row's own coordinates, so this also covers a
+    // hard-deleted source (`ScheduledJob` has no FK to the source) — without
+    // it the orphaned row would re-fire every cron slot forever.
+    await new PrismaScheduledJobRepository(prisma).deactivateForTarget({
+      projectId: fire.projectId,
+      targetType: fire.targetType,
+      targetId: fire.targetId,
+    });
     return;
   }
 

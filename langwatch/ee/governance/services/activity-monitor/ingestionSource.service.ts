@@ -104,9 +104,10 @@ function assertValidPullSchedule(
   try {
     assertParseablePullSchedule(pullSchedule);
   } catch (cause) {
+    const detail = cause instanceof Error ? ` (${cause.message})` : "";
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: `Invalid pullSchedule cron expression: ${pullSchedule}`,
+      message: `Invalid pullSchedule cron expression: ${pullSchedule}${detail}`,
       cause,
     });
   }
@@ -311,9 +312,15 @@ export class IngestionSourceService {
     // Keep the calendar row in step with the update: a schedulable source
     // gets a fresh (or reactivated) row — this covers both schedule changes
     // and re-enabling a disabled source — and anything else is deactivated so
-    // the due-scan skips it. Sources that never had a schedule (push-mode)
-    // have no calendar row to maintain.
-    if (existing.pullSchedule !== null || source.pullSchedule !== null) {
+    // the due-scan skips it. Only updates that can change scheduling
+    // (pullSchedule / status) touch the row: a rename or team move must not
+    // reset a leased or retrying slot. Sources that never had a schedule
+    // (push-mode) have no calendar row to maintain.
+    const schedulingTouched =
+      input.pullSchedule !== undefined || input.status !== undefined;
+    const hasOrHadSchedule =
+      existing.pullSchedule !== null || source.pullSchedule !== null;
+    if (schedulingTouched && hasOrHadSchedule) {
       const schedulable =
         source.status === "active" || source.status === "awaiting_first_event";
       if (source.pullSchedule && schedulable) {
