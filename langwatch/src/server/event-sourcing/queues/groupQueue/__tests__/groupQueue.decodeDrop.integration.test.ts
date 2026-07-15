@@ -632,6 +632,11 @@ describe.skipIf(!hasTestcontainers)(
           // never counted the loss — an operator saw nothing while an event
           // that could not possibly recover via replay was thrown away.
           expect(entry!.labels.reason).toBe("transient_exhausted");
+          // The terminal's OTHER deliberate change, which had no coverage until a
+          // review caught it: it no longer releases. Eight failed READS mean the
+          // STORE was unreachable, not that the blob is gone — most likely it is
+          // still there, so retiring it would delete a body that exists.
+          expect(flaky.deleted).toEqual([]);
         });
       });
     });

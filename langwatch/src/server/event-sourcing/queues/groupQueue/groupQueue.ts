@@ -1481,14 +1481,19 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * Give up on a staged job we cannot process — and say so out loud (#5538).
    *
    * The code this replaced justified itself with "recover via event replay". It
-   * does not. The replay service rebuilds fold projections and NEVER invokes
-   * reactors (`projections/projectionRouter.ts:61-71`); replay's only reactor
-   * references exist to *suppress* re-fires. `governanceOcsfEventsSync` (OCSF
-   * audit) and `gatewayBudgetSync` (billing) are reactors on the `traceSummary`
-   * fold — so for them this method IS the terminal event, and the counter below
-   * is the only evidence it ever happened. (Scoped honestly: fold/map drops
-   * genuinely are replay-covered via `replay/replayService.ts:74,105`. The false
-   * part was reactor-specific.)
+   * does not — and the proof is structural, not another comment: `ReplayExecutor`
+   * calls the fold's pure `projection.apply()` and writes straight to the store
+   * via `store.store()`, never constructing a `ProjectionRouter` — which is the
+   * only thing that calls `dispatchToReactors`. Reactors are unreachable from
+   * replay BY CONSTRUCTION. (`replay/` contains no reference to a reactor at all,
+   * except two that exist to *suppress* re-fires.)
+   *
+   * `governanceOcsfEventsSync` (OCSF audit) and `gatewayBudgetSync` (billing) are
+   * reactors on the `traceSummary` fold — so for them this method IS the terminal
+   * event, and the counter below is the only evidence it ever happened. Scoped
+   * honestly: fold/map drops genuinely ARE replay-covered (`ReplayService.replay`
+   * drives `config.projections` + `config.mapProjections`). The false part is
+   * reactor-specific.
    *
    * **Why `complete()` and not `parkPoisonGroup()`** — parking blocks the whole
    * group. Right for an oversized payload (the value is intact; a raised cap

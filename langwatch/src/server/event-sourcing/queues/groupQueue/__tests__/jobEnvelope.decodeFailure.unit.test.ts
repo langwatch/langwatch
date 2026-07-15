@@ -214,25 +214,49 @@ describe("jobEnvelope decode failures", () => {
     // storage URIs — so without a guard, raw body lands in prod logs. AC1 says
     // "never raw payload or tenant PII". Pre-dates this fix (#5736 started
     // logging `err` while the bare-JSON path threw a raw SyntaxError).
-    // V8 echoes only the FIRST ~10 CHARACTERS, so asserting the whole secret is
-    // absent passes even while leaking — that mistake made the first version of
-    // this test green with the guard removed. Assert the echoed PREFIX.
-    const PAYLOAD = "patient@hospital.example is HIV positive";
-    const ECHOED_PREFIX = PAYLOAD.slice(0, 10); // "patient@ho" — what V8 quotes back
+    // The redactor is an ALLOWLIST: keep the leading diagnosis, drop everything
+    // from the first `"`/`[`/`{` — where every parser hands input back.
+    //
+    // v1 of this test asserted the WHOLE secret was absent and passed with the
+    // guard removed (V8 echoes ~10 chars, so the full secret is never present
+    // either way). v2 asserted the echoed prefix. v3 (here) adds the cases a
+    // security review found v2's REGEX still leaked: V8 only appends `"..."` at
+    // ~21+ chars and echoes the whole string below that, so a 9-digit SSN or a
+    // 6-digit OTP sailed straight through the old `{12,}` threshold.
+    const LEAKY: Array<{ name: string; payload: string; secret: string }> = [
+      {
+        name: "a long payload (V8 truncates with an ellipsis)",
+        payload: "patient@hospital.example is HIV positive",
+        secret: "patient@ho",
+      },
+      {
+        name: "a 9-digit secret (V8 echoes it WHOLE — no ellipsis)",
+        payload: "x123456789",
+        secret: "123456789",
+      },
+      {
+        name: "a short secret under the old 12-char threshold",
+        payload: "xab12cd",
+        secret: "ab12cd",
+      },
+    ];
 
-    describe("when an inline bare-JSON body fails to parse", () => {
-      it("keeps the echoed payload prefix out of the thrown message", async () => {
-        const err = (await decodeJobEnvelope({ value: PAYLOAD })
-          .then(() => null)
-          .catch((e: unknown) => e)) as DecodeFailureError;
+    for (const { name, payload, secret } of LEAKY) {
+      describe(`when an inline bare-JSON body fails to parse — ${name}`, () => {
+        it("keeps the payload out of the thrown message", async () => {
+          const err = (await decodeJobEnvelope({ value: payload })
+            .then(() => null)
+            .catch((e: unknown) => e)) as DecodeFailureError;
 
-        expect(err).toBeInstanceOf(DecodeFailureError);
-        expect(err.message).not.toContain(ECHOED_PREFIX);
-        expect(err.message).toContain("<redacted>");
-        // Redaction, not lobotomy: the diagnosis must survive.
-        expect(err.message).toContain("failed to parse");
+          expect(err).toBeInstanceOf(DecodeFailureError);
+          expect(err.message).not.toContain(secret);
+          // Positive half — without it the negative could pass vacuously (wrong
+          // Node, reshaped message). This can only pass if the redactor ran.
+          expect(err.message).toContain("SyntaxError");
+          expect(err.message).toContain("failed to parse");
+        });
       });
-    });
+    }
 
     describe("when an offloaded body fails to parse", () => {
       it("keeps the payload out of the thrown message", async () => {
@@ -244,9 +268,11 @@ describe("jobEnvelope decode failures", () => {
         });
         // Valid gzip, so it inflates — then fails to PARSE, echoing its content.
         const { gzipSync } = await import("node:zlib");
-        const leaky = gzipSync(Buffer.from(PAYLOAD));
         for (const key of [...redisBlobs.store.keys()]) {
-          redisBlobs.store.set(key, leaky);
+          redisBlobs.store.set(
+            key,
+            gzipSync(Buffer.from("patient@hospital.example is HIV positive")),
+          );
         }
 
         const err = (await decodeJobEnvelope({ value: encoded, tieredBlobs })
@@ -254,7 +280,42 @@ describe("jobEnvelope decode failures", () => {
           .catch((e: unknown) => e)) as DecodeFailureError;
 
         expect(err).toBeInstanceOf(DecodeFailureError);
-        expect(err.message).not.toContain(ECHOED_PREFIX);
+        expect(err.message).not.toContain("patient@ho");
+        expect(err.message).toContain("SyntaxError");
+      });
+    });
+
+    describe("when the failure text carries no input echo at all", () => {
+      it("keeps the whole diagnosis rather than amputating it", async () => {
+        // zlib never echoes input ("incorrect header check"), so the allowlist
+        // must leave an already-safe message intact.
+        //
+        // Reaching zlib at all takes care: `decompress` SNIFFS (detectCompression)
+        // and passes unrecognised bytes straight through as "none", so random
+        // garbage fails later at the parse, not in zlib. Keep the gzip magic and
+        // corrupt the deflate stream behind it.
+        const { tieredBlobs, redisBlobs } = makeTiered();
+        const encoded = await encodeJobEnvelope({
+          jobData: offloadable(),
+          tieredBlobs,
+          projectId,
+        });
+        const { gzipSync } = await import("node:zlib");
+        const corrupt = gzipSync(Buffer.from("hello"));
+        corrupt.fill(0xff, 10, corrupt.length - 8); // magic intact, stream broken
+
+        for (const key of [...redisBlobs.store.keys()]) {
+          redisBlobs.store.set(key, corrupt);
+        }
+
+        const err = (await decodeJobEnvelope({ value: encoded, tieredBlobs })
+          .then(() => null)
+          .catch((e: unknown) => e)) as DecodeFailureError;
+
+        expect(err.reason).toBe("body_unreadable");
+        expect(err.message).toContain("decompress");
+        // The zlib diagnosis survives the allowlist untouched.
+        expect(err.message).toMatch(/check|invalid|incorrect|header/i);
       });
     });
   });

@@ -139,13 +139,28 @@ const errText = (err: unknown): string =>
  * and drops only the quoted echo. zlib messages ("incorrect header check")
  * never echo input, so they pass through untouched.
  */
-const safeParseErrText = (err: unknown): string =>
-  errText(err)
-    // V8: `Unexpected token 'p', "patient@ho"... is not valid JSON`
-    .replace(/,\s*"[\s\S]*?"\.\.\./g, ", <redacted>...")
-    // Defensive: any other double-quoted run in a parser message is input echo,
-    // not vocabulary. Parser messages quote input; they don't quote prose.
-    .replace(/"[^"]{12,}"/g, '"<redacted>"');
+const safeParseErrText = (err: unknown): string => {
+  const raw = errText(err);
+  // ALLOWLIST, not blocklist: keep the leading diagnosis and drop everything from
+  // the first delimiter a parser uses to hand input back — `"` (V8's echo, quoted
+  // or truncated) or `[`/`{` (msgpackr's `{"type":"Buffer","data":[83,69]}`, whose
+  // byte array decodes straight back to the plaintext).
+  //
+  // Matching V8's exact wording instead was the first attempt and it leaked: V8
+  // only appends `"..."` at ~21+ chars and echoes the WHOLE string below that, so
+  // a 9-digit SSN or a 6-digit OTP sailed through untouched. A blocklist over one
+  // library's message shapes re-opens on every runtime upgrade — the same
+  // fragility `DecodeFailureReason` exists to avoid for classification.
+  //
+  // What survives the cut is vocabulary, not payload: "Unexpected token 'x'",
+  // "Unterminated string in JSON at position 30", "incorrect header check". The
+  // single-quoted token is one character — kept because it is the most useful
+  // byte in the message and one character is not a secret.
+  const cut = raw.search(/["[{]/);
+  const head = (cut === -1 ? raw : raw.slice(0, cut)).trim().replace(/[,\s]+$/, "");
+  const name = err instanceof Error ? err.name : "Error";
+  return head ? `${name}: ${head}` : name;
+};
 
 /**
  * Decode-side twin of {@link assertPayloadWithinCap}: values staged before the
@@ -850,7 +865,21 @@ export function splitEnvelope(value: string): {
   const headerJson = buf
     .subarray(lenEnd + 1, lenEnd + 1 + headerLen)
     .toString("utf8");
-  const header = JSON.parse(headerJson) as EnvelopeHeader;
+  // Guarded for the same reason the body parses are: a corrupt header segment
+  // makes V8 echo it back ("Unexpected token 's', \"serId\":\"us\"..."), and the
+  // header carries `m.__context` (traceId / userId / projectId). That message
+  // would otherwise reach the drop log via the raw-Error path, which only strips
+  // storage URIs. Naming it also makes a corrupt header a `malformed_envelope`
+  // rather than an `unknown` (#5538).
+  let header: EnvelopeHeader;
+  try {
+    header = JSON.parse(headerJson) as EnvelopeHeader;
+  } catch (err) {
+    throw new DecodeFailureError(
+      `Malformed job envelope: header failed to parse: ${safeParseErrText(err)}`,
+      "malformed_envelope",
+    );
+  }
   return {
     header,
     body: buf.subarray(lenEnd + 1 + headerLen).toString("utf8"),
