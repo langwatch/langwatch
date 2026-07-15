@@ -65,8 +65,6 @@ WORKDIR /app
 # symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
 COPY --from=builder /app/langwatch ./langwatch
 COPY --from=builder /app/mcp-server ./mcp-server
-COPY --from=builder /app/typescript-sdk/package.json ./typescript-sdk/package.json
-COPY --from=builder /app/python-sdk/pyproject.toml ./python-sdk/pyproject.toml
 COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 
 ENV NODE_ENV=production
