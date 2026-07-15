@@ -22,7 +22,8 @@
  *   - When several rows supply a REAL name for the same `modelId`, the
  *     winner is decided, in order: (1) `enabled: true` beats `enabled:
  *     false`; (2) narrowest scope wins — PROJECT > TEAM > ORGANIZATION >
- *     none/unscoped (including `isSystem`); (3) lowest row `id`
+ *     none/unscoped (including `isSystem`); (3) a persisted row (one with
+ *     an `id`) beats a synthesized one without; (4) lowest row `id`
  *     lexicographically, as a final total-order tiebreak.
  *   - The map is dual-keyed: every real name is written under both
  *     `${provider}/${modelId}` and, when `row.id` exists,
@@ -157,6 +158,43 @@ describe("given a project-scoped row and an organization-scoped row that both de
   });
 });
 
+describe("given a persisted row and a row with no id that both define the same model id", () => {
+  describe("when display names are built across both rows", () => {
+    it("prefers the persisted row's name over the name on the row with no id", () => {
+      // Neither row carries scopes, so the enabled and scope tiers tie and
+      // the id tiebreak alone would hand this to the id-less row — an absent
+      // id sorts below every real one. Only a persisted tier ahead of that
+      // tiebreak keeps a synthesized placeholder from outranking a stored row.
+      const placeholderRow = makeProvider({
+        provider: "vendorJ",
+        enabled: true,
+        customModels: [
+          {
+            modelId: "helix-3",
+            displayName: "Seeded Placeholder",
+            mode: "chat",
+          },
+        ],
+      });
+      const persistedRow = makeProvider({
+        provider: "vendorJ",
+        enabled: true,
+        id: "mp_stored",
+        customModels: [
+          { modelId: "helix-3", displayName: "Stored Label", mode: "chat" },
+        ],
+      });
+
+      const result = buildCustomModelDisplayNames([
+        placeholderRow,
+        persistedRow,
+      ]);
+
+      expect(result["vendorJ/helix-3"]).toBe("Stored Label");
+    });
+  });
+});
+
 describe("given two equally-eligible rows (same enabled state, same scope tier) that both define the same model id", () => {
   describe("when display names are built across both rows", () => {
     it("prefers the row with the lexicographically lowest id when every other tier ties", () => {
@@ -188,6 +226,37 @@ describe("given two equally-eligible rows (same enabled state, same scope tier) 
       const result = buildCustomModelDisplayNames([alphaRow, zuluRow]);
 
       expect(result["vendorG/zeta-service"]).toBe("Customer Favorite");
+    });
+  });
+});
+
+describe("given two equally-eligible rows whose lexicographically lowest id is returned last", () => {
+  describe("when display names are built across both rows", () => {
+    // The mirror of the case above, which lists its winner first and so
+    // stays green against a resolver with no tiebreak at all (plain
+    // first-write-wins) — verified by knocking the tiebreak out. Only the
+    // pair together pins an id rank rather than an arrival order.
+    it("prefers the lexicographically lowest id whichever order the rows arrive in", () => {
+      const alphaRow = makeProvider({
+        provider: "vendorK",
+        enabled: true,
+        id: "alpha-row",
+        customModels: [
+          { modelId: "orbit-7", displayName: "Chosen Name", mode: "chat" },
+        ],
+      });
+      const zuluRow = makeProvider({
+        provider: "vendorK",
+        enabled: true,
+        id: "zulu-row",
+        customModels: [
+          { modelId: "orbit-7", displayName: "Other Name", mode: "chat" },
+        ],
+      });
+
+      const result = buildCustomModelDisplayNames([zuluRow, alphaRow]);
+
+      expect(result["vendorK/orbit-7"]).toBe("Chosen Name");
     });
   });
 });
