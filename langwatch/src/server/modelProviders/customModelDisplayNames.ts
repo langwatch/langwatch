@@ -10,6 +10,15 @@ import type { MaybeStoredModelProvider } from "./registry";
  * be stored at several scopes, and collapsing those rows by key first
  * would drop one row's custom models on the floor.
  *
+ * Two rows of the same provider defining the SAME `modelId` with
+ * different display names resolve to whichever row the query returned
+ * last. `findAllAccessibleForProject` issues a bare `findMany` with no
+ * `orderBy`, so row order carries no scope precedence — picking the
+ * first instead of the last would be equally arbitrary, and no
+ * precedence rule exists elsewhere in the picker to mirror. Both rows
+ * key to the same `<provider>/<modelId>`, so only the label is
+ * ambiguous; the stored value is identical either way.
+ *
  * Not to be confused with `mergeCustomModelMetadata`
  * (src/server/api/routers/modelProviders.utils.ts), which also reads
  * `displayName` off these same lists. Its record is keyed by model-
