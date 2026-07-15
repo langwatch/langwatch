@@ -39,6 +39,7 @@ export const shareRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       return getApp().share.getStateForResource({
+        projectId: input.projectId,
         resourceType: input.resourceType,
         resourceId: input.resourceId,
       });
