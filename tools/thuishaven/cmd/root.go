@@ -248,6 +248,9 @@ var commands = map[string]command{
 		if err != nil {
 			return err
 		}
+		if hasFlag(rest, "--first-message") && hasFlag(rest, "--no-first-message") {
+			return fmt.Errorf("--first-message and --no-first-message are mutually exclusive — pass one or the other")
+		}
 		return d.orch.Seed(ctx, d.params, app.SeedOptions{
 			Preset:             preset,
 			ShouldIngestTraces: hasFlag(rest, "--traces") || os.Getenv("HAVEN_SEED_TRACES") == "1",
@@ -514,9 +517,17 @@ func runUpDetached(d deps, rest []string) error {
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = d.worktree
 	cmd.Env = os.Environ()
-	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	// Owner-only: the detached log captures seed output, which includes the
+	// admin password and access tokens.
+	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if ferr != nil {
 		return fmt.Errorf("opening log file %s: %w", logPath, ferr)
+	}
+	// Chmod too — the mode above only applies on create, and older runs
+	// created this file 0644.
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("securing log file %s: %w", logPath, err)
 	}
 	cmd.Stdout, cmd.Stderr = f, f
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

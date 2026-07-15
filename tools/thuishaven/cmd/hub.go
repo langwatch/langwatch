@@ -78,11 +78,17 @@ func (d deps) hubActions() hubtui.Actions {
 	}
 }
 
-// openInBrowser opens a URL with the platform opener.
 func openInBrowser(url string) error {
 	opener := "open" // macOS
 	if runtime.GOOS != "darwin" {
 		opener = "xdg-open"
 	}
-	return exec.Command(opener, url).Start()
+	cmd := exec.Command(opener, url)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	// Reap in the background so repeated opens don't accumulate zombies while
+	// the hub stays up.
+	go func() { _ = cmd.Wait() }()
+	return nil
 }

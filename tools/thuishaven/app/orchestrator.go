@@ -141,18 +141,22 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if err := o.store.SaveStack(st); err != nil {
 		return domain.Stack{}, nil, err
 	}
-	// Start (or refresh) the databases' idle clock: the daemon prunes databases
-	// whose slug has not been up for DBIdleTTL, and this is what "up" means.
-	_ = o.store.TouchDBActivity(st.Slug)
-	o.printStack(st)
-	go o.heartbeat(ctx, st)
-
 	cleanup := func() {
 		for _, s := range st.Services {
 			o.proxy.Remove(s.Name, slug)
 		}
 		o.store.RemoveStack(slug)
 	}
+	// Start (or refresh) the databases' idle clock: the daemon prunes databases
+	// whose slug has not been up for DBIdleTTL, and this is what "up" means.
+	// A silently stale clock could get this stack's databases pruned as idle
+	// once it unregisters, so a failed write fails the up.
+	if err := o.store.TouchDBActivity(st.Slug); err != nil {
+		cleanup()
+		return domain.Stack{}, nil, fmt.Errorf("recording database activity for %q: %w", st.Slug, err)
+	}
+	o.printStack(st)
+	go o.heartbeat(ctx, st)
 	return st, cleanup, nil
 }
 
@@ -204,6 +208,28 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err := o.proxy.EnsureReady(); err != nil {
 		return fmt.Errorf("could not start the portless proxy automatically (%w) — run `haven setup` once to bootstrap it by hand", err)
 	}
+	slug, err := o.resolveSlug(p)
+	if err != nil {
+		return err
+	}
+	// Serialize `up` per slug: two concurrent runs could both pass the
+	// already-running guard and then both register the same slug. The lock is
+	// held only through guard + registration — holding it across supervision
+	// would make `up --force` wait forever on the launcher it is meant to
+	// replace (flocks die with their process, so a killed launcher can't leak
+	// the slot).
+	release, _, err := o.sem.Acquire(ctx, "up-"+slug, 1)
+	if err != nil {
+		return err
+	}
+	registering := true
+	endRegistration := func() {
+		if registering {
+			registering = false
+			release()
+		}
+	}
+	defer endRegistration()
 	if err := o.replaceRunningStack(p, opts.ShouldForce); err != nil {
 		return err
 	}
@@ -213,6 +239,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		return err
 	}
 	defer cleanup()
+	endRegistration()
 
 	env := st.OverlayEnv()
 	// Codegen (prisma/zod/sdk-versions/mcp) then migrations — both finish before
@@ -468,7 +495,13 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams, opts SeedOptions) e
 	if preset != "demo" && !opts.ShouldIngestTraces {
 		return nil
 	}
-	return o.seedSampleTraces(ctx, p)
+	// The retry hint must repeat what the user actually ran: `--preset demo`
+	// would also flip the onboarding state for a plain `--traces` run.
+	retryCmd := "haven seed --traces"
+	if preset == "demo" {
+		retryCmd = "haven seed --preset demo"
+	}
+	return o.seedSampleTraces(ctx, p, retryCmd)
 }
 
 // seedEnv builds the base environment for the prisma:seed child: the running
@@ -513,14 +546,14 @@ func hasEnvKey(env []string, key string) bool {
 // stack's collector — the real pipeline, not a ClickHouse side door — so the
 // stack must be up. It talks to the app's loopback port over plain HTTP
 // (portless terminates TLS in front of it; Node does not trust the proxy's CA).
-func (o *Orchestrator) seedSampleTraces(ctx context.Context, p UpParams) error {
+func (o *Orchestrator) seedSampleTraces(ctx context.Context, p UpParams, retryCmd string) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
 	}
 	st, ok := o.stackBySlug(slug)
 	if !ok || !o.sys.ProcessAlive(st.LauncherPID) {
-		return fmt.Errorf("stack %q is not running — sample traces go through the real collector, so start it (haven up) and re-run `haven seed --preset demo`", slug)
+		return fmt.Errorf("stack %q is not running — sample traces go through the real collector, so start it (haven up) and re-run `%s`", slug, retryCmd)
 	}
 	var appPort int
 	for _, svc := range st.Services {
@@ -529,7 +562,7 @@ func (o *Orchestrator) seedSampleTraces(ctx context.Context, p UpParams) error {
 		}
 	}
 	if appPort == 0 || !o.sys.PortInUse(appPort) {
-		return fmt.Errorf("stack %q's app is not answering yet — wait for it to boot and re-run `haven seed --preset demo`", slug)
+		return fmt.Errorf("stack %q's app is not answering yet — wait for it to boot and re-run `%s`", slug, retryCmd)
 	}
 	env := []string{
 		fmt.Sprintf("HAVEN_SEED_ENDPOINT=http://127.0.0.1:%d", appPort),

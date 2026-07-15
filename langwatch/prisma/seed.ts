@@ -131,10 +131,10 @@ async function main() {
   // HAVEN_SEED_FIRST_MESSAGE=1|0 overrides that flag independently of the
   // preset (`haven seed --first-message` sets it).
   const firstMessageOverride = process.env.HAVEN_SEED_FIRST_MESSAGE;
-  const isPastOnboarding =
-    firstMessageOverride !== undefined
-      ? firstMessageOverride === "1" || firstMessageOverride === "true"
-      : process.env.HAVEN_SEED_PRESET === "demo";
+  const hasFirstMessageOverride = firstMessageOverride !== undefined;
+  const isPastOnboarding = hasFirstMessageOverride
+    ? firstMessageOverride === "1" || firstMessageOverride === "true"
+    : process.env.HAVEN_SEED_PRESET === "demo";
 
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },
@@ -171,9 +171,12 @@ async function main() {
       firstMessage: isPastOnboarding,
       integrated: isPastOnboarding,
     },
-    update: isPastOnboarding
-      ? { apiKey, firstMessage: true, integrated: true }
-      : { apiKey },
+    // An explicit override must also be able to CLEAR the flags
+    // (`haven seed --no-first-message`); without one, an existing true is kept.
+    update:
+      hasFirstMessageOverride || isPastOnboarding
+        ? { apiKey, firstMessage: isPastOnboarding, integrated: isPastOnboarding }
+        : { apiKey },
   });
 
   // Admin user + BetterAuth credential (email/password) login.
@@ -430,10 +433,31 @@ async function seedModelProvidersFromEnv(organizationId: string) {
     for (const name of names) {
       if (name && envMap[name]) keys[name] = envMap[name];
     }
+    // The registry schemas mark every key `.nullable().optional()` (to allow
+    // env-var fallback in inbound payloads), so safeParse alone would happily
+    // seed an enabled-but-unusable provider (e.g. Bedrock with only the access
+    // key). Require every non-optional key; Azure needs its API key plus
+    // either mode's endpoint, not both.
+    const optionalKeys = new Set(
+      "optionalKeys" in def ? (def.optionalKeys ?? []) : [],
+    );
+    let missing = names.filter(
+      (name): name is string =>
+        Boolean(name) && !optionalKeys.has(name!) && !keys[name!],
+    );
+    if (provider === "azure") {
+      const endpointNames = ["AZURE_OPENAI_ENDPOINT", "AZURE_API_GATEWAY_BASE_URL"];
+      missing = missing.filter((name) => !endpointNames.includes(name));
+      if (!endpointNames.some((name) => keys[name])) {
+        missing.push(endpointNames.join(" or "));
+      }
+    }
     const parsed = def.keysSchema.safeParse(keys);
-    if (!parsed.success) {
+    if (!parsed.success || missing.length > 0) {
       console.log(
-        `⏭️  Model provider ${provider}: ${def.apiKey} is set but the key set is incomplete — skipped`,
+        `⏭️  Model provider ${provider}: ${def.apiKey} is set but the key set is incomplete${
+          missing.length > 0 ? ` (missing ${missing.join(", ")})` : ""
+        } — skipped`,
       );
       continue;
     }

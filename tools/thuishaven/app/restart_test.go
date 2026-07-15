@@ -30,7 +30,8 @@ func restartOrch(store *fakeStore, sys *fakeSystem) *Orchestrator {
 	}
 }
 
-// @scenario "Restarting one service of a running stack"
+// @scenario "Restarting one service bounces only that service"
+// @scenario "Restarting with no service named bounces every supervised child"
 func TestRestart(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
@@ -124,7 +125,8 @@ func TestRestart(t *testing.T) {
 	})
 }
 
-// @scenario "Up refuses a doubly-started worktree unless forced"
+// @scenario "Up refuses a worktree whose stack is already running"
+// @scenario "Up --force replaces the running stack"
 func TestUpAlreadyRunningGuard(t *testing.T) {
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
 
@@ -172,7 +174,8 @@ func TestUpAlreadyRunningGuard(t *testing.T) {
 	})
 }
 
-// @scenario "Down keeps databases unless explicitly asked to drop them"
+// @scenario "Down keeps the databases by default"
+// @scenario "Down drops the databases only when explicitly asked"
 func TestDownDatabaseSemantics(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}

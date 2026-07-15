@@ -126,10 +126,20 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			// databases, and prune databases whose worktree has not been up in
 			// DBIdleTTL — the unattended counterpart of `haven down --drop-db`.
 			if cycles%60 == 1 {
+				// Fail closed: this clock guards destructive pruning, so if any
+				// refresh cannot be persisted, skip pruning this cycle rather
+				// than risk dropping a recently used database off a stale clock.
+				touchesPersisted := true
 				for _, s := range o.store.Stacks() {
-					_ = o.store.TouchDBActivity(s.Slug)
+					if err := o.store.TouchDBActivity(s.Slug); err != nil {
+						touchesPersisted = false
+						o.log.Warn("could not refresh database idle clock",
+							zap.String("slug", s.Slug), zap.Error(err))
+					}
 				}
-				o.pruneIdleDatabases(ctx)
+				if touchesPersisted {
+					o.pruneIdleDatabases(ctx)
+				}
 			}
 			now := o.sys.Now()
 			for _, s := range o.store.Stacks() {

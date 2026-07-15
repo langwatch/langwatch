@@ -307,7 +307,6 @@ var (
 func (m model) View() string {
 	var b strings.Builder
 
-	// Header: title + a live summary of the whole machine.
 	live := 0
 	var totalRSS uint64
 	for _, r := range m.rows {
@@ -374,7 +373,17 @@ func (m model) View() string {
 	case m.flash != "":
 		b.WriteString("  " + m.flash + "\n")
 	default:
-		b.WriteString(styleDim.Render("  ↑↓ select · enter/g git · o open · r restart · d down · x destroy · q quit") + "\n")
+		keys := "  ↑↓ select · enter/g git"
+		if r, ok := m.selected(); ok {
+			if m.actions.OpenURL != nil && r.AppURL != "" {
+				keys += " · o open"
+			}
+			if m.actions.Restart != nil && r.IsLive {
+				keys += " · r restart"
+			}
+		}
+		keys += " · d down · x destroy · q quit"
+		b.WriteString(styleDim.Render(keys) + "\n")
 	}
 	return b.String()
 }

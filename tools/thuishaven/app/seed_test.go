@@ -54,6 +54,7 @@ func liveStackStore() *fakeStore {
 // @scenario "The default seed is unchanged"
 // @scenario "The demo preset needs the stack for its traces"
 // @scenario "Unknown presets are rejected with the available choices"
+// @scenario "Sample traces without the full demo preset"
 func TestSeedPresets(t *testing.T) {
 	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x", LwDir: "/wt/feat-x/langwatch"}
 
@@ -140,6 +141,11 @@ func TestSeedPresets(t *testing.T) {
 			err := o.Seed(context.Background(), params, SeedOptions{ShouldIngestTraces: true})
 			if err == nil || !strings.Contains(err.Error(), "not running") {
 				t.Fatalf("expected a stack-not-running error, got %v", err)
+			}
+			// The retry hint must repeat the trace-only command — `--preset demo`
+			// would additionally flip the onboarding state.
+			if !strings.Contains(err.Error(), "haven seed --traces") {
+				t.Errorf("err = %v, want the trace-only retry command", err)
 			}
 			if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "prisma:seed") {
 				t.Errorf("shells = %v, want just prisma:seed", sup.shells)

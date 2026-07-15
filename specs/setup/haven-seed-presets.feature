@@ -43,6 +43,10 @@ Feature: Seed presets — a database that is ready to look at
     Then the command fails
     And the error lists the presets I can pick from
 
+  # The two seed-script scenarios below run prisma/seed.ts against a real
+  # database; no automated harness drives that today, so they stay
+  # @unimplemented (the Go tests only cover the flag → HAVEN_SEED_* plumbing).
+  @integration @unimplemented
   Scenario: Model providers are seeded from the environment by default
     Given a provider API key is set in the environment or a dotenv layer
     When I run "haven seed"
@@ -50,6 +54,7 @@ Feature: Seed presets — a database that is ready to look at
     And re-running updates the same credential instead of duplicating it
     And "haven seed --skip-model-providers" seeds no providers
 
+  @integration @unimplemented
   Scenario: Extras are individually controllable
     When I run "haven seed --first-message"
     Then the project is marked as having received its first trace

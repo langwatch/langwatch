@@ -126,7 +126,6 @@ func (s *Store) ClearHMRGate(lwDir string) { _ = os.Remove(s.hmrGatePath(lwDir))
 // dbActivityPath is the machine-wide last-seen clock for per-slug databases.
 func (s *Store) dbActivityPath() string { return filepath.Join(s.home, "db-activity.json") }
 
-// TouchDBActivity records "slug's databases were in use now".
 func (s *Store) TouchDBActivity(slug string) error {
 	if slug == "" {
 		return nil
@@ -139,7 +138,6 @@ func (s *Store) TouchDBActivity(slug string) error {
 	return s.writeDBActivity(m)
 }
 
-// DBActivity returns the last-seen time per slug (empty map when none).
 func (s *Store) DBActivity() map[string]time.Time {
 	m := map[string]time.Time{}
 	b, err := os.ReadFile(s.dbActivityPath())
@@ -150,7 +148,6 @@ func (s *Store) DBActivity() map[string]time.Time {
 	return m
 }
 
-// RemoveDBActivity drops a slug's activity record.
 func (s *Store) RemoveDBActivity(slug string) {
 	m := s.DBActivity()
 	if _, ok := m[slug]; !ok {

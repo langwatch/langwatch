@@ -348,12 +348,15 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   let failures = 0;
   const beat = document.getElementById('beat'), stamp = document.getElementById('stamp');
   async function refresh() {
-    if (document.hidden) return;
+    const live = document.getElementById('live');
+    // Skip the swap while the user is tabbing through it — replacing the
+    // subtree would destroy the focused link every three seconds.
+    if (document.hidden || live.contains(document.activeElement)) return;
     try {
       const res = await fetch('/', {cache: 'no-store'});
       const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
       const next = doc.getElementById('live');
-      if (next) document.getElementById('live').replaceChildren(...next.children);
+      if (next) live.replaceChildren(...next.children);
       failures = 0;
       beat.classList.remove('off');
       stamp.textContent = 'live — updated ' + new Date().toLocaleTimeString();
