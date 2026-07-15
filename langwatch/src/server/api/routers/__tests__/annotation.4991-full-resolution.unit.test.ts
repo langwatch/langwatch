@@ -28,6 +28,8 @@ const { mockCreate, mockGetTracesWithSpans, mockBuildDeps, BLOB_DEPS } =
     };
   });
 
+const mockAnnotationFindMany = vi.fn().mockResolvedValue([]);
+
 vi.mock("~/server/traces/trace.service", () => ({
   TraceService: { create: mockCreate },
 }));
@@ -83,7 +85,7 @@ function makePrismaStub(): PrismaClient {
       count: vi.fn().mockResolvedValue(1),
     },
     annotation: {
-      findMany: vi.fn().mockResolvedValue([]),
+      findMany: mockAnnotationFindMany,
     },
     annotationQueue: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -139,5 +141,28 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
       });
       expectFullResolution();
     });
+  });
+});
+
+describe("annotation router public reads", () => {
+  it("only selects public profile fields for annotation users", async () => {
+    await caller.getByTraceId({
+      projectId: "project_123",
+      traceId: "t1",
+    });
+
+    expect(mockAnnotationFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
+        },
+      }),
+    );
   });
 });

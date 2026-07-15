@@ -205,7 +205,13 @@ export const annotationRouter = createTRPCRouter({
           projectId: input.projectId,
         },
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
         },
         orderBy: {
           createdAt: "asc",
