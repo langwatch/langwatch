@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { LiteMemberRestrictedError } from "../errors";
-import { DomainError } from "../../domain-error";
+import { HandledError } from "../../handled-error";
 
 describe("LiteMemberRestrictedError", () => {
   describe("when constructed with a resource", () => {
-    it("sets kind to lite_member_restricted", () => {
+    it("sets code to lite_member_restricted", () => {
       const error = new LiteMemberRestrictedError("prompts");
-      expect(error.kind).toBe("lite_member_restricted");
+      expect(error.code).toBe("lite_member_restricted");
     });
 
     it("sets the user-facing message", () => {
@@ -26,9 +26,9 @@ describe("LiteMemberRestrictedError", () => {
       expect(error.meta).toEqual({ resource: "datasets" });
     });
 
-    it("is an instance of DomainError", () => {
+    it("is an instance of HandledError", () => {
       const error = new LiteMemberRestrictedError("prompts");
-      expect(error).toBeInstanceOf(DomainError);
+      expect(error).toBeInstanceOf(HandledError);
     });
 
     it("sets name to LiteMemberRestrictedError", () => {
@@ -43,7 +43,7 @@ describe("LiteMemberRestrictedError", () => {
       const serialized = error.serialize();
 
       expect(serialized).toMatchObject({
-        kind: "lite_member_restricted",
+        code: "lite_member_restricted",
         meta: { resource: "evaluations" },
         httpStatus: 401,
         reasons: [],

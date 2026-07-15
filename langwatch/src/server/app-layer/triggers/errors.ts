@@ -1,8 +1,8 @@
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "~/server/app-layer/handled-error";
 
 /**
  * Domain errors raised by the automation authoring path (ADR-036). Each is a
- * concrete `DomainError` subclass so the existing tRPC `errorFormatter`
+ * concrete `HandledError` subclass so the existing tRPC `errorFormatter`
  * serialises it onto the wire as `error.data.domainError` with the `kind`
  * discriminator plus structured `meta`. The client matches on `kind` and
  * renders field-targeted, actionable errors (highlight the offending field,
@@ -12,7 +12,7 @@ import { DomainError } from "~/server/app-layer/domain-error";
  * discriminator, exactly like the existing `EvaluationNotFoundError` flow.
  */
 
-export class TemplateValidationError extends DomainError {
+export class TemplateValidationError extends HandledError {
   constructor(
     /** Template field that failed to parse — `emailSubjectTemplate`,
      *  `emailBodyTemplate`, `slackTemplate`, or `slackTemplateType`. */
@@ -32,7 +32,7 @@ export class TemplateValidationError extends DomainError {
   }
 }
 
-export class TestFireUnavailableError extends DomainError {
+export class TestFireUnavailableError extends HandledError {
   constructor(
     public readonly channel: "email" | "slack",
     /** Why the test fire can't be sent (no recipients, no webhook, …). */
@@ -50,7 +50,7 @@ export class TestFireUnavailableError extends DomainError {
  * An email address failed RFC-shape validation. Carries the offending
  * recipient so the UI can highlight the chip that needs fixing.
  */
-export class InvalidEmailRecipientError extends DomainError {
+export class InvalidEmailRecipientError extends HandledError {
   constructor(public readonly recipient: string) {
     super(
       "invalid_email_recipient",
@@ -64,7 +64,7 @@ export class InvalidEmailRecipientError extends DomainError {
   }
 }
 
-export class MissingSlackWebhookError extends DomainError {
+export class MissingSlackWebhookError extends HandledError {
   constructor() {
     super(
       "missing_slack_webhook",
@@ -80,10 +80,10 @@ export class MissingSlackWebhookError extends DomainError {
  * `not_in_channel` / `channel_not_found`, a dead webhook, a bad bot token. The
  * underlying `DispatchError` already carries an actionable, provider-specific
  * message (see `explainSlackPostError`); this lifts it onto the typed
- * `DomainError` channel so the drawer renders it as a clear 4xx instead of a
+ * `HandledError` channel so the drawer renders it as a clear 4xx instead of a
  * generic 500. `field` targets the channel input, the most common fix.
  */
-export class NotificationDeliveryError extends DomainError {
+export class NotificationDeliveryError extends HandledError {
   constructor(message: string) {
     super("notification_delivery_error", message, {
       meta: { field: "slackChannelId" },
@@ -93,7 +93,7 @@ export class NotificationDeliveryError extends DomainError {
   }
 }
 
-export class MissingAnnotatorError extends DomainError {
+export class MissingAnnotatorError extends HandledError {
   constructor() {
     super(
       "missing_annotator",
@@ -104,7 +104,7 @@ export class MissingAnnotatorError extends DomainError {
   }
 }
 
-export class ProjectNotFoundError extends DomainError {
+export class ProjectNotFoundError extends HandledError {
   constructor(public readonly projectId: string) {
     super("project_not_found", `Project not found: ${projectId}`, {
       meta: { projectId },

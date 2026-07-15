@@ -54,7 +54,7 @@ export async function enforceResourceLimitOrRespond({
 
       return c.json(
         {
-          error: error.kind,
+          error: error.code,
           message,
           limitType: error.limitType,
           current: error.current,

@@ -3,7 +3,22 @@ import type { ZodError } from "zod";
 
 import { grafanaTraceUrlFromEnv } from "~/utils/grafanaLinks";
 
-export interface DomainErrorTelemetry {
+export interface SerializedReason {
+  code: string;
+  meta?: Record<string, unknown>;
+  reasons?: SerializedReason[];
+}
+
+/**
+ * Serialised, client-safe shape of a {@link HandledError}. Mirrors the Go
+ * `herr.E` (`pkg/herr`): `code`/`meta`/`traceId`/`spanId`/`reasons` line up
+ * field-for-field with `Code`/`Meta`/`TraceID`/`SpanID`/`Reasons`. `httpStatus`
+ * and `traceUrl` are TypeScript-side conveniences with no `herr.E` equivalent
+ * (Go maps code→status via a registry and builds the trace link elsewhere).
+ */
+export interface SerializedHandledError {
+  code: string;
+  meta: Record<string, unknown>;
   traceId: string | undefined;
   spanId: string | undefined;
   /**
@@ -13,59 +28,53 @@ export interface DomainErrorTelemetry {
    * nothing to a client that can't reach it.
    */
   traceUrl?: string;
-}
-
-export interface SerializedReason {
-  kind: string;
-  meta?: Record<string, unknown>;
-  reasons?: SerializedReason[];
-}
-
-export interface SerializedDomainError {
-  kind: string;
-  meta: Record<string, unknown>;
-  telemetry: DomainErrorTelemetry;
   httpStatus: number;
   reasons: SerializedReason[];
 }
 
 /**
- * Base class for all handled domain errors.
+ * Base class for all handled errors — the TypeScript counterpart of Go's
+ * `herr.E` (`pkg/herr`). Its shape matches `herr.E` field-for-field:
+ * `code`↔`Code`, `meta`↔`Meta`, `traceId`↔`TraceID`, `spanId`↔`SpanID`,
+ * `reasons`↔`Reasons`. (`httpStatus` is TS-only; Go maps code→status via a
+ * registry. Stack traces stay on the native `Error.stack` and never serialise.)
  *
- * `kind` is a serialisable string discriminant — safe across process/worker
+ * `code` is a serialisable string discriminant — safe across process/worker
  * boundaries and serialisation (use instead of `instanceof` in those cases):
  *
  * ```ts
- * if (err.kind === "evaluation_not_found") { ... }   // cross-process safe
- * if (err instanceof EvaluationNotFoundError) { ...} // same-process only
+ * if (err.code === "evaluation_not_found") { ... }   // cross-process safe
+ * if (err instanceof EvaluationNotFoundError) { ...}  // same-process only
  * ```
  *
  * `meta` carries domain-specific context (e.g. `{ spanId }`) included in the
  * serialised shape. `httpStatus` is the suggested HTTP response code (defaults
  * to 500; subclasses set appropriate defaults). `traceId` / `spanId` are
- * captured automatically from the active OTel span. `reasons` serialises
- * DomainErrors by kind and masks everything else as `{ kind: "unknown" }`.
+ * captured automatically from the active OTel span. `reasons` serialises nested
+ * HandledErrors by code and masks everything else as `{ code: "unknown" }`.
  *
  * Serialised shape:
  * ```json
  * {
- *   "kind": "span_not_found",
+ *   "code": "span_not_found",
  *   "meta": { "spanId": "abc" },
- *   "telemetry": { "traceId": "...", "spanId": "..." },
+ *   "traceId": "...",
+ *   "spanId": "...",
  *   "httpStatus": 404,
- *   "reasons": [{ "kind": "invalid_span_id" }, { "kind": "unknown" }]
+ *   "reasons": [{ "code": "invalid_span_id" }, { "code": "unknown" }]
  * }
  * ```
  */
-export abstract class DomainError extends Error {
+export abstract class HandledError extends Error {
   readonly isHandled = true as const;
   readonly meta: Record<string, unknown>;
-  readonly telemetry: DomainErrorTelemetry;
+  readonly traceId: string | undefined;
+  readonly spanId: string | undefined;
   readonly httpStatus: number;
   readonly reasons: readonly Error[];
 
   constructor(
-    public readonly kind: string,
+    public readonly code: string,
     message: string,
     options: {
       meta?: Record<string, unknown>;
@@ -75,21 +84,24 @@ export abstract class DomainError extends Error {
   ) {
     super(message);
     const ctx = trace.getActiveSpan()?.spanContext();
-    this.telemetry = { traceId: ctx?.traceId, spanId: ctx?.spanId };
+    this.traceId = ctx?.traceId;
+    this.spanId = ctx?.spanId;
     this.meta = options.meta ?? {};
     this.httpStatus = options.httpStatus ?? 500;
     this.reasons = options.reasons ?? [];
   }
 
   /** Produce the full user-facing serialised shape. */
-  serialize(): SerializedDomainError {
-    // telemetry.traceId is the real trace id for domain errors, so it links
-    // straight to the trace when a Grafana is configured — see grafanaTraceUrlFromEnv.
-    const traceUrl = grafanaTraceUrlFromEnv(this.telemetry.traceId);
+  serialize(): SerializedHandledError {
+    // traceId is the real trace id for handled errors, so it links straight to
+    // the trace when a Grafana is configured — see grafanaTraceUrlFromEnv.
+    const traceUrl = grafanaTraceUrlFromEnv(this.traceId);
     return {
-      kind: this.kind,
+      code: this.code,
       meta: this.meta,
-      telemetry: traceUrl ? { ...this.telemetry, traceUrl } : this.telemetry,
+      traceId: this.traceId,
+      spanId: this.spanId,
+      ...(traceUrl ? { traceUrl } : {}),
       httpStatus: this.httpStatus,
       reasons: this.reasons.map(serializeReason),
     };
@@ -101,34 +113,34 @@ export abstract class DomainError extends Error {
    * Usage:
    *   EvaluationNotFoundError.is(err)   // error is EvaluationNotFoundError
    *   NotFoundError.is(err)             // error is NotFoundError
-   *   DomainError.is(err)               // error is DomainError
+   *   HandledError.is(err)              // error is HandledError
    */
-  static is<T extends DomainError>(
+  static is<T extends HandledError>(
     this: abstract new (...args: never) => T,
     error: unknown,
   ): error is T {
     return error instanceof this;
   }
 
-  /** Returns true when `error` is a known, handled DomainError. */
-  static isHandled(error: unknown): error is DomainError {
-    return error instanceof DomainError;
+  /** Returns true when `error` is a known, handled HandledError. */
+  static isHandled(error: unknown): error is HandledError {
+    return error instanceof HandledError;
   }
 
   /** Returns true when `error` is an unhandled infrastructure Error. */
   static isUnhandled(error: unknown): boolean {
-    return error instanceof Error && !(error instanceof DomainError);
+    return error instanceof Error && !(error instanceof HandledError);
   }
 
   /**
    * Returns a safe user-facing message for any error:
-   * - DomainErrors → their own message (safe to show users)
+   * - HandledErrors → their own message (safe to show users)
    * - Everything else → a generic "unknown error" string, and the original
    *   error is passed to the optional `log` callback for server-side logging.
    *
    * ```ts
    * } catch (e) {
-   *   const msg = DomainError.toUserMessage(e, (err) => logger.error(err));
+   *   const msg = HandledError.toUserMessage(e, (err) => logger.error(err));
    *   throw new TRPCError({ code: "NOT_FOUND", message: msg });
    * }
    * ```
@@ -137,40 +149,40 @@ export abstract class DomainError extends Error {
     error: unknown,
     log?: (error: unknown) => void,
   ): string {
-    if (error instanceof DomainError) return error.message;
+    if (error instanceof HandledError) return error.message;
     log?.(error);
     return "An unknown error occurred";
   }
 }
 
 function serializeReason(error: Error): SerializedReason {
-  if (error instanceof DomainError) {
+  if (error instanceof HandledError) {
     return {
-      kind: error.kind,
+      code: error.code,
       ...(Object.keys(error.meta).length > 0 && { meta: error.meta }),
       ...(error.reasons.length > 0 && {
         reasons: error.reasons.map(serializeReason),
       }),
     };
   }
-  return { kind: "unknown" };
+  return { code: "unknown" };
 }
 
 
 /**
  * Thrown when a requested resource does not exist (HTTP 404).
  *
- * Domain-specific subclasses narrow `kind` via `declare` and populate `meta`
+ * Domain-specific subclasses narrow `code` via `declare` and populate `meta`
  * with identifying fields (e.g. `{ spanId }`).
  */
-export class NotFoundError extends DomainError {
+export class NotFoundError extends HandledError {
   constructor(
-    kind: string,
+    code: string,
     resource: string,
     id: string,
     options: { meta?: Record<string, unknown>; reasons?: readonly Error[] } = {},
   ) {
-    super(kind, `${resource} not found: ${id}`, {
+    super(code, `${resource} not found: ${id}`, {
       meta: { id, ...options.meta },
       httpStatus: 404,
       reasons: options.reasons,
@@ -182,7 +194,7 @@ export class NotFoundError extends DomainError {
 /**
  * Thrown when input fails domain-level validation rules (HTTP 422).
  */
-export class ValidationError extends DomainError {
+export class ValidationError extends HandledError {
   constructor(
     message: string,
     options: { meta?: Record<string, unknown>; reasons?: readonly Error[] } = {},

@@ -229,14 +229,14 @@ describe("Global mutation error handler", () => {
       expect(extractLiteMemberRestrictionInfo(error)).toBeNull();
     });
 
-    it("returns null for UNAUTHORIZED with wrong domainError kind", () => {
+    it("returns null for UNAUTHORIZED with wrong domainError code", () => {
       const error = new TRPCClientError("Unauthorized", {
         result: {
           error: {
             data: {
               code: "UNAUTHORIZED",
               httpStatus: 401,
-              domainError: { kind: "some_other_error" },
+              domainError: { code: "some_other_error" },
             },
           },
         },
@@ -252,7 +252,7 @@ describe("Global mutation error handler", () => {
               code: "UNAUTHORIZED",
               httpStatus: 401,
               domainError: {
-                kind: "lite_member_restricted",
+                code: "lite_member_restricted",
                 meta: { resource: "prompts" },
               },
             },
@@ -272,7 +272,7 @@ describe("Global mutation error handler", () => {
               code: "UNAUTHORIZED",
               httpStatus: 401,
               domainError: {
-                kind: "lite_member_restricted",
+                code: "lite_member_restricted",
                 meta: {},
               },
             },
@@ -369,7 +369,7 @@ describe("Global mutation error handler", () => {
               code: "UNAUTHORIZED",
               httpStatus: 401,
               domainError: {
-                kind: "lite_member_restricted",
+                code: "lite_member_restricted",
                 meta: { resource: "prompts" },
               },
             },
@@ -424,7 +424,7 @@ describe("Global mutation error handler", () => {
               code: "UNAUTHORIZED",
               httpStatus: 401,
               domainError: {
-                kind: "lite_member_restricted",
+                code: "lite_member_restricted",
                 meta: { resource: "datasets" },
               },
             },
@@ -465,7 +465,7 @@ describe("Global mutation error handler", () => {
               code: "UNAUTHORIZED",
               httpStatus: 401,
               domainError: {
-                kind: "lite_member_restricted",
+                code: "lite_member_restricted",
                 meta: { resource: "datasets" },
               },
             },

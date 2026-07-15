@@ -69,7 +69,7 @@ export function buildWithdrawnMiddlewareStack({
   stack.push(async (c) =>
     c.json(
       {
-        kind: "endpoint_withdrawn",
+        code: "endpoint_withdrawn",
         message: "This endpoint has been removed",
       },
       410,

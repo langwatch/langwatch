@@ -12,7 +12,7 @@ import {
 import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
 import { actionParamsSchemaFor } from "~/automations/providers/server";
 import { getApp } from "~/server/app-layer/app";
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "~/server/app-layer/handled-error";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { listSlackChannels } from "~/server/triggers/slackWebApi";
 import {
@@ -179,7 +179,7 @@ function httpStatusToTRPCCode(httpStatus: number): TRPCErrorCode {
 
 /**
  * Wraps any thrown value as a `TRPCError` whose `cause` is preserved when the
- * value is a `DomainError`. The shared `errorFormatter` in `trpc.ts` serialises
+ * value is a `HandledError`. The shared `errorFormatter` in `trpc.ts` serialises
  * that cause as `error.data.domainError = { kind, meta, telemetry, … }` so the
  * client gets the full structured payload — that is the "incredibly good error
  * handling" surface (see ADR-036 follow-up).
@@ -188,9 +188,9 @@ function toTemplateTRPCError(err: unknown): TRPCError {
   if (err instanceof TRPCError) return err;
   // A provider rejection (Slack not_in_channel, dead webhook, bad token) arrives
   // as a DispatchError with an already-actionable message — lift it onto the
-  // typed DomainError channel so the UI shows a clean 4xx, not a generic 500.
+  // typed HandledError channel so the UI shows a clean 4xx, not a generic 500.
   const domainError =
-    err instanceof DomainError
+    err instanceof HandledError
       ? err
       : isDispatchError(err)
         ? new NotificationDeliveryError(err.message)

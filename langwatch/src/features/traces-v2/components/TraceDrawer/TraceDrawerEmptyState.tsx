@@ -39,9 +39,9 @@ type ErrorKind = "not-found" | "load-failed" | "no-selection";
 function classifyError(error: unknown, traceId: string | undefined): ErrorKind {
   if (!traceId) return "no-selection";
   const data = (
-    error as { data?: { code?: string; domainError?: { kind?: string } } }
+    error as { data?: { code?: string; domainError?: { code?: string } } }
   )?.data;
-  if (data?.domainError?.kind === "trace_not_found") return "not-found";
+  if (data?.domainError?.code === "trace_not_found") return "not-found";
   if (data?.code === "NOT_FOUND") return "not-found";
   return "load-failed";
 }

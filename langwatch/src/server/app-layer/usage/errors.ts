@@ -1,4 +1,4 @@
-import { DomainError } from "../domain-error";
+import { HandledError } from "../handled-error";
 
 /**
  * Domain error thrown when an organization has reached its scenario set limit.
@@ -7,8 +7,8 @@ import { DomainError } from "../domain-error";
  * ClickHouse-based (not Prisma-based), so it does not belong in the
  * license-enforcement LimitType system.
  */
-export class ScenarioSetLimitExceededError extends DomainError {
-  declare readonly kind: "scenario_set_limit_exceeded";
+export class ScenarioSetLimitExceededError extends HandledError {
+  declare readonly code: "scenario_set_limit_exceeded";
 
   constructor(current: number, max: number) {
     super(

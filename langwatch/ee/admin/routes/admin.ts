@@ -23,7 +23,7 @@ import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { auditLog } from "~/server/auditLog";
 import { UserService } from "~/server/users/user.service";
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "~/server/app-layer/handled-error";
 import { isAdmin } from "../isAdmin";
 import {
   ORGANIZATION_SAFE_SELECT,
@@ -54,7 +54,7 @@ const ALLOWED_RESOURCES = new Set([
 //
 // Both verbs share the same admin guard + BetterAuth session lookup, so we
 // route them through a single helper and let the service do the real work.
-// The service throws `DomainError` subclasses for business-rule rejections;
+// The service throws `HandledError` subclasses for business-rule rejections;
 // the helper below maps those to HTTP status codes, keeping the route
 // thin and leaving the rules in one testable place.
 
@@ -115,8 +115,8 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   } catch (err) {
     // Use `kind`, not `instanceof`, for the discriminant — survives the
     // bundler duplicating class identities across module boundaries (see
-    // the rule in CLAUDE.md + domain-error.ts's doc comment).
-    if (DomainError.isHandled(err)) {
+    // the rule in CLAUDE.md + handled-error.ts's doc comment).
+    if (HandledError.isHandled(err)) {
       return c.json({ message: err.message }, err.httpStatus as any);
     }
     throw err;

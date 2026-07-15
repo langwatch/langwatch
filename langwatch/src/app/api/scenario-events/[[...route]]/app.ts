@@ -96,7 +96,7 @@ secured.access(requires("scenarios:manage")).post(
     }
 
     // Enforce scenario set limit on RUN_STARTED events.
-    // ScenarioSetLimitExceededError (DomainError with httpStatus 403)
+    // ScenarioSetLimitExceededError (HandledError with httpStatus 403)
     // propagates to handleError which returns 403 + meta fields.
     await checkScenarioSetLimitForRunStarted({ project, event });
     await dispatchSimulationEvent(project.id, event);

@@ -1,10 +1,10 @@
-// Domain errors
+// Handled errors
 export {
-  DomainError,
+  HandledError,
   NotFoundError,
   ValidationError
-} from "./domain-error";
-export type { SerializedDomainError } from "./domain-error";
+} from "./handled-error";
+export type { SerializedHandledError } from "./handled-error";
 
 // Tracing
 export { traced } from "./tracing";

@@ -40,7 +40,7 @@ import {
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "~/server/app-layer/handled-error";
 import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
 import { prisma } from "~/server/db";
 import {
@@ -265,13 +265,13 @@ secured
           });
           const validationError = fromZodError(error);
           return c.json({ error: validationError.message }, 400);
-        } else if (DomainError.is(error)) {
+        } else if (HandledError.is(error)) {
           logger.warn(
-            { kind: error.kind, meta: error.meta, projectId: project.id },
-            "domain error processing batch evaluation",
+            { code: error.code, meta: error.meta, projectId: project.id },
+            "handled error processing batch evaluation",
           );
           return c.json(
-            { error: error.kind, message: error.message },
+            { error: error.code, message: error.message },
             error.httpStatus as 400,
           );
         } else {
@@ -1062,14 +1062,14 @@ async function handleEvaluatorCall(
       data.data[requiredField] === undefined ||
       data.data[requiredField] === null
     ) {
-      const domainError = new EvaluatorMissingFieldError(
+      const handledError = new EvaluatorMissingFieldError(
         requiredField,
         evaluatorDefinition.name,
       );
       logger.warn(
         {
-          kind: domainError.kind,
-          meta: domainError.meta,
+          code: handledError.code,
+          meta: handledError.meta,
           projectId: project.id,
         },
         "missing required field for evaluator",
@@ -1080,12 +1080,14 @@ async function handleEvaluatorCall(
           // this endpoint's existing wire shape for external API consumers.
           // `kind`/`meta` are additive so the workbench client can build a
           // friendly message (e.g. map candidate_a_id -> "Variant A")
-          // without depending on the message being a specific string.
-          error: domainError.message,
-          kind: domainError.kind,
-          meta: domainError.meta,
+          // without depending on the message being a specific string. The
+          // wire field is named `kind` for back-compat; it carries the
+          // HandledError `code`.
+          error: handledError.message,
+          kind: handledError.code,
+          meta: handledError.meta,
         },
-        domainError.httpStatus as 400,
+        handledError.httpStatus as 400,
       );
     }
   }

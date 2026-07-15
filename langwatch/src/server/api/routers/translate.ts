@@ -36,7 +36,7 @@ export const translateRouter = createTRPCRouter({
       // cascade resolver (resolveModelForFeature) throws the typed
       // ModelNotConfiguredError when nothing is set and
       // ModelProviderDisabledError when the resolved FAST model's provider
-      // is disabled, and both must reach domainErrorMiddleware untouched to
+      // is disabled, and both must reach handledErrorMiddleware untouched to
       // open their own toasts. wrapAiCall only passes ModelNotConfiguredError
       // through, so resolving inside it would mis-tag a disabled provider as
       // an AI_CALL_FAILED.

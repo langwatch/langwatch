@@ -21,7 +21,7 @@ describe("requestLogging", () => {
       });
     });
 
-    describe("when error has httpStatus (DomainError)", () => {
+    describe("when error has httpStatus (HandledError)", () => {
       it("returns the httpStatus value", () => {
         const err = Object.assign(new Error("not found"), { httpStatus: 404 });
         expect(getStatusCodeFromError(err)).toBe(404);
