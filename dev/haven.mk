@@ -46,7 +46,7 @@ haven:
 ifeq ($(strip $(HAVEN_ARGS)),)
 	@go build -o bin/haven $(HAVEN_PKG) && echo "built bin/haven"
 else ifeq ($(strip $(HAVEN_ARGS)),install)
-	@go install $(HAVEN_PKG) && echo "installed haven -> $$(go env GOPATH)/bin/haven — run 'haven ...' directly from now on"
+	@go install $(HAVEN_PKG) && bash scripts/haven-install-path.sh
 else
 	@$(HAVEN) $(HAVEN_ARGS)
 endif
