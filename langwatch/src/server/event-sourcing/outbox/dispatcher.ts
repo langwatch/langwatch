@@ -858,12 +858,28 @@ async function handleCadenceBatch(
             "Webhook body template render errors — fell back to default body",
           );
         }
+        // Stable per-dispatch id over the batch's traceIds: identical across
+        // outbox retries of THIS dispatch, distinct from other dispatches —
+        // sent as X-LangWatch-Event-Id so the receiver dedupes (ADR-040 §5).
+        const webhookEventId =
+          "evt_" +
+          createHash("sha256")
+            .update(
+              `${projectId}:${triggerId}:${triggerData
+                .map((d) => d.traceId)
+                .sort()
+                .join(",")}`,
+            )
+            .digest("hex")
+            .slice(0, 32);
         const result = await sendWebhook({
           url: params.url,
           method: params.method,
           headers: decryptWebhookHeaders(params),
           body: rendered.body,
           triggerName: trigger.name,
+          projectId,
+          eventId: webhookEventId,
         });
         // 5xx/429/408 throw retryable so the outbox backs off and retries;
         // other non-2xx are terminal (ADR-040 §5).

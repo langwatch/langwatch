@@ -1058,7 +1058,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // Re-stage with backoff — frees the worker slot immediately
                 gqJobsRetriedTotal.inc(routingLabels);
 
-                const backoffMs = getBackoffMs(attempt);
+                // Honor a receiver's Retry-After (ADR-040 §5) as a FLOOR over
+                // the exponential backoff: a DispatchError may carry a
+                // retryAfterMs hint, which can lengthen but never shorten the
+                // wait (so it can't cause a retry storm).
+                const retryAfterMs = isDispatchError(err)
+                  ? err.retryAfterMs
+                  : undefined;
+                const backoffMs = Math.max(
+                  getBackoffMs(attempt),
+                  retryAfterMs ?? 0,
+                );
                 gqRetryAttempt.observe(routingLabels, attempt);
                 gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;

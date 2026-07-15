@@ -1,4 +1,7 @@
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import {
+  DispatchError,
+  parseRetryAfterMs,
+} from "~/server/event-sourcing/outbox/dispatchError";
 import {
   fetchWithResolvedIp,
   ssrfSafeFetch,
@@ -45,6 +48,9 @@ export interface HttpDestinationResponse {
   status: number;
   /** Response body, truncated at {@link HttpDestinationRequest.maxResponseBytes}. */
   body: string;
+  /** Parsed `Retry-After` (ms) when the receiver sent one — a backpressure
+   *  hint the caller can fold into its retry backoff (ADR-040 §5). */
+  retryAfterMs?: number;
 }
 
 type ResponseBodyStream = Awaited<ReturnType<typeof ssrfSafeFetch>>["body"];
@@ -168,5 +174,9 @@ export async function sendHttpDestination({
     // carries the outcome; leave the snippet empty.
   }
 
-  return { status: response.status, body: responseBody };
+  return {
+    status: response.status,
+    body: responseBody,
+    retryAfterMs: parseRetryAfterMs(response.headers?.get("retry-after")),
+  };
 }

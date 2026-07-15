@@ -4,6 +4,7 @@ import {
   extractHttpStatus,
   isDispatchError,
   isRetryableHttpStatus,
+  parseRetryAfterMs,
   toDispatchError,
 } from "../dispatchError";
 
@@ -133,6 +134,44 @@ describe("toDispatchError", () => {
       const err = toDispatchError(cause, { message: "send failed" });
       expect(err.retryable).toBe(true);
       expect(err.cause).toBe(cause);
+    });
+  });
+});
+
+describe("parseRetryAfterMs", () => {
+  const NOW = Date.parse("2026-07-15T12:00:00.000Z");
+
+  describe("when the header is delta-seconds", () => {
+    it("returns the value in milliseconds", () => {
+      expect(parseRetryAfterMs("120", NOW)).toBe(120_000);
+      expect(parseRetryAfterMs("0", NOW)).toBe(0);
+    });
+  });
+
+  describe("when the header is an HTTP date", () => {
+    it("returns the delta from now for a future date", () => {
+      expect(
+        parseRetryAfterMs("Wed, 15 Jul 2026 12:01:00 GMT", NOW),
+      ).toBe(60_000);
+    });
+    it("returns undefined for a past date", () => {
+      expect(
+        parseRetryAfterMs("Wed, 15 Jul 2026 11:59:00 GMT", NOW),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("when the header is missing or unparseable", () => {
+    it("returns undefined", () => {
+      expect(parseRetryAfterMs(null, NOW)).toBeUndefined();
+      expect(parseRetryAfterMs(undefined, NOW)).toBeUndefined();
+      expect(parseRetryAfterMs("soon", NOW)).toBeUndefined();
+    });
+  });
+
+  describe("when the value is absurdly large", () => {
+    it("caps it at one hour", () => {
+      expect(parseRetryAfterMs("999999", NOW)).toBe(60 * 60 * 1000);
     });
   });
 });

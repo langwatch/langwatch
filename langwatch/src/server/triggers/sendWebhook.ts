@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { isIP } from "node:net";
 import {
   sanitizeWebhookHeaders,
@@ -6,6 +7,7 @@ import {
   type WebhookMethod,
 } from "~/automations/providers/definitions/webhook/shared";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { rateLimit } from "~/server/rateLimit";
 import {
   createSSRFValidator,
   isPrivateOrLocalhostIP,
@@ -44,6 +46,14 @@ function privateIpLiteral(url: string): string | null {
   return isIP(bare) !== 0 && isPrivateOrLocalhostIP(bare) ? bare : null;
 }
 
+/**
+ * Per-project hourly cap on real webhook dispatches (ADR-040 §4) — a backstop
+ * against an immediate-cadence trigger firing per-match turning our worker
+ * fleet into an outbound flood. A safety limit, not a billing knob; promote to
+ * an env var if a customer legitimately needs a higher ceiling.
+ */
+export const WEBHOOK_DISPATCH_HOURLY_CAP = 1000;
+
 export interface WebhookSendInput {
   url: string;
   method?: WebhookMethod;
@@ -55,14 +65,26 @@ export interface WebhookSendInput {
   /** Woven into DispatchError messages and delivery logs. */
   triggerName: string;
   /** Marks the request as a drawer test fire via a non-suppressible
-   *  X-LangWatch-Test-Fire header (ADR-040 §1). */
+   *  X-LangWatch-Test-Fire header (ADR-040 §1). Test fires skip the
+   *  per-project dispatch cap (they carry the drawer's per-user limit). */
   testFire?: boolean;
+  /** The firing project — enables the per-project dispatch rate limit
+   *  (ADR-040 §4). Omitted for a test fire. */
+  projectId?: string;
+  /** Stable per-dispatch identity, sent as `X-LangWatch-Event-Id` (ADR-040
+   *  §5): every retry of the same logical fire reuses it so a receiver can
+   *  dedupe. A fresh UUID is generated when absent (e.g. a test fire). */
+  eventId?: string;
 }
 
 export interface WebhookSendResult {
   status: number;
   /** Response snippet, already size-capped by the HTTP utility. */
   body: string;
+  /** Parsed `Retry-After` (ms) the receiver asked us to back off by. */
+  retryAfterMs?: number;
+  /** The `X-LangWatch-Event-Id` actually sent — surfaced for the delivery log. */
+  eventId: string;
 }
 
 /**
@@ -81,6 +103,8 @@ export async function sendWebhook({
   body,
   triggerName,
   testFire = false,
+  projectId,
+  eventId,
 }: WebhookSendInput): Promise<WebhookSendResult> {
   const label = `Webhook for trigger "${triggerName}"`;
   const shapeProblem = validateWebhookUrlShape(url);
@@ -100,6 +124,24 @@ export async function sendWebhook({
       retryable: false,
     });
   }
+  // Per-project dispatch cap (ADR-040 §4) — a real fire only; test fires ride
+  // the drawer's per-user limit. Over the cap throws RETRYABLE with a
+  // Retry-After to the window reset: a legitimate burst backs off and drains,
+  // a sustained flood dead-letters after the outbox's max attempts.
+  if (projectId && !testFire) {
+    const limit = await rateLimit({
+      key: `webhook-dispatch:${projectId}`,
+      windowSeconds: 3600,
+      max: WEBHOOK_DISPATCH_HOURLY_CAP,
+    });
+    if (!limit.allowed) {
+      throw new DispatchError({
+        message: `${label}: project webhook dispatch cap (${WEBHOOK_DISPATCH_HOURLY_CAP}/hour) reached — backing off.`,
+        retryable: true,
+        retryAfterMs: Math.max(0, limit.resetAt - Date.now()),
+      });
+    }
+  }
   // An unresolved kept sentinel means "the saved value" and should have been
   // resolved by the caller (save / test-fire / decrypt-at-dispatch) — never
   // send the literal marker to the customer's endpoint.
@@ -108,18 +150,23 @@ export async function sendWebhook({
       ([, value]) => value !== WEBHOOK_HEADER_VALUE_KEPT,
     ),
   );
-  return sendHttpDestination({
+  // Stable across retries when the caller supplies it (dispatch); a fresh id
+  // for a test fire, which has no retries to dedupe.
+  const resolvedEventId = eventId ?? randomUUID();
+  const response = await sendHttpDestination({
     url,
     method,
     headers: {
       ...sanitizeWebhookHeaders(resolvedHeaders),
       "Content-Type": "application/json",
+      "X-LangWatch-Event-Id": resolvedEventId,
       ...(testFire ? { "X-LangWatch-Test-Fire": "true" } : {}),
     },
     body,
     contextLabel: label,
     validateUrl: validateWebhookUrl,
   });
+  return { ...response, eventId: resolvedEventId };
 }
 
 /** How much of the receiver's response rides in an error message. */
@@ -135,7 +182,7 @@ export function assertWebhookDelivered({
   result,
   triggerName,
 }: {
-  result: WebhookSendResult;
+  result: Pick<WebhookSendResult, "status" | "body" | "retryAfterMs">;
   triggerName: string;
 }): void {
   const { status } = result;
@@ -147,5 +194,8 @@ export function assertWebhookDelivered({
       `Webhook for trigger "${triggerName}" received HTTP ${status}` +
       (snippet ? `: ${snippet}` : ""),
     retryable,
+    // Honor the receiver's backpressure on a retryable status (ADR-040 §5);
+    // the queue folds it into its backoff as a floor.
+    retryAfterMs: retryable ? result.retryAfterMs : undefined,
   });
 }

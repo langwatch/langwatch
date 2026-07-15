@@ -589,6 +589,11 @@ export async function dispatchGraphAlertAction({
       headers: decryptWebhookHeaders(params),
       body: rendered.body,
       triggerName: trigger.name,
+      projectId: project.id,
+      // The fire digest is this dispatch's stable identity — every outbox
+      // retry of the same fire reuses it as the X-LangWatch-Event-Id so the
+      // receiver dedupes (ADR-040 §5).
+      eventId: `evt_${destinationHash(`event:${input.fireDigest}`)}`,
     });
     // 5xx/429/408 throw retryable, other non-2xx terminal (ADR-040 §5) —
     // BEFORE the claim below, so a retryable failure is actually retried.
