@@ -81,20 +81,10 @@ export function SimulationModelSelect({
   }, [projectProviders.data]);
 
   // Configured custom-model display names, keyed by `<provider>/<modelId>`.
-  // Merged per row (rather than collapsed into one Record by provider key)
-  // so a provider stored at two scopes doesn't lose one row's custom
-  // models to the other's.
-  const displayNames = useMemo(() => {
-    const providers = projectProviders.data?.providers ?? [];
-    const map: Record<string, string> = {};
-    for (const provider of providers) {
-      Object.assign(
-        map,
-        buildCustomModelDisplayNames({ [provider.provider]: provider }),
-      );
-    }
-    return map;
-  }, [projectProviders.data]);
+  const displayNames = useMemo(
+    () => buildCustomModelDisplayNames(projectProviders.data?.providers ?? []),
+    [projectProviders.data],
+  );
 
   const inheritModel = resolvedDefault.data?.model ?? "";
 

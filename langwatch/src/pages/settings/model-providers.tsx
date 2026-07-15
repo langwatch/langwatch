@@ -84,21 +84,13 @@ export default function ModelsPage() {
     [allEnabledProviders],
   );
 
-  // Configured custom-model display names, keyed by `<provider>/<modelId>`,
-  // for the Default Models table's chips. Built from the ALL set (not the
-  // scope-filtered one) for the same reason as `enabledProviderKeys` above,
-  // and merged per row so a provider stored at two scopes doesn't lose one
-  // row's custom models to the other's.
-  const defaultModelsDisplayNames = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const provider of allProvidersList) {
-      Object.assign(
-        map,
-        buildCustomModelDisplayNames({ [provider.provider]: provider }),
-      );
-    }
-    return map;
-  }, [allProvidersList]);
+  // Display names for the Default Models table's chips. Built from the ALL
+  // set (not the scope-filtered one) for the same reason as
+  // `enabledProviderKeys` above.
+  const defaultModelsDisplayNames = useMemo(
+    () => buildCustomModelDisplayNames(allProvidersList),
+    [allProvidersList],
+  );
 
   // Client-side filter for the scope dropdown at the top of the page.
   // The list query returns every provider the caller can see; this just

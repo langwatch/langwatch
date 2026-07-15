@@ -33,7 +33,10 @@ describe("<ModelChip/>", () => {
       /** @scenario Default models table chip shows the configured display name */
       it("reads the configured display name", () => {
         renderChip(
-          <ModelChip model={FULL_ID} displayNames={{ [FULL_ID]: DISPLAY_NAME }} />,
+          <ModelChip
+            model={FULL_ID}
+            displayNames={{ [FULL_ID]: DISPLAY_NAME }}
+          />,
         );
 
         expect(screen.getByText(DISPLAY_NAME)).toBeInTheDocument();
@@ -41,7 +44,10 @@ describe("<ModelChip/>", () => {
 
       it("does not read the raw model id", () => {
         renderChip(
-          <ModelChip model={FULL_ID} displayNames={{ [FULL_ID]: DISPLAY_NAME }} />,
+          <ModelChip
+            model={FULL_ID}
+            displayNames={{ [FULL_ID]: DISPLAY_NAME }}
+          />,
         );
 
         expect(screen.queryByText(MODEL_ID)).not.toBeInTheDocument();
@@ -58,6 +64,22 @@ describe("<ModelChip/>", () => {
         );
 
         expect(screen.getByText("gpt-4o-mini")).toBeInTheDocument();
+      });
+    });
+
+    describe("when a display name is configured against a `latest` alias id", () => {
+      const ALIAS_ID = "openai/latest";
+
+      it("still picks the alias label from the id, not the display name", () => {
+        renderChip(
+          <ModelChip
+            model={ALIAS_ID}
+            displayNames={{ [ALIAS_ID]: "My Latest" }}
+          />,
+        );
+
+        expect(screen.getByText("Latest")).toBeInTheDocument();
+        expect(screen.queryByText("Latest smaller")).not.toBeInTheDocument();
       });
     });
   });

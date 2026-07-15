@@ -6,7 +6,6 @@
  */
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
-import { Tooltip } from "../ui/tooltip";
 import { modelDisplayLabel } from "~/server/modelProviders/customModelDisplayNames";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import {
@@ -17,6 +16,7 @@ import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
 } from "../llmPromptConfigs/constants";
+import { Tooltip } from "../ui/tooltip";
 
 interface Props {
   /** Full model id of the form "provider/family-variant". */
@@ -43,6 +43,10 @@ export function ModelChip({
 }: Props) {
   const providerKey = model.split("/")[0] ?? "";
   const family = modelDisplayLabel(model, displayNames);
+  // Alias detection reads the id, never `family` — a custom model can
+  // carry any display name, and branching on it would let one named
+  // "latest" masquerade as the alias (and vice versa).
+  const idFamily = model.split("/").slice(1).join("/");
   const icon =
     modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
   const iconSlot = size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE;
@@ -50,12 +54,11 @@ export function ModelChip({
   // the resolved concrete id inline in muted text so the table reads
   // as a single line, parens-disambiguated, instead of a stacked pair.
   const aliasResolved = isLatestAlias(model) ? resolveLatestAlias(model) : null;
-  const aliasLabel =
-    isLatestAlias(model)
-      ? family === "latest"
-        ? "Latest"
-        : "Latest smaller"
-      : null;
+  const aliasLabel = isLatestAlias(model)
+    ? idFamily === "latest"
+      ? "Latest"
+      : "Latest smaller"
+    : null;
 
   const chip = (
     <HStack

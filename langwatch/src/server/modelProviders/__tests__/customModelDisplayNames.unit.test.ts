@@ -37,16 +37,14 @@ const makeProvider = (
 describe("buildCustomModelDisplayNames()", () => {
   describe("given a custom chat model with a display name", () => {
     it('keys the map by "<provider>/<modelId>"', () => {
-      const providers: Record<string, MaybeStoredModelProvider> = {
-        custom: makeProvider({
+      const result = buildCustomModelDisplayNames([
+        makeProvider({
           provider: "custom",
           customModels: [
             { modelId: "gpt-5.1", displayName: "Ada Prod Model", mode: "chat" },
           ],
         }),
-      };
-
-      const result = buildCustomModelDisplayNames(providers);
+      ]);
 
       expect(result["custom/gpt-5.1"]).toBe("Ada Prod Model");
     });
@@ -54,8 +52,8 @@ describe("buildCustomModelDisplayNames()", () => {
 
   describe("given both a custom chat model and a custom embeddings model on the same provider", () => {
     it("includes both in one map, regardless of mode", () => {
-      const providers: Record<string, MaybeStoredModelProvider> = {
-        custom: makeProvider({
+      const result = buildCustomModelDisplayNames([
+        makeProvider({
           provider: "custom",
           customModels: [
             { modelId: "gpt-5.1", displayName: "Ada Prod Model", mode: "chat" },
@@ -68,12 +66,32 @@ describe("buildCustomModelDisplayNames()", () => {
             },
           ],
         }),
-      };
-
-      const result = buildCustomModelDisplayNames(providers);
+      ]);
 
       expect(result["custom/gpt-5.1"]).toBe("Ada Prod Model");
       expect(result["custom/text-embed-3"]).toBe("Ada Prod Embed");
+    });
+  });
+
+  describe("given the same provider stored at two scopes, each with its own custom model", () => {
+    it("keeps both rows' models rather than letting one row win", () => {
+      const result = buildCustomModelDisplayNames([
+        makeProvider({
+          provider: "openai",
+          customModels: [
+            { modelId: "org-tune", displayName: "Org Tune", mode: "chat" },
+          ],
+        }),
+        makeProvider({
+          provider: "openai",
+          customModels: [
+            { modelId: "proj-tune", displayName: "Project Tune", mode: "chat" },
+          ],
+        }),
+      ]);
+
+      expect(result["openai/org-tune"]).toBe("Org Tune");
+      expect(result["openai/proj-tune"]).toBe("Project Tune");
     });
   });
 
@@ -87,9 +105,9 @@ describe("buildCustomModelDisplayNames()", () => {
       { modelId: "gpt-5.2", mode: "chat" } as CustomModelEntry,
       { displayName: "Orphan", mode: "chat" } as CustomModelEntry,
     ];
-    const providers: Record<string, MaybeStoredModelProvider> = {
-      custom: makeProvider({ provider: "custom", customModels: entries }),
-    };
+    const providers = [
+      makeProvider({ provider: "custom", customModels: entries }),
+    ];
 
     /** @scenario A blank or incomplete custom entry falls back to the model id */
     it("resolves entries with a model id to that id, skips the entry with no model id, and never yields a blank or undefined name", () => {
@@ -110,12 +128,14 @@ describe("buildCustomModelDisplayNames()", () => {
     });
 
     it("does not add a key for the entry with no model id", () => {
-      const result = buildCustomModelDisplayNames({
-        custom: makeProvider({
+      const result = buildCustomModelDisplayNames([
+        makeProvider({
           provider: "custom",
-          customModels: [{ displayName: "Orphan", mode: "chat" } as CustomModelEntry],
+          customModels: [
+            { displayName: "Orphan", mode: "chat" } as CustomModelEntry,
+          ],
         }),
-      });
+      ]);
 
       expect(Object.keys(result)).toHaveLength(0);
     });
@@ -169,11 +189,9 @@ describe("modelDisplayLabel()", () => {
     /** @scenario A legacy custom model resolves to its model id */
     it("resolves to its model id", () => {
       const legacyEntries = toLegacyCompatibleCustomModels(["gpt-5.1"], "chat");
-      const providers: Record<string, MaybeStoredModelProvider> = {
-        custom: makeProvider({ provider: "custom", customModels: legacyEntries }),
-      };
-
-      const displayNames = buildCustomModelDisplayNames(providers);
+      const displayNames = buildCustomModelDisplayNames([
+        makeProvider({ provider: "custom", customModels: legacyEntries }),
+      ]);
 
       expect(modelDisplayLabel("custom/gpt-5.1", displayNames)).toBe("gpt-5.1");
     });

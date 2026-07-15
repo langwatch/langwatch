@@ -272,7 +272,9 @@ describe("<ProviderModelSelector/>", () => {
         // Scoped to the inherit entry, not the whole listbox: the
         // inherited model is also a real option here, so both legitimately
         // render the display name and an unscoped getByText matches twice.
-        expect(within(inheritItem()).getByText(DISPLAY_NAME)).toBeInTheDocument();
+        expect(
+          within(inheritItem()).getByText(DISPLAY_NAME),
+        ).toBeInTheDocument();
       });
 
       it("renders the collapsed selector's placeholder as the display name", () => {

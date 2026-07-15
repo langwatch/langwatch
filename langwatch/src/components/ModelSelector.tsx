@@ -125,7 +125,9 @@ export const useModelSelectionOptions = (
     }
   }
 
-  const displayNames = buildCustomModelDisplayNames(providersByKey);
+  const displayNames = buildCustomModelDisplayNames(
+    modelProviders.data?.providers ?? [],
+  );
 
   const selectOptions: ModelOption[] = allModels.map((modelValue) => {
     const provider = modelValue.split("/")[0]!;
