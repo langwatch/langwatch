@@ -4,8 +4,7 @@ import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { ScopeTier } from "../scopes/scope.types";
 import { llmModels } from "./loadModelCatalog";
 
-// Inlined from escape-string-regexp: escapes regex metacharacters and encodes
-// hyphens as \x2d — the model-name matching below relies on that \x2d form.
+// Inlined from escape-string-regexp to preserve the previous escaping behavior.
 function escapeStringRegexp(value: string): string {
   return value.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&").replace(/-/g, "\\x2d");
 }
