@@ -119,6 +119,16 @@ export interface GroupRepository {
     organizationId: string;
   }): Promise<boolean>;
 
+  /**
+   * Returns true only when every given user belongs to the organization.
+   * `userIds` is expected to be deduplicated by the caller and is resolved in a
+   * single query.
+   */
+  areUsersInOrganization(params: {
+    organizationId: string;
+    userIds: string[];
+  }): Promise<boolean>;
+
   validateScopeInOrganization(params: {
     organizationId: string;
     scopeType: RoleBindingScopeType;

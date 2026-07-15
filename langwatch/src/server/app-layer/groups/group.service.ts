@@ -77,12 +77,11 @@ export class GroupRestService {
     memberIds?: string[];
   }): Promise<Group> {
     const uniqueMemberIds = [...new Set(memberIds ?? [])];
-    const memberships = await Promise.all(
-      uniqueMemberIds.map((userId) =>
-        this.repo.isUserInOrganization({ organizationId, userId }),
-      ),
-    );
-    if (memberships.some((isMember) => !isMember)) {
+    const allMembersInOrganization = await this.repo.areUsersInOrganization({
+      organizationId,
+      userIds: uniqueMemberIds,
+    });
+    if (!allMembersInOrganization) {
       throw new UserNotInOrganizationError(
         "All users must belong to the organization before joining a group",
       );

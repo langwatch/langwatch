@@ -227,6 +227,21 @@ export class PrismaGroupRepository implements GroupRepository {
     return !!member;
   }
 
+  async areUsersInOrganization({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: string[];
+  }): Promise<boolean> {
+    if (userIds.length === 0) return true;
+
+    const count = await this.prisma.organizationUser.count({
+      where: { organizationId, userId: { in: userIds } },
+    });
+    return count === userIds.length;
+  }
+
   async validateScopeInOrganization({
     organizationId,
     scopeType,
