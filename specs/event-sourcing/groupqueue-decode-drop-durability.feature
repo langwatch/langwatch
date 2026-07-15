@@ -166,13 +166,14 @@ Feature: GroupQueue decode-drop durability and attribution
   # --- AC7: all four discarding sites; the false replay premise removed
 
   @integration @unimplemented
-  # UNBOUND, and the honest count is 2 of 5 — a test review caught me claiming 3.
-  # Covered by executing tests: dispatch decode, transient exhaustion. (AC8's pair
-  # exercises the SAME dispatch-decode site under a different AC — it is not a
-  # third site.) NOT covered: sibling-drain decode, sibling re-stage, and
-  # retry_encode_failed — that last one had no coverage AND no disclosure until
-  # the review. The "no path claims replay recovery" half is proven by AC7's grep
-  # rather than by an executing test. Tracked by #5817.
+  # UNBOUND as an outline: no single test drives all five sites. Honest count is
+  # 3 of 5 covered individually — dispatch decode, transient exhaustion, and (added
+  # after a test review caught it uncovered AND undisclosed) retry re-encode. AC8's
+  # pair exercises the SAME dispatch-decode site under a different AC — not a
+  # fourth. Still uncovered: sibling-drain decode and sibling re-stage, which need
+  # fault injection layered on the coalesced-batch harness that already exists in
+  # groupQueue.integration.test.ts. The "no path claims replay recovery" half is
+  # proven by AC7's grep rather than by an executing test. Tracked by #5817.
   Scenario Outline: every path that discards a job counts the loss
     Given a job that is discarded by the <site> path
     When the discard happens
@@ -185,7 +186,7 @@ Feature: GroupQueue decode-drop durability and attribution
       | transient exhaustion    | yes                           |
       | sibling-drain decode    | no — needs fault injection on the coalesced-batch harness |
       | sibling re-stage        | no — same                     |
-      | retry re-encode         | no — releases unconditionally (correctly: the body was already read) |
+      | retry re-encode         | yes — releases unconditionally, correctly: the body was already read |
 
   # --- AC8: a drop is not counted as a success
 
