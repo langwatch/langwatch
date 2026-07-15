@@ -113,9 +113,11 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
       req: c.req.raw,
     });
   } catch (err) {
-    // Use `kind`, not `instanceof`, for the discriminant — survives the
-    // bundler duplicating class identities across module boundaries (see
-    // the rule in CLAUDE.md + handled-error.ts's doc comment).
+    // Handled errors carry client-safe copy: narrow with isHandled, then return
+    // { message, httpStatus }; anything else re-throws to the global handler.
+    // isHandled is an instanceof check, reliable here since the error is thrown
+    // and caught in the same server module graph. See handled-error.ts's doc
+    // comment for when the serialisable `code` discriminant is needed instead.
     if (HandledError.isHandled(err)) {
       return c.json({ message: err.message }, err.httpStatus as any);
     }

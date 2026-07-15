@@ -202,4 +202,4 @@ export function createErrorHandler(): (
   };
 }
 
-export { formatError, isHandledErrorLike as isHandledErrorLike, zodErrorToPayload };
+export { formatError, isHandledErrorLike, zodErrorToPayload };

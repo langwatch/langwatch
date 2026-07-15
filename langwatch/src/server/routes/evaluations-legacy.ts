@@ -265,7 +265,7 @@ secured
           });
           const validationError = fromZodError(error);
           return c.json({ error: validationError.message }, 400);
-        } else if (HandledError.is(error)) {
+        } else if (HandledError.isHandled(error)) {
           logger.warn(
             { code: error.code, meta: error.meta, projectId: project.id },
             "handled error processing batch evaluation",
