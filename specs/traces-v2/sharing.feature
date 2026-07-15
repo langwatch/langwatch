@@ -9,7 +9,7 @@
 # onto possession of a high-entropy secret token: the token IS the credential.
 #
 # Data model: PublicShare is renamed to ShareLink and gains: a secret `token`
-# (prefixed, high-entropy), an optional `threadId` (share a trace with its
+# (bare high-entropy nanoid, unprefixed), an optional `threadId` (share a trace with its
 # surrounding conversation), a `visibility` (PUBLIC | ORGANIZATION | PROJECT),
 # an optional `expiresAt` (null = never), an optional `maxViews` (null =
 # unlimited; 1 = single view) and a `viewCount`. Legacy rows are migrated in

@@ -1194,9 +1194,11 @@ model AnnotationQueueItem {
 
 model ShareLink {
   id           String            @id @default(nanoid())
-  // Secret capability. `share-lw-` + high-entropy body for new links; legacy
-  // rows carry their old bare-nanoid id here (see migration backfill). The
-  // token — not the resource id — is what authorizes an anonymous read.
+  // Secret capability. A bare, unprefixed high-entropy nanoid for new links
+  // (deliberately unprefixed — its only home is the /share/<token> URL; see
+  // share.token.ts + ADR-039); legacy rows carry their old bare-nanoid id here
+  // (see migration backfill). The token — not the resource id — is what
+  // authorizes an anonymous read.
   token        String            @unique
   resourceType ShareResourceType
   resourceId   String
