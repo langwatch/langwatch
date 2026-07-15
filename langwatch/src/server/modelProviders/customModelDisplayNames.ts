@@ -17,9 +17,10 @@ import type { MaybeStoredModelProvider } from "./registry";
  * it answers "what can this model do", this answers "what do we call
  * it".
  *
- * Entries with no `modelId` or a blank/absent `displayName` are
- * omitted — the column is JSON and `toLegacyCompatibleCustomModels`
- * returns an unchecked cast, so malformed rows can reach here.
+ * Entries with no `modelId`, or whose `displayName` is absent or only
+ * whitespace, are omitted — the column is JSON and
+ * `toLegacyCompatibleCustomModels` returns an unchecked cast, so
+ * malformed rows can reach here.
  */
 export const buildCustomModelDisplayNames = (
   modelProviders: readonly MaybeStoredModelProvider[],
@@ -33,8 +34,9 @@ export const buildCustomModelDisplayNames = (
     ];
 
     for (const entry of entries) {
-      if (!entry?.modelId || !entry.displayName) continue;
-      displayNames[`${config.provider}/${entry.modelId}`] = entry.displayName;
+      const displayName = entry?.displayName?.trim();
+      if (!entry?.modelId || !displayName) continue;
+      displayNames[`${config.provider}/${entry.modelId}`] = displayName;
     }
   }
 
@@ -50,10 +52,13 @@ export const buildCustomModelDisplayNames = (
  * `||`, not `??`: a blank stored display name must fall through to
  * the id-derived label rather than render blank.
  */
-export const modelDisplayLabel = (
-  fullModelId: string,
-  displayNames?: Record<string, string>,
-): string => {
+export const modelDisplayLabel = ({
+  fullModelId,
+  displayNames,
+}: {
+  fullModelId: string;
+  displayNames?: Record<string, string>;
+}): string => {
   return (
     displayNames?.[fullModelId] || fullModelId.split("/").slice(1).join("/")
   );

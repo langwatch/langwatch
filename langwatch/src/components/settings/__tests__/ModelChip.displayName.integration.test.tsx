@@ -1,13 +1,14 @@
 /**
  * @vitest-environment jsdom
  *
- * Issue #5759: ModelChip (the Default Models table's per-role model
- * pill) rebuilds its label from the raw model id via
- * `model.split("/").slice(1).join("/")` and never reads the provider's
- * configured custom-model display name.
+ * Regression cover for issue #5759. ModelChip (the Default Models
+ * table's per-role model pill) used to rebuild its label from the raw
+ * model id via `model.split("/").slice(1).join("/")`, ignoring the
+ * provider's configured custom-model display name. It now resolves the
+ * label through `modelDisplayLabel` off an optional `displayNames` prop.
  *
- * `ModelChip` does not yet accept a `displayNames` prop — these tests
- * are expected to fail on the rendered label until issue #5759 is fixed.
+ * The prop is optional, so dropping it at a call site would compile
+ * silently — these tests are what makes that fail instead.
  *
  * @see specs/model-providers/custom-model-display-name.feature
  */

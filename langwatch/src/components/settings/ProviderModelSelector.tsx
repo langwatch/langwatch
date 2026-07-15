@@ -106,7 +106,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           };
         }
         return {
-          label: modelDisplayLabel(modelValue, displayNames),
+          label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
           value: modelValue,
           icon,
           subtitle: "",
@@ -205,7 +205,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         lineClamp={1}
         wordBreak="break-all"
       >
-        {modelDisplayLabel(inheritOption.model, displayNames)}
+        {modelDisplayLabel({ fullModelId: inheritOption.model, displayNames })}
       </Box>
     </HStack>
   ) : (
@@ -222,7 +222,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         wordBreak="break-all"
         color={isUnknown ? "gray.500" : undefined}
       >
-        {selectedItem?.label ?? modelDisplayLabel(model, displayNames)}
+        {selectedItem?.label ?? modelDisplayLabel({ fullModelId: model, displayNames })}
       </Box>
     </HStack>
   );
@@ -338,7 +338,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
                   fontFamily="mono"
                   lineClamp={1}
                 >
-                  {modelDisplayLabel(inheritOption.model, displayNames)}
+                  {modelDisplayLabel({ fullModelId: inheritOption.model, displayNames })}
                 </Text>
               </Box>
             </HStack>

@@ -1,16 +1,20 @@
 /**
  * @vitest-environment jsdom
  *
- * Issue #5759: a custom model's configured Display Name never reaches
- * ProviderModelSelector — it rebuilds every item's label from the raw
- * Model ID via `value.split("/").slice(1).join("/")` and never reads
- * the provider's configured `displayName`. Same bug hits the inherit
- * entry's subtitle and the collapsed trigger's inherit placeholder.
+ * Regression cover for issue #5759, where a custom model's configured
+ * Display Name never reached ProviderModelSelector: it rebuilt every
+ * item's label from the raw Model ID via
+ * `value.split("/").slice(1).join("/")`, and the same fallback hit the
+ * inherit entry's subtitle and the collapsed trigger's placeholder.
+ * Labels now resolve through `modelDisplayLabel` off an optional
+ * `displayNames` prop.
  *
- * `ProviderModelSelector` does not yet accept a `displayNames` prop —
- * these tests are expected to fail (assertion, not import/type error at
- * runtime; `pnpm typecheck` additionally flags the unknown prop) until
- * issue #5759 is fixed.
+ * The prop is optional, so dropping it at a call site would compile
+ * silently — these tests are what makes that fail instead. Note the
+ * label is resolved where `selectOptions` is BUILT, not where it is
+ * rendered: the search filter matches on `item.label`, so a
+ * render-only fix would make the item vanish when a user types the
+ * name they can see (see the search tests below).
  *
  * Query strategy: Select.Content (role="listbox") is mounted in the DOM
  * whether or not the dropdown is open (Ark/Chakra Select only toggles a

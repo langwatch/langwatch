@@ -133,7 +133,7 @@ export const useModelSelectionOptions = (
     const provider = modelValue.split("/")[0]!;
 
     return {
-      label: modelDisplayLabel(modelValue, displayNames),
+      label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
       value: modelValue,
       icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
       isDisabled: false,

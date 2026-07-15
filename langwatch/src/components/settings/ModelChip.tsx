@@ -42,7 +42,7 @@ export function ModelChip({
   displayNames,
 }: Props) {
   const providerKey = model.split("/")[0] ?? "";
-  const family = modelDisplayLabel(model, displayNames);
+  const family = modelDisplayLabel({ fullModelId: model, displayNames });
   // Alias detection reads the id, never `family` — a custom model can
   // carry any display name, and branching on it would let one named
   // "latest" masquerade as the alias (and vice versa).

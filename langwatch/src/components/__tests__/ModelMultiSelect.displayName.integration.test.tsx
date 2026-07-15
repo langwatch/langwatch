@@ -4,11 +4,15 @@
  * ModelMultiSelect shares `useModelSelectionOptions` with every other
  * model picker in the app (ModelSelector, LLMModelDisplay, ...) —
  * specs/model-providers/custom-model-display-name.feature, "Shared
- * model pickers show the configured display name". Issue #5759: the
- * hook's `selectOptions` mapping rebuilds each item's `label` from the
- * raw model id via `value.split("/").slice(1).join("/")` and never
- * reads the provider's configured custom-model display name
- * (src/components/ModelSelector.tsx, `useModelSelectionOptions`).
+ * model pickers show the configured display name".
+ *
+ * Regression cover for issue #5759, where the hook's `selectOptions`
+ * mapping rebuilt each item's `label` from the raw model id via
+ * `value.split("/").slice(1).join("/")`, ignoring the provider's
+ * configured custom-model display name
+ * (src/components/ModelSelector.tsx, `useModelSelectionOptions`). The
+ * label now resolves through `modelDisplayLabel`, which is why fixing
+ * the one hook fixed every picker that shares it.
  *
  * Renders the real hook against a mocked tRPC boundary (only
  * `api.modelProvider.listAllForProjectForFrontend` and
