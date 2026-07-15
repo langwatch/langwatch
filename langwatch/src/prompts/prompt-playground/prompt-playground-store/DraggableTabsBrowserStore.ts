@@ -1,5 +1,6 @@
 "use client";
 import { createLogger } from "@langwatch/observability";
+import { current } from "immer";
 import { cloneDeep } from "lodash-es";
 import type { DeepPartial } from "react-hook-form";
 import { z } from "zod";
@@ -522,7 +523,10 @@ function createDraggableTabsBrowserStore(projectId: string) {
               tabs: [
                 {
                   id: newTabId,
-                  data: cloneDeep(sourceTab.data),
+                  // sourceTab is an immer draft; unwrap it before cloning —
+                  // cloneDeep walks Ctor.prototype, which violates the draft
+                  // Proxy's invariants and throws.
+                  data: cloneDeep(current(sourceTab).data),
                 },
               ],
               activeTabId: newTabId,
