@@ -166,11 +166,13 @@ Feature: GroupQueue decode-drop durability and attribution
   # --- AC7: all four discarding sites; the false replay premise removed
 
   @integration @unimplemented
-  # UNBOUND: no single test drives all five discard sites. Three ARE covered
-  # individually (dispatch decode, transient exhaustion, and AC8's pair) by
-  # groupQueue.decodeDrop.integration.test.ts. The sibling-drain and
-  # sibling-re-stage sites are not, and the "no path claims replay recovery" half
-  # is proven by AC7's grep rather than by an executing test. Tracked by #5817.
+  # UNBOUND, and the honest count is 2 of 5 — a test review caught me claiming 3.
+  # Covered by executing tests: dispatch decode, transient exhaustion. (AC8's pair
+  # exercises the SAME dispatch-decode site under a different AC — it is not a
+  # third site.) NOT covered: sibling-drain decode, sibling re-stage, and
+  # retry_encode_failed — that last one had no coverage AND no disclosure until
+  # the review. The "no path claims replay recovery" half is proven by AC7's grep
+  # rather than by an executing test. Tracked by #5817.
   Scenario Outline: every path that discards a job counts the loss
     Given a job that is discarded by the <site> path
     When the discard happens
@@ -178,11 +180,12 @@ Feature: GroupQueue decode-drop durability and attribution
     And no operator-visible message claims the event recovers via replay
 
     Examples:
-      | site                    |
-      | dispatch decode         |
-      | sibling-drain decode    |
-      | sibling re-stage        |
-      | transient exhaustion    |
+      | site                    | covered by an executing test? |
+      | dispatch decode         | yes                           |
+      | transient exhaustion    | yes                           |
+      | sibling-drain decode    | no — needs fault injection on the coalesced-batch harness |
+      | sibling re-stage        | no — same                     |
+      | retry re-encode         | no — releases unconditionally (correctly: the body was already read) |
 
   # --- AC8: a drop is not counted as a success
 
