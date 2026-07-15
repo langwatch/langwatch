@@ -9,6 +9,12 @@ import emailClient, { type EmailSlice } from "./definitions/email/client";
 import emailShared, { type EmailPreview } from "./definitions/email/shared";
 import slackClient, { type SlackSlice } from "./definitions/slack/client";
 import slackShared, { type SlackPreview } from "./definitions/slack/shared";
+import webhookClient, {
+  type WebhookSlice,
+} from "./definitions/webhook/client";
+import webhookShared, {
+  type WebhookPreview,
+} from "./definitions/webhook/shared";
 import {
   type ClientEntry,
   isNotifyEntry,
@@ -19,6 +25,7 @@ import {
 export interface SliceFor {
   [TriggerAction.SEND_EMAIL]: EmailSlice;
   [TriggerAction.SEND_SLACK_MESSAGE]: SlackSlice;
+  [TriggerAction.SEND_WEBHOOK]: WebhookSlice;
   [TriggerAction.ADD_TO_DATASET]: DatasetSlice;
   [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: AnnotationQueueSlice;
 }
@@ -28,6 +35,7 @@ export interface SliceFor {
 export interface PreviewFor {
   [TriggerAction.SEND_EMAIL]: EmailPreview;
   [TriggerAction.SEND_SLACK_MESSAGE]: SlackPreview;
+  [TriggerAction.SEND_WEBHOOK]: WebhookPreview;
   [TriggerAction.ADD_TO_DATASET]: never;
   [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: never;
 }
@@ -59,6 +67,10 @@ export const CLIENT_PROVIDERS: Record<TriggerAction, ClientEntry> = {
   [TriggerAction.SEND_SLACK_MESSAGE]: {
     shared: slackShared,
     client: slackClient,
+  } as ClientEntry,
+  [TriggerAction.SEND_WEBHOOK]: {
+    shared: webhookShared,
+    client: webhookClient,
   } as ClientEntry,
   [TriggerAction.ADD_TO_DATASET]: {
     shared: datasetShared,
@@ -93,6 +105,7 @@ export function initialSlices(): AllSlices {
   return {
     [TriggerAction.SEND_EMAIL]: emailClient.initialSlice(),
     [TriggerAction.SEND_SLACK_MESSAGE]: slackClient.initialSlice(),
+    [TriggerAction.SEND_WEBHOOK]: webhookClient.initialSlice(),
     [TriggerAction.ADD_TO_DATASET]: datasetClient.initialSlice(),
     [TriggerAction.ADD_TO_ANNOTATION_QUEUE]:
       annotationQueueClient.initialSlice(),

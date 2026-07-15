@@ -159,16 +159,61 @@ export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
 ]`;
 
 /**
- * The four default-template strings a renderer needs, grouped together
- * to keep email + slack defaults aligned. Callers select the set that
- * matches the trigger directly — `ALERT_TRIGGER_DEFAULTS` for custom-graph
- * threshold alerts, `TRACE_TRIGGER_DEFAULTS` for trace triggers.
+ * ADR-040: default Liquid JSON bodies for the Webhook channel — a stable,
+ * documented envelope so a receiver can integrate without authoring a
+ * template. Every interpolated value goes through `| json` so trace content
+ * containing `"` or `}` cannot break out of the JSON structure (the JSON
+ * analog of `mrkdwn_escape`). Optional values are guarded with `{% if %}`
+ * rather than piped as nil, so the output always parses.
+ */
+export const DEFAULT_WEBHOOK_BODY_TEMPLATE = `{
+  "event": "trigger.matched",
+  "trigger": { "id": {{ trigger.id | json }}, "name": {{ trigger.name | json }}{% if trigger.alertType %}, "alertType": {{ trigger.alertType | json }}{% endif %} },
+  "project": { "name": {{ project.name | json }}, "slug": {{ project.slug | json }} },
+  "digest": { "count": {{ digest.count | json }} },
+  "matches": [{% for m in matches %}
+    { "traceId": {{ m.trace.id | json }}, "url": {{ m.trace.url | json }},
+      "input": {{ m.trace.input | json }}, "output": {{ m.trace.output | json }} }{% unless forloop.last %},{% endunless %}{% endfor %}
+  ]
+}`;
+
+export const DEFAULT_ALERT_WEBHOOK_BODY_TEMPLATE = `{
+  "event": "alert.fired",
+  "trigger": { "id": {{ trigger.id | json }}, "name": {{ trigger.name | json }}{% if trigger.alertType %}, "alertType": {{ trigger.alertType | json }}{% endif %} },
+  "project": { "name": {{ project.name | json }}, "slug": {{ project.slug | json }} },
+  "graph": { "name": {{ graph.name | json }}, "url": {{ graph.url | json }} },
+  "metric": { "label": {{ metric.label | json }} },
+  "condition": { "operator": {{ condition.operatorLabel | json }}, "threshold": {{ condition.threshold | json }}, "window": {{ condition.timePeriodLabel | json }} },
+  "currentValue": {{ currentValue | json }}{% if previousValue != nil %},
+  "previousValue": {{ previousValue | json }}{% endif %}
+}`;
+
+export const DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE = `{
+  "event": "report.scheduled",
+  "trigger": { "id": {{ trigger.id | json }}, "name": {{ trigger.name | json }} },
+  "project": { "name": {{ project.name | json }}, "slug": {{ project.slug | json }} },
+  "report": { "source": {{ report.sourceLabel | json }}, "schedule": {{ report.scheduleLabel | json }}, "isEmpty": {{ report.isEmpty | json }} },
+  "traces": [{% for t in traces %}
+    { "traceId": {{ t.traceId | json }}, "url": {{ t.url | json }}, "input": {{ t.input | json }} }{% unless forloop.last %},{% endunless %}{% endfor %}
+  ],
+  "charts": [{% for chart in charts %}
+    { "title": {{ chart.title | json }}{% unless chart.isEmpty %}, "total": {{ chart.total | json }}{% endunless %} }{% unless forloop.last %},{% endunless %}{% endfor %}
+  ],
+  "viewUrl": {{ viewUrl | json }}
+}`;
+
+/**
+ * The default-template strings a renderer needs, grouped together
+ * to keep email + slack + webhook defaults aligned. Callers select the set
+ * that matches the trigger directly — `ALERT_TRIGGER_DEFAULTS` for
+ * custom-graph threshold alerts, `TRACE_TRIGGER_DEFAULTS` for trace triggers.
  */
 export interface TriggerTemplateDefaults {
   emailSubject: string;
   emailBody: string;
   slackString: string;
   slackBlockKit: string;
+  webhookBody: string;
 }
 
 export const ALERT_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
@@ -176,6 +221,7 @@ export const ALERT_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
   emailBody: DEFAULT_ALERT_EMAIL_BODY_TEMPLATE,
   slackString: DEFAULT_ALERT_SLACK_TEMPLATE,
   slackBlockKit: DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE,
+  webhookBody: DEFAULT_ALERT_WEBHOOK_BODY_TEMPLATE,
 };
 
 export const DEFAULT_SLACK_BLOCK_KIT_TEMPLATE = `[
@@ -240,6 +286,7 @@ export const TRACE_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
   emailBody: DEFAULT_EMAIL_BODY_TEMPLATE,
   slackString: DEFAULT_SLACK_TEMPLATE,
   slackBlockKit: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
+  webhookBody: DEFAULT_WEBHOOK_BODY_TEMPLATE,
 };
 
 
@@ -324,6 +371,7 @@ export const REPORT_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
   emailBody: DEFAULT_REPORT_EMAIL_BODY_TEMPLATE,
   slackString: DEFAULT_REPORT_SLACK_TEMPLATE,
   slackBlockKit: DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE,
+  webhookBody: DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE,
 };
 
 /** What a trigger is about — trace data, a custom-graph threshold alert, or a

@@ -139,6 +139,17 @@ export interface ConfigFormCtx<TPreview = unknown> {
    *  test-fireable yet. `testFireLoading` reflects the in-flight send. */
   onTestFire?: () => void;
   testFireLoading?: boolean;
+  /** Most recent test-fire attempt this session, so a provider can render the
+   *  outcome (HTTP status, failure detail) inline next to its test button.
+   *  Providers filter by their own channel before rendering. */
+  lastTestAttempt?: {
+    at: number;
+    channel: "email" | "slack" | "webhook";
+    status: "success" | "failure";
+    httpStatus?: number;
+    errorTitle?: string;
+    errorDetail?: string;
+  } | null;
 }
 
 /** Mirrors `editors/liquidMonaco#VariableInfo`. Defined here too so the
@@ -196,7 +207,7 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
   extends ClientDef<S, TPreview> {
   /** The channel string the preview/testFire endpoints accept. Each
    *  provider names its own — the shared layer doesn't enumerate. */
-  readonly channel: "email" | "slack";
+  readonly channel: "email" | "slack" | "webhook";
   /** Webhook for the test-fire mutation. ADR-031: email test fires resolve
    *  their recipient server-side (the requester's own inbox), so no provider
    *  contributes a recipient list here — only Slack contributes its webhook. */
@@ -206,6 +217,14 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
      *  webhook. `botToken` is the freshly-typed token, or null to reuse the
      *  saved automation's stored token. */
     botDestination?: { channelId: string; botToken: string | null } | null;
+    /** Generic HTTP destination (ADR-040): the full request shape the test
+     *  fire sends through the SSRF-fenced sender. */
+    webhookDestination?: {
+      url: string;
+      method: "POST" | "PUT" | "PATCH";
+      headers: Record<string, string>;
+      bodyTemplate: string | null;
+    } | null;
   };
   /** Template strings contributed to the save payload (`templates`). */
   templatesFromSlice(slice: S): TemplateDraft;

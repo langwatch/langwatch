@@ -321,7 +321,7 @@ export function presetLabels(
 
 export function notifyChannel(
   draft: AutomationDraft,
-): "email" | "slack" | null {
+): "email" | "slack" | "webhook" | null {
   if (!draft.action) return null;
   const provider = CLIENT_PROVIDERS[draft.action];
   return isNotifyEntry(provider) ? provider.client.channel : null;
@@ -356,16 +356,24 @@ export function buildTestFirePayload({
   channel,
   webhook,
   botDestination,
+  webhookDestination,
   automationId,
   graphName,
   seriesLabel,
 }: {
   draft: AutomationDraft;
   projectId: string;
-  channel: "email" | "slack";
+  channel: "email" | "slack" | "webhook";
   webhook: string | null;
   /** Slack bot connection: test-fires via the Web API to this channel. */
   botDestination?: { channelId: string; botToken: string | null } | null;
+  /** ADR-040 generic HTTP destination: the full request the test fire sends. */
+  webhookDestination?: {
+    url: string;
+    method: "POST" | "PUT" | "PATCH";
+    headers: Record<string, string>;
+    bodyTemplate: string | null;
+  } | null;
   /** The saved automation being edited, so a kept bot token can be resolved. */
   automationId?: string;
   graphName?: string | null;
@@ -383,6 +391,7 @@ export function buildTestFirePayload({
     draft: templatesFromDraft(draft),
     webhook,
     botDestination: botDestination ?? null,
+    webhookDestination: webhookDestination ?? null,
     ...(automationId ? { automationId } : {}),
     graphAlert: isGraphAlert
       ? {

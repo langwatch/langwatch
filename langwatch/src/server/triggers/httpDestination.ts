@@ -1,5 +1,9 @@
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import {
+  fetchWithResolvedIp,
+  ssrfSafeFetch,
+  type SSRFValidationResult,
+} from "~/utils/ssrfProtection";
 
 /** Total-request timeout — a slowloris endpoint can't pin a worker slot. */
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -25,6 +29,15 @@ export interface HttpDestinationRequest {
   maxResponseBytes?: number;
   /** Short label woven into DispatchError messages (e.g. the trigger name). */
   contextLabel: string;
+  /**
+   * Override the SSRF validator — e.g. a `createSSRFValidator({ blockLocal:
+   * true, allowedHosts: [] })` instance that blocks private IPs regardless of
+   * the global BLOCK_LOCAL_HTTP_CALLS toggle (ADR-040 §4). When set, redirects
+   * are NOT followed: hop re-validation inside `fetchWithResolvedIp` uses the
+   * default (env-gated) validator, so following a redirect would silently drop
+   * back to the weaker policy. A 3xx is returned to the caller to classify.
+   */
+  validateUrl?: (url: string) => Promise<SSRFValidationResult>;
 }
 
 export interface HttpDestinationResponse {
@@ -102,10 +115,11 @@ export async function sendHttpDestination({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES,
   contextLabel,
+  validateUrl,
 }: HttpDestinationRequest): Promise<HttpDestinationResponse> {
   let response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
   try {
-    response = await ssrfSafeFetch(url, {
+    const init = {
       method,
       headers,
       body,
@@ -115,13 +129,26 @@ export async function sendHttpDestination({
       // on every one of up to 10 redirect hops.
       headersTimeoutMs: timeoutMs,
       bodyTimeoutMs: timeoutMs,
-    });
+    };
+    if (validateUrl) {
+      const validated = await validateUrl(url);
+      // MAX_SAFE_INTEGER pre-exhausts the redirect budget: the first 3xx with
+      // a Location throws instead of hopping through the weaker default
+      // validator (see `validateUrl` on the request type).
+      response = await fetchWithResolvedIp(validated, {
+        ...init,
+        _redirectCount: Number.MAX_SAFE_INTEGER,
+      });
+    } else {
+      response = await ssrfSafeFetch(url, init);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    // An SSRF rejection is a permanent misconfiguration; DNS / connection /
-    // timeout failures are transient and worth a retry.
+    // An SSRF rejection is a permanent misconfiguration (as is a redirect on
+    // the strict-validator path — the endpoint's shape, not a blip); DNS /
+    // connection / timeout failures are transient and worth a retry.
     const ssrfBlocked =
-      /ssrf|blocked|not allowed|private|loopback|metadata|link-local|disallowed/i.test(
+      /ssrf|blocked|not allowed|private|loopback|metadata|link-local|disallowed|too many redirects/i.test(
         message,
       );
     throw new DispatchError({

@@ -18,6 +18,7 @@ import {
 } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import { sendWebhook } from "~/server/triggers/sendWebhook";
 import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
 import type { ActionParams, TriggerContext } from "../types";
@@ -101,6 +102,7 @@ export function cronGraphAlertDeps(): GraphAlertDispatchDeps {
     sendEmail: sendRenderedTriggerEmail,
     sendSlack: sendRenderedSlackMessage,
     sendSlackBot: postSlackChatMessage,
+    sendWebhook,
     filterSuppressedRecipients: (params) =>
       app.emailSuppressions.filterSuppressed(params),
     // ADR-031: the two hard email caps, bound from env — the same consumers

@@ -18,6 +18,7 @@ import type { Trace } from "~/server/tracer/types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { handleSendEmail } from "./actions/sendEmail";
 import { handleSendSlackMessage } from "./actions/sendSlackMessage";
+import { handleSendWebhookRequest } from "./actions/sendWebhookRequest";
 import type {
   ActionParams,
   TriggerContext,
@@ -273,6 +274,8 @@ export const processCustomGraphTrigger = async (
           ({ didSend } = await handleSendEmail(context));
         } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
           ({ didSend } = await handleSendSlackMessage(context));
+        } else if (action === TriggerAction.SEND_WEBHOOK) {
+          ({ didSend } = await handleSendWebhookRequest(context));
         }
 
         if (didSend) {

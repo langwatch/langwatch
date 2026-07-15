@@ -59,6 +59,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   // Force-enable in dev: `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_governance_enabled`.
   "release_ui_ai_governance_enabled",
   "release_langy_enabled",
+  "release_webhook_automations",
 ] as const;
 
 /**

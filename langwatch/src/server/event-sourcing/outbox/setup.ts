@@ -22,6 +22,7 @@ import { dispatchGraphAlertAction } from "~/server/event-sourcing/pipelines/shar
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import { sendWebhook } from "~/server/triggers/sendWebhook";
 import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
@@ -208,6 +209,7 @@ export function buildOutboxRuntime({
             sendEmail: sendRenderedTriggerEmail,
             sendSlack: sendRenderedSlackMessage,
             sendSlackBot: postSlackChatMessage,
+            sendWebhook,
             // ADR-031: honour the same email suppression list the cron path
             // does, so one-click unsubscribes are respected on the
             // event-sourced graph-alert path too.

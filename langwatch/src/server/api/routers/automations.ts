@@ -48,6 +48,7 @@ import {
   validateTemplateDraft,
 } from "~/server/app-layer/triggers/trigger-template.service";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   sanitizeTriggerFilters,
@@ -152,6 +153,12 @@ const actionParamsSchema = z.object({
   annotators: z
     .array(z.object({ id: z.string(), name: z.string() }))
     .optional(),
+  // ADR-040 SEND_WEBHOOK destination — the per-action provider schema
+  // re-validates the shape (https-only URL, sanitized headers) below.
+  url: z.string().optional(),
+  method: z.enum(["POST", "PUT", "PATCH"]).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  bodyTemplate: z.string().nullable().optional(),
 });
 
 type TRPCErrorCode = ConstructorParameters<typeof TRPCError>[0]["code"];
@@ -649,13 +656,26 @@ export const automationRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        channel: z.enum(["email", "slack"]),
+        channel: z.enum(["email", "slack", "webhook"]),
         trigger: triggerIdentitySchema,
         draft: templateDraftSchema,
         webhook: z
           .string()
           .url()
           .startsWith("https://hooks.slack.com/")
+          .nullable()
+          .default(null),
+        /** ADR-040 generic HTTP test fire: the full request shape, body
+         *  template included (it lives in actionParams, not the four Trigger
+         *  template columns). URL shape is re-validated by the provider
+         *  schema; the real SSRF gate runs inside the sender. */
+        webhookDestination: z
+          .object({
+            url: z.string().url(),
+            method: z.enum(["POST", "PUT", "PATCH"]).default("POST"),
+            headers: z.record(z.string(), z.string()).default({}),
+            bodyTemplate: z.string().nullable().default(null),
+          })
           .nullable()
           .default(null),
         /** Set when the Slack automation uses a bot connection. `botToken` is
@@ -708,6 +728,21 @@ export const automationRouter = createTRPCRouter({
       // and intentionally exempt from the rate limit — it fires to the
       // customer's own webhook, not our mail provider.
       try {
+        // The webhook channel ships dark (ADR-040 §7): the type picker is
+        // flag-gated client-side, and the server refuses the channel too so
+        // the flag can't be bypassed by calling the API directly.
+        if (input.channel === "webhook") {
+          const allowed = await featureFlagService.isEnabled(
+            "release_webhook_automations",
+            { distinctId: ctx.session.user.id, projectId: input.projectId },
+          );
+          if (!allowed) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Webhook automations are not enabled for this project.",
+            });
+          }
+        }
         let recipients: string[] = [];
         if (input.channel === "email") {
           const limit = await rateLimit({
@@ -769,6 +804,7 @@ export const automationRouter = createTRPCRouter({
           recipients,
           webhook: input.webhook,
           botDestination,
+          webhookDestination: input.webhookDestination,
           graphAlert: input.graphAlert,
           report: input.report,
         });
@@ -811,17 +847,28 @@ export const automationRouter = createTRPCRouter({
       let parsedActionParams: Record<string, unknown> = {};
       try {
         validateTemplateDraft(input.templates);
+        // The webhook channel ships dark (ADR-040 §7): gate the save route as
+        // well as the picker, so the flag can't be bypassed via the API.
+        if (input.action === TriggerAction.SEND_WEBHOOK) {
+          const allowed = await featureFlagService.isEnabled(
+            "release_webhook_automations",
+            { distinctId: ctx.session.user.id, projectId: input.projectId },
+          );
+          if (!allowed) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Webhook automations are not enabled for this project.",
+            });
+          }
+        }
         if (isGraphAlert) {
           // Graph alerts only support notify channels — there is no
           // "ADD_TO_DATASET on a metric crossing a threshold" UX.
-          if (
-            input.action !== TriggerAction.SEND_EMAIL &&
-            input.action !== TriggerAction.SEND_SLACK_MESSAGE
-          ) {
+          if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message:
-                "Graph alerts only support Email or Slack notifications.",
+                "Graph alerts only support notify channels (Email, Slack, or a webhook).",
             });
           }
           if (!input.graphAlert) {

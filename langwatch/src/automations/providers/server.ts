@@ -7,6 +7,8 @@ import emailServer from "./definitions/email/server";
 import emailShared from "./definitions/email/shared";
 import slackServer from "./definitions/slack/server";
 import slackShared from "./definitions/slack/shared";
+import webhookServer from "./definitions/webhook/server";
+import webhookShared from "./definitions/webhook/shared";
 import type { ServerEntry } from "./types";
 
 /** The server-side provider registry — pairs each shared definition with
@@ -19,6 +21,10 @@ export const SERVER_PROVIDERS: Record<TriggerAction, ServerEntry> = {
   [TriggerAction.SEND_SLACK_MESSAGE]: {
     shared: slackShared,
     server: slackServer,
+  },
+  [TriggerAction.SEND_WEBHOOK]: {
+    shared: webhookShared,
+    server: webhookServer,
   },
   [TriggerAction.ADD_TO_DATASET]: {
     shared: datasetShared,

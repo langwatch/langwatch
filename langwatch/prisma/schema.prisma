@@ -738,6 +738,7 @@ enum TriggerAction {
   ADD_TO_DATASET
   ADD_TO_ANNOTATION_QUEUE
   SEND_SLACK_MESSAGE
+  SEND_WEBHOOK
 }
 
 // The three automation kinds, distinguished by WHAT FIRES them (ADR-042):

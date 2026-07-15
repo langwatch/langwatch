@@ -30,7 +30,13 @@ import {
   sendSlackWebhook,
 } from "~/server/triggers/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
+import {
+  assertWebhookDelivered,
+  sendWebhook,
+} from "~/server/triggers/sendWebhook";
+import type { WebhookMethod } from "~/automations/providers/definitions/webhook/shared";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
+import { renderWebhookBody } from "~/shared/templating/renderWebhookBody";
 import { renderTriggerSlack } from "~/shared/templating/renderSlack";
 import {
   buildTemplateContext,
@@ -66,6 +72,12 @@ interface ActionParams {
   /** Encrypted bot token (ciphertext) — decrypted just before dispatch. */
   slackBotToken?: string;
   slackChannelId?: string;
+  /** ADR-040 SEND_WEBHOOK destination — the whole config, body included,
+   *  lives in actionParams (not the Trigger template columns). */
+  url?: string;
+  method?: WebhookMethod;
+  headers?: Record<string, string>;
+  bodyTemplate?: string | null;
 }
 
 export interface OutboxDispatcherDeps {
@@ -818,6 +830,40 @@ async function handleCadenceBatch(
           triggerType: trigger.alertType,
           triggerMessage: trigger.message ?? "",
         });
+        didSend = true;
+        break;
+      }
+      case TriggerAction.SEND_WEBHOOK: {
+        if (!params.url) {
+          throw new DispatchError({
+            message: `Webhook trigger "${trigger.name}" has no URL configured`,
+            retryable: false,
+          });
+        }
+        // The body renders like Slack Block Kit: Liquid → JSON.parse, falling
+        // back to the framework default envelope on any template failure
+        // (ADR-040 §2). Trace-path dispatch renders against the trace default.
+        const rendered = await renderWebhookBody({
+          template: params.bodyTemplate ?? null,
+          context: buildContext(),
+        });
+        for (const v of rendered.missingVariables) missingVariables.add(v);
+        if (rendered.errors.length > 0) {
+          logger.warn(
+            { projectId, triggerId, errors: rendered.errors },
+            "Webhook body template render errors — fell back to default body",
+          );
+        }
+        const result = await sendWebhook({
+          url: params.url,
+          method: params.method,
+          headers: params.headers,
+          body: rendered.body,
+          triggerName: trigger.name,
+        });
+        // 5xx/429/408 throw retryable so the outbox backs off and retries;
+        // other non-2xx are terminal (ADR-040 §5).
+        assertWebhookDelivered({ result, triggerName: trigger.name });
         didSend = true;
         break;
       }

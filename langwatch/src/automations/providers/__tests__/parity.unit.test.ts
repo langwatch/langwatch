@@ -64,7 +64,7 @@ describe("provider registry parity", () => {
 
       it("gives notify providers a channel string the preview/testFire endpoints accept", () => {
         for (const p of NOTIFY_PROVIDERS) {
-          expect(["email", "slack"]).toContain(p.client.channel);
+          expect(["email", "slack", "webhook"]).toContain(p.client.channel);
         }
       });
 
