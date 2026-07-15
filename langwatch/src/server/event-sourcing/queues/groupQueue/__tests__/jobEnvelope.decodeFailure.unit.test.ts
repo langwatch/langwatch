@@ -207,6 +207,58 @@ describe("jobEnvelope decode failures", () => {
     });
   });
 
+  describe("given a body whose parse error would echo the payload back", () => {
+    // V8 quotes the offending input into the message:
+    //   JSON.parse("patient@…") -> Unexpected token 'p', "patient@ho"... is not valid JSON
+    // That message reaches the drop log, and redactStorageUrisInText only strips
+    // storage URIs — so without a guard, raw body lands in prod logs. AC1 says
+    // "never raw payload or tenant PII". Pre-dates this fix (#5736 started
+    // logging `err` while the bare-JSON path threw a raw SyntaxError).
+    // V8 echoes only the FIRST ~10 CHARACTERS, so asserting the whole secret is
+    // absent passes even while leaking — that mistake made the first version of
+    // this test green with the guard removed. Assert the echoed PREFIX.
+    const PAYLOAD = "patient@hospital.example is HIV positive";
+    const ECHOED_PREFIX = PAYLOAD.slice(0, 10); // "patient@ho" — what V8 quotes back
+
+    describe("when an inline bare-JSON body fails to parse", () => {
+      it("keeps the echoed payload prefix out of the thrown message", async () => {
+        const err = (await decodeJobEnvelope({ value: PAYLOAD })
+          .then(() => null)
+          .catch((e: unknown) => e)) as DecodeFailureError;
+
+        expect(err).toBeInstanceOf(DecodeFailureError);
+        expect(err.message).not.toContain(ECHOED_PREFIX);
+        expect(err.message).toContain("<redacted>");
+        // Redaction, not lobotomy: the diagnosis must survive.
+        expect(err.message).toContain("failed to parse");
+      });
+    });
+
+    describe("when an offloaded body fails to parse", () => {
+      it("keeps the payload out of the thrown message", async () => {
+        const { tieredBlobs, redisBlobs } = makeTiered();
+        const encoded = await encodeJobEnvelope({
+          jobData: offloadable(),
+          tieredBlobs,
+          projectId,
+        });
+        // Valid gzip, so it inflates — then fails to PARSE, echoing its content.
+        const { gzipSync } = await import("node:zlib");
+        const leaky = gzipSync(Buffer.from(PAYLOAD));
+        for (const key of [...redisBlobs.store.keys()]) {
+          redisBlobs.store.set(key, leaky);
+        }
+
+        const err = (await decodeJobEnvelope({ value: encoded, tieredBlobs })
+          .then(() => null)
+          .catch((e: unknown) => e)) as DecodeFailureError;
+
+        expect(err).toBeInstanceOf(DecodeFailureError);
+        expect(err.message).not.toContain(ECHOED_PREFIX);
+      });
+    });
+  });
+
   describe("readEnvelopeDescriptor", () => {
     describe("given a GQ2 envelope", () => {
       it("reports the format, version and the tiered blob hash", async () => {

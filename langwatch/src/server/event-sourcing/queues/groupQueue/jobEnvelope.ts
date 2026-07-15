@@ -96,7 +96,7 @@ async function readBody(data: Buffer): Promise<Record<string, unknown>> {
   } catch (err) {
     if (err instanceof PayloadTooLargeError) throw err;
     throw new DecodeFailureError(
-      `Job envelope body failed to parse: ${errText(err)}`,
+      `Job envelope body failed to parse: ${safeParseErrText(err)}`,
       "decompress_failure",
     );
   }
@@ -108,7 +108,7 @@ function parseInlineBody(body: string): Record<string, unknown> {
     return JSON.parse(body) as Record<string, unknown>;
   } catch (err) {
     throw new DecodeFailureError(
-      `Job envelope inline body failed to parse: ${errText(err)}`,
+      `Job envelope inline body failed to parse: ${safeParseErrText(err)}`,
       "decompress_failure",
     );
   }
@@ -116,6 +116,33 @@ function parseInlineBody(body: string): Record<string, unknown> {
 
 const errText = (err: unknown): string =>
   err instanceof Error ? err.message : String(err);
+
+/**
+ * A parse failure's message, with any echoed source text removed.
+ *
+ * **This is a PII guard, not tidiness.** V8 quotes the offending input back at
+ * you: `JSON.parse("patient@hospital.example …")` throws
+ * `Unexpected token 'p', "patient@ho"... is not valid JSON` — ten characters of
+ * raw body. That message reaches the drop log (`GroupQueue.recordDrop` →
+ * `err:`), and `redactStorageUrisInText` only strips storage URIs, so the
+ * fragment would land in prod logs verbatim. The body is exactly the thing we
+ * promised never to log (a staged payload can carry tenant PII), and it is the
+ * thing we could not read anyway.
+ *
+ * Pre-dates this fix: the bare-JSON path already threw a raw `SyntaxError` that
+ * #5736 then started logging. Fixed here rather than inherited (#5538).
+ *
+ * Keeps the diagnosis (`Unexpected token 'p'`, `Unterminated string`, position)
+ * and drops only the quoted echo. zlib messages ("incorrect header check")
+ * never echo input, so they pass through untouched.
+ */
+const safeParseErrText = (err: unknown): string =>
+  errText(err)
+    // V8: `Unexpected token 'p', "patient@ho"... is not valid JSON`
+    .replace(/,\s*"[\s\S]*?"\.\.\./g, ", <redacted>...")
+    // Defensive: any other double-quoted run in a parser message is input echo,
+    // not vocabulary. Parser messages quote input; they don't quote prose.
+    .replace(/"[^"]{12,}"/g, '"<redacted>"');
 
 /**
  * Decode-side twin of {@link assertPayloadWithinCap}: values staged before the
