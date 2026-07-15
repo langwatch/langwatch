@@ -35,12 +35,14 @@ describe("team.update", () => {
   let deleteMany: ReturnType<typeof vi.fn>;
   let update: ReturnType<typeof vi.fn>;
   let create: ReturnType<typeof vi.fn>;
+  let organizationUserCount: ReturnType<typeof vi.fn>;
   let caller: ReturnType<typeof teamRouter.createCaller>;
 
   beforeEach(() => {
     deleteMany = vi.fn().mockResolvedValue({ count: 0 });
     update = vi.fn().mockResolvedValue({});
     create = vi.fn().mockResolvedValue({});
+    organizationUserCount = vi.fn().mockResolvedValue(1);
 
     const tx = {
       team: { update: vi.fn().mockResolvedValue({}) },
@@ -59,6 +61,7 @@ describe("team.update", () => {
 
     const prisma = {
       team: { findUnique: vi.fn().mockResolvedValue({ organizationId: ORG_ID }) },
+      organizationUser: { count: organizationUserCount },
       $transaction: (fn: (tx: unknown) => unknown) => fn(tx),
     } as unknown as PrismaClient;
 
@@ -104,6 +107,23 @@ describe("team.update", () => {
       expect(deleteMany).toHaveBeenCalledWith({
         where: { id: { in: [MEMBER_BINDING_ID, CUSTOM_BINDING_ID] } },
       });
+    });
+  });
+
+  describe("when a submitted user belongs to another organization", () => {
+    it("rejects the update before writing bindings", async () => {
+      organizationUserCount.mockResolvedValue(0);
+
+      await expect(
+        caller.update({
+          teamId: TEAM_ID,
+          name: "Team",
+          members: [{ userId: "foreign_user", role: TeamUserRole.ADMIN }],
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+      expect(create).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
     });
   });
 });

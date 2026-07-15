@@ -28,7 +28,17 @@ export class PrismaGroupRepository implements GroupRepository {
           roleBindings: {
             include: { customRole: { select: { id: true, name: true } } },
           },
-          _count: { select: { members: true } },
+          _count: {
+            select: {
+              members: {
+                where: {
+                  user: {
+                    orgMemberships: { some: { organizationId } },
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: { name: "asc" },
         skip: (page - 1) * limit,
@@ -53,6 +63,11 @@ export class PrismaGroupRepository implements GroupRepository {
           include: { customRole: { select: { id: true, name: true } } },
         },
         members: {
+          where: {
+            user: {
+              orgMemberships: { some: { organizationId } },
+            },
+          },
           include: {
             user: { select: { id: true, name: true, email: true } },
           },
