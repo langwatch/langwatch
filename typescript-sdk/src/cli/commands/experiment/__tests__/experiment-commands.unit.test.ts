@@ -269,6 +269,31 @@ describe("addComparisonCommand()", () => {
     });
   });
 
+  describe("when --golden-field is passed as an empty string", () => {
+    it("treats it the same as omitting the flag", async () => {
+      mockAttachComparison.mockResolvedValue({
+        comparisonTargetId: "target_new",
+        createdTargetIds: [],
+        reusedTargetIds: [],
+        targets: [],
+      });
+
+      await addComparisonCommand("quality-check", {
+        variant: ["target:target-a", "target:target-b"],
+        goldenField: "",
+        inputField: "",
+      });
+
+      expect(mockAttachComparison).toHaveBeenCalledWith({
+        slug: "quality-check",
+        body: expect.objectContaining({
+          goldenField: undefined,
+          inputField: undefined,
+        }),
+      });
+    });
+  });
+
   describe("when format is json", () => {
     it("outputs raw JSON", async () => {
       const result = {

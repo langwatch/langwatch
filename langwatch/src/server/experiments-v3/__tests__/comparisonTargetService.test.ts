@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import type { DatasetReference, TargetConfig } from "~/experiments-v3/types";
+import { AgentNotFoundError } from "~/server/agents/errors";
 import {
   attachComparison,
   ComparisonTargetError,
@@ -57,7 +58,7 @@ const fakeAgentService = (
 ) => ({
   getByIdOrThrow: async ({ id }: { id: string }) => {
     const found = agents[id];
-    if (!found) throw new Error("Agent not found");
+    if (!found) throw new AgentNotFoundError();
     return found as never;
   },
 });
@@ -132,13 +133,13 @@ describe("attachComparison()", () => {
       const result = await attachComparison({
         prisma: basePrisma,
         projectId: "project-1",
-        targets: [existing],
+        targets: [existing, promptTarget("target-b")],
         datasets: [dataset()],
         activeDatasetId: "dataset-1",
         body: {
           variants: [
             { kind: "prompt", handle: "draft-v1" },
-            { kind: "existingTarget", targetId: "target-a" },
+            { kind: "existingTarget", targetId: "target-b" },
           ],
         },
         services: {
@@ -155,7 +156,7 @@ describe("attachComparison()", () => {
 
       expect(result.createdTargetIds).toEqual([]);
       expect(result.reusedTargetIds).toEqual(["target-a"]);
-      expect(result.targets).toHaveLength(2); // existing target + new comparison, no duplicate
+      expect(result.targets).toHaveLength(3); // 2 existing targets + new comparison, no duplicate
     });
   });
 
@@ -306,6 +307,206 @@ describe("attachComparison()", () => {
           services: { evaluatorService: fakeEvaluatorService() },
         }),
       ).rejects.toThrow(/golden field/i);
+    });
+  });
+
+  describe("when goldenField does not match a real dataset column", () => {
+    it("rejects rather than persisting a mapping to nothing", async () => {
+      await expect(
+        attachComparison({
+          prisma: basePrisma,
+          projectId: "project-1",
+          targets: [promptTarget("target-a"), promptTarget("target-b")],
+          datasets: [dataset()],
+          activeDatasetId: "dataset-1",
+          body: {
+            variants: [
+              { kind: "existingTarget", targetId: "target-a" },
+              { kind: "existingTarget", targetId: "target-b" },
+            ],
+            goldenField: "exptected_outputt",
+          },
+          services: { evaluatorService: fakeEvaluatorService() },
+        }),
+      ).rejects.toThrow(/not a column on dataset/i);
+    });
+  });
+
+  describe("when inputField does not match a real dataset column", () => {
+    it("rejects rather than persisting a mapping to nothing", async () => {
+      await expect(
+        attachComparison({
+          prisma: basePrisma,
+          projectId: "project-1",
+          targets: [promptTarget("target-a"), promptTarget("target-b")],
+          datasets: [dataset()],
+          activeDatasetId: "dataset-1",
+          body: {
+            variants: [
+              { kind: "existingTarget", targetId: "target-a" },
+              { kind: "existingTarget", targetId: "target-b" },
+            ],
+            inputField: "not-a-real-column",
+          },
+          services: { evaluatorService: fakeEvaluatorService() },
+        }),
+      ).rejects.toThrow(/not a column on dataset/i);
+    });
+  });
+
+  describe("when includeMetrics has duplicate entries", () => {
+    it("dedupes them", async () => {
+      const result = await attachComparison({
+        prisma: basePrisma,
+        projectId: "project-1",
+        targets: [promptTarget("target-a"), promptTarget("target-b")],
+        datasets: [dataset()],
+        activeDatasetId: "dataset-1",
+        body: {
+          variants: [
+            { kind: "existingTarget", targetId: "target-a" },
+            { kind: "existingTarget", targetId: "target-b" },
+          ],
+          includeMetrics: ["cost", "cost", "duration"],
+        },
+        services: { evaluatorService: fakeEvaluatorService() },
+      });
+
+      const comparisonTarget = result.targets.find(
+        (t) => t.id === result.comparisonTargetId,
+      )!;
+      expect(comparisonTarget.comparison?.includeMetrics).toEqual([
+        "cost",
+        "duration",
+      ]);
+    });
+  });
+
+  describe("when an agent variant references an agent that doesn't exist", () => {
+    it("rejects with a clean 404-style error, not a generic failure", async () => {
+      const error = await attachComparison({
+        prisma: basePrisma,
+        projectId: "project-1",
+        targets: [promptTarget("target-a")],
+        datasets: [dataset()],
+        activeDatasetId: "dataset-1",
+        body: {
+          variants: [
+            { kind: "existingTarget", targetId: "target-a" },
+            { kind: "agent", agentId: "does-not-exist" },
+          ],
+        },
+        services: {
+          agentService: fakeAgentService({}),
+          evaluatorService: fakeEvaluatorService(),
+        },
+      }).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ComparisonTargetError);
+      expect((error as ComparisonTargetError).status).toBe(404);
+      expect((error as Error).message).toMatch(/does-not-exist.*not found/i);
+    });
+  });
+
+  describe("when the experiment has no dataset configured", () => {
+    it("rejects rather than building an unrunnable comparison", async () => {
+      await expect(
+        attachComparison({
+          prisma: basePrisma,
+          projectId: "project-1",
+          targets: [promptTarget("target-a"), promptTarget("target-b")],
+          datasets: [],
+          activeDatasetId: "dataset-1",
+          body: {
+            variants: [
+              { kind: "existingTarget", targetId: "target-a" },
+              { kind: "existingTarget", targetId: "target-b" },
+            ],
+          },
+          services: { evaluatorService: fakeEvaluatorService() },
+        }),
+      ).rejects.toThrow(/no dataset/i);
+    });
+  });
+
+  describe("when two --variant specs resolve to the same underlying target", () => {
+    it("rejects an explicit duplicate existingTarget reference", async () => {
+      await expect(
+        attachComparison({
+          prisma: basePrisma,
+          projectId: "project-1",
+          targets: [promptTarget("target-a"), promptTarget("target-b")],
+          datasets: [dataset()],
+          activeDatasetId: "dataset-1",
+          body: {
+            variants: [
+              { kind: "existingTarget", targetId: "target-a" },
+              { kind: "existingTarget", targetId: "target-a" },
+            ],
+          },
+          services: { evaluatorService: fakeEvaluatorService() },
+        }),
+      ).rejects.toThrow(/at least two distinct variants/i);
+    });
+
+    it("rejects when a prompt: spec resolves to the same target as an existingTarget: spec", async () => {
+      const existing = promptTarget("target-a");
+      existing.promptId = "prompt-draft-v1";
+
+      await expect(
+        attachComparison({
+          prisma: basePrisma,
+          projectId: "project-1",
+          targets: [existing],
+          datasets: [dataset()],
+          activeDatasetId: "dataset-1",
+          body: {
+            variants: [
+              { kind: "existingTarget", targetId: "target-a" },
+              { kind: "prompt", handle: "draft-v1" },
+            ],
+          },
+          services: {
+            promptService: fakePromptService({
+              "draft-v1": { id: "prompt-draft-v1", version: 1, versionId: "v1" },
+            }),
+            evaluatorService: fakeEvaluatorService(),
+          },
+        }),
+      ).rejects.toThrow(/at least two distinct variants/i);
+    });
+  });
+
+  describe("when three or more variants are given", () => {
+    it("builds an N-way comparison, not just a pairwise one", async () => {
+      const result = await attachComparison({
+        prisma: basePrisma,
+        projectId: "project-1",
+        targets: [
+          promptTarget("target-a"),
+          promptTarget("target-b"),
+          promptTarget("target-c"),
+        ],
+        datasets: [dataset()],
+        activeDatasetId: "dataset-1",
+        body: {
+          variants: [
+            { kind: "existingTarget", targetId: "target-a" },
+            { kind: "existingTarget", targetId: "target-b" },
+            { kind: "existingTarget", targetId: "target-c" },
+          ],
+        },
+        services: { evaluatorService: fakeEvaluatorService() },
+      });
+
+      const comparisonTarget = result.targets.find(
+        (t) => t.id === result.comparisonTargetId,
+      )!;
+      expect(comparisonTarget.comparison?.variants.sort()).toEqual([
+        "target-a",
+        "target-b",
+        "target-c",
+      ]);
     });
   });
 });
