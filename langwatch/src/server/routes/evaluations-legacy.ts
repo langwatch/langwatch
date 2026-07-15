@@ -24,6 +24,8 @@ import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { fromZodError } from "zod-validation-error";
 import { evaluatorTempNameMap } from "~/components/checks/EvaluatorSelection";
+import { LEGACY_PAIRWISE_EVALUATOR_TYPE } from "~/experiments-v3/types";
+import { resolveDispatchEvaluatorType } from "~/experiments-v3/utils/normalizeComparison";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
 import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
@@ -620,6 +622,83 @@ export const getEvaluatorDataForParams = (
   };
 };
 
+/**
+ * Translates a legacy 2-slot pairwise payload (`candidate_a_id` /
+ * `candidate_a_output` / ... `candidate_b_*`) into the N-way `candidates`
+ * shape `langevals/select_best_compare` expects. The payload half of
+ * `resolveDispatchEvaluatorType`'s redirect — the two travel together, at
+ * the same call site, so they cannot disagree the way orchestrator.ts and
+ * the old dispatch logic once did (#5528).
+ *
+ * A slot with no `candidate_*_id` is dropped rather than sent as an empty
+ * candidate — an incomplete legacy config should surface as "missing
+ * candidate output" the same way a native comparison with a missing variant
+ * does, not as a judge call over a blank second candidate.
+ */
+export const translateLegacyPairwisePayload = (
+  data: Record<string, unknown>,
+): Record<string, unknown> => {
+  const {
+    candidate_a_id,
+    candidate_a_output,
+    candidate_a_cost,
+    candidate_a_duration,
+    candidate_b_id,
+    candidate_b_output,
+    candidate_b_cost,
+    candidate_b_duration,
+    ...rest
+  } = data;
+
+  const candidates = [
+    candidate_a_id !== undefined
+      ? {
+          id: candidate_a_id,
+          output: candidate_a_output,
+          cost: candidate_a_cost,
+          duration: candidate_a_duration,
+        }
+      : undefined,
+    candidate_b_id !== undefined
+      ? {
+          id: candidate_b_id,
+          output: candidate_b_output,
+          cost: candidate_b_cost,
+          duration: candidate_b_duration,
+        }
+      : undefined,
+  ].filter((candidate) => candidate !== undefined);
+
+  return { ...rest, candidates };
+};
+
+/**
+ * Removes a legacy pairwise `prompt` setting that select_best_compare cannot
+ * render. The pairwise judge's template uses `{candidate_a_output}` /
+ * `{candidate_b_output}` slots; the N-way judge only substitutes
+ * `{candidates}` (plus `{input}` / `{golden}`). A saved prompt with no
+ * `{candidates}` placeholder — including pairwise's own untouched default —
+ * would reach the new judge with its instructions half-literal, so it's
+ * dropped, letting the caller fall back to select_best_compare's default.
+ *
+ * A prompt that DOES contain `{candidates}` is kept: a user who already
+ * migrated their wording to the new placeholder should keep it.
+ * `droppedPrompt` is returned (rather than logged in here) so the caller owns
+ * the log context, and pure-function tests stay dependency-free.
+ */
+export const stripIncompatiblePairwisePrompt = (
+  settings: Record<string, unknown>,
+): { settings: Record<string, unknown>; droppedPrompt: boolean } => {
+  if (
+    typeof settings.prompt === "string" &&
+    !settings.prompt.includes("{candidates}")
+  ) {
+    const { prompt: _incompatible, ...rest } = settings;
+    return { settings: rest, droppedPrompt: true };
+  }
+  return { settings, droppedPrompt: false };
+};
+
 export const getEvaluatorIncludingCustom = async (
   projectId: string,
   checkType: EvaluatorTypes,
@@ -815,6 +894,17 @@ async function handleEvaluatorCall(
       })
     : null;
 
+  // Every legacy `langevals/pairwise_compare` dispatch — from a saved
+  // evaluator, a monitor, or a bare slug — is transparently rerouted to
+  // select_best_compare here. This is the ONE place that makes that call
+  // (see resolveDispatchEvaluatorType's JSDoc), so a caller upstream (the
+  // Experiments Workbench orchestrator, a monitor's scheduled run) never
+  // needs to know the redirect happened; it keeps sending the 2-slot wire
+  // shape it always has, and isLegacyPairwiseDispatch below decides whether
+  // that shape needs translating before it reaches the new judge.
+  const isLegacyPairwiseDispatch = checkType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+  checkType = resolveDispatchEvaluatorType(checkType) ?? checkType;
+
   const evaluatorDefinition =
     workflowEvaluatorDef ??
     (await getEvaluatorIncludingCustom(
@@ -872,16 +962,42 @@ async function handleEvaluatorCall(
   let settings: any = ((evaluatorSettings ?? monitor?.parameters) as any) ?? {};
 
   try {
-    settings = evaluatorSettingSchema?.parse({
+    // NB: `select_best_compare`'s settings schema is non-strict, so a legacy
+    // `swap_and_confirm` key with no equivalent field is silently dropped by
+    // the parse below rather than translated — `randomize_order` then falls
+    // back to its own default (`true`). Both fields default `true`, so this
+    // only differs for a legacy row that explicitly set
+    // `swap_and_confirm: false`; that row's candidate-ordering behavior
+    // flips silently on reroute. Narrow enough (and low-impact enough) to
+    // document rather than special-case.
+    const mergedSettings = {
       ...(!workflowEvaluatorDef
         ? getEvaluatorDefaultSettings(
             evaluatorDefinition as any,
             await resolveEvaluatorSettingsDefaults(project.id),
           )
         : {}),
-      ...(evaluatorSettings ?? (monitor ? (monitor.parameters as object) : {})),
+      ...(settings as Record<string, unknown>),
       ...(params.settings ? params.settings : {}),
-    });
+    };
+
+    // Drop a legacy pairwise `prompt` that can't render on the new judge (see
+    // stripIncompatiblePairwisePrompt), so select_best_compare's own default
+    // wins instead of forwarding unrendered pairwise placeholders. Stripped
+    // AFTER the full merge — including `params.settings` — so a prompt
+    // arriving via the request body can't bypass the strip the way stripping
+    // only the pre-merge DB/monitor settings would.
+    const { settings: finalSettings, droppedPrompt } = isLegacyPairwiseDispatch
+      ? stripIncompatiblePairwisePrompt(mergedSettings)
+      : { settings: mergedSettings, droppedPrompt: false };
+    if (droppedPrompt) {
+      logger.warn(
+        { projectId: project.id, checkType: LEGACY_PAIRWISE_EVALUATOR_TYPE },
+        "legacy pairwise_compare dispatch had a customized prompt with no {candidates} placeholder — dropping it in favor of select_best_compare's default rather than forwarding unrendered pairwise placeholders",
+      );
+    }
+
+    settings = evaluatorSettingSchema?.parse(finalSettings);
   } catch (error) {
     const message =
       error instanceof ZodErrorClass
@@ -914,7 +1030,9 @@ async function handleEvaluatorCall(
   try {
     data = getEvaluatorDataForParams(
       checkType,
-      params.data as Record<string, any>,
+      (isLegacyPairwiseDispatch
+        ? translateLegacyPairwisePayload(params.data as Record<string, any>)
+        : params.data) as Record<string, any>,
     );
   } catch (error) {
     const message =

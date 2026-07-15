@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { EvaluatorConfig, TargetConfig } from "../../types";
+import {
+  COMPARISON_EVALUATOR_TYPE,
+  type EvaluatorConfig,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
+  type TargetConfig,
+} from "../../types";
 import {
   normalizeEvaluators,
   normalizeTargets,
+  resolveDispatchEvaluatorType,
   resolveVerdictLabel,
   toComparisonConfig,
 } from "../normalizeComparison";
@@ -111,7 +117,10 @@ describe("toComparisonConfig", () => {
           randomizeOrder: true,
         };
 
-        const config = toComparisonConfig({ comparison, pairwise: legacyPairwise });
+        const config = toComparisonConfig({
+          comparison,
+          pairwise: legacyPairwise,
+        });
 
         expect(config?.variants).toEqual(["x", "y", "z"]);
       });
@@ -121,6 +130,38 @@ describe("toComparisonConfig", () => {
   describe("given a carrier that is not a comparison", () => {
     it("returns undefined", () => {
       expect(toComparisonConfig({})).toBeUndefined();
+    });
+  });
+});
+
+describe("resolveDispatchEvaluatorType", () => {
+  describe("given the legacy pairwise judge type", () => {
+    it("reroutes it to the current comparison judge", () => {
+      expect(resolveDispatchEvaluatorType(LEGACY_PAIRWISE_EVALUATOR_TYPE)).toBe(
+        COMPARISON_EVALUATOR_TYPE,
+      );
+    });
+  });
+
+  describe("given the current comparison judge type", () => {
+    it("passes it through untouched", () => {
+      expect(resolveDispatchEvaluatorType(COMPARISON_EVALUATOR_TYPE)).toBe(
+        COMPARISON_EVALUATOR_TYPE,
+      );
+    });
+  });
+
+  describe("given any other evaluator type", () => {
+    it("passes it through untouched", () => {
+      expect(resolveDispatchEvaluatorType("langevals/llm_boolean")).toBe(
+        "langevals/llm_boolean",
+      );
+    });
+  });
+
+  describe("given undefined", () => {
+    it("returns undefined", () => {
+      expect(resolveDispatchEvaluatorType(undefined)).toBeUndefined();
     });
   });
 });
@@ -156,7 +197,12 @@ describe("normalizeEvaluators", () => {
   describe("given a plain per-row evaluator", () => {
     it("leaves it alone", () => {
       const evaluators = [
-        { id: "eval-1", evaluatorType: "custom/exact_match", inputs: [], mappings: {} },
+        {
+          id: "eval-1",
+          evaluatorType: "custom/exact_match",
+          inputs: [],
+          mappings: {},
+        },
       ] as unknown as EvaluatorConfig[];
 
       const [normalized] = normalizeEvaluators(evaluators);

@@ -1,9 +1,33 @@
-import type {
-  ComparisonEvaluatorConfig,
-  EvaluatorConfig,
-  PairwiseEvaluatorConfig,
-  TargetConfig,
+import {
+  COMPARISON_EVALUATOR_TYPE,
+  type ComparisonEvaluatorConfig,
+  type EvaluatorConfig,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
+  type PairwiseEvaluatorConfig,
+  type TargetConfig,
 } from "../types";
+
+/**
+ * Reroutes a stored evaluator type to the judge that will actually run: a row
+ * whose persisted type is the legacy two-slot `pairwise_compare` judge is sent
+ * to the current N-way `select_best_compare` one instead — the legacy endpoint
+ * is never called again. Every other type passes through unchanged.
+ *
+ * Called at exactly one site — the legacy evaluations route
+ * (`evaluations-legacy.ts`), together with `translateLegacyPairwisePayload`,
+ * which reshapes the request body in the same breath. Keeping the type reroute
+ * and the payload translation co-located is the whole point: #5528 happened
+ * because the dispatched type was changed in one place while the payload shape
+ * was decided in another, so a 2-slot body could reach the N-way judge. Every
+ * upstream caller (the orchestrator, a monitor's scheduled run) keeps emitting
+ * the 2-slot shape it always has and is unaware of the reroute.
+ */
+export const resolveDispatchEvaluatorType = (
+  storedEvaluatorType: string | undefined,
+): string | undefined =>
+  storedEvaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE
+    ? COMPARISON_EVALUATOR_TYPE
+    : storedEvaluatorType;
 
 /**
  * Comparison configs are stored in one shape today (`comparison`), but
