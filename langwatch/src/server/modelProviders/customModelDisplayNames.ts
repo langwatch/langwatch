@@ -1,9 +1,42 @@
+import type { ScopeTier } from "../scopes/scope.types";
 import type { CustomModelEntry } from "./customModel.schema";
 import type { MaybeStoredModelProvider } from "./registry";
 
-/** Narrowest scope first. A row with no scope at all ranks last. */
-const SCOPE_RANK = { PROJECT: 0, TEAM: 1, ORGANIZATION: 2 } as const;
+/**
+ * Narrowest scope first. A row with no scope — or one this ranking does
+ * not know — ranks last.
+ *
+ * `satisfies Record<ScopeTier, number>` binds the table to the shared
+ * tier type, so a fourth tier lands as a compile error here rather than
+ * as an unranked value at runtime.
+ */
+const SCOPE_RANK = {
+  PROJECT: 0,
+  TEAM: 1,
+  ORGANIZATION: 2,
+} satisfies Record<ScopeTier, number>;
 const UNSCOPED_RANK = 3;
+
+/**
+ * Ranks a single scope tier, ranking anything this table doesn't know as
+ * unscoped.
+ *
+ * The `in` check is not redundant with the parameter type. `registry.ts`
+ * spells the tier union out by hand instead of deriving it from
+ * `ScopeTier`, and `modelProvider.service.ts` casts the Prisma enum into
+ * it unchecked, so a value outside the table compiles green and arrives
+ * here at runtime. It must rank as *something*: a bare lookup returns
+ * `undefined`, which `Math.min` turns into `NaN`. A `NaN` tier does not
+ * merely rank the row wrongly — `NaN` minus anything is `NaN`, which is
+ * falsy, so the scope tier drops out of `byPrecedence` altogether and a
+ * PROJECT row loses the authority to outrank an unscoped one. The
+ * comparator turns intransitive, and which row wins a key comes down to
+ * the order rows happen to arrive in.
+ */
+const rankOf = (scopeType: string | undefined): number =>
+  scopeType && scopeType in SCOPE_RANK
+    ? SCOPE_RANK[scopeType as ScopeTier]
+    : UNSCOPED_RANK;
 
 /**
  * Ranks a row by its narrowest scope, read from the `scopes[]` grant set
@@ -16,11 +49,7 @@ const scopeRank = (row: MaybeStoredModelProvider): number => {
     ? row.scopes.map((scope) => scope.scopeType)
     : [row.scopeType];
 
-  return Math.min(
-    ...scopeTypes.map((scopeType) =>
-      scopeType ? SCOPE_RANK[scopeType] : UNSCOPED_RANK,
-    ),
-  );
+  return Math.min(...scopeTypes.map(rankOf));
 };
 
 /**
@@ -34,8 +63,10 @@ const scopeRank = (row: MaybeStoredModelProvider): number => {
  * rows. They cannot separate two rows that both lack an `id`, which rank
  * alike on both (`1`, then `""`), so such a pair tied on the first two
  * tiers as well falls through to arrival order. No caller opens that
- * gap: `buildDefaultProviders` synthesizes at most one row per provider
- * and never gives it custom models.
+ * gap: both synthesizers of id-less rows — `buildDefaultProviders` and
+ * `buildDefaultProvidersFromEnvShape`, which backs the managed-bedrock
+ * system row — make at most one row per provider and never give it
+ * custom models.
  *
  * The persisted tier is not redundant with the id tier under it: `""`
  * sorts below every real id, so without it an id-less row would beat
@@ -46,21 +77,27 @@ const scopeRank = (row: MaybeStoredModelProvider): number => {
  * more correct source of a name.
  */
 const precedence = (row: MaybeStoredModelProvider) =>
-  [row.enabled ? 0 : 1, scopeRank(row), row.id ? 0 : 1, row.id ?? ""] as const;
+  [
+    row.enabled ? 0 : 1, // enabled: before disabled
+    scopeRank(row), // narrowest scope: PROJECT, then TEAM, then ORGANIZATION
+    row.id ? 0 : 1, // persisted: before synthesized
+    row.id ?? "", // lowest id: settles the rest reproducibly
+  ] as const;
 
 /** Orders rows best-first: lexicographic over `precedence`, lower wins. */
 const byPrecedence = (
   left: MaybeStoredModelProvider,
   right: MaybeStoredModelProvider,
 ): number => {
-  const rightTiers = precedence(right);
+  const [enabled, scope, persisted, id] = precedence(left);
+  const [theirEnabled, theirScope, theirPersisted, theirId] = precedence(right);
 
-  for (const [tier, ours] of precedence(left).entries()) {
-    const theirs = rightTiers[tier]!;
-    if (ours !== theirs) return ours < theirs ? -1 : 1;
-  }
-
-  return 0;
+  return (
+    enabled - theirEnabled ||
+    scope - theirScope ||
+    persisted - theirPersisted ||
+    (id === theirId ? 0 : id < theirId ? -1 : 1)
+  );
 };
 
 const customEntriesOf = (
@@ -121,10 +158,14 @@ const configuredDisplayName = (entry: CustomModelEntry): string | null => {
  * shared key still writes the row-id-keyed name no other row can claim.
  *
  * Only entries that name something compete, so a row's malformed or
- * unnamed entry costs no other row its name. The lists are JSON behind
- * an unchecked cast (`toLegacyCompatibleCustomModels` returns one), so
- * a hand-edited or migrated row can reach here holding any shape,
- * including a list that is not a list.
+ * unnamed entry costs no other row its name. That guard is load-bearing:
+ * `toLegacyCompatibleCustomModels` returns `[]` for anything that is not
+ * an array, so the list is always a list, but it casts the ELEMENTS
+ * through unchecked — these are JSON columns, so a hand-edited or
+ * migrated row can reach here holding an entry of any shape.
+ * `customEntriesOf`'s own array check is belt-and-braces on top of that
+ * guarantee, since every current path routes through that converter; it
+ * earns its place by also turning an absent list into an empty one.
  *
  * Not to be confused with `mergeCustomModelMetadata`
  * (src/server/api/routers/modelProviders.utils.ts), which also reads
@@ -165,8 +206,11 @@ export const buildCustomModelDisplayNames = (
  * same fallback every selector used before display names existed, and
  * the label a legacy custom model resolves to.
  *
- * `||`, not `??`: a blank stored display name must fall through to
- * the id-derived label rather than render blank.
+ * `||`, not `??`: a blank name must fall through to the id-derived label
+ * rather than render blank. `buildCustomModelDisplayNames` cannot hand
+ * one over — `configuredDisplayName` rejects blanks — but this is an
+ * exported entry point whose map is a plain `Record<string, string>`,
+ * with nothing tying it to that builder, so the guard stays.
  */
 export const modelDisplayLabel = ({
   fullModelId,

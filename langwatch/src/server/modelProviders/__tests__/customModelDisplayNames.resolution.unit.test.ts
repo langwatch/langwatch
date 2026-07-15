@@ -2,17 +2,20 @@
  * Unit tests for `buildCustomModelDisplayNames()`'s resolution contract —
  * pinned for issue #5837, where a configured custom-model Display Name
  * silently failed to resolve in production. Before this change, the
- * function was lossy in four ways:
+ * function was lossy in four ways (labeled by the AC each now guards —
+ * see the coverage map in
+ * specs/model-providers/custom-model-display-name-resolution.feature):
  *
- *   B  — a legacy `string[]` row converted (via `toLegacyCompatibleCustomModels`)
- *        to an entry whose `displayName === modelId` (an "identity" entry).
- *   C1/C2 — two rows of the same provider defining the same `modelId` resolved
- *        to whichever row the caller happened to list last: an identity entry
- *        could clobber a real configured name, and the winner flipped with row
- *        order instead of being decided by any precedence rule.
- *   D  — the map was keyed `${provider}/${modelId}` only, so the canonical
+ *   AC2  — a legacy `string[]` row converted (via `toLegacyCompatibleCustomModels`)
+ *        to an entry whose `displayName === modelId` (an "identity" entry)
+ *        could clobber a real configured name on another row of the same
+ *        provider.
+ *   AC3  — two rows of the same provider each defining a REAL name for the
+ *        same `modelId` resolved to whichever row the caller happened to
+ *        list last, instead of a precedence rule.
+ *   AC4  — the map was keyed `${provider}/${modelId}` only, so the canonical
  *        `${mpId}/${modelId}` form a caller may hold could never hit (#5828).
- *   E  — `entry?.displayName?.trim()` threw a TypeError when `displayName`
+ *   AC5b — `entry?.displayName?.trim()` threw a TypeError when `displayName`
  *        was present but not a string, and spreading a non-array
  *        `customModels` column threw too — the column is JSON behind an
  *        unchecked cast (`toLegacyCompatibleCustomModels` returns one), so
@@ -24,8 +27,9 @@
  *   - When several rows supply a REAL name for the same `modelId`, the
  *     winner is decided, in order: (1) `enabled: true` beats `enabled:
  *     false`; (2) narrowest scope wins — PROJECT > TEAM > ORGANIZATION >
- *     none/unscoped (including `isSystem`); (3) a persisted row (one with
- *     an `id`) beats a synthesized one without; (4) lowest row `id`
+ *     none/unscoped/unrecognized (a scope tier this table doesn't know
+ *     ranks the same as `isSystem`); (3) a persisted row (one with an
+ *     `id`) beats a synthesized one without; (4) lowest row `id`
  *     lexicographically, as a final total-order tiebreak.
  *   - The map is dual-keyed: every real name is written under both
  *     `${provider}/${modelId}` and, when `row.id` exists,
@@ -73,6 +77,15 @@ describe("given a real display name and a legacy identity row that collide on th
   });
 
   describe("when the legacy row is returned last", () => {
+    // This order resolves correctly even without the identity-skip rule:
+    // both rows tie on every precedence tier here (no id, no scope), so
+    // the stable sort leaves them in arrival order and the real row —
+    // listed first in this call — wins the first-write-wins map
+    // regardless of whether the legacy row's identity entry was ever
+    // skipped. Kept alongside the "returned first" case below, which is
+    // the one that actually exercises the identity-skip rule, so
+    // together the pair proves the fix is order-independent rather than
+    // resting on one lucky order.
     /** @scenario A legacy row of the same provider does not clobber a configured name */
     it("resolves the configured name when a legacy row is returned last", () => {
       const result = buildCustomModelDisplayNames([realRow, legacyRow]);
@@ -82,11 +95,12 @@ describe("given a real display name and a legacy identity row that collide on th
   });
 
   describe("when the legacy row is returned first", () => {
-    // Before this change, this order already resolved correctly by
-    // accident — the real row was processed last, so naive last-write-wins
-    // happened to land on it. Kept alongside the "returned last" case
-    // above so the pair proves the fix makes the outcome
-    // order-independent, not just luckier.
+    // This is the case that actually exercises the identity-skip rule:
+    // with every precedence tier tied, the stable sort leaves the legacy
+    // row first, so only skipping its identity entry (`displayName ===
+    // modelId`) stops it from writing "gpt-5.1" ahead of the real row's
+    // configured name. Drop that skip and only this ordering goes red —
+    // verified by sabotage.
     it("resolves the configured name when a legacy row is returned first", () => {
       const result = buildCustomModelDisplayNames([legacyRow, realRow]);
 
@@ -128,6 +142,44 @@ describe("given an enabled row and a disabled row that both define the same mode
   });
 });
 
+describe("given an enabled row and a disabled row whose winning row is returned last", () => {
+  describe("when display names are built across both rows", () => {
+    // The mirror of "given an enabled row and a disabled row..." above,
+    // which lists its winner (the enabled row) first and so stays green
+    // even with the precedence sort removed entirely (arrival-order-wins)
+    // — verified by knocking the sort out. Only the pair together pins
+    // the enabled tier rather than arrival order.
+    it("prefers the enabled row's name whichever order the rows arrive in", () => {
+      // Same discriminating shape as the case above: the disabled row
+      // has both the narrower scope and the lower id, so only a correct
+      // enabled-tier check — not scope, not id — explains the enabled
+      // row winning here too.
+      const enabledRow = makeProvider({
+        provider: "vendorM",
+        enabled: true,
+        id: "zzz-enabled",
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_4" }],
+        customModels: [
+          { modelId: "sigma-4", displayName: "Verified Label", mode: "chat" },
+        ],
+      });
+      const disabledRow = makeProvider({
+        provider: "vendorM",
+        enabled: false,
+        id: "aaa-disabled",
+        scopes: [{ scopeType: "PROJECT", scopeId: "proj_4" }],
+        customModels: [
+          { modelId: "sigma-4", displayName: "Legacy Label", mode: "chat" },
+        ],
+      });
+
+      const result = buildCustomModelDisplayNames([disabledRow, enabledRow]);
+
+      expect(result["vendorM/sigma-4"]).toBe("Verified Label");
+    });
+  });
+});
+
 describe("given a project-scoped row and an organization-scoped row that both define the same model id", () => {
   describe("when display names are built across both rows", () => {
     /** @scenario Two rows with distinct configured names resolve to one deterministic winner */
@@ -164,6 +216,145 @@ describe("given a project-scoped row and an organization-scoped row that both de
   });
 });
 
+describe("given a project-scoped row and an organization-scoped row whose winning row is returned last", () => {
+  describe("when display names are built across both rows", () => {
+    // The mirror of "given a project-scoped row and an organization-scoped
+    // row..." above, which lists its winner (the project-scoped row)
+    // first and so stays green even with the precedence sort removed
+    // entirely (arrival-order-wins) — verified by knocking the sort out.
+    // AC3's scenario promises the winner resolves "in either order";
+    // together with the case above, this pair proves that for the scope
+    // tier specifically, not just for the id tiebreak below.
+    it("prefers the project-scoped row's name whichever order the rows arrive in", () => {
+      const projectRow = makeProvider({
+        provider: "vendorN",
+        enabled: true,
+        id: "zzz-project",
+        scopes: [{ scopeType: "PROJECT", scopeId: "proj_5" }],
+        customModels: [
+          { modelId: "comet-5", displayName: "Falcon Nine", mode: "chat" },
+        ],
+      });
+      const organizationRow = makeProvider({
+        provider: "vendorN",
+        enabled: true,
+        id: "aaa-org",
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_5" }],
+        customModels: [
+          { modelId: "comet-5", displayName: "Widget Nine", mode: "chat" },
+        ],
+      });
+
+      const result = buildCustomModelDisplayNames([
+        organizationRow,
+        projectRow,
+      ]);
+
+      expect(result["vendorN/comet-5"]).toBe("Falcon Nine");
+    });
+  });
+});
+
+describe("given a project-scoped row and a row whose scope tier is not one `rankOf` recognizes", () => {
+  describe("when display names are built across both rows", () => {
+    // The unknown-tier row deliberately has the lexicographically LOWER
+    // id, so only a correct scope ranking can make the project-scoped
+    // row win: if the unknown tier fell through to the id tiebreak
+    // instead of ranking last, this row would win on id alone and the
+    // test would pass for the wrong reason. "WORKSPACE" stands in for a
+    // future tier, cast in unchecked the same way
+    // `modelProvider.service.ts` launders the Prisma enum with `as` —
+    // `registry.ts`'s `scopes[].scopeType` is typed as the known union,
+    // so reaching an unrecognized value here requires the same kind of
+    // cast a real caller would need to smuggle one past the type system.
+    it("ranks the unrecognized scope tier last, so the project-scoped row's name wins", () => {
+      const projectRow = makeProvider({
+        provider: "vendorO",
+        enabled: true,
+        id: "zzz-project",
+        scopes: [{ scopeType: "PROJECT", scopeId: "proj_6" }],
+        customModels: [
+          { modelId: "nova-6", displayName: "Trusted Name", mode: "chat" },
+        ],
+      });
+      const unknownTierRow = makeProvider({
+        provider: "vendorO",
+        enabled: true,
+        id: "aaa-unknown",
+        scopes: [
+          {
+            scopeType: "WORKSPACE" as unknown as
+              | "ORGANIZATION"
+              | "TEAM"
+              | "PROJECT",
+            scopeId: "ws_6",
+          },
+        ],
+        customModels: [
+          { modelId: "nova-6", displayName: "Unranked Name", mode: "chat" },
+        ],
+      });
+
+      const result = buildCustomModelDisplayNames([
+        unknownTierRow,
+        projectRow,
+      ]);
+
+      expect(result["vendorO/nova-6"]).toBe("Trusted Name");
+    });
+  });
+});
+
+describe("given two rows scoped only via the legacy singular scopeType field (no scopes[] array)", () => {
+  describe("when display names are built across both rows", () => {
+    // `registry.ts` keeps the collapsed `scopeType`/`scopeId` pair "for
+    // legacy callers that still key by scopeType/scopeId" alongside the
+    // plural `scopes[]` grant set every other scoped fixture in this file
+    // uses. Neither row here sets `scopes`, so `scopeRank`'s fallback
+    // branch (`: [row.scopeType]`) is the only thing that can rank them.
+    // The organization row deliberately has the lexicographically LOWER
+    // id, so only a correct read of that fallback branch — not the id
+    // tiebreak — can make the project row win.
+    it("prefers the project-scoped row's name over the organization-scoped row's name", () => {
+      const projectRow = makeProvider({
+        provider: "vendorP",
+        enabled: true,
+        id: "zzz-project",
+        scopeType: "PROJECT",
+        scopeId: "proj_7",
+        customModels: [
+          {
+            modelId: "pulsar-7",
+            displayName: "Legacy Field Winner",
+            mode: "chat",
+          },
+        ],
+      });
+      const organizationRow = makeProvider({
+        provider: "vendorP",
+        enabled: true,
+        id: "aaa-org",
+        scopeType: "ORGANIZATION",
+        scopeId: "org_7",
+        customModels: [
+          {
+            modelId: "pulsar-7",
+            displayName: "Legacy Field Loser",
+            mode: "chat",
+          },
+        ],
+      });
+
+      const result = buildCustomModelDisplayNames([
+        organizationRow,
+        projectRow,
+      ]);
+
+      expect(result["vendorP/pulsar-7"]).toBe("Legacy Field Winner");
+    });
+  });
+});
+
 describe("given a persisted row and a row with no id that both define the same model id", () => {
   describe("when display names are built across both rows", () => {
     it("prefers the persisted row's name over the name on the row with no id", () => {
@@ -194,6 +385,55 @@ describe("given a persisted row and a row with no id that both define the same m
       const result = buildCustomModelDisplayNames([
         placeholderRow,
         persistedRow,
+      ]);
+
+      expect(result["vendorJ/helix-3"]).toBe("Stored Label");
+    });
+  });
+});
+
+describe("given a persisted row and a row with no id whose winning row is returned first", () => {
+  describe("when display names are built across both rows", () => {
+    // The mirror of "given a persisted row and a row with no id..."
+    // above, which lists its winner (the persisted row) LAST — the order
+    // plain last-write-wins (the exact pre-fix production code this PR
+    // replaces) also resolves correctly, since the winner being last is
+    // exactly what last-write-wins rewards. That makes the case above
+    // pass for the wrong reason: it can't tell a correct persisted-tier
+    // rule from an incorrect last-write-wins rule. Swapping the order —
+    // winner first, loser last, as below — flips that: only a real
+    // persisted-tier rule still resolves the winner, while last-write-wins
+    // hands it to the loser. Verified by sabotage.
+    it("prefers the persisted row's name whichever order the rows arrive in", () => {
+      // Same discriminating shape as the case above: neither row carries
+      // scopes, so the enabled and scope tiers tie and the id tiebreak
+      // alone would hand this to the id-less row — an absent id sorts
+      // below every real one. Only a persisted tier ahead of that
+      // tiebreak keeps a synthesized placeholder from outranking a
+      // stored row, regardless of arrival order.
+      const placeholderRow = makeProvider({
+        provider: "vendorJ",
+        enabled: true,
+        customModels: [
+          {
+            modelId: "helix-3",
+            displayName: "Seeded Placeholder",
+            mode: "chat",
+          },
+        ],
+      });
+      const persistedRow = makeProvider({
+        provider: "vendorJ",
+        enabled: true,
+        id: "mp_stored",
+        customModels: [
+          { modelId: "helix-3", displayName: "Stored Label", mode: "chat" },
+        ],
+      });
+
+      const result = buildCustomModelDisplayNames([
+        persistedRow,
+        placeholderRow,
       ]);
 
       expect(result["vendorJ/helix-3"]).toBe("Stored Label");
