@@ -61,7 +61,7 @@ Feature: `langwatch code` captures VS Code Copilot Chat via a scoped shell funct
 
   Rule: the token rides a scoped `code()` function, never a bare global export
 
-    @unit @unimplemented
+    @unit
     Scenario: A scoped code() function sets the telemetry env only for code launches
       Given `langwatch code` resolves to ingestion
       When the user accepts the persistence prompt

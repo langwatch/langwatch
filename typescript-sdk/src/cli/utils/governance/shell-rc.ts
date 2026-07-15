@@ -67,6 +67,10 @@ export const SHELL_FUNCTION_TOOLS: readonly string[] = [
   "gemini",
   "opencode",
   "copilot",
+  // `code` (VS Code Copilot Chat) is a CLI-launched editor with no
+  // config-file env target for the auth header, so it uses the same
+  // scoped-function tier. ADR-039 §Extension #2.
+  "code",
 ] as const;
 
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
