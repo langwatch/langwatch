@@ -27,6 +27,7 @@ import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
+import { pMapLimited } from "../../event-sourcing/replay/pMapLimited";
 import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -261,22 +262,19 @@ export const workflowRouter = createTRPCRouter({
           ]),
         ),
       ];
-      const visibleProjects = new Map(
-        await Promise.all(
-          relatedProjectIds.map(
-            async (projectId) =>
-              [
-                projectId,
-                projectId === input.projectId ||
-                  (await hasProjectPermission(
-                    ctx,
-                    projectId,
-                    "workflows:view",
-                  )),
-              ] as const,
-          ),
-        ),
-      );
+      // Each related project needs its own RBAC check; cap concurrency so a
+      // workflow with many copies can't exhaust the DB connection pool.
+      const visibleProjects = new Map<string, boolean>();
+      await pMapLimited({
+        items: relatedProjectIds,
+        concurrency: 5,
+        fn: async (projectId) => {
+          const isVisible =
+            projectId === input.projectId ||
+            (await hasProjectPermission(ctx, projectId, "workflows:view"));
+          visibleProjects.set(projectId, isVisible);
+        },
+      });
 
       return workflows.map(({ copiedWorkflows, ...workflow }) => {
         const canSeeSource =

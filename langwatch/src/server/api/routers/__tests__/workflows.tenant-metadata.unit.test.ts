@@ -37,7 +37,10 @@ const createCaller = () => {
 beforeEach(() => {
   vi.clearAllMocks();
   hasProjectPermission.mockImplementation(
-    async (_ctx, projectId) => projectId === "project_visible",
+    async (_ctx, projectId, permission) => {
+      expect(permission).toBe("workflows:view");
+      return projectId === "project_visible";
+    },
   );
   findMany.mockResolvedValue([
     {
