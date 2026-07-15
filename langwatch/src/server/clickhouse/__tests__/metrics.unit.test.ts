@@ -481,9 +481,10 @@ describe("ClickHouse metrics", () => {
       });
     });
 
-    describe("when not in production (local dev)", () => {
-      // NODE_ENV is "test" here, exercising the off-prod path: local dev has no
-      // system.backup_log, so the repeated failure must never reach the console.
+    describe("when off-prod but not local dev (NODE_ENV=test / staging)", () => {
+      // NODE_ENV is "test" here: the query still runs (only local dev skips it), so
+      // this exercises the off-prod logging path — a repeated failure must never
+      // reach the console, it stays at debug.
       it("never warns and keeps backup-log failures at debug", async () => {
         const client = buildMockClient(() => true);
 
@@ -497,6 +498,30 @@ describe("ClickHouse metrics", () => {
         expect(
           countCallsMatching(loggerMocks.debug.mock.calls, 1, "system.backup_log"),
         ).toBeGreaterThanOrEqual(1);
+      });
+    });
+
+    describe("when running in local dev (NODE_ENV=development)", () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      beforeEach(() => {
+        process.env.NODE_ENV = "development";
+      });
+      afterEach(() => {
+        process.env.NODE_ENV = originalNodeEnv;
+      });
+
+      // system.backup_log never exists locally, so querying it every 15s tick is
+      // pointless — the collector must skip it entirely, leaving only parts + disks.
+      it("skips the system.backup_log query entirely", async () => {
+        const client = buildMockClient(() => false);
+
+        await metrics.collectStorageStats(client);
+
+        expect(client.query).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.stringContaining("system.backup_log"),
+          }),
+        );
       });
     });
   });
