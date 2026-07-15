@@ -381,6 +381,7 @@ model Project {
   annotations              Annotation[]
   projectSecrets           ProjectSecret[]
   TriggerSent              TriggerSent[]
+  WebhookDelivery          WebhookDelivery[]
   ReactorOutbox            ReactorOutbox[]
   annotationScores         AnnotationScore[]
   publicShares             PublicShare[]
@@ -803,10 +804,49 @@ model Trigger {
   // without a schema migration.
   traceDebounceMs      Int           @default(30000)
   TriggerSent   TriggerSent[]
+  webhookDeliveries WebhookDelivery[]
   customGraphId String?       @unique
   customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+// ADR-040 §6: per-ATTEMPT webhook delivery log — the drill-down behind a
+// webhook automation's "recent fires". One row per HTTP attempt; all attempts
+// of one logical fire share `dispatchId` (== the X-LangWatch-Event-Id). Header
+// values are stored REDACTED (auth/signature masked to "***"); the response
+// snippet is size-capped. Pruned after 30 days.
+model WebhookDelivery {
+  id             String                @id @default(nanoid())
+  projectId      String
+  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  triggerId      String
+  trigger        Trigger               @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  // Groups every attempt of one logical fire (== X-LangWatch-Event-Id).
+  dispatchId     String
+  requestMethod  String
+  requestUrl     String
+  // Redacted header record: auth/signature/api-key values masked to "***".
+  requestHeaders Json
+  // Null when no HTTP response arrived (transport/SSRF/timeout).
+  responseStatus Int?
+  responseBody   String?
+  latencyMs      Int?
+  // Transport / SSRF / timeout message when there is no HTTP response.
+  error          String?
+  outcome        WebhookDeliveryOutcome
+  firedAt        DateTime              @default(now())
+  createdAt      DateTime              @default(now())
+
+  @@index([projectId, triggerId, dispatchId])
+  @@index([projectId, triggerId, firedAt])
+}
+
+enum WebhookDeliveryOutcome {
+  success
+  retryable
+  terminal
+  pending
 }
 
 enum ExperimentType {

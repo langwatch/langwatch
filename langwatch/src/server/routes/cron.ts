@@ -12,6 +12,7 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { scheduleTopicClustering } from "~/server/topicClustering/topicClusteringQueue";
+import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
@@ -78,6 +79,33 @@ secured
 secured
   .access(cronPolicy())
   .post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
+
+// ---------- GET|POST /api/cron/webhook_delivery_cleanup ----------
+// ADR-040 §6: prune webhook delivery-log rows older than 30 days. Postgres is
+// outside the ClickHouse retention sweep, so the log needs its own cleaner.
+const webhookDeliveryCleanupHandler = async (c: CronContext) => {
+  if (!validateCronKey(c)) {
+    return c.body(null, 401);
+  }
+  try {
+    const deleted = await WebhookDeliveryService.create(prisma).pruneExpired();
+    return c.json({ message: "Webhook delivery log pruned", deleted });
+  } catch (error: any) {
+    return c.json(
+      {
+        message: "Error pruning webhook delivery log",
+        error: error?.message ? error.message.toString() : `${error}`,
+      },
+      500,
+    );
+  }
+};
+secured
+  .access(cronPolicy())
+  .get("/cron/webhook_delivery_cleanup", webhookDeliveryCleanupHandler);
+secured
+  .access(cronPolicy())
+  .post("/cron/webhook_delivery_cleanup", webhookDeliveryCleanupHandler);
 
 // ---------- GET|POST /api/cron/schedule_topic_clustering ----------
 const scheduleTopicClusteringHandler = async (c: CronContext) => {

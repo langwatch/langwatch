@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
+  redactHeadersForLog,
   sanitizeWebhookHeaders,
   validateWebhookUrlShape,
   WEBHOOK_HEADER_VALUE_KEPT,
   webhookActionParamsSchema,
 } from "../shared";
+
+describe("redactHeadersForLog", () => {
+  it("masks secret-bearing header values but keeps their names", () => {
+    expect(
+      redactHeadersForLog({
+        Authorization: "Bearer sk-123",
+        "X-Api-Key": "k",
+        "X-Signature": "abc",
+        "X-Trace-Id": "t1",
+        Accept: "application/json",
+      }),
+    ).toEqual({
+      Authorization: "***",
+      "X-Api-Key": "***",
+      "X-Signature": "***",
+      "X-Trace-Id": "t1",
+      Accept: "application/json",
+    });
+  });
+});
 
 describe("validateWebhookUrlShape", () => {
   describe("when the URL is a plain https endpoint", () => {

@@ -23,6 +23,7 @@ import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
 import { sendWebhook } from "~/server/triggers/sendWebhook";
+import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
 import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
@@ -188,6 +189,11 @@ export function buildOutboxRuntime({
   // unchanged. The TriggerSent repo mirrors the cron's dedup pattern
   // exactly.
   const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
+  // ADR-040 §6: one delivery-log writer shared by the trace-cadence outbox
+  // dispatcher and the event-sourced graph-alert path.
+  const webhookDeliveries = WebhookDeliveryService.create(prisma);
+  const recordWebhookDelivery = (input: Parameters<typeof webhookDeliveries.record>[0]) =>
+    webhookDeliveries.record(input);
   const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
     loadTrigger: async ({ triggerId, projectId }) =>
       prisma.trigger.findUnique({ where: { id: triggerId, projectId } }),
@@ -210,6 +216,7 @@ export function buildOutboxRuntime({
             sendSlack: sendRenderedSlackMessage,
             sendSlackBot: postSlackChatMessage,
             sendWebhook,
+            recordWebhookDelivery,
             // ADR-031: honour the same email suppression list the cron path
             // does, so one-click unsubscribes are respected on the
             // event-sourced graph-alert path too.
@@ -328,6 +335,7 @@ export function buildOutboxRuntime({
     addToDataset: async (params) => {
       await createManyDatasetRecords(params);
     },
+    recordWebhookDelivery,
     enqueueCadence: async (
       payload: CadenceStagePayload,
       { delayMs }: { delayMs: number },

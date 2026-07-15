@@ -20,6 +20,8 @@ import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
 import { sendWebhook } from "~/server/triggers/sendWebhook";
 import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
+import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
+import { prisma } from "~/server/db";
 import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
 import type { ActionParams, TriggerContext } from "../types";
 
@@ -103,6 +105,8 @@ export function cronGraphAlertDeps(): GraphAlertDispatchDeps {
     sendSlack: sendRenderedSlackMessage,
     sendSlackBot: postSlackChatMessage,
     sendWebhook,
+    recordWebhookDelivery: (input) =>
+      WebhookDeliveryService.create(prisma).record(input),
     filterSuppressedRecipients: (params) =>
       app.emailSuppressions.filterSuppressed(params),
     // ADR-031: the two hard email caps, bound from env — the same consumers

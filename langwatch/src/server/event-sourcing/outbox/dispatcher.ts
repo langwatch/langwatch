@@ -31,9 +31,9 @@ import {
 } from "~/server/triggers/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import {
-  assertWebhookDelivered,
-  sendWebhook,
-} from "~/server/triggers/sendWebhook";
+  deliverWebhook,
+  type WebhookDeliveryRecorder,
+} from "~/server/triggers/deliverWebhook";
 import { decryptWebhookHeaders } from "~/automations/providers/definitions/webhook/secret";
 import type { WebhookMethod } from "~/automations/providers/definitions/webhook/shared";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
@@ -119,6 +119,10 @@ export interface OutboxDispatcherDeps {
     projectId: string;
     datasetRecords: DatasetRecordEntry[];
   }) => Promise<void>;
+  /** ADR-040 §6 delivery-log writer — records one row per webhook attempt.
+   *  Optional: when absent (tests) deliveries aren't logged, dispatch is
+   *  unchanged. */
+  recordWebhookDelivery?: WebhookDeliveryRecorder;
   /**
    * Late-bound — settle stage's match-confirmed branch calls this to
    * re-enqueue as `cadence`. The queue ref is filled in by `buildOutboxRuntime`
@@ -872,18 +876,20 @@ async function handleCadenceBatch(
             )
             .digest("hex")
             .slice(0, 32);
-        const result = await sendWebhook({
+        // Send + classify + log one attempt (ADR-040 §5/§6). A retryable
+        // status throws so the outbox backs off and retries; the delivery-log
+        // row is written either way.
+        await deliverWebhook({
+          recorder: deps.recordWebhookDelivery,
+          projectId,
+          triggerId,
+          eventId: webhookEventId,
           url: params.url,
           method: params.method,
           headers: decryptWebhookHeaders(params),
           body: rendered.body,
           triggerName: trigger.name,
-          projectId,
-          eventId: webhookEventId,
         });
-        // 5xx/429/408 throw retryable so the outbox backs off and retries;
-        // other non-2xx are terminal (ADR-040 §5).
-        assertWebhookDelivered({ result, triggerName: trigger.name });
         didSend = true;
         break;
       }

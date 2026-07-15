@@ -531,11 +531,32 @@ deliberate deltas against the text above:
   (no per-tick re-post to a misconfigured endpoint); only retryable failures
   leave it open for the next tick.
 
-**Still deferred (unchanged decisions, not yet built):** HMAC request signing
-(§3, including the signing toggle UI), `Retry-After` →
-`DispatchError.retryAfterMs`, the stable `X-LangWatch-Event-Id` header,
-the per-project dispatch rate limit (test fires ARE rate-limited per user),
-and the Phase 4 `WebhookDelivery` log + report UI.
+**Phase 3 completed in a follow-up (also #5807):** `Retry-After` →
+`DispatchError.retryAfterMs` (parsed delta-seconds + HTTP-date, capped at 1h;
+honored by the GroupQueue as a backoff FLOOR); the stable `X-LangWatch-Event-Id`
+(trace path from the batch's traceIds, graph-alert path from the fire digest —
+identical across retries so receivers dedupe); and a per-project hourly
+dispatch cap (`webhook-dispatch:{projectId}`).
+
+**Phase 4 shipped as a standalone table (§6).** `WebhookDelivery` + a
+`WebhookDeliveryOutcome` enum, one row per attempt written by `deliverWebhook`
+(send + classify + log as a unit), redacted headers (`redactHeadersForLog`
+masks auth/signature values to `***`), a `getWebhookDeliveries` read procedure,
+the drawer's "Recent deliveries" drill-down, and a 30-day prune cron
+(`/api/cron/webhook_delivery_cleanup`).
+
+> **Known design debt / future direction.** `WebhookDelivery` is a
+> webhook-only, append-per-attempt log that sits *alongside* `ReactorOutbox`
+> (the generic delivery engine — one *mutable* row per dispatch, `lastError`
+> only) and `TriggerSent` (the idempotency/incident claim). The three answer
+> different questions today, but the deliverability report arguably belongs
+> *in* the outbox's audit mechanism (which already fires an `onFailed({ attempt,
+> willRetry })` hook per attempt) so every channel gets delivery history, not
+> just webhooks. Deferred deliberately: revisit unifying the per-attempt log
+> into the outbox rather than growing a parallel table.
+
+**Still deferred:** HMAC request signing (§3, including the signing toggle UI)
+and the `ProjectSecret`-ref auth union — the only remaining Phase 2 gap.
 
 ## References
 

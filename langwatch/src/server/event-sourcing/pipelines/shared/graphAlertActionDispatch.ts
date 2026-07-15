@@ -7,10 +7,11 @@ import {
 } from "~/automations/providers/definitions/webhook/secret";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import type { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import type { sendWebhook } from "~/server/triggers/sendWebhook";
 import {
-  assertWebhookDelivered,
-  type sendWebhook,
-} from "~/server/triggers/sendWebhook";
+  deliverWebhook,
+  type WebhookDeliveryRecorder,
+} from "~/server/triggers/deliverWebhook";
 import type { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { ALERT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
@@ -114,6 +115,10 @@ export interface GraphAlertDispatchDeps {
   /** ADR-040 SSRF-fenced webhook sender — same `sendWebhook` the trace
    *  cadence dispatcher uses. */
   sendWebhook: typeof sendWebhook;
+  /** ADR-040 §6 delivery-log writer — records one row per attempt. Optional:
+   *  when absent (tests, cron before wiring), deliveries aren't logged but
+   *  dispatch is unchanged. */
+  recordWebhookDelivery?: WebhookDeliveryRecorder;
   /**
    * ADR-031 email suppression gate. The event-sourced graph-alert path
    * renders the SAME one-click-unsubscribe footer + `List-Unsubscribe`
@@ -583,21 +588,24 @@ export async function dispatchGraphAlertAction({
         "Graph-alert webhook body render errors — fell back to default body",
       );
     }
-    const result = await deps.sendWebhook({
+    // Send + classify + log one attempt as a unit (ADR-040 §5/§6). A
+    // non-2xx throws BEFORE the claim below, so a retryable failure is
+    // actually retried; the delivery-log row is written either way.
+    await deliverWebhook({
+      send: deps.sendWebhook,
+      recorder: deps.recordWebhookDelivery,
+      projectId: project.id,
+      triggerId: trigger.id,
+      // The fire digest is this dispatch's stable identity — every outbox
+      // retry of the same fire reuses it as the X-LangWatch-Event-Id so the
+      // receiver dedupes (ADR-040 §5).
+      eventId: `evt_${destinationHash(`event:${input.fireDigest}`)}`,
       url: params.url,
       method: params.method,
       headers: decryptWebhookHeaders(params),
       body: rendered.body,
       triggerName: trigger.name,
-      projectId: project.id,
-      // The fire digest is this dispatch's stable identity — every outbox
-      // retry of the same fire reuses it as the X-LangWatch-Event-Id so the
-      // receiver dedupes (ADR-040 §5).
-      eventId: `evt_${destinationHash(`event:${input.fireDigest}`)}`,
     });
-    // 5xx/429/408 throw retryable, other non-2xx terminal (ADR-040 §5) —
-    // BEFORE the claim below, so a retryable failure is actually retried.
-    assertWebhookDelivered({ result, triggerName: trigger.name });
     await recordRecipientSent(urlHash);
     return {
       channel: "webhook",

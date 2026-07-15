@@ -58,6 +58,7 @@ import {
   validateTemplateDraft,
 } from "~/server/app-layer/triggers/trigger-template.service";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
 import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -496,6 +497,26 @@ export const automationRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
       return fireHistory.getAllRecentFiresForTrigger({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+        limit: input.limit,
+      });
+    }),
+  /** ADR-040 §6: the per-attempt webhook delivery log for one automation —
+   *  the drawer's "Recent deliveries" drill-down. Header values are already
+   *  redacted at write time. */
+  getWebhookDeliveries: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        triggerId: z.string(),
+        limit: z.number().int().min(1).max(50).default(50),
+      }),
+    )
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      const deliveries = WebhookDeliveryService.create(ctx.prisma);
+      return deliveries.getRecentByTrigger({
         projectId: input.projectId,
         triggerId: input.triggerId,
         limit: input.limit,

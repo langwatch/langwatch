@@ -99,6 +99,38 @@ Feature: Webhook (generic HTTP) automation action
       When the endpoint answers any other 4xx
       Then the dispatch fails terminally without retry
 
+    Scenario: A receiver's Retry-After lengthens the backoff
+      Given the endpoint answers 429 with a Retry-After header
+      When the dispatch is retried by the outbox
+      Then the next attempt waits at least as long as the receiver asked
+
+    Scenario: Every attempt of one fire carries the same event id
+      Given a dispatch that is retried by the outbox
+      Then each attempt sends the same X-LangWatch-Event-Id
+      So a receiver can dedupe replays of the same fire
+
+    Scenario: A project cannot flood an endpoint
+      Given a project has reached its hourly webhook dispatch cap
+      When another webhook fires
+      Then that dispatch backs off instead of contacting the endpoint
+
+  Rule: Delivery log
+
+    Scenario: Each attempt is recorded with its outcome
+      Given a webhook automation that fires and is retried
+      When the attempts complete
+      Then the automation's recent deliveries show one row per attempt
+      And each row shows the HTTP status or transport error and the latency
+
+    Scenario: Stored request headers never contain secret values
+      Given a webhook automation with an Authorization header that fires
+      Then the delivery log stores the header name with its value masked
+
+    Scenario: The delivery log is pruned after 30 days
+      Given delivery rows older than 30 days exist
+      When the delivery-log prune runs
+      Then those rows are deleted and newer rows are kept
+
     Scenario: A terminally failing endpoint is not re-posted every evaluation
       Given a graph alert webhook whose endpoint answers a terminal error
       When the alert fires and delivery fails terminally
