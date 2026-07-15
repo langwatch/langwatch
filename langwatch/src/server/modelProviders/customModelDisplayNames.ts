@@ -6,26 +6,6 @@ const SCOPE_RANK = { PROJECT: 0, TEAM: 1, ORGANIZATION: 2 } as const;
 const UNSCOPED_RANK = 3;
 
 /**
- * How good a row is as a source of display names. Tiers are compared in
- * declaration order and the LOWEST value wins each one.
- *
- * The first two tiers are the collapse rule
- * `ModelProviderService.isNarrower` already applies to these same rows;
- * the last two extend it to a total order over distinct rows, so a
- * winner exists no matter how the rows tie.
- */
-type RowRank = {
-  /** Enabled rows beat disabled ones. */
-  disabled: number;
-  /** PROJECT ▸ TEAM ▸ ORGANIZATION ▸ unscoped. */
-  scope: number;
-  /** Persisted rows beat synthesized ones, which carry no `id`. */
-  unpersisted: number;
-  /** Lexicographic row id — the final tiebreak. */
-  id: string;
-};
-
-/**
  * Ranks a row by its narrowest scope, read from the `scopes[]` grant set
  * that `registry.ts` directs consumers to prefer over the collapsed
  * pair. Falls back to the collapsed `scopeType` for callers that set only
@@ -43,31 +23,44 @@ const scopeRank = (row: MaybeStoredModelProvider): number => {
   );
 };
 
-const rankRow = (row: MaybeStoredModelProvider): RowRank => ({
-  disabled: row.enabled ? 0 : 1,
-  scope: scopeRank(row),
-  unpersisted: row.id ? 0 : 1,
-  id: row.id ?? "",
-});
+/**
+ * How good a row is as a source of display names, as tiers compared in
+ * order with the LOWEST value winning each:
+ * enabled ▸ narrowest scope ▸ persisted ▸ lowest id.
+ *
+ * The first two tiers are the collapse rule
+ * `ModelProviderService.isNarrower` already applies to these same rows;
+ * the last two extend it to a total order over distinct *persisted*
+ * rows. They cannot separate two rows that both lack an `id`, which rank
+ * alike on both (`1`, then `""`), so such a pair tied on the first two
+ * tiers as well falls through to arrival order. No caller opens that
+ * gap: `buildDefaultProviders` synthesizes at most one row per provider
+ * and never gives it custom models.
+ *
+ * The persisted tier is not redundant with the id tier under it: `""`
+ * sorts below every real id, so without it an id-less row would beat
+ * every stored one rather than lose to it.
+ *
+ * The id tier is a determinism device, not a meaningful one — it settles
+ * a tie reproducibly, and a lower id says nothing about a row being the
+ * more correct source of a name.
+ */
+const precedence = (row: MaybeStoredModelProvider) =>
+  [row.enabled ? 0 : 1, scopeRank(row), row.id ? 0 : 1, row.id ?? ""] as const;
 
-/** Whether `candidate` beats `incumbent` on the first tier they differ on. */
-const outranks = ({
-  candidate,
-  incumbent,
-}: {
-  candidate: RowRank;
-  incumbent: RowRank;
-}): boolean => {
-  if (candidate.disabled !== incumbent.disabled) {
-    return candidate.disabled < incumbent.disabled;
+/** Orders rows best-first: lexicographic over `precedence`, lower wins. */
+const byPrecedence = (
+  left: MaybeStoredModelProvider,
+  right: MaybeStoredModelProvider,
+): number => {
+  const rightTiers = precedence(right);
+
+  for (const [tier, ours] of precedence(left).entries()) {
+    const theirs = rightTiers[tier]!;
+    if (ours !== theirs) return ours < theirs ? -1 : 1;
   }
-  if (candidate.scope !== incumbent.scope) {
-    return candidate.scope < incumbent.scope;
-  }
-  if (candidate.unpersisted !== incumbent.unpersisted) {
-    return candidate.unpersisted < incumbent.unpersisted;
-  }
-  return candidate.id < incumbent.id;
+
+  return 0;
 };
 
 const customEntriesOf = (
@@ -82,9 +75,11 @@ const customEntriesOf = (
  *
  * That last case is what `toLegacyCompatibleCustomModels` synthesizes for
  * a legacy `string[]` row: an artifact of the conversion rather than a
- * name anyone chose. Dropping it is invisible to callers, since
- * `modelDisplayLabel` falls back to exactly that model id anyway, and it
- * keeps the artifact from outranking a real name on another row.
+ * name anyone chose. Dropping it costs the entry's own label nothing,
+ * since `modelDisplayLabel` falls back to exactly that model id anyway.
+ * Where it does decide something — deliberately — is when another row
+ * names the same model: the artifact never competes, so the real name
+ * wins the key even from a row the artifact's row would outrank.
  */
 const configuredDisplayName = (entry: CustomModelEntry): string | null => {
   const modelId = entry?.modelId;
@@ -111,12 +106,19 @@ const configuredDisplayName = (entry: CustomModelEntry): string | null => {
  * would drop one row's custom models on the floor.
  *
  * When several rows configure a name for the same key, the best-ranked
- * row wins (see `RowRank`), which makes the result independent of the
- * order rows arrive in — `findAllAccessibleForProject` issues a bare
- * `findMany` with no `orderBy`, so row order carries no meaning to read
- * precedence from. Ranking is per key rather than per model, because the
- * two key spaces collide differently: two rows can share a
- * `<provider>/<modelId>` key, but never a `<rowId>/<modelId>` one.
+ * row wins: rows are visited best-first (see `precedence`) and the first
+ * write of a key sticks. That makes the result independent of the order
+ * rows arrive in for every pair of rows the ranking separates, which is
+ * every pair of distinct persisted rows — worth having because
+ * `findAllAccessibleForProject` issues a bare `findMany` with no
+ * `orderBy`, so row order carries no meaning to read precedence from.
+ * Two rows that both lack an `id` are the pair it cannot separate;
+ * `precedence` covers why no caller produces them.
+ *
+ * Precedence lands per key rather than per model, because the two key
+ * spaces collide differently: two rows can share a `<provider>/<modelId>`
+ * key, but never a `<rowId>/<modelId>` one. So a row that loses the
+ * shared key still writes the row-id-keyed name no other row can claim.
  *
  * Only entries that name something compete, so a row's malformed or
  * unnamed entry costs no other row its name. The lists are JSON behind
@@ -135,10 +137,8 @@ export const buildCustomModelDisplayNames = (
   modelProviders: readonly MaybeStoredModelProvider[],
 ): Record<string, string> => {
   const displayNames: Record<string, string> = {};
-  const winningRank: Record<string, RowRank> = {};
 
-  for (const row of modelProviders) {
-    const rank = rankRow(row);
+  for (const row of [...modelProviders].sort(byPrecedence)) {
     const entries = [
       ...customEntriesOf(row.customModels),
       ...customEntriesOf(row.customEmbeddingsModels),
@@ -151,13 +151,7 @@ export const buildCustomModelDisplayNames = (
       const keys = [`${row.provider}/${entry.modelId}`];
       if (row.id) keys.push(`${row.id}/${entry.modelId}`);
 
-      for (const key of keys) {
-        const incumbent = winningRank[key];
-        if (incumbent && !outranks({ candidate: rank, incumbent })) continue;
-
-        displayNames[key] = displayName;
-        winningRank[key] = rank;
-      }
+      for (const key of keys) displayNames[key] ??= displayName;
     }
   }
 

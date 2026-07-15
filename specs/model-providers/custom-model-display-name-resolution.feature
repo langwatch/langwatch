@@ -39,7 +39,8 @@ Feature: Custom Model Display Name resolution is storage- and order-independent
     Given a second "azure" provider row at a broader scope whose entry for the same model id reads "Company GPT"
     When display names are resolved with the rows in either order
     Then both resolutions read the same single winner
-    And the winner follows the precedence rule stated in the pull request
+    And the winner is the enabled row, then the narrowest-scoped row,
+        then the stored row, then the lowest row id
 
   # --- Id-form independence -------------------------------------------------
 

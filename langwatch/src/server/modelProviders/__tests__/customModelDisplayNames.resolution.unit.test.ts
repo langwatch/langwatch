@@ -1,22 +1,24 @@
 /**
- * Unit tests for issue #5837 — `buildCustomModelDisplayNames()` is silently
- * lossy in production. Four defects, all reproduced at HEAD:
+ * Unit tests for `buildCustomModelDisplayNames()`'s resolution contract —
+ * pinned for issue #5837, where a configured custom-model Display Name
+ * silently failed to resolve in production. Before this change, the
+ * function was lossy in four ways:
  *
- *   B  — a legacy `string[]` row converts (via `toLegacyCompatibleCustomModels`)
+ *   B  — a legacy `string[]` row converted (via `toLegacyCompatibleCustomModels`)
  *        to an entry whose `displayName === modelId` (an "identity" entry).
- *   C1/C2 — two rows of the same provider defining the same `modelId` resolve
- *        to whichever row the caller happens to list last: an identity entry
- *        can clobber a real configured name, and the winner flips with row
+ *   C1/C2 — two rows of the same provider defining the same `modelId` resolved
+ *        to whichever row the caller happened to list last: an identity entry
+ *        could clobber a real configured name, and the winner flipped with row
  *        order instead of being decided by any precedence rule.
- *   D  — the map is keyed `${provider}/${modelId}` only, so the canonical
- *        `${mpId}/${modelId}` form a caller may hold can never hit (#5828).
- *   E  — `entry?.displayName?.trim()` throws a TypeError when `displayName`
- *        is present but not a string, and spreading a non-array
- *        `customModels` column throws too — the column is JSON behind an
+ *   D  — the map was keyed `${provider}/${modelId}` only, so the canonical
+ *        `${mpId}/${modelId}` form a caller may hold could never hit (#5828).
+ *   E  — `entry?.displayName?.trim()` threw a TypeError when `displayName`
+ *        was present but not a string, and spreading a non-array
+ *        `customModels` column threw too — the column is JSON behind an
  *        unchecked cast (`toLegacyCompatibleCustomModels` returns one), so
  *        both shapes can reach here from a hand-edited or migrated row.
  *
- * Target contract this file pins (see PR description for the full writeup):
+ * The contract this file pins:
  *   - Identity entries (`displayName.trim() === modelId`) are not names —
  *     they never enter the map and never compete with a real name.
  *   - When several rows supply a REAL name for the same `modelId`, the
@@ -31,8 +33,9 @@
  *   - A malformed entry or a malformed `customModels` column must not
  *     abort resolution for every other row.
  *
- * Some cases below (marked inline) already hold at HEAD — they're kept as
- * forward guards so the fix for the others can't regress them.
+ * Some cases below (marked inline) already held correctly before this
+ * change — they're kept as forward guards so a future change to this
+ * contract can't regress them.
  */
 import { describe, expect, it } from "vitest";
 import type { CustomModelEntry } from "../customModel.schema";
@@ -70,6 +73,7 @@ describe("given a real display name and a legacy identity row that collide on th
   });
 
   describe("when the legacy row is returned last", () => {
+    /** @scenario A legacy row of the same provider does not clobber a configured name */
     it("resolves the configured name when a legacy row is returned last", () => {
       const result = buildCustomModelDisplayNames([realRow, legacyRow]);
 
@@ -78,10 +82,11 @@ describe("given a real display name and a legacy identity row that collide on th
   });
 
   describe("when the legacy row is returned first", () => {
-    // At HEAD this order already resolves correctly — the real row is
-    // processed last, so last-write-wins happens to land on it. Kept
-    // alongside the "returned last" case above so the pair proves the
-    // fix makes the outcome order-independent, not just luckier.
+    // Before this change, this order already resolved correctly by
+    // accident — the real row was processed last, so naive last-write-wins
+    // happened to land on it. Kept alongside the "returned last" case
+    // above so the pair proves the fix makes the outcome
+    // order-independent, not just luckier.
     it("resolves the configured name when a legacy row is returned first", () => {
       const result = buildCustomModelDisplayNames([legacyRow, realRow]);
 
@@ -125,6 +130,7 @@ describe("given an enabled row and a disabled row that both define the same mode
 
 describe("given a project-scoped row and an organization-scoped row that both define the same model id", () => {
   describe("when display names are built across both rows", () => {
+    /** @scenario Two rows with distinct configured names resolve to one deterministic winner */
     it("prefers the project-scoped row's name over the organization-scoped row's name", () => {
       // The organization-scoped row deliberately has the lexicographically
       // lower id, so this only resolves correctly if scope is checked
@@ -279,6 +285,7 @@ describe("given a custom model row identified by its row id", () => {
   });
 
   describe("when the row-id-keyed full model id is resolved", () => {
+    /** @scenario A canonical model-provider-id-prefixed id resolves the display name */
     it("resolves the row-id-keyed full model id without falling back to the raw id", () => {
       const displayNames = buildCustomModelDisplayNames([row]);
 
@@ -294,6 +301,7 @@ describe("given a custom model row identified by its row id", () => {
 
 describe("given a row whose custom entry has a non-string display name", () => {
   describe("when display names are built alongside a valid entry on another row", () => {
+    /** @scenario A malformed entry is skipped without breaking valid ones */
     it("resolves a valid entry on another row when this row's display name is a number", () => {
       const goodRow = makeProvider({
         provider: "vendorA",
@@ -351,6 +359,7 @@ describe("given a row whose custom models column is not an array", () => {
 
 describe("given a provider with only a legacy-converted custom model", () => {
   describe("when the display name is resolved", () => {
+    /** @scenario A legacy-only provider renders the same label as before display names existed */
     it("resolves to the model id's family part", () => {
       const legacyEntries = toLegacyCompatibleCustomModels(
         ["research-preview-7"],
@@ -375,12 +384,12 @@ describe("given a provider with only a legacy-converted custom model", () => {
 
 describe("given a whitespace-only display name on a narrower-scoped row and a real display name on a broader-scoped row for the same model id", () => {
   describe("when display names are built across both rows", () => {
-    // Already holds at HEAD: today's blank/whitespace check is per-entry
-    // and unconditional, so it never even reaches a scope comparison.
-    // Kept as a forward guard — a precedence implementation that picks
-    // "the winning row by tier, then reads its name" instead of "the
-    // winning REAL name" would regress this by letting a blank-named
-    // narrower row shadow a real broader one.
+    // This already held before this change: the blank/whitespace check is
+    // per-entry and unconditional, so it never even reaches a scope
+    // comparison. Kept as a forward guard — a precedence implementation
+    // that picks "the winning row by tier, then reads its name" instead
+    // of "the winning REAL name" would regress this by letting a
+    // blank-named narrower row shadow a real broader one.
     it("resolves the broader-scoped row's real name over the narrower-scoped row's blank name", () => {
       const blankProjectRow = makeProvider({
         provider: "vendorH",
@@ -415,9 +424,32 @@ describe("given a whitespace-only display name on a narrower-scoped row and a re
   });
 });
 
+describe("given an entry whose display name is only whitespace, with no other row competing for the same model id", () => {
+  describe("when its label is resolved", () => {
+    /** @scenario A whitespace-only display name falls back to the model id family */
+    it("falls back to the model id's family part instead of the whitespace", () => {
+      const row = makeProvider({
+        provider: "vendorL",
+        customModels: [
+          { modelId: "nimbus-1", displayName: "   ", mode: "chat" },
+        ],
+      });
+
+      const displayNames = buildCustomModelDisplayNames([row]);
+      const label = modelDisplayLabel({
+        fullModelId: "vendorL/nimbus-1",
+        displayNames,
+      });
+
+      expect(label).toBe("nimbus-1");
+      expect(label).not.toBe("");
+    });
+  });
+});
+
 describe("given a custom model whose id is an alias-style latest pointer", () => {
   describe("when the display name is resolved", () => {
-    // Already holds at HEAD — nothing in the current or target resolver
+    // This already held before this change — nothing in the resolver
     // special-cases modelId content. Kept as a forward guard so a future
     // implementation that manipulates fullModelId strings (e.g. splitting
     // on "/") doesn't trip over an id that itself reads like a pointer.
