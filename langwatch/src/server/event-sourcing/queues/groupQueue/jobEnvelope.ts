@@ -595,7 +595,10 @@ export async function decodeJobEnvelope({
 }): Promise<Record<string, unknown>> {
   if (!isEnvelope(value)) {
     assertDecodeWithinCap(Buffer.byteLength(value, "utf8"));
-    return JSON.parse(value) as Record<string, unknown>;
+    // Legacy bare JSON. An unparseable one is still a body we HAVE and cannot
+    // read, so it earns a name like any other — otherwise it lands in `unknown`
+    // and looks like a gap in the enum rather than the thing it is.
+    return parseInlineBody(value);
   }
 
   const { header, body } = parsed ?? splitEnvelope(value);
