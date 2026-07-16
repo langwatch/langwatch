@@ -1474,6 +1474,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           dedupTtlMs: 0,
           jobDataJson,
         });
+        // Mirror restageDrainedSiblings: re-acquire the hold after a confirmed
+        // re-stage. Idempotent today (the hold survives the drop attempt
+        // unreleased), but keeps this path from silently diverging if a future
+        // refactor ever releases first — and acquire() never throws (it degrades
+        // to the TTL backstop), so it adds no failure surface here.
+        await this.blobLifecycle.acquire(jobDataJson);
         this.logger.warn(
           {
             queueName: this.queueName,
