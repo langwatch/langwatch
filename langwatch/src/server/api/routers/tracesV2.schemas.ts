@@ -34,6 +34,12 @@ const traceListItemSchema = z.object({
   sizeBytes: z.number().int().nonnegative().default(0),
   input: z.string().nullable(),
   output: z.string().nullable(),
+  // True when computed input/output still holds the write-time preview because
+  // its offloaded eventref couldn't be resolved at read time (#5835). Only set
+  // on the Conversation tab's `resolveFullIO` path; the grid, which never
+  // resolves, leaves these absent. Mirrors `traceHeaderSchema`.
+  inputTruncated: z.boolean().optional(),
+  outputTruncated: z.boolean().optional(),
   // Set when a restrict privacy rule hides the content from this viewer, so the
   // table cell shows a "Redacted" marker instead of an em-dash that reads as
   // "no content". `*VisibleTo` is the human audience label ("Admins" / "no one")

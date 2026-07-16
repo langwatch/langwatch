@@ -327,6 +327,11 @@ export function initializeDefaultApp(options?: {
         : new NullTraceListRepository(),
       evaluationRuns,
       topics,
+      // #5835: same blob-resolution deps as TraceSummaryService, threaded so the
+      // Conversation tab's `resolveFullIO` opt-in can restore each turn's full
+      // input/output from event_log. Reuses the single spanStorage instance as
+      // the spans reader. The grid never opts in, so this is inert for it.
+      { blobStore, ioExtractionService, spansReader: spanStorage },
     ),
     "TraceListService",
   );

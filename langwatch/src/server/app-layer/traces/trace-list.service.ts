@@ -3,7 +3,15 @@ import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topics/topic.service";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import {
+  hasEventRefs,
+  parseSpanEventRefs,
+} from "~/server/traces/offloaded-eventref-parsing";
+import type { ResolvedTraceSpans } from "~/server/traces/resolve-offloaded-traces";
+import { resolveOffloadedTracesBatch } from "~/server/traces/resolve-offloaded-traces-batch";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import {
   deriveTraceOrigin,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -26,6 +34,8 @@ import type {
   TraceListRepository,
   TraceListSort,
 } from "./repositories/trace-list.repository";
+import type { SpanReadBlobResolutionDeps } from "./span-storage.service";
+import type { TraceSpansReader } from "./trace-summary.service";
 import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";
 
@@ -78,6 +88,16 @@ export interface TraceListItem {
   sizeBytes: number;
   input: string | null;
   output: string | null;
+  /**
+   * Set at read time (ADR-022 / #5835) when this row's computed input/output
+   * still holds the write-time preview because its offloaded eventref could not
+   * be resolved from event_log — the value is incomplete. Only ever populated on
+   * the `resolveFullIO` path (the drawer's Conversation tab); the grid, which
+   * never resolves, leaves these undefined. Mirrors the identical fields on
+   * `TraceSummaryData` / the trace header.
+   */
+  inputTruncated?: boolean;
+  outputTruncated?: boolean;
   error: string | null;
   conversationId: string | null;
   userId: string | null;
@@ -93,6 +113,22 @@ export interface TraceListPage {
   items: TraceListItem[];
   totalHits: number;
   evaluations: Record<string, EvalSummary[]>;
+}
+
+/**
+ * Optional read-time blob-offload resolution dependencies (ADR-022 / #5835).
+ *
+ * Identical shape to `TraceSummaryService`'s `TraceSummaryBlobResolutionDeps`
+ * (a {@link SpanReadBlobResolutionDeps} plus a {@link TraceSpansReader}) — the
+ * composition root threads the SAME three instances to both services. When
+ * supplied AND a caller passes `resolveFullIO: true`, `getList` restores each
+ * row's FULL computed input/output from event_log before the visibility gate;
+ * when omitted (or `resolveFullIO` unset), the list returns the stored preview
+ * values unchanged — the grid's path, which issues zero event_log reads (AC5).
+ */
+export interface TraceListBlobResolutionDeps
+  extends SpanReadBlobResolutionDeps {
+  spansReader: TraceSpansReader;
 }
 
 interface FacetCounts {
@@ -119,6 +155,14 @@ interface ListParams {
    * input/output previews teaser-redacted. Omitted/null = ungated.
    */
   visibilityCutoffMs?: number | null;
+  /**
+   * When true AND blob-resolution deps were supplied at construction, restore
+   * each row's FULL computed input/output from event_log (ADR-022) before the
+   * visibility gate. The drawer's Conversation tab opts in (a turn needs its
+   * full message, not the 64 KB preview — #5835 AC2); the grid and every other
+   * caller omit it, keeping the preview-only, zero-event_log-read path (AC5).
+   */
+  resolveFullIO?: boolean;
 }
 
 interface FacetParams {
@@ -435,6 +479,10 @@ const discoverLogger = createLogger(
   "langwatch:app-layer:traces:trace-list-discover",
 );
 
+const resolveLogger = createLogger(
+  "langwatch:app-layer:traces:trace-list-resolve",
+);
+
 function isExpressionCategorical(
   def: FacetDefinition,
 ): def is ExpressionCategoricalDef {
@@ -473,6 +521,7 @@ export class TraceListService {
     private readonly repository: TraceListRepository,
     private readonly evaluationRunService: EvaluationRunService,
     private readonly topicService: TopicService,
+    private readonly blobResolutionDeps?: TraceListBlobResolutionDeps,
   ) {}
 
   /**
@@ -507,7 +556,16 @@ export class TraceListService {
       filterWhere: params.filterWhere,
     });
 
-    const items = result.rows.map((row) => mapToTraceListItem(row));
+    // ADR-022 read-time resolution (#5835 AC2): when the caller opted in via
+    // `resolveFullIO` (only the drawer's Conversation tab does), overlay each
+    // row's FULL computed input/output from event_log BEFORE mapping — and thus
+    // before the visibility gate below — so a turn shows its complete message
+    // rather than the 64 KB preview. A no-op returning `result.rows` untouched
+    // when `resolveFullIO` is unset or no deps were wired: the grid's path,
+    // which must issue zero span/event_log reads (AC5).
+    const rows = await this.resolveFullIOForRows(result.rows, params);
+
+    const items = rows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
     const evaluations = await this.evaluationRunService.findSummariesByTraceIds(
@@ -541,6 +599,54 @@ export class TraceListService {
       totalHits: result.totalHits,
       evaluations,
     };
+  }
+
+  /**
+   * Restores each row's full computed input/output from event_log (ADR-022) and
+   * flags any field whose eventref could not be resolved. Returns `rows`
+   * unchanged — issuing NO span or event_log reads — when `resolveFullIO` is
+   * unset or no resolution deps were wired (the grid's preview-only path, #5835
+   * AC5).
+   *
+   * Uses the BULK resolver ({@link resolveOffloadedTracesBatch}) so a 100-row
+   * conversation page fans a bounded set of event_log reads instead of N
+   * independent bursts. The per-row overlay + "content may be incomplete"
+   * flagging mirrors `TraceSummaryService.resolveOffloadedIO` exactly (see
+   * {@link overlayResolvedIO} / {@link detectOffloadedIOFields} below) — the two
+   * copies are intentionally not unified because `TraceSummaryService` is frozen
+   * for this change; unify them the next time that file is touched.
+   */
+  private async resolveFullIOForRows(
+    rows: TraceSummaryData[],
+    params: ListParams,
+  ): Promise<TraceSummaryData[]> {
+    const deps = this.blobResolutionDeps;
+    if (!params.resolveFullIO || !deps || rows.length === 0) return rows;
+
+    // Fetch each row's raw normalized spans — the eventref pointers live on span
+    // attributes, not on the summary row. `occurredAtMs` hints the span read for
+    // partition pruning (the summary row already knows when the trace occurred).
+    const spansPerTrace = await Promise.all(
+      rows.map((row) =>
+        deps.spansReader.getNormalizedSpansByTraceId({
+          tenantId: params.tenantId,
+          traceId: row.traceId,
+          occurredAtMs: row.occurredAt,
+        }),
+      ),
+    );
+
+    const resolvedPerTrace = await resolveOffloadedTracesBatch({
+      projectId: params.tenantId,
+      spansPerTrace,
+      blobStore: deps.blobStore,
+      ioExtractionService: deps.ioExtractionService,
+      logger: resolveLogger,
+    });
+
+    return rows.map((row, i) =>
+      overlayResolvedIO(row, spansPerTrace[i]!, resolvedPerTrace[i]!),
+    );
   }
 
   async getFacets(params: FacetParams): Promise<FacetCounts> {
@@ -1266,6 +1372,8 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     sizeBytes: row.sizeBytes ?? 0,
     input: row.computedInput,
     output: row.computedOutput,
+    inputTruncated: row.inputTruncated,
+    outputTruncated: row.outputTruncated,
     error: row.errorMessage,
     conversationId: row.attributes["gen_ai.conversation.id"] ?? null,
     userId: row.attributes["langwatch.user_id"] ?? null,
@@ -1276,4 +1384,96 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     rootSpanType: row.rootSpanType,
     events,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Read-time offloaded-IO overlay (ADR-022 / #5835, resolveFullIO path only).
+//
+// These mirror the private helpers in `trace-summary.service.ts`
+// (`INPUT_IO_ATTR_KEYS` / `OUTPUT_IO_ATTR_KEYS` / `detectOffloadedIOFields` and
+// the overlay in `resolveOffloadedIO`). They are duplicated rather than shared
+// because `TraceSummaryService` is frozen for this change; when that file is
+// next touched, lift one copy into a shared module and have both call it.
+// ---------------------------------------------------------------------------
+
+/**
+ * IO attribute keys that can carry an ADR-022 eventref, split by direction.
+ * Used to attribute an unresolved eventref to the input vs output field for the
+ * best-effort "content may be incomplete" signal (#5835 AC4).
+ */
+const INPUT_IO_ATTR_KEYS: ReadonlySet<string> = new Set([
+  ATTR_KEYS.LANGWATCH_INPUT,
+  ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+]);
+const OUTPUT_IO_ATTR_KEYS: ReadonlySet<string> = new Set([
+  ATTR_KEYS.LANGWATCH_OUTPUT,
+  ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
+]);
+
+/**
+ * Detects which trace-level IO directions carried an ADR-022 eventref, decoding
+ * pointers through the shared {@link parseSpanEventRefs}. Best-effort across ALL
+ * spans (not just the fold's winner) — computing the winner here would duplicate
+ * the fold's selection algorithm; over-flagging is bounded to the rare shape
+ * where a non-winning span's ref fails while the winner's value was complete.
+ * `missingEventIdKeys` count too: a ref with no usable eventId can't resolve, so
+ * its field is likewise still a preview.
+ */
+function detectOffloadedIOFields(spans: NormalizedSpan[]): {
+  inputHadRef: boolean;
+  outputHadRef: boolean;
+} {
+  let inputHadRef = false;
+  let outputHadRef = false;
+  for (const span of spans) {
+    const attrs = span.spanAttributes as Record<string, string>;
+    if (!hasEventRefs(attrs)) continue;
+    const { eventrefEntries, missingEventIdKeys } = parseSpanEventRefs(attrs);
+    const refAttrKeys = [
+      ...eventrefEntries.map((entry) => entry.attrKey),
+      ...missingEventIdKeys,
+    ];
+    for (const attrKey of refAttrKeys) {
+      if (INPUT_IO_ATTR_KEYS.has(attrKey)) inputHadRef = true;
+      else if (OUTPUT_IO_ATTR_KEYS.has(attrKey)) outputHadRef = true;
+    }
+  }
+  return { inputHadRef, outputHadRef };
+}
+
+/**
+ * Overlays a single trace's resolved full IO onto its summary row and flags any
+ * field whose eventref failed to resolve. `originalSpans` are the RAW spans
+ * (refs intact) so `detectOffloadedIOFields` can see which directions carried a
+ * ref — the resolved spans in `resolved` have those keys stripped.
+ *
+ * Invariants (identical to the summary service): overlay the recomputed value
+ * only when a span actually resolved AND the recompute was non-null (else keep
+ * the stored preview); a field is `*Truncated` exactly when it HAD a ref but
+ * resolution did not cover it (nothing resolved, or the recompute came back null
+ * for that field).
+ */
+function overlayResolvedIO(
+  stored: TraceSummaryData,
+  originalSpans: NormalizedSpan[],
+  resolved: ResolvedTraceSpans,
+): TraceSummaryData {
+  const { inputHadRef, outputHadRef } = detectOffloadedIOFields(originalSpans);
+  const { recomputedInput, recomputedOutput, anyResolved } = resolved;
+
+  const out: TraceSummaryData = { ...stored };
+
+  if (anyResolved) {
+    if (recomputedInput !== null) out.computedInput = recomputedInput.text;
+    if (recomputedOutput !== null) out.computedOutput = recomputedOutput.text;
+  }
+
+  if (inputHadRef && (!anyResolved || recomputedInput === null)) {
+    out.inputTruncated = true;
+  }
+  if (outputHadRef && (!anyResolved || recomputedOutput === null)) {
+    out.outputTruncated = true;
+  }
+
+  return out;
 }

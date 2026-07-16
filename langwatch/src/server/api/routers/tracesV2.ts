@@ -739,6 +739,11 @@ export const tracesV2Router = createTRPCRouter({
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(1000).default(50),
         query: z.string().nullish(),
+        // #5835: the drawer's Conversation tab opts in to restore each row's
+        // full input/output from event_log (a turn needs its complete message,
+        // not the 64 KB preview). Every other caller — the grid, previews —
+        // omits it, keeping the preview-only, zero-event_log-read path (AC5).
+        resolveFullIO: z.boolean().optional(),
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -757,6 +762,7 @@ export const tracesV2Router = createTRPCRouter({
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
         ),
+        resolveFullIO: input.resolveFullIO,
       });
       return {
         ...page,
