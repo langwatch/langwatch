@@ -1714,9 +1714,15 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
  *
  * Takes the value DIRECTLY rather than moving it from live `:data`: a drained
  * sibling is already out of staging, and the dispatch/transient sites hold the
- * value in hand too. The caller then advances its slot (or not) via `complete` —
- * writing to the DLQ FIRST means the value is never absent from BOTH the live
- * group and the dead-letter (#719 atomicity), even across a crash between the two.
+ * value in hand too.
+ *
+ * The "never absent from BOTH places" guarantee is the CALLER's, and it holds
+ * only at the copy-before-complete sites (dispatch / transient exhaustion):
+ * they write here FIRST and withhold `complete()` until it returns, so a crash
+ * or a rejected write leaves the value in the live group (`dropStagedJob`). A
+ * drained sibling has ALREADY left staging and owns no slot to withhold — if
+ * this write rejects there, the caller (`deadLetterDrainedValue`) re-stages the
+ * raw value as a fallback; that path is best-effort recovery, not atomicity.
  *
  * `dlq:{groupId}:error` is keyed by stagedJobId → reason so the dead-letter is
  * queryable by failure class; `replayFromDlq` drops it on restore (inspection
@@ -2116,8 +2122,11 @@ export class GroupStagingScripts {
    * same `dlq:{groupId}:*` layout the ops drain understands, keyed by
    * `stagedJobId`, labelled with its `reason`. The CALLER decides its slot: a
    * dispatch/transient drop calls `complete({dropped:true})` AFTER this to advance
-   * the group; a drained-sibling drop owns no slot and calls only this. Writing
-   * here first is what keeps the value from being absent from both places.
+   * the group — writing here first, completing after, is the copy-before-complete
+   * sequencing that keeps THAT value from ever being absent from both places. A
+   * drained-sibling drop owns no slot (it already left staging), so it cannot rely
+   * on that ordering: it re-stages the raw value if this write fails
+   * (`deadLetterDrainedValue`) — a fallback, not an atomicity guarantee.
    *
    * `nowMs` is the ZSET score the value re-dispatches with once an operator
    * drains it — passed in (never `Date.now()` in Lua) so a replay is deterministic.

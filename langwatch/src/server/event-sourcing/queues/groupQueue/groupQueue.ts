@@ -1345,20 +1345,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         bodyPreserved,
       });
       if (bodyPreserved) {
-        // No slot to complete (already drained) — just preserve the value so the
-        // operator drain can recover it (#719). Unlike the dispatch site, there is
-        // no complete() here: touching the live slot would corrupt a group this
-        // job already left.
-        await this.blobLifecycle.preserveForDlq({
-          value: sibling.jobDataJson,
-          groupId,
-          ttlSeconds: GROUP_QUEUE_DLQ_TTL_SECONDS,
-        });
-        await this.scripts.writeJobToDlq({
+        // No slot to complete (already drained) — preserve the value so the
+        // operator drain can recover it (#719). Unlike the dispatch site there is
+        // no complete() to withhold here (touching the live slot would corrupt a
+        // group this job already left), so the value has ALREADY left staging: if
+        // the dead-letter write rejects, deadLetterDrainedValue re-stages the raw
+        // value rather than losing it (Critical review #5853, RaiMx).
+        await this.deadLetterDrainedValue({
           groupId,
           stagedJobId: sibling.stagedJobId,
           jobDataJson: sibling.jobDataJson,
           reason,
+          originalScore: sibling.originalScore,
         });
       }
       return null;
@@ -1385,12 +1383,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
         });
-        // Re-acquire the sibling's hold (idempotent: it kept its hold through
-        // the drain, and its value — hence token — is unchanged).
-        await this.blobLifecycle.acquire(sibling.jobDataJson);
       } catch (err) {
-        // The sibling never made it back into staging, so nothing will dispatch
-        // it again — that is a discard, whatever the re-stage intended (#5538).
+        // stage() itself failed: the sibling never made it back into staging, so
+        // nothing will dispatch it again — that is a discard, whatever the
+        // re-stage intended (#5538).
         this.recordDrop({
           groupId,
           stagedJobId: sibling.stagedJobId,
@@ -1401,19 +1397,111 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           // Not released — the value is intact, it simply never got re-staged.
           bodyPreserved: true,
         });
-        // Body intact and no slot to complete: preserve it in the dead-letter so
-        // a re-stage failure becomes recoverable instead of a silent discard (#719).
-        await this.blobLifecycle.preserveForDlq({
-          value: sibling.jobDataJson,
-          groupId,
-          ttlSeconds: GROUP_QUEUE_DLQ_TTL_SECONDS,
-        });
-        await this.scripts.writeJobToDlq({
+        // Body intact and out of staging: dead-letter it (with the re-stage
+        // fallback) so a re-stage failure becomes recoverable, not a silent
+        // discard (#719 / RaiMx).
+        await this.deadLetterDrainedValue({
           groupId,
           stagedJobId: sibling.stagedJobId,
           jobDataJson: sibling.jobDataJson,
           reason: "sibling_restage_failed",
+          originalScore: sibling.originalScore,
         });
+        continue;
+      }
+      // Re-acquire the sibling's hold AFTER a confirmed re-stage (idempotent: it
+      // kept its hold through the drain, and its value — hence token — is
+      // unchanged). Deliberately OUTSIDE the try/catch above: acquire() degrades
+      // to the TTL backstop and never throws (envelopeBlobLifecycle.acquire), so
+      // a hold hiccup must NOT dead-letter a sibling that is already back in live
+      // staging — that would duplicate a live job into the dead-letter and let it
+      // double-process after a drain (Major review #5853, RaiMv).
+      await this.blobLifecycle.acquire(sibling.jobDataJson);
+    }
+  }
+
+  /**
+   * Persist a discarded DRAINED value into the job-scoped dead-letter, with a
+   * re-stage durability fallback (Critical review #5853, RaiMx).
+   *
+   * A drained value has already left live staging, so — unlike the dispatch and
+   * transient-exhaustion sites, which withhold `complete()` until AFTER the DLQ
+   * write (copy-before-complete: the value is never absent from both places) —
+   * there is no slot to hold open here. If dead-letter persistence rejects, the
+   * value would simply vanish. So on failure we re-stage the RAW value: it
+   * re-enters the live group (recoverable, and a later drain retries the DLQ
+   * write) rather than being lost. If the re-stage ALSO fails (Redis genuinely
+   * unreachable), the value still survives in the structured drop log `recordDrop`
+   * already wrote — the documented last resort — so we surface that loudly.
+   */
+  private async deadLetterDrainedValue({
+    groupId,
+    stagedJobId,
+    jobDataJson,
+    reason,
+    originalScore,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    jobDataJson: string;
+    reason: DropReason;
+    originalScore: number;
+  }): Promise<void> {
+    try {
+      // Push the referenced blob's TTL out to the quarantine window first (#720),
+      // then write the dead-letter entry — same order the dispatch site uses.
+      await this.blobLifecycle.preserveForDlq({
+        value: jobDataJson,
+        groupId,
+        ttlSeconds: GROUP_QUEUE_DLQ_TTL_SECONDS,
+      });
+      await this.scripts.writeJobToDlq({
+        groupId,
+        stagedJobId,
+        jobDataJson,
+        reason,
+      });
+    } catch (dlqErr) {
+      // The dead-letter write failed and the value is already out of staging.
+      // Re-stage the raw value so the drop stays recoverable instead of
+      // vanishing — a later drain retries the dead-letter write.
+      try {
+        await this.scripts.stage({
+          stagedJobId,
+          groupId,
+          dispatchAfterMs: originalScore,
+          dedupId: "",
+          dedupTtlMs: 0,
+          jobDataJson,
+        });
+        this.logger.warn(
+          {
+            queueName: this.queueName,
+            groupId,
+            stagedJobId,
+            reason,
+            error: dlqErr instanceof Error ? dlqErr.message : String(dlqErr),
+          },
+          "Dead-letter write failed for a drained value — re-staged the raw value as a durability fallback",
+        );
+      } catch (restageErr) {
+        // Both the dead-letter write AND the re-stage fallback failed (Redis
+        // unreachable). The value survives only in the structured drop log
+        // recordDrop already wrote; surface it so an operator can recover it.
+        this.logger.error(
+          {
+            queueName: this.queueName,
+            groupId,
+            stagedJobId,
+            reason,
+            dlqError: dlqErr instanceof Error ? dlqErr.message : String(dlqErr),
+            restageError:
+              restageErr instanceof Error
+                ? restageErr.message
+                : String(restageErr),
+          },
+          "Dead-letter write AND re-stage fallback failed for a drained value — recoverable only from the drop log",
+        );
       }
     }
   }

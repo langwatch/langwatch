@@ -164,14 +164,29 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
       | sibling re-stage     |
 
   @integration @unimplemented
-  # AC-719.7 — UNBOUND: the write-first ordering (value never absent from both live
-  # staging and the dead-letter) is structural — writeJobToDlq is awaited before
-  # complete() frees the slot — but asserting the instantaneous invariant needs a
-  # crash-injection seam the harness does not have. Tracked with the #719 follow-ups.
+  # AC-719.7 — UNBOUND, and SITE-SPECIFIC: the "value never absent from both live
+  # staging and the dead-letter" invariant holds only at the copy-before-complete
+  # sites (dispatch / transient exhaustion), where writeJobToDlq is awaited BEFORE
+  # complete() frees the slot — so a rejected write or a crash leaves the value in
+  # the live group. Asserting the instantaneous invariant there needs a crash-
+  # injection seam the harness does not have. A DRAINED sibling has already left
+  # staging and owns no slot to withhold, so it does NOT get this ordering — it
+  # relies on the re-stage fallback below (AC-719.7b). Tracked with the #719 follow-ups.
   Scenario: the dead-letter copy is durable before the live value is removed
-    Given a staged job whose body is present but cannot be decoded
+    Given a dispatched job whose body is present but cannot be decoded
     When the job is dead-lettered
     Then at no point is the job's value absent from both the live group data and the dead-letter
+
+  @unit
+  # AC-719.7b — the drained-sibling paths are NOT copy-before-complete (the value has
+  # already left staging), so their durability is a re-stage FALLBACK: if the dead-letter
+  # write fails, the raw value is re-staged into the live group rather than lost. Bound to
+  # a seam unit test with real failure injection (falsifiable: drop the fallback and the
+  # re-stage never happens).
+  Scenario: a drained value whose dead-letter write fails is re-staged not lost
+    Given a drained sibling being dead-lettered with its body present
+    When the dead-letter write fails
+    Then the raw value is re-staged into the live group
 
   @integration
   # AC-719.6 — the operator's existing group-scoped drain recovers a job-scoped entry
@@ -222,8 +237,9 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
 # #718: AC-718.1 bound; AC-718.6 bound (reactor + fold facade); AC-718.2b bound; AC-718.2/719.1/719.3 bound
 #       (one body-present test); AC-718.3 bound; AC-718.4a/b bound; AC-718.7 bound.
 #       AC-718.4c (@unimplemented, private generateStagedJobId); AC-718.5 (@unimplemented, GQ1-strip harness).
-# #719: AC-719.6 bound (drain round-trip). AC-719.4/719.5/719.7 (@unimplemented — coalesced-batch /
-#       crash-injection harness gaps, same class 5821 deferred; the no-slot sites are WIRED + typecheck-clean).
+# #719: AC-719.6 bound (drain round-trip). AC-719.7b bound (drained-sibling re-stage fallback, seam unit test
+#       with failure injection). AC-719.4/719.5/719.7 (@unimplemented — coalesced-batch / crash-injection harness
+#       gaps, same class 5821 deferred; the no-slot sites are WIRED + typecheck-clean).
 # #720: AC-720.1 bound (GQ2 holder, falsifiability-proven). AC-720.1b (@unimplemented, GQ1-forcing harness).
 # #721: AC-721.6 bound (both guard directions). AC-721.1-.5 are documentation ACs (ADR-046 + site corrections
 #       + migration 00042), verified by diff/review, not scenario-mapped.

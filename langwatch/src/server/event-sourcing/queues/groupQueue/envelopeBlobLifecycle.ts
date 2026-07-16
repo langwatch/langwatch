@@ -340,7 +340,7 @@ export class EnvelopeBlobLifecycle {
         // must not extend another tenant's blob lifetime.
         if (hold.ref.projectId !== this.projectIdFor(groupId)) {
           logger.warn(
-            { groupId, refTenant: hold.ref.projectId },
+            { groupId, refProjectId: hold.ref.projectId },
             "Skipping blob TTL preserve-for-DLQ for a tenant-mismatched ref",
           );
           return;

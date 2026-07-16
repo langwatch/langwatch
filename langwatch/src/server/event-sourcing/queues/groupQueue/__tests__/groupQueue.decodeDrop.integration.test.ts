@@ -766,23 +766,29 @@ describe.skipIf(!hasTestcontainers)(
             objectStore,
           });
 
+          // Poll the recovery SIDE EFFECT (DLQ written, live value gone), not the
+          // drop metric: recordDrop increments BEFORE the DLQ write finishes, so
+          // gating on the metric races the write (RaiMc).
           await vi.waitFor(
             async () => {
-              expect(await dropsFor(name)).toHaveLength(1);
+              expect(await dlqValue(name, groupId, "victim")).not.toBeNull();
+              expect(await liveValue(name, groupId, "victim")).toBeNull();
             },
             { timeout: 10000, interval: 100 },
           );
 
           // AC-719.1: preserved in the dead-letter, gone from live staging.
           // Revert-check: before #719 the drop only called complete(), so the
-          // value was deleted and dlqValue stays null.
+          // value was deleted and the waitFor above times out.
           const preserved = await dlqValue(name, groupId, "victim");
           expect(preserved).not.toBeNull();
-          expect(await liveValue(name, groupId, "victim")).toBeNull();
           // AC-719.3: labelled with the failure class.
           expect(await dlqReason(name, groupId, "victim")).toBe("body_unreadable");
           // AC-718.2: the quarantined reactor job is addressable by its event id.
           expect(readJobRecoveryKey(preserved!)).toBe("evt-1");
+          // The drop is counted (the metric fires before the side effect above,
+          // so it is present by now — no race).
+          expect(await dropsFor(name)).toHaveLength(1);
         });
       });
     });
@@ -804,16 +810,23 @@ describe.skipIf(!hasTestcontainers)(
           for (const uri of [...objectStore.store.keys()]) {
             objectStore.store.delete(uri);
           }
-          newQueue({
+          const consumer = newQueue({
             name,
             processFn: async () => {},
             consumerEnabled: true,
             objectStore,
           });
+          // Once the blob is gone the recoveryKey is the ONLY recovery identifier,
+          // and it rides the structured drop LOG (recordDrop) — not the metric,
+          // not Redis. Capture the log at the seam to prove it actually carries
+          // "evt-1" (RaiMf). Installed synchronously before any async drop runs.
+          const dropLog = vi.spyOn((consumer as any).logger, "error");
 
           await vi.waitFor(
             async () => {
-              expect(await dropsFor(name)).toHaveLength(1);
+              // Poll the release SIDE EFFECT (holder release → s3 delete), not the
+              // drop metric, which increments before the release finishes (RaiMc).
+              expect(objectStore.deleted.length).toBeGreaterThan(0);
             },
             { timeout: 10000, interval: 100 },
           );
@@ -823,9 +836,18 @@ describe.skipIf(!hasTestcontainers)(
           // This is the honest boundary — a missing_blob reactor drop is NAMED
           // (recoveryKey rides the drop log via recordDrop) but NOT recovered.
           expect(await dlqValue(name, groupId, "victim")).toBeNull();
-          expect(objectStore.deleted.length).toBeGreaterThan(0);
           const [entry] = await dropsFor(name);
           expect(entry!.labels.reason).toBe("missing_blob");
+          // AC-718.2b: the drop log names the exact event that was lost — the sole
+          // recovery identifier after the blob is gone. Revert-check: drop the
+          // header.k lift and recoveryKey logs as null here.
+          expect(dropLog).toHaveBeenCalledWith(
+            expect.objectContaining({
+              recoveryKey: "evt-1",
+              reason: "missing_blob",
+            }),
+            expect.any(String),
+          );
         });
       });
     });
@@ -928,12 +950,20 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 10000, interval: 100 },
           );
 
-          // The blob's holder must outlive the 7-day dead-letter window, or the
-          // quarantined value would reference a blob that got reclaimed first. The
-          // default holder TTL is 5 days; > 6 days proves preserveForDlq pushed it
-          // to the window. Revert preserveForDlq and this drops back to ~5d → red.
-          const pttl = await redis.pttl(holderKeys[0]!);
-          expect(pttl).toBeGreaterThan(6 * 24 * 60 * 60 * 1000);
+          // The blob's holder must be preserved to the SAME dead-letter window as
+          // the entry it backs, or a drain would recover an envelope pointing at a
+          // reclaimed blob. Compare against the ACTUAL DLQ data-key TTL rather than
+          // a magic 6-day threshold (RaiMk): preserveForDlq extends the holder just
+          // BEFORE the DLQ write, so the holder's remaining TTL tracks the entry's
+          // within write latency (5s slack) — it does not expire before it.
+          const holderPttl = await redis.pttl(holderKeys[0]!);
+          const dlqDataPttl = await redis.pttl(`${name}:gq:dlq:${groupId}:data`);
+          expect(dlqDataPttl).toBeGreaterThan(0);
+          expect(holderPttl).toBeGreaterThan(dlqDataPttl - 5_000);
+          // Falsifiability retained: the default holder TTL is 5 days, so > 6 days
+          // proves preserveForDlq pushed it to the window. Revert preserveForDlq and
+          // this drops back to ~5d → red.
+          expect(holderPttl).toBeGreaterThan(6 * 24 * 60 * 60 * 1000);
         });
       });
     });
