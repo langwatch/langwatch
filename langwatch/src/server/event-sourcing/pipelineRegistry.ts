@@ -42,10 +42,10 @@ import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-r
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
+import type { MetricDataPointRepository } from "../app-layer/metrics/repositories/metric-data-point.repository";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
-import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
 import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
@@ -82,6 +82,13 @@ import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-pr
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
+import { resolveMetricCommandShardCount } from "./pipelines/metric-processing/canonicalMetric";
+import { createMetricProcessingPipeline } from "./pipelines/metric-processing/pipeline";
+import {
+  MetricDataPointAppendStore,
+  MetricSeriesCatalogAppendStore,
+  MetricTimeRollupAppendStore,
+} from "./pipelines/metric-processing/projections/stores";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -139,7 +146,6 @@ import { resolveLogCommandShardCount } from "./pipelines/trace-processing/comman
 import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
-import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
@@ -233,7 +239,7 @@ export interface PipelineRepositories {
   /** Primary replica for read-after-write consistency. */
   traceSummaryFold: TraceSummaryRepository;
   logRecordStorage: LogRecordStorageRepository;
-  metricRecordStorage: MetricRecordStorageRepository;
+  metricDataPointStorage: MetricDataPointRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
   /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap). */
@@ -330,6 +336,7 @@ export class PipelineRegistry {
     );
 
     const evalPipeline = this.registerEvaluationPipeline({ traceSummaryStore });
+    const metricPipeline = this.registerMetricPipeline();
     const {
       pipeline: tracePipeline,
       simComputeRunMetrics,
@@ -354,6 +361,7 @@ export class PipelineRegistry {
 
     return {
       traces: mapCommands(tracePipeline.commands),
+      metrics: mapCommands(metricPipeline.commands),
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
@@ -515,6 +523,21 @@ export class PipelineRegistry {
       processOutboxWorker.start();
     }
     return { pipeline, processOutboxWorker };
+  }
+
+  private registerMetricPipeline() {
+    const repository = this.deps.repositories.metricDataPointStorage;
+    return this.deps.eventSourcing.register(
+      createMetricProcessingPipeline({
+        metricDataPointAppendStore: new MetricDataPointAppendStore(repository),
+        metricSeriesCatalogAppendStore:
+          new MetricSeriesCatalogAppendStore(repository),
+        metricTimeRollupAppendStore: new MetricTimeRollupAppendStore(repository),
+        metricCommandShardCount: resolveMetricCommandShardCount(
+          process.env.METRIC_PROCESSING_SHARDS,
+        ),
+      }),
+    );
   }
 
   private registerEvaluationPipeline({
@@ -790,9 +813,6 @@ export class PipelineRegistry {
         ),
         logRecordAppendStore: new LogRecordAppendStore(
           this.deps.repositories.logRecordStorage,
-        ),
-        metricRecordAppendStore: new MetricRecordAppendStore(
-          this.deps.repositories.metricRecordStorage,
         ),
         traceSummaryStore,
         originGateReactor,

@@ -1,13 +1,13 @@
 import { z } from "zod";
 
 import { EventSchema } from "../../../domain/types";
-import { metricTypeSchema, piiRedactionLevelSchema } from "./commands";
+import { piiRedactionLevelSchema } from "./commands";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_REMOVED_EVENT_TYPE,
   ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
-  METRIC_RECORD_RECEIVED_EVENT_TYPE,
+  METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
@@ -146,43 +146,50 @@ export function isLogRecordReceivedEvent(
 }
 
 /**
- * Zod schema for MetricRecordReceivedEvent metadata.
+ * A valid exemplar correlation is deliberately separate from the canonical
+ * metric event. Only this trace-scoped event is visible to trace folds.
  */
-export const metricRecordReceivedEventMetadataSchema = z
+export const metricDataPointCorrelatedEventMetadataSchema = z
   .object({
     processingTraceparent: z.string().optional(),
   })
   .passthrough();
 
-export const metricRecordReceivedEventDataSchema = z.object({
+export const metricDataPointCorrelatedEventDataSchema = z.object({
   traceId: z.string(),
   spanId: z.string(),
+  pointId: z.string(),
+  seriesId: z.string(),
   metricName: z.string(),
   metricUnit: z.string(),
-  metricType: metricTypeSchema,
-  value: z.number(),
-  timeUnixMs: z.number(),
-  attributes: z.record(z.string(), z.string()),
-  resourceAttributes: z.record(z.string(), z.string()),
+  metricKind: z.enum([
+    "gauge",
+    "sum",
+    "histogram",
+    "exponential_histogram",
+    "summary",
+  ]),
+  exemplarValue: z.number().nullable(),
+  exemplarTimeUnixMs: z.number(),
 });
 
-export const metricRecordReceivedEventSchema = EventSchema.extend({
-  type: z.literal(METRIC_RECORD_RECEIVED_EVENT_TYPE),
-  data: metricRecordReceivedEventDataSchema,
-  metadata: metricRecordReceivedEventMetadataSchema,
+export const metricDataPointCorrelatedEventSchema = EventSchema.extend({
+  type: z.literal(METRIC_DATA_POINT_CORRELATED_EVENT_TYPE),
+  data: metricDataPointCorrelatedEventDataSchema,
+  metadata: metricDataPointCorrelatedEventMetadataSchema,
 });
 
-export type MetricRecordReceivedEventData = z.infer<
-  typeof metricRecordReceivedEventDataSchema
+export type MetricDataPointCorrelatedEventData = z.infer<
+  typeof metricDataPointCorrelatedEventDataSchema
 >;
-export type MetricRecordReceivedEvent = z.infer<
-  typeof metricRecordReceivedEventSchema
+export type MetricDataPointCorrelatedEvent = z.infer<
+  typeof metricDataPointCorrelatedEventSchema
 >;
 
-export function isMetricRecordReceivedEvent(
+export function isMetricDataPointCorrelatedEvent(
   event: TraceProcessingEvent,
-): event is MetricRecordReceivedEvent {
-  return event.type === METRIC_RECORD_RECEIVED_EVENT_TYPE;
+): event is MetricDataPointCorrelatedEvent {
+  return event.type === METRIC_DATA_POINT_CORRELATED_EVENT_TYPE;
 }
 
 /**
@@ -392,7 +399,7 @@ export type TraceProcessingEvent =
   | SpanReceivedEvent
   | TopicAssignedEvent
   | LogRecordReceivedEvent
-  | MetricRecordReceivedEvent
+  | MetricDataPointCorrelatedEvent
   | OriginResolvedEvent
   | AnnotationAddedEvent
   | AnnotationRemovedEvent

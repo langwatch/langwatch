@@ -39,7 +39,9 @@ export interface ReplayRuntime {
 const MAP_TARGET_TABLE: Record<string, string> = {
   spanStorage: "stored_spans",
   logRecordStorage: "stored_log_records",
-  metricRecordStorage: "stored_metric_records",
+  metricDataPointStorage: "metric_data_points",
+  metricSeriesCatalog: "metric_series",
+  metricTimeRollup: "metric_time_rollups",
 };
 
 /**
@@ -97,23 +99,25 @@ export function createReplayRuntime(config: {
   for (const def of definitions) {
     const { name: pipelineName, aggregateType } = def.metadata;
     const store = storeByPipeline.get(pipelineName);
-    if (!store) continue; // global/billing pipelines — no CH replay needed
+    if (!store && pipelineName !== "metric_processing") continue;
 
-    for (const [, { definition: foldDef }] of def.foldProjections) {
-      // Clone the projection with the raw CH store instead of the Redis-cached one
-      const replayDef = Object.create(foldDef, {
-        store: { value: store, writable: true },
-      });
-      projections.push({
-        projectionName: foldDef.name,
-        pipelineName,
-        aggregateType,
-        source: "pipeline",
-        definition: replayDef,
-        // Folds enqueue with `__jobType=projection`; pause middle segment matches.
-        pauseKey: `${pipelineName}/projection/${foldDef.name}`,
-        kind: "fold",
-      });
+    if (store) {
+      for (const [, { definition: foldDef }] of def.foldProjections) {
+        // Clone the projection with the raw CH store instead of the Redis-cached one
+        const replayDef = Object.create(foldDef, {
+          store: { value: store, writable: true },
+        });
+        projections.push({
+          projectionName: foldDef.name,
+          pipelineName,
+          aggregateType,
+          source: "pipeline",
+          definition: replayDef,
+          // Folds enqueue with `__jobType=projection`; pause middle segment matches.
+          pauseKey: `${pipelineName}/projection/${foldDef.name}`,
+          kind: "fold",
+        });
+      }
     }
 
     for (const [, { definition: mapDef }] of def.mapProjections) {

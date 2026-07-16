@@ -17,6 +17,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Event } from "../../../domain/types";
 import { EVALUATION_EVENT_TYPES } from "../../../pipelines/evaluation-processing/schemas/constants";
+import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "../../../pipelines/metric-processing/schemas/constants";
 import {
   createMockAppendStore,
   createMockQueueManager,
@@ -141,5 +142,22 @@ describe("orgBillableEventsMeter — evaluation billing (issue #5124)", () => {
         expect(appendSpy).not.toHaveBeenCalled();
       });
     });
+  });
+});
+
+describe("orgBillableEventsMeter — canonical metrics remain shadow-only", () => {
+  it("does not dispatch metric data-point events to the production billable store", async () => {
+    const tenantId = createTestTenantId();
+    const { router, appendSpy } = createMeterRouterWithSpyStore();
+    const metricEvent = createTestEvent(
+      "a".repeat(64),
+      TEST_CONSTANTS.AGGREGATE_TYPE,
+      tenantId,
+      METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+    );
+
+    await router.dispatch([metricEvent], { tenantId });
+
+    expect(appendSpy).not.toHaveBeenCalled();
   });
 });

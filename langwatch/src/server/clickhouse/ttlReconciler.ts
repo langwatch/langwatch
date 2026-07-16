@@ -111,10 +111,24 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 49,
   },
   {
-    table: "stored_metric_records",
+    table: "metric_data_points",
     ttlColumn: "TimeUnixMs",
     retentionTTLColumn: "TimeUnixMs",
-    envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_RECORDS_TTL_DAYS",
+    envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_DATA_POINTS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
+    table: "metric_series",
+    ttlColumn: "LastSeenAt",
+    retentionTTLColumn: "LastSeenAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_SERIES_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
+    table: "metric_time_rollups",
+    ttlColumn: "BucketStart",
+    retentionTTLColumn: "BucketStart",
+    envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_ROLLUPS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {

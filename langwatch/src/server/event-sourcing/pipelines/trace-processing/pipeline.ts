@@ -17,7 +17,7 @@ import {
   logCommandGroupKey,
 } from "./commands/logCommandGroupKey";
 import { RecordLogCommand } from "./commands/recordLogCommand";
-import { RecordMetricCommand } from "./commands/recordMetricCommand";
+import { RecordMetricCorrelationCommand } from "./commands/recordMetricCorrelationCommand";
 import {
   RECORD_SPAN_DEDUPLICATION,
   RecordSpanCommand,
@@ -28,7 +28,6 @@ import {
   spanCommandGroupKey,
 } from "./commands/spanCommandGroupKey";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
-import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import {
   type TraceAnalyticsData,
@@ -45,7 +44,6 @@ import type {
 } from "./schemas/commands";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedLogRecord } from "./schemas/logRecords";
-import type { NormalizedMetricRecord } from "./schemas/metricRecords";
 import type { NormalizedSpan } from "./schemas/spans";
 import { TraceRequestUtils } from "./utils/traceRequest.utils";
 
@@ -54,7 +52,6 @@ export interface TraceProcessingPipelineDeps {
   /** ADR-034 Phase 1: per-span rollup writer (app-side, replaces the MV). */
   traceAnalyticsRollupAppendStore: AppendStore<TraceAnalyticsRollupRow>;
   logRecordAppendStore: AppendStore<NormalizedLogRecord>;
-  metricRecordAppendStore: AppendStore<NormalizedMetricRecord>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** ADR-034 Phase 2: slim per-trace fold writer (silent dual-tap, no read path). */
   traceAnalyticsStore: FoldProjectionStore<TraceAnalyticsData>;
@@ -198,12 +195,6 @@ export function createTraceProcessingPipeline(
       "logRecordStorage",
       new LogRecordStorageMapProjection({
         store: deps.logRecordAppendStore,
-      }),
-    )
-    .withMapProjection(
-      "metricRecordStorage",
-      new MetricRecordStorageMapProjection({
-        store: deps.metricRecordAppendStore,
       }),
     )
     .withReactor("traceSummary", "originGate", deps.originGateReactor)
@@ -372,7 +363,7 @@ export function createTraceProcessingPipeline(
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLog", RecordLogCommand, recordLogOptions)
-    .withCommand("recordMetric", RecordMetricCommand)
+    .withCommand("recordMetricCorrelation", RecordMetricCorrelationCommand)
     .withCommand("resolveOrigin", ResolveOriginCommand)
     .withCommand("addAnnotation", AddAnnotationCommand)
     .withCommand("removeAnnotation", RemoveAnnotationCommand)

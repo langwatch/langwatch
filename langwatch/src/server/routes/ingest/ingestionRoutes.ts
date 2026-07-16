@@ -41,6 +41,7 @@ import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanc
 import { createLogger } from "@langwatch/observability";
 import type {
   IExportLogsServiceRequest,
+  IExportMetricsServiceRequest,
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
 import type { IngestionSource } from "@prisma/client";
@@ -119,6 +120,21 @@ function stampLogOriginAttrs(
         record.attributes = [...existing, ...originAttrs];
       }
     }
+  }
+}
+
+function stampMetricOriginAttrs(
+  request: IExportMetricsServiceRequest,
+  source: IngestionSource,
+): void {
+  const originAttrs = buildOriginAttrs(source);
+  for (const resourceMetrics of request.resourceMetrics ?? []) {
+    const resource = resourceMetrics.resource ?? {
+      attributes: [],
+      droppedAttributesCount: 0,
+    };
+    resource.attributes = [...(resource.attributes ?? []), ...originAttrs];
+    resourceMetrics.resource = resource;
   }
 }
 
@@ -830,13 +846,10 @@ secured
       return c.json({ error: "unauthorized" }, 401);
     }
 
-    // V0: ack + log only. Counter delta synthesis is a v2 add (only
-    // matters for sources that emit metrics-only without the per-request
-    // event path). Today every Claude Code call also emits a
-    // claude_code.api_request log record which the /v1/logs path turns
-    // into a ledger row; metrics here are redundant for cost.
     let bodyBytes = 0;
     let metricCount = 0;
+    let rejectedDataPoints = 0;
+    let acceptedDataPoints = 0;
     let parseHint: string | undefined;
     try {
       const body = await readOtlpBody(c.req.raw);
@@ -849,11 +862,39 @@ secured
           (acc, rm) =>
             acc +
             (rm.scopeMetrics ?? []).reduce(
-              (a, sm) => a + (sm.metrics?.length ?? 0),
+              (scopeAcc, sm) =>
+                scopeAcc +
+                (sm.metrics ?? []).reduce(
+                  (metricAcc, metric) =>
+                    metricAcc +
+                    (metric?.gauge?.dataPoints?.length ?? 0) +
+                    (metric?.sum?.dataPoints?.length ?? 0) +
+                    (metric?.histogram?.dataPoints?.length ?? 0) +
+                    (metric?.exponentialHistogram?.dataPoints?.length ?? 0) +
+                    (metric?.summary?.dataPoints?.length ?? 0),
+                  0,
+                ),
               0,
             ),
           0,
         );
+        if (metricCount > 0) {
+          const govProject = await ensureHiddenGovernanceProject(
+            prisma,
+            source.organizationId,
+          );
+          stampMetricOriginAttrs(parsed.request, source);
+          const result =
+            await getApp().traces.metricCollection.handleOtlpMetricRequest({
+              tenantId: govProject.id,
+              organizationId: source.organizationId,
+              metricRequest: parsed.request,
+              piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+            });
+          rejectedDataPoints = result.rejectedDataPoints;
+          acceptedDataPoints = result.acceptedDataPoints;
+          parseHint = result.errorMessage;
+        }
       }
     } catch (err) {
       parseHint = String(err);
@@ -867,13 +908,18 @@ secured
         bytes: bodyBytes,
         metrics: metricCount,
       },
-      "otel metrics ingest landed (ack-only in v0)",
+      "otel metrics ingest landed",
     );
 
     const responseBody: Record<string, unknown> = {
       accepted: true,
       bytes: bodyBytes,
       metrics: metricCount,
+      acceptedDataPoints,
+      partialSuccess: {
+        rejectedDataPoints,
+        ...(parseHint ? { errorMessage: parseHint } : {}),
+      },
     };
     if (parseHint) responseBody.hint = parseHint;
     return c.json(responseBody, 202);

@@ -57,7 +57,6 @@ function buildTraceDeps(
   return {
     spanAppendStore: store,
     logRecordAppendStore: store,
-    metricRecordAppendStore: store,
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,

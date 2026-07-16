@@ -604,13 +604,21 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
-      await getApp().traces.metricCollection.handleOtlpMetricRequest({
-        tenantId: project.id,
-        metricRequest: metricsRequest,
-        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-      });
+      const result =
+        await getApp().traces.metricCollection.handleOtlpMetricRequest({
+          tenantId: project.id,
+          organizationId: project.team.organizationId,
+          metricRequest: metricsRequest,
+          piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+        });
 
-      return c.json({ message: "OK" });
+      if (result.rejectedDataPoints === 0) return c.json({});
+      return c.json({
+        partialSuccess: {
+          rejectedDataPoints: result.rejectedDataPoints,
+          ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
+        },
+      });
     },
   );
 });

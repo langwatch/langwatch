@@ -62,26 +62,28 @@ export const recordLogCommandDataSchema = z.object({
 
 export type RecordLogCommandData = z.infer<typeof recordLogCommandDataSchema>;
 
-export const metricTypeSchema = z.enum(["histogram", "gauge", "sum"]);
-export type MetricType = z.infer<typeof metricTypeSchema>;
-
-export const recordMetricCommandDataSchema = z.object({
+export const recordMetricCorrelationCommandDataSchema = z.object({
   tenantId: z.string(),
   traceId: z.string(),
   spanId: z.string(),
+  pointId: z.string().regex(/^[a-f0-9]{64}$/),
+  seriesId: z.string().regex(/^[a-f0-9]{64}$/),
   metricName: z.string(),
   metricUnit: z.string(),
-  metricType: metricTypeSchema,
-  value: z.number(),
-  timeUnixMs: z.number(),
-  attributes: z.record(z.string(), z.string()),
-  resourceAttributes: z.record(z.string(), z.string()),
-  piiRedactionLevel: piiRedactionLevelSchema.optional(),
+  metricKind: z.enum([
+    "gauge",
+    "sum",
+    "histogram",
+    "exponential_histogram",
+    "summary",
+  ]),
+  exemplarValue: z.number().nullable(),
+  exemplarTimeUnixMs: z.number().int().nonnegative(),
   occurredAt: z.number(),
 });
 
-export type RecordMetricCommandData = z.infer<
-  typeof recordMetricCommandDataSchema
+export type RecordMetricCorrelationCommandData = z.infer<
+  typeof recordMetricCorrelationCommandDataSchema
 >;
 
 export const resolveOriginCommandDataSchema = z.object({
@@ -110,4 +112,3 @@ export const changeTraceNameInputSchema = z.object({
 });
 
 export type ChangeTraceNameInput = z.infer<typeof changeTraceNameInputSchema>;
-
