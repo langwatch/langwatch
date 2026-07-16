@@ -112,6 +112,13 @@ var AutoStampedBaggageKeys = []string{
 	BaggageKeyCausalityDepth,
 }
 
+// BatchScheduledDelay is the BatchSpanProcessor scheduled export delay used by
+// the default (single-tenant) pipeline when Options.BatchTimeout is unset. Kept
+// short — vs the OTel ~5s default — so an uncatchable SIGKILL/OOM loses at most
+// this window of buffered spans; the SIGTERM path force-flushes earlier still.
+// This stays BATCH export (async, no per-span latency) — NOT synchronous export.
+const BatchScheduledDelay = 2 * time.Second
+
 // Options configures the telemetry provider. Fields left empty are filled from
 // the context's ServiceInfo when available.
 type Options struct {
@@ -314,7 +321,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 
 			batchTimeout := opts.BatchTimeout
 			if batchTimeout == 0 {
-				batchTimeout = 5 * time.Second
+				batchTimeout = BatchScheduledDelay
 			}
 			queueSize := opts.MaxQueueSize
 			if queueSize == 0 {
@@ -344,18 +351,20 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	otelapi.SetTracerProvider(tp)
 	provider := &Provider{tp: tp}
 
-	if err := installDebugSignals(ctx, opts, res, provider); err != nil {
+	if err := installDebugLogs(ctx, opts, res, provider); err != nil {
+		return nil, err
+	}
+	if err := installMetrics(ctx, opts, res, provider); err != nil {
 		return nil, err
 	}
 
 	return provider, nil
 }
 
-// installDebugSignals attaches the debug collector's net-new OTLP log + metric
-// pipelines to the provider and registers the global MeterProvider. Gated on
-// the debug endpoint, so it's a no-op unless a developer opted into the local
-// observability stack.
-func installDebugSignals(ctx context.Context, opts Options, res *resource.Resource, provider *Provider) error {
+// installDebugLogs attaches the debug collector's net-new OTLP log pipeline to
+// the provider. Gated on the debug endpoint, so it's a no-op unless a developer
+// opted into the local observability stack (product/ops logs go through zap).
+func installDebugLogs(ctx context.Context, opts Options, res *resource.Resource, provider *Provider) error {
 	if opts.DebugCollectorEndpoint == "" {
 		return nil
 	}
@@ -364,11 +373,48 @@ func installDebugSignals(ctx context.Context, opts Options, res *resource.Resour
 		return err
 	}
 	provider.lp = lp
+	return nil
+}
 
-	mp, err := newMeterProvider(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders, res)
-	if err != nil {
-		return err
+// installMetrics builds and installs the global MeterProvider from whatever
+// metric sinks are configured, fanning the same instruments to each:
+//
+//   - the PRIMARY product/ops endpoint, for SINGLE-TENANT services (aigateway,
+//     langyagent) — their instruments (gateway.*, langy.worker.*) + runtime
+//     metrics export to the same collector as their spans. This is the wiring
+//     that lights those instruments up: before it, the primary path installed
+//     only a TracerProvider, leaving the global MeterProvider a no-op in prod.
+//   - the DEBUG collector, when a developer opted into the local stack.
+//
+// MultiTenant services (nlpgo) opt OUT of the primary reader: a metric stream
+// has no per-tenant routing analogue to the span TenantRouter, so there is no
+// single correct static destination. When no sink applies (noop, or multi-tenant
+// with no debug collector) the global MeterProvider is left as the SDK no-op.
+func installMetrics(ctx context.Context, opts Options, res *resource.Resource, provider *Provider) error {
+	var readers []sdkmetric.Reader
+	if opts.OTLPEndpoint != "" && !opts.MultiTenant {
+		r, err := newMetricReader(ctx, metricsEndpointFromTraces(opts.OTLPEndpoint), opts.OTLPHeaders)
+		if err != nil {
+			return err
+		}
+		readers = append(readers, r)
 	}
+	if opts.DebugCollectorEndpoint != "" {
+		r, err := newMetricReader(ctx, withSignalPath(opts.DebugCollectorEndpoint, "/v1/metrics"), opts.DebugCollectorHeaders)
+		if err != nil {
+			return err
+		}
+		readers = append(readers, r)
+	}
+	if len(readers) == 0 {
+		return nil
+	}
+
+	mpOpts := []sdkmetric.Option{sdkmetric.WithResource(res)}
+	for _, r := range readers {
+		mpOpts = append(mpOpts, sdkmetric.WithReader(r))
+	}
+	mp := sdkmetric.NewMeterProvider(mpOpts...)
 	otelapi.SetMeterProvider(mp)
 	// Runtime metrics (GC, goroutines, mem) are the first cut — a start failure
 	// must not sink service init, so warn and carry on.
@@ -465,4 +511,32 @@ func (h *healthyExporter) ExportSpans(ctx context.Context, spans []sdktrace.Read
 
 func (h *healthyExporter) Shutdown(ctx context.Context) error {
 	return h.inner.Shutdown(ctx)
+}
+
+// ForceFlushGlobal force-flushes whatever tracer and meter providers are
+// currently installed as the OTel globals, best-effort and bounded by ctx. It
+// exists for callers that do NOT hold a *Provider handle but must still ship
+// buffered telemetry before the process may die — the process root on a fatal
+// panic, or an early-shutdown hook that wants to flush before a slow drain.
+//
+// Because pkg/otelsetup installs its *sdktrace.TracerProvider as the global,
+// this also flushes every span processor registered on it (primary + any debug
+// exporter). A no-op provider (no endpoint configured) or one without ForceFlush
+// is silently skipped.
+//
+// HONEST LIMIT: SIGKILL and OOM are uncatchable, so this cannot guarantee
+// zero loss. It narrows the window for the failures the process CAN observe
+// (SIGTERM, recovered-then-fatal panic); the short BatchScheduledDelay covers
+// the rest.
+func ForceFlushGlobal(ctx context.Context) {
+	if tp, ok := otelapi.GetTracerProvider().(interface {
+		ForceFlush(context.Context) error
+	}); ok {
+		_ = tp.ForceFlush(ctx)
+	}
+	if mp, ok := otelapi.GetMeterProvider().(interface {
+		ForceFlush(context.Context) error
+	}); ok {
+		_ = mp.ForceFlush(ctx)
+	}
 }

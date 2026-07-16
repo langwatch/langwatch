@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -9,7 +9,7 @@ export const deleteScenarioCommand = async (id: string, options?: { format?: str
 
   const service = new ScenariosApiService();
 
-  const resolveSpinner = ora(`Finding scenario "${id}"...`).start();
+  const resolveSpinner = createSpinner(`Finding scenario "${id}"...`).start();
 
   let scenarioName: string;
   try {
@@ -25,7 +25,7 @@ export const deleteScenarioCommand = async (id: string, options?: { format?: str
     process.exit(1);
   }
 
-  const deleteSpinner = ora(`Archiving scenario "${scenarioName}"...`).start();
+  const deleteSpinner = createSpinner(`Archiving scenario "${scenarioName}"...`).start();
 
   try {
     await service.delete(id);

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   type BudgetOnBreach,
   GatewayBudgetsApiService,
@@ -47,7 +47,7 @@ export const updateGatewayBudgetCommand = async (
   }
 
   const service = new GatewayBudgetsApiService();
-  const spinner = ora(`Updating budget "${id}"...`).start();
+  const spinner = createSpinner(`Updating budget "${id}"...`).start();
 
   try {
     const budget = await service.update(id, {
@@ -74,7 +74,7 @@ export const updateGatewayBudgetCommand = async (
     console.log(`${chalk.bold("Timezone:")} ${budget.timezone ?? chalk.gray("—")}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update gateway budget" });
+    failSpinner({ spinner, error, action: "update gateway budget", format: options?.format });
     process.exit(1);
   }
 };

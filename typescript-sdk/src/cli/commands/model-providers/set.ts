@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const setModelProviderCommand = async (
   checkApiKey();
 
   const service = new ModelProvidersApiService();
-  const spinner = ora(`Configuring model provider "${provider}"...`).start();
+  const spinner = createSpinner(`Configuring model provider "${provider}"...`).start();
 
   try {
     const customKeys: Record<string, string> = {};
@@ -43,7 +43,7 @@ export const setModelProviderCommand = async (
       console.log(JSON.stringify({ provider, enabled: options.enabled ?? true, defaultModel: options.defaultModel ?? null }, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "configure model provider" });
+    failSpinner({ spinner, error, action: "configure model provider", format: options?.format });
     process.exit(1);
   }
 };

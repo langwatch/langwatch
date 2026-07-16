@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   SuitesApiService,
   type SuiteTarget,
@@ -53,7 +53,7 @@ export const createSuiteCommand = async (
   const labels = options.labels ? options.labels.split(",").map((l) => l.trim()) : [];
 
   const service = new SuitesApiService();
-  const spinner = ora(`Creating suite "${name}"...`).start();
+  const spinner = createSpinner(`Creating suite "${name}"...`).start();
 
   try {
     const suite = await service.create({
@@ -86,7 +86,7 @@ export const createSuiteCommand = async (
       chalk.gray(`Run it with: ${chalk.cyan(`langwatch suite run ${suite.id}`)}`),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "create suite" });
+    failSpinner({ spinner, error, action: "create suite", format: options?.format });
     process.exit(1);
   }
 };

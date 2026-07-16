@@ -27,6 +27,10 @@ type Proxy interface {
 	// Endpoint reports how the proxy is reachable (scheme, port) so URLs are
 	// correct on the default 443 or an unprivileged port.
 	Endpoint() (scheme string, port int)
+	// CACertPath returns the portless Local CA PEM path (or "" if absent) so the
+	// orchestrator can point Bun/Node children at it via NODE_EXTRA_CA_CERTS —
+	// those runtimes ignore the macOS system trust store the CA is installed into.
+	CACertPath() string
 }
 
 // Store persists everything under the thuishaven home dir plus the two
@@ -228,6 +232,19 @@ type Hygiene interface {
 type Worktree struct {
 	Dir    string
 	Branch string
+}
+
+// ContainerRuntime is the colima VM haven runs shared containers on. The
+// langyagent worker's sandboxed / container-unsafe tiers launch the worker as a
+// container on it (see domain.LangyTier); it is the same VM ClickHouse and the
+// observability stack already share.
+type ContainerRuntime interface {
+	// Ensure guarantees the VM is up and returns the DOCKER_HOST that addresses its
+	// daemon, so `docker` commands target this profile's socket rather than whatever
+	// context happens to be selected.
+	Ensure(ctx context.Context) (dockerHost string, err error)
+	// Profile is the colima profile name, for logs and error messages.
+	Profile() string
 }
 
 // DaemonInfo is the little record `up` reads to find (or spawn) the daemon.

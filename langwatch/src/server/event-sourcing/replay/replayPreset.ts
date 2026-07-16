@@ -1,7 +1,11 @@
 import IORedis from "ioredis";
 import { getApp } from "../../app-layer/app";
 import { ReplayService } from "./replayService";
-import type { RegisteredFoldProjection, RegisteredMapProjection } from "./types";
+import type {
+  RegisteredFoldProjection,
+  RegisteredMapProjection,
+  RegisteredStateProjection,
+} from "./types";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
@@ -20,6 +24,11 @@ export interface ReplayRuntime {
   service: ReplayService;
   projections: RegisteredFoldProjection[];
   mapProjections: RegisteredMapProjection[];
+  /**
+   * Discovered `.withProjection()` operational state projections, carrying
+   * their definition and store for a paused, from-init canonical rebuild.
+   */
+  stateProjections: RegisteredStateProjection[];
   close: () => Promise<void>;
 }
 
@@ -64,6 +73,26 @@ export function createReplayRuntime(config: {
   const definitions = getApp().eventSourcing?.definitions ?? [];
   const projections: RegisteredFoldProjection[] = [];
   const mapProjections: RegisteredMapProjection[] = [];
+  const stateProjections: RegisteredStateProjection[] = [];
+
+  // State projections read the SAME canonical event_log as folds, but write to
+  // their own (Postgres) StateProjectionStore rather than a CH fold store — so
+  // discovery is independent of the CH-store map above.
+  for (const def of definitions) {
+    const { name: pipelineName, aggregateType } = def.metadata;
+    for (const [, stateDef] of def.stateProjections ?? []) {
+      stateProjections.push({
+        projectionName: stateDef.name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline",
+        definition: stateDef,
+        // State projections enqueue with `__jobType=stateProjection`.
+        pauseKey: `${pipelineName}/stateProjection/${stateDef.name}`,
+        kind: "state",
+      });
+    }
+  }
 
   for (const def of definitions) {
     const { name: pipelineName, aggregateType } = def.metadata;
@@ -117,6 +146,7 @@ export function createReplayRuntime(config: {
     service,
     projections,
     mapProjections,
+    stateProjections,
     close: async () => {
       redis.disconnect();
     },

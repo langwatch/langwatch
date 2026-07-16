@@ -76,6 +76,48 @@ import {
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
+import { LangyConversationService } from "./langy/langy-conversation.service";
+import { LangyTurnService } from "./langy/langy-turn.service";
+import { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
+import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
+import { getVercelAIModel } from "~/server/modelProviders/utils";
+import {
+  mintLangySessionApiKey,
+  revokeLangySessionApiKey,
+} from "~/server/app-layer/langy/langyApiKey";
+import {
+  LANGY_GITHUB_PRS_PER_DAY,
+  releaseLangyGithubPrPermit,
+  reserveLangyGithubPrPermit,
+} from "~/server/middleware/rate-limit-langy-github-prs";
+import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
+import {
+  LangyGithubAppTokenService,
+  type RedisLike,
+} from "./langy/langyGithubAppToken";
+import {
+  createLangyTrustedMessageReader,
+  LangyMessageService,
+} from "./langy/langy-message.service";
+import { PrismaLangyMessageRepository } from "./langy/repositories/langy-message.prisma.repository";
+import { NullLangyMessageRepository } from "./langy/repositories/langy-message.repository";
+import { NullLangyGithubInstallationsRepository } from "./langy/repositories/langy-github-installations.repository";
+import { PrismaLangyGithubInstallationsRepository } from "./langy/repositories/langy-github-installations.prisma.repository";
+import { createLangyConversationTitleGenerator } from "./langy/langy-title-generation.service";
+import { PrismaLangyConversationProjectionRepository } from "./langy/repositories/langy-conversation-projection.prisma.repository";
+import { PrismaLangyConversationTurnProjectionRepository } from "./langy/repositories/langy-conversation-turn-projection.prisma.repository";
+import { PrismaLangyMessageProjectionRepository } from "./langy/repositories/langy-message-projection.prisma.repository";
+import { PrismaLangyConversationRepository } from "./langy/repositories/langy-conversation.prisma.repository";
+import { NullLangyConversationRepository } from "./langy/repositories/langy-conversation.repository";
+import { PrismaLangyTurnAdmissionRepository } from "./langy/repositories/langy-turn-admission.prisma.repository";
+import { NullLangyTurnAdmissionRepository } from "./langy/repositories/langy-turn-admission.repository";
+import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
+import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
+import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
+import { PrismaProcessStore } from "../event-sourcing/process-manager";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,
@@ -564,6 +606,23 @@ export function initializeDefaultApp(options?: {
     "ShareService",
   );
 
+  const langyConversationRepository = new PrismaLangyConversationRepository(
+    prisma,
+  );
+  const langyTurnAdmission = new PrismaLangyTurnAdmissionRepository(prisma);
+  const langyMessageRepository = new PrismaLangyMessageRepository(prisma);
+  const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
+  const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
+  const langyWorker = createLangyWorkerPort({
+    agentUrl: langyAgentUrl ?? "",
+    internalSecret: langyInternalSecret ?? "",
+  });
+  const langyHandoffStore = createLangyTurnHandoffStore({ redis });
+  const langyTokenBuffer = createLangyTokenBuffer({ redis });
+  const langyTitleGenerator = createLangyConversationTitleGenerator({
+    messages: createLangyTrustedMessageReader(langyMessageRepository),
+  });
+
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
     suiteRunState: clickhouseEnabled
@@ -601,6 +660,19 @@ export function initializeDefaultApp(options?: {
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
+    langyConversationState: new PrismaLangyConversationProjectionRepository(
+      prisma,
+    ),
+    langyConversationTurnState:
+      new PrismaLangyConversationTurnProjectionRepository(prisma),
+    langyMessageStorage: new PrismaLangyMessageProjectionRepository(prisma),
+    langyAnalyticsEventStorage: new LangyAnalyticsEventAppendStore(
+      clickhouseEnabled
+        ? new ClickHouseLangyAnalyticsEventRepository(resolveClickHouseClient)
+        : new NullLangyAnalyticsEventRepository(),
+    ),
+    langyProcessStore: new PrismaProcessStore(prisma),
+    langyTurnAdmission,
   };
 
   const gatewayBudgetSync = clickhouseEnabled
@@ -634,19 +706,18 @@ export function initializeDefaultApp(options?: {
   // EventSourcing`), so its `.withOutbox` reactors can enqueue settle
   // payloads. Web processes don't build this (no settle traffic; no consumer
   // to drain).
-  const outbox =
-    roleRunsWorkers(config.processRole)
-      ? buildOutboxRuntime({
-          prisma,
-          redis: redis ?? null,
-          triggers,
-          emailSuppressions,
-          projects,
-          evaluations: { runs: evaluations.runs },
-          traces: { spans: spanStorage },
-          traceSummaryRepository: repositories.traceSummaryFold,
-        })
-      : undefined;
+  const outbox = roleRunsWorkers(config.processRole)
+    ? buildOutboxRuntime({
+        prisma,
+        redis: redis ?? null,
+        triggers,
+        emailSuppressions,
+        projects,
+        evaluations: { runs: evaluations.runs },
+        traces: { spans: spanStorage },
+        traceSummaryRepository: repositories.traceSummaryFold,
+      })
+    : undefined;
 
   // EventSourcing must be constructed AFTER `outbox` and be given it here: the
   // reactor adapter (`.withOutbox` → enqueueSettle) and the global queue's
@@ -718,16 +789,15 @@ export function initializeDefaultApp(options?: {
   // poll, never affecting correctness. Kept dormant this phase — no consumers
   // register yet (the report handler lands in a later phase), so the loop runs
   // and log-and-skips any orphan targetType.
-  const scheduler =
-    roleRunsWorkers(config.processRole)
-      ? new SchedulerService({
-          repo: new PrismaScheduledJobRepository(prisma),
-          registry: schedulerRegistry,
-          processRole: config.processRole,
-          logger: createLogger("langwatch:app-layer:scheduler"),
-          redis,
-        })
-      : undefined;
+  const scheduler = roleRunsWorkers(config.processRole)
+    ? new SchedulerService({
+        repo: new PrismaScheduledJobRepository(prisma),
+        registry: schedulerRegistry,
+        processRole: config.processRole,
+        logger: createLogger("langwatch:app-layer:scheduler"),
+        redis,
+      })
+    : undefined;
   scheduler?.start();
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
@@ -856,6 +926,13 @@ export function initializeDefaultApp(options?: {
     repositories,
     redis: redis!,
     broadcast,
+    langy: {
+      buffer: langyTokenBuffer,
+      handoffStore: langyHandoffStore,
+      worker: langyWorker,
+      titleGenerator: langyTitleGenerator,
+      runsWorkers: roleRunsWorkers(config.processRole),
+    },
     projects,
     monitors,
     triggers,
@@ -877,6 +954,58 @@ export function initializeDefaultApp(options?: {
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle =
     commands.scenarioExecutionHandle;
+
+  // Langy operational reads come from the Postgres projections; writes remain
+  // commands against the canonical ClickHouse event log.
+  const langyConversations = LangyConversationService.create(
+    commands.langy,
+    langyConversationRepository,
+    langyMessageRepository,
+  );
+  const langyMessages = new LangyMessageService(
+    langyMessageRepository,
+    langyConversationRepository,
+  );
+
+  // Langy GitHub App installations (issue #4747): the install/webhook lifecycle
+  // and the per-turn installation-token mint for bot-authored PRs. The App is
+  // optional per instance; when the private key is unset the service reports
+  // `configured=false` and every read short-circuits to "GitHub unavailable"
+  // without touching GitHub. The App private key is the only credential and it
+  // lives here in the control plane, never near a worker.
+  const langyGithubAppTokens = new LangyGithubAppTokenService(
+    env.GITHUB_LANGY_APP_ID ?? "",
+    env.GITHUB_LANGY_PRIVATE_KEY ?? "",
+    // ioredis Redis/Cluster satisfy the narrow RedisLike surface at runtime; the
+    // client's overloaded `set` signature just isn't structurally assignable.
+    (redis ?? null) as unknown as RedisLike | null,
+  );
+  const langyGithubInstallations = new LangyGithubInstallationsService(
+    new PrismaLangyGithubInstallationsRepository(prisma),
+    langyGithubAppTokens,
+  );
+
+  // Langy turn-start orchestration (LANGY_REWORK_PLAN.md S2 C): the pipeline the
+  // Hono route used to inline, now an app-layer service with injected ports. The
+  // worker port + turn stores are null when their infra is absent (no agent env /
+  // no Redis); the service raises LangyAgentUnavailableError in that case, exactly
+  // as the route 503'd.
+  const langyTurns = LangyTurnService.create({
+    conversations: langyConversations,
+    credentials: LangyCredentialService.create(prisma),
+    resolveModel: getVercelAIModel,
+    worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
+    reservePermit: reserveLangyGithubPrPermit,
+    releasePermit: releaseLangyGithubPrPermit,
+    perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
+    mintSessionKey: ({ session, projectId, organizationId }) =>
+      mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
+    revokeSessionKey: ({ apiKeyId }) =>
+      revokeLangySessionApiKey({ prisma, apiKeyId }).then(() => undefined),
+    admission: langyTurnAdmission,
+    accessStore: redis ? createLangyTurnAccessStore({ redis }) : null,
+    handoffStore: redis ? langyHandoffStore : null,
+  });
 
   const suiteRunService = SuiteRunService.create({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
@@ -985,6 +1114,10 @@ export function initializeDefaultApp(options?: {
       await broadcast.close();
     },
   });
+  gracefulCloseables.push({
+    name: "langy-process-outbox",
+    close: () => commands.processOutboxWorker.stop(),
+  });
   // The outbox runtime piggy-backs on the main event-sourcing queue
   // (ADR-030 revision 3), so there's nothing outbox-specific to close —
   // the event-sourcing queue's own close registration covers it.
@@ -1040,7 +1173,9 @@ export function initializeDefaultApp(options?: {
 
   const ops = {
     queues: new QueueService(queueRepo),
-    scheduler: new SchedulerOpsService(new PrismaScheduledJobRepository(prisma)),
+    scheduler: new SchedulerOpsService(
+      new PrismaScheduledJobRepository(prisma),
+    ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
     replay: new ReplayService(replayRepo),
     metricsCollector: redis
@@ -1061,6 +1196,12 @@ export function initializeDefaultApp(options?: {
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
+    langy: {
+      conversations: langyConversations,
+      turns: langyTurns,
+      messages: langyMessages,
+      githubInstallations: langyGithubInstallations,
+    },
     organizations,
     projects,
     tokenizer,
@@ -1231,6 +1372,59 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         queueSimulationRun: noop,
       }),
     },
+    langy: {
+      conversations: LangyConversationService.create(
+        {
+          createConversation: noop,
+          forkConversation: noop,
+          recordMessage: noop,
+          importMessage: noop,
+          acceptAgentTurn: noop,
+          initiateToolCall: noop,
+          succeedToolCall: noop,
+          failToolCall: noop,
+          updatePlan: noop,
+          failAgentResponse: noop,
+          recordAgentResponse: noop,
+          archiveConversation: noop,
+          updateConversationMetadata: noop,
+          recordTurnHandoff: noop,
+          consumeTurnHandoff: noop,
+          generateConversationTitle: noop,
+        },
+        new NullLangyConversationRepository(),
+      ),
+      turns: LangyTurnService.create({
+        conversations: void 0 as unknown as LangyConversationService,
+        credentials: void 0 as unknown as LangyCredentialService,
+        resolveModel: async () => {
+          throw new Error("no model provider in test app");
+        },
+        worker: null,
+        reservePermit: async () => ({
+          reserved: false,
+          allowed: false,
+          resetAt: 0,
+        }),
+        releasePermit: noop,
+        perDayPrCap: 0,
+        mintSessionKey: async () => {
+          throw new Error("no session-key mint in test app");
+        },
+        revokeSessionKey: noop,
+        admission: new NullLangyTurnAdmissionRepository(),
+        accessStore: null,
+        handoffStore: null,
+      }),
+      messages: new LangyMessageService(
+        new NullLangyMessageRepository(),
+        new NullLangyConversationRepository(),
+      ),
+      githubInstallations: new LangyGithubInstallationsService(
+        new NullLangyGithubInstallationsRepository(),
+        new LangyGithubAppTokenService("", "", null),
+      ),
+    },
     organizations: nullOrganizations,
     projects: nullProjects,
     tokenizer: new TokenizerService(new NullTokenizerClient()),
@@ -1299,6 +1493,24 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordSuiteRunItemStarted: noop,
         completeSuiteRunItem: noop,
       } as AppCommands["suiteRuns"],
+      langy: {
+        createConversation: noop,
+        forkConversation: noop,
+        recordMessage: noop,
+        importMessage: noop,
+        acceptAgentTurn: noop,
+        initiateToolCall: noop,
+        succeedToolCall: noop,
+        failToolCall: noop,
+        updatePlan: noop,
+        failAgentResponse: noop,
+        recordAgentResponse: noop,
+        archiveConversation: noop,
+        updateConversationMetadata: noop,
+        recordTurnHandoff: noop,
+        consumeTurnHandoff: noop,
+        generateConversationTitle: noop,
+      } as AppCommands["langy"],
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
@@ -1313,6 +1525,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         setPool: () => {
           /* noop */
         },
+      },
+      processOutboxWorker: {
+        stop: async () => {},
       },
     },
     retentionPolicyCache: testRetentionPolicyCache,

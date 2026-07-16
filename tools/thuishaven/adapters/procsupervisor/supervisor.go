@@ -21,10 +21,20 @@ import (
 )
 
 // Supervisor is the real process-backed implementation of app.Supervisor.
-type Supervisor struct{ isPlain bool }
+type Supervisor struct {
+	isPlain bool
+	recent  *recentLogs
+}
+
+type recentLogs struct {
+	sync.Mutex
+	lines []string
+}
 
 // New returns a Supervisor. isAgent=true suppresses colour for token-free output.
-func New(isAgent bool) Supervisor { return Supervisor{isPlain: isAgent} }
+func New(isAgent bool) Supervisor {
+	return Supervisor{isPlain: isAgent, recent: &recentLogs{}}
+}
 
 // RunOnce runs a command to completion, streaming its output.
 func (s Supervisor) RunOnce(ctx context.Context, name, dir, shell string, env []string) error {
@@ -34,7 +44,11 @@ func (s Supervisor) RunOnce(ctx context.Context, name, dir, shell string, env []
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	return cmd.Wait()
+	done := make(chan struct{})
+	go killOnCancel(ctx, cmd, done)
+	err := cmd.Wait()
+	close(done)
+	return err
 }
 
 // RunOnceBounded is RunOnce plus a reaper: a background poll kills the whole
@@ -49,6 +63,8 @@ func (s Supervisor) RunOnceBounded(ctx context.Context, name, dir, shell string,
 	if err := cmd.Start(); err != nil {
 		return err
 	}
+	done := make(chan struct{})
+	go killOnCancel(ctx, cmd, done)
 
 	reapCtx, cancelReap := context.WithCancel(ctx)
 	defer cancelReap()
@@ -58,6 +74,7 @@ func (s Supervisor) RunOnceBounded(ctx context.Context, name, dir, shell string,
 	}
 
 	err := cmd.Wait()
+	close(done)
 	select {
 	case reason := <-reaped:
 		return fmt.Errorf("%s: %s", name, reason)
@@ -115,6 +132,12 @@ func groupRSSBytes(pgid int) int64 {
 // Supervise runs every child concurrently, restarting any that exit until the
 // context is cancelled, then SIGTERMs (and finally SIGKILLs) the whole tree.
 func (s Supervisor) Supervise(ctx context.Context, children []app.Child) {
+	reapOrphans(children, os.Getpid())
+	if !s.isPlain {
+		fmt.Print("\x1b[?1049h\x1b[?25l")
+		defer fmt.Print("\x1b[?25h\x1b[?1049l\x1b[0m")
+		go renderUp(ctx, s.recent, children)
+	}
 	var wg sync.WaitGroup
 	for _, ch := range children {
 		wg.Add(1)
@@ -126,10 +149,86 @@ func (s Supervisor) Supervise(ctx context.Context, children []app.Child) {
 	wg.Wait()
 }
 
+func killOnCancel(ctx context.Context, cmd *exec.Cmd, done <-chan struct{}) {
+	select {
+	case <-done:
+		return
+	case <-ctx.Done():
+		if cmd.Process != nil {
+			// The first Ctrl-C is a hard stop for the launcher tree. Cleanup runs
+			// after the children are gone and must never hold the terminal hostage.
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+	}
+}
+
+func reapOrphans(children []app.Child, self int) {
+	knownDirs := make([]string, 0, len(children))
+	for _, child := range children {
+		if child.Dir != "" {
+			knownDirs = append(knownDirs, child.Dir)
+		}
+	}
+	out, err := exec.Command("ps", "-axo", "pid=,ppid=,pgid=,command=").Output()
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		var pid, ppid, pgid int
+		if _, err := fmt.Sscanf(fields[0], "%d", &pid); err != nil {
+			continue
+		}
+		if _, err := fmt.Sscanf(fields[1], "%d", &ppid); err != nil {
+			continue
+		}
+		if _, err := fmt.Sscanf(fields[2], "%d", &pgid); err != nil {
+			continue
+		}
+		if pid == self || ppid != 1 || pgid <= 0 {
+			continue
+		}
+		command := strings.Join(fields[3:], " ")
+		if !knownDevRuntime(command) || !containsAny(command, knownDirs) {
+			continue
+		}
+		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+	}
+}
+
+func ReapOrphans(dirs []string) {
+	children := make([]app.Child, 0, len(dirs))
+	for _, dir := range dirs {
+		children = append(children, app.Child{Dir: dir})
+	}
+	reapOrphans(children, os.Getpid())
+}
+
+func knownDevRuntime(command string) bool {
+	for _, token := range []string{"tsgo", "vite", "tsx", "pnpm", "node", "opencode", "go run", "service", "uv", "python"} {
+		if strings.Contains(command, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAny(value string, needles []string) bool {
+	for _, needle := range needles {
+		if needle != "" && strings.Contains(value, needle) {
+			return true
+		}
+	}
+	return false
+}
+
 // superviseChild runs one child, restarting it (1s backoff) on exit until ctx
 // is cancelled, then SIGTERMs the process group and SIGKILLs after 5s.
 func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
-	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain}
+	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain, preview: s.recent}
 	// Gate the start on a dependency being ready (e.g. the web lane on the API),
 	// so this process — and the hostname routed to it — never comes up before what
 	// it needs is serving.
@@ -151,15 +250,9 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 		select {
 		case <-ctx.Done():
 			if cmd.Process != nil {
-				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 			}
-			select {
-			case <-done:
-			case <-time.After(5 * time.Second):
-				if cmd.Process != nil {
-					_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-				}
-			}
+			<-done
 			return
 		case <-done:
 			if ctx.Err() != nil {
@@ -210,6 +303,7 @@ type proc struct {
 	name, dir, shell, color string
 	env                     []string
 	isPlain                 bool
+	preview                 *recentLogs
 }
 
 func (c proc) command(ctx context.Context) *exec.Cmd {
@@ -238,9 +332,51 @@ func (c proc) stream(r io.Reader) {
 
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\n")
+	if c.preview != nil {
+		c.preview.Lock()
+		c.preview.lines = append(c.preview.lines, fmt.Sprintf("%-8s │ %s", c.name, line))
+		if len(c.preview.lines) > 12 {
+			c.preview.lines = c.preview.lines[len(c.preview.lines)-12:]
+		}
+		c.preview.Unlock()
+		return
+	}
 	if c.isPlain {
 		fmt.Printf("%-8s | %s\n", c.name, line)
 		return
 	}
 	fmt.Printf("\x1b[%sm%-8s\x1b[0m │ %s\n", c.color, c.name, line)
+}
+
+func renderUp(ctx context.Context, logs *recentLogs, children []app.Child) {
+	t := time.NewTicker(250 * time.Millisecond)
+	defer t.Stop()
+	render := func() {
+		var b strings.Builder
+		b.WriteString("\x1b[H\x1b[2J\x1b[1m haven up \x1b[0m\x1b[2m— live stack · Ctrl-C stops immediately\x1b[0m\n\n")
+		b.WriteString("\x1b[1m stack\x1b[0m  ")
+		for i, child := range children {
+			if i > 0 {
+				b.WriteString(" · ")
+			}
+			b.WriteString(child.Name)
+		}
+		b.WriteString("\n\n\x1b[2m recent output (full logs remain in Grafana)\x1b[0m\n")
+		logs.Lock()
+		for _, line := range logs.lines {
+			b.WriteString(line)
+			b.WriteByte('\n')
+		}
+		logs.Unlock()
+		fmt.Print(b.String())
+	}
+	render()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			render()
+		}
+	}
 }

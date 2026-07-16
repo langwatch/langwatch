@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  within,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioCreateModal } from "../ScenarioCreateModal";
 
@@ -39,7 +45,9 @@ const mockOpenUpgradeModal = vi.fn();
 vi.mock("~/stores/upgradeModalStore", () => ({
   useUpgradeModalStore: (selector: unknown) => {
     if (typeof selector === "function") {
-      return (selector as (state: { open: typeof mockOpenUpgradeModal }) => unknown)({ open: mockOpenUpgradeModal });
+      return (
+        selector as (state: { open: typeof mockOpenUpgradeModal }) => unknown
+      )({ open: mockOpenUpgradeModal });
     }
     return { open: mockOpenUpgradeModal };
   },
@@ -58,7 +66,11 @@ vi.mock("~/utils/api", () => ({
       getResolvedDefault: {
         useQuery: () => ({
           data: mockProject.defaultModel
-            ? { model: mockProject.defaultModel, source: "test", scope: "PROJECT" }
+            ? {
+                model: mockProject.defaultModel,
+                source: "test",
+                scope: "PROJECT",
+              }
             : null,
           isLoading: false,
         }),
@@ -87,7 +99,9 @@ vi.mock("~/utils/api", () => ({
 
 // Create variables for mock that can be modified per test
 let mockHasEnabledProviders = true;
-let mockProviders: Record<string, { enabled: boolean }> | undefined = { openai: { enabled: true } };
+let mockProviders: Record<string, { enabled: boolean }> | undefined = {
+  openai: { enabled: true },
+};
 
 // Mock useModelProvidersSettings
 vi.mock("~/hooks/useModelProvidersSettings", () => ({
@@ -139,7 +153,11 @@ describe("<ScenarioCreateModal/>", () => {
     // override this in their own beforeEach.
     mockHasEnabledProviders = true;
     mockProviders = { openai: { enabled: true } };
-    mockProject = { id: "project-123", slug: "my-project", defaultModel: "openai/gpt-4o-mini" };
+    mockProject = {
+      id: "project-123",
+      slug: "my-project",
+      defaultModel: "openai/gpt-4o-mini",
+    };
 
     // Mock fetch for AI generation
     global.fetch = vi.fn().mockResolvedValue({
@@ -150,119 +168,132 @@ describe("<ScenarioCreateModal/>", () => {
 
   describe("when open", () => {
     it("displays scenario title", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
-      expect(within(dialog).getByText("Create new scenario")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("Create new scenario"),
+      ).toBeInTheDocument();
+    });
+
+    it("presents Langy as an editable drafting step while keeping manual setup", () => {
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
+
+      const dialog = getDialogContent();
+      expect(within(dialog).getByText("with Langy")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("What should this simulation prove?"),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByText("Draft with Langy")).toBeInTheDocument();
+      // The manual path is a first-class peer of the assistant, offered as a
+      // toggle right beside "With Langy" — not a buried "set up manually" link.
+      expect(
+        within(dialog).getByRole("button", { name: "Build it myself" }),
+      ).toBeInTheDocument();
     });
 
     it("displays scenario placeholder text", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       expect(
         within(dialog).getByPlaceholderText(
-          "Explain your agent, its goals and what behavior you want to test."
-        )
+          "Explain your agent, its goals and what behavior you want to test.",
+        ),
       ).toBeInTheDocument();
     });
 
     it("displays Customer Support example pill", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       expect(within(dialog).getByText("Customer Support")).toBeInTheDocument();
     });
 
     it("displays RAG Q&A example pill", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       expect(within(dialog).getByText("RAG Q&A")).toBeInTheDocument();
     });
 
     it("displays Tool-calling Agent example pill", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      expect(within(dialog).getByText("Tool-calling Agent")).toBeInTheDocument();
-    });
-
-    it("displays close button", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByRole("button", { name: /close/i })
+        within(dialog).getByText("Tool-calling Agent"),
+      ).toBeInTheDocument();
+    });
+
+    it("displays close button", () => {
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).getByRole("button", { name: /close/i }),
       ).toBeInTheDocument();
     });
   });
 
   describe("when user clicks Customer Support pill", () => {
     it("fills textarea with template", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       fireEvent.click(within(dialog).getByText("Customer Support"));
 
       const textarea = within(dialog).getByRole("textbox");
       expect(textarea).toHaveValue(
-        "A customer support agent that handles complaints. Test an angry customer who was charged twice and wants a refund."
+        "A customer support agent that handles complaints. Test an angry customer who was charged twice and wants a refund.",
       );
     });
   });
 
   describe("when user clicks RAG Q&A pill", () => {
     it("fills textarea with template", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       fireEvent.click(within(dialog).getByText("RAG Q&A"));
 
       const textarea = within(dialog).getByRole("textbox");
       expect(textarea).toHaveValue(
-        "A knowledge bot that answers questions from documentation. Test a question that requires combining info from multiple sources."
+        "A knowledge bot that answers questions from documentation. Test a question that requires combining info from multiple sources.",
       );
     });
   });
 
   describe("when user clicks Tool-calling Agent pill", () => {
     it("fills textarea with template", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       fireEvent.click(within(dialog).getByText("Tool-calling Agent"));
 
       const textarea = within(dialog).getByRole("textbox");
       expect(textarea).toHaveValue(
-        "An agent that uses tools to complete tasks. Test a request that requires calling multiple tools in sequence."
+        "An agent that uses tools to complete tasks. Test a request that requires calling multiple tools in sequence.",
       );
     });
   });
@@ -277,15 +308,18 @@ describe("<ScenarioCreateModal/>", () => {
     // `ScenarioFormData` / `ScenarioInitialData` accordingly, or update this test
     // to not expect `labels` in the generated output.
     it.skip("opens drawer with generated content without creating a DB record", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "My test scenario description" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
+      fireEvent.change(textarea, {
+        target: { value: "My test scenario description" },
+      });
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
+      );
 
       // Verify AI generation API was called
       await waitFor(() => {
@@ -298,7 +332,7 @@ describe("<ScenarioCreateModal/>", () => {
               currentScenario: null,
               projectId: "project-123",
             }),
-          })
+          }),
         );
       });
 
@@ -309,7 +343,7 @@ describe("<ScenarioCreateModal/>", () => {
           expect.objectContaining({
             initialFormData: mockGeneratedScenario,
           }),
-          { resetStack: true }
+          { resetStack: true },
         );
       });
     });
@@ -322,13 +356,14 @@ describe("<ScenarioCreateModal/>", () => {
     // `labels: []` to the object passed to `openEditorWithData` in `handleSkip`,
     // or update this test to not assert `labels` in the skip path.
     it.skip("opens drawer with empty initial data without creating a DB record", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
-      fireEvent.click(within(dialog).getByRole("button", { name: /i'll write it myself/i }));
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: /i'll write it myself/i }),
+      );
 
       await waitFor(() => {
         expect(mockOpenDrawer).toHaveBeenCalledWith(
@@ -341,7 +376,7 @@ describe("<ScenarioCreateModal/>", () => {
               labels: [],
             },
           }),
-          { resetStack: true }
+          { resetStack: true },
         );
       });
     });
@@ -349,14 +384,13 @@ describe("<ScenarioCreateModal/>", () => {
 
   describe("when open is true", () => {
     it("renders dialog in open state", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialogs = screen.queryAllByRole("dialog");
       const openDialogs = dialogs.filter(
-        (d: HTMLElement) => d.getAttribute("data-state") === "open"
+        (d: HTMLElement) => d.getAttribute("data-state") === "open",
       );
       expect(openDialogs.length).toBeGreaterThan(0);
     });
@@ -372,36 +406,39 @@ describe("<ScenarioCreateModal/>", () => {
     });
 
     it("shows the model-provider-required modal instead of the AI form", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
-      expect(within(dialog).getByText("Model provider not ready")).toBeInTheDocument();
       expect(
-        within(dialog).getByTestId("model-provider-required-modal-configure-button")
+        within(dialog).getByText("Model provider not ready"),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByTestId(
+          "model-provider-required-modal-configure-button",
+        ),
       ).toHaveAccessibleName("Configure model provider");
     });
 
     it("hides textarea", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
     });
 
     it("hides generate button", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
-      expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByRole("button", { name: /generate with ai/i }),
+      ).not.toBeInTheDocument();
     });
   });
 });
@@ -409,7 +446,11 @@ describe("<ScenarioCreateModal/>", () => {
 describe("when default model is Azure deployment not in registry", () => {
   describe("when azure provider IS enabled", () => {
     beforeEach(() => {
-      mockProject = { id: "project-123", slug: "my-project", defaultModel: "azure/my-gpt4-deployment" };
+      mockProject = {
+        id: "project-123",
+        slug: "my-project",
+        defaultModel: "azure/my-gpt4-deployment",
+      };
       // Azure provider IS enabled
       mockHasEnabledProviders = true;
       mockProviders = { azure: { enabled: true } };
@@ -421,25 +462,27 @@ describe("when default model is Azure deployment not in registry", () => {
     });
 
     it("does not show No model provider configured warning", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
-      expect(within(dialog).queryByText("No model provider configured")).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByText("No model provider configured"),
+      ).not.toBeInTheDocument();
     });
 
     it("proceeds with generation when description is provided", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test azure scenario" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
+      );
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalled();
@@ -449,7 +492,11 @@ describe("when default model is Azure deployment not in registry", () => {
 
   describe("when azure provider is NOT enabled but another provider is", () => {
     beforeEach(() => {
-      mockProject = { id: "project-123", slug: "my-project", defaultModel: "azure/my-gpt4-deployment" };
+      mockProject = {
+        id: "project-123",
+        slug: "my-project",
+        defaultModel: "azure/my-gpt4-deployment",
+      };
       // hasEnabledProviders=true simulates: OpenAI is configured, but Azure is NOT configured
       // yet the project's default model is azure/my-gpt4-deployment
       mockHasEnabledProviders = true;
@@ -462,36 +509,43 @@ describe("when default model is Azure deployment not in registry", () => {
     });
 
     it("shows the model-provider-required modal up-front (no Generate flow)", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
-      expect(within(dialog).getByText("Model provider not ready")).toBeInTheDocument();
       expect(
-        within(dialog).getByTestId("model-provider-required-modal-configure-button")
+        within(dialog).getByText("Model provider not ready"),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByTestId(
+          "model-provider-required-modal-configure-button",
+        ),
       ).toBeInTheDocument();
     });
   });
 });
 
-
 describe("when default model is Azure and provider is NOT configured at all", () => {
   beforeEach(() => {
-    mockProject = { id: "project-123", slug: "my-project", defaultModel: "azure/my-gpt4-deployment" };
+    mockProject = {
+      id: "project-123",
+      slug: "my-project",
+      defaultModel: "azure/my-gpt4-deployment",
+    };
     mockHasEnabledProviders = false;
     mockProviders = {};
   });
 
   it("shows the model-provider-required modal", () => {
-    render(
-      <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-      { wrapper: Wrapper }
-    );
+    render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+      wrapper: Wrapper,
+    });
 
     const dialog = getDialogContent();
-    expect(within(dialog).getByText("Model provider not ready")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Model provider not ready"),
+    ).toBeInTheDocument();
   });
 });
 
@@ -514,15 +568,16 @@ describe("given azure is the only enabled provider and project.defaultModel is a
     });
 
     it("calls generateScenarioWithAI exactly once (healthy non-openai default)", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test azure scenario" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
+      );
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -530,21 +585,24 @@ describe("given azure is the only enabled provider and project.defaultModel is a
     });
 
     it("does not render API keys not configured error", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test azure scenario" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
+      );
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalled();
       });
 
-      expect(within(dialog).queryByText(/api keys not configured/i)).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByText(/api keys not configured/i),
+      ).not.toBeInTheDocument();
     });
   });
 });
@@ -566,33 +624,34 @@ describe("given azure is the only enabled provider and project.defaultModel is n
     });
 
     it("shows the Configure model provider footer button", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByTestId("model-provider-required-modal-configure-button")
+        within(dialog).getByTestId(
+          "model-provider-required-modal-configure-button",
+        ),
       ).toHaveAccessibleName("Configure model provider");
     });
 
     it("does not render the description textarea or Generate button", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
-      expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByRole("button", { name: /generate with ai/i }),
+      ).not.toBeInTheDocument();
     });
 
     it("does not call generateScenarioWithAI", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       // Nothing the user can do in the modal triggers a generation.
       await waitFor(() => {
@@ -618,33 +677,34 @@ describe("given azure is the only enabled provider and project.defaultModel is o
     });
 
     it("shows the Configure model provider footer button", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByTestId("model-provider-required-modal-configure-button")
+        within(dialog).getByTestId(
+          "model-provider-required-modal-configure-button",
+        ),
       ).toHaveAccessibleName("Configure model provider");
     });
 
     it("does not render the description textarea or Generate button", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
       expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
-      expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByRole("button", { name: /generate with ai/i }),
+      ).not.toBeInTheDocument();
     });
 
     it("does not call generateScenarioWithAI", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(global.fetch).not.toHaveBeenCalled();
@@ -663,25 +723,31 @@ describe("given providers are still loading", () => {
     });
 
     it("does not render any error banner", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
-      expect(within(dialog).queryByText(/api keys not configured/i)).not.toBeInTheDocument();
-      expect(within(dialog).queryByText(/no default model/i)).not.toBeInTheDocument();
-      expect(within(dialog).queryByText(/provider.*disabled/i)).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByText(/api keys not configured/i),
+      ).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByText(/no default model/i),
+      ).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByText(/provider.*disabled/i),
+      ).not.toBeInTheDocument();
     });
 
     it("renders the Generate with AI button", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const dialog = getDialogContent();
-      expect(within(dialog).getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
+      ).toBeInTheDocument();
     });
   });
 });

@@ -3,19 +3,28 @@ import * as path from "path";
 import chalk from "chalk";
 import { FileManager } from "../utils/fileManager";
 import { checkApiKey } from "../utils/apiKey";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "../utils/errorOutput";
 import { ensureProjectInitialized } from "../utils/init";
 import { DEFAULT_PROMPT_MODEL } from "../constants";
 
-type CreateOptions = Record<string, unknown>;
+interface CreateOptions {
+  format?: string;
+}
 
 export const createCommand = async (
   name: string,
-  _options: CreateOptions,
+  options: CreateOptions = {},
 ): Promise<void> => {
   try {
     // Validate prompt name
     if (!name || name.trim() === "") {
-      console.error(chalk.red("Error: Prompt name cannot be empty"));
+      reportCommandError({
+        error: commandValidationError("Prompt name cannot be empty"),
+        format: options.format,
+      });
       process.exit(1);
     }
 
@@ -33,9 +42,12 @@ export const createCommand = async (
     );
 
     if (fs.existsSync(promptPath)) {
-      console.error(
-        chalk.red(`Error: Prompt file already exists at ${promptPath}`),
-      );
+      reportCommandError({
+        error: commandValidationError(
+          `Prompt file already exists at ${promptPath}`,
+        ),
+        format: options.format,
+      });
       process.exit(1);
     }
 
@@ -78,16 +90,25 @@ messages:
     FileManager.savePromptsLock(lock);
 
     const displayPath = `./${relativePath}`;
+
+    if (options.format === "json") {
+      console.log(
+        JSON.stringify(
+          { name, path: relativePath, dependency: `file:${relativePath}` },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
     console.log(
       chalk.green(`✓ Created prompt file: ${chalk.cyan(displayPath)}`),
     );
     console.log(chalk.gray(`  Edit this file and then run:`));
     console.log(chalk.cyan(`  langwatch prompt sync`));
   } catch (error) {
-    console.error(
-      chalk.red("Unexpected error:"),
-      error instanceof Error ? error.message : error,
-    );
+    reportCommandError({ error, format: options.format });
     process.exit(1);
   }
 };

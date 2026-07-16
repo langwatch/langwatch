@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const getSuiteCommand = async (
   checkApiKey();
 
   const service = new SuitesApiService();
-  const spinner = ora(`Fetching suite "${id}"...`).start();
+  const spinner = createSpinner(`Fetching suite "${id}"...`).start();
 
   try {
     const suite = await service.get(id);
@@ -58,7 +58,7 @@ export const getSuiteCommand = async (
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch suite" });
+    failSpinner({ spinner, error, action: "fetch suite", format: options?.format });
     process.exit(1);
   }
 };

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
@@ -16,7 +16,7 @@ export const listGraphsCommand = async (options: {
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = ora("Fetching graphs...").start();
+  const spinner = createSpinner("Fetching graphs...").start();
 
   try {
     const params = new URLSearchParams();
@@ -79,7 +79,7 @@ export const listGraphsCommand = async (options: {
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch graphs" });
+    failSpinner({ spinner, error, action: "fetch graphs", format: options?.format });
     process.exit(1);
   }
 };

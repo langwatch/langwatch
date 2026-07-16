@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
@@ -9,7 +9,7 @@ export const listModelProvidersCommand = async (options?: { format?: string }): 
   checkApiKey();
 
   const service = new ModelProvidersApiService();
-  const spinner = ora("Fetching model providers...").start();
+  const spinner = createSpinner("Fetching model providers...").start();
 
   try {
     const providers = await service.list();
@@ -58,7 +58,7 @@ export const listModelProvidersCommand = async (options?: { format?: string }): 
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch model providers" });
+    failSpinner({ spinner, error, action: "fetch model providers", format: options?.format });
     process.exit(1);
   }
 };

@@ -16,6 +16,9 @@ func (a *App) coreDispatch(ctx context.Context, call *pipeline.Call) (*domain.Re
 		return nil, err
 	}
 	creds := eligibleCredentials(call.Bundle.Credentials, call.Request.Resolved)
+	if len(creds) == 0 {
+		return nil, errNoProviderConfigured(ctx)
+	}
 	resp, el, err := retry.Walk(ctx, retryOpts(call.Bundle), credentialIDs(creds),
 		func(ctx context.Context, slotID string) (*domain.Response, error) {
 			return a.providers.Dispatch(ctx, call.Request, findCredential(creds, slotID))
@@ -34,6 +37,9 @@ func (a *App) coreDispatchStream(ctx context.Context, call *pipeline.Call) (doma
 		return nil, err
 	}
 	creds := eligibleCredentials(call.Bundle.Credentials, call.Request.Resolved)
+	if len(creds) == 0 {
+		return nil, errNoProviderConfigured(ctx)
+	}
 	iter, el, err := retry.Walk(ctx, retryOpts(call.Bundle), credentialIDs(creds),
 		func(ctx context.Context, slotID string) (domain.StreamIterator, error) {
 			return a.providers.DispatchStream(ctx, call.Request, findCredential(creds, slotID))
@@ -44,6 +50,16 @@ func (a *App) coreDispatchStream(ctx context.Context, call *pipeline.Call) (doma
 		return nil, err
 	}
 	return iter, nil
+}
+
+// errNoProviderConfigured is the terminal answer when the bundle has zero
+// eligible credentials: the organization has no model provider configured.
+// Falling through to dispatch would hand Bifrost a zero-value Credential,
+// which it rejects with an opaque "provider is required" 400.
+func errNoProviderConfigured(ctx context.Context) error {
+	return herr.New(ctx, domain.ErrNoProviderConfigured, herr.M{
+		"message": "no model provider configured for this organization — add a provider API key in Settings → Model Providers",
+	})
 }
 
 func retryOpts(bundle *domain.Bundle) retry.Options {

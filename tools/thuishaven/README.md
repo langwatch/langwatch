@@ -176,6 +176,24 @@ registry, and dashboard stay the same.
   resolves to a shared baseline stack (`HAVEN_BASELINE=1`, off `main`) instead of
   dead-ending. ClickHouse embodies this: one server, `clickhouse.<slug>` always
   resolves, only the database is per-worktree.
+- **Sandboxed Langy worker (by default).** The langyagent worker runs the Langy
+  agent, so haven isolates it like production rather than letting a test model run
+  as your own user. Two env flags pick one of three tiers:
+  - _neither_ (default): the worker runs in the shared colima VM with the
+    per-worker UID sandbox on (production-like); nothing it does can touch your
+    real filesystem. haven builds `langyagent:dev` into colima on first `up`
+    (minutes once; `HAVEN_LANGY_REBUILD=1` forces a rebuild after source changes).
+  - `LANGY_UNSAFE_CONTAINER=1`: still in the colima VM (host still isolated), but
+    the per-worker UID sandbox is off — simpler/faster when iterating.
+  - `LANGY_UNSAFE_HOST_ACCESS=1`: runs the worker as a bare host process, no VM,
+    full host filesystem access — the least safe, for when it genuinely must reach
+    host paths.
+
+  In the container tiers the worker reaches the control plane + gateway back on the
+  host via `host.docker.internal` (haven injects `LANGY_WORKER_CALLBACK_URL` /
+  `LANGY_WORKER_GATEWAY_URL`), and the host reaches the manager over a published
+  loopback port. Production is never any of these — it always runs sandboxed under
+  gVisor.
 - **`haven prune`.** Reclaim regenerable disk (node_modules, dist, caches) from
   worktrees that are neither up nor dirty. Dry-run by default; `--yes` to act.
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel

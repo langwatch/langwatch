@@ -2,11 +2,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
 import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import type { StateProjectionDefinition } from "../../projections/stateProjection.types";
 import {
   createMockFoldProjectionDefinition,
   createMockMapProjectionDefinition,
 } from "../../services/__tests__/testHelpers";
 import { definePipeline } from "../staticBuilder";
+
+function createMockStateProjectionDefinition<E extends Event>(
+  name: string,
+): StateProjectionDefinition<Record<string, never>, E> {
+  return {
+    name,
+    version: "2025-01-01",
+    eventTypes: [],
+    init: () => ({}),
+    apply: (state) => state,
+    store: {
+      load: vi.fn().mockResolvedValue(null),
+      store: vi.fn().mockResolvedValue(undefined),
+    },
+  };
+}
 
 describe("StaticPipelineBuilder validations", () => {
   beforeEach(() => {
@@ -47,6 +65,87 @@ describe("StaticPipelineBuilder validations", () => {
           .withFoldProjection("simple", fold)
           .build(),
       ).not.toThrow();
+    });
+  });
+
+  describe("when an event subscriber is registered", () => {
+    it("stores the event-only definition without attaching it to a projection", () => {
+      const subscriber: EventSubscriberDefinition<Event> = {
+        name: "conversationProcess",
+        eventTypes: [],
+        handle: vi.fn(),
+      };
+
+      const pipeline = definePipeline<Event>()
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withEventSubscriber("conversationProcess", subscriber)
+        .build();
+
+      expect(pipeline.eventSubscribers.get("conversationProcess")).toBe(
+        subscriber,
+      );
+      expect(pipeline.foldReactors.size).toBe(0);
+      expect(pipeline.mapReactors.size).toBe(0);
+    });
+  });
+
+  describe("when a default state projection is registered", () => {
+    it("keeps it out of the legacy fold and reactor registries", () => {
+      const projection =
+        createMockStateProjectionDefinition<Event>("conversationState");
+
+      const pipeline = definePipeline<Event>()
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withProjection("conversationState", projection)
+        .build();
+
+      expect(pipeline.stateProjections?.get("conversationState")).toBe(
+        projection,
+      );
+      expect(pipeline.foldProjections.size).toBe(0);
+      expect(pipeline.foldReactors.size).toBe(0);
+      expect(pipeline.mapReactors.size).toBe(0);
+    });
+
+    it("cannot be used as a reactor parent", () => {
+      const projection =
+        createMockStateProjectionDefinition<Event>("conversationState");
+      const reactor: ReactorDefinition<Event> = {
+        name: "shouldNotAttach",
+        handle: vi.fn(),
+      };
+
+      expect(() =>
+        definePipeline<Event>()
+          .withName("test-pipeline")
+          .withAggregateType("trace")
+          .withProjection("conversationState", projection)
+          .withReactor(
+            "conversationState" as never,
+            "shouldNotAttach",
+            reactor,
+          ),
+      ).toThrow(/projection not found/);
+    });
+  });
+
+  describe("when an event subscriber name is reused", () => {
+    it("throws ConfigurationError", () => {
+      const subscriber: EventSubscriberDefinition<Event> = {
+        name: "conversationProcess",
+        eventTypes: [],
+        handle: vi.fn(),
+      };
+
+      expect(() =>
+        definePipeline<Event>()
+          .withName("test-pipeline")
+          .withAggregateType("trace")
+          .withEventSubscriber("conversationProcess", subscriber)
+          .withEventSubscriber("conversationProcess", subscriber),
+      ).toThrow(/already exists/);
     });
   });
 

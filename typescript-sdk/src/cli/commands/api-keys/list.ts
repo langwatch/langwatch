@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
@@ -9,7 +9,7 @@ export const listApiKeysCommand = async (options?: { format?: string }): Promise
   checkApiKey();
 
   const service = new ApiKeysApiService();
-  const spinner = ora("Fetching API keys...").start();
+  const spinner = createSpinner("Fetching API keys...").start();
 
   try {
     const keys = await service.list();
@@ -62,7 +62,7 @@ export const listApiKeysCommand = async (options?: { format?: string }): Promise
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch API keys" });
+    failSpinner({ spinner, error, action: "fetch API keys", format: options?.format });
     process.exit(1);
   }
 };

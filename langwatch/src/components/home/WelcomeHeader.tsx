@@ -1,5 +1,6 @@
 import { Heading } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { SERIF } from "~/features/asaplangy";
 import { useSession } from "~/utils/auth-client";
 
 /**
@@ -50,17 +51,35 @@ export const getGreeting = ({
   return name ? `${named}${name}` : anonymous;
 };
 
-export function WelcomeHeader() {
-  const { data: session } = useSession();
-  const greetingName = getGreetingName(session?.user?.name);
+/**
+ * The clock's read of the day, resolved client-side after mount (so SSR and
+ * first paint agree on "morning" and never mismatch hydration). Shared by the
+ * greeting and the page's time-of-day aura.
+ */
+export function useTimeOfDay(): TimeOfDay {
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("morning");
-
   useEffect(() => {
     setTimeOfDay(getTimeOfDay(new Date().getHours()));
   }, []);
+  return timeOfDay;
+}
+
+export function WelcomeHeader() {
+  const { data: session } = useSession();
+  const greetingName = getGreetingName(session?.user?.name);
+  const timeOfDay = useTimeOfDay();
 
   return (
-    <Heading as="h1" size="lg">
+    // The page's serif display voice: the greeting is the home's one big line,
+    // so it speaks in the same face as the briefing headline below it.
+    <Heading
+      as="h1"
+      fontFamily={SERIF}
+      fontWeight="500"
+      fontSize="26px"
+      letterSpacing="-0.01em"
+      lineHeight="1.2"
+    >
       {getGreeting({ timeOfDay, name: greetingName })}
     </Heading>
   );

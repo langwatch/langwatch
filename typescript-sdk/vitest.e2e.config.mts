@@ -8,6 +8,7 @@ export default defineConfig({
         globalSetup: "./__tests__/e2e/setup/global-setup.ts",
         setupFiles: [
             "dotenv/config",
+            "./test-setup.ts",
             "./__tests__/e2e/setup/msw-setup.ts",
         ],
         include: ["**/*.e2e.test.ts"],

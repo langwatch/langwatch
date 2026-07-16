@@ -82,4 +82,51 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
       );
     });
   });
+
+  /**
+   * Regression: the project root is memoised, and the cache MUST be keyed by the
+   * cwd it was derived from.
+   *
+   * In a process that serves one command and exits, an unkeyed cache is
+   * invisible. In one that serves many from different directories — the CLI
+   * daemon, but equally a test runner or any embedding host — the second caller
+   * silently inherits the first caller's project root, and `prompt init` writes
+   * prompts.json into someone else's directory while `prompt sync` then fails to
+   * find it. Note there is no `_resetProjectRootCache()` below: that is the
+   * point.
+   */
+  describe("given one process serving callers from different directories", () => {
+    describe("when the cwd changes between calls", () => {
+      it("re-resolves the project root instead of reusing the first caller's", () => {
+        const first = path.join(scratchRoot, "caller-one");
+        const second = path.join(scratchRoot, "caller-two");
+        fs.mkdirSync(first);
+        fs.mkdirSync(second);
+
+        process.chdir(first);
+        expect(FileManager.getPromptsConfigPath()).toBe(
+          path.join(first, "prompts.json"),
+        );
+
+        process.chdir(second);
+        expect(FileManager.getPromptsConfigPath()).toBe(
+          path.join(second, "prompts.json"),
+        );
+      });
+    });
+
+    describe("when the cwd is unchanged between calls", () => {
+      it("still serves the memoised root", () => {
+        const dir = path.join(scratchRoot, "same-caller");
+        fs.mkdirSync(dir);
+        process.chdir(dir);
+
+        const first = FileManager.getPromptsConfigPath();
+        const second = FileManager.getPromptsConfigPath();
+
+        expect(second).toBe(first);
+        expect(second).toBe(path.join(dir, "prompts.json"));
+      });
+    });
+  });
 });

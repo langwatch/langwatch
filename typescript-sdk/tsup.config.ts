@@ -15,6 +15,10 @@ export default defineConfig([
     format: ["cjs", "esm"],
     dts: true,
     sourcemap: true,
+    // The card/domain-error contract is a source-only workspace package and a
+    // devDependency, so it must be inlined rather than left as an import the
+    // published `langwatch` tarball could never resolve.
+    noExternal: ["@langwatch/cli-cards"],
     define: {
       __CLI_VERSION__: JSON.stringify(packageJson.version),
     },

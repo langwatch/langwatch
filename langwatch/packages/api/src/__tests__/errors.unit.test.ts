@@ -246,13 +246,13 @@ describe("formatError", () => {
 
         expect(status).toBe(500);
         expect(body.code).toBe("internal_error");
-        expect(body.message).toBe("Internal server error");
+        expect(body.message).toBe("An unknown error occurred");
       } finally {
         process.env["NODE_ENV"] = originalEnv;
       }
     });
 
-    it("exposes the error message in development mode", () => {
+    it("does not expose the error message in development mode", () => {
       const originalEnv = process.env["NODE_ENV"];
       process.env["NODE_ENV"] = "development";
       try {
@@ -261,7 +261,7 @@ describe("formatError", () => {
 
         expect(status).toBe(500);
         expect(body.code).toBe("internal_error");
-        expect(body.message).toBe("secret internal details");
+        expect(body.message).toBe("An unknown error occurred");
       } finally {
         process.env["NODE_ENV"] = originalEnv;
       }

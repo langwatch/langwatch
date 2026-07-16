@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -32,7 +32,7 @@ export const createMonitorCommand = async (
   const endpoint =
     resolveControlPlaneUrl();
 
-  const spinner = ora(`Creating monitor "${name}"...`).start();
+  const spinner = createSpinner(`Creating monitor "${name}"...`).start();
 
   try {
     let parameters: Record<string, unknown> = {};
@@ -91,7 +91,7 @@ export const createMonitorCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--parameters must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "create monitor" });
+      failSpinner({ spinner, error, action: "create monitor", format: options?.format });
     }
     process.exit(1);
   }

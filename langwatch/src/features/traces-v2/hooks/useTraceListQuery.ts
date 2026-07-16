@@ -1,15 +1,17 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useSamplePreview } from "../onboarding";
 import { useFilterStore } from "../stores/filterStore";
 import { useViewStore } from "../stores/viewStore";
 import type { TraceListItem } from "../types/trace";
+import type { TraceListCursor } from "../stores/filterStore";
 import { mapTraceListPayload } from "../utils/mapTraceListPayload";
 
 export interface TraceListQueryResult {
   data: TraceListItem[];
   totalHits: number;
+  nextCursor: TraceListCursor | null;
   isLoading: boolean;
   isFetching: boolean;
   isPreviousData: boolean;
@@ -35,9 +37,18 @@ export function useTraceListQuery(): TraceListQueryResult {
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
   const page = useFilterStore((s) => s.page);
   const pageSize = useFilterStore((s) => s.pageSize);
+  const pageCursor = useFilterStore((s) => s.pageCursors[s.page]);
+  const setPage = useFilterStore((s) => s.setPage);
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const sort = useViewStore((s) => s.sort);
   const samplePreview = useSamplePreview();
+
+  // Offset page numbers cannot be restored honestly after a reload because a
+  // keyset cursor is intentionally opaque session state. Old `#?page=N` links
+  // therefore fall back to the first batch instead of issuing an offset read.
+  useEffect(() => {
+    if (page > 1 && pageCursor === undefined) setPage(1);
+  }, [page, pageCursor, setPage]);
 
   // Skip the tRPC request entirely while sample preview is active —
   // saves a roundtrip per page nav for users who're going to see
@@ -53,10 +64,14 @@ export function useTraceListQuery(): TraceListQueryResult {
       sort: { columnId: sort.columnId, direction: sort.direction },
       page,
       pageSize,
+      ...(page > 1 && pageCursor ? { cursor: pageCursor } : {}),
       query: queryText || undefined,
     },
     {
-      enabled: !!project?.id && samplePreview === null,
+      enabled:
+        !!project?.id &&
+        samplePreview === null &&
+        (page === 1 || pageCursor !== undefined),
       staleTime: 60_000,
       keepPreviousData: true,
     },
@@ -71,6 +86,7 @@ export function useTraceListQuery(): TraceListQueryResult {
     return {
       data: samplePreview.data,
       totalHits: samplePreview.totalHits,
+      nextCursor: null,
       isLoading: false,
       isFetching: false,
       isPreviousData: false,
@@ -83,6 +99,7 @@ export function useTraceListQuery(): TraceListQueryResult {
   return {
     data,
     totalHits: query.data?.totalHits ?? 0,
+    nextCursor: query.data?.nextCursor ?? null,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isPreviousData: query.isPreviousData,

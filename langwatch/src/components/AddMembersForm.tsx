@@ -65,6 +65,12 @@ interface AddMembersFormProps {
   onClose?: () => void;
   onCloseText?: string;
   isInviterAdmin?: boolean;
+  /**
+   * Seed the email field — used when the drawer is opened from the inline invite
+   * box, so what the user typed there carries into the form instead of being
+   * retyped.
+   */
+  initialEmails?: string;
 }
 
 export function AddMembersForm({
@@ -76,6 +82,7 @@ export function AddMembersForm({
   onClose,
   onCloseText = "Cancel",
   isInviterAdmin = true,
+  initialEmails = "",
 }: AddMembersFormProps) {
   const {
     register,
@@ -85,7 +92,7 @@ export function AddMembersForm({
     formState: { errors },
   } = useForm<InternalForm>({
     defaultValues: {
-      emailsRaw: "",
+      emailsRaw: initialEmails,
       orgRole: OrganizationUserRole.MEMBER,
       teams:
         teamOptions.length > 0
@@ -94,30 +101,39 @@ export function AddMembersForm({
     },
   });
 
-  const { fields: teamFields, append: appendTeam, remove: removeTeam } = useFieldArray({
+  const {
+    fields: teamFields,
+    append: appendTeam,
+    remove: removeTeam,
+  } = useFieldArray({
     control,
     name: "teams",
   });
 
   const selectedTeams = useWatch({ control, name: "teams" });
-  const orgRole = useWatch({ control, name: "orgRole" }) as OrganizationUserRole;
+  const orgRole = useWatch({
+    control,
+    name: "orgRole",
+  }) as OrganizationUserRole;
   const prevOrgRoleRef = useRef<OrganizationUserRole>(orgRole);
 
   useEffect(() => {
     if (prevOrgRoleRef.current !== orgRole && selectedTeams?.length > 0) {
-      selectedTeams.forEach((team: TeamAssignment | undefined, teamIndex: number) => {
-        if (!team) return;
-        if (orgRole === OrganizationUserRole.EXTERNAL) {
-          if (team.role !== TeamUserRole.VIEWER) {
-            setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
-            setValue(`teams.${teamIndex}.customRoleId`, undefined);
+      selectedTeams.forEach(
+        (team: TeamAssignment | undefined, teamIndex: number) => {
+          if (!team) return;
+          if (orgRole === OrganizationUserRole.EXTERNAL) {
+            if (team.role !== TeamUserRole.VIEWER) {
+              setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
+              setValue(`teams.${teamIndex}.customRoleId`, undefined);
+            }
+          } else if (orgRole === OrganizationUserRole.MEMBER) {
+            if (team.role === TeamUserRole.VIEWER) {
+              setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
+            }
           }
-        } else if (orgRole === OrganizationUserRole.MEMBER) {
-          if (team.role === TeamUserRole.VIEWER) {
-            setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
-          }
-        }
-      });
+        },
+      );
     }
     prevOrgRoleRef.current = orgRole;
   }, [orgRole, selectedTeams, setValue]);
@@ -125,17 +141,23 @@ export function AddMembersForm({
   const getAvailableTeamOptions = (currentTeamIndex?: number) => {
     const selectedTeamIds = selectedTeams
       ?.map((team: TeamAssignment | undefined, idx: number) => {
-        if (currentTeamIndex !== undefined && idx === currentTeamIndex) return null;
+        if (currentTeamIndex !== undefined && idx === currentTeamIndex)
+          return null;
         return team?.teamId;
       })
-      .filter((id: string | null | undefined): id is string => !!id && id !== "");
+      .filter(
+        (id: string | null | undefined): id is string => !!id && id !== "",
+      );
     return teamOptions.filter((opt) => !selectedTeamIds?.includes(opt.value));
   };
 
   const handleAddTeam = () => {
     const available = getAvailableTeamOptions();
     if (available.length > 0) {
-      appendTeam({ teamId: available[0]?.value ?? "", role: getDefaultTeamRole(orgRole) });
+      appendTeam({
+        teamId: available[0]?.value ?? "",
+        role: getDefaultTeamRole(orgRole),
+      });
     }
   };
 
@@ -148,9 +170,16 @@ export function AddMembersForm({
     // Normalize team roles to match org role constraints
     const normalizedTeams = data.teams.map((team) => {
       if (data.orgRole === OrganizationUserRole.EXTERNAL) {
-        return { teamId: team.teamId, role: TeamUserRole.VIEWER, customRoleId: undefined };
+        return {
+          teamId: team.teamId,
+          role: TeamUserRole.VIEWER,
+          customRoleId: undefined,
+        };
       }
-      if (data.orgRole === OrganizationUserRole.MEMBER && team.role === TeamUserRole.VIEWER) {
+      if (
+        data.orgRole === OrganizationUserRole.MEMBER &&
+        team.role === TeamUserRole.VIEWER
+      ) {
         return { ...team, role: TeamUserRole.MEMBER, customRoleId: undefined };
       }
       return team;
@@ -172,12 +201,21 @@ export function AddMembersForm({
             <Field.Label>Email addresses</Field.Label>
             <Input
               placeholder="alice@example.com, bob@example.com"
+              // When the drawer was opened from the inline invite box, land focus
+              // on the email field so typing continues seamlessly.
+              autoFocus={!!initialEmails}
               {...register("emailsRaw", {
                 required: "At least one email is required",
                 validate: (value) => {
-                  const emails = value.split(/[\s,;]+/).map((e) => e.trim()).filter(Boolean);
-                  if (emails.length === 0) return "At least one email is required";
-                  const invalid = emails.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+                  const emails = value
+                    .split(/[\s,;]+/)
+                    .map((e) => e.trim())
+                    .filter(Boolean);
+                  if (emails.length === 0)
+                    return "At least one email is required";
+                  const invalid = emails.find(
+                    (e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e),
+                  );
                   if (invalid) return `Invalid email: ${invalid}`;
                   return true;
                 },
@@ -202,9 +240,12 @@ export function AddMembersForm({
                   alignItems="flex-start"
                 >
                   <VStack align="start" gap={0}>
-                    <Text fontSize="sm" fontWeight="medium" lineHeight="short">Lite Member</Text>
+                    <Text fontSize="sm" fontWeight="medium" lineHeight="short">
+                      Lite Member
+                    </Text>
                     <Text fontSize="xs" color="fg.muted">
-                      Can only view projects they are invited to, cannot see costs
+                      Can only view projects they are invited to, cannot see
+                      costs
                     </Text>
                   </VStack>
                 </Checkbox>
@@ -239,9 +280,18 @@ export function AddMembersForm({
               <Table.Root variant={"ghost" as any} width="100%">
                 <Table.Header>
                   <Table.Row backgroundColor="transparent">
-                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>Team</Table.ColumnHeader>
-                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>Role</Table.ColumnHeader>
-                    <Table.ColumnHeader paddingLeft={0} paddingRight={0} paddingTop={0} width="50px" />
+                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
+                      Team
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
+                      Role
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader
+                      paddingLeft={0}
+                      paddingRight={0}
+                      paddingTop={0}
+                      width="50px"
+                    />
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -299,13 +349,24 @@ export function AddMembersForm({
         )}
 
         <HStack justify="end" width="100%" marginTop={4}>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isLoading}
+          >
             {onCloseText}
           </Button>
-          <Button colorPalette={isLoading ? "gray" : "orange"} type="submit" disabled={isLoading}>
+          <Button
+            colorPalette={isLoading ? "gray" : "orange"}
+            type="submit"
+            disabled={isLoading}
+          >
             <HStack>
               {isLoading ? <Spinner size="sm" /> : <Mail size={18} />}
-              <Text>{hasEmailProvider ? "Send invites" : "Create invites"}</Text>
+              <Text>
+                {hasEmailProvider ? "Send invites" : "Create invites"}
+              </Text>
             </HStack>
           </Button>
         </HStack>
@@ -373,16 +434,22 @@ function getFilteredTeamRoles(
     customRoleId: role.id,
   }));
 
-  if (orgRole === OrganizationUserRole.EXTERNAL) return [teamRolesOptions.VIEWER];
+  if (orgRole === OrganizationUserRole.EXTERNAL)
+    return [teamRolesOptions.VIEWER];
   if (orgRole === OrganizationUserRole.MEMBER) {
     if (!isInviterAdmin) return [teamRolesOptions.MEMBER];
-    return [...baseRoles.filter((r) => r.value !== TeamUserRole.VIEWER), ...customRoleOptions];
+    return [
+      ...baseRoles.filter((r) => r.value !== TeamUserRole.VIEWER),
+      ...customRoleOptions,
+    ];
   }
   return [...baseRoles, ...customRoleOptions];
 }
 
 function getDefaultTeamRole(orgRole: OrganizationUserRole): TeamUserRole {
-  return orgRole === OrganizationUserRole.EXTERNAL ? TeamUserRole.VIEWER : TeamUserRole.MEMBER;
+  return orgRole === OrganizationUserRole.EXTERNAL
+    ? TeamUserRole.VIEWER
+    : TeamUserRole.MEMBER;
 }
 
 function TeamRoleSelect({
@@ -422,7 +489,10 @@ function TeamRoleSelect({
           if (!val) return;
           field.onChange(val);
           if (val.startsWith("custom:")) {
-            setValue(`teams.${teamIndex}.customRoleId`, val.replace("custom:", ""));
+            setValue(
+              `teams.${teamIndex}.customRoleId`,
+              val.replace("custom:", ""),
+            );
           } else {
             setValue(`teams.${teamIndex}.customRoleId`, undefined);
           }

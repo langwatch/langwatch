@@ -161,7 +161,14 @@ describe("experimentResultsCommand()", () => {
           experimentSlug: "doc-qa",
           options: { filter: "failed" },
         });
-        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+        // Strip ANSI colour codes: whether chalk colours here depends on the
+        // environment (vitest propagates FORCE_COLOR from a colour terminal),
+        // and `\b1\b` never matches when the digit sits inside an escape code.
+        const printed = logSpy.mock.calls
+          .map((c: unknown[]) => String(c[0]))
+          .join("\n")
+          // eslint-disable-next-line no-control-regex
+          .replace(/\[[0-9;]*m/g, "");
         expect(printed).toMatch(/\b1\b/);
         expect(printed).toMatch(/\b2\b/);
         expect(printed).not.toContain("hello world");

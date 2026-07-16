@@ -16,10 +16,10 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 import NextLink from "~/utils/compat/next-link";
 import { aiBrandPalette } from "./aiBrandPalette";
 
-// Slow, breathing halo that cycles through the brand palette so the
+// Slow, breathing halo that cycles through the Langy palette so the
 // Ask AI affordance reads as alive without becoming a flashing
 // distraction. Each step blends two of the three palette stops so the
-// shadow drifts between orange / pink / violet over a 6s cycle.
+// shadow drifts between blue / purple / amber over a 6s cycle.
 const aiGlowPulse = keyframes`
   0%, 100% {
     box-shadow:
@@ -94,8 +94,8 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       position="relative"
       overflow="hidden"
       bg="transparent"
-      boxShadow="0 1px 4px rgba(168,85,247,0.25), 0 0 0 1px rgba(255,95,31,0.12)"
-      _dark={{ boxShadow: "0 1px 4px rgba(168,85,247,0.18)" }}
+      boxShadow="0 1px 4px rgba(237,137,38,0.22), 0 0 0 1px rgba(237,137,38,0.14)"
+      _dark={{ boxShadow: "0 1px 4px rgba(237,137,38,0.16)" }}
       // Live "AI breathing" halo — only when motion is allowed. Skipped
       // when fully gated by `disabledReason` (sample mode) — a pulsing
       // halo on an inert button reads as broken animation. Provider-
@@ -202,11 +202,11 @@ const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({
                 width="28px"
                 height="28px"
                 borderRadius="full"
-                bg="purple.subtle"
+                bg="orange.subtle"
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
-                color="purple.fg"
+                color="orange.fg"
               >
                 <Zap size={14} />
               </Box>
@@ -227,9 +227,9 @@ const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({
               <Button
                 size="xs"
                 width="full"
-                bg="purple.solid"
+                bg="orange.solid"
                 color="white"
-                _hover={{ bg: "purple.fg" }}
+                _hover={{ bg: "orange.fg" }}
               >
                 Add a provider
               </Button>

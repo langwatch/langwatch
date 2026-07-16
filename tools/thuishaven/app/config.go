@@ -55,6 +55,11 @@ type PlanOptions struct {
 	// worktree: the live launcher is terminated (and waited on) before the new
 	// one provisions. Without it, `up` refuses when the stack is already up.
 	ShouldForce bool
-	IsStub      bool // verification: echo servers instead of the real apps
-	RepoRoot    string
+	// LangyTier is the local isolation posture for the langyagent worker, resolved
+	// from LANGY_UNSAFE_CONTAINER / LANGY_UNSAFE_HOST_ACCESS. The zero value is the
+	// sandboxed (production-like) default: the worker runs in colima with the
+	// per-worker UID sandbox on.
+	LangyTier domain.LangyTier
+	IsStub    bool // verification: echo servers instead of the real apps
+	RepoRoot  string
 }

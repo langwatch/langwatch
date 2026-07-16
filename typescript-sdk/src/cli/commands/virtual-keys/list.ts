@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
@@ -10,7 +10,7 @@ export const listVirtualKeysCommand = async (options?: { format?: string }): Pro
   checkApiKey();
 
   const service = new VirtualKeysApiService();
-  const spinner = ora("Fetching virtual keys...").start();
+  const spinner = createSpinner("Fetching virtual keys...").start();
 
   try {
     const keys = await service.list();
@@ -58,7 +58,7 @@ export const listVirtualKeysCommand = async (options?: { format?: string }): Pro
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch virtual keys" });
+    failSpinner({ spinner, error, action: "fetch virtual keys", format: options?.format });
     process.exit(1);
   }
 };

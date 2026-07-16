@@ -54,7 +54,7 @@ export type FeatureConfig = {
 
 /**
  * Central configuration for feature icons and colors.
- * Used by MainMenu, QuickAccessLinks, and RecentItemsSection.
+ * Used by MainMenu and RecentItemsSection.
  */
 export const featureIcons: Record<FeatureKey, FeatureConfig> = {
   home: {

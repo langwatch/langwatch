@@ -17,7 +17,12 @@ export type BroadcastEventType =
   // Query cache for the discover endpoint — the next read pulls the
   // freshly-warmed value from Redis without paying the ClickHouse
   // cost. Payload is empty: the client refetches via tRPC.
-  | "discover_updated";
+  | "discover_updated"
+  // Fires when a Langy conversation's fold projection advances (ADR-046). The
+  // panel subscribes and cancels + invalidates its slim conversation list /
+  // detail queries, refetching the projection — the signal carries only the
+  // conversation id, never message content.
+  | "langy_conversation_updated";
 
 const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "trace_updated",
@@ -26,6 +31,7 @@ const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "presence_updated",
   "presence_cursor",
   "discover_updated",
+  "langy_conversation_updated",
 ];
 
 function redisChannel(eventType: BroadcastEventType): string {

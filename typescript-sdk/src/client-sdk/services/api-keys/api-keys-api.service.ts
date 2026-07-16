@@ -1,4 +1,5 @@
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfDomainError } from "@/client-sdk/services/_shared/throw-domain-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 export interface RoleBinding {
@@ -84,6 +85,12 @@ export class ApiKeysApiService {
         operation,
         error: parsedBody,
         options: { status: response.status },
+      });
+      throwIfDomainError({
+        operation,
+        error: parsedBody,
+        status: response.status,
+        message,
       });
       throw new ApiKeysApiError(message, operation, parsedBody);
     }

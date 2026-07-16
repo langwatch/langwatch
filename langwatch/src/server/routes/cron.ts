@@ -13,6 +13,7 @@ import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { scheduleTopicClustering } from "~/server/topicClustering/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
+import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   reportHasFailures,
@@ -332,5 +333,46 @@ const seedDemoHandler = async (c: CronContext) => {
 };
 secured.access(cronPolicy()).get("/cron/seed_demo", seedDemoHandler);
 secured.access(cronPolicy()).post("/cron/seed_demo", seedDemoHandler);
+
+/**
+ * Revokes every Langy session key whose lifetime has elapsed.
+ *
+ * THIS IS THE GUARANTEE. The agent manager revokes a worker's session key the
+ * moment it sees the worker die, which is the fast path and covers the ordinary
+ * cases — capability change, idle reap, shutdown, crash. But a manager that is
+ * SIGKILLed (OOM, node eviction, `--force` delete) sees nothing and runs no
+ * cleanup at all, and every key its workers held then stays valid for the rest of
+ * its TTL. No callback can close that hole: the process that would make the call
+ * is the one that died.
+ *
+ * So this reaper is not redundant with revocation-on-death — it is what makes the
+ * scheme safe, and removing it would reintroduce the long tail of live, orphaned
+ * credentials the whole change set out to remove.
+ */
+const langySessionKeysReapHandler = async (c: CronContext) => {
+  if (!validateInternalSecret(c)) return c.body(null, 401);
+  try {
+    const revoked = await reapExpiredLangySessionApiKeys({ prisma });
+    // Worth watching: a number that stays stubbornly high means workers are dying
+    // without their manager noticing, i.e. the fast path is not firing.
+    if (revoked > 0) {
+      logger.info({ revoked }, "reaped expired Langy session keys");
+    }
+    return c.json({ revoked });
+  } catch (error) {
+    logger.error({ error }, "reaping expired Langy session keys failed");
+    captureException(toError(error), {
+      extra: { context: "cron:langy_session_keys_reap" },
+    });
+    return c.json({ error: "reap failed" }, { status: 500 });
+  }
+};
+
+secured
+  .access(cronPolicy())
+  .get("/cron/langy_session_keys_reap", langySessionKeysReapHandler);
+secured
+  .access(cronPolicy())
+  .post("/cron/langy_session_keys_reap", langySessionKeysReapHandler);
 
 export const app = secured.hono;

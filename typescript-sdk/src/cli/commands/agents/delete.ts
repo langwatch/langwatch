@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -8,7 +8,7 @@ export const deleteAgentCommand = async (id: string, options?: { format?: string
   checkApiKey();
 
   const service = new AgentsApiService();
-  const spinner = ora(`Archiving agent "${id}"...`).start();
+  const spinner = createSpinner(`Archiving agent "${id}"...`).start();
 
   try {
     const result = await service.delete(id);
@@ -20,7 +20,7 @@ export const deleteAgentCommand = async (id: string, options?: { format?: string
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "archive agent" });
+    failSpinner({ spinner, error, action: "archive agent", format: options?.format });
     process.exit(1);
   }
 };

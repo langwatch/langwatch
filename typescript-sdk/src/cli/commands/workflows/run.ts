@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -12,7 +12,7 @@ export const runWorkflowCommand = async (
 ): Promise<void> => {
   checkApiKey();
 
-  const spinner = ora(`Running workflow "${id}"...`).start();
+  const spinner = createSpinner(`Running workflow "${id}"...`).start();
 
   try {
     let input: Record<string, unknown> = {};
@@ -63,7 +63,7 @@ export const runWorkflowCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--input must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "run workflow" });
+      failSpinner({ spinner, error, action: "run workflow", format: options?.format });
     }
     process.exit(1);
   }

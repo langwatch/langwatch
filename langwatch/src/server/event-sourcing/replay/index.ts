@@ -4,6 +4,7 @@ export { createReplayRuntime, type ReplayRuntime } from "./replayPreset";
 export type {
   RegisteredFoldProjection,
   RegisteredMapProjection,
+  RegisteredStateProjection,
   ProjectionKind,
   ReplayConfig,
   ReplayResult,

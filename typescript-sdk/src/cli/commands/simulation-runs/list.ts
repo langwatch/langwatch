@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -20,7 +20,7 @@ export const listSimulationRunsCommand = async (options: {
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = ora("Fetching simulation runs...").start();
+  const spinner = createSpinner("Fetching simulation runs...").start();
 
   try {
     const params = new URLSearchParams();
@@ -115,7 +115,7 @@ export const listSimulationRunsCommand = async (options: {
       chalk.gray(`Use ${chalk.cyan("langwatch simulation-run get <runId>")} to view full details`),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch simulation runs" });
+    failSpinner({ spinner, error, action: "fetch simulation runs", format: options?.format });
     process.exit(1);
   }
 };

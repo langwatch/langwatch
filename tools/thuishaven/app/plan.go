@@ -2,8 +2,6 @@ package app
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -24,8 +22,18 @@ func goServiceShell(repoRoot, svc string, shouldWatch bool) string {
 // planChildren turns a resolved stack into the supervised process set, layering
 // the overlay env (hostname URLs + ports) onto each child and giving each Go
 // service its SERVER_ADDR.
-func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir string) []Child {
+func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, langyDockerHost string) []Child {
 	base := st.OverlayEnv()
+	// Bun and Node use their own bundled CA roots, NOT the macOS system store, so
+	// the app process and the langy worker's opencode (Bun) subprocess otherwise
+	// reject the portless HTTPS certs on every gateway/control-plane call ("self
+	// signed certificate in certificate chain"). Point them at the portless Local
+	// CA so those runtimes trust the same hostnames curl/Go/the browser already do.
+	// Dev/portless only — production serves real certs, and CACertPath is "" when
+	// the CA is absent, so this appends nothing outside a portless stack.
+	if ca := o.proxy.CACertPath(); ca != "" {
+		base = append(base, "NODE_EXTRA_CA_CERTS="+ca)
+	}
 	port := func(name string) int {
 		for _, s := range st.Services {
 			if s.Name == name {
@@ -35,10 +43,19 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir str
 		return 0
 	}
 	var out []Child
+	// `pnpm -s` drops the `> pkg@ver script` lifecycle banner; DOTENV_CONFIG_QUIET
+	// silences dotenv v17's promo line for lanes that load it via
+	// `import "dotenv/config"`. Together with the `quiet: true` passed in
+	// server.mts / vite.config.ts, this keeps every Node lane starting on real
+	// logs — matching the Go services' clean startup.
+	nodeEnv := func() []string {
+		return append(append([]string{}, base...),
+			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true")
+	}
 	out = append(out, Child{
 		Name: "app", Dir: lwDir, Color: palette[1],
-		Shell: "pnpm run dev:vite",
-		Env:   append(append([]string{}, base...), "NODE_ENV=development"),
+		Shell: "pnpm -s run dev:vite",
+		Env:   nodeEnv(),
 		// Hold the web (vite) until the API answers /api/health. The app proxies
 		// /api to the API (start:app), which is a bigger process and boots slower;
 		// a browser that loads the web before the API is up gets stuck in an auth
@@ -49,13 +66,13 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir str
 	// In-process worker mode: the app process (start:app -> start.ts) hosts the
 	// worker stack itself when WORKERS_IN_PROCESS=1, so there is no separate
 	// `workers` lane below — one Node process instead of two, saving its RAM.
-	apiEnv := append(append([]string{}, base...), "NODE_ENV=development")
+	apiEnv := nodeEnv()
 	if opts.ShouldRunWorkersInProcess {
 		apiEnv = append(apiEnv, "WORKERS_IN_PROCESS=1")
 	}
 	out = append(out, Child{
 		Name: "api", Dir: lwDir, Color: palette[3],
-		Shell: "pnpm run start:app",
+		Shell: "pnpm -s run start:app",
 		Env:   apiEnv,
 	})
 	if !opts.ShouldSkipGateway {
@@ -73,24 +90,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir str
 		})
 	}
 	if !opts.ShouldSkipLangyAgent {
-		// langyagent (the cmd/service mono-binary) takes its listen port from PORT,
-		// not SERVER_ADDR (see services/langyagent/config.go) — PORT always wins. Its
-		// sessions/workspace roots default to the in-container /workspace, which is
-		// read-only on a dev host; point them at writable per-slug dirs under haven's
-		// home and create them so the manager boots (session spawn still needs an
-		// `opencode` binary on PATH, but the service itself comes up).
-		laRoot := filepath.Join(o.cfg.Home, "langyagent", st.Slug)
-		_ = os.MkdirAll(filepath.Join(laRoot, "sessions"), 0o755)
-		_ = os.MkdirAll(filepath.Join(laRoot, "workspace"), 0o755)
-		out = append(out, Child{
-			Name: "langyagent", Dir: opts.RepoRoot, Color: palette[6],
-			Shell: goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
-			Env: append(append([]string{}, base...),
-				fmt.Sprintf("PORT=%d", port("langyagent")),
-				"SESSIONS_ROOT="+filepath.Join(laRoot, "sessions"),
-				"LANGY_WORKSPACE_ROOT="+filepath.Join(laRoot, "workspace"),
-			),
-		})
+		out = append(out, o.langyChild(st, opts, base, port("langyagent"), langyDockerHost))
 	}
 	if opts.ShouldStartWorkers && !opts.ShouldRunWorkersInProcess {
 		out = append(out, Child{
@@ -99,8 +99,8 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir str
 			// is reserved for genuine failures, so no lane label uses it —
 			// TestNoLaneIsRed pins that.
 			Name: "workers", Dir: lwDir, Color: palette[0],
-			Shell: "pnpm run start:workers",
-			Env:   append(append([]string{}, base...), "NODE_ENV=development", "START_WORKERS=true"),
+			Shell: "pnpm -s run start:workers",
+			Env:   append(nodeEnv(), "START_WORKERS=true"),
 		})
 	}
 	return out

@@ -1,0 +1,272 @@
+/*
+ * Page context targets — "point at things on the page and add them to Langy".
+ *
+ * A target is any object a component registered via `<LangyContextTarget>` /
+ * `useLangyContextTarget` (a trace row, the trace drawer's header, an
+ * evaluation card). The hook only emits `class="langy-target"` while the panel
+ * is OPEN, so with Langy closed none of these rules match anything: no ring, no
+ * animation, no layout change. Zero page cost, by construction — the styles
+ * cannot fire without the class.
+ *
+ * THE VISUAL IS DRIVEN ENTIRELY BY `data-langy-target-state`, which
+ * `LangyContextTargetLayer` sets from the pointer's position:
+ *
+ *   (absent)  invisible. The overwhelming majority of targets, most of the time.
+ *   near      the pointer is within reach — a hairline, barely there. This is
+ *             the shimmer FIELD: it follows your hand across the page instead of
+ *             lighting everything up at once. A page-wide christmas tree is
+ *             exactly the "over the top" failure this design keeps walking back
+ *             from.
+ *   hover     the pointer is on it — firmer, and the layer floats an explicit
+ *             "Absorb context" button over it.
+ *   added     it's in Langy's context. Stays lit even with the pointer nowhere
+ *             near, so with the panel open you can see at a glance everything
+ *             Langy already has.
+ *
+ * ZERO LAYOUT IMPACT, ON ANY ELEMENT. Both treatments below (`outline` and
+ * inset `box-shadow`) are defined to take up no space, in any formatting
+ * context, table parts included. This is not fussiness — the first cut drew the
+ * ring with an absolutely-positioned `::before`, which on a <tbody> gets wrapped
+ * in an anonymous table box and broke the trace table's expanded rows on sight.
+ * Nothing here generates a box. Ever.
+ *
+ * The ring follows the element's OWN border-radius, so a target must carry the
+ * radius of the thing it is wrapping or it will square off a rounded card's
+ * corner. See the trace drawer's header and the online-evaluation cards, which
+ * both had to be told their own radius.
+ *
+ * The gradient stops are redeclared here rather than read from `--langy-ai-*`:
+ * those live on `.langy-root`, and targets are out on the PAGE, outside that
+ * root, so they'd resolve to nothing.
+ */
+
+:root {
+  /* The cool half of the AI mark. The warm end is deliberately left out: on a
+     page full of product chrome, orange reads as a warning. Cool reads as light. */
+  --langy-target-near-1: rgba(91, 141, 239, 0.14);
+  --langy-target-near-2: rgba(129, 116, 244, 0.24);
+  --langy-target-near-3: rgba(168, 85, 247, 0.16);
+
+  --langy-target-hover-1: rgba(91, 141, 239, 0.4);
+  --langy-target-hover-2: rgba(129, 116, 244, 0.62);
+  --langy-target-hover-3: rgba(168, 85, 247, 0.46);
+
+  --langy-target-added: rgba(168, 85, 247, 0.5);
+}
+
+.dark,
+:root.dark {
+  /* The 500-weight stops barely register against ink — lift them. */
+  --langy-target-near-1: rgba(95, 163, 255, 0.18);
+  --langy-target-near-2: rgba(139, 130, 255, 0.3);
+  --langy-target-near-3: rgba(168, 85, 247, 0.2);
+
+  --langy-target-hover-1: rgba(95, 163, 255, 0.46);
+  --langy-target-hover-2: rgba(139, 130, 255, 0.68);
+  --langy-target-hover-3: rgba(168, 85, 247, 0.52);
+
+  --langy-target-added: rgba(168, 85, 247, 0.56);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --langy-target-near-1: rgba(95, 163, 255, 0.18);
+    --langy-target-near-2: rgba(139, 130, 255, 0.3);
+    --langy-target-near-3: rgba(168, 85, 247, 0.2);
+
+    --langy-target-hover-1: rgba(95, 163, 255, 0.46);
+    --langy-target-hover-2: rgba(139, 130, 255, 0.68);
+    --langy-target-hover-3: rgba(168, 85, 247, 0.52);
+
+    --langy-target-added: rgba(168, 85, 247, 0.56);
+  }
+}
+
+/* ONE animated colour drives every treatment below. A plain custom property
+   can't be animated — it interpolates as a string and snaps — so it's
+   registered with `@property`, which gives it a real <color> type and lets it
+   tween. `inherits: true` is the point: the animation runs on the TARGET, and
+   its animated value inherits down, so a table row can paint that very same
+   shimmering colour onto its own cells. */
+@property --langy-target-color {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0);
+}
+
+/* Invisible until the pointer comes near. No outline, no shadow, no cursor
+   change — a registered target that nobody is pointing at is just the element. */
+.langy-target {
+  --langy-target-color: rgba(0, 0, 0, 0);
+  transition: outline-color 220ms ease;
+}
+
+.langy-target[data-langy-target-state] {
+  animation: langy-target-shimmer 11s ease-in-out infinite;
+  /* The per-id phase offset. Without it, every lit target marches in lockstep
+     and the field reads as a barcode; with it they drift out of phase, like
+     light moving on water. It is the whole difference between the two. */
+  animation-delay: var(--langy-target-delay, 0ms);
+}
+
+.langy-target[data-langy-target-state="hover"] {
+  animation-name: langy-target-shimmer-hover;
+}
+
+/* Added: settled and still. Nothing is being offered any more — it's yours. */
+.langy-target[data-langy-target-state="added"] {
+  animation: none;
+  --langy-target-color: var(--langy-target-added);
+}
+
+/* Blue -> indigo -> purple and back. A closed loop (0% == 100%), so the shimmer
+   never jumps when it wraps. Slow (11s) and low-alpha by design: you should
+   notice it only when you look for it, never while you're reading the row. */
+@keyframes langy-target-shimmer {
+  0%,
+  100% {
+    --langy-target-color: var(--langy-target-near-1);
+  }
+  50% {
+    --langy-target-color: var(--langy-target-near-2);
+  }
+  75% {
+    --langy-target-color: var(--langy-target-near-3);
+  }
+}
+
+@keyframes langy-target-shimmer-hover {
+  0%,
+  100% {
+    --langy-target-color: var(--langy-target-hover-1);
+  }
+  50% {
+    --langy-target-color: var(--langy-target-hover-2);
+  }
+  75% {
+    --langy-target-color: var(--langy-target-hover-3);
+  }
+}
+
+/* ── The ring, treatment 1 of 2: an OUTLINE ───────────────────────────────
+   The default, for every ordinary element — a card, a div, the drawer header. */
+.langy-target {
+  outline: 1px solid var(--langy-target-color);
+  outline-offset: -1px;
+}
+
+/* ── The ring, treatment 2 of 2: INSET SHADOWS ON THE CELLS ───────────────
+   Table rows can't use the outline, and the reason is worth writing down: the
+   trace table pins its first column (`position: sticky; z-index: 1`), and a
+   POSITIONED DESCENDANT paints above its ancestor's outline. So the checkbox
+   cell sat on top of the row's outline and swallowed the entire left edge,
+   corners included.
+
+   An ancestor can't win that fight, so it doesn't pick it: the row hands the
+   colour DOWN (that's what `inherits: true` on the registered property buys us)
+   and each cell paints its own slice of the ring as an inset box-shadow. The
+   sticky cell paints its own left edge, over its own background, so it can't
+   cover it.
+
+   The four edges compose through four variables rather than four competing
+   `box-shadow` declarations, because box-shadow doesn't merge across rules —
+   the last one would simply win, and a one-row <tbody> (which is both
+   `:first-of-type` and `:last-of-type`) would end up with a bottom edge and no
+   top. */
+tbody.langy-target,
+tr.langy-target {
+  outline: none;
+}
+
+tbody.langy-target > tr > td,
+tr.langy-target > td {
+  --langy-edge-top: 0 0 0 transparent;
+  --langy-edge-bottom: 0 0 0 transparent;
+  --langy-edge-left: 0 0 0 transparent;
+  --langy-edge-right: 0 0 0 transparent;
+  box-shadow:
+    inset var(--langy-edge-top),
+    inset var(--langy-edge-bottom),
+    inset var(--langy-edge-left),
+    inset var(--langy-edge-right);
+}
+
+/* A <tbody> target holds the main row AND its addon rows (the IO preview), so
+   the ring closes around the whole group: top edge on the first row, bottom on
+   the last, sides on every row between. */
+tbody.langy-target > tr:first-of-type > td,
+tr.langy-target > td {
+  --langy-edge-top: 0 1px 0 var(--langy-target-color);
+}
+
+tbody.langy-target > tr:last-of-type > td,
+tr.langy-target > td {
+  --langy-edge-bottom: 0 -1px 0 var(--langy-target-color);
+}
+
+tbody.langy-target > tr > td:first-of-type,
+tr.langy-target > td:first-of-type {
+  --langy-edge-left: 1px 0 0 var(--langy-target-color);
+}
+
+tbody.langy-target > tr > td:last-of-type,
+tr.langy-target > td:last-of-type {
+  --langy-edge-right: -1px 0 0 var(--langy-target-color);
+}
+
+/* The affordance fades in rather than popping — it's an offer, not an alert.
+   It anchors LEFT by default: the Langy panel is docked on the right, so a
+   button on a target's right edge is the one that ends up underneath it. The
+   right variant exists only for targets whose left edge is off-screen, and has
+   to carry `translateX(-100%)` through the animation so it stays pinned to its
+   own right edge while it moves (a transform in a keyframe replaces the
+   element's transform outright — it does not compose with it). */
+.langy-target-affordance {
+  animation: langy-affordance-in 160ms ease-out;
+}
+
+.langy-target-affordance--right {
+  transform: translateX(-100%);
+  animation-name: langy-affordance-in-right;
+}
+
+@keyframes langy-affordance-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes langy-affordance-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(-100%) translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-100%) translateY(0);
+  }
+}
+
+/* Nothing drifts, nothing fades in. The ring settles on the mid stop and simply
+   sits there — the states still read, with no motion at all. */
+@media (prefers-reduced-motion: reduce) {
+  .langy-target,
+  .langy-target[data-langy-target-state] {
+    animation: none;
+    transition: none;
+  }
+  .langy-target[data-langy-target-state="near"] {
+    --langy-target-color: var(--langy-target-near-2);
+  }
+  .langy-target[data-langy-target-state="hover"] {
+    --langy-target-color: var(--langy-target-hover-2);
+  }
+  .langy-target-affordance {
+    animation: none;
+  }
+}
