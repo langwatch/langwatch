@@ -125,7 +125,7 @@ describe("Pre-compiled Scenario Child Process", () => {
     // @langwatch/observability) is NOT top-linked into langwatch/node_modules by
     // pnpm, so its require throws MODULE_NOT_FOUND at prod boot. #2404 caused
     // exactly this by moving the pino family out of the app manifest.
-    it("resolves every externalized npm require() from a prod-shaped layout", () => {
+    it("boots without MODULE_NOT_FOUND — every externalized require() resolves in a prod-shaped layout", () => {
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
       const distDir = path.dirname(BUNDLE_PATH);
 
@@ -147,9 +147,33 @@ describe("Pre-compiled Scenario Child Process", () => {
       // if it ever stops being emitted, this guard would silently pass empty.
       expect(externalPkgs).toContain("pino");
 
-      // Every external npm package the bundle require()s at runtime MUST resolve
-      // from the bundle's directory. If any doesn't, it is not a *direct* app
-      // dep and prod boots into MODULE_NOT_FOUND (the #5855 crash).
+      // PRIMARY — EXECUTE the affected code path (coding guideline: runtime
+      // regression tests must run the code and observe the crash, not just assert
+      // strings). #5855 was a top-level require("pino") throwing MODULE_NOT_FOUND
+      // at boot. Node resolves the bundle's externals relative to the bundle file
+      // (dist/) — the exact prod root — so spawning it here reproduces the crash
+      // if any external is unresolvable. Empty stdin makes it fail fast on job
+      // parsing AFTER module load, so any module error is a real regression.
+      const boot = spawnSync("node", [BUNDLE_PATH], {
+        cwd: distDir,
+        input: "",
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          NODE_ENV: "test",
+          SKIP_ENV_VALIDATION: "1",
+          LANGWATCH_API_KEY: "test-key",
+          LANGWATCH_ENDPOINT: "http://localhost:9999",
+        },
+        timeout: 15000,
+      });
+      const bootStderr = boot.stderr?.toString() ?? "";
+      expect(bootStderr).not.toContain("MODULE_NOT_FOUND");
+      expect(bootStderr).not.toContain("Cannot find module");
+
+      // SUPPLEMENTARY — resolve each external from the prod-shaped root so a
+      // failure NAMES the exact unresolved module (the runtime check above only
+      // reports that *something* failed). Execute-the-path + precise attribution.
       const unresolved = externalPkgs.filter((name) => {
         try {
           require.resolve(name, { paths: [distDir] });
