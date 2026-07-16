@@ -26,11 +26,16 @@ import {
   BlobNotFoundError,
 } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import {
+  recomputeTraceIO,
+  TraceIOAccumulationService,
+} from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-io-accumulation.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
-import type {
-  ResolvedTraceSpans,
-  WarnLogger,
+import {
+  type ResolvedTraceSpans,
+  toRecomputedIO,
+  type WarnLogger,
 } from "./resolve-offloaded-traces";
 
 /**
@@ -225,6 +230,13 @@ export async function resolveOffloadedTracesBatch({
   );
 
   // ----- Phase 3: assemble resolved spans + recompute IO per trace.
+  // Reuse the fold's own winner-selection for the read-time recompute — see
+  // resolveOffloadedTraces for the #5835 AC9 rationale. One accumulation-service
+  // instance serves every trace in the batch.
+  const accumulationService = new TraceIOAccumulationService(
+    ioExtractionService,
+  );
+
   return tracePlans.map((spanPlans, traceIdx) => {
     const originalSpans = spansPerTrace[traceIdx]!;
     let anyResolved = false;
@@ -257,10 +269,14 @@ export async function resolveOffloadedTracesBatch({
       };
     }
 
+    const { computedInput, computedOutput } = recomputeTraceIO({
+      spans: resolvedSpans,
+      accumulationService,
+    });
     return {
       resolvedSpans,
-      recomputedInput: ioExtractionService.extractFirstInput(resolvedSpans),
-      recomputedOutput: ioExtractionService.extractLastOutput(resolvedSpans),
+      recomputedInput: toRecomputedIO(computedInput),
+      recomputedOutput: toRecomputedIO(computedOutput),
       anyResolved: true,
     };
   });
