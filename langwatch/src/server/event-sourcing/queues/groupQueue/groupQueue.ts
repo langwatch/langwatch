@@ -148,7 +148,7 @@ function assertNoReservedKeys(
       throw new QueueError(
         queueName,
         method,
-        `Payload key "${key}" is in the reserved __* namespace (queue machinery). User payloads must not start with "__" except __pipelineName / __jobType / __jobName.`,
+        `Payload key "${key}" is in the reserved __* namespace (queue machinery). User payloads must not start with "__" except ${[...CALLER_RESERVED_KEYS].join(" / ")}.`,
       );
     }
   }

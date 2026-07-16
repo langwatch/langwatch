@@ -335,6 +335,16 @@ export class EnvelopeBlobLifecycle {
     const { hold, blobId } = readEnvelopeRetirement(value);
     try {
       if (hold) {
+        // Tenant guard (ADR-030 §5), matching decode/release/transfer: derive the
+        // ref's tenant from untrusted envelope data, so a forged or mis-routed ref
+        // must not extend another tenant's blob lifetime.
+        if (hold.ref.projectId !== this.projectIdFor(groupId)) {
+          logger.warn(
+            { groupId, refTenant: hold.ref.projectId },
+            "Skipping blob TTL preserve-for-DLQ for a tenant-mismatched ref",
+          );
+          return;
+        }
         // GQ2: keep the holder alive past the window (so it is not reclaimed on a
         // later release) and push the redis-tier blob's own backstop out too.
         await this.blobHolders.touch({
