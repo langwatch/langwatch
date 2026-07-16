@@ -24,6 +24,7 @@ import { Redis as IORedis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
+import { DecodeFailureError } from "../jobEnvelope";
 import type { DrainedJob } from "../scripts";
 
 // Mirror groupQueue.blockingConnection.unit.test.ts: mock the collaborators the
@@ -72,6 +73,8 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
   let blobLifecycle: {
     preserveForDlq: ReturnType<typeof vi.fn>;
     acquire: ReturnType<typeof vi.fn>;
+    decode: ReturnType<typeof vi.fn>;
+    release: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -82,7 +85,12 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
     // Swap the real Redis-backed collaborators for spies so we can inject
     // dead-letter / re-stage failures without a live server.
     scripts = { stage: vi.fn(), writeJobToDlq: vi.fn() };
-    blobLifecycle = { preserveForDlq: vi.fn(), acquire: vi.fn() };
+    blobLifecycle = {
+      preserveForDlq: vi.fn(),
+      acquire: vi.fn(),
+      decode: vi.fn(),
+      release: vi.fn(),
+    };
     (processor as any).scripts = scripts;
     (processor as any).blobLifecycle = blobLifecycle;
   });
@@ -172,16 +180,26 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
         scripts.stage.mockResolvedValue(undefined);
         // acquire() is not supposed to throw (it degrades to the TTL backstop);
         // if it ever does, it sits OUTSIDE the dead-letter fallback catch, so it
-        // surfaces rather than being mistaken for a re-stage failure.
+        // SURFACES rather than being mistaken for a re-stage failure.
         blobLifecycle.acquire.mockRejectedValue(new Error("hold hiccup"));
 
-        await (processor as any)
-          .restageDrainedSiblings(GROUP_ID, [makeSibling()])
-          .catch(() => {});
+        // try/await/catch (not a chained `.catch`) so the rejection is handled
+        // synchronously in-band — no unhandled-rejection window to flake on.
+        let surfaced = false;
+        try {
+          await (processor as any).restageDrainedSiblings(GROUP_ID, [
+            makeSibling(),
+          ]);
+        } catch {
+          surfaced = true;
+        }
 
         // Falsifiability: with acquire() back INSIDE the try/catch (pre-fix), the
-        // hold hiccup is caught and the sibling is dead-lettered — a live job
-        // duplicated into the dead-letter. It must not be.
+        // hold hiccup is CAUGHT and the sibling is dead-lettered — a live job
+        // duplicated into the dead-letter — and restageDrainedSiblings resolves
+        // (surfaced stays false). Outside the catch, the throw surfaces and NO
+        // dead-letter is written.
+        expect(surfaced).toBe(true);
         expect(scripts.stage).toHaveBeenCalledTimes(1);
         expect(scripts.writeJobToDlq).not.toHaveBeenCalled();
       });
@@ -206,6 +224,39 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
             reason: "sibling_restage_failed",
           }),
         );
+      });
+    });
+  });
+
+  describe("given a drained sibling whose body is genuinely gone (missing_blob)", () => {
+    describe("when parseDrainedPayload decodes it", () => {
+      it("releases the stale holder and does NOT dead-letter (nothing to preserve)", async () => {
+        // Body genuinely gone → decode throws missing_blob. Unlike a body-present
+        // drop, there is nothing to dead-letter; the stale holder must be released
+        // here because the success-path release no longer covers dropped siblings.
+        blobLifecycle.decode.mockRejectedValue(
+          new DecodeFailureError({
+            message: "tiered blob is missing",
+            reason: "missing_blob",
+          }),
+        );
+        blobLifecycle.release.mockResolvedValue(undefined);
+
+        const result = await (processor as any).parseDrainedPayload({
+          sibling: makeSibling(),
+          groupId: GROUP_ID,
+        });
+
+        expect(result).toBeNull();
+        // The stale holder is dropped (blob already gone). Falsifiability: remove
+        // the missing_blob `else` release and this holder leaks — release is never
+        // called.
+        expect(blobLifecycle.release).toHaveBeenCalledWith(
+          expect.objectContaining({ values: [RAW_VALUE], groupId: GROUP_ID }),
+        );
+        // Nothing to preserve: no dead-letter write, no re-stage.
+        expect(blobLifecycle.preserveForDlq).not.toHaveBeenCalled();
+        expect(scripts.writeJobToDlq).not.toHaveBeenCalled();
       });
     });
   });
