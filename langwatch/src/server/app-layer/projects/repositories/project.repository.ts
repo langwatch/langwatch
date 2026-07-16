@@ -90,6 +90,10 @@ export interface ProjectRepository {
     page: number;
     limit: number;
   }): Promise<PaginatedResult<Project>>;
+  /** Every project id, across all tenants. For platform-wide maintenance jobs
+   *  (the webhook delivery-log prune) that must scope a project-level write by
+   *  projectId rather than issue an unscoped one. */
+  findAllIds(): Promise<string[]>;
   findBySlugInTeam(params: {
     slug: string;
     teamId: string;

@@ -8,7 +8,7 @@ import {
 } from "../shared";
 
 describe("redactHeadersForLog", () => {
-  it("masks secret-bearing header values but keeps their names", () => {
+  it("masks every header value but keeps their names", () => {
     expect(
       redactHeadersForLog({
         Authorization: "Bearer sk-123",
@@ -21,8 +21,16 @@ describe("redactHeadersForLog", () => {
       Authorization: "***",
       "X-Api-Key": "***",
       "X-Signature": "***",
-      "X-Trace-Id": "t1",
-      Accept: "application/json",
+      "X-Trace-Id": "***",
+      Accept: "***",
+    });
+  });
+
+  it("masks a credential whose name no heuristic would catch", () => {
+    // A header name cannot establish whether its value is secret: every
+    // configured value is treated as one (ADR-040 §6).
+    expect(redactHeadersForLog({ "X-Partner-Key": "super-secret" })).toEqual({
+      "X-Partner-Key": "***",
     });
   });
 });

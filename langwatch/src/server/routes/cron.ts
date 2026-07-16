@@ -89,10 +89,9 @@ const webhookDeliveryCleanupHandler = async (c: CronContext) => {
   try {
     // Scope the prune by projectId (the delivery log is a project-level model),
     // so enumerate every project and hand the ids to the service.
-    const projects = await prisma.project.findMany({ select: { id: true } });
-    const deleted = await getApp().webhookDeliveries.pruneExpired({
-      projectIds: projects.map((p) => p.id),
-    });
+    const app = getApp();
+    const projectIds = await app.projects.getAllIds();
+    const deleted = await app.webhookDeliveries.pruneExpired({ projectIds });
     return c.json({ message: "Webhook delivery log pruned", deleted });
   } catch (error: unknown) {
     return c.json(

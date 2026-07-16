@@ -48,7 +48,7 @@ export function HeadersEditor({
                     setRow(index, {
                       ...row,
                       name: e.target.value,
-                      kept: false,
+                      isKept: false,
                     })
                   }
                 />
@@ -56,12 +56,12 @@ export function HeadersEditor({
                   size="sm"
                   flex="2"
                   value={row.value}
-                  placeholder={row.kept ? "•••••• (saved)" : "Bearer …"}
+                  placeholder={row.isKept ? "•••••• (saved)" : "Bearer …"}
                   onChange={(e) =>
                     setRow(index, {
                       ...row,
                       value: e.target.value,
-                      kept: false,
+                      isKept: false,
                     })
                   }
                 />

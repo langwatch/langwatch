@@ -201,6 +201,12 @@ export class ProjectService {
     return this.repo.findAllByOrganization(params);
   }
 
+  /** Every project id, across all tenants — for platform-wide maintenance jobs
+   *  that must scope a project-level write by projectId. */
+  async getAllIds(): Promise<string[]> {
+    return this.repo.findAllIds();
+  }
+
   async getWithTeam(id: string): Promise<ProjectWithTeam | null> {
     return this.repo.getWithTeam(id);
   }

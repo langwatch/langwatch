@@ -61,10 +61,13 @@ function buildBaseRow({
 }
 
 /** Best-effort recorder wrapper: a logging failure never breaks dispatch. */
-async function recordDelivery(
-  recorder: WebhookDeliveryRecorder | undefined,
-  row: WebhookDeliveryInput,
-): Promise<void> {
+async function recordDelivery({
+  recorder,
+  row,
+}: {
+  recorder?: WebhookDeliveryRecorder;
+  row: WebhookDeliveryInput;
+}): Promise<void> {
   if (!recorder) return;
   try {
     await recorder(row);
@@ -76,11 +79,15 @@ async function recordDelivery(
   }
 }
 
-function successRow(
-  base: WebhookDeliveryBaseRow,
-  result: WebhookSendResult,
-  startedAt: number,
-): WebhookDeliveryInput {
+function successRow({
+  base,
+  result,
+  startedAt,
+}: {
+  base: WebhookDeliveryBaseRow;
+  result: WebhookSendResult;
+  startedAt: number;
+}): WebhookDeliveryInput {
   return {
     ...base,
     responseStatus: result.status,
@@ -90,12 +97,17 @@ function successRow(
   };
 }
 
-function failureRow(
-  base: WebhookDeliveryBaseRow,
-  result: WebhookSendResult | undefined,
-  err: unknown,
-  startedAt: number,
-): WebhookDeliveryInput {
+function failureRow({
+  base,
+  result,
+  err,
+  startedAt,
+}: {
+  base: WebhookDeliveryBaseRow;
+  result?: WebhookSendResult;
+  err: unknown;
+  startedAt: number;
+}): WebhookDeliveryInput {
   const retryable = isDispatchError(err) && err.retryable;
   return {
     ...base,
@@ -171,10 +183,16 @@ export async function deliverWebhook({
     });
     // Throws a classified DispatchError on a non-2xx (ADR-040 §5).
     assertWebhookDelivered({ result, triggerName });
-    await recordDelivery(recorder, successRow(baseRow, result, startedAt));
+    await recordDelivery({
+      recorder,
+      row: successRow({ base: baseRow, result, startedAt }),
+    });
     return result;
   } catch (err) {
-    await recordDelivery(recorder, failureRow(baseRow, result, err, startedAt));
+    await recordDelivery({
+      recorder,
+      row: failureRow({ base: baseRow, result, err, startedAt }),
+    });
     throw err;
   }
 }

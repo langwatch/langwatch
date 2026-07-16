@@ -22,7 +22,7 @@ export interface HeaderRow {
   /** True when the value is a saved secret the server kept back (ADR-040 §3):
    *  the input shows a masked placeholder, and the save sends the kept
    *  sentinel so the stored value survives. Typing or renaming clears it. */
-  kept: boolean;
+  isKept: boolean;
 }
 
 let headerRowSeq = 0;
@@ -32,7 +32,7 @@ export function newHeaderRow(partial?: Partial<Omit<HeaderRow, "id">>): HeaderRo
     id: `hdr_${headerRowSeq}`,
     name: "",
     value: "",
-    kept: false,
+    isKept: false,
     ...partial,
   };
 }
@@ -72,7 +72,7 @@ export function fromTriggerRow(row: SavedTriggerRow): WebhookSlice {
   // echoes names with the kept sentinel, which renders as a masked row.
   const headers = Object.entries(params.headers ?? {}).map(([name, value]) =>
     value === WEBHOOK_HEADER_VALUE_KEPT
-      ? newHeaderRow({ name, kept: true })
+      ? newHeaderRow({ name, isKept: true })
       : newHeaderRow({ name, value }),
   );
   return {
@@ -97,7 +97,7 @@ function headersRecord(rows: HeaderRow[]): Record<string, string> {
     if (!name) continue;
     // A kept row sends the sentinel; the server resolves it against the
     // stored ciphertext (save) or drops it if unresolvable (test fire).
-    out[name] = row.kept ? WEBHOOK_HEADER_VALUE_KEPT : row.value;
+    out[name] = row.isKept ? WEBHOOK_HEADER_VALUE_KEPT : row.value;
   }
   return out;
 }

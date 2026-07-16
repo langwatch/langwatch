@@ -143,6 +143,11 @@ export class PrismaProjectRepository implements ProjectRepository {
     return this.prisma.project.findUnique({ where: { id } });
   }
 
+  async findAllIds(): Promise<string[]> {
+    const rows = await this.prisma.project.findMany({ select: { id: true } });
+    return rows.map((row) => row.id);
+  }
+
   async findAllByOrganization({
     organizationId,
     page,
