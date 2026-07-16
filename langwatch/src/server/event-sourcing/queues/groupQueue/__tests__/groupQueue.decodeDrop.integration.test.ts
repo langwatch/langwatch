@@ -11,6 +11,7 @@ import {
 } from "vitest";
 
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
 import {
   getTestRedisConnection,
   startTestContainers,
@@ -823,6 +824,72 @@ describe.skipIf(!hasTestcontainers)(
           expect(objectStore.deleted.length).toBeGreaterThan(0);
           const [entry] = await dropsFor(name);
           expect(entry!.labels.reason).toBe("missing_blob");
+        });
+      });
+    });
+
+    describe("given a body-present job quarantined in the dead-letter (#719 recovery)", () => {
+      describe("when an operator drains the group's dead-letter", () => {
+        it("restores it to live staging byte-identical and it dispatches", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/dlq-replay`;
+          const objectStore = new InMemoryObjectStore();
+          await stageOffloaded({
+            name,
+            groupId,
+            objectStore,
+            extra: { __recoveryKey: "evt-1" },
+          });
+
+          // Save the good bytes, then corrupt so the first claim drops it to the
+          // dead-letter (the rolling-deploy codec-skew shape).
+          const [uri] = [...objectStore.store.keys()];
+          const goodBytes = Buffer.from(objectStore.store.get(uri!)!);
+          objectStore.store.set(uri!, Buffer.from("not a valid gzip body"));
+
+          const processed = vi.fn<(p: TestPayload) => Promise<void>>();
+          const consumer = newQueue({
+            name,
+            processFn: processed,
+            consumerEnabled: true,
+            objectStore,
+          });
+          await consumer.waitUntilReady();
+
+          await vi.waitFor(
+            async () => {
+              expect(await dlqValue(name, groupId, "victim")).not.toBeNull();
+            },
+            { timeout: 10000, interval: 100 },
+          );
+          const preserved = await dlqValue(name, groupId, "victim");
+
+          // A newer worker can now read the body (the rollout has completed).
+          objectStore.store.set(uri!, goodBytes);
+
+          // The operator drains via the EXISTING group-scoped drain — unchanged.
+          // That it recovers a job-scoped entry proves the key layout matches.
+          const ops = new QueueRedisRepository(redis);
+          const { jobsReplayed } = await ops.replayFromDlq({
+            queueName: name,
+            groupId,
+          });
+          expect(jobsReplayed).toBe(1);
+
+          // Restored byte-identical to live staging, and gone from the dead-letter.
+          expect(await liveValue(name, groupId, "victim")).toBe(preserved);
+          expect(await dlqValue(name, groupId, "victim")).toBeNull();
+
+          // And it actually dispatches + processes now the body reads, with the
+          // queue machinery (incl. __recoveryKey) stripped from the handler payload.
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 10000, interval: 100 },
+          );
+          expect(processed.mock.calls[0]![0].id).toBe("victim");
+          expect(processed.mock.calls[0]![0]).not.toHaveProperty("__recoveryKey");
         });
       });
     });
