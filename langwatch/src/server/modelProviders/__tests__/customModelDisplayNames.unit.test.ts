@@ -19,21 +19,7 @@ import {
   buildCustomModelDisplayNames,
   modelDisplayLabel,
 } from "../customModelDisplayNames";
-import type { MaybeStoredModelProvider } from "../registry";
-
-const makeProvider = (
-  overrides: Partial<MaybeStoredModelProvider> & { provider: string },
-): MaybeStoredModelProvider => ({
-  enabled: true,
-  customKeys: null,
-  models: null,
-  embeddingsModels: null,
-  customModels: null,
-  customEmbeddingsModels: null,
-  deploymentMapping: null,
-  extraHeaders: null,
-  ...overrides,
-});
+import { makeProvider } from "./test-helpers";
 
 describe("buildCustomModelDisplayNames()", () => {
   describe("given a custom chat model with a display name", () => {
