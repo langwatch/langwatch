@@ -50,6 +50,7 @@ import {
   encodeJobEnvelope,
   PayloadTooLargeError,
   readEnvelopeDescriptor,
+  readJobRecoveryKey,
   readJobRoutingMeta,
 } from "./jobEnvelope";
 import {
@@ -130,6 +131,10 @@ const CALLER_RESERVED_KEYS = new Set([
   "__pipelineName",
   "__jobType",
   "__jobName",
+  // Facade-set like the routing trio (#718): the QueueManager reactor/fold facade
+  // stamps the event id here so a dropped job stays nameable. Stripped before the
+  // handler runs — see INTERNAL_FIELDS.
+  "__recoveryKey",
 ]);
 
 function assertNoReservedKeys(
@@ -155,6 +160,10 @@ const INTERNAL_FIELDS = [
   "__stagedJobId",
   "__dispatchScore",
   "__attempt",
+  // #718: queue machinery, never the handler's concern. For GQ1 (which does not
+  // lift machinery into the header) this list is the ONLY strip that keeps
+  // __recoveryKey out of the decoded payload the handler sees.
+  "__recoveryKey",
 ] as const;
 
 /**
@@ -1608,6 +1617,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }): void {
     const { pipelineName, jobType, jobName } = readJobRoutingMeta(jobDataJson);
     const descriptor = readEnvelopeDescriptor(jobDataJson);
+    // #718: the event id, read from the header so it survives a gone blob. This is
+    // the ONLY durable name a dropped reactor job has — its staged-job id is a
+    // random UUID (reactor payloads have no top-level .id). Deliberately NOT a
+    // counter label: event ids are unbounded-cardinality, they belong in the log.
+    const recoveryKey = readJobRecoveryKey(jobDataJson);
 
     gqJobsDroppedTotal.inc({
       queue_name: this.queueName,
@@ -1634,6 +1648,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         envelopeFormat: descriptor.format,
         envelopeVersion: descriptor.version,
         blobId: descriptor.blobId,
+        // #718: names the exact event this drop lost, even when the blob is gone.
+        recoveryKey,
         bodyPreserved,
         err: redactStorageUrisInText(
           err instanceof Error ? err.message : String(err),
