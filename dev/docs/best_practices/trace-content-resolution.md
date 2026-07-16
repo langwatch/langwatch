@@ -19,6 +19,7 @@ resolution safe and consistent.
 |---|---|---|
 | `resolveOffloadedTraces` | `src/server/traces/resolve-offloaded-traces.ts` | one trace's spans |
 | `resolveOffloadedTracesBatch` | `src/server/traces/resolve-offloaded-traces-batch.ts` | a whole result set — dedupes identical `(aggregateId, eventId, field)` refs, bounds concurrency at `EVENT_LOG_RESOLVE_CONCURRENCY = 25` |
+| `overlayResolvedIO` | `src/server/traces/offload-truncation-detection.ts` | merges a resolve result onto a stored `TraceSummaryData` row and sets `inputTruncated`/`outputTruncated`, via `detectOffloadedIOFields` — shared by `TraceSummaryService` and `TraceListService` so the flagging rule lives in exactly one place |
 
 Both: find `langwatch.reserved.eventref.*` pointers on span attributes, fetch the
 full value via `blobStore.getFromEventLog({ eventId, field, tenantId, aggregateType, aggregateId })`,
@@ -157,6 +158,8 @@ it does not invent a new visual.
 
 - Read-time resolution: `src/server/traces/resolve-offloaded-traces.ts`,
   `resolve-offloaded-traces-batch.ts`
+- Overlay + truncation-flag decision (shared by both call sites):
+  `src/server/traces/offload-truncation-detection.ts`
 - Winner-consistency:
   `src/server/event-sourcing/pipelines/trace-processing/projections/services/trace-io-accumulation.service.ts`
   (`accumulateIO`, `recomputeTraceIO`)

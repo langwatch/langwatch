@@ -3,15 +3,9 @@ import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topics/topic.service";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import {
-  hasEventRefs,
-  parseSpanEventRefs,
-} from "~/server/traces/offloaded-eventref-parsing";
-import type { ResolvedTraceSpans } from "~/server/traces/resolve-offloaded-traces";
+import { overlayResolvedIO } from "~/server/traces/offload-truncation-detection";
 import { resolveOffloadedTracesBatch } from "~/server/traces/resolve-offloaded-traces-batch";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import {
   deriveTraceOrigin,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -611,10 +605,9 @@ export class TraceListService {
    * Uses the BULK resolver ({@link resolveOffloadedTracesBatch}) so a 100-row
    * conversation page fans a bounded set of event_log reads instead of N
    * independent bursts. The per-row overlay + "content may be incomplete"
-   * flagging mirrors `TraceSummaryService.resolveOffloadedIO` exactly (see
-   * {@link overlayResolvedIO} / {@link detectOffloadedIOFields} below) — the two
-   * copies are intentionally not unified because `TraceSummaryService` is frozen
-   * for this change; unify them the next time that file is touched.
+   * flagging is the shared {@link overlayResolvedIO} helper, also used by
+   * `TraceSummaryService.resolveOffloadedIO` (#5835), so the rule lives in
+   * exactly one place.
    */
   private async resolveFullIOForRows(
     rows: TraceSummaryData[],
@@ -1384,96 +1377,4 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     rootSpanType: row.rootSpanType,
     events,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Read-time offloaded-IO overlay (ADR-022 / #5835, resolveFullIO path only).
-//
-// These mirror the private helpers in `trace-summary.service.ts`
-// (`INPUT_IO_ATTR_KEYS` / `OUTPUT_IO_ATTR_KEYS` / `detectOffloadedIOFields` and
-// the overlay in `resolveOffloadedIO`). They are duplicated rather than shared
-// because `TraceSummaryService` is frozen for this change; when that file is
-// next touched, lift one copy into a shared module and have both call it.
-// ---------------------------------------------------------------------------
-
-/**
- * IO attribute keys that can carry an ADR-022 eventref, split by direction.
- * Used to attribute an unresolved eventref to the input vs output field for the
- * best-effort "content may be incomplete" signal (#5835 AC4).
- */
-const INPUT_IO_ATTR_KEYS: ReadonlySet<string> = new Set([
-  ATTR_KEYS.LANGWATCH_INPUT,
-  ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-]);
-const OUTPUT_IO_ATTR_KEYS: ReadonlySet<string> = new Set([
-  ATTR_KEYS.LANGWATCH_OUTPUT,
-  ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
-]);
-
-/**
- * Detects which trace-level IO directions carried an ADR-022 eventref, decoding
- * pointers through the shared {@link parseSpanEventRefs}. Best-effort across ALL
- * spans (not just the fold's winner) — computing the winner here would duplicate
- * the fold's selection algorithm; over-flagging is bounded to the rare shape
- * where a non-winning span's ref fails while the winner's value was complete.
- * `missingEventIdKeys` count too: a ref with no usable eventId can't resolve, so
- * its field is likewise still a preview.
- */
-function detectOffloadedIOFields(spans: NormalizedSpan[]): {
-  inputHadRef: boolean;
-  outputHadRef: boolean;
-} {
-  let inputHadRef = false;
-  let outputHadRef = false;
-  for (const span of spans) {
-    const attrs = span.spanAttributes as Record<string, string>;
-    if (!hasEventRefs(attrs)) continue;
-    const { eventrefEntries, missingEventIdKeys } = parseSpanEventRefs(attrs);
-    const refAttrKeys = [
-      ...eventrefEntries.map((entry) => entry.attrKey),
-      ...missingEventIdKeys,
-    ];
-    for (const attrKey of refAttrKeys) {
-      if (INPUT_IO_ATTR_KEYS.has(attrKey)) inputHadRef = true;
-      else if (OUTPUT_IO_ATTR_KEYS.has(attrKey)) outputHadRef = true;
-    }
-  }
-  return { inputHadRef, outputHadRef };
-}
-
-/**
- * Overlays a single trace's resolved full IO onto its summary row and flags any
- * field whose eventref failed to resolve. `originalSpans` are the RAW spans
- * (refs intact) so `detectOffloadedIOFields` can see which directions carried a
- * ref — the resolved spans in `resolved` have those keys stripped.
- *
- * Invariants (identical to the summary service): overlay the recomputed value
- * only when a span actually resolved AND the recompute was non-null (else keep
- * the stored preview); a field is `*Truncated` exactly when it HAD a ref but
- * resolution did not cover it (nothing resolved, or the recompute came back null
- * for that field).
- */
-function overlayResolvedIO(
-  stored: TraceSummaryData,
-  originalSpans: NormalizedSpan[],
-  resolved: ResolvedTraceSpans,
-): TraceSummaryData {
-  const { inputHadRef, outputHadRef } = detectOffloadedIOFields(originalSpans);
-  const { recomputedInput, recomputedOutput, anyResolved } = resolved;
-
-  const out: TraceSummaryData = { ...stored };
-
-  if (anyResolved) {
-    if (recomputedInput !== null) out.computedInput = recomputedInput.text;
-    if (recomputedOutput !== null) out.computedOutput = recomputedOutput.text;
-  }
-
-  if (inputHadRef && (!anyResolved || recomputedInput === null)) {
-    out.inputTruncated = true;
-  }
-  if (outputHadRef && (!anyResolved || recomputedOutput === null)) {
-    out.outputTruncated = true;
-  }
-
-  return out;
 }
