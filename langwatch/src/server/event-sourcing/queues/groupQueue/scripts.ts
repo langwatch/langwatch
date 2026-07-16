@@ -1278,6 +1278,12 @@ local tenantCountKeyPrefix = ARGV[4]
 -- groups resume, so we unpark up to the freed headroom. 0 = cap disabled.
 local staticCap = tonumber(ARGV[5]) or 0
 local nowMs = tonumber(ARGV[6])
+-- "1" when the slot is being freed because the job was DISCARDED, not processed
+-- (#5538). The group must still advance — that is why this is COMPLETE and not a
+-- park — but a discarded job is not a completion: it must not INCR the completed
+-- counters and must not clear the group's stored error. Absent/"" = a genuine
+-- success, so older call sites keep their exact behaviour.
+local isDropped = ARGV[7] == "1"
 
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
@@ -1329,16 +1335,21 @@ end
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
 
--- Increment completed counter for Skynet
-redis.call("INCR", statsKey)
+-- A discarded job is not a completion. Counting it as one made the drop worse
+-- than invisible: it inflated the success rate AND wiped the group's stored
+-- error, so ops saw a win where an event had just been thrown away (#5538).
+if not isDropped then
+  -- Increment completed counter for Skynet
+  redis.call("INCR", statsKey)
 
--- Increment per-job-name completed counter
-if jobName and jobName ~= "" then
-  redis.call("INCR", statsKey .. ":" .. jobName)
+  -- Increment per-job-name completed counter
+  if jobName and jobName ~= "" then
+    redis.call("INCR", statsKey .. ":" .. jobName)
+  end
+
+  -- Clear any leftover error from previous failures now that the job succeeded
+  redis.call("DEL", errorKey)
 end
-
--- Clear any leftover error from previous failures now that the job succeeded
-redis.call("DEL", errorKey)
 
 return 1
 `;
@@ -2005,10 +2016,18 @@ export class GroupStagingScripts {
     groupId,
     stagedJobId,
     jobName,
+    dropped = false,
   }: {
     groupId: string;
     stagedJobId: string;
     jobName?: string;
+    /**
+     * The slot is being freed because the job was DISCARDED, not processed
+     * (#5538). Keeps the group advancing while withholding the completed-counter
+     * INCRs and the stored-error clear, so ops can tell a thrown-away event from
+     * a successful one. Defaults false — a plain `complete()` is still a success.
+     */
+    dropped?: boolean;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const jobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
@@ -2032,6 +2051,7 @@ export class GroupStagingScripts {
       `${this.keyPrefix}tenant_active_z:`,
       String(readTenantCap()),
       String(Date.now()),
+      dropped ? "1" : "",
     );
 
     return result === 1;
