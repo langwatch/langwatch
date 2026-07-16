@@ -60,7 +60,7 @@ jobs:
           install-dir: typescript-sdk
 
       - name: Install TypeScript Native Preview
-        run: pnpm install -D @typescript/native-preview
+        run: pnpm install -D -w @typescript/native-preview
 
       - name: Run lint check
         run: pnpm run lint

@@ -31,6 +31,9 @@ ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 # (via start:prepare:files → build:mcp-server).
 COPY mcp-server ./mcp-server
 COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+COPY packages ./packages
+COPY skills ./skills
+COPY Dockerfile.langyagent ./Dockerfile.langyagent
 
 COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
 # The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)

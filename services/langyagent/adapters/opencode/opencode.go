@@ -548,7 +548,7 @@ func planItemsFromInput(raw json.RawMessage) ([]frames.PlanItem, bool) {
 	var wrapper struct {
 		Todos []todoEntry `json:"todos"`
 	}
-	todos := []todoEntry(nil)
+	var todos []todoEntry
 	if err := json.Unmarshal(raw, &wrapper); err == nil && len(wrapper.Todos) > 0 {
 		todos = wrapper.Todos
 	} else {
