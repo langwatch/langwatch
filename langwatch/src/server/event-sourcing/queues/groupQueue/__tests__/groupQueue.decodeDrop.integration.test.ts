@@ -107,16 +107,23 @@ describe.skipIf(!hasTestcontainers)(
       processFn,
       consumerEnabled,
       objectStore,
+      processBatch,
+      coalesceMaxBatch,
     }: {
       name: string;
       processFn: (payload: TestPayload) => Promise<void>;
       consumerEnabled: boolean;
       objectStore: InMemoryObjectStore;
+      // Opt-in batch coalescing (drives the drained-sibling path).
+      processBatch?: (payloads: TestPayload[]) => Promise<void>;
+      coalesceMaxBatch?: (payload: TestPayload) => number;
     }): GroupQueueProcessor<TestPayload> {
       const definition: EventSourcedQueueDefinition<TestPayload> = {
         name,
         groupKey: (p) => p.groupId,
         process: processFn,
+        ...(processBatch ? { processBatch } : {}),
+        ...(coalesceMaxBatch ? { coalesceMaxBatch } : {}),
       };
       const queue = new GroupQueueProcessor<TestPayload>(definition, redis, {
         consumerEnabled,
@@ -964,6 +971,81 @@ describe.skipIf(!hasTestcontainers)(
           // proves preserveForDlq pushed it to the window. Revert preserveForDlq and
           // this drops back to ~5d → red.
           expect(holderPttl).toBeGreaterThan(6 * 24 * 60 * 60 * 1000);
+        });
+      });
+    });
+
+    describe("given a coalesced batch whose drained sibling is dead-lettered (#5853 release fix)", () => {
+      describe("when the dispatched job succeeds", () => {
+        /** @scenario a dead-lettered drained sibling's blob survives the batch's success */
+        it("does not release the dropped sibling's preserved blob on the batch's success", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/coalesce-release`;
+          const objectStore = new InMemoryObjectStore();
+
+          // Stage TWO offloaded jobs in the same group with a consumer-less queue
+          // so corruption can't race the dispatcher: J (dispatched, decodes fine)
+          // first, then S2 (the drained sibling). incompressible() is random per
+          // call, so the two get distinct blobs.
+          const staging = newQueue({
+            name,
+            processFn: async () => {},
+            consumerEnabled: false,
+            objectStore,
+          });
+          await staging.waitUntilReady();
+          await staging.send({
+            id: "dispatched",
+            groupId,
+            value: OFFLOADABLE_S3_VALUE(),
+          });
+          const jUris = new Set(objectStore.store.keys());
+          await staging.send({
+            id: "sibling",
+            groupId,
+            value: OFFLOADABLE_S3_VALUE(),
+          });
+          const s2Uri = [...objectStore.store.keys()].find((u) => !jUris.has(u));
+          expect(s2Uri).toBeDefined();
+
+          // Corrupt ONLY the sibling's blob: body present, unreadable to this
+          // worker (the codec-skew case #719 targets) — NOT evicted.
+          objectStore.store.set(s2Uri!, Buffer.from("not a valid gzip body"));
+
+          // Coalescing consumer: dispatches J, drains S2 as a sibling, S2 decode
+          // fails → dead-lettered, J's handler succeeds → the success-path release
+          // runs. maxBatch > 1 + processBatch is what turns coalescing on.
+          const processed = vi.fn<(p: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          newQueue({
+            name,
+            processFn: processed,
+            consumerEnabled: true,
+            objectStore,
+            processBatch: async () => {},
+            coalesceMaxBatch: () => 50,
+          });
+
+          // Wait until S2 is dead-lettered AND the dispatched job completed
+          // (a real completion, not a drop — completedStat is only bumped by a
+          // non-dropped complete()).
+          await vi.waitFor(
+            async () => {
+              expect(
+                await redis.hlen(`${name}:gq:dlq:${groupId}:data`),
+              ).toBe(1);
+              expect(await completedStat(name)).not.toBeNull();
+            },
+            { timeout: 15000, interval: 100 },
+          );
+
+          // The fix: the dispatched job's success released only its OWN blob, not
+          // the dropped sibling's PRESERVED blob. Revert the fix (release every
+          // drainedSibling) and S2's blob is UNLINKed here → its dead-letter entry
+          // points at a gone blob and a drain recovers a bodyless envelope. This
+          // is the exact use-after-free the adversarial review found.
+          expect(objectStore.deleted).not.toContain(s2Uri);
+          expect(objectStore.store.has(s2Uri!)).toBe(true);
         });
       });
     });

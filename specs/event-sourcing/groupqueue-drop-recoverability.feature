@@ -189,6 +189,18 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
     Then the raw value is re-staged into the live group
 
   @integration
+  # AC-719.8 — a body-present drained sibling is dead-lettered with its blob kept alive
+  # (#720); the DISPATCHED job of the same coalesced batch must not, on its success,
+  # release that preserved blob — else a drain would recover a bodyless envelope. The
+  # success-path release covers only the dispatched job + the siblings that folded into
+  # the batch, never the dropped ones. Bound to a coalesced-batch integration test
+  # (falsifiable: release every drained sibling and the sibling's blob is UNLINKed).
+  Scenario: a dead-lettered drained sibling's blob survives the batch's success
+    Given a coalesced batch whose drained sibling is dead-lettered with its body present
+    When the dispatched job succeeds
+    Then the dropped sibling's preserved blob is not reclaimed
+
+  @integration
   # AC-719.6 — the operator's existing group-scoped drain recovers a job-scoped entry
   # unchanged, byte-identical AND actually dispatchable (proving the key-layout reuse).
   Scenario: draining the dead-letter restores the job to live staging and it dispatches
@@ -237,7 +249,8 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
 # #718: AC-718.1 bound; AC-718.6 bound (reactor + fold facade); AC-718.2b bound; AC-718.2/719.1/719.3 bound
 #       (one body-present test); AC-718.3 bound; AC-718.4a/b bound; AC-718.7 bound.
 #       AC-718.4c (@unimplemented, private generateStagedJobId); AC-718.5 (@unimplemented, GQ1-strip harness).
-# #719: AC-719.6 bound (drain round-trip). AC-719.7b bound (drained-sibling re-stage fallback, seam unit test
+# #719: AC-719.6 bound (drain round-trip). AC-719.8 bound (dead-lettered sibling's blob survives the batch
+#       success — coalesced-batch integration test). AC-719.7b bound (drained-sibling re-stage fallback, seam unit test
 #       with failure injection). AC-719.4/719.5/719.7 (@unimplemented — coalesced-batch / crash-injection harness
 #       gaps, same class 5821 deferred; the no-slot sites are WIRED + typecheck-clean).
 # #720: AC-720.1 bound (GQ2 holder, falsifiability-proven). AC-720.1b (@unimplemented, GQ1-forcing harness).

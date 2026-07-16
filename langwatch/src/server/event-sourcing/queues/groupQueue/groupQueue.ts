@@ -864,6 +864,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const maxBatch = this.coalesceMaxBatch?.(payload) ?? 1;
     let batchPayloads: Payload[] | null = null;
     let drainedSiblings: DrainedJob[] = [];
+    // The drained siblings that actually folded into the batch — the ONLY ones
+    // safe to release on the dispatched job's success. A DROPPED sibling (parse
+    // returned null → dead-lettered / re-staged / gone) must NOT be released, or
+    // the success path would reclaim a blob its preserved DLQ entry or re-staged
+    // copy still references, losing the value the drop path just preserved
+    // (adversarial review #5853).
+    let foldedSiblingValues: string[] = [];
     if (maxBatch > 1 && this.processBatch) {
       try {
         drainedSiblings = await this.scripts.drainGroupReady({
@@ -892,6 +899,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           const siblingPayloads = parsedSiblings.filter(
             (parsed) => parsed !== null,
           ) as Payload[];
+          // Only siblings that PARSED are folded + processed, so only those are
+          // released on success. Dropped siblings (null) were already retired by
+          // parseDrainedPayload — a body-present one preserved (blob kept alive),
+          // a missing_blob one released there — so they are excluded here.
+          foldedSiblingValues = drainedSiblings
+            .filter((_, i) => parsedSiblings[i] !== null)
+            .map((sibling) => sibling.jobDataJson);
           if (siblingPayloads.length > 0) {
             batchPayloads = [payload, ...siblingPayloads];
           }
@@ -1043,11 +1057,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // removed from staging during the drain, so completing the
               // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
+              // Release ONLY the dispatched job + the siblings that folded into
+              // the batch. A DROPPED sibling's blob must NOT be reclaimed here:
+              // its preserved DLQ entry or re-staged copy still references it, so
+              // releasing would leave a recoverable value pointing at a gone blob
+              // (adversarial review #5853). Dropped siblings were already retired
+              // by parseDrainedPayload (body-present preserved, missing_blob
+              // released), so they are excluded from this release.
               await this.blobLifecycle.release({
-                values: [
-                  jobDataJson,
-                  ...drainedSiblings.map((sibling) => sibling.jobDataJson),
-                ],
+                values: [jobDataJson, ...foldedSiblingValues],
                 groupId,
               });
               gqJobsCompletedTotal.inc(routingLabels);
@@ -1357,6 +1375,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           jobDataJson: sibling.jobDataJson,
           reason,
           originalScore: sibling.originalScore,
+        });
+      } else {
+        // Body genuinely gone (missing_blob) — nothing to preserve. Release the
+        // stale holder NOW, mirroring the dispatch site's bodyIsGone release: the
+        // success-path release no longer covers dropped siblings, so without this
+        // the stale holder would leak to the TTL backstop (adversarial review
+        // #5853). The blob is already gone, so this just drops the dead token.
+        await this.blobLifecycle.release({
+          values: [sibling.jobDataJson],
+          groupId,
         });
       }
       return null;
