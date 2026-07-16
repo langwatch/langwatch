@@ -218,7 +218,7 @@ ENVIRONMENT
     LW_OBS_GRAFANA_PORT=3000     Grafana port (also LW_OBS_OTLP_HTTP_PORT=4318,
                                  LW_OBS_OTLP_GRPC_PORT=4317).
     PORTLESS=0                   Bypass portless entirely (legacy PORT scheme).
-    HAVEN_AGENT=1                Plain, colourless, redraw-free output (also on
+    HAVEN_AGENT=1                Plain, colorless, redraw-free output (also on
                                  with --agent, NO_COLOR, or a non-terminal stdout)
                                  — zero token waste when an AI agent drives haven.
 

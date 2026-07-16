@@ -1,7 +1,7 @@
 // Package procsupervisor implements app.Supervisor: it runs child processes via
 // `bash -lc` with prefixed output, restarts them on crash, and tears the whole
 // process tree down when the context is cancelled. In agent mode it emits plain,
-// colourless, redraw-free lines so an AI driver wastes no tokens on ANSI.
+// colorless, redraw-free lines so an AI driver wastes no tokens on ANSI.
 package procsupervisor
 
 import (
@@ -31,7 +31,7 @@ type recentLogs struct {
 	lines []string
 }
 
-// New returns a Supervisor. isAgent=true suppresses colour for token-free output.
+// New returns a Supervisor. isAgent=true suppresses color for token-free output.
 func New(isAgent bool) Supervisor {
 	return Supervisor{isPlain: isAgent, recent: &recentLogs{}}
 }

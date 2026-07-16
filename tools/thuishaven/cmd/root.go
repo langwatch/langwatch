@@ -369,7 +369,7 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 }
 
 // resolveAgent turns agent mode on for AI drivers: explicit env, NO_COLOR, or a
-// non-terminal stdout — unless FORCE_COLOR asks us to keep colour under a pipe.
+// non-terminal stdout — unless FORCE_COLOR asks us to keep color under a pipe.
 func resolveAgent() bool {
 	if os.Getenv("HAVEN_AGENT") == "1" {
 		return true

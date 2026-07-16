@@ -19,7 +19,7 @@ type Config struct {
 	DBIdleTTL                time.Duration
 	HeartbeatEvery           time.Duration // launcher heartbeat cadence
 	DaemonArgv               []string      // how to (re)launch `haven daemon`
-	IsAgent                  bool          // token-free plain output for AI drivers (no colour/TUI)
+	IsAgent                  bool          // token-free plain output for AI drivers (no color/TUI)
 	ShouldManageClickHouse   bool          // haven provisions a shared ClickHouse container (colima) + per-slug DBs
 	ShouldStopClickHouseIdle bool          // daemon stops the managed CH container when the last stack is reaped
 	ShouldManagePostgres     bool          // haven ensures a shared brew-services Postgres + per-slug DBs

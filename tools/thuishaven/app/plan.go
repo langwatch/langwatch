@@ -6,7 +6,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// palette gives each supervised child a distinct prefix colour.
+// palette gives each supervised child a distinct prefix color.
 var palette = []string{"32", "34", "33", "35", "36", "31", "92", "94"}
 
 // goServiceShell picks `make service` (go run) or `make service-watch` (air) for
