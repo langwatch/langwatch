@@ -274,11 +274,37 @@ export function initializeDefaultApp(options?: {
   );
   const spanDedup = createSpanDedupeService(redis);
 
+  // ADR-022 (#5835): construct the blob/IO deps and the span read service
+  // BEFORE traceSummary so the Summary-panel read path (tracesV2.header →
+  // getByTraceId) can resolve offloaded eventref pointers and return the full
+  // trace input/output instead of the 64 KB write-time preview stored in
+  // trace_summaries. #4888: the same factory backs the customer-facing
+  // full=true detail read path; the composition root passes its own ClickHouse
+  // decision/resolver so the eval-path deps stay byte-identical to the
+  // pre-#4888 inline wiring.
+  const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
+    clickhouseEnabled,
+    resolveClickHouseClient,
+  });
+  const spanStorage = traced(
+    new SpanStorageService(
+      clickhouseEnabled
+        ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
+        : new NullSpanStorageRepository(),
+      { blobStore, ioExtractionService },
+    ),
+    "SpanStorageService",
+  );
+
   const traceSummary = traced(
     new TraceSummaryService(
       clickhouseEnabled
         ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
         : new NullTraceSummaryRepository(),
+      // Reuse the single spanStorage instance as the spans reader rather than
+      // re-deriving ClickHouse access — spanStorage.getNormalizedSpansByTraceId
+      // returns the raw spans this read path resolves the eventrefs from.
+      { blobStore, ioExtractionService, spansReader: spanStorage },
     ),
     "TraceSummaryService",
   );
@@ -304,16 +330,6 @@ export function initializeDefaultApp(options?: {
     ),
     "TraceListService",
   );
-  // ADR-022: construct blob/IO deps before SpanStorageService so the v2 read
-  // path (spansFull / spanDetail) can resolve offloaded eventref pointers.
-  // #4888: the same factory backs the customer-facing full=true read path; the
-  // composition root passes its own ClickHouse decision/resolver so the
-  // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
-  const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
-    clickhouseEnabled,
-    resolveClickHouseClient,
-  });
-
   // Wire the discover-cache → SSE bridge. Module-level setter keeps
   // the TraceListService constructor lean (the null/test preset below
   // doesn't need a broadcaster — refreshes that never get an SSE push
@@ -334,15 +350,6 @@ export function initializeDefaultApp(options?: {
       "discover_updated",
     );
   });
-  const spanStorage = traced(
-    new SpanStorageService(
-      clickhouseEnabled
-        ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
-        : new NullSpanStorageRepository(),
-      { blobStore, ioExtractionService },
-    ),
-    "SpanStorageService",
-  );
   const logRecordStorage = traced(
     new LogRecordStorageService(
       clickhouseEnabled
