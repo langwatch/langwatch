@@ -124,6 +124,18 @@ export async function sendWebhook({
       retryable: false,
     });
   }
+  // Production-dispatch invariant (ADR-040 §4/§5): a real fire MUST carry a
+  // projectId (so the per-project cap below applies — omitting it would let an
+  // uncapped flood through) and a stable eventId (so every retry dedupes —
+  // omitting it mints a fresh id per attempt). Only a test fire may omit them.
+  // Fail terminally so a mis-wired caller dead-letters instead of leaking past
+  // these gates.
+  if (!testFire && (!projectId || !eventId)) {
+    throw new DispatchError({
+      message: `${label}: a production webhook dispatch requires projectId and eventId.`,
+      retryable: false,
+    });
+  }
   // Per-project dispatch cap (ADR-040 §4) — a real fire only; test fires ride
   // the drawer's per-user limit. Over the cap throws RETRYABLE with a
   // Retry-After to the window reset: a legitimate burst backs off and drains,

@@ -75,11 +75,11 @@ describe("sendWebhook dispatch orchestration", () => {
     });
   });
 
-  describe("the per-project dispatch cap", () => {
+  describe("when enforcing the per-project dispatch cap", () => {
     it("gates a real dispatch on the project cap", async () => {
       sendResolves();
       allowRateLimit();
-      await sendWebhook({ ...base, projectId: "proj_1" });
+      await sendWebhook({ ...base, projectId: "proj_1", eventId: "evt_1" });
       expect(mockedRateLimit).toHaveBeenCalledWith({
         key: "webhook-dispatch:proj_1",
         windowSeconds: 3600,
@@ -102,7 +102,7 @@ describe("sendWebhook dispatch orchestration", () => {
       });
       let caught: unknown;
       try {
-        await sendWebhook({ ...base, projectId: "proj_1" });
+        await sendWebhook({ ...base, projectId: "proj_1", eventId: "evt_1" });
       } catch (err) {
         caught = err;
       }
@@ -114,7 +114,24 @@ describe("sendWebhook dispatch orchestration", () => {
     });
   });
 
-  describe("Retry-After from the receiver", () => {
+  describe("when a production dispatch omits its required fields", () => {
+    it("throws a terminal DispatchError before any send when eventId is missing", async () => {
+      sendResolves();
+      allowRateLimit();
+      let caught: unknown;
+      try {
+        await sendWebhook({ ...base, projectId: "proj_1" });
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(DispatchError);
+      expect((caught as DispatchError).retryable).toBe(false);
+      expect(mockedRateLimit).not.toHaveBeenCalled();
+      expect(mockedSend).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the receiver supplies Retry-After", () => {
     it("threads it onto the retryable DispatchError on a 429", () => {
       let caught: unknown;
       try {

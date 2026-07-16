@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import type { WebhookDeliveryInput } from "~/server/app-layer/triggers/repositories/webhook-delivery.repository";
 import { deliverWebhook } from "../deliverWebhook";
-import type { WebhookSendResult } from "../sendWebhook";
+import type { sendWebhook, WebhookSendResult } from "../sendWebhook";
 
 const base = {
   projectId: "proj_1",
@@ -10,20 +10,26 @@ const base = {
   eventId: "evt_abc",
   url: "https://example.com/hook",
   method: "POST" as const,
-  headers: { Authorization: "Bearer secret", "X-Trace": "t1" },
+  // A heuristic-named credential, a heuristic-miss credential, and a
+  // non-secret trace header — EVERY value must be masked in the log.
+  headers: {
+    Authorization: "Bearer secret",
+    "X-Partner-Key": "pk_live_123",
+    "X-Trace": "t1",
+  },
   body: "{}",
   triggerName: "My automation",
 };
 
 function sendResolvingWith(
   overrides: Partial<WebhookSendResult>,
-): typeof import("../sendWebhook").sendWebhook {
+): typeof sendWebhook {
   return (async () => ({
     status: 200,
     body: "ok",
     eventId: "evt_abc",
     ...overrides,
-  })) as unknown as typeof import("../sendWebhook").sendWebhook;
+  })) as unknown as typeof sendWebhook;
 }
 
 describe("deliverWebhook", () => {
@@ -47,12 +53,25 @@ describe("deliverWebhook", () => {
         responseStatus: 201,
         outcome: "success",
       });
-      // The secret header value is masked in the log row.
       expect(rows[0]!.requestHeaders).toEqual({
         Authorization: "***",
-        "X-Trace": "t1",
+        "X-Partner-Key": "***",
+        "X-Trace": "***",
       });
       expect(rows[0]!.latencyMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it("stores the request URL as origin + path only, stripping the query", async () => {
+      const rows: WebhookDeliveryInput[] = [];
+      await deliverWebhook({
+        ...base,
+        url: "https://example.com/hook?token=secret&sig=abc#frag",
+        send: sendResolvingWith({ status: 200 }),
+        recorder: async (row) => {
+          rows.push(row);
+        },
+      });
+      expect(rows[0]!.requestUrl).toBe("https://example.com/hook");
     });
   });
 
@@ -99,7 +118,7 @@ describe("deliverWebhook", () => {
           message: "blocked: private address",
           retryable: false,
         });
-      }) as unknown as typeof import("../sendWebhook").sendWebhook;
+      }) as unknown as typeof sendWebhook;
       await expect(
         deliverWebhook({
           ...base,

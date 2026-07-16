@@ -9,9 +9,8 @@ import emailClient, { type EmailSlice } from "./definitions/email/client";
 import emailShared, { type EmailPreview } from "./definitions/email/shared";
 import slackClient, { type SlackSlice } from "./definitions/slack/client";
 import slackShared, { type SlackPreview } from "./definitions/slack/shared";
-import webhookClient, {
-  type WebhookSlice,
-} from "./definitions/webhook/client";
+import webhookClient from "./definitions/webhook/client";
+import { type WebhookSlice } from "./definitions/webhook/slice";
 import webhookShared, {
   type WebhookPreview,
 } from "./definitions/webhook/shared";

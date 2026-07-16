@@ -39,6 +39,7 @@ import {
   type WebhookStoredActionParams,
 } from "~/automations/providers/definitions/webhook/secret";
 import {
+  normalizeWebhookUrl,
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookActionParams,
 } from "~/automations/providers/definitions/webhook/shared";
@@ -58,7 +59,6 @@ import {
   validateTemplateDraft,
 } from "~/server/app-layer/triggers/trigger-template.service";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
-import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
 import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -514,9 +514,8 @@ export const automationRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("triggers:view"))
-    .query(async ({ ctx, input }) => {
-      const deliveries = WebhookDeliveryService.create(ctx.prisma);
-      return deliveries.getRecentByTrigger({
+    .query(async ({ input }) => {
+      return getApp().webhookDeliveries.getRecentByTrigger({
         projectId: input.projectId,
         triggerId: input.triggerId,
         limit: input.limit,
@@ -846,7 +845,10 @@ export const automationRouter = createTRPCRouter({
         // automation's test fire carries the kept sentinel — resolve it
         // against the stored ciphertext, exactly like the Slack bot token
         // above. Unresolvable kept values (fresh draft, renamed header) are
-        // dropped rather than sent as the literal sentinel.
+        // dropped rather than sent as the literal sentinel. Kept values are
+        // bound to the saved destination: they are only decrypted when the
+        // supplied URL matches the saved one, so a changed URL cannot
+        // exfiltrate masked credentials to an attacker endpoint.
         let webhookDestination = input.webhookDestination;
         if (
           webhookDestination &&
@@ -860,9 +862,15 @@ export const automationRouter = createTRPCRouter({
               where: { id: input.automationId, projectId: input.projectId },
               select: { actionParams: true },
             });
-            saved = decryptWebhookHeaders(
-              (row?.actionParams ?? {}) as WebhookStoredActionParams,
-            );
+            const savedParams = (row?.actionParams ??
+              {}) as WebhookStoredActionParams;
+            if (
+              typeof savedParams.url === "string" &&
+              normalizeWebhookUrl(savedParams.url) ===
+                normalizeWebhookUrl(webhookDestination.url)
+            ) {
+              saved = decryptWebhookHeaders(savedParams);
+            }
           }
           const headers: Record<string, string> = {};
           for (const [name, value] of Object.entries(

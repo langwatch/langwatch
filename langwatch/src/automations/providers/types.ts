@@ -205,8 +205,9 @@ export interface ConfigFormProps<S, TPreview = unknown> {
 /** Notify-specific client additions. Generic over slice and preview. */
 export interface NotifyClientDef<S = unknown, TPreview = unknown>
   extends ClientDef<S, TPreview> {
-  /** The channel string the preview/testFire endpoints accept. Each
-   *  provider names its own — the shared layer doesn't enumerate. */
+  /** The channel string the preview/testFire endpoints accept. This union
+   *  enumerates every notify channel — a new provider must extend it (and the
+   *  preview/testFire endpoints that switch on it). */
   readonly channel: "email" | "slack" | "webhook";
   /** Webhook for the test-fire mutation. ADR-031: email test fires resolve
    *  their recipient server-side (the requester's own inbox), so no provider

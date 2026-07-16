@@ -1,5 +1,6 @@
 import { decrypt, encrypt } from "~/utils/encryption";
 import {
+  normalizeWebhookUrl,
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookActionParams,
 } from "./shared";
@@ -43,6 +44,11 @@ export function decryptWebhookHeaders(
  * the saved row, then encrypt the full record. A kept value whose name has no
  * stored counterpart is dropped (renaming a header requires re-typing its
  * value — the stored value is keyed by the old name).
+ *
+ * Kept secrets are bound to the destination they were saved against: they are
+ * only reused when the incoming URL normalizes to the SAME saved URL. A changed
+ * destination drops every kept value, so masked credentials can never be
+ * re-pointed at an attacker-controlled endpoint (ADR-040 §3).
  */
 export function persistWebhookActionParams({
   incoming,
@@ -51,7 +57,10 @@ export function persistWebhookActionParams({
   incoming: WebhookActionParams;
   existing?: WebhookStoredActionParams | null;
 }): WebhookStoredActionParams {
-  const saved = existing ? decryptWebhookHeaders(existing) : {};
+  const urlUnchanged =
+    existing?.url != null &&
+    normalizeWebhookUrl(incoming.url) === normalizeWebhookUrl(existing.url);
+  const saved = existing && urlUnchanged ? decryptWebhookHeaders(existing) : {};
   const resolved: Record<string, string> = {};
   for (const [name, value] of Object.entries(incoming.headers)) {
     if (value === WEBHOOK_HEADER_VALUE_KEPT) {

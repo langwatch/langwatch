@@ -668,6 +668,9 @@ export async function fetchWithResolvedIp(
       const location = response.headers.get("location");
       if (location) {
         if (init?.followRedirects === false) {
+          // Drain the redirect response body so undici can release the socket —
+          // an undrained body keeps the connection busy until GC.
+          await response.body?.cancel();
           throw new Error(
             "Redirects are not followed for this destination — the endpoint must answer directly.",
           );

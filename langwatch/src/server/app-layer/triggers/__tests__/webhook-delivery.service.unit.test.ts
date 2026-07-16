@@ -16,7 +16,7 @@ function makeRepo(overrides?: Partial<WebhookDeliveryRepository>) {
 }
 
 describe("WebhookDeliveryService", () => {
-  describe("record", () => {
+  describe("when recording an attempt", () => {
     it("delegates the attempt to the repository", async () => {
       const repo = makeRepo();
       const row: WebhookDeliveryInput = {
@@ -33,7 +33,7 @@ describe("WebhookDeliveryService", () => {
     });
   });
 
-  describe("getRecentByTrigger", () => {
+  describe("when fetching recent attempts", () => {
     it("threads projectId, triggerId, and limit to the repository", async () => {
       const repo = makeRepo();
       await new WebhookDeliveryService(repo).getRecentByTrigger({
@@ -49,13 +49,21 @@ describe("WebhookDeliveryService", () => {
     });
   });
 
-  describe("pruneExpired", () => {
-    it("deletes rows older than ~30 days", async () => {
-      const repo = makeRepo({ deleteOlderThan: vi.fn(async () => 7) });
-      const deleted = await new WebhookDeliveryService(repo).pruneExpired();
+  describe("when pruning expired attempts", () => {
+    it("scopes the delete by projectId and cuts off at ~30 days", async () => {
+      // Hold the mock in a local const: the repo prop is typed as the
+      // repository function (no `.mock`), so assert on the const instead.
+      const deleteOlderThan = vi.fn(
+        async (_params: { projectIds: string[]; before: Date }) => 7,
+      );
+      const repo = makeRepo({ deleteOlderThan });
+      const deleted = await new WebhookDeliveryService(repo).pruneExpired({
+        projectIds: ["p1", "p2"],
+      });
       expect(deleted).toBe(7);
-      const before = repo.deleteOlderThan.mock.calls[0]![0].before.getTime();
-      const daysAgo = (Date.now() - before) / (24 * 60 * 60 * 1000);
+      const call = deleteOlderThan.mock.calls[0]![0];
+      expect(call.projectIds).toEqual(["p1", "p2"]);
+      const daysAgo = (Date.now() - call.before.getTime()) / (24 * 60 * 60 * 1000);
       expect(daysAgo).toBeGreaterThan(29.9);
       expect(daysAgo).toBeLessThan(30.1);
     });

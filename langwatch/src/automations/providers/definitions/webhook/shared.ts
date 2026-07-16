@@ -53,26 +53,56 @@ export function sanitizeWebhookHeaders(
   return out;
 }
 
-/** Header names whose VALUE is a secret and must be masked before a request
- *  is persisted to the delivery log (ADR-040 §6). Matched case-insensitively,
- *  substring — covers `Authorization`, `X-Api-Key`, `X-Signature`, etc. */
-const SECRET_HEADER_PATTERN =
-  /authorization|cookie|token|secret|api[-_]?key|signature|password|auth/i;
-
 /**
  * Redact a header record for the delivery log: which headers were sent is kept
  * (an operator debugging a 401 needs to see `Authorization` was present), but
- * the secret VALUE is masked to "***" so credential material never lands in
- * control-plane Postgres (ADR-040 §6).
+ * EVERY value is masked to "***". A header name cannot reliably establish
+ * whether its value is secret — the feature treats all configured header values
+ * as secrets (encrypted at rest), so a credential under an arbitrary name like
+ * `X-Partner-Key` must never land verbatim in control-plane Postgres and get
+ * returned by `getWebhookDeliveries` (ADR-040 §6).
  */
 export function redactHeadersForLog(
   headers: Record<string, string>,
 ): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [name, value] of Object.entries(headers)) {
-    out[name] = SECRET_HEADER_PATTERN.test(name) ? "***" : value;
+  for (const name of Object.keys(headers)) {
+    out[name] = "***";
   }
   return out;
+}
+
+/**
+ * Redact a destination URL for the delivery log: keep only origin + path so an
+ * operator can see where a webhook fired, but drop the query string (tokens and
+ * signatures commonly ride there), the fragment, and any embedded credentials
+ * before the value is persisted (ADR-040 §6).
+ */
+export function redactWebhookUrlForLog(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    // Unparseable input — strip anything after the first "?" as a best effort.
+    return url.split("?")[0] ?? url;
+  }
+}
+
+/**
+ * Canonical form of a webhook URL for equality comparison (ADR-040 §3): lowered
+ * protocol + host (port included), path with trailing slashes trimmed, query
+ * and fragment dropped. Kept secrets are only reused when the incoming URL
+ * normalizes to the SAME saved URL — a changed destination must never inherit
+ * credentials bound to the old one. Unparseable input compares by trimmed text.
+ */
+export function normalizeWebhookUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, "");
+    return `${parsed.protocol}//${parsed.host}${path || "/"}`;
+  } catch {
+    return url.trim();
+  }
 }
 
 /**

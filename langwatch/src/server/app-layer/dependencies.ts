@@ -44,6 +44,7 @@ import type {
   TestFireResult,
   TestFireTriggerInput,
 } from "./triggers/trigger-template.service";
+import type { WebhookDeliveryService } from "./triggers/webhook-delivery.service";
 import type { UsageService } from "./usage/usage.service";
 
 export interface DataRetentionDependencies {
@@ -98,6 +99,10 @@ export interface AppDependencies {
   triggerTemplates: {
     testFire: (input: TestFireTriggerInput) => Promise<TestFireResult>;
   };
+  /** ADR-040 §6 per-attempt webhook delivery log — write side records an
+   *  attempt, read side backs the drawer's "Recent deliveries", prune keeps
+   *  the table bounded at 30 days (projectId-scoped). */
+  webhookDeliveries: WebhookDeliveryService;
   emailSuppressions: EmailSuppressionService;
   organizations: OrganizationService;
   projects: ProjectService;

@@ -6,6 +6,8 @@ import {
 } from "~/shared/templating/banner";
 import { DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE } from "~/shared/templating/defaults";
 import graphAlertDetailedSource from "~/automations/providers/definitions/slack/templates/graph_alert_detailed.liquid?raw";
+import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { assertWebhookDelivered } from "~/server/triggers/sendWebhook";
 import { TemplateValidationError, TestFireUnavailableError } from "../errors";
 import {
   type DraftIdentity,
@@ -58,6 +60,12 @@ function makeNotifier() {
     },
     sendWebhook: async (args) => {
       sentWebhooks.push(args);
+      // Mirror production (`liveTriggerNotifier`): a non-2xx throws the
+      // classified DispatchError so the author sees what the endpoint said.
+      assertWebhookDelivered({
+        result: { status: webhookStatus, body: "" },
+        triggerName: args.triggerName,
+      });
       return { status: webhookStatus };
     },
   };
@@ -129,7 +137,7 @@ describe("validateTemplateDraft", () => {
 });
 
 describe("testFireTrigger", () => {
-  describe("given a webhook destination", () => {
+  describe("when a webhook destination is supplied", () => {
     it("sends the rendered JSON body and returns the endpoint's HTTP status", async () => {
       const { notifier, sentWebhooks } = makeNotifier();
       const service = makeService(notifier);
@@ -199,6 +207,59 @@ describe("testFireTrigger", () => {
             webhookDestination: null,
           }),
         ).rejects.toThrow(/endpoint/i);
+      });
+    });
+
+    describe("when the endpoint answers a non-2xx status", () => {
+      it("rejects with the classified failure after recording the attempt", async () => {
+        const { notifier, sentWebhooks, setWebhookStatus } = makeNotifier();
+        const service = makeService(notifier);
+        setWebhookStatus(500);
+
+        await expect(
+          service.testFire({
+            channel: "webhook",
+            trigger: TRIGGER,
+            project: PROJECT,
+            draft: {},
+            recipients: [],
+            webhook: null,
+            webhookDestination: {
+              url: "https://example.com/hook",
+              method: "POST",
+              headers: {},
+              bodyTemplate: null,
+            },
+          }),
+        ).rejects.toBeInstanceOf(DispatchError);
+        // The send was attempted (the classification happens on its response).
+        expect(sentWebhooks).toHaveLength(1);
+      });
+    });
+
+    describe("when the custom body template is invalid", () => {
+      it("rejects and never contacts the endpoint (fails closed)", async () => {
+        const { notifier, sentWebhooks } = makeNotifier();
+        const service = makeService(notifier);
+
+        await expect(
+          service.testFire({
+            channel: "webhook",
+            trigger: TRIGGER,
+            project: PROJECT,
+            draft: {},
+            recipients: [],
+            webhook: null,
+            webhookDestination: {
+              url: "https://example.com/hook",
+              method: "POST",
+              headers: {},
+              // Invalid JSON — must NOT fall back to the default envelope.
+              bodyTemplate: "not json {{ trigger.name }}",
+            },
+          }),
+        ).rejects.toBeInstanceOf(TemplateValidationError);
+        expect(sentWebhooks).toHaveLength(0);
       });
     });
   });

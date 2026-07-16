@@ -8,10 +8,17 @@ import type {
 } from "./templateContext";
 
 export interface RenderedWebhookBody {
-  /** The JSON string to send — always valid JSON. */
+  /** The JSON string to send. Empty when a custom template failed to render
+   *  (`failed: true`); callers MUST NOT dispatch it. */
   body: string;
-  /** True when the framework default was used (custom null, threw, or unparseable). */
+  /** True when the framework default envelope was used (the custom template was
+   *  absent). Never true as a fallback for a broken custom template. */
   usedDefault: boolean;
+  /** True when a NON-EMPTY custom template threw or produced invalid JSON. The
+   *  caller must fail the dispatch rather than fall back — falling back would
+   *  leak the full-trace default the customer intentionally omitted (ADR-040
+   *  §2, fail closed). */
+  failed: boolean;
   missingVariables: string[];
   errors: string[];
 }
@@ -35,13 +42,17 @@ async function renderJsonBody({
 
 /**
  * Renders a webhook automation's JSON body (ADR-040 §2) — the same Liquid
- * engine and contexts Slack/email render against, with the Block Kit
- * fall-back discipline: the output must `JSON.parse`, and a render throw or
- * parse failure on the customer's template falls back to the framework
- * default body, with the error captured for the operator. If even the
- * default fails (it shouldn't — it is ours), a minimal static envelope is
- * sent rather than nothing, so a delivery is never silently dropped over a
- * template.
+ * engine and contexts Slack/email render against, but fail CLOSED: a non-empty
+ * custom template that throws or produces invalid JSON returns a render failure
+ * (`failed: true`, empty body), NEVER the framework default. Falling back would
+ * disclose the full-trace default body the customer intentionally left out of
+ * their payload — a data leak, not a convenience. Callers must reject a failed
+ * render before dispatching.
+ *
+ * The framework default is used ONLY when no custom template is supplied. If
+ * even the default fails (it is ours, so that is a framework bug), a minimal
+ * static envelope is returned so a default-body delivery is never silently
+ * dropped over a template.
  */
 export async function renderWebhookBody({
   template,
@@ -56,24 +67,25 @@ export async function renderWebhookBody({
 }): Promise<RenderedWebhookBody> {
   const ctx = context as unknown as Record<string, unknown>;
 
-  // `customMissing` captures the missing-variable diagnostics from the
-  // customer's own render, so a JSON.parse failure below still surfaces the
-  // author's typos rather than the framework default's (clean) diagnostics.
-  let customError: string | undefined;
-  let customMissing: string[] | undefined;
   if (template != null && template.trim() !== "") {
     try {
       const rendered = await renderLiquid({ template, context: ctx });
-      customMissing = rendered.missingVariables;
       const parsed: unknown = JSON.parse(rendered.output);
       return {
         body: JSON.stringify(parsed),
         usedDefault: false,
+        failed: false,
         missingVariables: rendered.missingVariables,
         errors: [],
       };
     } catch (err) {
-      customError = errorMessage(err);
+      return {
+        body: "",
+        usedDefault: false,
+        failed: true,
+        missingVariables: [],
+        errors: [errorMessage(err)],
+      };
     }
   }
 
@@ -85,8 +97,9 @@ export async function renderWebhookBody({
     return {
       body: rendered.body,
       usedDefault: true,
-      missingVariables: customMissing ?? rendered.missingVariables,
-      errors: customError ? [customError] : [],
+      failed: false,
+      missingVariables: rendered.missingVariables,
+      errors: [],
     };
   } catch (err) {
     const trigger = ctx.trigger as { id?: string; name?: string } | undefined;
@@ -96,10 +109,9 @@ export async function renderWebhookBody({
         trigger: { id: trigger?.id ?? null, name: trigger?.name ?? null },
       }),
       usedDefault: true,
+      failed: false,
       missingVariables: [],
-      errors: [customError, errorMessage(err)].filter(
-        (e): e is string => e != null,
-      ),
+      errors: [errorMessage(err)],
     };
   }
 }

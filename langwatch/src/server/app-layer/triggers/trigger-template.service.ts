@@ -363,6 +363,15 @@ export async function testFireTrigger(
       context,
       defaultBody: defaults.webhookBody,
     });
+    // Fail closed: a broken custom body template must NOT test-fire the
+    // framework default in its place (that would leak the full-trace envelope
+    // the author left out). Surface the render error and send nothing.
+    if (rendered.failed) {
+      throw new TemplateValidationError(
+        "bodyTemplate",
+        rendered.errors[0] ?? "The webhook body template failed to render.",
+      );
+    }
     // Actually sends through the full SSRF-fenced sender so the author sees a
     // real status code (ADR-040 §1); a non-2xx throws the classified
     // DispatchError, which the route lifts into a clean domain error.

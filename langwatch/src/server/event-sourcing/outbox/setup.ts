@@ -4,6 +4,7 @@ import { env } from "~/env.mjs";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
+import { getApp } from "~/server/app-layer/app";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -23,7 +24,7 @@ import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
 import { sendWebhook } from "~/server/triggers/sendWebhook";
-import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
+import type { WebhookDeliveryInput } from "~/server/app-layer/triggers/webhook-delivery.service";
 import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
@@ -190,10 +191,10 @@ export function buildOutboxRuntime({
   // exactly.
   const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
   // ADR-040 §6: one delivery-log writer shared by the trace-cadence outbox
-  // dispatcher and the event-sourced graph-alert path.
-  const webhookDeliveries = WebhookDeliveryService.create(prisma);
-  const recordWebhookDelivery = (input: Parameters<typeof webhookDeliveries.record>[0]) =>
-    webhookDeliveries.record(input);
+  // dispatcher and the event-sourced graph-alert path — resolved from the app
+  // container at dispatch time (getApp() is initialized by then).
+  const recordWebhookDelivery = (input: WebhookDeliveryInput) =>
+    getApp().webhookDeliveries.record(input);
   const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
     loadTrigger: async ({ triggerId, projectId }) =>
       prisma.trigger.findUnique({ where: { id: triggerId, projectId } }),

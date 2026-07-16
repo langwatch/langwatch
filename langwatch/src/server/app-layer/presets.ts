@@ -203,6 +203,8 @@ import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.
 import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
 import { TriggerService } from "./triggers/trigger.service";
 import { testFireTrigger } from "./triggers/trigger-template.service";
+import { PrismaWebhookDeliveryRepository } from "./triggers/repositories/webhook-delivery.prisma.repository";
+import { WebhookDeliveryService } from "./triggers/webhook-delivery.service";
 import { UsageService } from "./usage/usage.service";
 
 /**
@@ -510,6 +512,9 @@ export function initializeDefaultApp(options?: {
     testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
       testFireTrigger(triggerTemplateDeps, input),
   };
+  const webhookDeliveries = new WebhookDeliveryService(
+    new PrismaWebhookDeliveryRepository(prisma),
+  );
   const tokenizer = new TokenizerService(
     config.disableTokenization
       ? new NullTokenizerClient()
@@ -1057,6 +1062,7 @@ export function initializeDefaultApp(options?: {
     experiments,
     triggers,
     triggerTemplates,
+    webhookDeliveries,
     emailSuppressions,
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
@@ -1224,6 +1230,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           testFireTrigger(testDeps, input),
       };
     })(),
+    webhookDeliveries: new WebhookDeliveryService(
+      new PrismaWebhookDeliveryRepository(testPrisma),
+    ),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: {
       runs: SuiteRunService.create({

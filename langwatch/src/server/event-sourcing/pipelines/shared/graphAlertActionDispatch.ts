@@ -578,15 +578,19 @@ export async function dispatchGraphAlertAction({
       context,
       defaultBody: defaults.webhookBody,
     });
-    if (rendered.errors.length > 0) {
-      logger.warn(
-        {
-          triggerId: trigger.id,
-          projectId: project.id,
-          errors: rendered.errors,
-        },
-        "Graph-alert webhook body render errors — fell back to default body",
+    // Fail closed: a broken custom body template dead-letters this fire rather
+    // than delivering the framework default in its place — the default would
+    // leak the full-trace envelope the customer intentionally omitted (ADR-040
+    // §2). Non-retryable: an invalid template will not fix itself on retry.
+    if (rendered.failed) {
+      logger.error(
+        { triggerId: trigger.id, projectId: project.id, errors: rendered.errors },
+        "Graph-alert webhook body template failed to render — not sending",
       );
+      throw new DispatchError({
+        message: `Webhook body template for alert "${trigger.name}" failed to render: ${rendered.errors[0] ?? "invalid template"}`,
+        retryable: false,
+      });
     }
     // Send + classify + log one attempt as a unit (ADR-040 §5/§6). A
     // non-2xx throws BEFORE the claim below, so a retryable failure is

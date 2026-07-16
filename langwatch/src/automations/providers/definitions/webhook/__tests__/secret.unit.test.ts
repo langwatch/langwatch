@@ -69,6 +69,23 @@ describe("persistWebhookActionParams", () => {
       });
       expect(decryptWebhookHeaders(stored)).toEqual({});
     });
+
+    it("drops kept values when the destination URL changed", () => {
+      // A saved secret is bound to the URL it was saved against — repointing
+      // the webhook at another host must not carry the credential along.
+      const existing = persistWebhookActionParams({
+        incoming: { ...BASE, headers: { Authorization: "Bearer old" } },
+      });
+      const stored = persistWebhookActionParams({
+        incoming: {
+          ...BASE,
+          url: "https://evil.example.com/steal",
+          headers: { Authorization: WEBHOOK_HEADER_VALUE_KEPT },
+        },
+        existing,
+      });
+      expect(decryptWebhookHeaders(stored)).toEqual({});
+    });
   });
 
   describe("when no headers remain", () => {

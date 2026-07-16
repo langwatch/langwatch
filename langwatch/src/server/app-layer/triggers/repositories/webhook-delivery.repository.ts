@@ -51,7 +51,12 @@ export interface WebhookDeliveryRepository {
     limit: number;
   }): Promise<WebhookDeliveryRow[]>;
 
-  /** Delete rows older than `before`; returns how many were removed (the
-   *  30-day prune, ADR-040 §6). */
-  deleteOlderThan(params: { before: Date }): Promise<number>;
+  /** Delete rows older than `before` within the given projects; returns how
+   *  many were removed (the projectId-scoped 30-day prune, ADR-040 §6).
+   *  `projectId` is the first predicate — no unscoped deletion on a
+   *  project-level model. */
+  deleteOlderThan(params: {
+    projectIds: string[];
+    before: Date;
+  }): Promise<number>;
 }

@@ -12,7 +12,6 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { scheduleTopicClustering } from "~/server/topicClustering/topicClusteringQueue";
-import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
@@ -88,13 +87,18 @@ const webhookDeliveryCleanupHandler = async (c: CronContext) => {
     return c.body(null, 401);
   }
   try {
-    const deleted = await WebhookDeliveryService.create(prisma).pruneExpired();
+    // Scope the prune by projectId (the delivery log is a project-level model),
+    // so enumerate every project and hand the ids to the service.
+    const projects = await prisma.project.findMany({ select: { id: true } });
+    const deleted = await getApp().webhookDeliveries.pruneExpired({
+      projectIds: projects.map((p) => p.id),
+    });
     return c.json({ message: "Webhook delivery log pruned", deleted });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return c.json(
       {
         message: "Error pruning webhook delivery log",
-        error: error?.message ? error.message.toString() : `${error}`,
+        error: error instanceof Error ? error.message : String(error),
       },
       500,
     );

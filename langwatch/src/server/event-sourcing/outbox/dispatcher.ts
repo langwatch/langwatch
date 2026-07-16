@@ -848,19 +848,21 @@ async function handleCadenceBatch(
             retryable: false,
           });
         }
-        // The body renders like Slack Block Kit: Liquid → JSON.parse, falling
-        // back to the framework default envelope on any template failure
-        // (ADR-040 §2). Trace-path dispatch renders against the trace default.
+        // The body renders like Slack Block Kit: Liquid → JSON.parse. It fails
+        // CLOSED (ADR-040 §2): a broken custom template dead-letters this
+        // dispatch rather than delivering the framework default in its place,
+        // which would leak the full-trace envelope the customer left out.
+        // Trace-path dispatch renders against the trace default.
         const rendered = await renderWebhookBody({
           template: params.bodyTemplate ?? null,
           context: buildContext(),
         });
         for (const v of rendered.missingVariables) missingVariables.add(v);
-        if (rendered.errors.length > 0) {
-          logger.warn(
-            { projectId, triggerId, errors: rendered.errors },
-            "Webhook body template render errors — fell back to default body",
-          );
+        if (rendered.failed) {
+          throw new DispatchError({
+            message: `Webhook body template for trigger "${trigger.name}" failed to render: ${rendered.errors[0] ?? "invalid template"}`,
+            retryable: false,
+          });
         }
         // Stable per-dispatch id over the batch's traceIds: identical across
         // outbox retries of THIS dispatch, distinct from other dispatches —

@@ -58,9 +58,15 @@ export class PrismaWebhookDeliveryRepository
     }));
   }
 
-  async deleteOlderThan({ before }: { before: Date }): Promise<number> {
+  async deleteOlderThan({
+    projectIds,
+    before,
+  }: {
+    projectIds: string[];
+    before: Date;
+  }): Promise<number> {
     const { count } = await this.prisma.webhookDelivery.deleteMany({
-      where: { firedAt: { lt: before } },
+      where: { projectId: { in: projectIds }, firedAt: { lt: before } },
     });
     return count;
   }

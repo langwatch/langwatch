@@ -825,8 +825,10 @@ model WebhookDelivery {
   // Groups every attempt of one logical fire (== X-LangWatch-Event-Id).
   dispatchId     String
   requestMethod  String
+  // Origin + path only: the query string and any embedded credentials are
+  // stripped before persistence (webhook tokens/signatures often ride the query).
   requestUrl     String
-  // Redacted header record: auth/signature/api-key values masked to "***".
+  // Redacted header record: every configured header value is masked to "***".
   requestHeaders Json
   // Null when no HTTP response arrived (transport/SSRF/timeout).
   responseStatus Int?
@@ -839,7 +841,8 @@ model WebhookDelivery {
   createdAt      DateTime              @default(now())
 
   @@index([projectId, triggerId, dispatchId])
-  @@index([projectId, triggerId, firedAt])
+  // Indexes the projectId-scoped 30-day prune.
+  @@index([projectId, firedAt])
 }
 
 enum WebhookDeliveryOutcome {

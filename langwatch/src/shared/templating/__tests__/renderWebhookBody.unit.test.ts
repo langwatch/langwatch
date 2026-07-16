@@ -119,27 +119,30 @@ describe("renderWebhookBody", () => {
   });
 
   describe("when the custom template renders invalid JSON", () => {
-    it("falls back to the default envelope and surfaces the error", async () => {
+    it("fails closed — no body, no default fallback, error surfaced", async () => {
       const rendered = await renderWebhookBody({
         template: "not json at all {{ trigger.name }}",
         context: makeContext(),
       });
-      expect(rendered.usedDefault).toBe(true);
+      // Falling back to the default would leak the full-trace envelope the
+      // customer intentionally omitted — so a failed custom render sends nothing.
+      expect(rendered.failed).toBe(true);
+      expect(rendered.usedDefault).toBe(false);
+      expect(rendered.body).toBe("");
       expect(rendered.errors.length).toBeGreaterThan(0);
-      const parsed = JSON.parse(rendered.body) as { event: string };
-      expect(parsed.event).toBe("trigger.matched");
     });
   });
 
   describe("when the custom template throws at render", () => {
-    it("falls back to the default envelope and surfaces the error", async () => {
+    it("fails closed — no body, no default fallback, error surfaced", async () => {
       const rendered = await renderWebhookBody({
         template: "{% unknown_tag %}",
         context: makeContext(),
       });
-      expect(rendered.usedDefault).toBe(true);
+      expect(rendered.failed).toBe(true);
+      expect(rendered.usedDefault).toBe(false);
+      expect(rendered.body).toBe("");
       expect(rendered.errors.length).toBeGreaterThan(0);
-      expect(() => JSON.parse(rendered.body)).not.toThrow();
     });
   });
 });

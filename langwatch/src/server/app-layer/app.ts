@@ -27,6 +27,7 @@ export class App {
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
   readonly triggerTemplates: AppDependencies["triggerTemplates"];
+  readonly webhookDeliveries: AppDependencies["webhookDeliveries"];
   readonly emailSuppressions: AppDependencies["emailSuppressions"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
@@ -60,6 +61,7 @@ export class App {
     this.experiments = deps.experiments;
     this.triggers = deps.triggers;
     this.triggerTemplates = deps.triggerTemplates;
+    this.webhookDeliveries = deps.webhookDeliveries;
     this.emailSuppressions = deps.emailSuppressions;
     this.organizations = deps.organizations;
     this.projects = deps.projects;

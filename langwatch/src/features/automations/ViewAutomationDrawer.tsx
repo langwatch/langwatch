@@ -414,12 +414,12 @@ function groupFiresByLabel(
 type WebhookDelivery =
   RouterOutputs["automation"]["getWebhookDeliveries"][number];
 
-const OUTCOME_DOT: Record<WebhookDelivery["outcome"], string> = {
+const OUTCOME_DOT = {
   success: "green.solid",
   retryable: "yellow.solid",
   terminal: "red.solid",
   pending: "gray.solid",
-};
+} as const satisfies Record<WebhookDelivery["outcome"], string>;
 
 /**
  * The webhook delivery log (ADR-040 §6): attempts grouped by the fire that
@@ -432,20 +432,26 @@ function WebhookDeliveriesList({
 }: {
   deliveries: WebhookDelivery[];
 }) {
-  // Rows arrive newest-first. Group by dispatchId keeping first-seen order
-  // (newest fire on top); reverse each group so attempts read oldest→newest.
-  const groups: { dispatchId: string; attempts: WebhookDelivery[] }[] = [];
+  // Group attempts by the fire that produced them (dispatchId). Within a group,
+  // sort attempts ascending (oldest→newest, so "Attempt 1" is the first try).
+  // Order groups by each group's EARLIEST attempt, descending — the newest fire
+  // sits on top even when an older fire had a recent retry (a first-seen order
+  // would let that older fire jump above a newer one).
   const byId = new Map<string, WebhookDelivery[]>();
   for (const d of deliveries) {
-    let attempts = byId.get(d.dispatchId);
-    if (!attempts) {
-      attempts = [];
-      byId.set(d.dispatchId, attempts);
-      groups.push({ dispatchId: d.dispatchId, attempts });
-    }
-    attempts.push(d);
+    const attempts = byId.get(d.dispatchId);
+    if (attempts) attempts.push(d);
+    else byId.set(d.dispatchId, [d]);
   }
-  for (const g of groups) g.attempts.reverse();
+  const firedAtMs = (d: WebhookDelivery) => new Date(d.firedAt).getTime();
+  const groups = Array.from(byId.entries())
+    .map(([dispatchId, attempts]) => ({
+      dispatchId,
+      attempts: [...attempts].sort((a, b) => firedAtMs(a) - firedAtMs(b)),
+    }))
+    .sort(
+      (a, b) => firedAtMs(b.attempts[0]!) - firedAtMs(a.attempts[0]!),
+    );
 
   return (
     <VStack align="stretch" gap={2} width="full">
@@ -483,7 +489,7 @@ function DeliveryAttemptRow({
   index: number;
   total: number;
 }) {
-  const [open, setOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const statusText =
     attempt.responseStatus != null
       ? `HTTP ${attempt.responseStatus}`
@@ -500,7 +506,7 @@ function DeliveryAttemptRow({
         width="full"
         textAlign="left"
         cursor="pointer"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setIsOpen((v) => !v)}
       >
         <Box
           boxSize={2}
@@ -517,7 +523,7 @@ function DeliveryAttemptRow({
           {formatTimeAgo(new Date(attempt.firedAt).getTime())}
         </Text>
       </HStack>
-      {open ? (
+      {isOpen ? (
         <VStack align="stretch" gap={2} paddingX={3} paddingBottom={3}>
           <Text textStyle="xs" color="fg.muted">
             {attempt.requestMethod} {attempt.requestUrl}
