@@ -1,0 +1,31 @@
+-- +goose Up
+-- +goose ENVSUB ON
+
+-- CORRECTION to 00026_create_governance_ocsf_events.sql. Deployed migrations are
+-- immutable history (CLAUDE.md), so this correction lands in a NEW migration
+-- rather than editing 00026. Documentation only — no schema change.
+--
+-- 00026's header calls governance_ocsf_events a "fold projection" and its Down
+-- note claims the table "can be dropped + rebuilt at any time from event_log
+-- without data loss". BOTH ARE FALSE, and acting on the rebuild claim
+-- PERMANENTLY DESTROYS SOC2 / ISO27001 audit evidence:
+--
+--   1. The table is REACTOR-populated (governanceOcsfEventsSync, registered via
+--      builder.withReactor("traceSummary", …)), NOT a fold projection. Event
+--      replay rebuilds fold/map projections and NEVER invokes reactors
+--      (projections/projectionRouter.ts; ADR-046), so a rebuild from event_log
+--      produces ZERO OCSF rows for event-sourced audit events.
+--   2. Two of its three writers never touch event_log at all —
+--      adminWorkspaceViewAudit.service.ts (admin drill-in audit) and
+--      pullerWorker.ts (external governance pull). Those rows have NO event_log
+--      representation, so no replay however capable could reconstruct them.
+--
+-- DO NOT drop + rebuild governance_ocsf_events from event_log. It is a durable
+-- audit sink, not derived data. See dev/docs/adr/046-drop-to-replay-not-recovery
+-- -for-reactors.md for the full decision record.
+-- +goose StatementBegin
+SELECT 1;
+-- +goose StatementEnd
+
+-- +goose Down
+-- No-op: documentation-only correction, nothing to roll back.

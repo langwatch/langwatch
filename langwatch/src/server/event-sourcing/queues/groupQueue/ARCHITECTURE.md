@@ -64,7 +64,7 @@ producer.send(payload)
 A failure anywhere in this chain takes one of three paths:
 
 - **Retryable** → `RESTAGE_AND_BLOCK_LUA` puts the job back at the head of its group with a backoff score; the group is briefly blocked so the same job comes out next.
-- **Non-retryable** → drop to the fail-safe (complete the slot, recover via event replay).
+- **Non-retryable** → drop to the fail-safe (complete the slot; recover via event replay for fold/map only — a reactor on the path is named + preserved, not recovered; see ADR-046).
 - **Transient blob-store error** → re-stage the SAME envelope (same hold token) so the body stays referenced through the retry.
 
 ---
@@ -188,7 +188,7 @@ When a `process()` handler throws, the queue:
 
 1. **Classifies** the error via `categorizeError`:
    - `Retryable` → re-stage with exponential backoff
-   - `NonRetryable` → drop to the fail-safe; the slot is completed and the work is expected to recover via event replay
+   - `NonRetryable` → drop to the fail-safe; the slot is completed and the work recovers via event replay for fold/map only — replay never invokes reactors, so a reactor job is named + dead-lettered, not recovered (ADR-046)
    - `Transient` (blob-store specific) → re-stage the SAME envelope (same hold token, no re-encode)
 2. **Computes backoff** via `getBackoffMs(attempt)` (exponential with jitter, capped).
 3. **Re-encodes** the payload with `__attempt: N+1` and atomically transfers the hold from the old envelope to the new one.
@@ -236,7 +236,7 @@ The active key (`{queue}:active:{groupId}`) is a separate safety net: a TTL'd ma
 
 The queue is built so a transient infrastructure failure never drops a job, and a permanent failure never silently corrupts state:
 
-- **Missing blob** (offloaded body genuinely gone — TTL backstop kicked in, or a manual purge) → decode returns null, the dispatcher logs and completes the slot. The work is expected to recover via event replay.
+- **Missing blob** (offloaded body genuinely gone — TTL backstop kicked in, or a manual purge) → decode returns null, the dispatcher logs and completes the slot. The work recovers via event replay for fold/map projections only — replay never invokes reactors (ADR-046), so a missing-blob reactor drop is named in the drop log (addressable to its event), not recovered.
 - **Transient blob-store error** (network blip, 5xx) → classified `TransientBlobStoreError`, the job is re-staged with the SAME envelope (no re-encode, no holder churn). Distinguished from `Missing` so a transient store outage can't mass-drop every in-flight offloaded job.
 - **Decode tenant mismatch** → refuse to fetch, log tenant-attributed, drop to fail-safe.
 - **Oversized value** (staged value or decompressed blob exceeds `MAX_BLOB_BYTES` at decode) → parked unparsed via the poison guard below.

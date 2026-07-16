@@ -178,7 +178,7 @@ All operations are scoped to `tenantId`. Events, projections, and stores enforce
 - **Map failures**: GroupQueue retries the job. Append stores should be idempotent or tolerate duplicates.
 - **Reactor failures**: GroupQueue retries the reactor independently. The fold state is already persisted, so the reactor can safely retry.
 - **Transient blob-store failures** (offloaded body temporarily unreachable — network blip, 5xx): GroupQueue re-stages the SAME envelope without re-encoding, so the body stays referenced through the retry. Distinguished from "missing" so a transient store outage can't mass-drop every in-flight offloaded job.
-- **Genuinely missing offloaded body** (TTL backstop kicked in, or manual purge): decode returns null, the slot is completed, the work recovers via event replay. The append-only event log is the durable source of truth.
+- **Genuinely missing offloaded body** (TTL backstop kicked in, or manual purge): decode returns null, the slot is completed, and the work recovers via event replay **for fold/map projections only — replay never invokes reactors, so a dropped reactor job is real loss (named, not recovered); see ADR-046**. The append-only event log is the durable source of truth for fold/map rebuild.
 
 ## Key Implementation Files
 
