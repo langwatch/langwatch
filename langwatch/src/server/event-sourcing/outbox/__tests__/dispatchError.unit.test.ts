@@ -312,19 +312,14 @@ describe("toDispatchError", () => {
       // The secret sits past the cap: redaction must run on the whole message
       // first, or truncation would simply hide (not scrub) it — and a slightly
       // shorter body would leak it verbatim.
-      // Assembled at runtime: a token-shaped literal in the source trips
-      // GitHub's push protection even as a fixture.
-      const slackToken = [
-        "xoxb",
-        "111111111111",
-        "222222222222",
-        "abcdefghijklmnopqrstuvwx",
-      ].join("-");
       const err = toDispatchError(
-        new Error("padding ".repeat(20) + slackToken),
+        new Error(
+          "padding ".repeat(20) +
+            "xoxb-111111111111-222222222222-abcdefghijklmnopqrstuvwx",
+        ),
         { message: "send failed" },
       );
-      expect(err.message).not.toContain(slackToken);
+      expect(err.message).not.toContain("xoxb-111111111111");
       expect(err.message).toContain(SECRETS_REDACTION_MARKER);
     });
   });
