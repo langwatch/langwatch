@@ -1330,19 +1330,31 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }
       // Already out of staging, so there is no slot to complete — but the loss is
       // real and is counted like any other (#5538).
+      const reason = dropReasonOf(err);
+      // We do not release a sibling's value, so the body outlives the drop
+      // unless it was already gone.
+      const bodyPreserved = reason !== "missing_blob";
       this.recordDrop({
         groupId,
         stagedJobId: sibling.stagedJobId,
         jobDataJson: sibling.jobDataJson,
         err,
-        reason: dropReasonOf(err),
+        reason,
         message: "Failed to parse drained sibling job data — dropping",
-        // We do not release a sibling's value, so the body outlives the drop
-        // unless it was already gone.
-        bodyPreserved: !(err instanceof DecodeFailureError
-          ? err.reason === "missing_blob"
-          : false),
+        bodyPreserved,
       });
+      if (bodyPreserved) {
+        // No slot to complete (already drained) — just preserve the value so the
+        // operator drain can recover it (#719). Unlike the dispatch site, there is
+        // no complete() here: touching the live slot would corrupt a group this
+        // job already left.
+        await this.scripts.writeJobToDlq({
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+          jobDataJson: sibling.jobDataJson,
+          reason,
+        });
+      }
       return null;
     }
   }
@@ -1382,6 +1394,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           message: "Failed to re-stage drained sibling after batch failure",
           // Not released — the value is intact, it simply never got re-staged.
           bodyPreserved: true,
+        });
+        // Body intact and no slot to complete: preserve it in the dead-letter so
+        // a re-stage failure becomes recoverable instead of a silent discard (#719).
+        await this.scripts.writeJobToDlq({
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+          jobDataJson: sibling.jobDataJson,
+          reason: "sibling_restage_failed",
         });
       }
     }
