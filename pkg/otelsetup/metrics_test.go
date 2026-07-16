@@ -39,7 +39,7 @@ func TestInstallMetrics_MeterProviderWiring(t *testing.T) {
 	})
 
 	t.Run("when multi-tenant with no debug collector", func(t *testing.T) {
-		// nlpgo: a metric stream has no per-tenant routing analogue, so it opts out
+		// nlpgo: a metric stream has no per-tenant routing analog, so it opts out
 		// of the primary reader and the MeterProvider stays the SDK no-op.
 		p, err := New(ctx, Options{OTLPEndpoint: "http://localhost:1/v1/traces", MultiTenant: true})
 		if err != nil {

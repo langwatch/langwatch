@@ -387,7 +387,7 @@ func installDebugLogs(ctx context.Context, opts Options, res *resource.Resource,
 //   - the DEBUG collector, when a developer opted into the local stack.
 //
 // MultiTenant services (nlpgo) opt OUT of the primary reader: a metric stream
-// has no per-tenant routing analogue to the span TenantRouter, so there is no
+// has no per-tenant routing analog to the span TenantRouter, so there is no
 // single correct static destination. When no sink applies (noop, or multi-tenant
 // with no debug collector) the global MeterProvider is left as the SDK no-op.
 func installMetrics(ctx context.Context, opts Options, res *resource.Resource, provider *Provider) error {

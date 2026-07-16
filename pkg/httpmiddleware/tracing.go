@@ -67,7 +67,7 @@ func Tracing(instrumentationName string) func(http.Handler) http.Handler {
 			span.SetAttributes(semconv.HTTPResponseStatusCode(rec.status))
 			// Only 5xx marks the span errored: a 4xx is the caller's problem and a
 			// trace full of red spans for routine 401s/409s is noise that trains
-			// people to ignore the colour.
+				// people to ignore the color.
 			if rec.status >= 500 {
 				span.SetStatus(codes.Error, http.StatusText(rec.status))
 			}
