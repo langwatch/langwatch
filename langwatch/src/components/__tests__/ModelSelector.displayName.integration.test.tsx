@@ -14,10 +14,10 @@
  * component built on the same hook).
  *
  * The resolver itself (`buildCustomModelDisplayNames` /
- * `modelDisplayLabel`) is unit-tested in
- * customModelDisplayNames.resolution.unit.test.ts — this file pins the
- * WIRING for the exact reported repro data shape (an azure custom model),
- * not the resolution logic.
+ * `modelDisplayLabel`) is unit-tested across the split
+ * customModelDisplayNames.{precedence,scopeRank,malformedEntries,labelKeys}.unit.test.ts
+ * suites — this file pins the WIRING for the exact reported repro data
+ * shape (an azure custom model), not the resolution logic.
  *
  * Renders the real `ModelSelector` (and the real `useModelSelectionOptions`
  * hook) against a mocked tRPC boundary, matching

@@ -39,12 +39,10 @@ const UNSCOPED_RANK = 3;
  * exists to prevent, re-opening the hole one tier lower. Every
  * `Object.prototype` member is reachable this way (`toString`, `valueOf`,
  * `constructor`, `hasOwnProperty`, `__proto__`); only an own-property
- * check ranks them all as unscoped. Called through `Object.prototype`
- * rather than off the table, since a lookup table is exactly the kind of
- * object whose own keys could shadow the method.
+ * check ranks them all as unscoped.
  */
 const rankOf = (scopeType: string | undefined): number =>
-  scopeType && Object.prototype.hasOwnProperty.call(SCOPE_RANK, scopeType)
+  scopeType && Object.hasOwn(SCOPE_RANK, scopeType)
     ? SCOPE_RANK[scopeType as ScopeTier]
     : UNSCOPED_RANK;
 
