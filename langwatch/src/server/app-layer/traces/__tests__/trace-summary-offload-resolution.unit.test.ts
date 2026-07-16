@@ -196,6 +196,7 @@ function makeDeps(
 describe("TraceSummaryService read-time offload resolution (#5835)", () => {
   describe("given a trace whose winning span carries a resolvable IO eventref", () => {
     describe("when getByTraceId is called with blob-resolution deps and no visibility gate", () => {
+      /** @scenario Summary panel resolves full input/output beyond the 64KB preview */
       it("returns the full resolved input and output, not the stored preview", async () => {
         const service = new TraceSummaryService(
           makeRepository(makeSummary()),
@@ -217,6 +218,7 @@ describe("TraceSummaryService read-time offload resolution (#5835)", () => {
     });
 
     describe("when the trace occurred before the visibility cutoff", () => {
+      /** @scenario Full-content resolution does not bypass the visibility window */
       it("teases the resolved full content and flags redaction, never leaking the full value", async () => {
         const service = new TraceSummaryService(
           makeRepository(
@@ -248,6 +250,7 @@ describe("TraceSummaryService read-time offload resolution (#5835)", () => {
 
   describe("given a trace whose IO eventref points at a missing event_log row", () => {
     describe("when getByTraceId is called with blob-resolution deps", () => {
+      /** @scenario Summary panel shows an incomplete-content indicator when resolution fails */
       it("keeps the preview value and flags the field as truncated without throwing", async () => {
         const service = new TraceSummaryService(
           makeRepository(makeSummary()),

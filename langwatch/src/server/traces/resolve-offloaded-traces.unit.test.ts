@@ -411,6 +411,7 @@ describe("resolveOffloadedTraces()", () => {
         ).toBe("preview…");
       });
 
+      /** @scenario A malformed reserved-key value degrades to a logged warning, not a throw */
       it("logs a warning at warn level identifying the malformed attrKey", async () => {
         const blobSvc = fakeBlobStore({});
         const logger = createMockLogger();
@@ -458,6 +459,7 @@ describe("resolveOffloadedTraces() — #5835 AC7: read count is bounded by offlo
     const normalizedSpans = [plainRoot, plainChild];
 
     describe("when resolved", () => {
+      /** @scenario No offloaded content means no extra event_log reads */
       it("calls BlobStore.getFromEventLog zero times", async () => {
         const blobSvc = fakeBlobStore({});
         const getFromEventLogSpy = blobSvc.getFromEventLog as ReturnType<
@@ -576,6 +578,7 @@ describe("resolveOffloadedTraces() — #5835 AC7: read count is bounded by offlo
     const TOTAL_EVENTREF_FIELDS = 3;
 
     describe("when resolved", () => {
+      /** @scenario Read cost is bounded by offloaded span/field count, not total span count */
       it("calls BlobStore.getFromEventLog exactly F times — once per offloaded field, not once per span and not only for the winner", async () => {
         const blobSvc = fakeBlobStore({
           "langwatch.input": "ROOT-full-input",

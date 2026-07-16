@@ -262,6 +262,7 @@ const BASE_LIST_PARAMS = {
 describe("TraceListService read-time offload resolution (#5835)", () => {
   describe("given resolveFullIO is true and one row carries a resolvable IO eventref", () => {
     describe("when getList is called with blob-resolution deps and no visibility gate", () => {
+      /** @scenario Conversation tab resolves full turn text beyond the 64KB preview */
       it("resolves the offloaded row's full output and leaves the plain row unchanged", async () => {
         const service = makeService(
           [
@@ -337,6 +338,7 @@ describe("TraceListService read-time offload resolution (#5835)", () => {
 
   describe("given resolveFullIO is omitted (the grid's real call shape)", () => {
     describe("when getList is called with blob-resolution deps present", () => {
+      /** @scenario The trace grid continues to issue zero event_log reads */
       it("issues zero span reads and zero event_log reads (AC5 regression guard)", async () => {
         const deps = makeDeps(
           { "trace-A": [makeOffloadedRootSpan("trace-A")] },
@@ -360,6 +362,7 @@ describe("TraceListService read-time offload resolution (#5835)", () => {
 
   describe("given resolveFullIO is true and a row's eventref points at a missing event_log row", () => {
     describe("when getList is called with blob-resolution deps", () => {
+      /** @scenario Conversation tab shows an incomplete-content indicator when resolution fails */
       it("keeps the preview and flags the fields as truncated without throwing", async () => {
         const service = makeService(
           [makeRow({ traceId: "trace-A" })],

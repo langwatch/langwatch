@@ -78,6 +78,7 @@ describe("serializeAttributes", () => {
 
 describe("deserializeAttributes", () => {
   describe("when given boolean strings", () => {
+    /** @scenario Non-reserved attribute values keep their existing typed-conversion behavior */
     it("converts 'true' to boolean true", () => {
       const result = deserializeAttributes({ flag: "true" });
       expect(result).toEqual({ flag: true });

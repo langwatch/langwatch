@@ -184,6 +184,7 @@ describe("resolveOffloadedTraces() — #5835 AC9: recomputed output matches the 
     });
 
     describe("when the trace is read through resolveOffloadedTraces", () => {
+      /** @scenario Resolved content matches the fold's actual winning span, not a different one */
       it("recomputes the trace output as the root span's full resolved content, not the later-ending child's", async () => {
         const blobStore = fakeBlobStore({
           "langwatch.output": ROOT_FULL_OUTPUT,
@@ -243,6 +244,7 @@ describe("resolveOffloadedTraces() — #5835 AC9: recomputed output matches the 
     });
 
     describe("when the trace is read through resolveOffloadedTraces", () => {
+      /** @scenario Resolved content excludes tool and Claude-Code-utility spans from winning */
       it("recomputes the trace output as the conversational span's content, not the tool span's", async () => {
         const blobStore = fakeBlobStore({
           "langwatch.output": TOOL_FULL_OUTPUT,

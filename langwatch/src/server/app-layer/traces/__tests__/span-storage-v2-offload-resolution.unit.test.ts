@@ -141,6 +141,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
     });
 
     describe("when getSpansByTraceId is called with BlobResolutionDeps wired", () => {
+      /** @scenario Attributes pane resolves full content for an offloaded span attribute */
       it("returns spans with the full output value, not the preview", async () => {
         const repo = makeStubRepository([spanWithRef]);
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
@@ -426,6 +427,7 @@ describe("SpanStorageService hasIncompleteAttributes flag (#5835)", () => {
     });
 
     describe("when getSpansByTraceId cannot resolve it", () => {
+      /** @scenario Attributes pane shows an incomplete-content indicator when resolution fails */
       it("flags the span as having incomplete attributes", async () => {
         const repo = makeStubRepository([spanMissing]);
         const blobStore = makeBlobStore({}); // every fetch throws BlobNotFoundError

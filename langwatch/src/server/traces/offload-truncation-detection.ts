@@ -71,8 +71,11 @@ export function detectOffloadedIOFields(spans: NormalizedSpan[]): {
  *
  * Invariants: overlay the recomputed value only when a span actually resolved
  * AND the recompute was non-null (else keep the stored preview); a field is
- * `*Truncated` exactly when it HAD a ref but resolution did not cover it
- * (nothing resolved at all, or the recompute came back null for that field).
+ * `*Truncated` exactly when (1) it HAD a ref, (2) a stored preview exists
+ * (non-null), and (3) no resolution succeeded at all (`anyResolved=false`).
+ * When `anyResolved=true`, we cannot distinguish "fold-excluded span with
+ * resolved ref" from "winner span's ref failed", so we conservatively avoid
+ * false-positive truncation warnings in ambiguous cases.
  */
 export function overlayResolvedIO(
   stored: TraceSummaryData,
@@ -89,10 +92,10 @@ export function overlayResolvedIO(
     if (recomputedOutput !== null) out.computedOutput = recomputedOutput.text;
   }
 
-  if (inputHadRef && (!anyResolved || recomputedInput === null)) {
+  if (inputHadRef && stored.computedInput !== null && !anyResolved) {
     out.inputTruncated = true;
   }
-  if (outputHadRef && (!anyResolved || recomputedOutput === null)) {
+  if (outputHadRef && stored.computedOutput !== null && !anyResolved) {
     out.outputTruncated = true;
   }
 
