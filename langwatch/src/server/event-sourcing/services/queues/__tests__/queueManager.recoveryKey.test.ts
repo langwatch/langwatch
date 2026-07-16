@@ -45,6 +45,7 @@ describe("QueueManager recovery-key injection (#718)", () => {
 
   describe("given a reactor facade", () => {
     describe("when an event is dispatched to it", () => {
+      /** @scenario a reactor job staged through its facade carries its event id in the header */
       it("stamps the recovery key from event.id", async () => {
         const q = createMockSharedQueue();
         const manager = newManager(q);
@@ -78,6 +79,7 @@ describe("QueueManager recovery-key injection (#718)", () => {
 
   describe("given a projection (fold/map) facade", () => {
     describe("when an event is dispatched to it", () => {
+      /** @scenario a fold job staged through its facade carries its event id in the header */
       it("stamps the recovery key from the bare event's id", async () => {
         const q = createMockSharedQueue();
         const manager = newManager(q);

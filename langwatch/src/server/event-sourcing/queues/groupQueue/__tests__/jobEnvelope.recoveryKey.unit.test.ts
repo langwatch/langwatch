@@ -55,6 +55,7 @@ describe("jobEnvelope recovery key (#718)", () => {
 
   describe("given a GQ2 offloaded job whose blob is gone", () => {
     describe("when the recovery key is read from the header", () => {
+      /** @scenario the recovery key is readable from the header after the blob is gone */
       it("returns the event id even though the body cannot be decoded", async () => {
         const { tieredBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({
@@ -78,6 +79,7 @@ describe("jobEnvelope recovery key (#718)", () => {
 
   describe("given a GQ1 offloaded job whose blob is gone", () => {
     describe("when the recovery key is read from the header", () => {
+      /** @scenario the recovery key is readable from the header after the blob is gone */
       it("returns the event id even though the body cannot be decoded", async () => {
         // No tieredBlobs/projectId → GQ1 fallback; >32KB → offloaded blob.
         const encoded = await encodeJobEnvelope({
@@ -98,6 +100,7 @@ describe("jobEnvelope recovery key (#718)", () => {
 
   describe("given values that are not well-formed key-bearing envelopes", () => {
     describe("when the recovery key is read", () => {
+      /** @scenario reading a recovery key never throws */
       it("never throws and returns null", () => {
         expect(readJobRecoveryKey('{"id":"legacy"}')).toBeNull(); // bare JSON
         expect(readJobRecoveryKey("GQ2|not-a-length|garbage")).toBeNull(); // malformed
@@ -116,6 +119,7 @@ describe("jobEnvelope recovery key (#718)", () => {
 
   describe("given two GQ2 jobs with identical bodies but different recovery keys", () => {
     describe("when both are encoded", () => {
+      /** @scenario two events with different recovery keys but identical bodies still dedup to one blob */
       it("collapses them to the same content-addressed blob", async () => {
         const { tieredBlobs } = makeTiered();
         const body = { event: { id: "shared", body: "y".repeat(48 * 1024) }, foldState: {} };
@@ -143,6 +147,7 @@ describe("jobEnvelope recovery key (#718)", () => {
 
   describe("given a GQ2 job with a recovery key", () => {
     describe("when it is encoded", () => {
+      /** @scenario a GQ2 recovery key lives in the header, not in the lifted machinery */
       it("lifts the key to header.k and does not duplicate it into header.m machinery", async () => {
         const { tieredBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({
@@ -161,6 +166,7 @@ describe("jobEnvelope recovery key (#718)", () => {
 
   describe("given a key-bearing envelope of either tier", () => {
     describe("when it is decoded and described", () => {
+      /** @scenario a header-key-bearing envelope still round-trips and still routes */
       it("round-trips the body and still reports descriptor + routing", async () => {
         for (const tier of ["GQ2", "GQ1"] as const) {
           const jobData = reactorPayload("evt-1");

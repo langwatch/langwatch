@@ -744,6 +744,7 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a body-present drop carrying a recovery key (#719/#718)", () => {
       describe("when a worker claims the group and the decode fails", () => {
+        /** @scenario a body-present reactor drop is dead-lettered with its recovery key */
         it("preserves the value in the dead-letter, labelled and keyed", async () => {
           const name = freshName();
           const groupId = `${TENANT}/dlq-body-present`;
@@ -788,6 +789,7 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a missing-blob drop carrying a recovery key (#718.2b/#719.2)", () => {
       describe("when a worker claims the group and the blob is genuinely gone", () => {
+        /** @scenario a missing-blob reactor drop is named in the log but not dead-lettered */
         it("does not dead-letter and releases the absent blob's holder", async () => {
           const name = freshName();
           const groupId = `${TENANT}/dlq-missing-blob`;
@@ -830,6 +832,7 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a body-present job quarantined in the dead-letter (#719 recovery)", () => {
       describe("when an operator drains the group's dead-letter", () => {
+        /** @scenario draining the dead-letter restores the job to live staging and it dispatches */
         it("restores it to live staging byte-identical and it dispatches", async () => {
           const name = freshName();
           const groupId = `${TENANT}/dlq-replay`;
@@ -896,6 +899,7 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a body-present GQ2 drop (#720 blob lifetime)", () => {
       describe("when the job is dead-lettered", () => {
+        /** @scenario a dead-lettered GQ2 job's blob holder outlives the dead-letter window */
         it("extends the blob holder past the dead-letter quarantine window", async () => {
           const name = freshName();
           const groupId = `${TENANT}/dlq-blob-ttl`;

@@ -42,6 +42,7 @@ export function replayClaimViolations(source: string): string[] {
 
 describe("replay-recovery premise guard (#721 / ADR-046)", () => {
   describe("given the queue module source as shipped", () => {
+    /** @scenario the replay-premise guard passes on the corrected tree */
     it("contains no un-caveated replay-recovery claim", () => {
       const files = readdirSync(MODULE_DIR).filter(
         (f) => f.endsWith(".ts") && !f.includes(".test."),
@@ -56,6 +57,7 @@ describe("replay-recovery premise guard (#721 / ADR-046)", () => {
   });
 
   describe("given a planted violation", () => {
+    /** @scenario the replay-premise guard fails on a discarding branch that claims replay recovery */
     it("fires on an un-caveated claim and stays silent on a caveated one", () => {
       const planted = "// the work recovers via event replay, so the drop is safe";
       expect(replayClaimViolations(planted)).toHaveLength(1);
