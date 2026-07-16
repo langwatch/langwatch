@@ -306,6 +306,10 @@ function mapSpanToDetail(
         }
       : null,
     params: span.params ?? null,
+    // #5835: threaded from the read path — true when an offloaded attribute
+    // could not be restored to its full value, so the Attributes pane warns
+    // the content may be a truncated preview.
+    hasIncompleteAttributes: span.hasIncompleteAttributes ?? false,
     events: rawEvents.map((e) => ({
       name: e.name,
       timestampMs: e.timeUnixMs,

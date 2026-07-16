@@ -10,6 +10,7 @@ import {
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Markdown } from "~/components/Markdown";
+import { ContentIncompleteNotice } from "~/components/ui/ContentPrivacyMarkers";
 import { RedactedInline } from "~/components/ui/RedactedField";
 import type { RouterOutputs } from "~/utils/api";
 import type { TraceListItem } from "../../../types/trace";
@@ -151,6 +152,10 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         />
       ) : null}
 
+      {/* Warn when the message shown is still a preview because the full input
+          couldn't be loaded at read time (#5835). */}
+      <ContentIncompleteNotice incomplete={turn.inputTruncated} />
+
       {assistantText ? (
         <TurnMessage
           layout={layout}
@@ -202,6 +207,10 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           visibleTo={turn.outputVisibleTo}
         />
       ) : null}
+
+      {/* Warn when the response shown is still a preview because the full
+          output couldn't be loaded at read time (#5835). */}
+      <ContentIncompleteNotice incomplete={turn.outputTruncated} />
     </VStack>
   );
 });

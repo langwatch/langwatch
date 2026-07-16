@@ -1,6 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
 import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
+import { ContentIncompleteNotice } from "~/components/ui/ContentPrivacyMarkers";
 import { PrivacyDroppedNotice } from "~/components/ui/PrivacyDroppedNotice";
 import { RedactedField } from "~/components/ui/RedactedField";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -222,6 +223,9 @@ export function TraceSummaryAccordions({
                       content the server already nulled, and a redacted side
                       renders the shared "Redacted" marker instead of the
                       "no input recorded" placeholder. */}
+                  {/* Warn per-field when the shown value is still a preview
+                      because its full content couldn't be loaded (#5835). */}
+                  <ContentIncompleteNotice incomplete={trace.inputTruncated} />
                   <RedactedField
                     field="input"
                     redacted={trace.inputRedacted ?? false}
@@ -237,6 +241,7 @@ export function TraceSummaryAccordions({
                       <MissingIORow label="Input" mode="input" />
                     )}
                   </RedactedField>
+                  <ContentIncompleteNotice incomplete={trace.outputTruncated} />
                   <RedactedField
                     field="output"
                     redacted={trace.outputRedacted ?? false}

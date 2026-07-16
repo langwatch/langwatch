@@ -10,6 +10,7 @@ import {
 import { useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
 import {
+  ContentIncompleteNotice,
   ContentPrivacyMarkers,
   PiiIncompleteNotice,
 } from "~/components/ui/ContentPrivacyMarkers";
@@ -51,6 +52,9 @@ export function SpanAccordions({
   // empty (so a fully hidden or dropped span still explains itself).
   const contentPrivacy = detail?.contentPrivacy;
   const piiIncomplete = !!detail?.piiAnalysisIncomplete;
+  // An offloaded span attribute whose full value couldn't be loaded at read
+  // time — the Attributes pane warns the value shown may be truncated (#5835).
+  const contentIncomplete = !!detail?.hasIncompleteAttributes;
   const hasPrivacyMarkers =
     piiIncomplete ||
     (!!contentPrivacy &&
@@ -97,7 +101,7 @@ export function SpanAccordions({
     exceptions: hasError,
     io: hasIO || hasPrivacyMarkers,
     prompt: hasPrompt,
-    attributes: hasSpanAttrs || !!detail?.costSuggestion,
+    attributes: hasSpanAttrs || !!detail?.costSuggestion || contentIncomplete,
     scope: hasScope,
     events: hasEvents,
   });
@@ -250,6 +254,9 @@ export function SpanAccordions({
                   isFirst={isFirst}
                   open={isOpen}
                 >
+                  {/* Leads the pane so a truncated attribute value is flagged
+                      before the table it applies to (#5835). */}
+                  <ContentIncompleteNotice incomplete={contentIncomplete} />
                   {!detailQuery.isLoading && detail?.costSuggestion && (
                     <UnmappedCostSuggestion
                       model={detail.costSuggestion.model}

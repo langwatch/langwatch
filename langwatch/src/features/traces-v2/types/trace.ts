@@ -89,6 +89,14 @@ export interface TraceListItem {
   outputRedacted?: boolean | null;
   inputVisibleTo?: string | null;
   outputVisibleTo?: string | null;
+  /**
+   * Set when the shown input/output still holds the write-time preview because
+   * its full content couldn't be loaded at read time (#5835). Only the
+   * Conversation tab (which opts into read-time resolution) sees these; the
+   * grid leaves them absent. Lets a turn warn its message may be truncated.
+   */
+  inputTruncated?: boolean;
+  outputTruncated?: boolean;
   error?: string;
   errorSpanName?: string;
   conversationId?: string;

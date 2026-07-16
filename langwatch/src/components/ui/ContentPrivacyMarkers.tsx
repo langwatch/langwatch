@@ -206,3 +206,25 @@ export const PiiIncompleteNotice: React.FC<{
     </Alert.Root>
   );
 };
+
+/**
+ * Warns that the content shown may be a shortened preview because its full
+ * value could not be loaded. Surfaces the gap instead of letting a truncated
+ * preview read as the complete value. Same shape as {@link PiiIncompleteNotice}.
+ */
+export const ContentIncompleteNotice: React.FC<{
+  incomplete?: boolean | null;
+}> = ({ incomplete }) => {
+  if (!incomplete) return null;
+  return (
+    <Alert.Root status="warning" size="sm" variant="subtle" width="full">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description fontSize="sm">
+          Some content could not be fully loaded, so you may be seeing only part
+          of it.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+};

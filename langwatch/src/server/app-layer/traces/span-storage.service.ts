@@ -2,10 +2,11 @@ import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
+import { mapNormalizedSpanToSpan } from "~/server/traces/mappers/span.mapper";
 import {
-  mapNormalizedSpansToSpans,
-  mapNormalizedSpanToSpan,
-} from "~/server/traces/mappers/span.mapper";
+  hasEventRefs,
+  parseSpanEventRefs,
+} from "~/server/traces/offloaded-eventref-parsing";
 import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
 import type { BlobStore } from "./blob-store.service";
 import type {
@@ -61,6 +62,33 @@ const applyVisibilityGate = <T extends Span>(
   );
 };
 
+/**
+ * Read-path completeness check for one span's offloaded attributes (#5835).
+ *
+ * Given a span's PRE-resolution attributes and the attributes it holds AFTER
+ * {@link resolveOffloadedTraces} ran, returns true when at least one
+ * `langwatch.reserved.eventref.*` pointer did NOT get replaced with its full
+ * value — the resolved value is still the write-time preview, so the span is
+ * showing truncated content. Mirrors the summary/list path's
+ * `detectOffloadedIOFields`: a ref carrying no usable eventId can never resolve
+ * and likewise counts as incomplete.
+ */
+export function spanHasIncompleteAttributes(
+  preResolutionAttrs: Record<string, string>,
+  resolvedAttrs: Record<string, string>,
+): boolean {
+  if (!hasEventRefs(preResolutionAttrs)) return false;
+  const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
+    parseSpanEventRefs(preResolutionAttrs);
+  // A ref with no usable eventId can never resolve — its value stays a preview.
+  if (missingEventIdKeys.length > 0) return true;
+  // A well-formed ref is unresolved when its resolved value still equals the
+  // write-time preview (a successful resolution overwrote it with the full value).
+  return eventrefEntries.some(
+    ({ attrKey }) => resolvedAttrs[attrKey] === cleanedAttrs[attrKey],
+  );
+}
+
 export class SpanStorageService {
   private readonly blobResolutionDeps?: SpanReadBlobResolutionDeps;
   private readonly logger = createLogger(
@@ -110,9 +138,38 @@ export class SpanStorageService {
       logger: this.logger,
     });
     return applyVisibilityGate(
-      mapNormalizedSpansToSpans(resolvedSpans),
+      this.mapResolvedSpansWithIncompleteFlag(normalizedSpans, resolvedSpans),
       params.visibilityCutoffMs,
     );
+  }
+
+  /**
+   * Maps resolved spans to the legacy Span shape and flags each span whose
+   * offloaded attributes could not be fully resolved (#5835). Pre-resolution
+   * attributes are paired to their resolved span by spanId, so the flag is
+   * independent of any ordering assumption in {@link resolveOffloadedTraces}.
+   */
+  private mapResolvedSpansWithIncompleteFlag(
+    preResolutionSpans: NormalizedSpan[],
+    resolvedSpans: NormalizedSpan[],
+  ): Span[] {
+    const preAttrsBySpanId = new Map(
+      preResolutionSpans.map((s) => [
+        s.spanId,
+        s.spanAttributes as Record<string, string>,
+      ]),
+    );
+    return resolvedSpans.map((resolved) => {
+      const mapped = mapNormalizedSpanToSpan(resolved);
+      const preAttrs = preAttrsBySpanId.get(resolved.spanId);
+      return preAttrs &&
+        spanHasIncompleteAttributes(
+          preAttrs,
+          resolved.spanAttributes as Record<string, string>,
+        )
+        ? { ...mapped, hasIncompleteAttributes: true }
+        : mapped;
+    });
   }
 
   async getNormalizedSpansByTraceId(
@@ -152,7 +209,17 @@ export class SpanStorageService {
     });
     const resolved = resolvedSpans.find((s) => s.spanId === params.spanId);
     if (!resolved) return null;
-    return gateOne(mapNormalizedSpanToSpan(resolved));
+    const preSpan = normalizedSpans.find((s) => s.spanId === params.spanId);
+    const mapped = mapNormalizedSpanToSpan(resolved);
+    return gateOne(
+      preSpan &&
+        spanHasIncompleteAttributes(
+          preSpan.spanAttributes as Record<string, string>,
+          resolved.spanAttributes as Record<string, string>,
+        )
+        ? { ...mapped, hasIncompleteAttributes: true }
+        : mapped,
+    );
   }
 
   async getTraceEventsByTraceId(

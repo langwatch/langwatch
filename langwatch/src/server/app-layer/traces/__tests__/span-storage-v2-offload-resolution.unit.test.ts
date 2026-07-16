@@ -355,3 +355,187 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// #5835 AC4c: per-span "attributes may be incomplete" signal. A span whose
+// offloaded eventref could not be resolved keeps its preview value AND is
+// flagged so the Attributes pane can warn the content is truncated.
+// ---------------------------------------------------------------------------
+
+describe("SpanStorageService hasIncompleteAttributes flag (#5835)", () => {
+  const wiredService = (repo: SpanStorageRepository, blobStore: BlobStore) =>
+    new SpanStorageService(repo, {
+      blobStore,
+      ioExtractionService: new TraceIOExtractionService(),
+    });
+
+  describe("given a span whose eventref resolves to its full value", () => {
+    const spanResolved = makeNormalizedSpan({
+      spanId: "span-ok",
+      traceId: "trace-flag",
+      spanAttributes: {
+        "langwatch.output": PREVIEW_OUTPUT,
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+          field: "langwatch.output",
+          eventId: "evt-ok",
+        }),
+      },
+    });
+
+    describe("when getSpansByTraceId resolves it successfully", () => {
+      it("does not flag the span as having incomplete attributes", async () => {
+        const repo = makeStubRepository([spanResolved]);
+        const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
+        const spans = await wiredService(repo, blobStore).getSpansByTraceId({
+          tenantId: "proj-1",
+          traceId: "trace-flag",
+        });
+
+        expect(spans).toHaveLength(1);
+        expect(spans[0]?.hasIncompleteAttributes).toBeFalsy();
+      });
+    });
+
+    describe("when getSpanById resolves it successfully", () => {
+      it("does not flag the span as having incomplete attributes", async () => {
+        const repo = makeStubRepository([spanResolved]);
+        const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
+        const span = await wiredService(repo, blobStore).getSpanById({
+          tenantId: "proj-1",
+          traceId: "trace-flag",
+          spanId: "span-ok",
+        });
+
+        expect(span).not.toBeNull();
+        expect(span?.hasIncompleteAttributes).toBeFalsy();
+      });
+    });
+  });
+
+  describe("given a span whose eventref points at a missing event_log row", () => {
+    const spanMissing = makeNormalizedSpan({
+      spanId: "span-missing",
+      traceId: "trace-flag",
+      spanAttributes: {
+        "langwatch.output": PREVIEW_OUTPUT,
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+          field: "langwatch.output",
+          eventId: "evt-missing",
+        }),
+      },
+    });
+
+    describe("when getSpansByTraceId cannot resolve it", () => {
+      it("flags the span as having incomplete attributes", async () => {
+        const repo = makeStubRepository([spanMissing]);
+        const blobStore = makeBlobStore({}); // every fetch throws BlobNotFoundError
+        const spans = await wiredService(repo, blobStore).getSpansByTraceId({
+          tenantId: "proj-1",
+          traceId: "trace-flag",
+        });
+
+        expect(spans).toHaveLength(1);
+        expect(spans[0]?.hasIncompleteAttributes).toBe(true);
+      });
+    });
+
+    describe("when getSpanById cannot resolve it", () => {
+      it("flags the returned span as having incomplete attributes", async () => {
+        const repo = makeStubRepository([spanMissing]);
+        const blobStore = makeBlobStore({});
+        const span = await wiredService(repo, blobStore).getSpanById({
+          tenantId: "proj-1",
+          traceId: "trace-flag",
+          spanId: "span-missing",
+        });
+
+        expect(span).not.toBeNull();
+        expect(span?.hasIncompleteAttributes).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with no eventref pointer at all", () => {
+    const cleanSpan = makeNormalizedSpan({
+      spanId: "span-clean",
+      traceId: "trace-flag",
+      spanAttributes: {
+        "langwatch.output": "A short, non-offloaded output value",
+      },
+    });
+
+    describe("when getSpansByTraceId returns it", () => {
+      it("never flags it as having incomplete attributes", async () => {
+        const repo = makeStubRepository([cleanSpan]);
+        const blobStore = makeBlobStore({});
+        const spans = await wiredService(repo, blobStore).getSpansByTraceId({
+          tenantId: "proj-1",
+          traceId: "trace-flag",
+        });
+
+        expect(spans).toHaveLength(1);
+        expect(spans[0]?.hasIncompleteAttributes).toBeFalsy();
+      });
+    });
+  });
+
+  describe("given two sibling spans, one resolved and one missing", () => {
+    const spanOk = makeNormalizedSpan({
+      spanId: "span-ok",
+      traceId: "trace-flag",
+      spanAttributes: {
+        "langwatch.output": PREVIEW_OUTPUT,
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+          field: "langwatch.output",
+          eventId: "evt-ok",
+        }),
+      },
+    });
+    const spanMissing = makeNormalizedSpan({
+      spanId: "span-missing",
+      traceId: "trace-flag",
+      spanAttributes: {
+        "langwatch.output": PREVIEW_OUTPUT,
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+          field: "langwatch.output",
+          eventId: "evt-missing",
+        }),
+      },
+    });
+
+    describe("when getSpansByTraceId resolves only the first", () => {
+      it("flags the unresolved sibling only, not the resolved one", async () => {
+        const repo = makeStubRepository([spanOk, spanMissing]);
+        // Resolve by eventId so exactly one sibling's ref succeeds.
+        const blobStore = {
+          getFromEventLog: vi.fn(
+            async ({
+              eventId,
+              field,
+            }: {
+              eventId: string;
+              field: string;
+            }) => {
+              if (eventId === "evt-ok" && field === "langwatch.output") {
+                return FULL_OUTPUT;
+              }
+              throw new BlobNotFoundError(eventId, field, "proj-1");
+            },
+          ),
+          putSpool: vi.fn(),
+          getSpool: vi.fn(),
+          deleteSpool: vi.fn(),
+        } as unknown as BlobStore;
+
+        const spans = await wiredService(repo, blobStore).getSpansByTraceId({
+          tenantId: "proj-1",
+          traceId: "trace-flag",
+        });
+
+        const bySpanId = new Map(spans.map((s) => [s.span_id, s]));
+        expect(bySpanId.get("span-ok")?.hasIncompleteAttributes).toBeFalsy();
+        expect(bySpanId.get("span-missing")?.hasIncompleteAttributes).toBe(true);
+      });
+    });
+  });
+});

@@ -287,6 +287,11 @@ export const spanDetailSchema = z.object({
   // (names/locations) did not run, so the content may still contain names or
   // locations. The drawer warns instead of implying it is fully scrubbed.
   piiAnalysisIncomplete: z.boolean().nullish(),
+  // True when at least one span attribute still shows its write-time preview
+  // because its offloaded content could not be loaded at read time (#5835), so
+  // the drawer warns the attribute content may be incomplete instead of
+  // implying it is complete. Absent on older cached responses.
+  hasIncompleteAttributes: z.boolean().nullish(),
   // Custom-attribute restrict rules that apply to this viewer, so the
   // attributes table can mark a matching row as restricted and name who can
   // read it. Absent on older cached responses.
