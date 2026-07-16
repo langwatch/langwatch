@@ -44,7 +44,7 @@
     "@ai-sdk/anthropic": "^3.0.44",
     "@anthropic-ai/claude-code": "2.1.202",
     "@eslint/js": "^10.0.1",
-    "@langwatch/scenario": "^0.4.6",
+    "@langwatch/scenario": "^0.5.1",
     "@types/debug": "^4.1.13",
     "@types/express": "^5.0.6",
     "@types/node": "^25.6.0",
