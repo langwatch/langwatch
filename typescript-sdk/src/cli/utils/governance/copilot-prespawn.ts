@@ -181,3 +181,24 @@ export function copilotPrespawnWarnings(
 
   return warnings;
 }
+
+/**
+ * Gateway mode routes copilot through its BYOK provider env
+ * (COPILOT_PROVIDER_*), and GitHub documents COPILOT_MODEL as REQUIRED for
+ * BYOK — without a model, copilot fails with an opaque error before any
+ * traffic reaches the gateway. Returns an actionable message when no model
+ * is resolvable from the args or environment, else null. Gateway-only:
+ * the ingestion (direct-OTLP) path runs copilot on its seat with its own
+ * model selection and needs no model here.
+ */
+export function copilotGatewayModelPreflight(opts: {
+  args: string[];
+  env: Record<string, string | undefined>;
+}): string | null {
+  const hasModel =
+    !!opts.env.COPILOT_MODEL ||
+    !!opts.env.COPILOT_PROVIDER_MODEL_ID ||
+    opts.args.some((a) => a === "--model" || a.startsWith("--model="));
+  if (hasModel) return null;
+  return "gateway mode needs a model — GitHub Copilot's BYOK path requires one. Re-run with `--model <id>` or set COPILOT_MODEL.";
+}

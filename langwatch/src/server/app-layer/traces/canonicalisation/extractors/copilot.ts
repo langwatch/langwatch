@@ -20,6 +20,9 @@
  *   figure in premium-request units, NOT dollars — deliberately kept
  *   out of langwatch cost fields so the pricing-lookup pipeline stays
  *   the single source of dollar cost)
+ * - `github.copilot.nano_aiu` → metadata.copilot_nano_aiu (the raw
+ *   AI-unit count at nano-scale — a distinct figure from cost, likewise
+ *   metadata-only, never a dollar field)
  * - `github.copilot.git.repository` / `github.copilot.github.org` →
  *   metadata.copilot_repository / metadata.copilot_organization
  * - span type inferred from gen_ai.operation.name (invoke_agent →
@@ -41,8 +44,15 @@ import type {
 
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 
-/** Copilot CLI's instrumentation scope name (verified, copilot 1.0.69). */
-export const COPILOT_SCOPE = "@github/copilot";
+/**
+ * Copilot's instrumentation scope name. Verified on the wire: build
+ * 1.0.71 emits `github.copilot` (the documented `COPILOT_OTEL_SOURCE_NAME`
+ * default); `@github/copilot` is kept as a legacy alias for older builds.
+ * Matching by scope — not only by a `github.copilot.*` attribute — is what
+ * lets an `execute_tool` span (which may carry no vendor attribute) still
+ * be recognized as copilot and classified as a tool span.
+ */
+export const COPILOT_SCOPES = ["github.copilot", "@github/copilot"];
 
 /** Copilot's gen_ai.operation.name values → langwatch span types. */
 const OPERATION_TO_SPAN_TYPE: Record<string, string> = {
@@ -71,7 +81,8 @@ export class CopilotExtractor implements CanonicalAttributesExtractor {
     // wire) or a github.copilot.* attribute.
     const scopeName = ctx.span.instrumentationScope?.name ?? "";
     const hasCopilotProvenance =
-      scopeName === COPILOT_SCOPE || attrs.hasByPrefix(COPILOT_ATTR_PREFIX);
+      COPILOT_SCOPES.includes(scopeName) ||
+      attrs.hasByPrefix(COPILOT_ATTR_PREFIX);
     if (!hasCopilotProvenance) return;
 
     if (typeof operation === "string" && OPERATION_TO_SPAN_TYPE[operation]) {
@@ -100,6 +111,12 @@ export class CopilotExtractor implements CanonicalAttributesExtractor {
     if (copilotCost !== undefined && copilotCost !== null) {
       ctx.setAttr("metadata.copilot_cost", String(copilotCost));
       ctx.recordRule(`${this.id}:cost_units`);
+    }
+
+    const nanoAiu = attrs.take(`${COPILOT_ATTR_PREFIX}nano_aiu`);
+    if (nanoAiu !== undefined && nanoAiu !== null) {
+      ctx.setAttr("metadata.copilot_nano_aiu", String(nanoAiu));
+      ctx.recordRule(`${this.id}:nano_aiu`);
     }
 
     const repository = attrs.take(`${COPILOT_ATTR_PREFIX}git.repository`);

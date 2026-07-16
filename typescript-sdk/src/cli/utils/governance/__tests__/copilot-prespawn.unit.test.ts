@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  copilotGatewayModelPreflight,
   copilotManagedSettingsPaths,
   copilotPrespawnWarnings,
   detectManagedOtelPin,
@@ -147,5 +148,48 @@ describe("copilotManagedSettingsPaths()", () => {
     expect(copilotManagedSettingsPaths("linux")).toEqual([
       "/etc/github-copilot/policy.d",
     ]);
+  });
+});
+
+describe("copilotGatewayModelPreflight", () => {
+  describe("when no model is resolvable", () => {
+    it("returns an actionable message", () => {
+      const msg = copilotGatewayModelPreflight({ args: [], env: {} });
+
+      expect(msg).toContain("--model");
+      expect(msg).toContain("COPILOT_MODEL");
+    });
+  });
+
+  describe("when a model is provided", () => {
+    it("accepts --model in the args", () => {
+      expect(
+        copilotGatewayModelPreflight({ args: ["--model", "gpt-5"], env: {} }),
+      ).toBeNull();
+    });
+
+    it("accepts --model=<id> in the args", () => {
+      expect(
+        copilotGatewayModelPreflight({ args: ["--model=gpt-5"], env: {} }),
+      ).toBeNull();
+    });
+
+    it("accepts COPILOT_MODEL in the environment", () => {
+      expect(
+        copilotGatewayModelPreflight({
+          args: [],
+          env: { COPILOT_MODEL: "gpt-5" },
+        }),
+      ).toBeNull();
+    });
+
+    it("accepts COPILOT_PROVIDER_MODEL_ID in the environment", () => {
+      expect(
+        copilotGatewayModelPreflight({
+          args: [],
+          env: { COPILOT_PROVIDER_MODEL_ID: "gpt-5" },
+        }),
+      ).toBeNull();
+    });
   });
 });

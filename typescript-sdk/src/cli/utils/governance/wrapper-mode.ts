@@ -401,12 +401,34 @@ export async function resolveWrapperMode(
   return {
     mode,
     vars,
+    clears: ingestionClears(tool),
     codexConfigPath,
     newKeyMinted: minted,
     notice,
     endpoint,
     ingestionToken: token,
   };
+}
+
+/**
+ * Env vars to scrub from the child in ingestion (Path B) mode. Copilot's
+ * BYOK provider vars — if the user hand-exported them in their shell —
+ * would otherwise survive into the child and keep BYOK active, routing LLM
+ * traffic OFF the Copilot seat (defeating seat-preserving ingestion) and,
+ * when the inherited base URL is itself a LangWatch gateway, double-capturing
+ * against the OTLP lane. Gateway mode already scrubs its conflicting twins;
+ * this is the ingestion-side counterpart. Non-copilot tools have no such
+ * activation var, so the set is empty.
+ */
+function ingestionClears(tool: string): string[] {
+  if (tool === "copilot") {
+    return [
+      "COPILOT_PROVIDER_TYPE",
+      "COPILOT_PROVIDER_BASE_URL",
+      "COPILOT_PROVIDER_API_KEY",
+    ];
+  }
+  return [];
 }
 
 /**
@@ -419,7 +441,7 @@ export function telemetryEnvVarNames(tool: string): string[] {
   return Object.keys(buildOtelEnvBlock(tool, "", ""));
 }
 
-function buildOtelEnvBlock(
+export function buildOtelEnvBlock(
   tool: string,
   endpoint: string,
   token: string,
