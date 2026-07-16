@@ -110,6 +110,19 @@ export interface WrapperModeResult {
   notice?: string;
 }
 
+/**
+ * Whether an env value expresses an explicit content-capture opt-out.
+ * OTel booleans are parsed case-insensitively, and this repo's sibling
+ * parsers also honour "0"/"no"/"off", so `FALSE`, `False`, `0`, `no`,
+ * `off` must all count — otherwise a user who disabled capture is
+ * silently overridden into exporting full prompt/response content
+ * (privacy regression). Unset means "not opted out" (default-on).
+ */
+function isCaptureOptOut(raw: string | undefined): boolean {
+  if (raw === undefined) return false;
+  return ["false", "0", "no", "off"].includes(raw.trim().toLowerCase());
+}
+
 const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
   claude: "claude_code",
   codex: "codex",
@@ -324,7 +337,9 @@ export async function resolveWrapperMode(
   // the tokens-only consequence visible instead of silent (ADR-039 D5).
   if (
     tool === "copilot" &&
-    process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT === "false"
+    isCaptureOptOut(
+      process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+    )
   ) {
     delete vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
     const optOutNotice = `${lwTag()} content capture is disabled in your environment (OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false); copilot traces will carry tokens only.`;

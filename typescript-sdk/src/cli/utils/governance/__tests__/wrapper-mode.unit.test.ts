@@ -422,6 +422,27 @@ describe("resolveWrapperMode", () => {
       }
     });
 
+    /** @scenario An explicit user opt-out of content capture is never overwritten */
+    it.each(["FALSE", "False", "0", "no", "off", "  false  "])(
+      "treats the case-insensitive/falsey opt-out %j as off (never silently forces capture on)",
+      async (value) => {
+        const { resolveWrapperMode } = await import("../wrapper-mode.js");
+        mintCopilot();
+        process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = value;
+        try {
+          const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
+          const out = await resolveWrapperMode(cfg, "copilot", {});
+
+          expect(
+            out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+          ).toBeUndefined();
+          expect(out.notice).toContain("tokens only");
+        } finally {
+          delete process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
+        }
+      },
+    );
+
     /** @scenario A cached copilot_cli ingest key is reused instead of re-minting */
     it("reuses a live cached copilot_cli key instead of minting again", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
@@ -569,6 +590,33 @@ describe("resolveWrapperMode", () => {
         expect(persisted.tool_mode?.copilot).toBeUndefined();
       }
     });
+
+    // The `forcedMode === undefined` gate changed behavior for ALL tools,
+    // and production `runWrapped` always supplies a concrete forcedMode —
+    // so cover a non-copilot tool too, not just copilot.
+    it.each(["claude", "codex"])(
+      "does not pin tool_mode for %s either when a forcedMode was passed (cross-tool regression)",
+      async (tool) => {
+        const { resolveWrapperMode } = await import("../wrapper-mode.js");
+        (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue(
+          {
+            token: "sk-lw-tok",
+            prefix: "sk-lw-tok",
+            endpoint: "http://app.example.com/api/otel",
+          },
+        );
+
+        const cfg = baseCfg();
+        await resolveWrapperMode(cfg, tool, {}, [], "ingestion");
+
+        const saved = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock
+          .calls;
+        for (const call of saved) {
+          const persisted = call[0] as GovernanceConfig;
+          expect(persisted.tool_mode?.[tool]).toBeUndefined();
+        }
+      },
+    );
 
     it("still caches the freshly minted ingest key", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
