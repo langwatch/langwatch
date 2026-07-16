@@ -204,6 +204,10 @@ describe("renderLaunchAgent", () => {
       expect(xml).toContain("<LogonTrigger>");
       // <Environment> is NOT a valid Task Scheduler element — must be absent
       expect(xml).not.toContain("<Environment>");
+      // the declaration must match the UTF-8 bytes writeFile emits, or
+      // schtasks /Create /XML rejects it as malformed
+      expect(xml).toContain('encoding="UTF-8"');
+      expect(xml).not.toContain("UTF-16");
     });
 
     it("sets the env via a wrapper script the task launches, not the XML", () => {

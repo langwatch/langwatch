@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CopilotAppAgentError,
   installCopilotAppAgent,
   isCopilotAppAgentInstalled,
   removeCopilotAppAgent,
@@ -15,7 +16,11 @@ import {
 } from "../copilot-app-agent";
 import { type LaunchAgentSpec } from "../copilot-app";
 
-function fakeIo(existing = new Set<string>()) {
+/** `failOn(cmd, args)` returns true when that command should throw. */
+function fakeIo(
+  existing = new Set<string>(),
+  failOn: (cmd: string, args: string[]) => boolean = () => false,
+) {
   const files = new Map<string, string>();
   for (const f of existing) files.set(f, "");
   const runs: { cmd: string; args: string[] }[] = [];
@@ -26,7 +31,10 @@ function fakeIo(existing = new Set<string>()) {
     writeFile: (file, content, _mode) => void files.set(file, content),
     removeFile: (file) => void files.delete(file),
     fileExists: (file) => files.has(file),
-    run: (cmd, args) => void runs.push({ cmd, args }),
+    run: (cmd, args) => {
+      runs.push({ cmd, args });
+      if (failOn(cmd, args)) throw new Error(`boom: ${cmd} ${args.join(" ")}`);
+    },
   };
   return { io, files, runs };
 }
@@ -146,5 +154,64 @@ describe("isCopilotAppAgentInstalled", () => {
     installCopilotAppAgent(macSpec, io);
 
     expect(isCopilotAppAgentInstalled("darwin", "/Users/dev", io)).toBe(true);
+  });
+});
+
+describe("installCopilotAppAgent registration-failure handling", () => {
+  describe("when a real service-manager command fails", () => {
+    it("throws instead of reporting a silent success (macOS launchctl load)", () => {
+      const { io } = fakeIo(new Set(), (cmd, args) => args[0] === "load");
+
+      expect(() => installCopilotAppAgent(macSpec, io)).toThrow(
+        CopilotAppAgentError,
+      );
+    });
+
+    it("throws when the Windows schtasks /Create fails", () => {
+      const { io } = fakeIo(new Set(), (cmd) => cmd === "schtasks");
+
+      expect(() =>
+        installCopilotAppAgent(
+          { ...macSpec, platform: "win32", home: "C:\\Users\\dev" },
+          io,
+        ),
+      ).toThrow(CopilotAppAgentError);
+    });
+  });
+
+  describe("when only the expected first-install unload fails", () => {
+    it("tolerates it and still installs (load succeeds)", () => {
+      // `launchctl unload` errors on a first install (nothing loaded yet);
+      // that one failure must not abort the install.
+      const { io, files } = fakeIo(new Set(), (cmd, args) => args[0] === "unload");
+
+      const p = installCopilotAppAgent(macSpec, io);
+
+      expect(files.has(p)).toBe(true);
+    });
+  });
+});
+
+describe("removeCopilotAppAgent unregister-failure handling", () => {
+  /** @scenario Logout removes the capture login agent */
+  it("throws and keeps the descriptor when unregister fails, so a live agent is never silently orphaned", () => {
+    // install cleanly, then make the unload fail on removal
+    const { io, files } = fakeIo();
+    const p = installCopilotAppAgent(macSpec, io);
+
+    const io2 = {
+      ...io,
+      run: (cmd: string, args: string[]) => {
+        if (cmd === "launchctl" && args[0] === "unload") {
+          throw new Error("transient unload failure");
+        }
+      },
+    };
+
+    expect(() => removeCopilotAppAgent("darwin", "/Users/dev", io2)).toThrow(
+      CopilotAppAgentError,
+    );
+    // descriptor preserved for retry — NOT deleted
+    expect(files.has(p)).toBe(true);
   });
 });

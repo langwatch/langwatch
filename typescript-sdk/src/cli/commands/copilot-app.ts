@@ -28,7 +28,11 @@ import {
 
 const SOURCE_TYPE = "copilot_app";
 
-export type ConnectFailure = "not-logged-in" | "not-installed" | "unsupported-os";
+export type ConnectFailure =
+  | "not-logged-in"
+  | "not-installed"
+  | "unsupported-os"
+  | "agent-install-failed";
 
 export class CopilotAppConnectError extends Error {
   constructor(
@@ -101,12 +105,26 @@ export async function connectCopilotApp(
     token,
     captureContent: deps.captureContent,
   });
-  const agentPath = deps.install({
-    platform: deps.platform,
-    home: deps.home,
-    execPath,
-    env: appEnv,
-  });
+  // The mint above is a server-side hard-cut rotation, so a failed agent
+  // registration here would leave the freshly-rotated key with no running
+  // agent. Surface it loudly instead of printing "connected" — never claim
+  // capture is on when the service manager rejected the agent.
+  let agentPath: string;
+  try {
+    agentPath = deps.install({
+      platform: deps.platform,
+      home: deps.home,
+      execPath,
+      env: appEnv,
+    });
+  } catch (err) {
+    throw new CopilotAppConnectError(
+      "agent-install-failed",
+      `Minted the ingest key, but installing the capture agent failed: ${
+        (err as Error)?.message ?? String(err)
+      }. Capture is NOT active. Fix the error above and re-run \`langwatch copilot-app connect\`.`,
+    );
+  }
 
   if (!deps.captureContent) {
     deps.warn(
@@ -115,8 +133,12 @@ export async function connectCopilotApp(
   }
   const project =
     cfg.organization?.slug ?? cfg.organization?.name ?? "your personal project";
+  // Honest lifecycle: the agent launches Copilot with tracking now and on
+  // each login. A manual relaunch from the Dock/Start menu before the next
+  // login inherits no environment and is NOT tracked (ADR-039 §Extension,
+  // Dock-launch open question).
   deps.info(
-    `GitHub Copilot app connected. Usage will be tracked into ${project}. If the app is already open, quit and reopen it to start capture.`,
+    `GitHub Copilot app connected. Usage will be tracked into ${project}. Capture is active for the app launched now and on every login; a manual relaunch before your next login is not tracked.`,
   );
 
   return {

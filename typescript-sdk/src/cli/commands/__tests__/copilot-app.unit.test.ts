@@ -109,6 +109,21 @@ describe("connectCopilotApp", () => {
     });
   });
 
+  describe("when the capture agent fails to register", () => {
+    it("reports agent-install-failed loudly instead of a false 'connected'", async () => {
+      const install = vi.fn((_spec: LaunchAgentSpec) => {
+        throw new Error("launchctl load: Input/output error");
+      });
+      const info = vi.fn();
+
+      await expect(
+        connectCopilotApp(baseDeps({ install, info })),
+      ).rejects.toMatchObject({ kind: "agent-install-failed" });
+      // never prints a success line when the agent didn't register
+      expect(info).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the user is not logged in", () => {
     it("refuses before doing anything", async () => {
       const mint = vi.fn();

@@ -253,7 +253,9 @@ WantedBy=default.target
         .join("\r\n");
       const wrapper = `@echo off\r\n${setLines}\r\nstart "" "${spec.execPath}"\r\n`;
 
-      const xml = `<?xml version="1.0" encoding="UTF-16"?>
+      // UTF-8: defaultIo.writeFile emits UTF-8 bytes, so the declaration
+      // must match or schtasks /Create /XML rejects the malformed file.
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Triggers>
     <LogonTrigger>
