@@ -133,7 +133,7 @@ export function parseTimeseriesRows(
     Math.max(0, previousPeriod.length - currentPeriod.length),
   );
 
-  normalizeMetricKeys(correctedPrevious, currentPeriod, groupBy);
+  normalizeMetricKeys(correctedPrevious, currentPeriod, series, groupBy);
 
   return { previousPeriod: correctedPrevious, currentPeriod };
 }
@@ -147,7 +147,10 @@ export function parseTimeseriesRows(
  * buckets are keyed `{queryIndex}/{metric}/{aggregation}[/{key}]` with
  * `terms` rewritten to `cardinality`.
  */
-export function buildSeriesName(series: SeriesInputType, index: number): string {
+export function buildSeriesName(
+  series: SeriesInputType,
+  index: number,
+): string {
   const aggregation =
     series.aggregation === "terms" ? "cardinality" : series.aggregation;
   if (series.pipeline) {
@@ -160,9 +163,32 @@ export function buildSeriesName(series: SeriesInputType, index: number): string 
 }
 
 /**
+ * Whether an absent bucket value for this series truly means zero. Counts and
+ * sums are additive — no matching rows IS zero, and defaulting keeps the
+ * frontend's % change math working when one period has no data. Averages,
+ * extrema and percentiles are NOT: ClickHouse returns NaN/NULL for them over
+ * zero rows, and defaulting that to 0 fabricates a measurement — e.g. a 0%
+ * pass rate on a day the evaluator never ran, dragging the Evaluations-page
+ * card down while the analytics donut (which counts runs) stayed correct.
+ * Those stay absent so consumers can tell "no data" apart from "really 0".
+ * Pipeline series re-aggregate per entity, so the cross-entity pipeline
+ * aggregation is the one that decides additivity.
+ */
+function isZeroWhenAbsent(series: SeriesInputType): boolean {
+  if (series.pipeline) return series.pipeline.aggregation === "sum";
+  return (
+    series.aggregation === "cardinality" ||
+    series.aggregation === "terms" ||
+    series.aggregation === "sum"
+  );
+}
+
+/**
  * Normalise metric keys across both periods. Ensures every bucket carries
- * every metric (with a 0 default) so the frontend can compute % change for
- * series that ClickHouse returned NULL for in one of the periods.
+ * every ADDITIVE metric (with a 0 default) so the frontend can compute %
+ * change for series that ClickHouse returned NULL for in one of the periods.
+ * Non-additive series (avg / min / max / percentiles) are left absent — see
+ * `isZeroWhenAbsent`.
  *
  * Grouped: only fill in missing metric sub-keys for groups already present in
  * a bucket — do NOT spawn new groups from the other period, that would bleed
@@ -171,8 +197,14 @@ export function buildSeriesName(series: SeriesInputType, index: number): string 
 function normalizeMetricKeys(
   previousPeriod: TimeseriesBucket[],
   currentPeriod: TimeseriesBucket[],
+  series: readonly SeriesInputType[],
   groupBy?: string,
 ): void {
+  const zeroFillableKeys = new Set<string>();
+  series.forEach((s, i) => {
+    if (isZeroWhenAbsent(s)) zeroFillableKeys.add(buildSeriesName(s, i));
+  });
+
   const allMetricKeys = new Set<string>();
   const allGroupedMetricSubKeys = new Set<string>();
 
@@ -200,7 +232,9 @@ function normalizeMetricKeys(
 
   for (const bucket of [...previousPeriod, ...currentPeriod]) {
     for (const key of allMetricKeys) {
-      if (bucket[key] === undefined) bucket[key] = 0;
+      if (bucket[key] === undefined && zeroFillableKeys.has(key)) {
+        bucket[key] = 0;
+      }
     }
     if (groupBy && bucket[groupBy] && typeof bucket[groupBy] === "object") {
       const groupData = bucket[groupBy] as Record<
@@ -209,7 +243,10 @@ function normalizeMetricKeys(
       >;
       for (const groupKey of Object.keys(groupData)) {
         for (const metricKey of allGroupedMetricSubKeys) {
-          if (groupData[groupKey]![metricKey] === undefined) {
+          if (
+            groupData[groupKey]![metricKey] === undefined &&
+            zeroFillableKeys.has(metricKey)
+          ) {
             groupData[groupKey]![metricKey] = 0;
           }
         }

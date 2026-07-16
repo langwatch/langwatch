@@ -13,12 +13,9 @@ import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
-import { formatChartDate } from "./formatChartDate";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { LuShield } from "react-icons/lu";
-import { ChartTooltip } from "./ChartTooltip";
-import { ChartErrorState } from "./ChartErrorState";
 import {
   Area,
   AreaChart,
@@ -38,11 +35,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Formatter, NameType, Payload, ValueType } from "recharts/types/component/DefaultTooltipContent";
-import { useRouter } from "~/utils/compat/next-router";
+import type {
+  Formatter,
+  NameType,
+  Payload,
+  ValueType,
+} from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
-import type { FilterField } from "~/server/filters/types";
 import { availableFilters } from "~/server/filters/registry";
+import type { FilterField } from "~/server/filters/types";
+import { useRouter } from "~/utils/compat/next-router";
 import {
   useColorModeValue,
   useColorRawValue,
@@ -51,7 +53,6 @@ import { useFilterParams } from "../../hooks/useFilterParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
-import { buildMetadataFilterParams } from "../../utils/buildMetadataFilterParams";
 import {
   getGroup,
   getMetric,
@@ -59,11 +60,15 @@ import {
 } from "../../server/analytics/registry";
 import type { AppRouter } from "../../server/api/root";
 import { api } from "../../utils/api";
+import { buildMetadataFilterParams } from "../../utils/buildMetadataFilterParams";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
 import { Delayed } from "../Delayed";
 import { usePeriodSelector } from "../PeriodSelector";
+import { ChartErrorState } from "./ChartErrorState";
+import { ChartTooltip } from "./ChartTooltip";
+import { formatChartDate } from "./formatChartDate";
 import { SummaryMetric } from "./SummaryMetric";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
@@ -79,17 +84,17 @@ export type CustomGraphInput = {
   graphId: string;
   filters?: Record<FilterField, string[] | Record<string, string[]>>;
   graphType:
-  | "line"
-  | "bar"
-  | "horizontal_bar"
-  | "stacked_bar"
-  | "area"
-  | "stacked_area"
-  | "scatter"
-  | "pie"
-  | "donnut"
-  | "summary"
-  | "monitor_graph";
+    | "line"
+    | "bar"
+    | "horizontal_bar"
+    | "stacked_bar"
+    | "area"
+    | "stacked_area"
+    | "scatter"
+    | "pie"
+    | "donnut"
+    | "summary"
+    | "monitor_graph";
   series: Series[];
   groupBy?: z.infer<typeof timeseriesSeriesInput>["groupBy"];
   groupByKey?: z.infer<typeof timeseriesSeriesInput>["groupByKey"];
@@ -216,7 +221,9 @@ const CustomGraph_ = React.memo(
     useEffect(() => {
       try {
         const stored = localStorage.getItem(storageKey);
-        setHiddenSeries(stored ? new Set(JSON.parse(stored) as string[]) : new Set());
+        setHiddenSeries(
+          stored ? new Set(JSON.parse(stored) as string[]) : new Set(),
+        );
       } catch {
         setHiddenSeries(new Set());
       }
@@ -326,7 +333,12 @@ const CustomGraph_ = React.memo(
         return defaultOnDataPointClick;
       }
       return undefined;
-    }, [onDataPointClick, input.graphType, input.timeScale, defaultOnDataPointClick]);
+    }, [
+      onDataPointClick,
+      input.graphType,
+      input.timeScale,
+      defaultOnDataPointClick,
+    ]);
 
     const timeScale = useMemo(() => {
       // Force "full" only for summary charts to get aggregated data
@@ -402,6 +414,28 @@ const CustomGraph_ = React.memo(
       { ...queryOpts, enabled: queryOpts.enabled && load },
     );
 
+    // Monitor cards headline the value over the WHOLE period as one "full"
+    // bucket, which run-weights it by construction. Averaging the daily
+    // buckets instead would weigh a 1-run day the same as a 100-run day and
+    // diverge from the run-counting charts on the evaluations analytics page.
+    const monitorSummaryTimeseries = api.analytics.getTimeseries.useQuery(
+      {
+        ...filterParams,
+        filters: {
+          ...filterParams.filters,
+          ...filters,
+        },
+        ...queryInput,
+        timeScale: "full",
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      },
+      {
+        ...queryOpts,
+        enabled:
+          queryOpts.enabled && load && input.graphType === "monitor_graph",
+      },
+    );
+
     // Use queryInput for shapeDataForGraph to match the query that was sent
     const currentAndPreviousData = shapeDataForGraph(queryInput, timeseries);
     const expectedKeys = Array.from(
@@ -417,13 +451,13 @@ const CustomGraph_ = React.memo(
       input.graphType === "scatter" || input.graphType === "line"
         ? currentAndPreviousData
         : fillEmptyData(
-          currentAndPreviousData,
-          expectedKeys,
-          input.graphType === "monitor_graph" &&
-            input.series[0]?.metric.includes("pass_rate")
-            ? 1
-            : 0,
-        );
+            currentAndPreviousData,
+            expectedKeys,
+            input.graphType === "monitor_graph" &&
+              input.series[0]?.metric.includes("pass_rate")
+              ? 1
+              : 0,
+          );
     const keysToValues = Object.fromEntries(
       expectedKeys.map((key) => [
         key,
@@ -440,13 +474,12 @@ const CustomGraph_ = React.memo(
       ]),
     );
 
-    const sortedKeys = expectedKeys
-      .toSorted((a, b) => {
-        const totalA = keysToSum[a] ?? 0;
-        const totalB = keysToSum[b] ?? 0;
+    const sortedKeys = expectedKeys.toSorted((a, b) => {
+      const totalA = keysToSum[a] ?? 0;
+      const totalB = keysToSum[b] ?? 0;
 
-        return totalB - totalA;
-      });
+      return totalB - totalA;
+    });
 
     // Use queryInput.series for seriesByKey to match the keys generated from the query
     // This ensures donut charts with added pipeline have matching keys
@@ -475,19 +508,21 @@ const CustomGraph_ = React.memo(
         const group =
           input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
         const displayGroupKey = groupKey || "unknown";
-        const groupName = groupKey !== undefined
-          ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "
-          }${displayGroupKey}`
-          : "";
+        const groupName =
+          groupKey !== undefined
+            ? `${
+                hideGroupLabel ? "" : group?.label.toLowerCase() + " "
+              }${displayGroupKey}`
+            : "";
         return input.series.length > 1
           ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
           : groupName
             ? uppercaseFirstLetter(groupName)
-              .replace("Evaluation passed passed", "Evaluation Passed")
-              .replace("Evaluation passed failed", "Evaluation Failed")
-              .replace("Contains error", "Traces")
-              .replace(/^Evaluation label /i, "")
-              .replace(/^Thumbs up\/down /i, "")
+                .replace("Evaluation passed passed", "Evaluation Passed")
+                .replace("Evaluation passed failed", "Evaluation Failed")
+                .replace("Contains error", "Traces")
+                .replace(/^Evaluation label /i, "")
+                .replace(/^Thumbs up\/down /i, "")
             : (series?.name ?? aggKey);
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
@@ -659,44 +694,38 @@ const CustomGraph_ = React.memo(
                   onClick={() => void timeseries.refetch()}
                   title={timeseries.error.message}
                 >
-                  <Badge
-                    colorPalette="red"
-                    variant="solid"
-                    fontSize="xs"
-                  >
+                  <Badge colorPalette="red" variant="solid" fontSize="xs">
                     Refresh failed — click to retry
                   </Badge>
                 </button>
               )}
-              {allEmpty && input.graphType !== "monitor_graph" ? (
-                emptyState ?? (
-                  <VStack
-                    position="absolute"
-                    top="50%"
-                    left="50%"
-                    transform="translate(-50%, -50%)"
-                    gap={2}
-                  >
-                    <HStack gap={1} align="end" opacity={0.3}>
-                      {[40, 65, 30, 80, 50, 70, 45, 60].map((h, i) => (
-                        <Box
-                          key={i}
-                          width="6px"
-                          height={`${h}%`}
-                          maxHeight="40px"
-                          bg="border"
-                          borderRadius="sm"
-                        />
-                      ))}
-                    </HStack>
-                    <Text textStyle="xs" color="fg.subtle">
-                      No data — try adjusting the date range
-                    </Text>
-                  </VStack>
-                )
-              ) : (
-                child
-              )}
+              {allEmpty && input.graphType !== "monitor_graph"
+                ? (emptyState ?? (
+                    <VStack
+                      position="absolute"
+                      top="50%"
+                      left="50%"
+                      transform="translate(-50%, -50%)"
+                      gap={2}
+                    >
+                      <HStack gap={1} align="end" opacity={0.3}>
+                        {[40, 65, 30, 80, 50, 70, 45, 60].map((h, i) => (
+                          <Box
+                            key={i}
+                            width="6px"
+                            height={`${h}%`}
+                            maxHeight="40px"
+                            bg="border"
+                            borderRadius="sm"
+                          />
+                        ))}
+                      </HStack>
+                      <Text textStyle="xs" color="fg.subtle">
+                        No data — try adjusting the date range
+                      </Text>
+                    </VStack>
+                  ))
+                : child}
             </>
           )}
         </Box>
@@ -721,9 +750,9 @@ const CustomGraph_ = React.memo(
           .toReversed()
           .map((series) => [
             series.metric +
-            series.aggregation +
-            series.pipeline?.field +
-            series.pipeline?.aggregation,
+              series.aggregation +
+              series.pipeline?.field +
+              series.pipeline?.aggregation,
             series,
           ]),
       );
@@ -736,11 +765,7 @@ const CustomGraph_ = React.memo(
           overflowX={"auto"}
           width="full"
         >
-          <Flex
-            paddingBottom={3}
-            width="full"
-            gap={0}
-          >
+          <Flex paddingBottom={3} width="full" gap={0}>
             {timeseries.isLoading &&
               Object.entries(seriesSet).map(([key, series]) => (
                 <SummaryMetric
@@ -781,11 +806,20 @@ const CustomGraph_ = React.memo(
               label={pieChartPercentageLabel as any}
               innerRadius={input.graphType === "donnut" ? "50%" : 0}
               onClick={(data: any, index: number) => {
-                if (handleDataPointClick && data && typeof index === "number" && pieData[index]) {
+                if (
+                  handleDataPointClick &&
+                  data &&
+                  typeof index === "number" &&
+                  pieData[index]
+                ) {
                   const entry = pieData[index]!;
-                  const { series, groupKey } = getSeries(seriesByKey, entry.key);
+                  const { series, groupKey } = getSeries(
+                    seriesByKey,
+                    entry.key,
+                  );
                   // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
-                  const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+                  const evaluatorId =
+                    series?.key || input.groupByKey || input.series[0]?.key;
 
                   handleDataPointClick({
                     evaluatorId,
@@ -867,12 +901,11 @@ const CustomGraph_ = React.memo(
               height={
                 input.graphType === "horizontal_bar" ? undefined : xAxisWidth
               }
-              interval={
-                input.graphType === "horizontal_bar" ? 0 : undefined
-              }
+              interval={input.graphType === "horizontal_bar" ? 0 : undefined}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
+              tick={{ fill: gray400 }}
+              style={{ fontSize: "11px" }}
               angle={input.graphType === "horizontal_bar" ? undefined : 45}
               textAnchor={
                 input.graphType === "horizontal_bar" ? "end" : "start"
@@ -882,7 +915,8 @@ const CustomGraph_ = React.memo(
               type="number"
               dataKey="value"
               domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
-              tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
+              tick={{ fill: gray400 }}
+              style={{ fontSize: "11px" }}
               tickFormatter={(value: number) => {
                 if (typeof yAxisValueFormat === "function") {
                   return yAxisValueFormat(value);
@@ -900,11 +934,12 @@ const CustomGraph_ = React.memo(
               dataKey="value"
               minPointSize={4}
               onClick={(item: any) => {
-                if (handleDataPointClick && item && item.payload && item.payload.key) {
+                if (handleDataPointClick && item?.payload?.key) {
                   const key = item.payload.key;
                   const { series, groupKey } = getSeries(seriesByKey, key);
                   // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
-                  const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+                  const evaluatorId =
+                    series?.key || input.groupByKey || input.series[0]?.key;
 
                   handleDataPointClick({
                     evaluatorId,
@@ -933,6 +968,7 @@ const CustomGraph_ = React.memo(
           seriesByKey={seriesByKey}
           currentAndPreviousData={currentAndPreviousData}
           currentAndPreviousDataFilled={currentAndPreviousDataFilled}
+          summaryTimeseries={monitorSummaryTimeseries}
           sortedKeys={sortedKeys}
           nameForSeries={nameForSeries}
           getColor={getColor}
@@ -997,7 +1033,8 @@ const CustomGraph_ = React.memo(
             tickFormatter={formatDate}
             tickLine={false}
             axisLine={false}
-            tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
+            tick={{ fill: gray400 }}
+            style={{ fontSize: "11px" }}
           />
           <YAxisComponent
             type="number"
@@ -1006,7 +1043,8 @@ const CustomGraph_ = React.memo(
             tickCount={4}
             tickMargin={20}
             domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
-            tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
+            tick={{ fill: gray400 }}
+            style={{ fontSize: "11px" }}
             tickFormatter={(value: number) => {
               if (typeof yAxisValueFormat === "function") {
                 return yAxisValueFormat(value);
@@ -1063,14 +1101,13 @@ const CustomGraph_ = React.memo(
             const isAreaType = ["area", "stacked_area"].includes(
               input.graphType,
             );
-            const isBarType = [
-              "bar",
-              "stacked_bar",
-              "horizontal_bar",
-            ].includes(input.graphType);
+            const isBarType = ["bar", "stacked_bar", "horizontal_bar"].includes(
+              input.graphType,
+            );
             const { series, groupKey } = getSeries(seriesByKey, aggKey);
             // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
-            const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+            const evaluatorId =
+              series?.key || input.groupByKey || input.series[0]?.key;
             const isHidden = hiddenSeries.has(aggKey);
             // Extra props that only apply to Bar-type graphs
             const extraProps: Record<string, unknown> = {};
@@ -1086,8 +1123,16 @@ const CustomGraph_ = React.memo(
                   hide={isHidden}
                   dataKey={aggKey}
                   stroke={strokeColor}
-                  stackId={["stacked_bar", "stacked_area"].includes(input.graphType) ? "same" : undefined}
-                  fill={isAreaType ? `url(#gradient-${uniqueId}-${index})` : fillColor}
+                  stackId={
+                    ["stacked_bar", "stacked_area"].includes(input.graphType)
+                      ? "same"
+                      : undefined
+                  }
+                  fill={
+                    isAreaType
+                      ? `url(#gradient-${uniqueId}-${index})`
+                      : fillColor
+                  }
                   fillOpacity={isBarType ? 0.8 : undefined}
                   {...extraProps}
                   strokeWidth={isBarType ? 0 : 2.5}
@@ -1105,9 +1150,16 @@ const CustomGraph_ = React.memo(
                     if (onDataPointClick && data) {
                       // Extract date from data - check multiple possible locations
                       let date: string | undefined;
-                      if (["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType)) {
+                      if (
+                        ["bar", "stacked_bar", "horizontal_bar"].includes(
+                          input.graphType,
+                        )
+                      ) {
                         // For bar charts, check multiple possible locations for the date
-                        date = data.payload?.date || data.date || data.activePayload?.[0]?.payload?.date;
+                        date =
+                          data.payload?.date ||
+                          data.date ||
+                          data.activePayload?.[0]?.payload?.date;
                       } else {
                         // For other chart types (line, area, etc.), use existing logic
                         date = data.date || data.payload?.date;
@@ -1118,13 +1170,17 @@ const CustomGraph_ = React.memo(
                       let endDate: string | undefined;
                       if (
                         date &&
-                        ["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType) &&
+                        ["bar", "stacked_bar", "horizontal_bar"].includes(
+                          input.graphType,
+                        ) &&
                         typeof timeScale === "number"
                       ) {
                         const clickedDate = new Date(date);
                         startDate = clickedDate.toISOString();
                         // Calculate endDate by adding the timeScale in minutes
-                        const endDateObj = new Date(clickedDate.getTime() + timeScale * 60 * 1000);
+                        const endDateObj = new Date(
+                          clickedDate.getTime() + timeScale * 60 * 1000,
+                        );
                         endDate = endDateObj.toISOString();
                       }
 
@@ -1181,8 +1237,7 @@ const CustomGraph_ = React.memo(
       JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
       JSON.stringify(prevProps.titleProps) ===
         JSON.stringify(nextProps.titleProps) &&
-      JSON.stringify(prevProps.filters) ===
-        JSON.stringify(nextProps.filters) &&
+      JSON.stringify(prevProps.filters) === JSON.stringify(nextProps.filters) &&
       prevProps.onDataPointClick === nextProps.onDataPointClick
     );
   },
@@ -1425,6 +1480,7 @@ function MonitorGraph({
   sortedKeys,
   currentAndPreviousData,
   currentAndPreviousDataFilled,
+  summaryTimeseries,
   nameForSeries,
   getColor,
   size,
@@ -1438,6 +1494,10 @@ function MonitorGraph({
   seriesByKey: Record<string, Series>;
   currentAndPreviousData: ReturnType<typeof shapeDataForGraph>;
   currentAndPreviousDataFilled: ReturnType<typeof shapeDataForGraph>;
+  summaryTimeseries: UseTRPCQueryResult<
+    inferRouterOutputs<AppRouter>["analytics"]["getTimeseries"],
+    TRPCClientErrorLike<AppRouter>
+  >;
   sortedKeys: string[];
   nameForSeries: (aggKey: string) => string;
   getColor: (
@@ -1460,33 +1520,44 @@ function MonitorGraph({
   const isPassRate = firstKey.includes("pass_rate");
   const allValues = isPassRate
     ? currentAndPreviousDataFilled
-      ?.map((entry) => entry[firstKey]!)
-      .filter((x) => x !== undefined && x !== null)
+        ?.map((entry) => entry[firstKey]!)
+        .filter((x) => x !== undefined && x !== null)
     : currentAndPreviousData
-      ?.map((entry) => entry[firstKey]!)
-      .filter((x) => x !== undefined && x !== null);
-  const hasData = allValues !== undefined && allValues.length > 0;
-  const total =
-    allValues?.reduce((acc, curr) => {
-      return acc + curr;
-    }, 0) ?? 0;
-  const average = total / (allValues?.length ?? 1);
-  const hasLoaded = currentAndPreviousDataFilled?.length !== undefined;
+        ?.map((entry) => entry[firstKey]!)
+        .filter((x) => x !== undefined && x !== null);
+  const dailyAverage =
+    (allValues?.reduce((acc, curr) => acc + curr, 0) ?? 0) /
+    (allValues?.length ?? 1);
+
+  // The headline is the run-weighted value over the whole period (one "full"
+  // bucket), so it matches the run-counting charts on the analytics page. The
+  // daily buckets only draw the sparkline; averaging them would weigh a 1-run
+  // day the same as a 100-run day. Fall back to that average only if the
+  // full-period read errored, so a transient failure doesn't blank the card.
+  const summaryRaw = summaryTimeseries.data?.currentPeriod?.[0]?.[firstKey];
+  const summaryValue =
+    typeof summaryRaw === "number"
+      ? summaryRaw
+      : summaryTimeseries.isError && allValues && allValues.length > 0
+        ? dailyAverage
+        : undefined;
+  const hasData = summaryValue !== undefined;
+  const hasLoaded =
+    currentAndPreviousDataFilled?.length !== undefined &&
+    (summaryTimeseries.data !== undefined || summaryTimeseries.isError);
   const gray400 = useColorRawValue("gray.400");
 
   // TODO: allow user to define the thresholds instead of hardcoded amounts
   const colorSet: RotatingColorSet = input.monitorGraph?.disabled
     ? "grayTones"
-    : !hasData || average > 0.8 || !hasLoaded
+    : summaryValue === undefined || summaryValue > 0.8 || !hasLoaded
       ? "greenTones"
-      : average < 0.4
+      : summaryValue < 0.4
         ? "redTones"
         : "orangeTones";
 
   const finiteValues =
-    allValues && allValues.length > 0
-      ? allValues.filter(Number.isFinite)
-      : [];
+    allValues && allValues.length > 0 ? allValues.filter(Number.isFinite) : [];
   const maxValue = isPassRate
     ? 1
     : finiteValues.length > 0
@@ -1551,15 +1622,12 @@ function MonitorGraph({
           <Text fontSize="2xl" fontWeight="bold">
             {hasLoaded ? (
               hasData ? (
-                numeral(average).format(isPassRate ? "0%" : "0.[00]")
+                numeral(summaryValue).format(isPassRate ? "0%" : "0.[00]")
               ) : (
                 "-"
               )
             ) : (
-              <Skeleton
-                width="56px"
-                height="36px"
-              />
+              <Skeleton width="56px" height="36px" />
             )}
           </Text>
           <Text fontSize="xs">
@@ -1580,7 +1648,7 @@ function MonitorGraph({
               );
               const periodDays = Math.ceil(
                 (filterParams.endDate - filterParams.startDate) /
-                (1000 * 60 * 60 * 24),
+                  (1000 * 60 * 60 * 24),
               );
 
               // If end date is within one day of today, show "Last X days"
@@ -1606,10 +1674,10 @@ function MonitorGraph({
           margin={
             size === "md"
               ? {
-                top: 10,
-                left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
-                right: 24,
-              }
+                  top: 10,
+                  left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
+                  right: 24,
+                }
               : {}
           }
         >
@@ -1622,7 +1690,8 @@ function MonitorGraph({
                 tickFormatter={formatDate}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
+                tick={{ fill: gray400 }}
+                style={{ fontSize: "11px" }}
               />
               <YAxis
                 type="number"
@@ -1631,7 +1700,8 @@ function MonitorGraph({
                 tickCount={4}
                 tickMargin={20}
                 domain={[0, maxValue]}
-                tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
+                tick={{ fill: gray400 }}
+                style={{ fontSize: "11px" }}
                 tickFormatter={(value) => {
                   if (typeof yAxisValueFormat === "function") {
                     return yAxisValueFormat(value);
