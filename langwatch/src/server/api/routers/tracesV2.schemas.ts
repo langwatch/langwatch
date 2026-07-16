@@ -90,6 +90,12 @@ const traceHeaderSchema = z.object({
   // True when input/output/error were teaser-redacted by the plan's
   // visibility window — drives the blurred-content upgrade treatment.
   redactedByVisibilityWindow: z.boolean().optional(),
+  // True when computed input/output still holds the write-time preview
+  // because its offloaded eventref couldn't be resolved at read time
+  // (#5835) — the drawer warns the content may be incomplete instead of
+  // implying it's complete.
+  inputTruncated: z.boolean().optional(),
+  outputTruncated: z.boolean().optional(),
   models: z.array(z.string()),
   /**
    * Grand list-price cost of the trace (sum of span costs). LangWatch bills

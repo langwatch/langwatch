@@ -117,7 +117,9 @@ function buildFilterWhere(input: {
 // Mappers – internal types → scoped output models
 // ---------------------------------------------------------------------------
 
-function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
+export function mapTraceSummaryToHeader(
+  summary: TraceSummaryData,
+): TraceHeader {
   const totalTokens =
     (summary.totalPromptTokenCount ?? 0) +
     (summary.totalCompletionTokenCount ?? 0);
@@ -149,6 +151,8 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     input: summary.computedInput,
     output: summary.computedOutput,
     redactedByVisibilityWindow: summary.redactedByVisibilityWindow,
+    inputTruncated: summary.inputTruncated,
+    outputTruncated: summary.outputTruncated,
     models: summary.models,
     totalCost: summary.totalCost,
     nonBilledCost,
