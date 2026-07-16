@@ -35,6 +35,10 @@ import {
   TRACE_PROCESSING_COMMAND_TYPES,
   TRACE_PROCESSING_EVENT_TYPES,
 } from "../pipelines/trace-processing/schemas/constants";
+import {
+  METRIC_PROCESSING_COMMAND_TYPES,
+  METRIC_PROCESSING_EVENT_TYPES,
+} from "../pipelines/metric-processing/schemas/constants";
 
 /**
  * Test event type identifiers for integration tests.
@@ -48,6 +52,7 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
 export const EVENT_TYPE_IDENTIFIERS = [
   ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
+  ...METRIC_PROCESSING_EVENT_TYPES,
   ...EVALUATION_PROCESSING_EVENT_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
   ...SIMULATION_PROCESSING_EVENT_TYPES,
@@ -62,6 +67,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
 export const COMMAND_TYPE_IDENTIFIERS = [
   ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
+  ...METRIC_PROCESSING_COMMAND_TYPES,
   ...EVALUATION_PROCESSING_COMMAND_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
   ...SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
@@ -84,6 +90,7 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
 export const AGGREGATE_TYPE_IDENTIFIERS = [
   "trigger",
   "trace",
+  "metric",
   "evaluation",
   "experiment_run",
   "simulation_run",

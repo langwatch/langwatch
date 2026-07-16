@@ -172,7 +172,9 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   event_log: "traces",
   stored_spans: "traces",
   stored_log_records: "traces",
-  stored_metric_records: "traces",
+  metric_data_points: "traces",
+  metric_series: "traces",
+  metric_time_rollups: "traces",
   trace_summaries: "traces",
   // ADR-034: both analytics projections derive from trace events and age with
   // the same per-project retention policy as trace_summaries.
@@ -199,3 +201,19 @@ export type RetentionManagedTable = keyof typeof RETENTION_TABLE_CATEGORY_MAP;
 export const RETENTION_MANAGED_TABLES = Object.keys(
   RETENTION_TABLE_CATEGORY_MAP,
 ) as RetentionManagedTable[];
+
+/**
+ * Tables included in the customer-visible production storage meter. Canonical
+ * metrics follow trace retention, but remain shadow-only for pricing: their
+ * raw source bytes and derived rows must not affect billed storage totals.
+ */
+const SHADOW_METRIC_STORAGE_TABLES = new Set<RetentionManagedTable>([
+  "metric_data_points",
+  "metric_series",
+  "metric_time_rollups",
+]);
+
+export const PRODUCTION_STORAGE_METER_TABLES =
+  RETENTION_MANAGED_TABLES.filter(
+    (table) => !SHADOW_METRIC_STORAGE_TABLES.has(table),
+  );
