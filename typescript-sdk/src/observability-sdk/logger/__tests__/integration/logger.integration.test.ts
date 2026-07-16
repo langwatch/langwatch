@@ -59,6 +59,11 @@ describe("Logger Integration Tests", () => {
    * Each start also gets its own exporter and processor, because shutting a
    * handle down shuts down its processors too. A processor shared across tests
    * would stop recording for every test after the first shutdown.
+   *
+   * `disableAutoShutdown` keeps setup from registering beforeExit/SIGINT/SIGTERM
+   * handlers on every start. Those are never removed, not even by shutdown, so
+   * without this each start leaks three process listeners and the suite trips
+   * Node's MaxListeners warning. `afterEach` owns teardown here.
    */
   function startObservability({
     dataCapture,
@@ -73,7 +78,7 @@ describe("Logger Integration Tests", () => {
       langwatch: "disabled",
       logRecordProcessors: [logRecordProcessor],
       debug: { logger: new NoOpLogger() },
-      advanced: { throwOnSetupError: true },
+      advanced: { throwOnSetupError: true, disableAutoShutdown: true },
       ...(dataCapture ? { dataCapture } : {}),
       attributes: {
         "test.suite": "logger-integration",
@@ -94,6 +99,28 @@ describe("Logger Integration Tests", () => {
   afterEach(async () => {
     await observabilityHandle.shutdown();
     resetObservabilitySdkConfig();
+  });
+
+  describe("when observability is started repeatedly", () => {
+    const countShutdownListeners = () =>
+      process.listenerCount("beforeExit") +
+      process.listenerCount("SIGINT") +
+      process.listenerCount("SIGTERM");
+
+    it("leaves the process shutdown listener count unchanged", async () => {
+      // Setup registers beforeExit/SIGINT/SIGTERM handlers unless
+      // disableAutoShutdown is set, and never removes them again. This suite
+      // starts observability once per test, so a leak here accumulates across
+      // the whole file and can outlive it.
+      const before = countShutdownListeners();
+
+      for (let i = 0; i < 3; i++) {
+        const handle = startObservability();
+        await handle.shutdown();
+      }
+
+      expect(countShutdownListeners()).toBe(before);
+    });
   });
 
   describe("log record creation and data flow", () => {
