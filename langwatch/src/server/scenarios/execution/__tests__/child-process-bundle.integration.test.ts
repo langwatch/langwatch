@@ -7,6 +7,7 @@
 
 import { execSync, spawnSync, spawn } from "child_process";
 import fs from "fs";
+import { isBuiltin } from "module";
 import path from "path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -115,5 +116,50 @@ describe("Pre-compiled Scenario Child Process", () => {
       // Exit code 1 = it started, read stdin, failed to parse (expected behavior)
       expect(result.exitCode).toBe(1);
     }, 8000);
+
+    // Regression guard for #5855: the bundle keeps some deps external (see the
+    // `external` list in scripts/build-scenario-child-process.mjs), so it emits
+    // runtime require("x") calls that MUST resolve from the bundle's own
+    // directory — the exact resolution root prod uses. An external that is only
+    // a transitive dep of a workspace package (e.g. pino via
+    // @langwatch/observability) is NOT top-linked into langwatch/node_modules by
+    // pnpm, so its require throws MODULE_NOT_FOUND at prod boot. #2404 caused
+    // exactly this by moving the pino family out of the app manifest.
+    it("resolves every externalized npm require() from a prod-shaped layout", () => {
+      const content = fs.readFileSync(BUNDLE_PATH, "utf8");
+      const distDir = path.dirname(BUNDLE_PATH);
+
+      // Externalized deps appear as bare `require("x")` in the CJS bundle.
+      const emitted = new Set<string>();
+      const re = /require\("([^".][^"]*)"\)/g;
+      for (const match of content.matchAll(re)) {
+        const name = match[1];
+        if (name) {
+          emitted.add(name);
+        }
+      }
+
+      const externalPkgs = [...emitted].filter(
+        (name) => !name.startsWith(".") && !isBuiltin(name),
+      );
+
+      // Sanity: the logger dep whose absence broke prod must be one of them —
+      // if it ever stops being emitted, this guard would silently pass empty.
+      expect(externalPkgs).toContain("pino");
+
+      // Every external npm package the bundle require()s at runtime MUST resolve
+      // from the bundle's directory. If any doesn't, it is not a *direct* app
+      // dep and prod boots into MODULE_NOT_FOUND (the #5855 crash).
+      const unresolved = externalPkgs.filter((name) => {
+        try {
+          require.resolve(name, { paths: [distDir] });
+          return false;
+        } catch {
+          return true;
+        }
+      });
+
+      expect(unresolved).toEqual([]);
+    });
   });
 });
