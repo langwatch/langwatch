@@ -114,11 +114,31 @@ Feature: Reactor Outbox dispatch for stake-sensitive reactors
       And lastError records the error message
 
     Scenario: A non-retryable dispatch failure leaves the queue instead of blocking the group
-      Given a group-queue job whose dispatch raises a non-retryable DispatchError
+      Given a group-queue job whose dispatch raises a provider-terminal DispatchError
       When the job fails
+      And the dead outbox row is durably recorded
       Then the job completes out of the queue rather than being re-staged
       And the group is not blocked, so later jobs for the same group still dispatch
       And the dead outbox row remains the operator's recovery surface
+
+    Scenario: A configuration or integrity failure is parked for an operator
+      Given a group-queue job whose dispatch raises a non-retryable DispatchError
+      that no provider verdict backs — an invalid webhook URL, a missing token
+      or channel, a misrouted batch
+      When the job fails
+      Then the group is blocked and the job re-staged for an operator
+      So that a broken invariant is never silently dead-lettered, and later work
+      cannot proceed on the same broken configuration unnoticed
+
+    Scenario: A provider-terminal failure whose dead transition cannot be recorded stays recoverable
+      Given a group-queue job whose dispatch raises a provider-terminal DispatchError
+      When the job fails
+      And the dead outbox row cannot be durably recorded, because the side-store
+      is unavailable
+      Then the job is not completed out of the queue
+      And the group is blocked and the job re-staged instead
+      So that the dispatch is never dropped while the recovery surface that was
+      meant to carry it to an operator does not exist
 
     Scenario: Worker crash mid-dispatch releases the lease and retries
       Given a row leased to a worker that never completed

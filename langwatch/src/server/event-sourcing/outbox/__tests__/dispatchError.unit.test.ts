@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { SECRETS_REDACTION_MARKER } from "~/server/data-privacy/redaction/secretsRedaction";
 import {
   DispatchError,
   extractHttpStatus,
   isDispatchError,
+  isProviderTerminal,
   isRetryableHttpStatus,
+  MAX_CAUSE_MESSAGE_LENGTH,
   toDispatchError,
 } from "../dispatchError";
 
@@ -26,6 +29,77 @@ describe("DispatchError", () => {
       const err = new DispatchError({ message: "x", retryable: true });
       expect(err).toBeInstanceOf(Error);
       expect(err).toBeInstanceOf(DispatchError);
+    });
+
+    it("carries the disposition when one is given", () => {
+      const err = new DispatchError({
+        message: "x",
+        retryable: false,
+        disposition: "provider_terminal",
+      });
+      expect(err.disposition).toBe("provider_terminal");
+    });
+
+    it("leaves the disposition absent when none is given", () => {
+      const err = new DispatchError({ message: "x", retryable: false });
+      expect(err.disposition).toBeUndefined();
+    });
+  });
+});
+
+describe("isProviderTerminal", () => {
+  describe("when the failure is a non-retryable provider verdict", () => {
+    it("returns true", () => {
+      expect(
+        isProviderTerminal(
+          new DispatchError({
+            message: "revoked webhook",
+            retryable: false,
+            disposition: "provider_terminal",
+          }),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe("when the failure is a non-retryable config error", () => {
+    it("returns false so the queue parks it rather than dead-lettering it", () => {
+      expect(
+        isProviderTerminal(
+          new DispatchError({
+            message: "invalid slack url",
+            retryable: false,
+            disposition: "config",
+          }),
+        ),
+      ).toBe(false);
+    });
+
+    it("returns false when the disposition was never classified", () => {
+      expect(
+        isProviderTerminal(
+          new DispatchError({
+            message: "mixed cadence batch",
+            retryable: false,
+          }),
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe("when the failure is retryable or not a DispatchError", () => {
+    it("returns false", () => {
+      expect(
+        isProviderTerminal(
+          new DispatchError({
+            message: "429",
+            retryable: true,
+            disposition: "provider_terminal",
+          }),
+        ),
+      ).toBe(false);
+      expect(isProviderTerminal(new Error("plain"))).toBe(false);
+      expect(isProviderTerminal(null)).toBe(false);
     });
   });
 });
@@ -126,6 +200,49 @@ describe("toDispatchError", () => {
       expect(err.retryable).toBe(false);
       expect(err.message).toBe("send failed: HTTP 404");
     });
+
+    it("marks it provider-terminal, because the provider itself returned the verdict", () => {
+      const err = toDispatchError(
+        { response: { status: 404 } },
+        { message: "send failed" },
+      );
+      expect(err.disposition).toBe("provider_terminal");
+      expect(isProviderTerminal(err)).toBe(true);
+    });
+  });
+
+  describe("when the caller declares the failure non-retryable itself", () => {
+    it("marks it config, so a broken invariant is never dead-lettered as a provider verdict", () => {
+      const err = toDispatchError(new Error("invalid slack webhook url"), {
+        message: "guard rejected",
+        retryable: false,
+      });
+      expect(err.retryable).toBe(false);
+      expect(err.disposition).toBe("config");
+      expect(isProviderTerminal(err)).toBe(false);
+    });
+
+    it("stays config even when a terminal status is also present", () => {
+      // The override wins the retryable decision, so it must own the
+      // disposition too — otherwise a caller-classified config failure would
+      // inherit provider-terminal treatment from an incidental status.
+      const err = toDispatchError(
+        Object.assign(new Error("rejected"), { response: { status: 400 } }),
+        { message: "guard rejected", retryable: false },
+      );
+      expect(err.disposition).toBe("config");
+      expect(isProviderTerminal(err)).toBe(false);
+    });
+  });
+
+  describe("when a retryable failure is classified", () => {
+    it("is never provider-terminal", () => {
+      const err = toDispatchError(
+        { response: { status: 503 } },
+        { message: "send failed" },
+      );
+      expect(isProviderTerminal(err)).toBe(false);
+    });
   });
 
   describe("when the failure has no recognizable status", () => {
@@ -158,12 +275,57 @@ describe("toDispatchError", () => {
       expect(err.message).toBe("render failed: template exploded");
     });
 
-    it("caps an oversized provider message instead of inlining it whole", () => {
+    it("caps an oversized provider message at exactly the cause limit, ellipsis included", () => {
       const err = toDispatchError(new Error("x".repeat(2000)), {
         message: "send failed",
       });
-      expect(err.message.length).toBeLessThan(500);
-      expect(err.message).toContain("…");
+      const cause = err.message.replace("send failed: ", "");
+      expect(cause).toHaveLength(MAX_CAUSE_MESSAGE_LENGTH);
+      expect(cause.endsWith("…")).toBe(true);
+      expect(cause).toBe("x".repeat(MAX_CAUSE_MESSAGE_LENGTH - 1) + "…");
+    });
+
+    it("leaves a message at the cap untouched rather than truncating it", () => {
+      const exact = "x".repeat(MAX_CAUSE_MESSAGE_LENGTH);
+      const err = toDispatchError(new Error(exact), {
+        message: "send failed",
+      });
+      expect(err.message).toBe(`send failed: ${exact}`);
+    });
+  });
+
+  describe("when the provider echoes a secret back in its error message", () => {
+    it("redacts the secret before it can reach logs or audit rows", () => {
+      const err = toDispatchError(
+        new Error(
+          'request failed: {"authorization":"Bearer sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAA"}',
+        ),
+        { message: "send failed" },
+      );
+      expect(err.message).not.toContain(
+        "sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      );
+      expect(err.message).toContain(SECRETS_REDACTION_MARKER);
+    });
+
+    it("redacts before capping, so a long body cannot smuggle a secret past the cap", () => {
+      // The secret sits past the cap: redaction must run on the whole message
+      // first, or truncation would simply hide (not scrub) it — and a slightly
+      // shorter body would leak it verbatim.
+      // Assembled at runtime: a token-shaped literal in the source trips
+      // GitHub's push protection even as a fixture.
+      const slackToken = [
+        "xoxb",
+        "111111111111",
+        "222222222222",
+        "abcdefghijklmnopqrstuvwx",
+      ].join("-");
+      const err = toDispatchError(
+        new Error("padding ".repeat(20) + slackToken),
+        { message: "send failed" },
+      );
+      expect(err.message).not.toContain(slackToken);
+      expect(err.message).toContain(SECRETS_REDACTION_MARKER);
     });
   });
 

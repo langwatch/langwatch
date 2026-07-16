@@ -243,11 +243,24 @@ export interface QueueAuditAdapter<Payload> {
     attempt: number;
   }): Promise<void>;
 
+  /**
+   * Records the terminal transition. Returns whether it was durably written:
+   * `true` only when the adapter's side-store acknowledged the write and it
+   * landed on a row.
+   *
+   * This is the one hook whose result a queue may act on. A dead row is the
+   * operator's only recovery surface for a job the queue is about to remove,
+   * so a queue that completes a job out of the queue must confirm the
+   * transition first (see the provider-terminal path in `groupQueue`) and keep
+   * the job recoverable when it returns `false`. Every other hook — and this
+   * one on the block/park path, where the parked job is itself the recovery
+   * surface — stays best-effort.
+   */
   onDead(event: {
     payload: Payload;
     lastError: string;
     attempt: number;
-  }): Promise<void>;
+  }): Promise<boolean>;
 }
 
 /**

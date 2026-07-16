@@ -15,7 +15,10 @@ import {
   getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
 import { GroupQueueProcessor } from "../groupQueue";
-import type { EventSourcedQueueDefinition } from "../../queue.types";
+import type {
+  EventSourcedQueueDefinition,
+  QueueAuditAdapter,
+} from "../../queue.types";
 import { DispatchError } from "../../../outbox/dispatchError";
 
 // Skip when running without testcontainers (unit-only test runs)
@@ -81,6 +84,29 @@ describe.skipIf(!hasTestcontainers)(
       );
       queues.push(queue);
       return queue;
+    }
+
+    const blockedMembers = (name: string) =>
+      redis.smembers(`${name}:gq:blocked`);
+
+    /** A queue name the test can build Redis keys from, since the processor
+     *  keeps its own name private. */
+    const uniqueQueueName = () =>
+      `{test/gq/${crypto.randomUUID().slice(0, 8)}}`;
+
+    /** Audit adapter whose hooks all no-op, with a durably-recorded `onDead`.
+     *  Overrides let a test make one hook misbehave. */
+    function stubAuditAdapter(
+      overrides: Partial<QueueAuditAdapter<TestPayload>> = {},
+    ): QueueAuditAdapter<TestPayload> {
+      return {
+        onEnqueue: async () => undefined,
+        onLeased: async () => undefined,
+        onDispatched: async () => undefined,
+        onFailed: async () => undefined,
+        onDead: async () => true,
+        ...overrides,
+      };
     }
 
     describe("send()", () => {
@@ -770,43 +796,160 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
-    describe("non-retryable dispatch failures", () => {
-      describe("when a job fails with a non-retryable DispatchError", () => {
-        /** @scenario 'A non-retryable dispatch failure leaves the queue instead of blocking the group' */
-        it("completes the job out of the queue so later jobs in the same group still dispatch", async () => {
-          const processed: TestPayload[] = [];
-          const attemptsById = new Map<string, number>();
-          const queue = createQueue(async (p) => {
+    describe("when a job fails with a provider-terminal DispatchError", () => {
+      /** @scenario 'A non-retryable dispatch failure leaves the queue instead of blocking the group' */
+      it("completes the job out of the queue so later jobs in the same group still dispatch", async () => {
+        const processed: TestPayload[] = [];
+        const attemptsById = new Map<string, number>();
+        const name = uniqueQueueName();
+        const queue = createQueue(
+          async (p) => {
             attemptsById.set(p.id, (attemptsById.get(p.id) ?? 0) + 1);
             if (p.id === "dead-webhook") {
               throw new DispatchError({
                 message: "Slack webhook dispatch failed: HTTP 404",
                 retryable: false,
+                disposition: "provider_terminal",
               });
             }
             processed.push(p);
-          });
-          await queue.waitUntilReady();
+          },
+          { name, auditAdapter: stubAuditAdapter() },
+        );
+        await queue.waitUntilReady();
 
-          await queue.send({
-            id: "dead-webhook",
-            groupId: "group-a",
-            value: "1",
-          });
-          await queue.send({ id: "next-alert", groupId: "group-a", value: "2" });
-
-          // The group must not be blocked by the terminal failure: the
-          // follow-up job for the same group still dispatches.
-          await vi.waitFor(
-            () => {
-              expect(processed.map((p) => p.id)).toContain("next-alert");
-            },
-            { timeout: 15000, interval: 100 },
-          );
-
-          // And the failed job left the queue without being re-fired.
-          expect(attemptsById.get("dead-webhook")).toBe(1);
+        await queue.send({
+          id: "dead-webhook",
+          groupId: "group-a",
+          value: "1",
         });
+        await queue.send({ id: "next-alert", groupId: "group-a", value: "2" });
+
+        // The group must not be blocked by the terminal failure: the
+        // follow-up job for the same group still dispatches.
+        await vi.waitFor(
+          () => {
+            expect(processed.map((p) => p.id)).toContain("next-alert");
+          },
+          { timeout: 15000, interval: 100 },
+        );
+
+        // And the failed job left the queue without being re-fired.
+        expect(attemptsById.get("dead-webhook")).toBe(1);
+        expect(await blockedMembers(name)).not.toContain("group-a");
+      });
+    });
+
+    describe("when a job fails with a non-retryable config DispatchError", () => {
+      /** @scenario 'A configuration or integrity failure is parked for an operator' */
+      it("parks the group for an operator instead of dead-lettering the broken invariant", async () => {
+        const processed: TestPayload[] = [];
+        const name = uniqueQueueName();
+        const queue = createQueue(
+          async (p) => {
+            if (p.id === "bad-config") {
+              // Same `retryable: false` as a terminal provider verdict, but the
+              // provider never rendered one — the config is broken on our side.
+              throw new DispatchError({
+                message: "Slack webhook URL is not a hooks.slack.com endpoint",
+                retryable: false,
+                disposition: "config",
+              });
+            }
+            processed.push(p);
+          },
+          { name, auditAdapter: stubAuditAdapter() },
+        );
+        await queue.waitUntilReady();
+
+        await queue.send({ id: "bad-config", groupId: "group-a", value: "1" });
+        await queue.send({ id: "next-alert", groupId: "group-a", value: "2" });
+
+        await vi.waitFor(
+          async () => {
+            expect(await blockedMembers(name)).toContain("group-a");
+          },
+          { timeout: 15000, interval: 100 },
+        );
+
+        // The group stays parked, so later work cannot proceed on the same
+        // broken config behind the operator's back.
+        expect(processed.map((p) => p.id)).not.toContain("next-alert");
+      });
+    });
+
+    describe("when a provider-terminal failure's dead transition cannot be recorded", () => {
+      /** @scenario 'A provider-terminal failure whose dead transition cannot be recorded stays recoverable' */
+      it("parks the job rather than completing it with no recovery surface", async () => {
+        const processed: TestPayload[] = [];
+        const name = uniqueQueueName();
+        const queue = createQueue(
+          async (p) => {
+            if (p.id === "dead-webhook") {
+              throw new DispatchError({
+                message: "Slack webhook dispatch failed: HTTP 404",
+                retryable: false,
+                disposition: "provider_terminal",
+              });
+            }
+            processed.push(p);
+          },
+          {
+            name,
+            // The side-store is down, so the dead row that would carry this
+            // alert to an operator was never written.
+            auditAdapter: stubAuditAdapter({ onDead: async () => false }),
+          },
+        );
+        await queue.waitUntilReady();
+
+        await queue.send({
+          id: "dead-webhook",
+          groupId: "group-a",
+          value: "1",
+        });
+
+        await vi.waitFor(
+          async () => {
+            expect(await blockedMembers(name)).toContain("group-a");
+          },
+          { timeout: 15000, interval: 100 },
+        );
+      });
+
+      it("treats a throwing audit adapter as an unrecorded transition", async () => {
+        const name = uniqueQueueName();
+        const queue = createQueue(
+          async () => {
+            throw new DispatchError({
+              message: "Slack webhook dispatch failed: HTTP 404",
+              retryable: false,
+              disposition: "provider_terminal",
+            });
+          },
+          {
+            name,
+            auditAdapter: stubAuditAdapter({
+              onDead: async () => {
+                throw new Error("postgres is down");
+              },
+            }),
+          },
+        );
+        await queue.waitUntilReady();
+
+        await queue.send({
+          id: "dead-webhook",
+          groupId: "group-a",
+          value: "1",
+        });
+
+        await vi.waitFor(
+          async () => {
+            expect(await blockedMembers(name)).toContain("group-a");
+          },
+          { timeout: 15000, interval: 100 },
+        );
       });
     });
   },

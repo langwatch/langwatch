@@ -328,14 +328,23 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
     );
   }
 
+  /**
+   * Returns whether the row reached `dead` durably — PG acknowledged the write
+   * AND the CAS matched a row. A caller that is about to drop the job's only
+   * other trace (the queue's provider-terminal completion) relies on this, so
+   * a swallowed PG outage must read as `false`, not as success.
+   *
+   * A payload that is neither settle nor cadence has no outbox row here, so
+   * there is nothing this adapter can durably record for it.
+   */
   async onDead(event: {
     payload: OutboxJob;
     lastError: string;
     attempt: number;
-  }): Promise<void> {
+  }): Promise<boolean> {
     const p = event.payload;
-    if (!isSettle(p) && !isCadence(p)) return;
-    await this.write(() =>
+    if (!isSettle(p) && !isCadence(p)) return false;
+    const rowsAffected = await this.write(() =>
       this.prisma.reactorOutbox.updateMany({
         where: {
           projectId: p.projectId,
@@ -353,6 +362,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
         },
       }),
     );
+    return rowsAffected > 0;
   }
 
   /**

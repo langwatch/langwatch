@@ -26,7 +26,10 @@ import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
-import { isDispatchError } from "../../outbox/dispatchError";
+import {
+  isDispatchError,
+  isProviderTerminal,
+} from "../../outbox/dispatchError";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -104,8 +107,13 @@ const DEFAULT_DEDUPLICATION_TTL_MS = 200;
  * Two non-retryable classes:
  * - event-sourcing errors categorized CRITICAL (validation/security/config)
  * - outbox `DispatchError`s explicitly marked `retryable: false` — the
- *   dispatcher rethrows these so the queue must dead-letter rather than
- *   re-fire a dispatch the dispatcher already judged unrecoverable.
+ *   dispatcher rethrows these so the queue never re-fires a dispatch the
+ *   dispatcher already judged unrecoverable.
+ *
+ * This decides only whether to re-fire. What becomes of a job that must not be
+ * re-fired is a separate call the failure branch makes on the error's
+ * disposition: a provider-terminal failure completes out of the queue, every
+ * other non-retryable failure parks for an operator.
  */
 export function isRetryableJobError(err: unknown): boolean {
   if (isDispatchError(err) && !err.retryable) return false;
@@ -702,6 +710,36 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
+   * Load-bearing counterpart to {@link runAudit} for the one transition a
+   * caller must not lose: `dead`. Returns whether the adapter durably recorded
+   * it, so the provider-terminal path can decide between completing the job and
+   * parking it. A thrown adapter reads as "not recorded" — the point is to
+   * distrust the write, not to let the queue die with it.
+   *
+   * A queue with no audit adapter has no dead row to strand, so there is
+   * nothing to confirm and the caller may proceed.
+   */
+  private async confirmDeadTransition(event: {
+    payload: Payload;
+    lastError: string;
+    attempt: number;
+  }): Promise<boolean> {
+    if (!this.auditAdapter) return true;
+    try {
+      return await this.auditAdapter.onDead(event);
+    } catch (err) {
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        "Audit adapter onDead threw; treating the dead transition as unrecorded",
+      );
+      return false;
+    }
+  }
+
+  /**
    * fastq worker function: poison guard, then the real job processing.
    *
    * The guard records a claim strike BEFORE any decode/parse work and clears
@@ -1161,28 +1199,89 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 span.setAttribute("error", true);
                 span.setAttribute("error.message", error.message);
 
-                if (isDispatchError(err) && !err.retryable) {
-                  // The dispatch endpoint judged this failure terminal (e.g. a
-                  // revoked Slack webhook) and the outbox audit row is
-                  // dead-lettered via onDead below — that row is the operator's
+                // Only a provider's own terminal verdict (a revoked Slack
+                // webhook, a payload it will never accept) may leave the queue
+                // this way. A config/security/integrity DispatchError is also
+                // `retryable: false`, but it signals a broken invariant on our
+                // side — completing it would dead-letter the alert and let
+                // later work proceed on the same broken config, so it takes the
+                // park-for-operator path below like any other critical error.
+                if (isProviderTerminal(err)) {
+                  // Re-firing can never succeed, and blocking the group would
+                  // stall every later job for it, so the job completes out of
+                  // the queue and its dead outbox row becomes the operator's
                   // recovery surface (specs/event-sourcing/
-                  // reactor-outbox-dispatch.feature). Blocking the group and
-                  // re-staging here would keep re-firing a dispatch that can
-                  // never succeed and stall every later job for the same group,
-                  // so the job completes out of the queue instead.
-                  gqJobsNonRetryableTotal.inc(routingLabels);
-                  this.logger.error(
-                    {
-                      queueName: this.queueName,
+                  // reactor-outbox-dispatch.feature). That makes the dead
+                  // transition load-bearing rather than best-effort: record it
+                  // BEFORE dropping the job, or the row strands in
+                  // `dispatching` with nothing left to recover it.
+                  const deadRecorded = await this.confirmDeadTransition({
+                    payload,
+                    lastError: error.message,
+                    attempt,
+                  });
+
+                  // Drained siblings keep best-effort audit: their rows resync
+                  // on a later transition, and none of them owns the queue slot
+                  // this branch is about to complete.
+                  const siblings = (batchPayloads ?? []).filter(
+                    (p) => p !== payload,
+                  );
+                  await this.runAuditAll(
+                    siblings.map(
+                      (p) => () =>
+                        this.auditAdapter?.onDead({
+                          payload: p,
+                          lastError: error.message,
+                          attempt,
+                        }),
+                    ),
+                  );
+
+                  if (deadRecorded) {
+                    gqJobsNonRetryableTotal.inc(routingLabels);
+                    this.logger.error(
+                      {
+                        queueName: this.queueName,
+                        groupId,
+                        stagedJobId,
+                        attempt,
+                        errorCategory: category,
+                        error: error.message,
+                      },
+                      "Dispatch failed non-retryably; job completed out of the queue, dead outbox row is the recovery surface",
+                    );
+                    await this.scripts.complete({
                       groupId,
                       stagedJobId,
-                      attempt,
-                      errorCategory: category,
-                      error: error.message,
-                    },
-                    "Dispatch failed non-retryably; job completed out of the queue, dead outbox row is the recovery surface",
-                  );
-                  await this.scripts.complete({ groupId, stagedJobId, jobName });
+                      jobName,
+                    });
+                  } else {
+                    // The recovery surface does not exist, so the job is all
+                    // that is left of this dispatch. Park it instead: a later
+                    // operator-driven retry re-runs the terminal dispatch and
+                    // marks it dead once the side-store is writable again.
+                    this.logger.warn(
+                      {
+                        queueName: this.queueName,
+                        groupId,
+                        stagedJobId,
+                        attempt,
+                        errorCategory: category,
+                        error: error.message,
+                      },
+                      "Dispatch failed non-retryably but the dead transition was not durably recorded; parking the job so it stays recoverable",
+                    );
+                    await this.handleExhaustedRetries({
+                      groupId,
+                      stagedJobId,
+                      payload,
+                      originalScore,
+                      lastError: error,
+                      contextMetadata,
+                      routingLabels,
+                    });
+                  }
                 } else {
                   if (!isRetryable) {
                     gqJobsNonRetryableTotal.inc(routingLabels);
@@ -1208,20 +1307,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     contextMetadata,
                     routingLabels,
                   });
+
+                  // Audit hook: terminal — onDead fires for the dispatched
+                  // payload + every drained sibling. Best-effort: the parked
+                  // job is itself the recovery surface here, so a lagging
+                  // projection loses nothing.
+                  await this.runAuditAll(
+                    (batchPayloads ?? [payload]).map(
+                      (p) => () =>
+                        this.auditAdapter?.onDead({
+                          payload: p,
+                          lastError: error.message,
+                          attempt,
+                        }),
+                    ),
+                  );
                 }
 
-                // Audit hook: terminal — onDead fires for the dispatched
-                // payload + every drained sibling.
-                await this.runAuditAll(
-                  (batchPayloads ?? [payload]).map(
-                    (p) => () =>
-                      this.auditAdapter?.onDead({
-                        payload: p,
-                        lastError: error.message,
-                        attempt,
-                      }),
-                  ),
-                );
                 await this.blobLifecycle.release({
                   values: [jobDataJson],
                   groupId,

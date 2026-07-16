@@ -28,26 +28,55 @@ Define a typed error class in the outbox framework:
 
 ```ts
 // src/server/event-sourcing/outbox/dispatchError.ts
+export type DispatchDisposition = "provider_terminal" | "config";
+
 export class DispatchError extends Error {
   readonly retryable: boolean;
   readonly cause?: unknown;
+  readonly disposition?: DispatchDisposition;
 
   constructor({
     message,
     retryable,
     cause,
+    disposition,
   }: {
     message: string;
     retryable: boolean;
     cause?: unknown;
+    disposition?: DispatchDisposition;
   }) {
     super(message);
     this.name = "DispatchError";
     this.retryable = retryable;
     this.cause = cause;
+    this.disposition = disposition;
   }
 }
 ```
+
+### Amendment: `disposition` — why `retryable: false` is not one decision
+
+`retryable` answers "re-fire this?". It does not answer "what becomes of the job?", and conflating the two is a correctness bug: `retryable: false` is thrown both for a provider's terminal verdict (a revoked webhook, a payload Slack will never accept) **and** for our own configuration, security, or integrity failures (an invalid Slack URL, a missing bot token or channel, an unsupported graph action, a mixed cadence batch, a notify-stage misrouting).
+
+Those two want opposite handling:
+
+| Disposition | Source | Queue handling |
+|---|---|---|
+| `provider_terminal` | the provider answered with a terminal HTTP status | complete out of the queue; the dead outbox row carries it to an operator |
+| `config` (or unset) | we rejected the dispatch before/without a provider verdict | park: block the group and re-stage for an operator |
+
+A config failure completed out of the queue would dead-letter the alert **and** let later work continue on the same broken invariant, unnoticed. So the queue completes a job only on an explicit `provider_terminal`; `config` and an unset disposition both park. Defaulting to the parking path keeps a hand-constructed `DispatchError` fail-safe: a new dispatch endpoint that has not thought about disposition parks rather than silently dropping alerts.
+
+`toDispatchError` sets the disposition from where the verdict came from, never from the flag alone: `provider_terminal` only when the non-retryable decision was **derived** from a terminal HTTP status, and `config` whenever a caller passed `retryable: false` itself — including when a status happens to be present, since the override owns the decision.
+
+### Amendment: the dead transition is load-bearing on the provider-terminal path
+
+Completing a job out of the queue destroys everything but the dead outbox row, so that row is not a projection there — it is the only recovery surface. Audit writes are otherwise best-effort (a PG outage logs and continues, ADR-030 revision), which on this one path would let a side-store outage remove the job while its row stays stuck in `dispatching`, with no reconciliation.
+
+So `QueueAuditAdapter.onDead` returns whether it durably recorded the transition, and the provider-terminal path confirms it **before** completing. When it cannot be confirmed, the job parks instead — the group blocks, the job re-stages, and a later attempt re-runs the terminal dispatch and marks it dead once the side-store is writable. Drained batch siblings stay best-effort: none of them owns the queue slot being completed, and their rows resync on a later transition.
+
+Every other hook, and `onDead` on the block/park path, stays best-effort — a parked job is its own recovery surface, so a lagging projection loses nothing.
 
 All dispatch endpoints invoked by `.withOutbox` reactors must throw `DispatchError` on failure:
 
@@ -126,6 +155,8 @@ In all cases the **enforcement** lives in the outbox state machine, not the prov
 - **Worker retry policy is per-error-type.** `DispatchError({ retryable: false })` transitions immediately to `dead`. `DispatchError({ retryable: true })` and unknown errors use the registered `retryPolicy.backoffMs(attempt)` until `maxAttempts`.
 - **Slack double-send risk** in the rare "dispatch succeeded but status update failed" case is accepted. Surfaced in operator activity tab (ADR-037) as a "possibly-duplicate-dispatched" badge if the row has `attemptCount > 1` AND `status='dispatched'`. Cheap to detect; cheap to surface.
 - **Future dispatch endpoints** added for new outbox reactors (e.g., `customerIoTraceSync`, `addToDataset` after migration) must follow the same contract. A unit-test convention enforces it.
+- **A non-retryable endpoint must mean it.** An endpoint that wraps a provider failure through `toDispatchError` gets its disposition classified for free. One that constructs a `DispatchError` by hand and wants the job dropped from the queue must pass `disposition: "provider_terminal"` explicitly and be sure a provider actually returned that verdict; everything else parks for an operator.
+- **Audit adapters must report `onDead` durability honestly.** An adapter that swallows a write failure must return `false`, not resolve as success — the provider-terminal path drops the job on the strength of that answer.
 
 ## References
 

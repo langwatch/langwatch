@@ -1,3 +1,22 @@
+import { redactSecretsInText } from "~/server/data-privacy/redaction/secretsRedaction";
+
+/**
+ * Why a non-retryable dispatch failed, which decides what the queue does with
+ * the job beyond not retrying it:
+ *
+ *   - `provider_terminal`: the provider answered and rejected us for good (a
+ *     revoked webhook, a payload it will never accept). Re-firing can never
+ *     succeed, so the queue completes the job out of the queue and the dead
+ *     outbox row carries it to an operator.
+ *   - `config`: we never got a usable verdict from the provider — the failure
+ *     is our own configuration, security, or integrity problem (an invalid
+ *     webhook URL, a missing token, a misrouted batch). The broken invariant
+ *     must be parked for an operator, never silently dead-lettered.
+ *
+ * See dev/docs/adr/027-typed-dispatcherror-contract.md.
+ */
+export type DispatchDisposition = "provider_terminal" | "config";
+
 /**
  * Typed error thrown by outbox dispatch endpoints to signal whether the
  * failure is worth retrying.
@@ -13,25 +32,47 @@
  * Any non-DispatchError thrown from a dispatch endpoint is treated as
  * retryable by default — better to retry an unexpected crash than to
  * silently dead-letter a row whose failure mode we did not classify.
+ *
+ * `disposition` refines a non-retryable failure. It is absent on a
+ * hand-constructed error, which reads as the conservative `config` case: only
+ * an explicit `provider_terminal` lets the queue complete a job out of the
+ * queue.
  */
 export class DispatchError extends Error {
   readonly retryable: boolean;
   readonly cause?: unknown;
+  readonly disposition?: DispatchDisposition;
 
   constructor({
     message,
     retryable,
     cause,
+    disposition,
   }: {
     message: string;
     retryable: boolean;
     cause?: unknown;
+    disposition?: DispatchDisposition;
   }) {
     super(message);
     this.name = "DispatchError";
     this.retryable = retryable;
     this.cause = cause;
+    this.disposition = disposition;
   }
+}
+
+/**
+ * Whether a failure is a provider's own terminal verdict — the only class of
+ * non-retryable failure a queue may complete out of the queue rather than park
+ * for an operator.
+ */
+export function isProviderTerminal(error: unknown): boolean {
+  return (
+    isDispatchError(error) &&
+    !error.retryable &&
+    error.disposition === "provider_terminal"
+  );
 }
 
 export function isDispatchError(error: unknown): error is DispatchError {
@@ -80,9 +121,10 @@ export function extractHttpStatus(error: unknown): number | undefined {
 
 /**
  * Providers can embed whole response bodies in their error messages; cap the
- * detail so log lines and audit rows stay readable.
+ * detail so log lines and audit rows stay readable. The cap is inclusive of the
+ * ellipsis a truncated message ends with.
  */
-const MAX_CAUSE_MESSAGE_LENGTH = 300;
+export const MAX_CAUSE_MESSAGE_LENGTH = 300;
 
 /**
  * Human-readable summary of the underlying failure — "HTTP 404 — <provider
@@ -90,6 +132,11 @@ const MAX_CAUSE_MESSAGE_LENGTH = 300;
  * (outbox dispatcher logs, group-queue audit rows, Sentry titles) serializes
  * only `error.message`, so the detail must live in the message itself for an
  * operator to tell a revoked webhook from a rejected payload.
+ *
+ * Providers routinely echo the request (headers, auth, whole response bodies)
+ * back in the error message, so secrets are scrubbed before the detail reaches
+ * any of those sinks. Redaction runs before the cap, so the marker a redaction
+ * leaves behind is what gets truncated — never a half-scrubbed credential.
  */
 function describeCause(error: unknown, status: number | undefined): string {
   const rawMessage =
@@ -98,10 +145,11 @@ function describeCause(error: unknown, status: number | undefined): string {
       : typeof error === "string"
         ? error
         : "";
+  const { text: redactedMessage } = redactSecretsInText({ text: rawMessage });
   const causeMessage =
-    rawMessage.length > MAX_CAUSE_MESSAGE_LENGTH
-      ? rawMessage.slice(0, MAX_CAUSE_MESSAGE_LENGTH) + "…"
-      : rawMessage;
+    redactedMessage.length > MAX_CAUSE_MESSAGE_LENGTH
+      ? redactedMessage.slice(0, MAX_CAUSE_MESSAGE_LENGTH - 1) + "…"
+      : redactedMessage;
   return [status === undefined ? "" : `HTTP ${status}`, causeMessage]
     .filter(Boolean)
     .join(" — ");
@@ -117,6 +165,11 @@ function describeCause(error: unknown, status: number | undefined): string {
  * render failure where the payload itself is malformed), it can pass
  * `retryable: false` to short-circuit the HTTP-status heuristic and
  * promote the row straight to `dead`.
+ *
+ * The disposition follows from where the non-retryable verdict came from: only
+ * a terminal HTTP status the provider itself returned is `provider_terminal`.
+ * A caller-supplied `retryable: false` is a config/integrity judgement we made
+ * without the provider, so it stays `config` and parks for an operator.
  */
 export function toDispatchError(
   error: unknown,
@@ -129,12 +182,18 @@ export function toDispatchError(
   const status = extractHttpStatus(error);
   const causeSummary = describeCause(error, status);
   const fullMessage = causeSummary ? `${message}: ${causeSummary}` : message;
+  const derivedFromStatus = retryableOverride === undefined;
   const retryable =
     retryableOverride ??
     (status === undefined ? true : isRetryableHttpStatus(status));
+  const disposition: DispatchDisposition =
+    derivedFromStatus && status !== undefined && !isRetryableHttpStatus(status)
+      ? "provider_terminal"
+      : "config";
   return new DispatchError({
     message: fullMessage,
     retryable,
     cause: error,
+    disposition,
   });
 }

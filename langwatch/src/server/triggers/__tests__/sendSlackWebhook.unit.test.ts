@@ -12,9 +12,44 @@ vi.mock("@slack/webhook", () => ({
 }));
 
 import {
+  MAX_TEXT_BYTES,
   sendRenderedSlackMessage,
   sendSlackWebhook,
 } from "../sendSlackWebhook";
+
+const dispatchedText = (): string =>
+  sendMock.mock.calls[0]?.[0]?.text as string;
+
+/** One trace carrying the given events, shaped like the trigger pipeline's. */
+function traceWith({
+  traceId,
+  input = "in",
+  output = "out",
+  events = [],
+}: {
+  traceId: string;
+  input?: string;
+  output?: string;
+  events?: unknown[];
+}) {
+  return {
+    traceId,
+    input,
+    output,
+    fullTrace: { trace_id: traceId, events } as unknown as Trace,
+  };
+}
+
+function sendWithTraces(triggerData: ReturnType<typeof traceWith>[]) {
+  return sendSlackWebhook({
+    triggerWebhook: "https://hooks.slack.com/services/T/B/X",
+    triggerData,
+    triggerName: "Quality Alert",
+    projectSlug: "demo",
+    triggerType: AlertType.WARNING,
+    triggerMessage: "",
+  });
+}
 
 function callSlack() {
   return sendSlackWebhook({
@@ -245,6 +280,152 @@ describe("sendSlackWebhook", () => {
       const text = sendMock.mock.calls[0]?.[0]?.text as string;
       expect(text).toContain("*Input:* in");
       expect(text).not.toContain("in…");
+    });
+  });
+
+  describe("when escaping inflates content past the per-field caps", () => {
+    it("keeps the dispatched payload within the byte budget", async () => {
+      sendMock.mockResolvedValue(undefined);
+      // Each field caps at 500 chars, but every `&` escapes to 5 chars, so ten
+      // traces of input+output alone reach ~50KB post-escape — the exact shape
+      // Slack rejects with a terminal 400.
+      const escapeHeavy = "&".repeat(500);
+      await sendWithTraces(
+        Array.from({ length: 10 }, (_, i) =>
+          traceWith({
+            traceId: `trace-${i}`,
+            input: escapeHeavy,
+            output: escapeHeavy,
+          }),
+        ),
+      );
+
+      const text = dispatchedText();
+      expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(
+        MAX_TEXT_BYTES,
+      );
+      expect(text).toContain("[truncated]");
+    });
+
+    it("bounds a payload made of mixed mrkdwn control characters", async () => {
+      sendMock.mockResolvedValue(undefined);
+      const escapeHeavy = "<&>".repeat(200);
+      await sendWithTraces(
+        Array.from({ length: 10 }, (_, i) =>
+          traceWith({
+            traceId: `trace-${i}`,
+            input: escapeHeavy,
+            output: escapeHeavy,
+            events: Array.from({ length: 20 }, (_, e) => ({
+              event_type: `evt-${e}`,
+              metrics: Object.fromEntries(
+                Array.from({ length: 30 }, (_, m) => [`m${m}`, m]),
+              ),
+              event_details: Object.fromEntries(
+                Array.from({ length: 30 }, (_, d) => [`d${d}`, escapeHeavy]),
+              ),
+            })),
+          }),
+        ),
+      );
+
+      const text = dispatchedText();
+      expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(
+        MAX_TEXT_BYTES,
+      );
+      expect(text).not.toContain("<&>");
+    });
+  });
+
+  describe("when a trace carries high-cardinality events", () => {
+    it("caps how many events are rendered per trace", async () => {
+      sendMock.mockResolvedValue(undefined);
+      await sendWithTraces([
+        traceWith({
+          traceId: "trace-1",
+          events: Array.from({ length: 50 }, (_, e) => ({
+            event_type: `evt-${e}`,
+            metrics: {},
+            event_details: {},
+          })),
+        }),
+      ]);
+
+      const text = dispatchedText();
+      expect(text).toContain("*Event Type:* evt-0");
+      expect(text).toContain("*Event Type:* evt-9");
+      expect(text).not.toContain("evt-10");
+      expect(text).not.toContain("evt-49");
+    });
+
+    it("caps how many metric and detail entries are rendered per event", async () => {
+      sendMock.mockResolvedValue(undefined);
+      await sendWithTraces([
+        traceWith({
+          traceId: "trace-1",
+          events: [
+            {
+              event_type: "thumbs_up",
+              metrics: Object.fromEntries(
+                Array.from({ length: 50 }, (_, m) => [`m${m}`, m]),
+              ),
+              event_details: Object.fromEntries(
+                Array.from({ length: 50 }, (_, d) => [`d${d}`, "v"]),
+              ),
+            },
+          ],
+        }),
+      ]);
+
+      const text = dispatchedText();
+      expect(text).toContain("*m0:*");
+      expect(text).toContain("*m19:*");
+      expect(text).not.toContain("*m20:*");
+      expect(text).toContain("*d0:*");
+      expect(text).not.toContain("*d20:*");
+    });
+
+    it("truncates an oversized entry key instead of interpolating it whole", async () => {
+      sendMock.mockResolvedValue(undefined);
+      const hugeKey = "k".repeat(5000);
+      await sendWithTraces([
+        traceWith({
+          traceId: "trace-1",
+          events: [
+            {
+              event_type: "thumbs_up",
+              metrics: {},
+              event_details: { [hugeKey]: "v" },
+            },
+          ],
+        }),
+      ]);
+
+      const text = dispatchedText();
+      expect(text).not.toContain(hugeKey);
+      expect(text).toContain("k".repeat(100) + "…");
+    });
+  });
+
+  describe("when the trigger name and message are customer-authored", () => {
+    it("escapes and bounds them like any other interpolated field", async () => {
+      sendMock.mockResolvedValue(undefined);
+      await sendSlackWebhook({
+        triggerWebhook: "https://hooks.slack.com/services/T/B/X",
+        triggerData: [],
+        triggerName: "<script>alert(1)</script>",
+        projectSlug: "demo",
+        triggerType: AlertType.WARNING,
+        triggerMessage: "a & b".repeat(500),
+      });
+
+      const text = dispatchedText();
+      expect(text).not.toContain("<script>");
+      expect(text).toContain("&lt;script&gt;");
+      expect(text).toContain("…");
+      expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(
+        MAX_TEXT_BYTES,
+      );
     });
   });
 });

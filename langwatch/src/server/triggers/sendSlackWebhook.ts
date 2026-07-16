@@ -25,21 +25,68 @@ const escapeMrkdwn = (value: unknown): string =>
 /**
  * Trace content is unbounded customer data, but Slack rejects oversized
  * webhook payloads with a terminal 400, which would dead-letter the alert.
- * Bound every interpolated field so 10 traces of content always fit
- * (see specs/triggers/slack-webhook-dispatch.feature). Truncate before
- * escaping so the cut never lands mid-entity.
+ * Bounding happens in two layers (see
+ * specs/triggers/slack-webhook-dispatch.feature): per-field caps keep any one
+ * value readable, and `boundTextBytes` below is the guarantee that the payload
+ * fits at all.
+ *
+ * Truncate before escaping so the cut never lands mid-entity.
  */
 const MAX_FIELD_LENGTH = 500;
 
-const truncateField = (value: unknown): string => {
+/** Metric and detail keys are customer-authored too, and far shorter in any
+ *  legitimate trace than the values they label. */
+const MAX_KEY_LENGTH = 100;
+
+/** A trace can carry any number of events, each with any number of metric and
+ *  detail entries. Bound both so the message stays proportional to a trace
+ *  rather than to its cardinality. */
+const MAX_EVENTS_PER_TRACE = 10;
+const MAX_ENTRIES_PER_EVENT = 20;
+
+/**
+ * Final backstop on the assembled message. Per-field caps alone cannot bound
+ * it: escaping runs after truncation and multiplies a field up to 5x (`&` ->
+ * `&amp;`), and traces, events, and entries each multiply the field count.
+ * Slack's practical `text` ceiling is ~40000 characters, so budget in bytes —
+ * always >= the character count — and leave headroom for the rest of the
+ * payload.
+ */
+export const MAX_TEXT_BYTES = 39_000;
+const TEXT_TRUNCATION_MARKER = "\n…[truncated]";
+
+const truncate = (value: unknown, maxLength: number): string => {
   const text = String(value ?? "");
-  return text.length > MAX_FIELD_LENGTH
-    ? text.slice(0, MAX_FIELD_LENGTH) + "…"
-    : text;
+  return text.length > maxLength ? text.slice(0, maxLength) + "…" : text;
 };
 
 const formatField = (value: unknown): string =>
-  escapeMrkdwn(truncateField(value));
+  escapeMrkdwn(truncate(value, MAX_FIELD_LENGTH));
+
+const formatKey = (value: unknown): string =>
+  escapeMrkdwn(truncate(value, MAX_KEY_LENGTH));
+
+/**
+ * Caps the fully-built, escaped text at the byte budget. Cuts on a UTF-8
+ * character boundary so a truncated emoji or multi-byte character can never
+ * leave an invalid sequence in the payload.
+ */
+const boundTextBytes = (text: string): string => {
+  const buffer = Buffer.from(text, "utf8");
+  if (buffer.length <= MAX_TEXT_BYTES) return text;
+
+  let end = MAX_TEXT_BYTES - Buffer.byteLength(TEXT_TRUNCATION_MARKER, "utf8");
+  // 0b10xxxxxx is a UTF-8 continuation byte; walk back off any of them to land
+  // on the start of a character.
+  while (end > 0 && ((buffer[end] ?? 0) & 0xc0) === 0x80) end--;
+  return buffer.toString("utf8", 0, end) + TEXT_TRUNCATION_MARKER;
+};
+
+const formatEntries = (entries: Record<string, unknown> | undefined): string =>
+  Object.entries(entries ?? {})
+    .slice(0, MAX_ENTRIES_PER_EVENT)
+    .map(([key, value]) => `\n*${formatKey(key)}:* ${formatField(value)}`)
+    .join("");
 
 interface TriggerData {
   traceId?: string;
@@ -117,20 +164,11 @@ export const sendSlackWebhook = async ({
       ${
         !isCustomGraph &&
         (trace.events ?? [])
-          .map((event: any) => {
-            return `\n*Event Type:* ${escapeMrkdwn(event.event_type)}
-          ${Object.entries(event.metrics || {})
-            .map(
-              ([key, value]) =>
-                `\n*${escapeMrkdwn(key)}:* ${formatField(value)}`,
-            )
-            .join("")}
-          ${Object.entries(event.event_details || {})
-            .map(
-              ([key, value]) =>
-                `\n*${escapeMrkdwn(key)}:* ${formatField(value)}`,
-            )
-            .join("")}
+          .slice(0, MAX_EVENTS_PER_TRACE)
+          .map((event) => {
+            return `\n*Event Type:* ${formatField(event.event_type)}
+          ${formatEntries(event.metrics)}
+          ${formatEntries(event.event_details)}
           \n-------------------`;
           })
           .join("")
@@ -151,11 +189,17 @@ export const sendSlackWebhook = async ({
     }
   };
 
+  // The trigger name and message are customer-authored and unbounded too, so
+  // they are formatted like any other interpolated field rather than trusted.
+  const text = boundTextBytes(
+    `${alertIcon(triggerType)} LangWatch Trigger - *${formatField(triggerName)}*
+       ${triggerMessage ? `\n\n*Msg:* ${formatField(triggerMessage)}` : ""}
+      \n${traceLinks.join("")}`,
+  );
+
   try {
     await webhook.send({
-      text: `${alertIcon(triggerType)} LangWatch Trigger - *${triggerName}*
-       ${triggerMessage ? `\n\n*Msg:* ${triggerMessage}` : ""}
-      \n${traceLinks.join("")}`,
+      text,
       username: "LangWatch",
       icon_emoji: ":robot_face:",
     });
