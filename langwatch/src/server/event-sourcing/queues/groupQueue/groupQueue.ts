@@ -1161,7 +1161,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 span.setAttribute("error", true);
                 span.setAttribute("error.message", error.message);
 
-                if (!isRetryable) {
+                if (isDispatchError(err) && !err.retryable) {
+                  // The dispatch endpoint judged this failure terminal (e.g. a
+                  // revoked Slack webhook) and the outbox audit row is
+                  // dead-lettered via onDead below — that row is the operator's
+                  // recovery surface (specs/event-sourcing/
+                  // reactor-outbox-dispatch.feature). Blocking the group and
+                  // re-staging here would keep re-firing a dispatch that can
+                  // never succeed and stall every later job for the same group,
+                  // so the job completes out of the queue instead.
                   gqJobsNonRetryableTotal.inc(routingLabels);
                   this.logger.error(
                     {
@@ -1172,19 +1180,35 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                       errorCategory: category,
                       error: error.message,
                     },
-                    "Job failed with non-retryable error, skipping retries",
+                    "Dispatch failed non-retryably; job completed out of the queue, dead outbox row is the recovery surface",
                   );
-                }
+                  await this.scripts.complete({ groupId, stagedJobId, jobName });
+                } else {
+                  if (!isRetryable) {
+                    gqJobsNonRetryableTotal.inc(routingLabels);
+                    this.logger.error(
+                      {
+                        queueName: this.queueName,
+                        groupId,
+                        stagedJobId,
+                        attempt,
+                        errorCategory: category,
+                        error: error.message,
+                      },
+                      "Job failed with non-retryable error, skipping retries",
+                    );
+                  }
 
-                await this.handleExhaustedRetries({
-                  groupId,
-                  stagedJobId,
-                  payload,
-                  originalScore,
-                  lastError: error,
-                  contextMetadata,
-                  routingLabels,
-                });
+                  await this.handleExhaustedRetries({
+                    groupId,
+                    stagedJobId,
+                    payload,
+                    originalScore,
+                    lastError: error,
+                    contextMetadata,
+                    routingLabels,
+                  });
+                }
 
                 // Audit hook: terminal — onDead fires for the dispatched
                 // payload + every drained sibling.

@@ -113,6 +113,13 @@ Feature: Reactor Outbox dispatch for stake-sensitive reactors
       And no further attempts are scheduled
       And lastError records the error message
 
+    Scenario: A non-retryable dispatch failure leaves the queue instead of blocking the group
+      Given a group-queue job whose dispatch raises a non-retryable DispatchError
+      When the job fails
+      Then the job completes out of the queue rather than being re-staged
+      And the group is not blocked, so later jobs for the same group still dispatch
+      And the dead outbox row remains the operator's recovery surface
+
     Scenario: Worker crash mid-dispatch releases the lease and retries
       Given a row leased to a worker that never completed
       When the lease expires

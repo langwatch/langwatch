@@ -16,6 +16,7 @@ import {
 } from "../../../__tests__/integration/testContainers";
 import { GroupQueueProcessor } from "../groupQueue";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
+import { DispatchError } from "../../../outbox/dispatchError";
 
 // Skip when running without testcontainers (unit-only test runs)
 const hasTestcontainers = !!(
@@ -765,6 +766,46 @@ describe.skipIf(!hasTestcontainers)(
             },
             { timeout: 45000, interval: 100 },
           );
+        });
+      });
+    });
+
+    describe("non-retryable dispatch failures", () => {
+      describe("when a job fails with a non-retryable DispatchError", () => {
+        /** @scenario 'A non-retryable dispatch failure leaves the queue instead of blocking the group' */
+        it("completes the job out of the queue so later jobs in the same group still dispatch", async () => {
+          const processed: TestPayload[] = [];
+          const attemptsById = new Map<string, number>();
+          const queue = createQueue(async (p) => {
+            attemptsById.set(p.id, (attemptsById.get(p.id) ?? 0) + 1);
+            if (p.id === "dead-webhook") {
+              throw new DispatchError({
+                message: "Slack webhook dispatch failed: HTTP 404",
+                retryable: false,
+              });
+            }
+            processed.push(p);
+          });
+          await queue.waitUntilReady();
+
+          await queue.send({
+            id: "dead-webhook",
+            groupId: "group-a",
+            value: "1",
+          });
+          await queue.send({ id: "next-alert", groupId: "group-a", value: "2" });
+
+          // The group must not be blocked by the terminal failure: the
+          // follow-up job for the same group still dispatches.
+          await vi.waitFor(
+            () => {
+              expect(processed.map((p) => p.id)).toContain("next-alert");
+            },
+            { timeout: 15000, interval: 100 },
+          );
+
+          // And the failed job left the queue without being re-fired.
+          expect(attemptsById.get("dead-webhook")).toBe(1);
         });
       });
     });
