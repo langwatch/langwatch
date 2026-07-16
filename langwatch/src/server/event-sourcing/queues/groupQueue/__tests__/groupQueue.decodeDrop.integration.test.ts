@@ -19,7 +19,11 @@ import {
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
 import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
-import { encodeJobEnvelope, readEnvelopeHold } from "../jobEnvelope";
+import {
+  encodeJobEnvelope,
+  readEnvelopeHold,
+  readJobRecoveryKey,
+} from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
 import { GroupStagingScripts } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -48,6 +52,9 @@ type TestPayload = {
   __pipelineName?: string;
   __jobType?: string;
   __jobName?: string;
+  // #718: normally the QueueManager facade injects this; the harness sets it
+  // directly (it is in CALLER_RESERVED_KEYS) to stand in for a reactor's event id.
+  __recoveryKey?: string;
 };
 
 // Tenant prefix for groupIds so GQ2 (content-addressed, tenant-namespaced)
@@ -129,6 +136,14 @@ describe.skipIf(!hasTestcontainers)(
       const metric = await gqJobsDroppedTotal.get();
       return metric.values.filter((v) => v.labels.queue_name === name);
     }
+
+    // Job-scoped dead-letter reads (#719). Same key layout the ops drain uses.
+    const dlqValue = (name: string, groupId: string, stagedJobId: string) =>
+      redis.hget(`${name}:gq:dlq:${groupId}:data`, stagedJobId);
+    const dlqReason = (name: string, groupId: string, stagedJobId: string) =>
+      redis.hget(`${name}:gq:dlq:${groupId}:error`, stagedJobId);
+    const liveValue = (name: string, groupId: string, stagedJobId: string) =>
+      redis.hget(`${name}:gq:group:${groupId}:data`, stagedJobId);
 
     /**
      * Stages a GQ2 s3-tier job directly (bypassing the dispatch loop) whose
@@ -722,6 +737,92 @@ describe.skipIf(!hasTestcontainers)(
           // STORE was unreachable, not that the blob is gone — most likely it is
           // still there, so retiring it would delete a body that exists.
           expect(flaky.deleted).toEqual([]);
+        });
+      });
+    });
+
+    describe("given a body-present drop carrying a recovery key (#719/#718)", () => {
+      describe("when a worker claims the group and the decode fails", () => {
+        it("preserves the value in the dead-letter, labelled and keyed", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/dlq-body-present`;
+          const objectStore = new InMemoryObjectStore();
+          await stageOffloaded({
+            name,
+            groupId,
+            objectStore,
+            extra: { __recoveryKey: "evt-1" },
+          });
+          // Body present but unreadable (codec skew), NOT evicted.
+          for (const uri of [...objectStore.store.keys()]) {
+            objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
+          }
+          newQueue({
+            name,
+            processFn: async () => {},
+            consumerEnabled: true,
+            objectStore,
+          });
+
+          await vi.waitFor(
+            async () => {
+              expect(await dropsFor(name)).toHaveLength(1);
+            },
+            { timeout: 10000, interval: 100 },
+          );
+
+          // AC-719.1: preserved in the dead-letter, gone from live staging.
+          // Revert-check: before #719 the drop only called complete(), so the
+          // value was deleted and dlqValue stays null.
+          const preserved = await dlqValue(name, groupId, "victim");
+          expect(preserved).not.toBeNull();
+          expect(await liveValue(name, groupId, "victim")).toBeNull();
+          // AC-719.3: labelled with the failure class.
+          expect(await dlqReason(name, groupId, "victim")).toBe("body_unreadable");
+          // AC-718.2: the quarantined reactor job is addressable by its event id.
+          expect(readJobRecoveryKey(preserved!)).toBe("evt-1");
+        });
+      });
+    });
+
+    describe("given a missing-blob drop carrying a recovery key (#718.2b/#719.2)", () => {
+      describe("when a worker claims the group and the blob is genuinely gone", () => {
+        it("does not dead-letter and releases the absent blob's holder", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/dlq-missing-blob`;
+          const objectStore = new InMemoryObjectStore();
+          await stageOffloaded({
+            name,
+            groupId,
+            objectStore,
+            extra: { __recoveryKey: "evt-1" },
+          });
+          // Genuinely gone (eviction / purge), not corrupt — delete the object.
+          for (const uri of [...objectStore.store.keys()]) {
+            objectStore.store.delete(uri);
+          }
+          newQueue({
+            name,
+            processFn: async () => {},
+            consumerEnabled: true,
+            objectStore,
+          });
+
+          await vi.waitFor(
+            async () => {
+              expect(await dropsFor(name)).toHaveLength(1);
+            },
+            { timeout: 10000, interval: 100 },
+          );
+
+          // The body is GONE, so there is nothing to preserve: no dead-letter
+          // entry, and the absent blob's holder is released (s3 delete recorded).
+          // This is the honest boundary — a missing_blob reactor drop is NAMED
+          // (recoveryKey rides the drop log via recordDrop) but NOT recovered.
+          expect(await dlqValue(name, groupId, "victim")).toBeNull();
+          expect(objectStore.deleted.length).toBeGreaterThan(0);
+          const [entry] = await dropsFor(name);
+          expect(entry!.labels.reason).toBe("missing_blob");
         });
       });
     });

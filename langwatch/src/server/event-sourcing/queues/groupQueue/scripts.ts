@@ -1705,12 +1705,64 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
 // EVALSHA-cached forms of the scripts above: the source is sent to Redis
 // once per node, every later call ships a 40-byte sha instead of the full
 // 11-23 KB script body (see CachedLuaScript).
+/**
+ * Job-scoped dead-letter (#719). Preserves ONE staged value under the SAME
+ * `dlq:{groupId}:*` key layout the ops group-scoped `moveToDlq` uses, so the
+ * existing `replayFromDlq` drain (`app-layer/ops/repositories/queue.redis.repository.ts`
+ * `REPLAY_FROM_DLQ_LUA`) restores it unchanged — this writes the recovery surface,
+ * it does not invent a second one.
+ *
+ * Takes the value DIRECTLY rather than moving it from live `:data`: a drained
+ * sibling is already out of staging, and the dispatch/transient sites hold the
+ * value in hand too. The caller then advances its slot (or not) via `complete` —
+ * writing to the DLQ FIRST means the value is never absent from BOTH the live
+ * group and the dead-letter (#719 atomicity), even across a crash between the two.
+ *
+ * `dlq:{groupId}:error` is keyed by stagedJobId → reason so the dead-letter is
+ * queryable by failure class; `replayFromDlq` drops it on restore (inspection
+ * only). All three destination keys expire together — the quarantine window.
+ */
+const WRITE_JOB_TO_DLQ_LUA = `
+local dlqJobsKey  = KEYS[1]
+local dlqDataKey  = KEYS[2]
+local dlqErrorKey = KEYS[3]
+local dlqIndexKey = KEYS[4]
+local groupId     = ARGV[1]
+local stagedJobId = ARGV[2]
+local jobDataJson = ARGV[3]
+local reason      = ARGV[4]
+local score       = tonumber(ARGV[5])
+local ttl         = tonumber(ARGV[6])
+
+redis.call("ZADD", dlqJobsKey, score, stagedJobId)
+redis.call("HSET", dlqDataKey, stagedJobId, jobDataJson)
+redis.call("HSET", dlqErrorKey, stagedJobId, reason)
+redis.call("SADD", dlqIndexKey, groupId)
+
+if ttl > 0 then
+  redis.call("EXPIRE", dlqJobsKey, ttl)
+  redis.call("EXPIRE", dlqDataKey, ttl)
+  redis.call("EXPIRE", dlqErrorKey, ttl)
+end
+
+return 1
+`;
+
 const stageScript = new CachedLuaScript(STAGE_LUA);
 const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
 const dispatchScript = new CachedLuaScript(DISPATCH_LUA);
 const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const completeScript = new CachedLuaScript(COMPLETE_LUA);
+const writeJobToDlqScript = new CachedLuaScript(WRITE_JOB_TO_DLQ_LUA);
+
+/**
+ * Quarantine window for a dead-lettered staged job (#719). Mirrors the ops
+ * repository's `DLQ_TTL_SECONDS` (`app-layer/ops/repositories/queue.redis.repository.ts`)
+ * so a job-scoped entry and a group-scoped one age out together; the two copies
+ * are a known small duplication worth unifying if a third reader appears.
+ */
+const GROUP_QUEUE_DLQ_TTL_SECONDS = 604800; // 7 days
 const refreshScript = new CachedLuaScript(REFRESH_LUA);
 const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
 const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);
@@ -2055,6 +2107,50 @@ export class GroupStagingScripts {
     );
 
     return result === 1;
+  }
+
+  /**
+   * Preserve one discarded staged value in the job-scoped dead-letter (#719).
+   *
+   * Body-present drops route here instead of vanishing: the value lands under the
+   * same `dlq:{groupId}:*` layout the ops drain understands, keyed by
+   * `stagedJobId`, labelled with its `reason`. The CALLER decides its slot: a
+   * dispatch/transient drop calls `complete({dropped:true})` AFTER this to advance
+   * the group; a drained-sibling drop owns no slot and calls only this. Writing
+   * here first is what keeps the value from being absent from both places.
+   *
+   * `nowMs` is the ZSET score the value re-dispatches with once an operator
+   * drains it — passed in (never `Date.now()` in Lua) so a replay is deterministic.
+   */
+  async writeJobToDlq({
+    groupId,
+    stagedJobId,
+    jobDataJson,
+    reason,
+    nowMs = Date.now(),
+    ttlSeconds = GROUP_QUEUE_DLQ_TTL_SECONDS,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    jobDataJson: string;
+    reason: string;
+    nowMs?: number;
+    ttlSeconds?: number;
+  }): Promise<void> {
+    await writeJobToDlqScript.run(
+      this.redis,
+      4,
+      `${this.keyPrefix}dlq:${groupId}:jobs`,
+      `${this.keyPrefix}dlq:${groupId}:data`,
+      `${this.keyPrefix}dlq:${groupId}:error`,
+      `${this.keyPrefix}dlq`,
+      groupId,
+      stagedJobId,
+      jobDataJson,
+      reason,
+      String(nowMs),
+      String(ttlSeconds),
+    );
   }
 
   /**

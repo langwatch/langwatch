@@ -1568,6 +1568,20 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       bodyPreserved: !bodyIsGone,
     });
 
+    if (!bodyIsGone) {
+      // Body present but unreadable to THIS worker (codec skew, malformed frame):
+      // preserve it in the job-scoped dead-letter BEFORE freeing the slot, so an
+      // operator drain — or a newer worker after a rollout — can still recover it
+      // (#719). Writing first means the value is never absent from both the live
+      // group and the dead-letter, even if we crash between the two calls.
+      await this.scripts.writeJobToDlq({
+        groupId,
+        stagedJobId,
+        jobDataJson,
+        reason,
+      });
+    }
+
     // `dropped: true` keeps the group advancing WITHOUT counting a thrown-away
     // job as a completion or clearing the group's stored error (#5538).
     await this.scripts.complete({ groupId, stagedJobId, dropped: true });
