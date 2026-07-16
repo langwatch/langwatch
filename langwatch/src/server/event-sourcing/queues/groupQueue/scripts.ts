@@ -1762,7 +1762,7 @@ const writeJobToDlqScript = new CachedLuaScript(WRITE_JOB_TO_DLQ_LUA);
  * so a job-scoped entry and a group-scoped one age out together; the two copies
  * are a known small duplication worth unifying if a third reader appears.
  */
-const GROUP_QUEUE_DLQ_TTL_SECONDS = 604800; // 7 days
+export const GROUP_QUEUE_DLQ_TTL_SECONDS = 604800; // 7 days
 const refreshScript = new CachedLuaScript(REFRESH_LUA);
 const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
 const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);

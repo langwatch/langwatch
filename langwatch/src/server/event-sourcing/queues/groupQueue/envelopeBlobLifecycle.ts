@@ -7,6 +7,7 @@ import {
 } from "../../../stored-objects/project-storage-destination";
 import { createTenantId, type TenantId } from "../../domain/tenantId";
 import { BlobHolders } from "./blobHolders";
+import { blobNamespaceId } from "./blobKeys";
 import {
   decodeJobEnvelope,
   encodeJobEnvelope,
@@ -310,6 +311,61 @@ export class EnvelopeBlobLifecycle {
         }
       }),
     );
+  }
+
+  /**
+   * Push a still-referenced blob's TTL out to at least the dead-letter quarantine
+   * window (#719/#720). A body-present drop is preserved in the dead-letter for
+   * ~7 days, but the referenced blob's own backstop is shorter — GQ2 ~4-5 days,
+   * GQ1 7 days but timed from staging so already ticking down at drop time — so
+   * without this the dead-letter would outlive the blob it references and a drain
+   * would recover an envelope pointing at nothing. s3-tier objects have no redis
+   * TTL and are left to the bucket lifecycle. Best-effort: a failure warns and
+   * relies on the existing backstop, and never blocks the drop.
+   */
+  async preserveForDlq({
+    value,
+    groupId,
+    ttlSeconds,
+  }: {
+    value: string;
+    groupId: string;
+    ttlSeconds: number;
+  }): Promise<void> {
+    const { hold, blobId } = readEnvelopeRetirement(value);
+    try {
+      if (hold) {
+        // GQ2: keep the holder alive past the window (so it is not reclaimed on a
+        // later release) and push the redis-tier blob's own backstop out too.
+        await this.blobHolders.touch({
+          projectId: hold.ref.projectId,
+          hash: hold.ref.hash,
+          ttlSeconds,
+        });
+        if (hold.ref.tier === "redis") {
+          await this.blobs.refreshTtl({
+            id: blobNamespaceId({
+              projectId: hold.ref.projectId,
+              hash: hold.ref.hash,
+            }),
+            ttlSeconds,
+          });
+        }
+      } else if (blobId) {
+        // GQ1: extend the standalone blob.
+        await this.blobs.refreshTtl({ id: blobId, ttlSeconds });
+      }
+    } catch (err) {
+      logger.warn(
+        {
+          groupId,
+          error: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
+        },
+        "Blob TTL preserve-for-DLQ failed; relying on the backstop",
+      );
+    }
   }
 
   /**

@@ -75,6 +75,7 @@ import { RedisJobBlobStore } from "./redisJobBlobStore";
 import {
   type DispatchResult,
   type DrainedJob,
+  GROUP_QUEUE_DLQ_TTL_SECONDS,
   GroupStagingScripts,
   readClaimStrikeThreshold,
 } from "./scripts";
@@ -1348,6 +1349,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         // operator drain can recover it (#719). Unlike the dispatch site, there is
         // no complete() here: touching the live slot would corrupt a group this
         // job already left.
+        await this.blobLifecycle.preserveForDlq({
+          value: sibling.jobDataJson,
+          groupId,
+          ttlSeconds: GROUP_QUEUE_DLQ_TTL_SECONDS,
+        });
         await this.scripts.writeJobToDlq({
           groupId,
           stagedJobId: sibling.stagedJobId,
@@ -1397,6 +1403,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         });
         // Body intact and no slot to complete: preserve it in the dead-letter so
         // a re-stage failure becomes recoverable instead of a silent discard (#719).
+        await this.blobLifecycle.preserveForDlq({
+          value: sibling.jobDataJson,
+          groupId,
+          ttlSeconds: GROUP_QUEUE_DLQ_TTL_SECONDS,
+        });
         await this.scripts.writeJobToDlq({
           groupId,
           stagedJobId: sibling.stagedJobId,
@@ -1594,6 +1605,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // operator drain — or a newer worker after a rollout — can still recover it
       // (#719). Writing first means the value is never absent from both the live
       // group and the dead-letter, even if we crash between the two calls.
+      // Push the referenced blob's TTL out to the quarantine window first (#720):
+      // the dead-letter outlives the blob's own backstop, so without this a drain
+      // would recover an envelope pointing at a gone blob.
+      await this.blobLifecycle.preserveForDlq({
+        value: jobDataJson,
+        groupId,
+        ttlSeconds: GROUP_QUEUE_DLQ_TTL_SECONDS,
+      });
       await this.scripts.writeJobToDlq({
         groupId,
         stagedJobId,

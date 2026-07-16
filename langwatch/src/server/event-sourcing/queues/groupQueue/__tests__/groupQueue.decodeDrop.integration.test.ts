@@ -893,5 +893,45 @@ describe.skipIf(!hasTestcontainers)(
         });
       });
     });
+
+    describe("given a body-present GQ2 drop (#720 blob lifetime)", () => {
+      describe("when the job is dead-lettered", () => {
+        it("extends the blob holder past the dead-letter quarantine window", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/dlq-blob-ttl`;
+          const objectStore = new InMemoryObjectStore();
+          await stageOffloaded({ name, groupId, objectStore });
+
+          // The send() path acquired a holder — so pttl is a real TTL, not -2
+          // (the harness's batch-stage path would bypass acquire).
+          const holderKeys = await redis.keys(`${name}:gq:blobholders:*`);
+          expect(holderKeys).toHaveLength(1);
+
+          for (const uri of [...objectStore.store.keys()]) {
+            objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
+          }
+          newQueue({
+            name,
+            processFn: async () => {},
+            consumerEnabled: true,
+            objectStore,
+          });
+
+          await vi.waitFor(
+            async () => {
+              expect(await dlqValue(name, groupId, "victim")).not.toBeNull();
+            },
+            { timeout: 10000, interval: 100 },
+          );
+
+          // The blob's holder must outlive the 7-day dead-letter window, or the
+          // quarantined value would reference a blob that got reclaimed first. The
+          // default holder TTL is 5 days; > 6 days proves preserveForDlq pushed it
+          // to the window. Revert preserveForDlq and this drops back to ~5d → red.
+          const pttl = await redis.pttl(holderKeys[0]!);
+          expect(pttl).toBeGreaterThan(6 * 24 * 60 * 60 * 1000);
+        });
+      });
+    });
   },
 );

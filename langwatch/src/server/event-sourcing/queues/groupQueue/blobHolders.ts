@@ -118,18 +118,22 @@ export class BlobHolders {
       .exec();
   }
 
-  /** Refreshes the holder set's TTL on access (dispatch), so it outlives the blob it guards. */
+  /**
+   * Refreshes the holder set's TTL on access (dispatch), so it outlives the blob
+   * it guards. `ttlSeconds` overrides the default backstop — the dead-letter path
+   * (#719/#720) passes the quarantine window so the holder does not drop (and let
+   * the blob be reclaimed) before an operator can drain the dead-letter.
+   */
   async touch({
     projectId,
     hash,
+    ttlSeconds = BLOB_HOLDER_TTL_SECONDS,
   }: {
     projectId: TenantId;
     hash: string;
+    ttlSeconds?: number;
   }): Promise<void> {
-    await this.redis.expire(
-      this.holderKey(projectId, hash),
-      BLOB_HOLDER_TTL_SECONDS,
-    );
+    await this.redis.expire(this.holderKey(projectId, hash), ttlSeconds);
   }
 
   /**
