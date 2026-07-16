@@ -63,7 +63,14 @@ const mockSession = {
 describe("RBAC Integration Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: no group memberships, no role bindings, no team user (falls through to denied)
+    // Default: the caller IS a current member of the owning org — scoped
+    // resolution fails closed on membership, so every test that exercises a
+    // binding/group path needs one. Tests about non-members override this with
+    // null. Beyond that: no group memberships, no role bindings, no team user
+    // (falls through to denied).
+    mockPrisma.organizationUser.findFirst.mockResolvedValue({
+      role: OrganizationUserRole.MEMBER,
+    });
     mockPrisma.groupMembership.findMany.mockResolvedValue([]);
     mockPrisma.roleBinding.findMany.mockResolvedValue([]);
     mockPrisma.teamUser.findFirst.mockResolvedValue(null);
@@ -996,14 +1003,12 @@ describe("RBAC Integration Tests", () => {
       hasTeamMember?: boolean;
     }) {
       mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-1",
-          organizationId: "org-1",
-          organization: {
-            members: orgRole ? [{ role: orgRole }] : [],
-          },
-        },
+        team: { id: "team-1", organizationId: "org-1" },
       });
+      // No orgRole => no OrganizationUser row => not a current member.
+      mockPrisma.organizationUser.findFirst.mockResolvedValue(
+        orgRole ? { role: orgRole } : null,
+      );
       if (hasTeamMember && teamRole) {
         mockPrisma.roleBinding.findMany.mockResolvedValue([
           { role: teamRole, customRoleId: null },
@@ -1655,13 +1660,13 @@ describe("RBAC Integration Tests", () => {
       teamRole?: TeamUserRole;
       assignedRoleId?: string;
     } = {}) {
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: OrganizationUserRole.EXTERNAL,
+      });
       mockPrisma.project.findUnique.mockResolvedValue({
         team: {
           id: "team-1",
           organizationId: "org-1",
-          organization: {
-            members: [{ role: OrganizationUserRole.EXTERNAL }],
-          },
         },
       });
       mockPrisma.roleBinding.findMany.mockResolvedValue([
@@ -1893,14 +1898,11 @@ describe("RBAC Integration Tests", () => {
 
     describe("when non-EXTERNAL user (ADMIN org role) accesses resources", () => {
       it("grants full team-role-based access", async () => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.ADMIN,
+        });
         mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-1",
-            organizationId: "org-1",
-            organization: {
-              members: [{ role: OrganizationUserRole.ADMIN }],
-            },
-          },
+          team: { id: "team-1", organizationId: "org-1" },
         });
         mockPrisma.groupMembership.findMany.mockResolvedValue([]);
         mockPrisma.roleBinding.findMany.mockResolvedValue([

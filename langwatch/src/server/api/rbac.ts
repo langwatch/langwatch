@@ -871,6 +871,31 @@ async function resolveBindingPermission(
 }
 
 /**
+ * The single source of truth for "is this user a CURRENT member of this org,
+ * and with what role". `null` means no `OrganizationUser` row — the caller must
+ * fail closed rather than fall through to bindings, because a stale cross-org
+ * RoleBinding can still name a non-member at a project/team scope.
+ *
+ * Every scoped permission path derives membership through here so a future
+ * tenancy fix lands once instead of in each resolver.
+ */
+async function getCurrentOrganizationRole({
+  prisma,
+  userId,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+}): Promise<OrganizationUserRole | null> {
+  const member = await prisma.organizationUser?.findFirst({
+    where: { userId, organizationId },
+    select: { role: true },
+  });
+  return member?.role ?? null;
+}
+
+/**
  * Resolve a project permission check, returning the permission decision
  * along with the user's organization role.
  */
@@ -890,32 +915,21 @@ export async function resolveProjectPermission(
 
   const projectTeam = await ctx.prisma.project.findUnique?.({
     where: { id: projectId },
-    select: {
-      team: {
-        select: {
-          id: true,
-          organizationId: true,
-          organization: {
-            select: {
-              members: {
-                where: { userId: ctx.session.user.id },
-                select: { role: true },
-              },
-            },
-          },
-        },
-      },
-    },
+    select: { team: { select: { id: true, organizationId: true } } },
   });
 
   const teamId = projectTeam?.team.id;
   const organizationId = projectTeam?.team.organizationId;
-  const organizationRole =
-    projectTeam?.team.organization?.members[0]?.role ?? null;
 
   if (!teamId || !organizationId) {
-    return { permitted: false, organizationRole };
+    return { permitted: false, organizationRole: null };
   }
+
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId,
+  });
 
   // Fail closed on current organization membership. A user who is not an
   // OrganizationUser of the owning org is denied outright, even if a stale
@@ -977,12 +991,11 @@ export async function resolveTeamPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  const organizationUser = await ctx.prisma.organizationUser?.findFirst({
-    where: { userId: ctx.session.user.id, organizationId: team.organizationId },
-    select: { role: true },
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId: team.organizationId,
   });
-
-  const organizationRole = organizationUser?.role ?? null;
 
   // Fail closed on current organization membership — a non-member is denied even
   // if a stale cross-org binding names them at this team scope. See the matching
@@ -1207,11 +1220,14 @@ async function loadScopeResolution(
   const userId = ctx.session?.user?.id;
   if (!userId) return null;
 
-  const orgMember = await ctx.prisma.organizationUser?.findFirst({
-    where: { userId, organizationId: args.organizationId },
-    select: { role: true },
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId,
+    organizationId: args.organizationId,
   });
-  if (!orgMember) return null;
+  // Fail closed on current membership — a non-member gets nothing, even if a
+  // stale cross-org binding names them at one of these scopes.
+  if (organizationRole === null) return null;
 
   const groupMemberships = await ctx.prisma.groupMembership.findMany({
     where: { userId, group: { organizationId: args.organizationId } },

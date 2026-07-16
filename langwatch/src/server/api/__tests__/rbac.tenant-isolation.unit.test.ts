@@ -39,15 +39,11 @@ describe("read-path tenant isolation", () => {
       const prisma = {
         project: {
           findUnique: vi.fn().mockResolvedValue({
-            // organization.members filtered by userId is empty → user_B is not a
-            // member → organizationRole resolves to null.
-            team: {
-              id: TEAM_A,
-              organizationId: ORG_A,
-              organization: { members: [] },
-            },
+            team: { id: TEAM_A, organizationId: ORG_A },
           }),
         },
+        // No OrganizationUser row → user_B is not a member of org_A.
+        organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: { findMany: roleBindingFindMany },
         teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -104,14 +100,13 @@ describe("read-path tenant isolation", () => {
       const prisma = {
         project: {
           findUnique: vi.fn().mockResolvedValue({
-            team: {
-              id: TEAM_A,
-              organizationId: ORG_A,
-              organization: {
-                members: [{ role: OrganizationUserRole.MEMBER }],
-              },
-            },
+            team: { id: TEAM_A, organizationId: ORG_A },
           }),
+        },
+        organizationUser: {
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
         },
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: {
