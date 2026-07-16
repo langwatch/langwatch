@@ -135,6 +135,62 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     });
   });
 
+  describe("given a query carrying negateFilters", () => {
+    // The fast-path builders do not implement filter negation — serving the
+    // query from slim/rollup would silently return NON-negated results.
+    it("routes a trace-source query to trace_summaries", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        negateFilters: true,
+      });
+      expect(table).toBe("trace_summaries");
+    });
+
+    it("routes an eval-source query to evaluation_runs", () => {
+      const table = pickAnalyticsTable({
+        series: [series("evaluations.evaluation_runs", "cardinality")],
+        negateFilters: true,
+      });
+      expect(table).toBe("evaluation_runs");
+    });
+
+    it("still routes to the rollup when negateFilters is false", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        negateFilters: false,
+      });
+      expect(table).toBe("trace_analytics_rollup");
+    });
+  });
+
+  describe("given a query scoped to explicit trace ids", () => {
+    // The fast-path builders do not implement the TraceId narrowing — the
+    // result would silently cover ALL traces instead of the requested set.
+    it("routes a trace-source query to trace_summaries", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        traceIds: ["trace-1", "trace-2"],
+      });
+      expect(table).toBe("trace_summaries");
+    });
+
+    it("routes an eval-source query to evaluation_runs", () => {
+      const table = pickAnalyticsTable({
+        series: [series("evaluations.evaluation_runs", "cardinality")],
+        traceIds: ["trace-1"],
+      });
+      expect(table).toBe("evaluation_runs");
+    });
+
+    it("still routes to the rollup when the trace id list is empty", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        traceIds: [],
+      });
+      expect(table).toBe("trace_analytics_rollup");
+    });
+  });
+
   describe("given a percentile aggregation", () => {
     describe("when no group-by is set", () => {
       it("routes to trace_analytics (slim) because rollup can't do percentiles", () => {
