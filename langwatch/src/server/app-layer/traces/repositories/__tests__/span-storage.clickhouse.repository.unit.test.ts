@@ -371,6 +371,91 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
       });
     });
   });
+
+  describe("given a span whose reserved eventref value is a string that is not valid JSON at all (AC4b)", () => {
+    describe("when reading normalized spans through the real ClickHouse row-mapping path", () => {
+      it("does not throw, and parseSpanEventRefs silently drops the malformed pointer per its documented policy", async () => {
+        const { repo, query } = repoWithSpyClient();
+        query.mockResolvedValue({
+          json: async () => [
+            {
+              SpanId: "s-1",
+              TraceId: "t-1",
+              TenantId: "p-1",
+              ParentSpanId: null,
+              ParentTraceId: null,
+              ParentIsRemote: null,
+              Sampled: true,
+              StartTimeMs: 1_700_000_000_000,
+              EndTimeMs: 1_700_000_000_100,
+              DurationMs: 100,
+              SpanName: "llm-call",
+              SpanKind: 1,
+              ResourceAttributes: {},
+              // Raw ClickHouse Map(String, String) shape, matching the
+              // reserved-eventref fixture above: every value is a string.
+              // Unlike that fixture (a well-formed eventref pointer),
+              // this reserved value is not valid JSON under ANY
+              // interpretation — a corrupted row or a future writer bug,
+              // not the auto-JSON-parse hazard the other fixture covers.
+              SpanAttributes: {
+                "langwatch.input": "a normal preview value",
+                [`${EVENTREF_ATTR_PREFIX}langwatch.input`]:
+                  "not-json-at-all",
+              },
+              StatusCode: 1,
+              StatusMessage: null,
+              ScopeName: "test",
+              ScopeVersion: "1.0",
+              Cost: null,
+              NonBilledCost: null,
+              Events_Timestamp: [],
+              Events_Name: [],
+              Events_Attributes: [],
+              Links_TraceId: [],
+              Links_SpanId: [],
+              Links_Attributes: [],
+            },
+          ],
+        });
+
+        // (a) The read completes and returns normally. Reaching the
+        // assertions below IS the proof: a throwing read would reject this
+        // await and fail the test before any expect() below ever ran.
+        const spans = await repo.getNormalizedSpansByTraceId({
+          tenantId: "p-1",
+          traceId: "t-1",
+          occurredAtMs: Date.now(),
+        });
+        expect(spans).toHaveLength(1);
+
+        const spanAttributes = spans[0]!.spanAttributes as Record<
+          string,
+          string
+        >;
+
+        // Sanity-check the fixture: the malformed value must have survived
+        // deserializeAttributes byte-for-byte as a raw string (reserved keys
+        // are exempted from auto-parse) — otherwise parseSpanEventRefs below
+        // would not be the thing whose own catch block is being exercised.
+        expect(spanAttributes[`${EVENTREF_ATTR_PREFIX}langwatch.input`]).toBe(
+          "not-json-at-all",
+        );
+
+        // (b) parseSpanEventRefs's documented policy: "A reserved key with
+        // malformed JSON is silently dropped (the preview already sits in
+        // cleanedAttrs under the non-reserved IO key)." No eventrefEntry, no
+        // missingEventIdKeys entry — the key just vanishes, with no throw.
+        // Note: parseSpanEventRefs takes no logger — it has no mechanism to
+        // log a warning for this case; the drop is silent by construction.
+        const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
+          parseSpanEventRefs(spanAttributes);
+        expect(eventrefEntries).toEqual([]);
+        expect(missingEventIdKeys).toEqual([]);
+        expect(cleanedAttrs["langwatch.input"]).toBe("a normal preview value");
+      });
+    });
+  });
 });
 
 describe("mapSpanSummaryRow", () => {

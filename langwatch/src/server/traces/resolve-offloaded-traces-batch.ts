@@ -184,13 +184,27 @@ export async function resolveOffloadedTracesBatch({
         return { cleanedAttrs: attrs, refs: [], hadRefs: false };
       }
 
-      const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
-        parseSpanEventRefs(attrs);
+      const {
+        cleanedAttrs,
+        eventrefEntries,
+        missingEventIdKeys,
+        malformedKeys,
+      } = parseSpanEventRefs(attrs);
 
       for (const attrKey of missingEventIdKeys) {
         logger.warn(
           { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },
           "eventref missing eventId — keeping preview value",
+        );
+      }
+
+      // Eventref value failed JSON.parse entirely — can't resolve. Same
+      // preview-preserving fallback as missingEventIdKeys, but a distinct
+      // message so the two causes are distinguishable in logs (#5835 AC4b).
+      for (const attrKey of malformedKeys) {
+        logger.warn(
+          { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },
+          "eventref value is not valid JSON — keeping preview value",
         );
       }
 
