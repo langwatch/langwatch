@@ -22,6 +22,25 @@ const escapeMrkdwn = (value: unknown): string =>
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
+/**
+ * Trace content is unbounded customer data, but Slack rejects oversized
+ * webhook payloads with a terminal 400, which would dead-letter the alert.
+ * Bound every interpolated field so 10 traces of content always fit
+ * (see specs/triggers/slack-webhook-dispatch.feature). Truncate before
+ * escaping so the cut never lands mid-entity.
+ */
+const MAX_FIELD_LENGTH = 500;
+
+const truncateField = (value: unknown): string => {
+  const text = String(value ?? "");
+  return text.length > MAX_FIELD_LENGTH
+    ? text.slice(0, MAX_FIELD_LENGTH) + "…"
+    : text;
+};
+
+const formatField = (value: unknown): string =>
+  escapeMrkdwn(truncateField(value));
+
 interface TriggerData {
   traceId?: string;
   graphId?: string;
@@ -91,8 +110,8 @@ export const sendSlackWebhook = async ({
     return `\n<${getLink(trace)}|${getDisplayText(trace)}>
     ${
       !triggerMessage && !isCustomGraph
-        ? ` \n*Input:* ${escapeMrkdwn(trace.input)}
-    \n*Output:* ${escapeMrkdwn(trace.output)}\n`
+        ? ` \n*Input:* ${formatField(trace.input)}
+    \n*Output:* ${formatField(trace.output)}\n`
         : ""
     }
       ${
@@ -103,13 +122,13 @@ export const sendSlackWebhook = async ({
           ${Object.entries(event.metrics || {})
             .map(
               ([key, value]) =>
-                `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`,
+                `\n*${escapeMrkdwn(key)}:* ${formatField(value)}`,
             )
             .join("")}
           ${Object.entries(event.event_details || {})
             .map(
               ([key, value]) =>
-                `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`,
+                `\n*${escapeMrkdwn(key)}:* ${formatField(value)}`,
             )
             .join("")}
           \n-------------------`;

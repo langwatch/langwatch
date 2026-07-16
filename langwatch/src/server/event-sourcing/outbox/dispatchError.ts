@@ -79,6 +79,35 @@ export function extractHttpStatus(error: unknown): number | undefined {
 }
 
 /**
+ * Providers can embed whole response bodies in their error messages; cap the
+ * detail so log lines and audit rows stay readable.
+ */
+const MAX_CAUSE_MESSAGE_LENGTH = 300;
+
+/**
+ * Human-readable summary of the underlying failure — "HTTP 404 — <provider
+ * message>" — appended to the DispatchError message. Every sink downstream
+ * (outbox dispatcher logs, group-queue audit rows, Sentry titles) serializes
+ * only `error.message`, so the detail must live in the message itself for an
+ * operator to tell a revoked webhook from a rejected payload.
+ */
+function describeCause(error: unknown, status: number | undefined): string {
+  const rawMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+  const causeMessage =
+    rawMessage.length > MAX_CAUSE_MESSAGE_LENGTH
+      ? rawMessage.slice(0, MAX_CAUSE_MESSAGE_LENGTH) + "…"
+      : rawMessage;
+  return [status === undefined ? "" : `HTTP ${status}`, causeMessage]
+    .filter(Boolean)
+    .join(" — ");
+}
+
+/**
  * Converts a raw dispatch failure into a DispatchError with a retryable
  * decision derived from its HTTP status. An already-typed DispatchError is
  * returned unchanged. Failures with no recognizable status default to
@@ -97,14 +126,15 @@ export function toDispatchError(
   }: { message: string; retryable?: boolean },
 ): DispatchError {
   if (isDispatchError(error)) return error;
-  if (retryableOverride !== undefined) {
-    return new DispatchError({
-      message,
-      retryable: retryableOverride,
-      cause: error,
-    });
-  }
   const status = extractHttpStatus(error);
-  const retryable = status === undefined ? true : isRetryableHttpStatus(status);
-  return new DispatchError({ message, retryable, cause: error });
+  const causeSummary = describeCause(error, status);
+  const fullMessage = causeSummary ? `${message}: ${causeSummary}` : message;
+  const retryable =
+    retryableOverride ??
+    (status === undefined ? true : isRetryableHttpStatus(status));
+  return new DispatchError({
+    message: fullMessage,
+    retryable,
+    cause: error,
+  });
 }

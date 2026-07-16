@@ -106,14 +106,14 @@ describe("toDispatchError", () => {
   });
 
   describe("when the failure has a retryable status", () => {
-    it("produces a retryable DispatchError", () => {
+    it("produces a retryable DispatchError with the status in the message", () => {
       const err = toDispatchError(
         { $metadata: { httpStatusCode: 503 } },
         { message: "send failed" },
       );
       expect(err).toBeInstanceOf(DispatchError);
       expect(err.retryable).toBe(true);
-      expect(err.message).toBe("send failed");
+      expect(err.message).toBe("send failed: HTTP 503");
     });
   });
 
@@ -124,6 +124,7 @@ describe("toDispatchError", () => {
         { message: "send failed" },
       );
       expect(err.retryable).toBe(false);
+      expect(err.message).toBe("send failed: HTTP 404");
     });
   });
 
@@ -133,6 +134,43 @@ describe("toDispatchError", () => {
       const err = toDispatchError(cause, { message: "send failed" });
       expect(err.retryable).toBe(true);
       expect(err.cause).toBe(cause);
+    });
+  });
+
+  describe("when the failure carries both a status and a provider message", () => {
+    it("includes both in the message so logs are diagnosable without the cause", () => {
+      const cause = Object.assign(
+        new Error("An HTTP protocol error occurred: statusCode = 404"),
+        { original: { response: { status: 404 } } },
+      );
+      const err = toDispatchError(cause, { message: "send failed" });
+      expect(err.message).toBe(
+        "send failed: HTTP 404 — An HTTP protocol error occurred: statusCode = 404",
+      );
+    });
+
+    it("keeps the detail when the caller overrides retryable", () => {
+      const err = toDispatchError(new Error("template exploded"), {
+        message: "render failed",
+        retryable: false,
+      });
+      expect(err.retryable).toBe(false);
+      expect(err.message).toBe("render failed: template exploded");
+    });
+
+    it("caps an oversized provider message instead of inlining it whole", () => {
+      const err = toDispatchError(new Error("x".repeat(2000)), {
+        message: "send failed",
+      });
+      expect(err.message.length).toBeLessThan(500);
+      expect(err.message).toContain("…");
+    });
+  });
+
+  describe("when the failure carries neither a status nor a message", () => {
+    it("leaves the caller's message untouched", () => {
+      const err = toDispatchError({ weird: true }, { message: "send failed" });
+      expect(err.message).toBe("send failed");
     });
   });
 });

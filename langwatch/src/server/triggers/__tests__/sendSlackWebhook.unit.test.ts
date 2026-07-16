@@ -66,13 +66,14 @@ describe("sendSlackWebhook", () => {
   });
 
   describe("when the webhook was revoked", () => {
-    it("raises a non-retryable DispatchError", async () => {
+    it("raises a non-retryable DispatchError naming the HTTP status", async () => {
       sendMock.mockRejectedValue({
         original: { response: { status: 404 } },
       });
       const err = await callSlack().catch((e: unknown) => e);
       expect(err).toBeInstanceOf(DispatchError);
       expect((err as DispatchError).retryable).toBe(false);
+      expect((err as DispatchError).message).toContain("HTTP 404");
     });
   });
 
@@ -195,6 +196,55 @@ describe("sendSlackWebhook", () => {
       const err = await callSlack().catch((e: unknown) => e);
       expect(err).toBeInstanceOf(DispatchError);
       expect((err as DispatchError).retryable).toBe(true);
+    });
+  });
+
+  describe("when trace content exceeds the per-field limit", () => {
+    it("truncates input, output, and event values with an ellipsis instead of interpolating them whole", async () => {
+      sendMock.mockResolvedValue(undefined);
+      const hugeInput = "i".repeat(5000);
+      const hugeOutput = "o".repeat(5000);
+      const hugeDetail = "d".repeat(5000);
+      await sendSlackWebhook({
+        triggerWebhook: "https://hooks.slack.com/services/T/B/X",
+        triggerData: [
+          {
+            traceId: "trace-1",
+            input: hugeInput,
+            output: hugeOutput,
+            fullTrace: {
+              trace_id: "trace-1",
+              events: [
+                {
+                  event_type: "thumbs_up",
+                  metrics: {},
+                  event_details: { feedback: hugeDetail },
+                },
+              ],
+            } as unknown as Trace,
+          },
+        ],
+        triggerName: "Quality Alert",
+        projectSlug: "demo",
+        triggerType: AlertType.WARNING,
+        triggerMessage: "",
+      });
+
+      const text = sendMock.mock.calls[0]?.[0]?.text as string;
+      expect(text).not.toContain(hugeInput);
+      expect(text).not.toContain(hugeOutput);
+      expect(text).not.toContain(hugeDetail);
+      expect(text).toContain("i".repeat(500) + "…");
+      expect(text).toContain("o".repeat(500) + "…");
+      expect(text).toContain("d".repeat(500) + "…");
+    });
+
+    it("leaves short content untouched", async () => {
+      sendMock.mockResolvedValue(undefined);
+      await callSlack();
+      const text = sendMock.mock.calls[0]?.[0]?.text as string;
+      expect(text).toContain("*Input:* in");
+      expect(text).not.toContain("in…");
     });
   });
 });

@@ -32,6 +32,13 @@ Feature: DispatchError contract for dispatch endpoints
     Then a DispatchError is raised
     And it is marked retryable
 
+  Scenario: Classified failures carry the provider's failure detail
+    Given a dispatch fails with a provider error carrying an HTTP status or message
+    When the failure is classified
+    Then the DispatchError message includes the HTTP status and the provider's message
+    So that an operator reading only the logged message can tell a revoked
+    webhook from a rejected payload without access to the cause object
+
   # Slack webhook endpoint
 
   Scenario: A failing Slack webhook no longer swallows the error
