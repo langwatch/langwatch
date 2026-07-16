@@ -21,7 +21,7 @@ const UNSCOPED_RANK = 3;
  * Ranks a single scope tier, ranking anything this table doesn't know as
  * unscoped.
  *
- * The `in` check is not redundant with the parameter type. `registry.ts`
+ * The guard is not redundant with the parameter type. `registry.ts`
  * spells the tier union out by hand instead of deriving it from
  * `ScopeTier`, and `modelProvider.service.ts` casts the Prisma enum into
  * it unchecked, so a value outside the table compiles green and arrives
@@ -29,12 +29,22 @@ const UNSCOPED_RANK = 3;
  * `undefined`, which `Math.min` turns into `NaN`. A `NaN` tier does not
  * merely rank the row wrongly — `NaN` minus anything is `NaN`, which is
  * falsy, so the scope tier drops out of `byPrecedence` altogether and a
- * PROJECT row loses the authority to outrank an unscoped one. The
- * comparator turns intransitive, and which row wins a key comes down to
- * the order rows happen to arrive in.
+ * PROJECT row loses the authority to outrank an unscoped one. Given three
+ * or more rows the comparator turns intransitive too, and which row wins a
+ * key comes down to the order rows happen to arrive in.
+ *
+ * An OWN-property check, not `in`: `in` also accepts INHERITED keys, so
+ * `"toString"` passes it and resolves to `Object.prototype.toString` — a
+ * function, which `Math.min` turns into exactly the `NaN` this guard
+ * exists to prevent, re-opening the hole one tier lower. Every
+ * `Object.prototype` member is reachable this way (`toString`, `valueOf`,
+ * `constructor`, `hasOwnProperty`, `__proto__`); only an own-property
+ * check ranks them all as unscoped. Called through `Object.prototype`
+ * rather than off the table, since a lookup table is exactly the kind of
+ * object whose own keys could shadow the method.
  */
 const rankOf = (scopeType: string | undefined): number =>
-  scopeType && scopeType in SCOPE_RANK
+  scopeType && Object.prototype.hasOwnProperty.call(SCOPE_RANK, scopeType)
     ? SCOPE_RANK[scopeType as ScopeTier]
     : UNSCOPED_RANK;
 
