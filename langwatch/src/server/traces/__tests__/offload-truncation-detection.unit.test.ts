@@ -48,6 +48,7 @@ describe("overlayResolvedIO", () => {
 
       // Eventref resolved but recomputeTraceIO returns null for input (fold excluded)
       const resolved: ResolvedTraceSpans = {
+        resolvedSpans: [],
         anyResolved: true,
         recomputedInput: null, // fold-excluded span's result
         recomputedOutput: null,
@@ -86,6 +87,7 @@ describe("overlayResolvedIO", () => {
       ];
 
       const resolved: ResolvedTraceSpans = {
+        resolvedSpans: [],
         anyResolved: true,
         recomputedInput: null,
         recomputedOutput: null, // fold-excluded span's result
@@ -125,6 +127,7 @@ describe("overlayResolvedIO", () => {
 
       // Resolution failed (anyResolved = false or recomputedInput = null)
       const resolved: ResolvedTraceSpans = {
+        resolvedSpans: [],
         anyResolved: false,
         recomputedInput: null,
         recomputedOutput: null,
@@ -162,6 +165,7 @@ describe("overlayResolvedIO", () => {
       ];
 
       const resolved: ResolvedTraceSpans = {
+        resolvedSpans: [],
         anyResolved: false, // no resolution succeeded
         recomputedInput: null,
         recomputedOutput: null,
@@ -199,6 +203,7 @@ describe("overlayResolvedIO", () => {
       ];
 
       const resolved: ResolvedTraceSpans = {
+        resolvedSpans: [],
         anyResolved: false,
         recomputedInput: null,
         recomputedOutput: null,
@@ -234,6 +239,7 @@ describe("overlayResolvedIO", () => {
       ];
 
       const resolved: ResolvedTraceSpans = {
+        resolvedSpans: [],
         anyResolved: false,
         recomputedInput: null,
         recomputedOutput: null,
@@ -272,8 +278,9 @@ describe("overlayResolvedIO", () => {
 
       const fullInput = JSON.stringify({ full: "Complete input content" });
       const resolved: ResolvedTraceSpans = {
+        resolvedSpans: [],
         anyResolved: true,
-        recomputedInput: { text: fullInput },
+        recomputedInput: { raw: fullInput, text: fullInput, source: "langwatch" },
         recomputedOutput: null,
       };
 
@@ -309,9 +316,10 @@ describe("overlayResolvedIO", () => {
 
       const fullOutput = JSON.stringify({ full: "Complete output content" });
       const resolved: ResolvedTraceSpans = {
+        resolvedSpans: [],
         anyResolved: true,
         recomputedInput: null,
-        recomputedOutput: { text: fullOutput },
+        recomputedOutput: { raw: fullOutput, text: fullOutput, source: "langwatch" },
       };
 
       const result = overlayResolvedIO(stored, originalSpans, resolved);
