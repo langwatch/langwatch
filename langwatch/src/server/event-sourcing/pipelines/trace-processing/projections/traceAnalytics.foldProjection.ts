@@ -18,7 +18,7 @@ import type {
   AnnotationRemovedEvent,
   AnnotationsBulkSyncedEvent,
   LogRecordReceivedEvent,
-  MetricRecordReceivedEvent,
+  MetricDataPointCorrelatedEvent,
   OriginResolvedEvent,
   SpanReceivedEvent,
   TopicAssignedEvent,
@@ -29,7 +29,7 @@ import {
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
   logRecordReceivedEventSchema,
-  metricRecordReceivedEventSchema,
+  metricDataPointCorrelatedEventSchema,
   originResolvedEventSchema,
   spanReceivedEventSchema,
   topicAssignedEventSchema,
@@ -116,7 +116,7 @@ const traceAnalyticsEvents = [
   spanReceivedEventSchema,
   topicAssignedEventSchema,
   logRecordReceivedEventSchema,
-  metricRecordReceivedEventSchema,
+  metricDataPointCorrelatedEventSchema,
   originResolvedEventSchema,
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
@@ -772,20 +772,16 @@ export class TraceAnalyticsFoldProjection
     };
   }
 
-  handleTraceMetricRecordReceived(
-    event: MetricRecordReceivedEvent,
+  handleTraceMetricDataPointCorrelated(
+    event: MetricDataPointCorrelatedEvent,
     state: TraceAnalyticsData,
   ): TraceAnalyticsData {
-    // Mirrors the trace-summary fold: a standalone gauge/sum without
-    // exemplar trace context is persisted to stored_metric_records by the
-    // map projection but skipped here.
-    if (!event.data.traceId || !event.data.spanId) {
-      return state;
-    }
-
     let timeToFirstTokenMs = state.timeToFirstTokenMs;
-    if (event.data.metricName === "gen_ai.server.time_to_first_token") {
-      const ttftMs = event.data.value * 1000;
+    if (
+      event.data.metricName === "gen_ai.server.time_to_first_token" &&
+      event.data.exemplarValue !== null
+    ) {
+      const ttftMs = event.data.exemplarValue * 1000;
       timeToFirstTokenMs =
         timeToFirstTokenMs === null
           ? ttftMs

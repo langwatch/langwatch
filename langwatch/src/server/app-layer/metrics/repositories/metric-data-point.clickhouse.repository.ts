@@ -1,0 +1,490 @@
+import { createLogger } from "@langwatch/observability";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import {
+  affectedRollupBuckets,
+  buildMetricRollups,
+} from "~/server/event-sourcing/pipelines/metric-processing/rollup";
+import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing/pipelines/metric-processing/schemas/constants";
+import type {
+  AggregationTemporality,
+  CanonicalMetricDataPoint,
+  MetricKind,
+  MetricUsageEstimate,
+  MetricUsageEstimateQuery,
+} from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
+import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
+import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { MetricDataPointRepository } from "./metric-data-point.repository";
+
+const logger = createLogger(
+  "langwatch:app-layer:metrics:metric-data-point-repository",
+);
+
+interface RawMetricRow {
+  TenantId: string;
+  PointId: string;
+  SeriesId: string;
+  ResourceSchemaUrl: string;
+  ResourceAttributesJson: string;
+  ResourceAttributeKeys: string[];
+  ScopeSchemaUrl: string;
+  ScopeName: string;
+  ScopeVersion: string;
+  ScopeAttributesJson: string;
+  ScopeAttributeKeys: string[];
+  MetricName: string;
+  MetricDescription: string;
+  MetricUnit: string;
+  MetricKind: MetricKind;
+  AggregationTemporality: AggregationTemporality;
+  IsMonotonic: number | boolean | null;
+  PointAttributesJson: string;
+  PointAttributeKeys: string[];
+  StartTimeUnixNano: string;
+  TimeUnixNano: string;
+  TimeUnixMs: string | number;
+  Flags: number;
+  ValueType: "none" | "int" | "double";
+  ValueInt: string | null;
+  ValueDouble: number | null;
+  Count: string | null;
+  Sum: number | null;
+  Min: number | null;
+  Max: number | null;
+  ExplicitBounds: number[];
+  BucketCounts: string[];
+  ExponentialScale: number | null;
+  ExponentialZeroThreshold: number | null;
+  ZeroCount: string | null;
+  PositiveOffset: number | null;
+  PositiveBucketCounts: string[];
+  NegativeOffset: number | null;
+  NegativeBucketCounts: string[];
+  SummaryQuantilesJson: string;
+  CanonicalPayload: string;
+  _size_bytes: number;
+  OccurredAt: string | number;
+  AcceptedAt: string | number;
+}
+
+const RAW_SELECT = `
+  TenantId, PointId, SeriesId,
+  ResourceSchemaUrl, ResourceAttributesJson, ResourceAttributeKeys,
+  ScopeSchemaUrl, ScopeName, ScopeVersion, ScopeAttributesJson, ScopeAttributeKeys,
+  MetricName, MetricDescription, MetricUnit, MetricKind,
+  AggregationTemporality, IsMonotonic,
+  PointAttributesJson, PointAttributeKeys,
+  StartTimeUnixNano, TimeUnixNano, toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs,
+  Flags, ValueType, ValueInt, ValueDouble, Count, Sum, Min, Max,
+  ExplicitBounds, BucketCounts, ExponentialScale, ExponentialZeroThreshold, ZeroCount,
+  PositiveOffset, PositiveBucketCounts, NegativeOffset, NegativeBucketCounts,
+  SummaryQuantilesJson, CanonicalPayload, _size_bytes,
+  toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
+  toUnixTimestamp64Milli(AcceptedAt) AS AcceptedAt
+`;
+
+function rawRow(point: CanonicalMetricDataPoint, retentionDays: number) {
+  return {
+    TenantId: point.tenantId,
+    PointId: point.pointId,
+    SeriesId: point.seriesId,
+    ResourceSchemaUrl: point.resourceSchemaUrl,
+    ResourceAttributesJson: point.resourceAttributesJson,
+    ResourceAttributeKeys: point.resourceAttributeKeys,
+    ScopeSchemaUrl: point.scopeSchemaUrl,
+    ScopeName: point.scopeName,
+    ScopeVersion: point.scopeVersion,
+    ScopeAttributesJson: point.scopeAttributesJson,
+    ScopeAttributeKeys: point.scopeAttributeKeys,
+    MetricName: point.metricName,
+    MetricDescription: point.metricDescription,
+    MetricUnit: point.metricUnit,
+    MetricKind: point.metricKind,
+    AggregationTemporality: point.aggregationTemporality,
+    IsMonotonic: point.isMonotonic,
+    PointAttributesJson: point.pointAttributesJson,
+    PointAttributeKeys: point.pointAttributeKeys,
+    StartTimeUnixNano: point.startTimeUnixNano,
+    TimeUnixNano: point.timeUnixNano,
+    TimeUnixMs: new Date(point.timeUnixMs),
+    Flags: point.flags,
+    ValueType: point.valueType,
+    ValueInt: point.valueInt,
+    ValueDouble: point.valueDouble,
+    Count: point.count,
+    Sum: point.sum,
+    Min: point.min,
+    Max: point.max,
+    ExplicitBounds: point.explicitBounds,
+    BucketCounts: point.bucketCounts,
+    ExponentialScale: point.exponentialScale,
+    ExponentialZeroThreshold: point.exponentialZeroThreshold,
+    ZeroCount: point.zeroCount,
+    PositiveOffset: point.positiveOffset,
+    PositiveBucketCounts: point.positiveBucketCounts,
+    NegativeOffset: point.negativeOffset,
+    NegativeBucketCounts: point.negativeBucketCounts,
+    SummaryQuantilesJson: point.summaryQuantilesJson,
+    CanonicalPayload: point.canonicalPayload,
+    OccurredAt: new Date(point.occurredAt),
+    AcceptedAt: new Date(point.acceptedAt),
+    // Keep the first acceptance when the same PointId is retried.
+    DedupVersion: (
+      18_446_744_073_709_551_615n - BigInt(point.acceptedAt)
+    ).toString(),
+    _retention_days: retentionDays,
+    _size_bytes: point.canonicalSizeBytes,
+  };
+}
+
+function fromRaw(
+  row: RawMetricRow,
+  organizationId: string,
+): CanonicalMetricDataPoint {
+  return {
+    tenantId: row.TenantId,
+    // Organization identity is deliberately absent from authoritative metric
+    // storage. It is carried only long enough to write the shadow ledger.
+    organizationId,
+    pointId: row.PointId,
+    seriesId: row.SeriesId,
+    resourceSchemaUrl: row.ResourceSchemaUrl,
+    resourceAttributesJson: row.ResourceAttributesJson,
+    resourceAttributeKeys: row.ResourceAttributeKeys,
+    scopeSchemaUrl: row.ScopeSchemaUrl,
+    scopeName: row.ScopeName,
+    scopeVersion: row.ScopeVersion,
+    scopeAttributesJson: row.ScopeAttributesJson,
+    scopeAttributeKeys: row.ScopeAttributeKeys,
+    metricName: row.MetricName,
+    metricDescription: row.MetricDescription,
+    metricUnit: row.MetricUnit,
+    metricKind: row.MetricKind,
+    aggregationTemporality: row.AggregationTemporality,
+    isMonotonic: row.IsMonotonic === null ? null : Boolean(row.IsMonotonic),
+    pointAttributesJson: row.PointAttributesJson,
+    pointAttributeKeys: row.PointAttributeKeys,
+    startTimeUnixNano: String(row.StartTimeUnixNano),
+    timeUnixNano: String(row.TimeUnixNano),
+    timeUnixMs: Number(row.TimeUnixMs),
+    flags: row.Flags,
+    valueType: row.ValueType,
+    valueInt: row.ValueInt === null ? null : String(row.ValueInt),
+    valueDouble: row.ValueDouble,
+    count: row.Count === null ? null : String(row.Count),
+    sum: row.Sum,
+    min: row.Min,
+    max: row.Max,
+    explicitBounds: row.ExplicitBounds,
+    bucketCounts: row.BucketCounts.map(String),
+    exponentialScale: row.ExponentialScale,
+    exponentialZeroThreshold: row.ExponentialZeroThreshold,
+    zeroCount: row.ZeroCount === null ? null : String(row.ZeroCount),
+    positiveOffset: row.PositiveOffset,
+    positiveBucketCounts: row.PositiveBucketCounts.map(String),
+    negativeOffset: row.NegativeOffset,
+    negativeBucketCounts: row.NegativeBucketCounts.map(String),
+    summaryQuantilesJson: row.SummaryQuantilesJson,
+    canonicalPayload: row.CanonicalPayload,
+    canonicalSizeBytes: Number(row._size_bytes),
+    occurredAt: Number(row.OccurredAt),
+    acceptedAt: Number(row.AcceptedAt),
+  };
+}
+
+function validate(point: CanonicalMetricDataPoint, operation: string): void {
+  EventUtils.validateTenantId({ tenantId: point.tenantId }, operation);
+  if (!/^[a-f0-9]{64}$/.test(point.pointId)) {
+    throw new SecurityError(operation, "invalid PointId", point.tenantId);
+  }
+}
+
+export class MetricDataPointClickHouseRepository implements MetricDataPointRepository {
+  constructor(
+    private readonly resolveClient: ClickHouseClientResolver,
+    private readonly resolveOrganizationClient: ClickHouseClientResolver = resolveClient,
+  ) {}
+
+  async ensureDataPoint(
+    point: CanonicalMetricDataPoint,
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+  ): Promise<void> {
+    validate(point, "MetricDataPointClickHouseRepository.ensureDataPoint");
+    const client = await this.resolveClient(point.tenantId);
+    try {
+      // Raw must be authoritative before any derived or shadow write.
+      await client.insert({
+        table: "metric_data_points",
+        values: [rawRow(point, retentionDays)],
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+      await client.insert({
+        table: "metric_usage_estimates",
+        values: [
+          {
+            OrganizationId: point.organizationId,
+            TenantId: point.tenantId,
+            PointId: point.pointId,
+            SeriesId: point.seriesId,
+            MetricName: point.metricName,
+            AcceptedAt: new Date(point.acceptedAt),
+            AcceptedHour: new Date(
+              Math.floor(point.acceptedAt / 3_600_000) * 3_600_000,
+            ),
+            CanonicalSourceBytes: point.canonicalSizeBytes,
+            // ReplacingMergeTree keeps the largest version. Inverting the
+            // acceptance millisecond makes the first accepted retry win.
+            DedupVersion: (
+              18_446_744_073_709_551_615n - BigInt(point.acceptedAt)
+            ).toString(),
+          },
+        ],
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      logger.error(
+        { tenantId: point.tenantId, pointId: point.pointId, error },
+        "Failed to persist canonical metric point",
+      );
+      throw error;
+    }
+  }
+
+  async upsertSeries(
+    point: CanonicalMetricDataPoint,
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+  ): Promise<void> {
+    validate(point, "MetricDataPointClickHouseRepository.upsertSeries");
+    const client = await this.resolveClient(point.tenantId);
+    await client.insert({
+      table: "metric_series",
+      values: [
+        {
+          TenantId: point.tenantId,
+          SeriesId: point.seriesId,
+          ResourceSchemaUrl: point.resourceSchemaUrl,
+          ResourceAttributesJson: point.resourceAttributesJson,
+          ResourceAttributeKeys: point.resourceAttributeKeys,
+          ScopeSchemaUrl: point.scopeSchemaUrl,
+          ScopeName: point.scopeName,
+          ScopeVersion: point.scopeVersion,
+          ScopeAttributesJson: point.scopeAttributesJson,
+          ScopeAttributeKeys: point.scopeAttributeKeys,
+          MetricName: point.metricName,
+          MetricDescription: point.metricDescription,
+          MetricUnit: point.metricUnit,
+          MetricKind: point.metricKind,
+          AggregationTemporality: point.aggregationTemporality,
+          IsMonotonic: point.isMonotonic,
+          PointAttributesJson: point.pointAttributesJson,
+          PointAttributeKeys: point.pointAttributeKeys,
+          LastSeenAt: new Date(point.timeUnixMs),
+          _retention_days: retentionDays,
+          _size_bytes: 0,
+        },
+      ],
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+    });
+  }
+
+  private async immediateNeighbors(
+    point: CanonicalMetricDataPoint,
+  ): Promise<CanonicalMetricDataPoint[]> {
+    const client = await this.resolveClient(point.tenantId);
+    const result = await client.query({
+      query: `
+        (SELECT ${RAW_SELECT}
+         FROM metric_data_points FINAL
+         WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
+           AND (TimeUnixMs < {time:DateTime64(3)} OR (TimeUnixMs = {time:DateTime64(3)} AND (TimeUnixNano < {timeNano:UInt64} OR (TimeUnixNano = {timeNano:UInt64} AND PointId < {pointId:String}))))
+         ORDER BY TimeUnixNano DESC, PointId DESC LIMIT 1)
+        UNION ALL
+        (SELECT ${RAW_SELECT}
+         FROM metric_data_points FINAL
+         WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
+           AND (TimeUnixMs > {time:DateTime64(3)} OR (TimeUnixMs = {time:DateTime64(3)} AND (TimeUnixNano > {timeNano:UInt64} OR (TimeUnixNano = {timeNano:UInt64} AND PointId >= {pointId:String}))))
+         ORDER BY TimeUnixNano ASC, PointId ASC LIMIT 2)
+      `,
+      query_params: {
+        tenantId: point.tenantId,
+        seriesId: point.seriesId,
+        time: new Date(point.timeUnixMs),
+        timeNano: point.timeUnixNano,
+        pointId: point.pointId,
+      },
+      format: "JSONEachRow",
+    });
+    return (await result.json<RawMetricRow>()).map((row) =>
+      fromRaw(row, point.organizationId),
+    );
+  }
+
+  private async pointsForBuckets(
+    point: CanonicalMetricDataPoint,
+    buckets: ReadonlySet<number>,
+  ): Promise<CanonicalMetricDataPoint[]> {
+    const starts = [...buckets];
+    const from = Math.min(...starts);
+    const to = Math.max(...starts) + METRIC_ROLLUP_INTERVAL_MS;
+    const client = await this.resolveClient(point.tenantId);
+    const result = await client.query({
+      query: `
+        (SELECT ${RAW_SELECT}
+         FROM metric_data_points FINAL
+         WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
+           AND TimeUnixMs < {from:DateTime64(3)}
+         ORDER BY TimeUnixNano DESC, PointId DESC LIMIT 1)
+        UNION ALL
+        (SELECT ${RAW_SELECT}
+         FROM metric_data_points FINAL
+         WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
+           AND TimeUnixMs >= {from:DateTime64(3)} AND TimeUnixMs < {to:DateTime64(3)}
+         ORDER BY TimeUnixNano ASC, PointId ASC)
+      `,
+      query_params: {
+        tenantId: point.tenantId,
+        seriesId: point.seriesId,
+        from: new Date(from),
+        to: new Date(to),
+      },
+      format: "JSONEachRow",
+    });
+    return (await result.json<RawMetricRow>()).map((row) =>
+      fromRaw(row, point.organizationId),
+    );
+  }
+
+  async recomputeAffectedRollups(
+    point: CanonicalMetricDataPoint,
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+  ): Promise<void> {
+    // Projection queues are independent. Ensuring the point here makes the
+    // raw-before-derived invariant true even if this projection wins the race.
+    await this.ensureDataPoint(point, retentionDays);
+    const neighbors = await this.immediateNeighbors(point);
+    const affected = affectedRollupBuckets(neighbors, point);
+    const authoritative = await this.pointsForBuckets(point, affected);
+    const rows = buildMetricRollups(authoritative, affected);
+    if (rows.length === 0) return;
+    const client = await this.resolveClient(point.tenantId);
+    await client.insert({
+      table: "metric_time_rollups",
+      values: rows.map((row) => ({
+        TenantId: row.tenantId,
+        SeriesId: row.seriesId,
+        MetricName: row.metricName,
+        MetricUnit: row.metricUnit,
+        MetricKind: row.metricKind,
+        AggregationTemporality: row.aggregationTemporality,
+        IsMonotonic: row.isMonotonic,
+        BucketStart: new Date(row.bucketStartMs),
+        BucketEnd: new Date(row.bucketEndMs),
+        GaugeLast: row.gaugeLast,
+        Min: row.min,
+        Max: row.max,
+        Sum: row.sum,
+        Count: row.count,
+        ExplicitBounds: row.explicitBounds,
+        BucketCounts: row.bucketCounts,
+        ExponentialScale: row.exponentialScale,
+        ExponentialZeroThreshold: row.exponentialZeroThreshold,
+        ZeroCount: row.zeroCount,
+        PositiveOffset: row.positiveOffset,
+        PositiveBucketCounts: row.positiveBucketCounts,
+        NegativeOffset: row.negativeOffset,
+        NegativeBucketCounts: row.negativeBucketCounts,
+        ResetCount: row.resetCount,
+        GapCount: row.gapCount,
+        SourcePointCount: row.sourcePointCount,
+        UpdatedAt: new Date(row.updatedAt),
+        _retention_days: retentionDays,
+        _size_bytes: 0,
+      })),
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+    });
+  }
+
+  async queryUsageEstimates(
+    query: MetricUsageEstimateQuery,
+  ): Promise<MetricUsageEstimate[]> {
+    if (!query.organizationId) {
+      throw new SecurityError(
+        "MetricDataPointClickHouseRepository.queryUsageEstimates",
+        "organizationId is required",
+      );
+    }
+    const client = query.tenantId
+      ? await this.resolveClient(query.tenantId)
+      : await this.resolveOrganizationClient(query.organizationId);
+    const dimensions = {
+      organization: ["OrganizationId"],
+      project: ["OrganizationId", "TenantId"],
+      metric: ["OrganizationId", "TenantId", "MetricName"],
+      hour: ["OrganizationId", "TenantId", "MetricName", "AcceptedHour"],
+    }[query.groupBy];
+    const selectDimensions = dimensions.join(", ");
+    const identityWhere = [
+      "OrganizationId = {organizationId:String}",
+      "AcceptedAt < {to:DateTime64(3)}",
+      query.tenantId ? "TenantId = {tenantId:String}" : "",
+      query.metricName ? "MetricName = {metricName:String}" : "",
+    ]
+      .filter(Boolean)
+      .join(" AND ");
+    const result = await client.query({
+      query: `
+        SELECT
+          ${selectDimensions},
+          uniqExact(SeriesId) AS UniqueActiveSeries,
+          uniqExact(tuple(SeriesId, AcceptedHour)) AS ActiveSeriesHours,
+          uniqExact(PointId) AS AcceptedPoints,
+          sum(CanonicalSourceBytes) AS CanonicalRetainedBytes,
+          uniqExact(tuple(SeriesId, AcceptedHour)) AS ProjectedEventEquivalentUsage
+          FROM (
+          SELECT
+            PointId,
+            any(OrganizationId) AS OrganizationId,
+            any(TenantId) AS TenantId,
+            any(SeriesId) AS SeriesId,
+            any(MetricName) AS MetricName,
+            min(AcceptedAt) AS AcceptedAt,
+            toStartOfHour(min(AcceptedAt)) AS AcceptedHour,
+            any(CanonicalSourceBytes) AS CanonicalSourceBytes
+          FROM metric_usage_estimates
+          WHERE ${identityWhere}
+          GROUP BY PointId
+          HAVING min(AcceptedAt) >= {from:DateTime64(3)}
+        )
+        GROUP BY ${selectDimensions}
+        ORDER BY ${selectDimensions}
+      `,
+      query_params: {
+        organizationId: query.organizationId,
+        from: query.from,
+        to: query.to,
+        ...(query.tenantId ? { tenantId: query.tenantId } : {}),
+        ...(query.metricName ? { metricName: query.metricName } : {}),
+      },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<Record<string, string>>();
+    return rows.map((row) => ({
+      organizationId: row.OrganizationId!,
+      tenantId: row.TenantId ?? null,
+      metricName: row.MetricName ?? null,
+      acceptedHour: row.AcceptedHour ?? null,
+      uniqueActiveSeries: Number(row.UniqueActiveSeries ?? 0),
+      activeSeriesHours: Number(row.ActiveSeriesHours ?? 0),
+      acceptedPoints: Number(row.AcceptedPoints ?? 0),
+      canonicalRetainedBytes: Number(row.CanonicalRetainedBytes ?? 0),
+      projectedEventEquivalentUsage: Number(
+        row.ProjectedEventEquivalentUsage ?? 0,
+      ),
+    }));
+  }
+}

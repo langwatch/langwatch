@@ -22,7 +22,10 @@
 export const TIME_PARTITIONED_TABLES = {
   stored_spans: ["StartTime"],
   stored_log_records: ["TimeUnixMs"],
-  stored_metric_records: ["TimeUnixMs"],
+  metric_data_points: ["TimeUnixMs"],
+  metric_series: ["LastSeenAt"],
+  metric_time_rollups: ["BucketStart"],
+  metric_usage_estimates: ["AcceptedAt", "AcceptedHour"],
   event_log: ["EventOccurredAt"],
   billable_events: ["EventTimestamp"],
   governance_ocsf_events: ["EventTime"],
