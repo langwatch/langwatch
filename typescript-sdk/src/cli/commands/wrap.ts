@@ -18,6 +18,10 @@ export const wrapCopilot = async (args: string[]): Promise<void> => {
   await runWrapped("copilot", args);
 };
 
+export const wrapCode = async (args: string[]): Promise<void> => {
+  await runWrapped("code", args);
+};
+
 export const wrapCursor = async (args: string[]): Promise<void> => {
   await runWrapped("cursor", args);
 };

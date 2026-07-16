@@ -133,6 +133,10 @@ const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
   // `copilot` would be confusable with it in the API-keys page and
   // analytics filters. ADR-039 Decision 2.
   copilot: "copilot_cli",
+  // `code` = the VS Code Copilot Chat extension. Its own sourceType so the
+  // editor surface is separable from the CLI (`copilot_cli`) and app
+  // (`copilot_app`) in the API-keys page and analytics. ADR-039 §Extension #2.
+  code: "copilot_vscode",
 };
 
 /**
@@ -336,7 +340,7 @@ export async function resolveWrapperMode(
   // lets the inherited "false" win in the spawn merge; the notice makes
   // the tokens-only consequence visible instead of silent (ADR-039 D5).
   if (
-    tool === "copilot" &&
+    (tool === "copilot" || tool === "code") &&
     isCaptureOptOut(
       process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
     )
@@ -583,6 +587,24 @@ export function buildOtelEnvBlock(
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=copilot-cli",
+      };
+    case "code":
+      // VS Code Copilot Chat extension (ADR-039 §Extension #2). Same OTel
+      // GenAI export as the copilot CLI, enabled purely by env — the
+      // COPILOT_OTEL_ENABLED env overrides the extension's default-false
+      // `github.copilot.chat.otel.enabled` setting (spike-verified: an
+      // env-only launch with an empty settings.json still captured a real
+      // turn). service.name=copilot-chat is the extension's own resource
+      // label and the sourceType discriminator on the wire. Ingestion-only:
+      // the chat extension has no BYOK gateway env, so no Path A here.
+      return {
+        COPILOT_OTEL_ENABLED: "true",
+        OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true",
+        OTEL_TRACES_EXPORTER: "otlp",
+        OTEL_METRICS_EXPORTER: "otlp",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+        ...base,
+        OTEL_RESOURCE_ATTRIBUTES: "service.name=copilot-chat",
       };
     default:
       return base;
