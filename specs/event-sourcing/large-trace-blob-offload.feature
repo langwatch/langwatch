@@ -220,6 +220,181 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     And the facet query SQL contains "NOT startsWith(key, 'langwatch.reserved.')"
 
   # ===========================================================================
+  # Track 3 — v2 Trace Explorer read resolution (issue #5835)
+  # ===========================================================================
+  # Track 2's read-resolution mechanism (resolveOffloadedTraces /
+  # resolveOffloadedTracesBatch) was proven on the LEGACY TraceService
+  # (Scenario: "Trace-detail collapsed uses preview..." above) but was never
+  # wired into tracesV2.header / tracesV2.list — so the v2 Trace Explorer
+  # (the only live UI today) silently served the 64KB preview as if it were
+  # complete, with no expand control and no indication of truncation, on its
+  # cold-open default view (the Summary panel). Investigation also found the
+  # v2 span-attribute row-mapper (`deserializeAttributes`) silently corrupts
+  # the eventref pointer for reserved keys, breaking the per-span Attributes
+  # pane's resolution too — a second, independent bug on the same seam family.
+  # A THIRD finding, made during this issue's readiness review: the
+  # recompute mechanism resolveOffloadedTraces/resolveOffloadedTracesBatch
+  # ALREADY use — recomputes trace-level input/output via
+  # TraceIOExtractionService.extractFirstInput/extractLastOutput, which
+  # implements a DIFFERENT winner-selection algorithm than the fold's
+  # TraceIOAccumulationService.accumulateIO (root > explicit > last-finishing
+  # priority vs. single-node-else-last-finishing-by-endTime) — confirmed to
+  # disagree on a plain two-span trace, no exclusion rule involved. This is a
+  # latent bug in the ALREADY-SHIPPED Track 2 mechanism, not something #5835
+  # introduces — surfaced here because porting it into v2's cold-open default
+  # view raises its exposure far above the legacy opt-in `{full:true}` path.
+
+  @integration @track3
+  # Bound by a regression test through the REAL SpanStorageClickHouseRepository
+  # row-mapping path (ClickHouse row -> deserializeAttributes -> NormalizedSpan),
+  # not a hand-built fixture — the existing test-pyramid gap that let this ship.
+  Scenario: Attributes pane resolves full content for an offloaded span attribute
+    Given a span attribute exceeding 64 KB was offloaded at ingest, carrying a
+        well-formed "langwatch.reserved.eventref.<attrKey>" pointer
+    When tracesV2.spanDetail (or spansFull) reads the span through the real
+        ClickHouse row-mapping path
+    Then the returned attribute value is byte-identical to the full
+        originally-ingested content, not the 64KB write-time preview
+    Because deserializeAttributes no longer auto-JSON-parses the
+        "langwatch.reserved." namespace before parseSpanEventRefs sees it
+
+  @integration @track3
+  Scenario: Summary panel resolves full input/output beyond the 64KB preview
+    Given a trace whose winning input or output span exceeds the 64KB
+        write-time preview cap
+    When tracesV2.header reads the trace
+    Then the returned input/output is byte-identical to the full
+        originally-ingested value, not the 64KB-capped trace_summaries preview
+
+  @integration @track3
+  Scenario: Conversation tab resolves full turn text beyond the 64KB preview
+    Given a conversation turn whose content exceeds the 64KB write-time
+        preview cap
+    When tracesV2.list is called in conversation-scoped mode (resolveFullIO
+        true, mirroring useConversationTurns)
+    Then the returned turn content is byte-identical to the full originally-
+        ingested value, not the truncated preview
+
+  @integration @track3
+  # AC9. Two independent winner-selection algorithms over the same spans
+  # disagree even with no tool/utility/guardrail spans involved — proven via
+  # the existing traceSummaryIO.test.ts:63-103 root+child fixture.
+  Scenario Outline: Resolved content matches the fold's actual winning span, not a different one
+    Given a trace with a root span (ends earlier) and a non-root child span
+        (ends later), where the root's output is the fold's winner and the
+        root's content exceeds 64KB
+    When <surface> reads the trace's resolved output
+    Then the resolved output is the full form of the ROOT's content
+    And it is NOT the later-ending child's content
+
+    Examples:
+      | surface                                          |
+      | tracesV2.header (Summary panel)                  |
+      | tracesV2.list in conversation-scoped mode         |
+
+  @integration @track3
+  # Supplementary case: the exclusion-set dimension (tool/guardrail/Claude-
+  # Code-utility spans must never win), distinct from the priority dimension
+  # covered by the Outline above.
+  Scenario: Resolved content excludes tool and Claude-Code-utility spans from winning
+    Given a trace with a root-position tool-type (or Claude-Code-utility) span
+        and a genuine conversational span, both carrying offloaded content
+    When the trace's resolved output is read
+    Then the resolved output is the full form of the genuine conversational
+        span's content
+    And it is NOT the tool/utility span's content
+
+  @unit @track3
+  # AC4b. Same documented error policy resolveOffloadedTraces already has for
+  # a missing event_log row, applied to a genuinely-malformed reserved value.
+  Scenario: A malformed reserved-key value degrades to a logged warning, not a throw
+    Given a "langwatch.reserved.*" span attribute value that is not valid
+        JSON even as a raw string
+    When the span is read through deserializeAttributes and parseSpanEventRefs
+    Then the read does not throw
+    And the preview value is kept
+    And a warning is logged
+
+  @unit @track3
+  Scenario: Non-reserved attribute values keep their existing typed-conversion behavior
+    Given a non-reserved span attribute value shaped like JSON, an array, a
+        boolean, or a number
+    When the value is read through deserializeAttributes
+    Then it is still auto-converted to its typed form exactly as before this
+        change
+    Because the auto-parse exemption is narrowed to the "langwatch.reserved."
+        namespace only, not disabled generally
+
+  @integration @track3
+  Scenario: The trace grid continues to issue zero event_log reads
+    Given a grid-shaped tracesV2.list call (resolveFullIO omitted, mirroring
+        TraceTable's query)
+    When the list is read
+    Then zero event_log SELECTs are issued
+    Because the opt-in resolve flag defaults off and only useConversationTurns
+        sets it
+
+  @integration @track3
+  Scenario: No offloaded content means no extra event_log reads
+    Given a trace with no eventref-bearing spans at all
+    When tracesV2.header or a conversation-scoped tracesV2.list reads the trace
+    Then zero event_log reads are issued
+    Because resolveOffloadedTraces' "no span has any event ref -> skip
+        entirely" fast path is exercised, not bypassed
+
+  @integration @track3
+  Scenario: Read cost is bounded by offloaded span/field count, not total span count
+    Given a trace with N eventref-bearing spans carrying F total eventref
+        fields, where at least one eventref-bearing span is not the fold's
+        eventual winner
+    When tracesV2.header reads the trace
+    Then exactly F event_log reads are issued
+    Because every eventref-bearing span is resolved so the winner can be
+        recomputed correctly — resolution is not pre-filtered to only the
+        winning field(s)
+
+  @integration @track3
+  # AC10. A privacy regression found in the same readiness review: the
+  # resolve-overlay must not bypass the existing visibility-window gate.
+  Scenario Outline: Full-content resolution does not bypass the visibility window
+    Given a trace whose occurredAt is before the caller's visibilityCutoffMs
+    And the trace's input/output exceeds 64KB and was offloaded
+    When <surface> reads the trace
+    Then the returned content is the <=300-char teaser value with
+        redactedByVisibilityWindow true
+    And it is NOT the resolved full content
+
+    Examples:
+      | surface                                    |
+      | tracesV2.header (Summary panel)             |
+      | tracesV2.list in conversation-scoped mode   |
+
+  @integration @track3
+  Scenario: Summary panel shows an incomplete-content indicator when resolution fails
+    Given a span's eventref points at a missing or retention-expired
+        event_log row, or the blob-store fetch throws
+    When the Summary panel reads the trace
+    Then the response carries an explicit inputTruncated or outputTruncated marker
+    And the Summary panel renders a "content may be incomplete" indicator
+    And the partial preview is not silently displayed with no signal
+
+  @integration @track3
+  Scenario: Conversation tab shows an incomplete-content indicator when resolution fails
+    Given a conversation turn's eventref points at a missing or retention-
+        expired event_log row, or the blob-store fetch throws
+    When the Conversation tab reads the turn
+    Then the response carries an explicit inputTruncated or outputTruncated marker
+    And the Conversation tab renders a "content may be incomplete" indicator
+
+  @integration @track3
+  Scenario: Attributes pane shows an incomplete-content indicator when resolution fails
+    Given a span attribute's eventref points at a missing or retention-
+        expired event_log row, or the blob-store fetch throws
+    When the Attributes pane reads the span
+    Then the response carries an explicit incomplete marker for that attribute
+    And the Attributes pane renders an incomplete-content indicator
+
+  # ===========================================================================
   # Cross-cutting
   # ===========================================================================
 
@@ -289,4 +464,45 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   #
   # Count: 13 behavioral ACs (T1.1-3, T2.1-8, X.1-2) -> 15 scenarios (+1 Scenario Outline row
   # for the second SDK). X.3 is a process gate, intentionally not a scenario.
+  #
+  # Track 3 — v2 Trace Explorer read resolution (issue #5835)
+  # AC0: "Attributes pane resolves full content for an offloaded span attribute"
+  #   -> Scenario: Attributes pane resolves full content for an offloaded span attribute
+  # AC1: "Summary panel displays FULL content beyond the 64KB preview"
+  #   -> Scenario: Summary panel resolves full input/output beyond the 64KB preview
+  # AC2: "Conversation tab shows full turn text beyond the 64KB backend cap"
+  #   -> Scenario: Conversation tab resolves full turn text beyond the 64KB preview
+  # AC3: "Content at/under 64KB renders exactly as today — no behavior change"
+  #   -> No new scenario (per the AC's own evidence shape) — maps to the EXISTING,
+  #      unmodified scenarios in specs/traces-v2/trace-view.feature ("Very long
+  #      content is truncated at the IOViewer cap", "Expanding truncated content
+  #      shows the full text") and conversation-message-expand.feature ("Long
+  #      message shows 'Show more' instead of a bare ellipsis", "Short messages
+  #      have no toggle") staying green unmodified.
+  # AC4: "Summary/Conversation surface an explicit incomplete-content indicator on resolution failure"
+  #   -> Scenario: Summary panel shows an incomplete-content indicator when resolution fails
+  #   -> Scenario: Conversation tab shows an incomplete-content indicator when resolution fails
+  # AC4b: "Malformed reserved-key value degrades to logged warning, doesn't throw"
+  #   -> Scenario: A malformed reserved-key value degrades to a logged warning, not a throw
+  # AC4c: "Attributes pane surfaces an incomplete-content indicator on resolution failure"
+  #   -> Scenario: Attributes pane shows an incomplete-content indicator when resolution fails
+  # AC5: "Grid list call continues to issue zero event_log SELECTs"
+  #   -> Scenario: The trace grid continues to issue zero event_log reads
+  # AC6: "Non-reserved attribute values keep existing typed-conversion behavior"
+  #   -> Scenario: Non-reserved attribute values keep their existing typed-conversion behavior
+  # AC7: "No-offload fast path preserved; read cost bounded by offloaded span/field count"
+  #   -> Scenario: No offloaded content means no extra event_log reads
+  #   -> Scenario: Read cost is bounded by offloaded span/field count, not total span count
+  # AC8: "Read-path-only — no migration, no destructive writes, no schema change"
+  #   -> Diff-review gate (no *.sql/migration files, no new INSERT/UPDATE/ALTER/write calls),
+  #      mirroring X.3 above — not a runtime behavioral invariant, intentionally not a scenario.
+  # AC9: "Resolved content matches the fold's actual winning span on BOTH call sites"
+  #   -> Scenario Outline: Resolved content matches the fold's actual winning span, not a different one (Summary, Conversation)
+  #   -> Scenario: Resolved content excludes tool and Claude-Code-utility spans from winning
+  # AC10: "Full-content resolution does not bypass the visibility-window teaser gate"
+  #   -> Scenario Outline: Full-content resolution does not bypass the visibility window (Summary, Conversation)
+  #
+  # Track 3 count: 13 issue ACs (AC0-AC10, including AC4b/AC4c) -> 14 scenarios
+  # (2 as Scenario Outlines, 2 examples each) + 1 existing-scenarios cross-reference (AC3)
+  # + 1 diff-review process gate (AC8, no scenario, mirrors X.3's precedent).
   # ===========================================================================
