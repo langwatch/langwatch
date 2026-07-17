@@ -60,6 +60,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     const client = { insert } as never;
     const repository = new MetricDataPointClickHouseRepository(
       async () => client,
+      async () => client,
     );
 
     await repository.ensureDataPoint({ point: dataPoint(), retentionDays: 49 });
@@ -112,6 +113,7 @@ describe("MetricDataPointClickHouseRepository", () => {
       const client = { insert } as never;
       const repository = new MetricDataPointClickHouseRepository(
         async () => client,
+        async () => client,
       );
       const points = [
         { ...dataPoint(), pointId: "a".repeat(64), timeUnixMs: 1 },
@@ -136,6 +138,7 @@ describe("MetricDataPointClickHouseRepository", () => {
       >(async () => {});
       const client = { insert } as never;
       const repository = new MetricDataPointClickHouseRepository(
+        async () => client,
         async () => client,
       );
       const base = dataPoint();

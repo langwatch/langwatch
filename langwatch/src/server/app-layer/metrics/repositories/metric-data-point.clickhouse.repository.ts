@@ -37,9 +37,17 @@ const logger = createLogger(
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
 export class MetricDataPointClickHouseRepository implements MetricDataPointRepository {
+  /**
+   * Both resolvers are required on purpose. The organization-wide usage query
+   * relies on its client being resolved from the organization — that is what
+   * makes `OrganizationId` a real isolation boundary rather than a convention
+   * (see the carve-out in dev/docs/best_practices/clickhouse-queries.md).
+   * Defaulting this to the project resolver would hand it an organization id
+   * to look up as a project.
+   */
   constructor(
     private readonly resolveClient: ClickHouseClientResolver,
-    private readonly resolveOrganizationClient: ClickHouseClientResolver = resolveClient,
+    private readonly resolveOrganizationClient: ClickHouseClientResolver,
   ) {}
 
   async ensureDataPoint(args: MetricDataPointWrite): Promise<void> {
