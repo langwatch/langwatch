@@ -50,7 +50,7 @@ Feature: Governance visibility rides a single feature flag
     And the existing AI Gateway menu still renders (different flag)
 
   Scenario: Operators force the flag off via env override
-    Given an operator sets `RELEASE_UI_AI_GOVERNANCE_ENABLED=0` on the app environment
+    Given an operator disables governance for the whole installation via env override
     When users log in
     Then every governance surface above is hidden
     And AI-tools (device) CLI login approvals are refused with a pointer at project login
