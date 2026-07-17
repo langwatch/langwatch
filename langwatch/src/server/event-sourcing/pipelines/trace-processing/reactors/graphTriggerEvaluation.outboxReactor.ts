@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
-import { featureFlagService } from "~/server/featureFlag";
 import type {
   OutboxEnqueueRequest,
   OutboxReactorDefinition,
@@ -28,13 +27,10 @@ const logger = createLogger(
  * by the spec) collapses repeat enqueues into a single evaluation so a
  * burst of spans doesn't fan-out into a burst of evaluations.
  *
- * Per-project gated by `release_es_graph_triggers_firing`:
- *
- *   - OFF (default): `decide` returns `[]`. The cron handles the
- *     project's graph triggers as today.
- *   - ON: `decide` returns one `OutboxEnqueueRequest` per active graph
- *     trigger on the project, all targeting the same shared handler
- *     `evaluateGraphTrigger`.
+ * `decide` returns one `OutboxEnqueueRequest` per active graph trigger on
+ * the project, all targeting the same shared handler `evaluateGraphTrigger`.
+ * This is the sole real-time graph-alert path (ADR-034: the K8s cron was
+ * removed once every project cut over).
  *
  * The reactor itself does NOT call the handler — that's the dispatcher's
  * job (settle/cadence/graphEval stage routing). This keeps the reactor
@@ -73,12 +69,6 @@ export function createGraphTriggerEvaluationOutboxReactor(
       if (event.occurredAt < Date.now() - 60 * 60 * 1000) {
         return [];
       }
-
-      const enabled = await featureFlagService.isEnabled(
-        "release_es_graph_triggers_firing",
-        { distinctId: tenantId, projectId: tenantId },
-      );
-      if (!enabled) return [];
 
       const triggers =
         await deps.triggers.getActiveGraphTriggersForProject(tenantId);

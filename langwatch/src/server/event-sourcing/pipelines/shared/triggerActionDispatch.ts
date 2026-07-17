@@ -37,6 +37,7 @@ const logger = createLogger("langwatch:trigger-action-dispatch");
 export const NOTIFY_TRIGGER_ACTIONS = new Set<TriggerAction>([
   TriggerAction.SEND_EMAIL,
   TriggerAction.SEND_SLACK_MESSAGE,
+  TriggerAction.SEND_WEBHOOK,
 ]);
 
 export const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
@@ -164,6 +165,7 @@ export async function dispatchTriggerAction({
   switch (trigger.action) {
     case TriggerAction.SEND_EMAIL:
     case TriggerAction.SEND_SLACK_MESSAGE:
+    case TriggerAction.SEND_WEBHOOK:
       // Notify-class actions never dispatch inline — they ride the outbox
       // (settle → cadence) so debounce, cadence coalescing, and the typed
       // retry contract apply. Both callers pre-filter on

@@ -1,6 +1,13 @@
 import type { Project, Trigger } from "@prisma/client";
 import { TriggerAction } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+
+// Fake cipher so the webhook-headers tests exercise the decrypt-at-dispatch
+// seam (ADR-040 §3) without real AES/env plumbing.
+vi.mock("~/utils/encryption", () => ({
+  encrypt: (s: string) => `enc(${s})`,
+  decrypt: (s: string) => s.replace(/^enc\(/, "").replace(/\)$/, ""),
+}));
 import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
 import {
   dispatchGraphAlertAction,
@@ -74,6 +81,12 @@ function makeDeps() {
   const sendSlackBot = vi.fn<(payload: unknown) => Promise<void>>(
     async () => undefined,
   );
+  // Returns a 2xx by default — individual tests override to exercise the
+  // retry/terminal classification the dispatcher applies via
+  // assertWebhookDelivered.
+  const sendWebhook = vi.fn(
+    async (_payload: unknown) => ({ status: 200, body: "ok" }),
+  );
   // Pass-through suppression by default — individual tests override to
   // exercise the ADR-031 unsubscribe gate.
   const filterSuppressedRecipients = vi.fn(
@@ -104,6 +117,7 @@ function makeDeps() {
       sendEmail,
       sendSlack,
       sendSlackBot,
+      sendWebhook,
       filterSuppressedRecipients,
       consumeEmailCapSlot,
       emailHourlyCap: 100,
@@ -115,6 +129,7 @@ function makeDeps() {
     sendEmail,
     sendSlack,
     sendSlackBot,
+    sendWebhook,
     filterSuppressedRecipients,
     consumeEmailCapSlot,
     consumeTenantEmailCapSlot,
@@ -690,6 +705,131 @@ describe("dispatchGraphAlertAction", () => {
         });
 
         expect(sendSlack).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe("given a SEND_WEBHOOK trigger with a URL", () => {
+    const webhookTrigger = () =>
+      makeTrigger({
+        action: TriggerAction.SEND_WEBHOOK,
+        actionParams: { url: "https://example.com/hook", method: "POST" },
+      });
+
+    it("renders the alert body and sends it to the configured URL", async () => {
+      const { deps, sendWebhook, sendEmail, sendSlack } = makeDeps();
+      const result = await dispatchGraphAlertAction({
+        deps,
+        input: {
+          trigger: webhookTrigger(),
+          project: makeProject(),
+          context: makeContext(),
+          recipients: [],
+          slackWebhook: null,
+          fireDigest: FIRE_DIGEST,
+        },
+      });
+
+      expect(result.channel).toBe("webhook");
+      expect(result.didSend).toBe(true);
+      expect(sendEmail).not.toHaveBeenCalled();
+      expect(sendSlack).not.toHaveBeenCalled();
+      expect(sendWebhook).toHaveBeenCalledTimes(1);
+      const call = sendWebhook.mock.calls[0]?.[0] as {
+        url: string;
+        body: string;
+      };
+      expect(call.url).toBe("https://example.com/hook");
+      const body = JSON.parse(call.body) as { event: string };
+      expect(body.event).toBe("alert.fired");
+    });
+
+    describe("when header secrets are stored encrypted", () => {
+      it("decrypts them just before the send", async () => {
+        const { deps, sendWebhook } = makeDeps();
+        await dispatchGraphAlertAction({
+          deps,
+          input: {
+            trigger: makeTrigger({
+              action: TriggerAction.SEND_WEBHOOK,
+              actionParams: {
+                url: "https://example.com/hook",
+                method: "POST",
+                headersEncrypted: `enc(${JSON.stringify({
+                  Authorization: "Bearer secret",
+                })})`,
+              },
+            }),
+            project: makeProject(),
+            context: makeContext(),
+            recipients: [],
+            slackWebhook: null,
+            fireDigest: FIRE_DIGEST,
+          },
+        });
+        const call = sendWebhook.mock.calls[0]?.[0] as {
+          headers: Record<string, string>;
+        };
+        expect(call.headers).toEqual({ Authorization: "Bearer secret" });
+      });
+    });
+
+    describe("when the URL is not configured", () => {
+      it("skips the send and reports didSend false", async () => {
+        const { deps, sendWebhook } = makeDeps();
+        const result = await dispatchGraphAlertAction({
+          deps,
+          input: {
+            trigger: makeTrigger({
+              action: TriggerAction.SEND_WEBHOOK,
+              actionParams: {},
+            }),
+            project: makeProject(),
+            context: makeContext(),
+            recipients: [],
+            slackWebhook: null,
+            fireDigest: FIRE_DIGEST,
+          },
+        });
+        expect(result.didSend).toBe(false);
+        expect(sendWebhook).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the endpoint answers a retryable status", () => {
+      it("throws a retryable DispatchError and does NOT claim the fire", async () => {
+        const { deps, sendWebhook, claims } = makeDeps();
+        sendWebhook.mockResolvedValueOnce({ status: 503, body: "down" });
+        const input = {
+          trigger: webhookTrigger(),
+          project: makeProject(),
+          context: makeContext(),
+          recipients: [],
+          slackWebhook: null,
+          fireDigest: FIRE_DIGEST,
+        };
+        await expect(
+          dispatchGraphAlertAction({ deps, input }),
+        ).rejects.toMatchObject({ retryable: true });
+        // No claim recorded — a retry must re-attempt, not skip as delivered.
+        expect(claims.size).toBe(0);
+      });
+    });
+
+    describe("when the same fire is retried after a successful post", () => {
+      it("does not re-post to an endpoint already reached", async () => {
+        const { deps, sendWebhook } = makeDeps();
+        const input = {
+          trigger: webhookTrigger(),
+          project: makeProject(),
+          context: makeContext(),
+          recipients: [],
+          slackWebhook: null,
+          fireDigest: FIRE_DIGEST,
+        };
+        await dispatchGraphAlertAction({ deps, input });
+        await dispatchGraphAlertAction({ deps, input });
+        expect(sendWebhook).toHaveBeenCalledTimes(1);
       });
     });
   });

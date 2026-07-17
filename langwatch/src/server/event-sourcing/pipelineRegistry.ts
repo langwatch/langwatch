@@ -591,9 +591,7 @@ export class PipelineRegistry {
       });
 
     // ADR-034 Phase 6: real-time graph-trigger reactor on the slim eval fold.
-    // Flag-gated per project via the same `release_es_graph_triggers_firing`
-    // flag the trace pipeline uses — disabled = empty decide; cron handles
-    // the project's graph triggers as today.
+    // The sole path — the K8s cron was removed (ADR-034).
     const graphTriggerEvaluationOutboxReactor =
       createEvaluationGraphTriggerEvaluationOutboxReactor({
         triggers: this.deps.triggers,

@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import type { EvaluationAnalyticsData } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
-import { featureFlagService } from "~/server/featureFlag";
 import type {
   OutboxEnqueueRequest,
   OutboxReactorDefinition,
@@ -31,14 +30,10 @@ const logger = createLogger(
  * repeat enqueues into a single evaluation so a burst of evaluations
  * doesn't fan-out into a burst of graph-trigger evaluations.
  *
- * Per-project gated by the SAME `release_es_graph_triggers_firing` flag
- * the trace path uses — there is no separate eval flag because the
- * customer-facing capability ("real-time graph alerts") is one thing, not
- * two. OFF (default) → `decide` returns `[]` and the cron handles the
- * project's graph triggers; ON → emits one `OutboxEnqueueRequest` per
- * active graph trigger on the project, all targeting the same shared
- * handler `evaluateGraphTrigger` (the trace reactor's handler, reused
- * verbatim).
+ * Emits one `OutboxEnqueueRequest` per active graph trigger on the project,
+ * all targeting the same shared handler `evaluateGraphTrigger` (the trace
+ * reactor's handler, reused verbatim). Like the trace path, this is the sole
+ * real-time graph-alert path (ADR-034: the K8s cron was removed).
  *
  * The reactor itself does NOT call the handler — that's the dispatcher's
  * job (settle/cadence/graphEval stage routing).
@@ -82,12 +77,6 @@ export function createEvaluationGraphTriggerEvaluationOutboxReactor(
       if (event.occurredAt < Date.now() - 60 * 60 * 1000) {
         return [];
       }
-
-      const enabled = await featureFlagService.isEnabled(
-        "release_es_graph_triggers_firing",
-        { distinctId: tenantId, projectId: tenantId },
-      );
-      if (!enabled) return [];
 
       const triggers =
         await deps.triggers.getActiveGraphTriggersForProject(tenantId);

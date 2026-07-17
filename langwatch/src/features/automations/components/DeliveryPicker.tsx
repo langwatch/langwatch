@@ -6,10 +6,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { TriggerAction } from "@prisma/client";
+import { TriggerAction } from "@prisma/client";
 import { Settings2 } from "lucide-react";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import type { ClientEntry } from "~/automations/providers/types";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { ConditionSource } from "../logic/draftReducer";
 import { useAutomationStore } from "../state/automationStore";
 import {
@@ -47,11 +49,23 @@ export function DeliveryPicker({
   const setSection = useAutomationStore((s) => s.setSection);
   const configComplete = useConfigComplete();
   const configSummary = useConfigurationSummary();
-  const entries = Object.values(CLIENT_PROVIDERS);
-  const notify = entries.filter((e) => e.shared.category === "notify");
-  const action = entries.filter((e) => e.shared.category === "action");
+  const { project } = useOrganizationTeamProject();
+  // ADR-040: the webhook channel ships dark. The card is hidden until the
+  // flag is on (the save/test routes are gated server-side too), and never
+  // offered for reports — the scheduled-report dispatch is email/Slack only.
+  const { enabled: webhookEnabled } = useFeatureFlag(
+    "release_webhook_automations",
+    { projectId: project?.id, enabled: !!project },
+  );
   const isAlertKind = source === "customGraph";
   const notifyOnly = isAlertKind || source === "report";
+  const entries = Object.values(CLIENT_PROVIDERS).filter(
+    (e) =>
+      e.shared.action !== TriggerAction.SEND_WEBHOOK ||
+      (webhookEnabled && source !== "report"),
+  );
+  const notify = entries.filter((e) => e.shared.category === "notify");
+  const action = entries.filter((e) => e.shared.category === "action");
   const accent = ACCENT_FOR_SOURCE[source];
 
   // Picking a channel drops the author straight into its setup — no separate,

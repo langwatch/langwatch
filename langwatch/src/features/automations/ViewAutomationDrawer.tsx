@@ -12,6 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { TriggerKind } from "@prisma/client";
 import { differenceInMinutes, differenceInSeconds } from "date-fns";
+import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
@@ -75,9 +76,18 @@ export function ViewAutomationDrawer({
     { triggerId: automationId, projectId: project?.id ?? "", limit: 20 },
     { enabled: !!project?.id },
   );
+  // ADR-040 §6: the per-attempt delivery log, only for webhook automations.
+  const webhookDeliveriesQuery = api.automation.getWebhookDeliveries.useQuery(
+    { triggerId: automationId, projectId: project?.id ?? "", limit: 50 },
+    {
+      enabled:
+        !!project?.id && triggerQuery.data?.action === "SEND_WEBHOOK",
+    },
+  );
 
   const trigger = triggerQuery.data;
   const isGraphAlert = !!trigger?.customGraphId;
+  const isWebhook = trigger?.action === "SEND_WEBHOOK";
   const isSchedule = trigger?.triggerKind === TriggerKind.REPORT;
   const actionParams = (trigger?.actionParams ?? {}) as TriggerActionParams;
 
@@ -268,6 +278,25 @@ export function ViewAutomationDrawer({
                 />
               )}
             </VStack>
+
+            {isWebhook ? (
+              <VStack align="start" gap={2} width="full">
+                <Text textStyle="xs" color="fg.muted" fontWeight="medium">
+                  Recent deliveries
+                </Text>
+                {webhookDeliveriesQuery.isLoading ? (
+                  <Skeleton height="60px" width="full" />
+                ) : (webhookDeliveriesQuery.data ?? []).length === 0 ? (
+                  <Text textStyle="sm" color="fg.muted">
+                    No delivery attempts recorded yet.
+                  </Text>
+                ) : (
+                  <WebhookDeliveriesList
+                    deliveries={webhookDeliveriesQuery.data ?? []}
+                  />
+                )}
+              </VStack>
+            ) : null}
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -380,4 +409,140 @@ function groupFiresByLabel(
     else groups.push({ key: fire.id, label, count: 1 });
   }
   return groups;
+}
+
+type WebhookDelivery =
+  RouterOutputs["automation"]["getWebhookDeliveries"][number];
+
+const OUTCOME_DOT: Record<WebhookDelivery["outcome"], string> = {
+  success: "green.solid",
+  retryable: "yellow.solid",
+  terminal: "red.solid",
+  pending: "gray.solid",
+};
+
+/**
+ * The webhook delivery log (ADR-040 §6): attempts grouped by the fire that
+ * produced them (`dispatchId`), newest fire first. Each attempt expands to the
+ * request headers (secret values already masked server-side) and the
+ * receiver's response snippet — enough to debug a 401/422 without re-firing.
+ */
+function WebhookDeliveriesList({
+  deliveries,
+}: {
+  deliveries: WebhookDelivery[];
+}) {
+  // Rows arrive newest-first. Group by dispatchId keeping first-seen order
+  // (newest fire on top); reverse each group so attempts read oldest→newest.
+  const groups: { dispatchId: string; attempts: WebhookDelivery[] }[] = [];
+  const byId = new Map<string, WebhookDelivery[]>();
+  for (const d of deliveries) {
+    let attempts = byId.get(d.dispatchId);
+    if (!attempts) {
+      attempts = [];
+      byId.set(d.dispatchId, attempts);
+      groups.push({ dispatchId: d.dispatchId, attempts });
+    }
+    attempts.push(d);
+  }
+  for (const g of groups) g.attempts.reverse();
+
+  return (
+    <VStack align="stretch" gap={2} width="full">
+      {groups.map((g) => (
+        <VStack
+          key={g.dispatchId}
+          align="stretch"
+          gap={0}
+          width="full"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="md"
+          overflow="hidden"
+        >
+          {g.attempts.map((attempt, index) => (
+            <DeliveryAttemptRow
+              key={attempt.id}
+              attempt={attempt}
+              index={index}
+              total={g.attempts.length}
+            />
+          ))}
+        </VStack>
+      ))}
+    </VStack>
+  );
+}
+
+function DeliveryAttemptRow({
+  attempt,
+  index,
+  total,
+}: {
+  attempt: WebhookDelivery;
+  index: number;
+  total: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const statusText =
+    attempt.responseStatus != null
+      ? `HTTP ${attempt.responseStatus}`
+      : (attempt.error ?? "No response");
+  const headerEntries = Object.entries(attempt.requestHeaders ?? {});
+
+  return (
+    <Box borderBottomWidth="1px" borderColor="border" _last={{ borderBottomWidth: 0 }}>
+      <HStack
+        as="button"
+        gap={2.5}
+        paddingX={3}
+        paddingY={2}
+        width="full"
+        textAlign="left"
+        cursor="pointer"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Box
+          boxSize={2}
+          borderRadius="full"
+          flexShrink={0}
+          bg={OUTCOME_DOT[attempt.outcome]}
+        />
+        <Text textStyle="sm" flex="1" minWidth="0">
+          {total > 1 ? `Attempt ${index + 1} · ` : ""}
+          {statusText}
+        </Text>
+        <Text textStyle="xs" color="fg.muted" flexShrink={0} whiteSpace="nowrap">
+          {attempt.latencyMs != null ? `${attempt.latencyMs}ms · ` : ""}
+          {formatTimeAgo(new Date(attempt.firedAt).getTime())}
+        </Text>
+      </HStack>
+      {open ? (
+        <VStack align="stretch" gap={2} paddingX={3} paddingBottom={3}>
+          <Text textStyle="xs" color="fg.muted">
+            {attempt.requestMethod} {attempt.requestUrl}
+          </Text>
+          {headerEntries.length > 0 ? (
+            <VStack align="stretch" gap={0.5}>
+              {headerEntries.map(([name, value]) => (
+                <Code key={name} fontSize="xs" width="full" whiteSpace="pre-wrap">
+                  {name}: {value}
+                </Code>
+              ))}
+            </VStack>
+          ) : null}
+          {attempt.responseBody ? (
+            <Code
+              fontSize="xs"
+              width="full"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+            >
+              {attempt.responseBody}
+            </Code>
+          ) : null}
+        </VStack>
+      ) : null}
+    </Box>
+  );
 }

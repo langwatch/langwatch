@@ -1,11 +1,21 @@
 import type { Project, Trigger } from "@prisma/client";
 import { createHash } from "crypto";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import {
+  decryptWebhookHeaders,
+  type WebhookStoredActionParams,
+} from "~/automations/providers/definitions/webhook/secret";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import type { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import type { sendWebhook } from "~/server/triggers/sendWebhook";
+import {
+  deliverWebhook,
+  type WebhookDeliveryRecorder,
+} from "~/server/triggers/deliverWebhook";
 import type { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { ALERT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
+import { renderWebhookBody } from "~/shared/templating/renderWebhookBody";
 import {
   renderTriggerSlack,
   type SlackTemplateType,
@@ -102,6 +112,13 @@ export interface GraphAlertDispatchDeps {
   /** Slack Web API sender for bot connections — same `postSlackChatMessage`
    *  the trace cadence dispatcher uses. */
   sendSlackBot: typeof postSlackChatMessage;
+  /** ADR-040 SSRF-fenced webhook sender — same `sendWebhook` the trace
+   *  cadence dispatcher uses. */
+  sendWebhook: typeof sendWebhook;
+  /** ADR-040 §6 delivery-log writer — records one row per attempt. Optional:
+   *  when absent (tests, cron before wiring), deliveries aren't logged but
+   *  dispatch is unchanged. */
+  recordWebhookDelivery?: WebhookDeliveryRecorder;
   /**
    * ADR-031 email suppression gate. The event-sourced graph-alert path
    * renders the SAME one-click-unsubscribe footer + `List-Unsubscribe`
@@ -182,7 +199,7 @@ export interface GraphAlertDispatchDeps {
 }
 
 export interface GraphAlertDispatchResult {
-  channel: "email" | "slack" | "none";
+  channel: "email" | "slack" | "webhook" | "none";
   /** True when this fire is consumed from the caller's perspective: a
    *  provider call was made, a retry found every recipient already claimed,
    *  or an ADR-031 email cap suppressed the delivery (see `capExhausted`).
@@ -236,9 +253,9 @@ export interface GraphAlertDispatchResult {
  * (`sendRenderedTriggerEmail` / `sendRenderedSlackMessage`) — same ones
  * the trace cadence dispatcher uses; sender signatures are unchanged.
  *
- * Both dispatchers call it: the event-sourced evaluator when
- * `release_es_graph_triggers_firing` is on, and the cron when it is off. The
- * flag decides WHO evaluates, never what the customer receives.
+ * The event-sourced evaluator (real-time reactor + heartbeat) is the sole
+ * caller — the K8s cron that used to share this dispatcher was removed once
+ * every project cut over (ADR-034).
  */
 export async function dispatchGraphAlertAction({
   deps,
@@ -303,12 +320,10 @@ export async function dispatchGraphAlertAction({
       };
     }
     // ADR-031: the two hard email caps, consumed HERE — inside the shared
-    // dispatcher — so the cron and the event-sourced evaluator cannot drift
-    // (the parity contract: `release_es_graph_triggers_firing` decides WHO
-    // evaluates, never what the customer receives). Both claims are keyed on
-    // the fire digest, so an outbox retry of THIS fire re-reads the count
-    // instead of burning a second slot, and the next incident (new digest)
-    // gets a fresh slot.
+    // dispatcher — so the real-time reactor and heartbeat callers cannot
+    // drift. Both claims are keyed on the fire digest, so an outbox retry of
+    // THIS fire re-reads the count instead of burning a second slot, and the
+    // next incident (new digest) gets a fresh slot.
     //
     // Over either cap the dispatch is a terminal drop: no send, no throw —
     // throwing would let the outbox retry the spam. `didSend` stays true so
@@ -522,9 +537,85 @@ export async function dispatchGraphAlertAction({
     };
   }
 
+  if (trigger.action === "SEND_WEBHOOK") {
+    // The whole webhook config, body template included, lives in
+    // `actionParams` (ADR-040 §1) — no evaluator pre-extraction to thread.
+    // Header values are stored as one ciphertext blob (ADR-040 §3),
+    // decrypted just before the send below.
+    const params = (trigger.actionParams ??
+      {}) as Partial<WebhookStoredActionParams>;
+    if (!params.url) {
+      logger.info(
+        { triggerId: trigger.id, projectId: project.id },
+        "Graph alert has no webhook URL configured — skipping send",
+      );
+      return {
+        channel: "webhook",
+        didSend: false,
+        missingVariables: [],
+        renderErrors: [],
+      };
+    }
+    // The endpoint URL is this fire's destination identity — gate it the same
+    // way an email address or Slack channel is, or an outbox retry re-posts.
+    const urlHash = destinationHash(`webhook:${params.url}`);
+    if (await isRecipientSent(urlHash)) {
+      logger.info(
+        { triggerId: trigger.id, projectId: project.id },
+        "Graph-alert webhook already delivered for this fire — skipping re-post on retry",
+      );
+      return {
+        channel: "webhook",
+        didSend: true,
+        missingVariables: [],
+        renderErrors: [],
+      };
+    }
+    const rendered = await renderWebhookBody({
+      template: params.bodyTemplate ?? null,
+      context,
+      defaultBody: defaults.webhookBody,
+    });
+    if (rendered.errors.length > 0) {
+      logger.warn(
+        {
+          triggerId: trigger.id,
+          projectId: project.id,
+          errors: rendered.errors,
+        },
+        "Graph-alert webhook body render errors — fell back to default body",
+      );
+    }
+    // Send + classify + log one attempt as a unit (ADR-040 §5/§6). A
+    // non-2xx throws BEFORE the claim below, so a retryable failure is
+    // actually retried; the delivery-log row is written either way.
+    await deliverWebhook({
+      send: deps.sendWebhook,
+      recorder: deps.recordWebhookDelivery,
+      projectId: project.id,
+      triggerId: trigger.id,
+      // The fire digest is this dispatch's stable identity — every outbox
+      // retry of the same fire reuses it as the X-LangWatch-Event-Id so the
+      // receiver dedupes (ADR-040 §5).
+      eventId: `evt_${destinationHash(`event:${input.fireDigest}`)}`,
+      url: params.url,
+      method: params.method,
+      headers: decryptWebhookHeaders(params),
+      body: rendered.body,
+      triggerName: trigger.name,
+    });
+    await recordRecipientSent(urlHash);
+    return {
+      channel: "webhook",
+      didSend: true,
+      missingVariables: rendered.missingVariables,
+      renderErrors: rendered.errors,
+    };
+  }
+
   // Persist actions (ADD_TO_DATASET / ADD_TO_ANNOTATION_QUEUE) and any
   // future TriggerAction value never apply to graph alerts — the cron's
-  // routing only ever dispatches email / Slack here. Fail loud so a
+  // routing only ever dispatches notify channels here. Fail loud so a
   // misconfigured trigger dead-letters with an actionable operator signal
   // rather than silently no-op every fire (dispatch5015-002).
   logger.error(
@@ -533,10 +624,10 @@ export async function dispatchGraphAlertAction({
       projectId: project.id,
       action: trigger.action,
     },
-    "Graph alert action is neither SEND_EMAIL nor SEND_SLACK_MESSAGE — dead-lettering",
+    "Graph alert action is not a notify channel — dead-lettering",
   );
   throw new DispatchError({
-    message: `Graph alert action "${trigger.action}" is not supported — only SEND_EMAIL and SEND_SLACK_MESSAGE apply to graph alerts.`,
+    message: `Graph alert action "${trigger.action}" is not supported — only SEND_EMAIL, SEND_SLACK_MESSAGE, and SEND_WEBHOOK apply to graph alerts.`,
     retryable: false,
   });
 }

@@ -6,6 +6,7 @@ import {
 } from "~/server/mailer/triggerNoReply";
 import { EXAMPLE_MATCHES } from "~/shared/templating/exampleContext";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
+import { renderWebhookBody } from "~/shared/templating/renderWebhookBody";
 import {
   renderTriggerSlack,
   type SlackPayload,
@@ -27,7 +28,7 @@ import {
 import { validateLiquid } from "~/shared/templating/validate";
 import { TemplateValidationError, TestFireUnavailableError } from "./errors";
 
-export type TemplateChannel = "email" | "slack";
+export type TemplateChannel = "email" | "slack" | "webhook";
 
 export const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;
 
@@ -50,6 +51,16 @@ export interface TriggerNotifier {
     channel: string;
     payload: SlackPayload;
   }): Promise<void>;
+  /** ADR-040 generic HTTP delivery — the SSRF-fenced webhook sender, with
+   *  the test-fire header injected. Returns the real HTTP status so the
+   *  author sees what their endpoint answered. */
+  sendWebhook(args: {
+    url: string;
+    method: "POST" | "PUT" | "PATCH";
+    headers: Record<string, string>;
+    body: string;
+    triggerName: string;
+  }): Promise<{ status: number }>;
 }
 
 /** The four template columns, as edited in the drawer. Each may be null
@@ -79,6 +90,8 @@ export interface TestFireResult {
   usedDefault: boolean;
   missingVariables: string[];
   errors: string[];
+  /** Webhook only: the HTTP status the customer's endpoint answered with. */
+  httpStatus?: number;
 }
 
 const LIQUID_TEMPLATE_COLUMNS = [
@@ -200,6 +213,15 @@ export interface TestFireTriggerInput {
   /** Present when the Slack automation delivers via a bot connection: the
    *  resolved token + channel. Test-fires via the Web API with gated blocks. */
   botDestination?: { token: string; channel: string } | null;
+  /** Present for the webhook channel (ADR-040): the full request shape,
+   *  body template included — it lives in `actionParams`, not the four
+   *  Trigger template columns, so it rides its own field here. */
+  webhookDestination?: {
+    url: string;
+    method: "POST" | "PUT" | "PATCH";
+    headers: Record<string, string>;
+    bodyTemplate: string | null;
+  } | null;
   /** Present when the draft is a custom-graph alert. */
   graphAlert?: TestFireGraphAlertInput | null;
   /** Present when the draft is a scheduled report. */
@@ -325,6 +347,39 @@ export async function testFireTrigger(
       usedDefault: rendered.usedDefault,
       missingVariables: rendered.missingVariables,
       errors: rendered.errors,
+    };
+  }
+
+  if (channel === "webhook") {
+    if (!input.webhookDestination) {
+      throw new TestFireUnavailableError(
+        "webhook",
+        "This automation has no endpoint URL to test-fire to.",
+      );
+    }
+    const { url, method, headers, bodyTemplate } = input.webhookDestination;
+    const rendered = await renderWebhookBody({
+      template: bodyTemplate,
+      context,
+      defaultBody: defaults.webhookBody,
+    });
+    // Actually sends through the full SSRF-fenced sender so the author sees a
+    // real status code (ADR-040 §1); a non-2xx throws the classified
+    // DispatchError, which the route lifts into a clean domain error.
+    const { status } = await deps.notifier.sendWebhook({
+      url,
+      method,
+      headers,
+      body: rendered.body,
+      triggerName: trigger.name,
+    });
+    return {
+      channel: "webhook",
+      recipientCount: 1,
+      usedDefault: rendered.usedDefault,
+      missingVariables: rendered.missingVariables,
+      errors: rendered.errors,
+      httpStatus: status,
     };
   }
 

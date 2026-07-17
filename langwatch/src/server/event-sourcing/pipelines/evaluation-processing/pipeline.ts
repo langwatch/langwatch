@@ -47,10 +47,8 @@ export interface EvaluationProcessingPipelineDeps {
    * ADR-034 Phase 6: real-time path for eval-metric custom-graph threshold
    * alerts. Attached on `evaluationAnalytics` (the slim eval fold) so it
    * fires on every slim-fold update; debounced per (triggerId, projectId)
-   * inside the reactor's `decide`. Flag-gated per project via the same
-   * `release_es_graph_triggers_firing` flag the trace pipeline uses —
-   * disabled = empty decide; cron handles the project's graph triggers
-   * as today.
+   * inside the reactor's `decide`. This is the sole path — the K8s cron
+   * was removed (ADR-034).
    */
   graphTriggerEvaluationOutboxReactor: OutboxReactorDefinition<
     EvaluationProcessingEvent,

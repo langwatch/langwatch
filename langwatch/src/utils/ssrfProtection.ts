@@ -533,6 +533,13 @@ const MAX_REDIRECTS = 10;
 export interface SSRFSafeFetchOptions extends RequestInit {
   _redirectCount?: number;
   /**
+   * Set false to refuse redirects outright: a 3xx with a Location header
+   * throws instead of hopping. For callers whose SSRF policy is stricter than
+   * the default validator (e.g. the webhook channel, ADR-040 §4) — following
+   * a hop would re-validate through the weaker default policy.
+   */
+  followRedirects?: boolean;
+  /**
    * Socket-level bound on how long the endpoint may take to send response
    * HEADERS, in ms. Defence in depth behind `signal`: undici's own default is
    * 300s, which is long enough for a slowloris endpoint to pin a worker slot.
@@ -660,6 +667,11 @@ export async function fetchWithResolvedIp(
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get("location");
       if (location) {
+        if (init?.followRedirects === false) {
+          throw new Error(
+            "Redirects are not followed for this destination — the endpoint must answer directly.",
+          );
+        }
         if (redirectCount >= MAX_REDIRECTS) {
           throw new Error(`Too many redirects (max ${MAX_REDIRECTS})`);
         }

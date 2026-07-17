@@ -1,12 +1,11 @@
 /**
  * Pure threshold evaluation for custom-graph alerts (ADR-034 Phase 5).
  *
- * Extracted from the cron's `checkThreshold` in
- * `src/pages/api/cron/triggers/utils.ts` so the legacy cron and the new
- * event-sourced path (`graph-trigger-evaluation.service.ts`) call the
- * SAME function. Pure — no I/O, no side effects, no dependency on
- * Prisma or ClickHouse — so it composes into both paths and is trivial
- * to unit-test.
+ * The threshold logic the event-sourced evaluator
+ * (`graph-trigger-evaluation.service.ts`) calls. Pure — no I/O, no side
+ * effects, no dependency on Prisma or ClickHouse — so it composes into the
+ * real-time and heartbeat paths and is trivial to unit-test. (Originally
+ * extracted from the removed cron's `checkThreshold`.)
  *
  * `isNoDataPredicate` recognises every trigger shape that fires on total
  * silence — the case the event-driven path cannot reach (there is, by

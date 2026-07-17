@@ -136,11 +136,11 @@ export interface CadenceStagePayload
  *
  * Single-stage outbox payload — graph evaluations do not have a settle
  * → cadence shape because they have no `traceId` to debounce per-trace
- * and no per-trigger digest to coalesce: each call drives the cron-
- * mirror handler `evaluateGraphTrigger` which itself owns dedup via
+ * and no per-trigger digest to coalesce: each call drives the shared
+ * handler `evaluateGraphTrigger` which itself owns dedup via
  * `TriggerSent`. The Debounce Mode TTL on the outer queue collapses
- * repeated `(triggerId, projectId)` enqueues into a single fire — see
- * `release_es_graph_triggers_firing` (ADR-034 Phase 5).
+ * repeated `(triggerId, projectId)` enqueues into a single fire
+ * (ADR-034 Phase 5).
  */
 export const GRAPH_TRIGGER_EVAL_REACTOR_NAME =
   "graphTriggerEvaluation" as const;

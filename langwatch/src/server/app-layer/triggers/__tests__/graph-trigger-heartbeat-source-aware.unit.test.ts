@@ -11,7 +11,6 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalyticsMetricSource } from "~/server/app-layer/analytics/routing/field-availability";
-import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   decideGraphTriggerHeartbeat,
   type GraphTriggerHeartbeatDeps,
@@ -65,12 +64,6 @@ function makeTriggersService(
     updateLastRunAt: vi.fn(),
     invalidate: vi.fn(),
   } as unknown as TriggerService;
-}
-
-function makeFlagsAllOn(): FeatureFlagServiceInterface {
-  return {
-    isEnabled: vi.fn(async () => true),
-  };
 }
 
 function makeSources(overrides: {
@@ -154,7 +147,6 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
         triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => clickHouseStub.client,
-        featureFlagService: makeFlagsAllOn(),
         lookupTriggerSource: async ({ triggerId }) =>
           sourceByTrigger[triggerId],
       };
@@ -199,7 +191,6 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
         triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => clickHouseStub.client,
-        featureFlagService: makeFlagsAllOn(),
         lookupTriggerSource: async () => "evaluation" as const,
       };
 
@@ -236,7 +227,6 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
         triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => clickHouseStub.client,
-        featureFlagService: makeFlagsAllOn(),
         // lookupTriggerSource returns undefined → heartbeat defaults to "trace".
         lookupTriggerSource: async () => undefined,
       };

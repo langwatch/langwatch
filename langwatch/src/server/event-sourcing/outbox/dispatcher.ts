@@ -30,7 +30,14 @@ import {
   sendSlackWebhook,
 } from "~/server/triggers/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
+import {
+  deliverWebhook,
+  type WebhookDeliveryRecorder,
+} from "~/server/triggers/deliverWebhook";
+import { decryptWebhookHeaders } from "~/automations/providers/definitions/webhook/secret";
+import type { WebhookMethod } from "~/automations/providers/definitions/webhook/shared";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
+import { renderWebhookBody } from "~/shared/templating/renderWebhookBody";
 import { renderTriggerSlack } from "~/shared/templating/renderSlack";
 import {
   buildTemplateContext,
@@ -66,6 +73,15 @@ interface ActionParams {
   /** Encrypted bot token (ciphertext) — decrypted just before dispatch. */
   slackBotToken?: string;
   slackChannelId?: string;
+  /** ADR-040 SEND_WEBHOOK destination — the whole config, body included,
+   *  lives in actionParams (not the Trigger template columns). Header values
+   *  are secrets, stored as one ciphertext blob (ADR-040 §3) and decrypted
+   *  just before dispatch. */
+  url?: string;
+  method?: WebhookMethod;
+  headersEncrypted?: string;
+  headers?: Record<string, string>;
+  bodyTemplate?: string | null;
 }
 
 export interface OutboxDispatcherDeps {
@@ -103,6 +119,10 @@ export interface OutboxDispatcherDeps {
     projectId: string;
     datasetRecords: DatasetRecordEntry[];
   }) => Promise<void>;
+  /** ADR-040 §6 delivery-log writer — records one row per webhook attempt.
+   *  Optional: when absent (tests) deliveries aren't logged, dispatch is
+   *  unchanged. */
+  recordWebhookDelivery?: WebhookDeliveryRecorder;
   /**
    * Late-bound — settle stage's match-confirmed branch calls this to
    * re-enqueue as `cadence`. The queue ref is filled in by `buildOutboxRuntime`
@@ -817,6 +837,58 @@ async function handleCadenceBatch(
           projectSlug: project.slug,
           triggerType: trigger.alertType,
           triggerMessage: trigger.message ?? "",
+        });
+        didSend = true;
+        break;
+      }
+      case TriggerAction.SEND_WEBHOOK: {
+        if (!params.url) {
+          throw new DispatchError({
+            message: `Webhook trigger "${trigger.name}" has no URL configured`,
+            retryable: false,
+          });
+        }
+        // The body renders like Slack Block Kit: Liquid → JSON.parse, falling
+        // back to the framework default envelope on any template failure
+        // (ADR-040 §2). Trace-path dispatch renders against the trace default.
+        const rendered = await renderWebhookBody({
+          template: params.bodyTemplate ?? null,
+          context: buildContext(),
+        });
+        for (const v of rendered.missingVariables) missingVariables.add(v);
+        if (rendered.errors.length > 0) {
+          logger.warn(
+            { projectId, triggerId, errors: rendered.errors },
+            "Webhook body template render errors — fell back to default body",
+          );
+        }
+        // Stable per-dispatch id over the batch's traceIds: identical across
+        // outbox retries of THIS dispatch, distinct from other dispatches —
+        // sent as X-LangWatch-Event-Id so the receiver dedupes (ADR-040 §5).
+        const webhookEventId =
+          "evt_" +
+          createHash("sha256")
+            .update(
+              `${projectId}:${triggerId}:${triggerData
+                .map((d) => d.traceId)
+                .sort()
+                .join(",")}`,
+            )
+            .digest("hex")
+            .slice(0, 32);
+        // Send + classify + log one attempt (ADR-040 §5/§6). A retryable
+        // status throws so the outbox backs off and retries; the delivery-log
+        // row is written either way.
+        await deliverWebhook({
+          recorder: deps.recordWebhookDelivery,
+          projectId,
+          triggerId,
+          eventId: webhookEventId,
+          url: params.url,
+          method: params.method,
+          headers: decryptWebhookHeaders(params),
+          body: rendered.body,
+          triggerName: trigger.name,
         });
         didSend = true;
         break;

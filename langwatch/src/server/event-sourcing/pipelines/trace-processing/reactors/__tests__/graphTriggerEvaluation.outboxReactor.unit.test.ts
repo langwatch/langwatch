@@ -1,5 +1,5 @@
 import { TriggerAction, TriggerKind } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
@@ -7,17 +7,6 @@ import type { GraphEvalStagePayload } from "../../../../outbox/payload";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import { createGraphTriggerEvaluationOutboxReactor } from "../graphTriggerEvaluation.outboxReactor";
-
-// featureFlagService is a process singleton; mock the module so we can
-// control `isEnabled` per test.
-vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: {
-    isEnabled: vi.fn(),
-  },
-}));
-
-// eslint-disable-next-line import/order
-import { featureFlagService } from "~/server/featureFlag";
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID_A = "trig-a";
@@ -80,26 +69,8 @@ function makeTriggersStub(graphTriggers: TriggerSummary[]): TriggerService {
 }
 
 describe("graphTriggerEvaluation outbox reactor", () => {
-  beforeEach(() => {
-    vi.mocked(featureFlagService.isEnabled).mockReset();
-  });
-
-  describe("when the flag is OFF for the project", () => {
-    it("returns no enqueue requests", async () => {
-      vi.mocked(featureFlagService.isEnabled).mockResolvedValue(false);
-      const triggers = makeTriggersStub([makeGraphTrigger(TRIGGER_ID_A)]);
-
-      const reactor = createGraphTriggerEvaluationOutboxReactor({ triggers });
-      const result = await reactor.decide(makeEvent(), makeContext());
-
-      expect(result).toEqual([]);
-      expect(triggers.getActiveGraphTriggersForProject).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the flag is ON and there are graph triggers", () => {
+  describe("when there are graph triggers", () => {
     it("enqueues one graphEval payload per active graph trigger", async () => {
-      vi.mocked(featureFlagService.isEnabled).mockResolvedValue(true);
       const triggers = makeTriggersStub([
         makeGraphTrigger(TRIGGER_ID_A),
         makeGraphTrigger(TRIGGER_ID_B),
@@ -121,9 +92,8 @@ describe("graphTriggerEvaluation outbox reactor", () => {
     });
   });
 
-  describe("when the flag is ON but there are no graph triggers", () => {
+  describe("when there are no graph triggers", () => {
     it("returns no enqueue requests", async () => {
-      vi.mocked(featureFlagService.isEnabled).mockResolvedValue(true);
       const triggers = makeTriggersStub([]);
 
       const reactor = createGraphTriggerEvaluationOutboxReactor({ triggers });
@@ -134,8 +104,7 @@ describe("graphTriggerEvaluation outbox reactor", () => {
   });
 
   describe("when the event is older than the replay-flood guard", () => {
-    it("returns no enqueue requests without checking the flag", async () => {
-      vi.mocked(featureFlagService.isEnabled).mockResolvedValue(true);
+    it("returns no enqueue requests without loading triggers", async () => {
       const triggers = makeTriggersStub([makeGraphTrigger(TRIGGER_ID_A)]);
 
       const oldEvent = {
@@ -147,7 +116,7 @@ describe("graphTriggerEvaluation outbox reactor", () => {
       const result = await reactor.decide(oldEvent, makeContext());
 
       expect(result).toEqual([]);
-      expect(featureFlagService.isEnabled).not.toHaveBeenCalled();
+      expect(triggers.getActiveGraphTriggersForProject).not.toHaveBeenCalled();
     });
   });
 });
