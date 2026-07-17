@@ -2,6 +2,8 @@ import { definePipeline } from "../../";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import type { ProcessManagerApplier } from "../../pipeline/processBuilder";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "~/server/app-layer/langy/process-manager/langyConversationProcess.types";
 import {
   ArchiveConversationCommand,
   ConsumeTurnHandoffCommand,
@@ -51,6 +53,9 @@ export interface LangyConversationProcessingPipelineDeps {
   langyAnalyticsEventProjectionStore: AppendStore<LangyAnalyticsEventProjectionRecord>;
   /** Live consumers are independent from projection state and replay. */
   subscribers?: EventSubscriberDefinition<LangyConversationProcessingEvent>[];
+  /** ADR-049/052: the conversation process manager (worker dispatch +
+   *  one-shot title generation), mounted on this pipeline. */
+  processManager?: ProcessManagerApplier<LangyConversationProcessingEvent>;
 }
 
 /**
@@ -121,6 +126,12 @@ export function createLangyConversationProcessingPipeline(
 
   for (const subscriber of deps.subscribers ?? []) {
     builder = builder.withEventSubscriber(subscriber.name, subscriber);
+  }
+  if (deps.processManager) {
+    builder = builder.withProcessManager(
+      LANGY_CONVERSATION_PROCESS_NAME,
+      deps.processManager,
+    );
   }
 
   return builder

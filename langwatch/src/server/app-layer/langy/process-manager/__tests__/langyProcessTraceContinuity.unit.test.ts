@@ -40,7 +40,7 @@ import {
   createLangyIntentHandlers,
   createStubLangyEffectPorts,
 } from "../langyEffectPorts";
-import { createLangyProcessSubscriber } from "../langyProcessSubscriber";
+import { createLangyProcessTestSubscriber } from "./helpers/langyProcessTestSubscriber";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,
@@ -92,7 +92,7 @@ describe("Langy process trace continuity", () => {
   function subscriberOver(
     service: ProcessManagerService<LangyConversationProcessState>,
   ) {
-    return createLangyProcessSubscriber({
+    return createLangyProcessTestSubscriber({
       processManager: service,
       clock: () => T0,
     });

@@ -110,15 +110,8 @@ import {
   mintLangySessionApiKeyForUser,
   revokeLangySessionApiKey,
 } from "../app-layer/langy/langyApiKey";
-import {
-  createLangyEffectPorts,
-  createLangyIntentHandlers,
-  LANGY_OUTBOX_LEASE_DURATION_MS,
-} from "../app-layer/langy/process-manager/langyEffectPorts";
-import {
-  createLangyProcessSubscriber,
-  langyConversationProcessDefinition,
-} from "../app-layer/langy/process-manager";
+import { createLangyEffectPorts } from "../app-layer/langy/process-manager/langyEffectPorts";
+import { langyConversationPM } from "../app-layer/langy/process-manager/langyConversation.pm";
 import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
 import {
@@ -127,12 +120,7 @@ import {
   createLangyTurnAdmissionLifecycleSubscriber,
 } from "../app-layer/langy/subscribers";
 import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
-import {
-  OutboxDispatcherService,
-  ProcessManagerService,
-  ProcessOutboxWorker,
-  type ProcessStore,
-} from "./process-manager";
+import type { ProcessStore } from "./process-manager";
 import type { EvaluationRunData } from "../app-layer/evaluations/types";
 import type { EventSubscriberDefinition } from "./subscribers/eventSubscriber.types";
 import {
@@ -428,7 +416,7 @@ export class PipelineRegistry {
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
     });
-    const { pipeline: langyConversationPipeline, processOutboxWorker } =
+    const { pipeline: langyConversationPipeline } =
       this.registerLangyConversationPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
@@ -446,12 +434,6 @@ export class PipelineRegistry {
       scenarioExecutionHandle,
       // Starting and notifying are private composition concerns so a web role
       // cannot accidentally start the worker. App shutdown only needs stop().
-      // The automation PM workers are owned by the EventSourcing runtime
-      // and stop with es.close(); only langy's hand-rolled worker remains
-      // here (until it migrates onto withProcessManager).
-      processOutboxWorker: {
-        stop: () => processOutboxWorker.stop(),
-      },
     };
   }
 
@@ -476,10 +458,6 @@ export class PipelineRegistry {
       }) => Promise<void>
     >("langyGenerateTitle");
 
-    const processManager = new ProcessManagerService({
-      definition: langyConversationProcessDefinition,
-      store: this.deps.repositories.processStore,
-    });
     const effectPorts = createLangyEffectPorts({
       handoffStore: this.deps.langy.handoffStore,
       worker: this.deps.langy.worker,
@@ -497,20 +475,6 @@ export class PipelineRegistry {
         }).then(() => undefined),
       titleGenerator: this.deps.langy.titleGenerator,
       saveTitle: (args) => saveTitle.fn(args),
-    });
-    const outboxDispatcher = new OutboxDispatcherService({
-      store: this.deps.repositories.processStore,
-      handlers: createLangyIntentHandlers({ ports: effectPorts }),
-      // The lease MUST outlive the slowest accepted dispatch, or a healthy
-      // long-running turn loses its lease mid-flight and a second instance
-      // re-delivers it concurrently (the completing handler is then fenced
-      // out and the message never retires). The generic 30s default is unsafe
-      // against the 60s dispatch budget.
-      leaseDurationMs: LANGY_OUTBOX_LEASE_DURATION_MS,
-    });
-    const processOutboxWorker = new ProcessOutboxWorker({
-      dispatcher: outboxDispatcher,
-      logger,
     });
 
     const conversationReader = {
@@ -537,10 +501,6 @@ export class PipelineRegistry {
       },
     };
 
-    const processSubscriber = createLangyProcessSubscriber({
-      processManager,
-      notifyOutbox: () => processOutboxWorker.notify(),
-    });
     const livenessSubscriber = createAgentTurnLivenessSubscriber({
       buffer: this.deps.langy.buffer,
       conversations: conversationReader,
@@ -567,11 +527,11 @@ export class PipelineRegistry {
         langyAnalyticsEventProjectionStore:
           this.deps.repositories.langyAnalyticsEventStorage,
         subscribers: [
-          processSubscriber,
           livenessSubscriber,
           broadcastSubscriber,
           admissionLifecycleSubscriber,
         ],
+        processManager: langyConversationPM({ ports: effectPorts }),
       }),
     );
 
@@ -596,10 +556,7 @@ export class PipelineRegistry {
         model: args.model,
       }),
     );
-    if (this.deps.langy.runsWorkers) {
-      processOutboxWorker.start();
-    }
-    return { pipeline, processOutboxWorker };
+    return { pipeline };
   }
 
   private registerEvaluationPipeline({

@@ -1061,12 +1061,6 @@ export function initializeDefaultApp(options?: {
       await broadcast.close();
     },
   });
-  gracefulCloseables.push({
-    // The langy + automation process outbox/wake workers share one stop
-    // composite exposed by the registry.
-    name: "process-outbox-workers",
-    close: () => commands.processOutboxWorker.stop(),
-  });
   if (scheduler) {
     gracefulCloseables.push({
       name: "scheduler",
@@ -1464,9 +1458,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         setPool: () => {
           /* noop */
         },
-      },
-      processOutboxWorker: {
-        stop: async () => {},
       },
     },
     retentionPolicyCache: testRetentionPolicyCache,

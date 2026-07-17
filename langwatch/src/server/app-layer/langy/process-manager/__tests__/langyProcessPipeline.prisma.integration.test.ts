@@ -20,7 +20,7 @@ import {
   createLangyIntentHandlers,
   createStubLangyEffectPorts,
 } from "../langyEffectPorts";
-import { createLangyProcessSubscriber } from "../langyProcessSubscriber";
+import { createLangyProcessTestSubscriber } from "./helpers/langyProcessTestSubscriber";
 import {
   agentRespondedEvent,
   agentTurnAcceptedEvent,
@@ -102,7 +102,7 @@ describe("Langy process subscriber and outbox with Postgres", () => {
       definition: langyConversationProcessDefinition,
       store,
     });
-    const subscriber = createLangyProcessSubscriber({
+    const subscriber = createLangyProcessTestSubscriber({
       processManager,
       notifyOutbox,
       clock: () => PROCESS_NOW,

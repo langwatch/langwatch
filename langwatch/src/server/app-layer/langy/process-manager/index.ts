@@ -24,7 +24,4 @@ export {
   type LangyWorkerDispatchPort,
   type StubLangyEffectCalls,
 } from "./langyEffectPorts";
-export {
-  createLangyProcessSubscriber,
-  type LangyProcessManagerPort,
-} from "./langyProcessSubscriber";
+export { langyConversationPM } from "./langyConversation.pm";
