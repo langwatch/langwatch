@@ -17,6 +17,7 @@ import type {
   AnnotationAddedEvent,
   AnnotationRemovedEvent,
   AnnotationsBulkSyncedEvent,
+  LogContributedEvent,
   LogRecordReceivedEvent,
   MetricDataPointCorrelatedEvent,
   OriginResolvedEvent,
@@ -28,6 +29,7 @@ import {
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
+  logContributedEventSchema,
   logRecordReceivedEventSchema,
   metricDataPointCorrelatedEventSchema,
   originResolvedEventSchema,
@@ -117,6 +119,7 @@ const traceAnalyticsEvents = [
   spanReceivedEventSchema,
   topicAssignedEventSchema,
   logRecordReceivedEventSchema,
+  logContributedEventSchema,
   metricDataPointCorrelatedEventSchema,
   originResolvedEventSchema,
   annotationAddedEventSchema,
@@ -704,8 +707,7 @@ export class TraceAnalyticsFoldProjection
     state: TraceAnalyticsData,
   ): TraceAnalyticsData {
     // Mirrors the trace-summary fold: standalone OTLP logs (no trace
-    // context) are accepted on the wire and persisted to stored_log_records
-    // by the map projection, but skipped here so they don't aggregate per
+    // context) are accepted on the wire, but skipped here so they don't aggregate per
     // tenant under a single empty aggregateId.
     if (!event.data.traceId || !event.data.spanId) {
       return state;
@@ -759,6 +761,64 @@ export class TraceAnalyticsFoldProjection
     const liftedOut = Number(liftedAttrs["langwatch.output_tokens"]);
     if (Number.isFinite(liftedOut) && liftedOut > 0) {
       totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + liftedOut;
+    }
+
+    return {
+      ...state,
+      traceId: state.traceId || event.data.traceId,
+      attributes: mergedAttributes,
+      models,
+      totalCost,
+      nonBilledCost,
+      totalPromptTokenCount,
+      totalCompletionTokenCount,
+    };
+  }
+
+  handleTraceLogContributed(
+    event: LogContributedEvent,
+    state: TraceAnalyticsData,
+  ): TraceAnalyticsData {
+    const mergedAttributes = { ...state.attributes };
+    const logCount = parseInt(
+      mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
+      10,
+    );
+    mergedAttributes["langwatch.reserved.log_record_count"] = String(
+      logCount + 1,
+    );
+    for (const [key, value] of Object.entries(event.data.liftedAttributes)) {
+      mergedAttributes[key] = String(value);
+    }
+
+    let models = state.models;
+    let totalCost = state.totalCost;
+    let nonBilledCost = state.nonBilledCost;
+    let totalPromptTokenCount = state.totalPromptTokenCount;
+    let totalCompletionTokenCount = state.totalCompletionTokenCount;
+    const model = event.data.liftedAttributes["langwatch.model"];
+    if (typeof model === "string" && model.length > 0) {
+      models = mergeModelsMostRecentFirst(models, [model]);
+    }
+    const cost = Number(event.data.liftedAttributes["langwatch.cost.usd"]);
+    if (Number.isFinite(cost) && cost > 0) {
+      totalCost = (totalCost ?? 0) + cost;
+      if (event.data.nonBillable) {
+        nonBilledCost = (nonBilledCost ?? 0) + cost;
+      }
+    }
+    const inputTokens = Number(
+      event.data.liftedAttributes["langwatch.input_tokens"],
+    );
+    if (Number.isFinite(inputTokens) && inputTokens > 0) {
+      totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
+    }
+    const outputTokens = Number(
+      event.data.liftedAttributes["langwatch.output_tokens"],
+    );
+    if (Number.isFinite(outputTokens) && outputTokens > 0) {
+      totalCompletionTokenCount =
+        (totalCompletionTokenCount ?? 0) + outputTokens;
     }
 
     return {

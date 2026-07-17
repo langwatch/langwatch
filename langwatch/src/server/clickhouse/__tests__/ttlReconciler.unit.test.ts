@@ -347,6 +347,7 @@ describe("ttlReconciler", () => {
         "experiment_runs",
         "simulation_runs",
         "stored_log_records",
+        "log_records",
         "suite_runs",
         "metric_data_points",
         "metric_series",

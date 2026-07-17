@@ -1,9 +1,14 @@
 import { z } from "zod";
+import { logTraceContributionSchema } from "../../log-processing/schemas/logRecord";
 import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./constants";
 import { metricCorrelationFields } from "./metricCorrelationFields";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
-export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
+export const piiRedactionLevelSchema = z.enum([
+  "STRICT",
+  "ESSENTIAL",
+  "DISABLED",
+]);
 export type PIIRedactionLevel = z.infer<typeof piiRedactionLevelSchema>;
 
 /**
@@ -43,7 +48,9 @@ export const assignTopicCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 
-export type AssignTopicCommandData = z.infer<typeof assignTopicCommandDataSchema>;
+export type AssignTopicCommandData = z.infer<
+  typeof assignTopicCommandDataSchema
+>;
 
 export const recordLogCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -62,6 +69,12 @@ export const recordLogCommandDataSchema = z.object({
 });
 
 export type RecordLogCommandData = z.infer<typeof recordLogCommandDataSchema>;
+
+export const recordLogContributionCommandDataSchema =
+  logTraceContributionSchema;
+export type RecordLogContributionCommandData = z.infer<
+  typeof recordLogContributionCommandDataSchema
+>;
 
 export const recordMetricCorrelationCommandDataSchema = z.object({
   tenantId: z.string(),

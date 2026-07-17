@@ -20,6 +20,10 @@ export const LOG_RECORD_RECEIVED_EVENT_VERSIONS = [
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
 ] as const;
 
+export const LOG_CONTRIBUTED_EVENT_TYPE =
+  "lw.obs.trace.log_contributed" as const;
+export const LOG_CONTRIBUTED_EVENT_VERSION_LATEST = "2026-07-17" as const;
+
 export const METRIC_DATA_POINT_CORRELATED_EVENT_TYPE =
   "lw.obs.trace.metric_data_point_correlated" as const;
 export const METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST =
@@ -61,7 +65,8 @@ export const ANNOTATION_REMOVED_EVENT_VERSIONS = [
 
 export const ANNOTATIONS_BULK_SYNCED_EVENT_TYPE =
   "lw.obs.trace.annotations_bulk_synced" as const;
-export const ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST = "2026-03-25" as const;
+export const ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST =
+  "2026-03-25" as const;
 
 export const ANNOTATIONS_BULK_SYNCED_EVENT_VERSIONS = [
   ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST,
@@ -79,6 +84,7 @@ export const TRACE_PROCESSING_EVENT_TYPES = [
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
+  LOG_CONTRIBUTED_EVENT_TYPE,
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_TYPE,
   ANNOTATION_ADDED_EVENT_TYPE,
@@ -93,18 +99,26 @@ export type TraceProcessingEventType =
 export const RECORD_SPAN_COMMAND_TYPE = "lw.obs.trace.record_span" as const;
 export const ASSIGN_TOPIC_COMMAND_TYPE = "lw.obs.trace.assign_topic" as const;
 export const RECORD_LOG_COMMAND_TYPE = "lw.obs.trace.record_log" as const;
+export const RECORD_LOG_CONTRIBUTION_COMMAND_TYPE =
+  "lw.obs.trace.record_log_contribution" as const;
 export const RECORD_METRIC_CORRELATION_COMMAND_TYPE =
   "lw.obs.trace.record_metric_correlation" as const;
-export const RESOLVE_ORIGIN_COMMAND_TYPE = "lw.obs.trace.resolve_origin" as const;
-export const ADD_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.add_annotation" as const;
-export const REMOVE_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.remove_annotation" as const;
-export const BULK_SYNC_ANNOTATIONS_COMMAND_TYPE = "lw.obs.trace.bulk_sync_annotations" as const;
-export const CHANGE_TRACE_NAME_COMMAND_TYPE = "lw.obs.trace.change_trace_name" as const;
+export const RESOLVE_ORIGIN_COMMAND_TYPE =
+  "lw.obs.trace.resolve_origin" as const;
+export const ADD_ANNOTATION_COMMAND_TYPE =
+  "lw.obs.trace.add_annotation" as const;
+export const REMOVE_ANNOTATION_COMMAND_TYPE =
+  "lw.obs.trace.remove_annotation" as const;
+export const BULK_SYNC_ANNOTATIONS_COMMAND_TYPE =
+  "lw.obs.trace.bulk_sync_annotations" as const;
+export const CHANGE_TRACE_NAME_COMMAND_TYPE =
+  "lw.obs.trace.change_trace_name" as const;
 
 export const TRACE_PROCESSING_COMMAND_TYPES = [
   RECORD_SPAN_COMMAND_TYPE,
   ASSIGN_TOPIC_COMMAND_TYPE,
   RECORD_LOG_COMMAND_TYPE,
+  RECORD_LOG_CONTRIBUTION_COMMAND_TYPE,
   RECORD_METRIC_CORRELATION_COMMAND_TYPE,
   RESOLVE_ORIGIN_COMMAND_TYPE,
   ADD_ANNOTATION_COMMAND_TYPE,

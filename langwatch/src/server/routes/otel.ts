@@ -507,13 +507,25 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
         );
       }
 
-      await getApp().traces.logCollection.handleOtlpLogRequest({
+      const result = await getApp().traces.logCollection.handleOtlpLogRequest({
         tenantId: project.id,
+        organizationId: project.team.organizationId,
         logRequest,
         piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
       });
 
-      return c.json({ message: "OK" });
+      return c.json(
+        result.rejectedLogRecords > 0
+          ? {
+              partialSuccess: {
+                rejectedLogRecords: result.rejectedLogRecords,
+                ...(result.errorMessage
+                  ? { errorMessage: result.errorMessage }
+                  : {}),
+              },
+            }
+          : {},
+      );
     },
   );
 });

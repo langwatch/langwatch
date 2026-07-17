@@ -164,6 +164,8 @@ import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/rep
 import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
+import { CanonicalLogRecordClickHouseRepository } from "./logs/repositories/canonical-log-record.clickhouse.repository";
+import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-log-record.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
@@ -626,6 +628,9 @@ export function initializeDefaultApp(options?: {
     logRecordStorage: clickhouseEnabled
       ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
       : new NullLogRecordStorageRepository(),
+    canonicalLogStorage: clickhouseEnabled
+      ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
+      : new NullCanonicalLogRecordRepository(),
     metricDataPointStorage: clickhouseEnabled
       ? new MetricDataPointClickHouseRepository(
           resolveClickHouseClient,
@@ -1009,7 +1014,8 @@ export function initializeDefaultApp(options?: {
 
   const logCollection = traced(
     new LogRequestCollectionService({
-      recordLog: commands.traces.recordLog,
+      recordLogRecords: commands.logs.recordLogRecord.sendBatch!,
+      recordLogContributions: commands.traces.recordLogContribution.sendBatch!,
     }),
     "LogRequestCollectionService",
   );
@@ -1249,7 +1255,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         ),
         logCollection: traced(
           new LogRequestCollectionService({
-            recordLog: noop,
+            recordLogRecords: noop,
+            recordLogContributions: noop,
           }),
           "LogRequestCollectionService",
         ),
@@ -1391,6 +1398,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordSpan: noop,
         assignTopic: noop,
         recordLog: noop,
+        recordLogContribution: noop,
         recordMetricCorrelation: noop,
         resolveOrigin: noop,
         addAnnotation: noop,
@@ -1401,6 +1409,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       metrics: {
         recordDataPoint: noop,
       } satisfies AppCommands["metrics"],
+      logs: {
+        recordLogRecord: noop,
+      } satisfies AppCommands["logs"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,

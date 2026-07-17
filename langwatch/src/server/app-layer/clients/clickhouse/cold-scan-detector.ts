@@ -22,10 +22,12 @@
 export const TIME_PARTITIONED_TABLES = {
   stored_spans: ["StartTime"],
   stored_log_records: ["TimeUnixMs"],
+  log_records: ["TimeUnixMs"],
   metric_data_points: ["TimeUnixMs"],
   metric_series: ["LastSeenAt"],
   metric_time_rollups: ["BucketStart"],
   metric_usage_estimates: ["AcceptedAt", "AcceptedHour"],
+  log_usage_estimates: ["AcceptedAt", "AcceptedHour"],
   event_log: ["EventOccurredAt"],
   billable_events: ["EventTimestamp"],
   governance_ocsf_events: ["EventTime"],
@@ -33,9 +35,7 @@ export const TIME_PARTITIONED_TABLES = {
 
 /** Strip line and block comments so they can't hide or fake a predicate. */
 function stripComments(sql: string): string {
-  return sql
-    .replace(/--[^\n]*/g, " ")
-    .replace(/\/\*[\s\S]*?\*\//g, " ");
+  return sql.replace(/--[^\n]*/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
 }
 
 /**
@@ -56,10 +56,7 @@ function hasTimePredicate(sql: string, column: string): boolean {
     "i",
   );
   // ... <op> column   (e.g. {from} <= StartTime)
-  const opThenCol = new RegExp(
-    `(?:>=|<=|<>|!=|=|>|<)\\s*\\b${col}\\b`,
-    "i",
-  );
+  const opThenCol = new RegExp(`(?:>=|<=|<>|!=|=|>|<)\\s*\\b${col}\\b`, "i");
   return colThenOp.test(sql) || opThenCol.test(sql);
 }
 

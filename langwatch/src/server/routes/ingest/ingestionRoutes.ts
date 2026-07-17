@@ -552,6 +552,7 @@ secured.access(ingestAuth).post("/webhook/:sourceId", async (c: Context) => {
       const logRequest = buildWebhookLogRequest(raw, source);
       await getApp().traces.logCollection.handleOtlpLogRequest({
         tenantId: govProject.id,
+        organizationId: source.organizationId,
         logRequest,
         piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
       });
@@ -657,6 +658,7 @@ secured
           try {
             await getApp().traces.logCollection.handleOtlpLogRequest({
               tenantId: govProject.id,
+              organizationId: source.organizationId,
               logRequest: parsed.request,
               piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
             });

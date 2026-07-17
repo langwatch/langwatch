@@ -18,6 +18,7 @@ import {
   logCommandGroupKey,
 } from "./commands/logCommandGroupKey";
 import { RecordLogCommand } from "./commands/recordLogCommand";
+import { RecordLogContributionCommand } from "./commands/recordLogContributionCommand";
 import { RecordMetricCorrelationCommand } from "./commands/recordMetricCorrelationCommand";
 import {
   RECORD_SPAN_DEDUPLICATION,
@@ -28,7 +29,6 @@ import {
   clampSpanShardCount,
   spanCommandGroupKey,
 } from "./commands/spanCommandGroupKey";
-import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import {
   type TraceAnalyticsData,
@@ -48,7 +48,6 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
 } from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
-import type { NormalizedLogRecord } from "./schemas/logRecords";
 import type { NormalizedSpan } from "./schemas/spans";
 import { TraceRequestUtils } from "./utils/traceRequest.utils";
 
@@ -56,7 +55,6 @@ export interface TraceProcessingPipelineDeps {
   spanAppendStore: AppendStore<NormalizedSpan>;
   /** ADR-034 Phase 1: per-span rollup writer (app-side, replaces the MV). */
   traceAnalyticsRollupAppendStore: AppendStore<TraceAnalyticsRollupRow>;
-  logRecordAppendStore: AppendStore<NormalizedLogRecord>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** ADR-034 Phase 2: slim per-trace fold writer (silent dual-tap, no read path). */
   traceAnalyticsStore: FoldProjectionStore<TraceAnalyticsData>;
@@ -179,12 +177,6 @@ export function createTraceProcessingPipeline(
         store: deps.traceAnalyticsRollupAppendStore,
       }),
     )
-    .withMapProjection(
-      "logRecordStorage",
-      new LogRecordStorageMapProjection({
-        store: deps.logRecordAppendStore,
-      }),
-    )
     .withReactor("traceSummary", "originGate", deps.originGateReactor)
     .withReactor(
       "traceSummary",
@@ -238,7 +230,7 @@ export function createTraceProcessingPipeline(
       deps.spanStorageBroadcastReactor,
     )
     .withReactor(
-      "logRecordStorage",
+      "traceSummary",
       "claudeCodeSpanSync",
       deps.claudeCodeSpanSyncReactor,
     );
@@ -360,6 +352,7 @@ export function createTraceProcessingPipeline(
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLog", RecordLogCommand, recordLogOptions)
+    .withCommand("recordLogContribution", RecordLogContributionCommand)
     .withCommand("recordMetricCorrelation", RecordMetricCorrelationCommand)
     .withCommand("resolveOrigin", ResolveOriginCommand)
     .withCommand("addAnnotation", AddAnnotationCommand)
