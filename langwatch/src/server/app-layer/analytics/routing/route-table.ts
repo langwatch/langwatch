@@ -473,6 +473,10 @@ export interface PickAnalyticsTableInput {
     >
   >;
   groupBy?: string;
+  /** Narrow the scan to an explicit trace set. Legacy-builder-only. */
+  traceIds?: string[];
+  /** Invert the user's filter selection (toolbar toggle). Legacy-builder-only. */
+  negateFilters?: boolean;
 }
 
 /**
@@ -522,6 +526,15 @@ export function pickAnalyticsTable(
     (s) => s.filters !== undefined && Object.keys(s.filters).length > 0,
   );
   if (hasSeriesFilters) return legacyFallbackFor(source);
+
+  // Filter negation and explicit trace scoping only exist in the legacy
+  // builder. Serving such a query from slim/rollup would silently ignore the
+  // parameter — non-negated results for a negated query, all traces for a
+  // trace-scoped one.
+  if (input.negateFilters) return legacyFallbackFor(source);
+  if (input.traceIds && input.traceIds.length > 0) {
+    return legacyFallbackFor(source);
+  }
 
   // Reject anything reading a blocklisted attribute key via metadata.key /
   // metadata.value — those values were dropped from slim's trimmed
