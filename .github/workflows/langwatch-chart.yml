@@ -87,9 +87,15 @@ jobs:
           version: v3.12.0
       - name: Build clickhouse-serverless image
         run: docker build -t langwatch/clickhouse-serverless:next ../../clickhouse-serverless/
+      - name: Resolve app image
+        if: matrix.build_app
+        run: |
+          APP_REPO=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'repository:' | awk '{print $2}')
+          APP_TAG=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'tag:' | head -1 | awk '{print $2}')
+          echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
       - name: Build app image
         if: matrix.build_app
-        run: docker build -t langwatch/langwatch:2.6.0 ../..
+        run: docker build -t "$APP_IMAGE" ../..
       # The gateway image isn't published to ghcr yet — build it locally so
       # the chart e2e can install. values-e2e.yaml overrides
       # gateway.image.{repository,tag,pullPolicy} to match.
@@ -103,7 +109,7 @@ jobs:
           kind load docker-image langwatch/clickhouse-serverless:next --name ${{ matrix.cluster }}
           kind load docker-image langwatch/ai-gateway:e2e --name ${{ matrix.cluster }}
           if [ "${{ matrix.build_app }}" = "true" ]; then
-            kind load docker-image langwatch/langwatch:2.6.0 --name ${{ matrix.cluster }}
+            kind load docker-image "$APP_IMAGE" --name ${{ matrix.cluster }}
           fi
       - run: ${{ matrix.script }}
         env:
@@ -116,3 +122,8 @@ jobs:
           [ -z "$NS" ] && exit 0
           kubectl -n "$NS" get pods -o wide 2>/dev/null || true
           kubectl -n "$NS" get events --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
+          kubectl -n "$NS" describe pods 2>/dev/null || true
+          for POD in $(kubectl -n "$NS" get pods -o name 2>/dev/null); do
+            kubectl -n "$NS" logs "$POD" --all-containers --prefix --tail=-1 2>/dev/null || true
+            kubectl -n "$NS" logs "$POD" --all-containers --prefix --previous --tail=-1 2>/dev/null || true
+          done
