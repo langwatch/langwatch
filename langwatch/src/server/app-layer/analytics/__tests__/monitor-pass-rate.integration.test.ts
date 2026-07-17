@@ -230,11 +230,13 @@ describe("monitor pass-rate read path", () => {
   });
 
   describe("when reading the full period as one bucket (the card headline)", () => {
+    /** @scenario Card headline matches the analytics donut */
     it("returns 100% for the evaluator whose processed runs all passed", async () => {
       const result = await shim.run(queryInput("full"));
       expect(result.currentPeriod[0]?.[passRateKey]).toBe(1);
     });
 
+    /** @scenario Card headline weighs days by run volume */
     it("returns the run-weighted rate, not the average of daily rates", async () => {
       const result = await shim.run({
         ...queryInput("full"),
@@ -248,6 +250,19 @@ describe("monitor pass-rate read path", () => {
       // daily rates would be (0.1 + 1.0 + 0.5) / 3 ≈ 0.533 — the distortion
       // the card used to show.
       expect(result.currentPeriod[0]?.[key]).toBeCloseTo(93 / 104, 5);
+    });
+
+    /** @scenario Card shows no data when the evaluator never ran */
+    it("carries no value for an evaluator with no runs, so the card shows its no-data state", async () => {
+      const ghostSeries = { ...passRateSeries, key: `${tenantId}-ghost` };
+      const result = await shim.run({
+        ...queryInput("full"),
+        series: [ghostSeries],
+      });
+      const key = buildSeriesName(ghostSeries, 0);
+      for (const bucket of result.currentPeriod) {
+        expect(bucket).not.toHaveProperty(key);
+      }
     });
   });
 });

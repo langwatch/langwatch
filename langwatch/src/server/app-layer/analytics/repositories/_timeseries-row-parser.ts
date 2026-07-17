@@ -11,7 +11,10 @@
  */
 
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
-import type { SeriesInputType } from "~/server/analytics/registry";
+import {
+  isZeroWhenAbsentSeries,
+  type SeriesInputType,
+} from "~/server/analytics/registry";
 import type {
   TimeseriesBucket,
   TimeseriesResult,
@@ -163,32 +166,12 @@ export function buildSeriesName(
 }
 
 /**
- * Whether an absent bucket value for this series truly means zero. Counts and
- * sums are additive — no matching rows IS zero, and defaulting keeps the
- * frontend's % change math working when one period has no data. Averages,
- * extrema and percentiles are NOT: ClickHouse returns NaN/NULL for them over
- * zero rows, and defaulting that to 0 fabricates a measurement — e.g. a 0%
- * pass rate on a day the evaluator never ran, dragging the Evaluations-page
- * card down while the analytics donut (which counts runs) stayed correct.
- * Those stay absent so consumers can tell "no data" apart from "really 0".
- * Pipeline series re-aggregate per entity, so the cross-entity pipeline
- * aggregation is the one that decides additivity.
- */
-function isZeroWhenAbsent(series: SeriesInputType): boolean {
-  if (series.pipeline) return series.pipeline.aggregation === "sum";
-  return (
-    series.aggregation === "cardinality" ||
-    series.aggregation === "terms" ||
-    series.aggregation === "sum"
-  );
-}
-
-/**
  * Normalise metric keys across both periods. Ensures every bucket carries
  * every ADDITIVE metric (with a 0 default) so the frontend can compute %
  * change for series that ClickHouse returned NULL for in one of the periods.
- * Non-additive series (avg / min / max / percentiles) are left absent — see
- * `isZeroWhenAbsent`.
+ * Non-additive series (avg / min / max / percentiles) are only ever absent
+ * when there was no data, so they are left absent rather than defaulted to a
+ * fabricated 0 — see `isZeroWhenAbsentSeries`.
  *
  * Grouped: only fill in missing metric sub-keys for groups already present in
  * a bucket — do NOT spawn new groups from the other period, that would bleed
@@ -202,7 +185,7 @@ function normalizeMetricKeys(
 ): void {
   const zeroFillableKeys = new Set<string>();
   series.forEach((s, i) => {
-    if (isZeroWhenAbsent(s)) zeroFillableKeys.add(buildSeriesName(s, i));
+    if (isZeroWhenAbsentSeries(s)) zeroFillableKeys.add(buildSeriesName(s, i));
   });
 
   const allMetricKeys = new Set<string>();

@@ -21,7 +21,6 @@ Feature: Negate filters and trace scoping reach the analytics query
     Given a timeseries request with filters and negateFilters enabled
     When the legacy shim builds the query
     Then the builder receives negateFilters enabled
-    And the resulting SQL inverts the filter selection
 
   @unit
   Scenario: Legacy shim forwards trace scoping to the query builder

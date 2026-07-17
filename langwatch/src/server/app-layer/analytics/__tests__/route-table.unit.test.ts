@@ -138,6 +138,7 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
   describe("given a query carrying negateFilters", () => {
     // The fast-path builders do not implement filter negation — serving the
     // query from slim/rollup would silently return NON-negated results.
+    /** @scenario Negated queries never route to the fast-path tables */
     it("routes a trace-source query to trace_summaries", () => {
       const table = pickAnalyticsTable({
         series: [series("performance.total_cost", "sum")],
@@ -166,6 +167,7 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
   describe("given a query scoped to explicit trace ids", () => {
     // The fast-path builders do not implement the TraceId narrowing — the
     // result would silently cover ALL traces instead of the requested set.
+    /** @scenario Trace-scoped queries never route to the fast-path tables */
     it("routes a trace-source query to trace_summaries", () => {
       const table = pickAnalyticsTable({
         series: [series("performance.total_cost", "sum")],

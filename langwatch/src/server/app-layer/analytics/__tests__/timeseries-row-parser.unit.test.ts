@@ -57,6 +57,7 @@ describe("parseTimeseriesRows", () => {
         expect(result.currentPeriod[2]?.[seriesName]).toBe(1);
       });
 
+      /** @scenario Buckets without processed runs carry no pass-rate value */
       it("carries no value for buckets without processed runs", () => {
         expect(result.currentPeriod[0]).not.toHaveProperty(seriesName);
         expect(result.currentPeriod[1]).not.toHaveProperty(seriesName);
@@ -96,6 +97,7 @@ describe("parseTimeseriesRows", () => {
       const passRateName = buildSeriesName(passRateSeries, 0);
       const runsName = buildSeriesName(runsSeries, 1);
 
+      /** @scenario Count-type series still default missing buckets to zero */
       it("defaults the count series to 0 in the empty bucket", () => {
         expect(result.currentPeriod[0]?.[runsName]).toBe(0);
       });
@@ -175,6 +177,7 @@ describe("parseTimeseriesRows", () => {
         expect(groups.failed?.[runsName]).toBe(2);
       });
 
+      /** @scenario Grouped buckets follow the same fabrication rules */
       it("keeps the average score absent for the group without a value", () => {
         expect(groups.passed).not.toHaveProperty(scoreName);
       });
