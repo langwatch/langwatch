@@ -1,20 +1,18 @@
 /**
- * TDD-red regression test for issue #5835 AC9 (bulk path).
+ * Regression test for issue #5835 AC9 (bulk path).
  *
  * See resolve-offloaded-traces-5835.unit.test.ts for the full rationale — the
- * SAME algorithmic divergence applies here since resolveOffloadedTracesBatch
- * recomputes trace-level output the same way per trace (Phase 3):
- * `ioExtractionService.extractLastOutput(resolvedSpans)`, using the REAL
- * TraceIOExtractionService rather than the fold's TraceIOAccumulationService.
+ * SAME winner-selection contract applies here since resolveOffloadedTracesBatch
+ * recomputes trace-level IO per trace via the fold's own algorithm (Phase 3):
+ * `recomputeTraceIO` over `TraceIOAccumulationService`, NOT the old
+ * `TraceIOExtractionService.extractLastOutput` read-time path.
  *
  * This file drives the REAL resolveOffloadedTracesBatch end-to-end with a
  * single-trace batch of one, using the identical root+later-ending-child
- * fixture as the single-trace test, to prove the same divergence exists on
- * the bulk call site too (AC9: "matches the fold's actual winning span on
- * BOTH call sites").
- *
- * Do NOT fix the bug here — this test must FAIL against the current
- * TraceIOExtractionService.extractLastOutput implementation.
+ * fixture as the single-trace test, to prove the recompute matches the fold's
+ * actual winning span on the bulk call site too (AC9: "matches the fold's
+ * actual winning span on BOTH call sites") and guards against a regression back
+ * to extractLastOutput.
  *
  * Conventions matched from resolve-offloaded-traces-batch.unit.test.ts:
  *   - vitest, vi.mock("langwatch", ...) tracer passthrough

@@ -1,32 +1,30 @@
 /**
- * TDD-red regression tests for issue #5835 AC9 (single-trace path).
+ * Regression tests for issue #5835 AC9 (single-trace path).
  *
  * AC9: "Resolved content matches the fold's actual winning span on BOTH call
- * sites." resolveOffloadedTraces recomputes trace-level output at read time
- * via TraceIOExtractionService.extractLastOutput, which implements a
- * DIFFERENT winner-selection algorithm than the fold's own
- * TraceIOAccumulationService.accumulateIO:
+ * sites." At read time resolveOffloadedTraces recomputes trace-level IO via the
+ * fold's OWN winner-selection (recomputeTraceIO over
+ * TraceIOAccumulationService.accumulateIO), so the read-time recompute agrees
+ * with the winner stored in trace_summaries on BOTH priority and exclusion:
  *
  *   - accumulateIO (via shouldOverrideOutput,
  *     trace-io-accumulation.service.ts:38-66): a ROOT span (parentSpanId ===
  *     null) ALWAYS beats a non-root span's output, regardless of end time.
  *     Tool/evaluation/guardrail/Claude-Code-utility spans are excluded from
  *     ever winning.
- *   - extractLastOutput (trace-io-extraction.service.ts:112-203): tries a
- *     "single span with valid output" fast path first; when MORE than one
- *     span has valid output it falls through to plain last-finishing-by-
- *     endTimeUnixMs across ALL eligible spans — no root-priority at all, and
- *     its shouldExcludeSpan only excludes evaluation/guardrail, NOT tool.
+ *   - TraceIOExtractionService.extractLastOutput
+ *     (trace-io-extraction.service.ts:112-203) — the OLD read-time path this
+ *     fix replaced — had NO root-priority (plain last-finishing-by-
+ *     endTimeUnixMs across ALL eligible spans) and excluded only
+ *     evaluation/guardrail, NOT tool. Recomputing with it diverged from the
+ *     stored winner; this suite guards against a regression back to it.
  *
- * These two tests drive the REAL resolveOffloadedTraces end-to-end (through
- * the real eventref-resolution machinery and the REAL
- * TraceIOExtractionService.extractLastOutput — nothing here is mocked away)
- * to prove the divergence at the read-time recompute, not just at the
- * algorithm level.
+ * These two tests drive the REAL resolveOffloadedTraces end-to-end (through the
+ * real eventref-resolution machinery and the REAL TraceIOAccumulationService —
+ * nothing here is mocked away) to prove the read-time recompute matches the
+ * fold's actual winning span, not just at the algorithm level.
  *
- * Do NOT fix the bug here — these tests must FAIL against the current
- * TraceIOExtractionService.extractLastOutput implementation. The bulk-path
- * sibling lives in resolve-offloaded-traces-batch-5835.unit.test.ts.
+ * The bulk-path sibling lives in resolve-offloaded-traces-batch-5835.unit.test.ts.
  *
  * Conventions matched from resolve-offloaded-traces.unit.test.ts /
  * resolve-offloaded-traces-4888.unit.test.ts:

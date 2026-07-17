@@ -375,7 +375,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
 
   describe("given a span whose reserved eventref value is a string that is not valid JSON at all (AC4b)", () => {
     describe("when reading normalized spans through the real ClickHouse row-mapping path", () => {
-      it("does not throw, and parseSpanEventRefs silently drops the malformed pointer per its documented policy", async () => {
+      it("does not throw, records the malformed pointer in malformedKeys, and keeps the preview", async () => {
         const { repo, query } = repoWithSpyClient();
         query.mockResolvedValue({
           json: async () => [
@@ -443,16 +443,21 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
           "not-json-at-all",
         );
 
-        // (b) parseSpanEventRefs's documented policy: "A reserved key with
-        // malformed JSON is silently dropped (the preview already sits in
-        // cleanedAttrs under the non-reserved IO key)." No eventrefEntry, no
-        // missingEventIdKeys entry — the key just vanishes, with no throw.
-        // Note: parseSpanEventRefs takes no logger — it has no mechanism to
-        // log a warning for this case; the drop is silent by construction.
-        const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
-          parseSpanEventRefs(spanAttributes);
+        // (b) parseSpanEventRefs's documented policy: a reserved key whose
+        // value fails JSON.parse is classified into `malformedKeys` (NOT
+        // eventrefEntries or missingEventIdKeys) so the caller can warn and keep
+        // the preview — which already sits in cleanedAttrs under the
+        // non-reserved IO key. The resolver logs a warning off this
+        // classification; the pointer is recorded, not silently dropped.
+        const {
+          cleanedAttrs,
+          eventrefEntries,
+          missingEventIdKeys,
+          malformedKeys,
+        } = parseSpanEventRefs(spanAttributes);
         expect(eventrefEntries).toEqual([]);
         expect(missingEventIdKeys).toEqual([]);
+        expect(malformedKeys).toEqual(["langwatch.input"]);
         expect(cleanedAttrs["langwatch.input"]).toBe("a normal preview value");
       });
     });
