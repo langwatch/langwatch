@@ -1,8 +1,4 @@
 import type {
-  OutboxEnqueueRequest,
-  OutboxReactorDefinition,
-} from "../../../outbox/outboxReactor.types";
-import type {
   ReactorContext,
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
@@ -140,46 +136,3 @@ export function defineOriginGuardedTraceReactor(opts: {
   };
 }
 
-/**
- * Outbox-flavored counterpart of `defineOriginGuardedTraceReactor`. Same
- * guards (stale event / non-message event / old trace / blocked guardrail /
- * origin-not-resolved), but the body returns an `OutboxEnqueueRequest[]`
- * instead of performing side effects. Used by `.withOutbox`-registered
- * reactors whose `decide()` builds settle payloads.
- */
-export function defineOriginGuardedTraceOutboxReactor(opts: {
-  name: string;
-  jobIdPrefix: string;
-  ttl?: number;
-  delay?: number;
-  isRelevant?: ExtraGuard;
-  decide: (
-    event: TraceProcessingEvent,
-    context: ReactorContext<TraceSummaryData>,
-  ) => Promise<OutboxEnqueueRequest[]>;
-}): OutboxReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  const passes = (
-    event: TraceProcessingEvent,
-    context: ReactorContext<TraceSummaryData>,
-  ): boolean =>
-    passesTraceOriginGuards(event, context.foldState) &&
-    (opts.isRelevant?.(event, context) ?? true);
-
-  return {
-    name: opts.name,
-    options: {
-      makeJobId: (payload) =>
-        `${opts.jobIdPrefix}:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: opts.ttl ?? 30_000,
-      delay: opts.delay ?? 30_000,
-    },
-
-    // See the `.withReactor` twin above for why this is also a shouldReact.
-    shouldReact: passes,
-
-    async decide(event, context) {
-      if (!passes(event, context)) return [];
-      return opts.decide(event, context);
-    },
-  };
-}

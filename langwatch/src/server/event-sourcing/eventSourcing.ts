@@ -12,18 +12,6 @@ import { resolveProjectStorageDestination } from "../stored-objects/project-stor
 import { createStorageRegistry } from "../stored-objects/stored-objects-factory";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
-import type { OutboxReactorDefinition } from "./outbox/outboxReactor.types";
-import { adaptOutboxReactor } from "./outbox/outboxReactorAdapter";
-import {
-  cadenceGroupKey,
-  graphEvalGroupKey,
-  isCadence,
-  isGraphEval,
-  isSettle,
-  type OutboxJob,
-  settleGroupKey,
-} from "./outbox/payload";
-import type { OutboxRuntime } from "./outbox/setup";
 import type {
   NoCommands,
   RegisteredCommand,
@@ -63,12 +51,6 @@ export interface EventSourcingOptions {
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
-  /** Optional outbox runtime (ADR-030 revision 3). When provided, the
-   *  global queue routes settle/cadence payloads to its dispatcher and
-   *  wires its audit adapter onto every lifecycle event. Non-outbox
-   *  payloads flow through the normal registry — the runtime piggy-backs
-   *  on the existing queue instead of standing up its own. */
-  outbox?: OutboxRuntime;
   retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
@@ -125,7 +107,6 @@ export class EventSourcing {
   private readonly _clickhouse?: ClickHouseClientResolver | null;
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
-  private readonly _outbox?: OutboxRuntime;
   private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
 
   constructor(options: EventSourcingOptions = {}) {
@@ -133,7 +114,6 @@ export class EventSourcing {
     this._clickhouse = options.clickhouse;
     this._redis = options.redis;
     this._processRole = options.processRole;
-    this._outbox = options.outbox;
     this._retentionPolicyResolver = options.retentionPolicyResolver;
 
     // Create projection registry and register SaaS-only projections
@@ -156,21 +136,6 @@ export class EventSourcing {
 
   get isEnabled(): boolean {
     return this._enabled;
-  }
-
-  /**
-   * Whether an outbox runtime is wired into this instance.
-   *
-   * This is the exact invariant that silently broke trigger dispatch: on a
-   * worker the outbox must be present so `.withOutbox` reactors enqueue settle
-   * payloads instead of hitting the no-op drop path. It is set once, from the
-   * constructor `outbox` option — passing the runtime anywhere else (e.g. only
-   * to the pipeline registry) leaves this `false` and every trigger silently
-   * drops. Exposed so the composition root's wiring can be asserted in tests
-   * and surfaced as a worker health signal rather than failing invisibly.
-   */
-  get isOutboxWired(): boolean {
-    return !!this._outbox;
   }
 
   get eventStore(): EventStore | undefined {
@@ -275,7 +240,7 @@ export class EventSourcing {
 
         const eventStore = this.eventStore as EventStore<EventType>;
 
-        const serviceOptions = buildServiceOptions(definition, this._outbox);
+        const serviceOptions = buildServiceOptions(definition);
 
         // Initialize the projection registry if it has projections and hasn't been initialized yet
         if (
@@ -441,68 +406,46 @@ export class EventSourcing {
   private createGlobalQueue(): void {
     const queueName = makeQueueName("event-sourcing/jobs");
 
-    // ADR-030 revision 3: outbox payloads (settle/cadence) ride this same
-    // queue. Each callback peels off the outbox case first; everything else
-    // falls through to the existing registry-based dispatch. The audit
-    // adapter from the outbox runtime is wired below — it gates internally
-    // on `isSettle || isCadence`, so non-outbox queue events no-op cheaply.
-    const outbox = this._outbox;
-    const isOutboxPayload = (
+    // ADR-052 cutover tombstone: the legacy ReactorOutbox stack staged
+    // settle/cadence/graphEval payloads onto this queue. A deploy can race
+    // jobs staged by the previous release, so recognize the legacy shape and
+    // ACK-drop it with a log instead of parsing it as an event (which would
+    // poison-retry). Removable after one release.
+    const isLegacyOutboxPayload = (
       payload: Record<string, unknown>,
-    ): payload is OutboxJob =>
-      isSettle(payload) || isCadence(payload) || isGraphEval(payload);
+    ): boolean =>
+      payload.stage === "settle" ||
+      payload.stage === "cadence" ||
+      payload.stage === "graphEval";
+    const dropLegacyOutboxPayload = (payload: Record<string, unknown>) => {
+      logger.warn(
+        { stage: payload.stage, projectId: payload.projectId },
+        "Dropping legacy ReactorOutbox-era queue payload staged before the ADR-052 cutover",
+      );
+    };
 
     const definition = {
       name: queueName,
       groupKey: (payload: Record<string, unknown>) => {
-        if (isOutboxPayload(payload)) {
-          if (isSettle(payload)) return settleGroupKey(payload);
-          if (isCadence(payload)) return cadenceGroupKey(payload);
-          return graphEvalGroupKey(payload);
-        }
+        if (isLegacyOutboxPayload(payload)) return "__legacy_outbox__";
         const result = this.lookupEntry(payload);
         if (!result) return "__unknown__";
         return result.entry.groupKeyFn(result.clean);
       },
       score: (payload: Record<string, unknown>) => {
-        // The queue treats `score` as a millisecond wall-clock TIMESTAMP:
-        // `dispatchAfterMs = score + delay` (groupQueue.send), and the
-        // default when unset is `Date.now()`. Regular jobs return
-        // `occurredAt` here for exactly this reason. Outbox payloads MUST
-        // do the same — returning 0 made `dispatchAfterMs = 0 + delay`,
-        // i.e. a 1970 timestamp that is always already-due, so the cadence
-        // digest delay collapsed and a windowed digest fanned out to one
-        // email per match instead of one batched digest (ADR-026). Using
-        // the enqueue-time now makes `dispatchAfterMs = now + delayMs =
-        // scheduledFor`, restoring both the digest delay and any future
-        // delayed outbox stage. No-delay stages (settle/graphEval) are
-        // unaffected — now + 0 is immediately due, same as before.
-        if (isOutboxPayload(payload)) return Date.now();
         const result = this.lookupEntry(payload);
         if (!result) return Date.now();
         return result.entry.scoreFn(result.clean);
       },
       spanAttributes: (payload: Record<string, unknown>) => {
-        if (isOutboxPayload(payload)) {
-          return { "outbox.stage": payload.stage };
-        }
         const result = this.lookupEntry(payload);
         if (!result) return {};
         if (!result.entry.spanAttributes) return {};
         return result.entry.spanAttributes(result.clean);
       },
       process: async (payload: Record<string, unknown>) => {
-        if (isOutboxPayload(payload)) {
-          if (!outbox) {
-            // Fail closed: throwing here keeps the job in the queue's
-            // retryable state instead of ACKing and silently dropping a
-            // notification. Operators see the error in queue metrics
-            // and the worker boot wiring gets fixed.
-            throw new Error(
-              `Outbox payload (stage=${payload.stage}) arrived on a queue without a wired outbox runtime; failing closed so the row is retryable until the runtime is attached`,
-            );
-          }
-          await outbox.dispatcher.process(payload);
+        if (isLegacyOutboxPayload(payload)) {
+          dropLegacyOutboxPayload(payload);
           return;
         }
         const result = this.lookupEntry(payload);
@@ -513,90 +456,26 @@ export class EventSourcing {
         await result.entry.process(result.clean);
       },
       coalesceMaxBatch: (payload: Record<string, unknown>) => {
-        if (isOutboxPayload(payload)) {
-          // Settle / graphEval are per-(trigger, ...) so coalescing makes
-          // no sense — their dedup mode is the collapsing primitive.
-          // Cadence digest batches up to 100 same-window jobs into one
-          // render+dispatch.
-          if (isSettle(payload) || isGraphEval(payload)) return 1;
-          return 100;
-        }
         const result = this.lookupEntry(payload);
         return result?.entry.coalesceMaxBatch ?? 1;
       },
       processBatch: async (payloads: Record<string, unknown>[]) => {
         if (payloads.length === 0) return;
-        // Outbox batch: the queue only coalesces same-group jobs, so a
-        // homogeneous outbox batch goes through the dispatcher's
-        // processBatch directly.
-        const head = payloads[0]!;
-        if (isOutboxPayload(head)) {
-          if (!outbox) {
-            // Fail closed (see process() above): throwing keeps the
-            // rows retryable rather than ACKing and dropping the digest.
-            throw new Error(
-              `Outbox batch (stage=${head.stage}, count=${payloads.length}) on a queue without a wired outbox runtime; failing closed so the rows are retryable until the runtime is attached`,
-            );
-          }
-          // Verify batch homogeneity before the cast — the GroupQueue
-          // only coalesces same-group jobs so this should already hold,
-          // but a stray non-outbox payload sneaking into an outbox
-          // batch would misroute. Fall back to per-item processing on
-          // mismatch so the non-outbox job lands in the normal lane.
-          const allOutbox = payloads.every((p) => isOutboxPayload(p));
-          if (!allOutbox) {
-            // Isolate per-item failures: a single throwing payload must not
-            // fail the whole fastq job and re-stage already-dispatched
-            // siblings (which would re-fire outbox notifications on retry).
-            // Throw only when every item failed — then nothing was
-            // dispatched and a wholesale retry is safe.
-            let failures = 0;
-            let lastError: unknown;
-            for (const p of payloads) {
-              try {
-                if (isOutboxPayload(p)) {
-                  await outbox.dispatcher.process(p);
-                } else {
-                  const r = this.lookupEntry(p);
-                  if (r) {
-                    await r.entry.process(r.clean);
-                  } else {
-                    logger.warn(
-                      { payload: p },
-                      "Mixed outbox batch contained an unknown non-outbox payload; skipping",
-                    );
-                  }
-                }
-              } catch (error) {
-                failures++;
-                lastError = error;
-                logger.error(
-                  {
-                    payload: p,
-                    error:
-                      error instanceof Error ? error.message : String(error),
-                  },
-                  "Mixed outbox batch item failed; continuing with remaining items",
-                );
-              }
-            }
-            if (failures === payloads.length && failures > 0) {
-              throw lastError instanceof Error
-                ? lastError
-                : new Error(String(lastError));
-            }
-            return;
-          }
-          await outbox.dispatcher.processBatch(payloads as OutboxJob[]);
-          return;
-        }
         // A coalesced batch is always one group → one registry entry. Resolve
         // every payload and guard against a mixed/unknown batch (should never
         // happen — the GroupQueue only coalesces same-group jobs — but a stray
         // payload must never be misrouted to the wrong handler). On any mismatch
         // fall back to per-item processing.
-        const first = this.lookupEntry(payloads[0]!);
-        const resolved = payloads.map((payload) => this.lookupEntry(payload));
+        const survivors = payloads.filter((p) => {
+          if (isLegacyOutboxPayload(p)) {
+            dropLegacyOutboxPayload(p);
+            return false;
+          }
+          return true;
+        });
+        if (survivors.length === 0) return;
+        const first = this.lookupEntry(survivors[0]!);
+        const resolved = survivors.map((payload) => this.lookupEntry(payload));
         const homogeneous =
           !!first?.entry.processBatch &&
           resolved.every((r) => r?.entry === first.entry);
@@ -608,19 +487,7 @@ export class EventSourcing {
         }
         await first.entry.processBatch!(resolved.map((r) => r!.clean));
       },
-      // The adapter is `QueueAuditAdapter<OutboxJob>`; the queue's payload
-      // type is the widened `Record<string, unknown>`. The adapter gates
-      // internally on `isSettle || isCadence` so any non-outbox payload
-      // is a no-op — the cast is structurally safe.
-      auditAdapter: outbox?.auditAdapter as
-        | EventSourcedQueueDefinition<Record<string, unknown>>["auditAdapter"]
-        | undefined,
     };
-    // Outbox dedup configuration deliberately lives on the producer side
-    // (settle: enqueueSettle's per-send override, cadence: TriggerSent
-    // claim + per-trigger groupKey + processBatch coalescing). No queue-
-    // level dedup — that would require a default makeId for non-outbox
-    // payloads where no obvious dedup identity exists.
 
     const effectiveRedis = this._redis;
     if (effectiveRedis) {
@@ -633,11 +500,6 @@ export class EventSourcing {
       this._globalQueue = new EventSourcedQueueProcessorMemory(definition);
     }
 
-    // The outbox runtime needs a back-reference to the queue so its
-    // public `enqueueSettle` (and the dispatcher's internal
-    // `enqueueCadence` re-enqueue) can send onto it. The cycle is
-    // intentional and resolved by attaching after construction.
-    outbox?.attachQueue(this._globalQueue);
   }
 
   private logDisabledWarning(context: {
@@ -708,20 +570,11 @@ export class EventSourcing {
 /**
  * Pure function to convert a StaticPipelineDefinition's Maps/arrays
  * into the flat arrays that EventSourcingPipeline expects.
- *
- * `outbox` is threaded through so reactors registered via `.withOutbox`
- * are adapted into regular `ReactorDefinition`s that forward each
- * emitted `OutboxEnqueueRequest` to `outbox.enqueueSettle`. The
- * adapted reactors are merged into the `reactors`/`mapReactors` arrays
- * the runtime already consumes — no separate dispatch loop.
  */
 function buildServiceOptions<
   EventType extends Event,
   ProjectionTypes extends Record<string, Projection>,
->(
-  definition: StaticPipelineDefinition<EventType, ProjectionTypes, any>,
-  outbox: OutboxRuntime | undefined,
-) {
+>(definition: StaticPipelineDefinition<EventType, ProjectionTypes, any>) {
   // Pass class instances directly — do NOT spread.
   // Getters like `eventTypes` live on the prototype and are lost by `{...obj}`.
   const foldProjections = Array.from(definition.foldProjections.values()).map(
@@ -745,41 +598,19 @@ function buildServiceOptions<
         }))
       : undefined;
 
-  const adaptedFoldOutboxReactors = Array.from(
-    definition.foldOutboxReactors.values(),
-  ).map((entry) => ({
-    foldName: entry.projectionName as string,
-    definition: adaptOutboxReactor(
-      entry.definition as OutboxReactorDefinition<EventType>,
-      outbox,
-    ),
-  }));
-
-  const adaptedMapOutboxReactors = Array.from(
-    definition.mapOutboxReactors.values(),
-  ).map((entry) => ({
-    mapName: entry.projectionName as string,
-    definition: adaptOutboxReactor(
-      entry.definition as OutboxReactorDefinition<EventType>,
-      outbox,
-    ),
-  }));
-
-  const foldReactorList = [
-    ...Array.from(definition.foldReactors.values()).map((entry) => ({
+  const foldReactorList = Array.from(definition.foldReactors.values()).map(
+    (entry) => ({
       foldName: entry.projectionName as string,
       definition: entry.definition,
-    })),
-    ...adaptedFoldOutboxReactors,
-  ];
+    }),
+  );
 
-  const mapReactorList = [
-    ...Array.from(definition.mapReactors.values()).map((entry) => ({
+  const mapReactorList = Array.from(definition.mapReactors.values()).map(
+    (entry) => ({
       mapName: entry.projectionName as string,
       definition: entry.definition,
-    })),
-    ...adaptedMapOutboxReactors,
-  ];
+    }),
+  );
 
   const reactors = foldReactorList.length > 0 ? foldReactorList : undefined;
   const mapReactors = mapReactorList.length > 0 ? mapReactorList : undefined;

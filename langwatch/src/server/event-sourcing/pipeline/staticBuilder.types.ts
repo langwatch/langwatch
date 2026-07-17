@@ -2,7 +2,6 @@ import type { FeatureFlagKey } from "../../featureFlag/registry";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { Event, Projection } from "../domain/types";
-import type { OutboxReactorDefinition } from "../outbox/outboxReactor.types";
 import type {
   FoldProjectionDefinition,
   FoldProjectionOptions,
@@ -130,28 +129,6 @@ export interface StaticPipelineDefinition<
   mapReactors: Map<
     string,
     { projectionName: string; definition: ReactorDefinition<EventType> }
-  >;
-
-  /**
-   * Outbox-backed reactors attached to fold projections. Dispatch
-   * runs through the ReactorOutbox + drainer rather than firing
-   * inline. See dev/docs/adr/024.
-   */
-  foldOutboxReactors: Map<
-    string,
-    {
-      projectionName: string;
-      definition: OutboxReactorDefinition<EventType>;
-    }
-  >;
-
-  /** Outbox-backed reactors attached to map projections. */
-  mapOutboxReactors: Map<
-    string,
-    {
-      projectionName: string;
-      definition: OutboxReactorDefinition<EventType>;
-    }
   >;
 
   /** Live event consumers that are independent of fold/map projections. */

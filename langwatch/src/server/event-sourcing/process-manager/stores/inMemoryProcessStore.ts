@@ -14,6 +14,8 @@ import type {
 interface StoredMessage extends OutboxMessageRecord {
   /** Epoch ms until which the message is exclusively leased; 0 = unleased. */
   leasedUntil: number;
+  /** Epoch ms of the successful dispatch; null while pending/dead. */
+  dispatchedAt: number | null;
 }
 
 function refKey(ref: ProcessRef): string {
@@ -106,6 +108,7 @@ export class InMemoryProcessStore implements ProcessStore {
         leaseToken: null,
         createdAt: commit.now,
         leasedUntil: 0,
+        dispatchedAt: null,
       });
       insertedMessageKeys.push(message.messageKey);
     }
@@ -165,6 +168,7 @@ export class InMemoryProcessStore implements ProcessStore {
     message.attempts += 1;
     message.leasedUntil = 0;
     message.leaseToken = null;
+    message.dispatchedAt = params.now;
   }
 
   async markFailed(params: {

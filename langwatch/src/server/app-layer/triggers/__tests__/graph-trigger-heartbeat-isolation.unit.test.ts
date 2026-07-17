@@ -89,7 +89,7 @@ describe("decideGraphTriggerHeartbeat per-project isolation", () => {
       });
 
       expect(requests).toHaveLength(1);
-      expect(requests[0]?.payload).toMatchObject({ projectId: HEALTHY });
+      expect(requests[0]).toMatchObject({ projectId: HEALTHY });
     });
 
     it("does not enqueue anything for the failing project", async () => {
@@ -104,9 +104,7 @@ describe("decideGraphTriggerHeartbeat per-project isolation", () => {
         now,
       });
 
-      const projectIds = requests.map(
-        (r) => (r.payload as unknown as { projectId: string }).projectId,
-      );
+      const projectIds = requests.map((r) => r.projectId);
       expect(projectIds).not.toContain(BROKEN);
     });
   });

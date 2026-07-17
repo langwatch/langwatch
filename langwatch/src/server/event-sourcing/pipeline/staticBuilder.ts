@@ -14,7 +14,6 @@ import type {
 } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
-import type { OutboxReactorDefinition } from "../outbox/outboxReactor.types";
 import type {
   FoldProjectionDefinition,
   FoldProjectionOptions,
@@ -135,18 +134,6 @@ export class StaticPipelineBuilderWithNameAndType<
     string,
     { projectionName: string; definition: ReactorDefinition<EventType> }
   >();
-  // Outbox reactors are projection-attached like `foldReactors` /
-  // `mapReactors`, but their dispatch path runs through the
-  // ReactorOutbox + drainer rather than firing inline post-fold.
-  // See dev/docs/adr/024-withoutbox-pipeline-builder-primitive.md.
-  private foldOutboxReactors = new Map<
-    string,
-    { projectionName: string; definition: OutboxReactorDefinition<EventType> }
-  >();
-  private mapOutboxReactors = new Map<
-    string,
-    { projectionName: string; definition: OutboxReactorDefinition<EventType> }
-  >();
   private eventSubscribers = new Map<
     string,
     EventSubscriberDefinition<EventType>
@@ -226,8 +213,7 @@ export class StaticPipelineBuilderWithNameAndType<
    * Register the default operational state projection.
    *
    * It runs as one direct repository load/apply/store cycle under the queue's
-   * per-key lock. It is intentionally not a valid parent for `.withReactor()`
-   * or `.withOutbox()`.
+   * per-key lock. It is intentionally not a valid parent for `.withReactor()`.
    */
   withProjection(
     name: string,
@@ -308,10 +294,7 @@ export class StaticPipelineBuilderWithNameAndType<
     definition: ReactorDefinition<EventType>,
   ): this {
     const nameTaken =
-      this.foldReactors.has(reactorName) ||
-      this.mapReactors.has(reactorName) ||
-      this.foldOutboxReactors.has(reactorName) ||
-      this.mapOutboxReactors.has(reactorName);
+      this.foldReactors.has(reactorName) || this.mapReactors.has(reactorName);
     if (nameTaken) {
       throw new ConfigurationError(
         "StaticPipelineBuilder",
@@ -328,63 +311,6 @@ export class StaticPipelineBuilderWithNameAndType<
       throw new ConfigurationError(
         "StaticPipelineBuilder",
         `Cannot register reactor "${reactorName}" on projection "${projectionName}" — projection not found`,
-        { projectionName, reactorName },
-      );
-    }
-
-    return this;
-  }
-
-  /**
-   * Register an outbox-backed reactor on a fold or map projection.
-   *
-   * Mirrors `.withReactor` but routes dispatch through the
-   * ReactorOutbox + drainer instead of firing inline post-fold. Use
-   * this for stake-sensitive side effects (customer email/Slack,
-   * dataset writes) that need durable retry and operator visibility
-   * — see dev/docs/adr/024-withoutbox-pipeline-builder-primitive.md.
-   *
-   * The definition's `decide(event, context)` returns the enqueue
-   * requests (zero or more); the runtime fans them into outbox rows
-   * and posts a single wakeup per request. The actual dispatch
-   * (HTTP call, mailer, dataset write) is performed by an
-   * `OutboxDispatcher` registered against the same `reactorName` on
-   * the dispatcher (ADR-030 revision 3 rides the main event-sourcing queue).
-   */
-  withOutbox(
-    projectionName: FoldNames | MapNames,
-    reactorName: string,
-    definition: OutboxReactorDefinition<EventType>,
-  ): this {
-    if (definition.name !== reactorName) {
-      throw new ConfigurationError(
-        "StaticPipelineBuilder",
-        `Outbox reactor name mismatch: arg "${reactorName}" !== definition.name "${definition.name}"`,
-        { reactorName, definitionName: definition.name, projectionName },
-      );
-    }
-
-    const nameTaken =
-      this.foldReactors.has(reactorName) ||
-      this.mapReactors.has(reactorName) ||
-      this.foldOutboxReactors.has(reactorName) ||
-      this.mapOutboxReactors.has(reactorName);
-    if (nameTaken) {
-      throw new ConfigurationError(
-        "StaticPipelineBuilder",
-        `Reactor with name "${reactorName}" already exists`,
-        { reactorName },
-      );
-    }
-
-    if (this.foldProjections.has(projectionName)) {
-      this.foldOutboxReactors.set(reactorName, { projectionName, definition });
-    } else if (this.mapProjections.has(projectionName)) {
-      this.mapOutboxReactors.set(reactorName, { projectionName, definition });
-    } else {
-      throw new ConfigurationError(
-        "StaticPipelineBuilder",
-        `Cannot register outbox reactor "${reactorName}" on projection "${projectionName}" — projection not found`,
         { projectionName, reactorName },
       );
     }
@@ -548,8 +474,6 @@ export class StaticPipelineBuilderWithNameAndType<
       commands: this.commands,
       foldReactors: this.foldReactors,
       mapReactors: this.mapReactors,
-      foldOutboxReactors: this.foldOutboxReactors,
-      mapOutboxReactors: this.mapOutboxReactors,
       eventSubscribers: this.eventSubscribers,
       featureFlagService: this.featureFlagService,
 

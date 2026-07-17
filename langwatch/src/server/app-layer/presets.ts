@@ -1060,20 +1060,11 @@ export function initializeDefaultApp(options?: {
     },
   });
   gracefulCloseables.push({
-    name: "langy-process-outbox",
+    // The langy + automation process outbox/wake workers share one stop
+    // composite exposed by the registry.
+    name: "process-outbox-workers",
     close: () => commands.processOutboxWorker.stop(),
   });
-  // The outbox runtime piggy-backs on the main event-sourcing queue
-  // (ADR-030 revision 3), so there's nothing outbox-specific to close —
-  // the event-sourcing queue's own close registration covers it.
-  if (outboxHeartbeatScheduler) {
-    gracefulCloseables.push({
-      name: "outbox-heartbeat-scheduler",
-      close: async () => {
-        await outboxHeartbeatScheduler.stop();
-      },
-    });
-  }
   if (scheduler) {
     gracefulCloseables.push({
       name: "scheduler",

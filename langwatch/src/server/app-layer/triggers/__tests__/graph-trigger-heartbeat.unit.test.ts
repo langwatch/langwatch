@@ -1,7 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GraphEvalStagePayload } from "~/server/event-sourcing/outbox/payload";
 import {
   decideGraphTriggerHeartbeat,
   defaultCandidateSources,
@@ -194,12 +193,9 @@ describe("decideGraphTriggerHeartbeat", () => {
       });
 
       expect(result).toHaveLength(1);
-      const payload = result[0]?.payload as unknown as GraphEvalStagePayload;
-      expect(payload.reason).toBe("heartbeat-absence");
-      expect(payload.triggerId).toBe(TRIGGER_NO_DATA);
-      expect(result[0]?.dedupKey).toBe(
-        `${PROJECT_A}/${TRIGGER_NO_DATA}:graph:hb`,
-      );
+      expect(result[0]?.reason).toBe("heartbeat-absence");
+      expect(result[0]?.triggerId).toBe(TRIGGER_NO_DATA);
+      expect(result[0]?.projectId).toBe(PROJECT_A);
     });
   });
 
@@ -263,9 +259,8 @@ describe("decideGraphTriggerHeartbeat", () => {
       });
 
       expect(result).toHaveLength(1);
-      const payload = result[0]?.payload as unknown as GraphEvalStagePayload;
-      expect(payload.reason).toBe("heartbeat-resolve");
-      expect(payload.triggerId).toBe(TRIGGER_OPEN);
+      expect(result[0]?.reason).toBe("heartbeat-resolve");
+      expect(result[0]?.triggerId).toBe(TRIGGER_OPEN);
     });
   });
 
