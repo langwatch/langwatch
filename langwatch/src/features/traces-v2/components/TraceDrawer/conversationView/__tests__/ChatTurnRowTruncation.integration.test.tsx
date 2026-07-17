@@ -129,5 +129,23 @@ describe("ChatTurnRow content-incomplete notice", () => {
         ).not.toBeInTheDocument();
       });
     });
+
+    describe("when the input is a truncated preview but redacted by a privacy rule", () => {
+      it("suppresses the notice — the viewer sees a Redacted marker, not a preview", () => {
+        renderRow({ inputTruncated: true, inputRedacted: true });
+        expect(
+          screen.queryByText(/could not be fully loaded/i),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the output is a truncated preview but redacted by a privacy rule", () => {
+      it("suppresses the notice on the response side", () => {
+        renderRow({ outputTruncated: true, outputRedacted: true });
+        expect(
+          screen.queryByText(/could not be fully loaded/i),
+        ).not.toBeInTheDocument();
+      });
+    });
   });
 });
