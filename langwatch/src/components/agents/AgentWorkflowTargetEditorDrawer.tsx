@@ -1,18 +1,10 @@
-import {
-  Box,
-  Button,
-  Field,
-  Heading,
-  HStack,
-  Link as ChakraLink,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Field, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
-import { LuArrowLeft, LuExternalLink } from "react-icons/lu";
+import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
+import { Link } from "~/components/ui/link";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -28,6 +20,7 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
 import type { Field as DSLField, Workflow } from "~/optimization_studio/types/dsl";
+import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
 
@@ -180,45 +173,45 @@ export function AgentWorkflowTargetEditorDrawer(
               paddingY={4}
               overflowY="auto"
             >
-              <Box>
+              {workflowQuery.data && (
                 <Field.Root>
                   <Field.Label>Workflow</Field.Label>
-                  <HStack
-                    gap={2}
-                    paddingX={3}
-                    paddingY={2}
-                    borderWidth="1px"
-                    borderColor="border"
-                    borderRadius="md"
-                    align="center"
-                  >
-                    <Text fontSize="sm" flex={1} data-testid="linked-workflow-name">
-                      {workflowQuery.data?.name ?? "(workflow not found)"}
-                    </Text>
-                    {editorHref && (
-                      // A plain external anchor, not the app router's Link:
-                      // target="_blank" is always a hard navigation into a
-                      // new tab, so there's no client-side routing to gain
-                      // by composing through NextLink here — and doing so
-                      // previously swallowed data-testid, since Chakra's
-                      // asChild slot only forwards style-related props to
-                      // the composed child, not arbitrary data attributes.
-                      <ChakraLink
-                        href={editorHref}
-                        target="_blank"
-                        fontSize="sm"
-                        color="blue.fg"
-                        data-testid="open-workflow-link"
-                      >
-                        <HStack gap={1} align="center">
-                          <Text>Open Workflow</Text>
-                          <LuExternalLink size={14} />
-                        </HStack>
-                      </ChakraLink>
-                    )}
-                  </HStack>
+                  {editorHref ? (
+                    // isExternal renders a plain anchor directly, not
+                    // composed through the app router's client-side Link:
+                    // target="_blank" is always a hard navigation into a
+                    // new tab regardless, and composing through NextLink
+                    // previously swallowed data-testid — Chakra's asChild
+                    // slot only forwards style-related props to the
+                    // composed child, not arbitrary data attributes.
+                    <Link
+                      href={editorHref}
+                      isExternal
+                      data-testid="open-workflow-link"
+                    >
+                      <WorkflowCardDisplay
+                        name={workflowQuery.data.name}
+                        icon={workflowQuery.data.icon}
+                        updatedAt={workflowQuery.data.updatedAt}
+                        action={
+                          <ExternalLink
+                            size={16}
+                            color="var(--chakra-colors-fg-muted)"
+                          />
+                        }
+                        width="300px"
+                      />
+                    </Link>
+                  ) : (
+                    <WorkflowCardDisplay
+                      name={workflowQuery.data.name}
+                      icon={workflowQuery.data.icon}
+                      updatedAt={workflowQuery.data.updatedAt}
+                      width="300px"
+                    />
+                  )}
                 </Field.Root>
-              </Box>
+              )}
 
               <VariablesSection
                 title="Input Variables"

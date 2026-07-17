@@ -94,6 +94,8 @@ describe("AgentWorkflowTargetEditorDrawer", () => {
     workflowQueryData = {
       id: "workflow-123",
       name: "fast resolution agent workflow",
+      icon: "🦊",
+      updatedAt: new Date("2026-07-17T12:00:00Z"),
       currentVersion: {
         dsl: {
           nodes: [
@@ -117,9 +119,7 @@ describe("AgentWorkflowTargetEditorDrawer", () => {
     it("shows the linked workflow's name with a link to open it in Studio", () => {
       renderDrawer();
 
-      expect(screen.getByTestId("linked-workflow-name")).toHaveTextContent(
-        "fast resolution agent workflow",
-      );
+      expect(screen.getByText("fast resolution agent workflow")).toBeInTheDocument();
 
       expect(screen.getByTestId("open-workflow-link")).toHaveAttribute(
         "href",
