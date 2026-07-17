@@ -224,19 +224,16 @@ describe("useOpenTargetEditor", () => {
       );
     });
 
-    it("opens workflow in new tab for workflow agent target", async () => {
-      // Arrange: Mock window.open and the agent API
-      const mockWindowOpen = vi.spyOn(window, "open").mockImplementation(() => null);
-
+    it("opens agentWorkflowTargetEditor drawer for a workflow agent target", async () => {
+      // A workflow-type agent has no code of its own to edit inline — the
+      // drawer shows the linked workflow as a card (with a link to open the
+      // real graph editor) plus the same input-mapping UI every other agent
+      // target type gets. This must NOT fall back to window.open: a full
+      // graph editor doesn't belong in a sidebar, but the mapping UI does.
       mockAgentFetch.mockResolvedValue({
         id: "agent-3",
         name: "Workflow Agent",
         type: "workflow",
-        // `workflowId` is a top-level column on the Agent row (set by
-        // WorkflowSelectorDrawer), not a `config` field — `config` only ever
-        // carries `workflow_id` (snake_case) as a fallback for older agents.
-        // A fixture using `config.workflowId` here would mask the real bug:
-        // the code must read the top-level field to find anything.
         workflowId: "workflow-123",
         config: {},
       });
@@ -245,56 +242,31 @@ describe("useOpenTargetEditor", () => {
 
       const { result } = renderHook(() => useOpenTargetEditor());
 
-      // Act: Open the target editor
-      await act(async () => {
-        await result.current.openTargetEditor(target);
-      });
-
-      // Assert: Window.open was called with workflow URL
-      await waitFor(() => {
-        expect(mockWindowOpen).toHaveBeenCalledWith(
-          "/test-project/studio/workflow-123",
-          "_blank",
-        );
-      });
-
-      // Ensure no drawer was opened
-      expect(mockOpenDrawer).not.toHaveBeenCalled();
-
-      mockWindowOpen.mockRestore();
-    });
-
-    it("falls back to config.workflow_id when the agent has no top-level workflowId", async () => {
-      // Older agents may predate the top-level `workflowId` column — the
-      // config's snake_case `workflow_id` must still resolve.
-      const mockWindowOpen = vi.spyOn(window, "open").mockImplementation(() => null);
-
-      mockAgentFetch.mockResolvedValue({
-        id: "agent-3b",
-        name: "Legacy Workflow Agent",
-        type: "workflow",
-        workflowId: null,
-        config: {
-          workflow_id: "workflow-456",
-        },
-      });
-
-      const target = createAgentTarget("target-3b", "agent-3b");
-
-      const { result } = renderHook(() => useOpenTargetEditor());
-
       await act(async () => {
         await result.current.openTargetEditor(target);
       });
 
       await waitFor(() => {
-        expect(mockWindowOpen).toHaveBeenCalledWith(
-          "/test-project/studio/workflow-456",
-          "_blank",
+        expect(mockOpenDrawer).toHaveBeenCalledWith(
+          "agentWorkflowTargetEditor",
+          expect.objectContaining({
+            urlParams: expect.objectContaining({
+              targetId: "target-3",
+              agentId: "agent-3",
+            }),
+          }),
         );
       });
 
-      mockWindowOpen.mockRestore();
+      // Ensure no other agent drawer was opened for this target
+      expect(mockOpenDrawer).not.toHaveBeenCalledWith(
+        "agentHttpEditor",
+        expect.anything(),
+      );
+      expect(mockOpenDrawer).not.toHaveBeenCalledWith(
+        "agentCodeEditor",
+        expect.anything(),
+      );
     });
 
     it("does not open any drawer when agent has no dbAgentId", async () => {

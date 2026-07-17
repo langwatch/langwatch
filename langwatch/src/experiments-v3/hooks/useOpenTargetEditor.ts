@@ -208,18 +208,56 @@ export const useOpenTargetEditor = () => {
           });
 
           if (agent?.type === "workflow") {
-            // A workflow-type agent has no code or mapping settings of its
-            // own to edit inline — it's just a pointer to a Studio graph, so
-            // "Edit" opens that graph. `agent.workflowId` (top-level, set by
-            // WorkflowSelectorDrawer) is authoritative; `config.workflow_id`
-            // is the fallback for older agents that predate that column.
-            const config = agent.config as Record<string, unknown>;
-            const workflowId =
-              agent.workflowId ?? (config.workflow_id as string | undefined);
-            if (workflowId) {
-              const workflowUrl = `/${project?.slug}/studio/${workflowId}`;
-              window.open(workflowUrl, "_blank");
-            }
+            // A workflow-type agent has no code of its own to edit inline —
+            // it's a pointer to a Studio graph, which can't be edited
+            // meaningfully inside a narrow sidebar. The drawer shows the
+            // linked workflow as a card with a link to open the real editor
+            // in a new tab, plus the same input-mapping UI every other
+            // agent target type gets.
+            const availableSources = buildAvailableSources();
+            const uiMappings = buildUIMappings(target, activeDatasetId);
+
+            setFlowCallbacks("agentWorkflowTargetEditor", {
+              onInputMappingsChange: (
+                identifier: string,
+                mapping: UIFieldMapping | undefined,
+              ) => {
+                const currentActiveDatasetId =
+                  useEvaluationsV3Store.getState().activeDatasetId;
+                const currentDatasets =
+                  useEvaluationsV3Store.getState().datasets;
+                const checkIsDatasetSource = (sourceId: string) =>
+                  currentDatasets.some((d) => d.id === sourceId);
+
+                if (mapping) {
+                  setTargetMapping(
+                    target.id,
+                    currentActiveDatasetId,
+                    identifier,
+                    convertFromUIMapping(mapping, checkIsDatasetSource),
+                  );
+                } else {
+                  removeTargetMapping(
+                    target.id,
+                    currentActiveDatasetId,
+                    identifier,
+                  );
+                }
+              },
+            });
+
+            openDrawer("agentWorkflowTargetEditor", {
+              availableSources,
+              inputMappings: uiMappings,
+              urlParams: {
+                targetId: target.id,
+                agentId: target.dbAgentId ?? "",
+              },
+            });
+
+            requestAnimationFrame(() => {
+              scrollToTargetColumn(target.id);
+            });
           } else if (agent?.type === "http") {
             // HTTP agent - open HTTP editor drawer
             const availableSources = buildAvailableSources();
