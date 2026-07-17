@@ -225,7 +225,10 @@ export function TraceSummaryAccordions({
                       "no input recorded" placeholder. */}
                   {/* Warn per-field when the shown value is still a preview
                       because its full content couldn't be loaded (#5835). */}
-                  <ContentIncompleteNotice incomplete={trace.inputTruncated} />
+                  <ContentIncompleteNotice
+                    incomplete={trace.inputTruncated}
+                    redacted={trace.inputRedacted}
+                  />
                   <RedactedField
                     field="input"
                     redacted={trace.inputRedacted ?? false}
@@ -241,7 +244,10 @@ export function TraceSummaryAccordions({
                       <MissingIORow label="Input" mode="input" />
                     )}
                   </RedactedField>
-                  <ContentIncompleteNotice incomplete={trace.outputTruncated} />
+                  <ContentIncompleteNotice
+                    incomplete={trace.outputTruncated}
+                    redacted={trace.outputRedacted}
+                  />
                   <RedactedField
                     field="output"
                     redacted={trace.outputRedacted ?? false}

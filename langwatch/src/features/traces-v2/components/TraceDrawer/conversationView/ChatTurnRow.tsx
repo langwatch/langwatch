@@ -153,11 +153,11 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
       ) : null}
 
       {/* Warn when the message shown is still a preview because the full input
-          couldn't be loaded at read time (#5835). Suppressed when the input is
-          redacted — the viewer is seeing a "Redacted" marker, not a preview, so
-          an incomplete-content warning would be contradictory. */}
+          couldn't be loaded at read time (#5835). The notice self-suppresses
+          when the input is redacted, so the rule lives in one place. */}
       <ContentIncompleteNotice
-        incomplete={turn.inputTruncated && !turn.inputRedacted}
+        incomplete={turn.inputTruncated}
+        redacted={turn.inputRedacted}
       />
 
       {assistantText ? (
@@ -213,11 +213,11 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
       ) : null}
 
       {/* Warn when the response shown is still a preview because the full
-          output couldn't be loaded at read time (#5835). Suppressed when the
-          output is redacted — the viewer is seeing a "Redacted" marker, not a
-          preview, so an incomplete-content warning would be contradictory. */}
+          output couldn't be loaded at read time (#5835). The notice
+          self-suppresses when the output is redacted. */}
       <ContentIncompleteNotice
-        incomplete={turn.outputTruncated && !turn.outputRedacted}
+        incomplete={turn.outputTruncated}
+        redacted={turn.outputRedacted}
       />
     </VStack>
   );

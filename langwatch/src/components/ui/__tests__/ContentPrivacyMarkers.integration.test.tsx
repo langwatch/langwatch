@@ -212,4 +212,15 @@ describe("ContentIncompleteNotice", () => {
       expect(container.textContent).toContain("could not be fully loaded");
     });
   });
+
+  describe("when the content is incomplete but redacted by a privacy rule", () => {
+    it("renders nothing — a Redacted marker is shown instead of a preview, so the incomplete warning would be contradictory", () => {
+      const { container } = render(
+        <Wrapper>
+          <ContentIncompleteNotice incomplete redacted />
+        </Wrapper>,
+      );
+      expect(container.textContent).toBe("");
+    });
+  });
 });

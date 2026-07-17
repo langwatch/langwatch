@@ -211,11 +211,17 @@ export const PiiIncompleteNotice: React.FC<{
  * Warns that the content shown may be a shortened preview because its full
  * value could not be loaded. Surfaces the gap instead of letting a truncated
  * preview read as the complete value. Same shape as {@link PiiIncompleteNotice}.
+ *
+ * Self-suppresses when `redacted` is set: a redacted field renders a "Redacted"
+ * marker rather than a preview, so an incomplete-content warning would be
+ * contradictory. Keeping the rule here (not at each call site) stops the two IO
+ * surfaces — the Summary tab and the Conversation tab — from drifting apart.
  */
 export const ContentIncompleteNotice: React.FC<{
   incomplete?: boolean | null;
-}> = ({ incomplete }) => {
-  if (!incomplete) return null;
+  redacted?: boolean | null;
+}> = ({ incomplete, redacted }) => {
+  if (!incomplete || redacted) return null;
   return (
     <Alert.Root status="warning" size="sm" variant="subtle" width="full">
       <Alert.Indicator />
