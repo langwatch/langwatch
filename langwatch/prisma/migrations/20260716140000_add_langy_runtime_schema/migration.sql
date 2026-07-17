@@ -1,8 +1,5 @@
--- Consolidated Langy schema additions.
---
--- This migration is additive and safe to deploy after any subset of the
--- pre-release Langy migrations. Historical migrations remain in the tree so
--- Prisma's production migration ledger is never rewritten or flattened away.
+-- Add the persistence required by the Langy runtime: conversation projections,
+-- GitHub installations, process-manager state, and active-turn leases.
 
 ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "langyEgressAllowlist" JSONB;
 
