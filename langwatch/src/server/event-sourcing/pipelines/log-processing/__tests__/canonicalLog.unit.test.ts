@@ -3,6 +3,7 @@ import {
   logCommandGroupKey,
   prepareCanonicalLogRecords,
 } from "../canonicalLog";
+import { CanonicalLogStorageMapProjection } from "../projections/canonicalLogStorage.mapProjection";
 
 const noRedaction = {
   redactLog: async () => undefined,
@@ -215,5 +216,18 @@ describe("canonical log preparation", () => {
     expect(
       Number(logCommandGroupKey("b".repeat(64), 16).split(":")[1]),
     ).toBeLessThan(16);
+  });
+
+  it("uses the canonical record id to shard map storage", () => {
+    const projection = new CanonicalLogStorageMapProjection({
+      store: {} as never,
+      shardCount: 16,
+    });
+    const recordId = "a".repeat(64);
+    const event = { data: { recordId } } as never;
+
+    expect(projection.options?.groupKeyFn?.(event)).toBe(
+      logCommandGroupKey(recordId, 16),
+    );
   });
 });

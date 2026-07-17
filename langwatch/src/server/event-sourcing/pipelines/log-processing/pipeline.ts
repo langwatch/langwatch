@@ -19,6 +19,7 @@ export function createLogProcessingPipeline(deps: LogProcessingPipelineDeps) {
       "canonicalLogStorage",
       new CanonicalLogStorageMapProjection({
         store: deps.canonicalLogAppendStore,
+        shardCount: deps.logCommandShardCount,
       }),
     )
     .withCommand("recordLogRecord", RecordCanonicalLogCommand, {
