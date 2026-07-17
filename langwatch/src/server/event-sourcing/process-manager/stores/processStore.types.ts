@@ -149,4 +149,16 @@ export interface ProcessStore {
 
   /** Processes whose nextWakeAt is due, with the revision to guard against staleness. */
   findDueWakes(params: { now: number; limit: number }): Promise<DueWake[]>;
+
+  /**
+   * Retention for high-frequency recurring intents (ADR-052): deletes
+   * DISPATCHED outbox rows of one processName whose dispatch finished
+   * before `before`. Pending/dead rows are never touched — dead rows are
+   * the operator's failure record, pending rows are work. Returns the
+   * deleted count.
+   */
+  deleteDispatchedBefore(params: {
+    processName: string;
+    before: number;
+  }): Promise<number>;
 }

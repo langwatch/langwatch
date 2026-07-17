@@ -201,4 +201,20 @@ export class InMemoryProcessStore implements ProcessStore {
     }
     return due;
   }
+
+  async deleteDispatchedBefore(params: {
+    processName: string;
+    before: number;
+  }): Promise<number> {
+    let deleted = 0;
+    for (const [key, message] of this.messages) {
+      if (message.processName !== params.processName) continue;
+      if (message.status !== "dispatched") continue;
+      if (message.dispatchedAt === null || message.dispatchedAt >= params.before)
+        continue;
+      this.messages.delete(key);
+      deleted++;
+    }
+    return deleted;
+  }
 }

@@ -52,10 +52,10 @@ const MESSAGE_EVENT_TYPES = new Set<string>([
  * Wraps the reactor's `handle` with these guards so each call site
  * doesn't repeat the same preamble.
  */
-/** Pure guard check, shared between the `.withReactor` and `.withOutbox`
- *  variants below so both branches stay in sync. Returns true when the
- *  reactor's user-provided body should run. */
-function passesTraceOriginGuards(
+/** Pure guard check, shared between the reactor variant below and the
+ *  alert-trigger match subscriber (ADR-052) so both stay in sync. Returns
+ *  true when the reactor's/subscriber's user-provided body should run. */
+export function passesTraceOriginGuards(
   event: TraceProcessingEvent,
   foldState: TraceSummaryData,
 ): boolean {

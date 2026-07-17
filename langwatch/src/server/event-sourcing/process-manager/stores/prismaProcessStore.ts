@@ -404,4 +404,18 @@ export class PrismaProcessStore implements ProcessStore {
           ],
     );
   }
+
+  async deleteDispatchedBefore(params: {
+    processName: string;
+    before: number;
+  }): Promise<number> {
+    const result = await this.prisma.processManagerOutbox.deleteMany({
+      where: {
+        processName: params.processName,
+        status: "dispatched",
+        dispatchedAt: { lt: asDate(params.before) },
+      },
+    });
+    return result.count;
+  }
 }
