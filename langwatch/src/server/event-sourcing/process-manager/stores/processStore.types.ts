@@ -122,6 +122,14 @@ export interface ProcessStore {
     now: number;
     limit: number;
     leaseDurationMs: number;
+    /**
+     * Restrict leasing to these processNames. The outbox table is shared
+     * across every process manager, so each domain's dispatcher MUST scope
+     * its leases — an unfiltered dispatcher would lease another domain's
+     * intents, fail to find a handler, and retry-churn them (ADR-051 §4).
+     * Omitted means unfiltered (single-domain deployments and tests).
+     */
+    processNames?: readonly string[];
   }): Promise<LeasedOutboxMessageRecord[]>;
 
   markDispatched(params: {

@@ -251,8 +251,12 @@ export interface PipelineRepositories {
   langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free ClickHouse event-grain analytics. */
   langyAnalyticsEventStorage: AppendStore<LangyAnalyticsEventProjectionRecord>;
-  /** Durable process inbox, state, and outbox persistence. */
-  langyProcessStore: ProcessStore;
+  /**
+   * Durable process inbox, state, and outbox persistence — SHARED across
+   * every process manager (the ProcessManager* tables are generic; each
+   * domain's dispatcher scopes its leases via `processNames`).
+   */
+  processStore: ProcessStore;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
 }
@@ -393,7 +397,7 @@ export class PipelineRegistry {
 
     const processManager = new ProcessManagerService({
       definition: langyConversationProcessDefinition,
-      store: this.deps.repositories.langyProcessStore,
+      store: this.deps.repositories.processStore,
     });
     const effectPorts = createLangyEffectPorts({
       handoffStore: this.deps.langy.handoffStore,
@@ -414,7 +418,7 @@ export class PipelineRegistry {
       saveTitle: (args) => saveTitle.fn(args),
     });
     const outboxDispatcher = new OutboxDispatcherService({
-      store: this.deps.repositories.langyProcessStore,
+      store: this.deps.repositories.processStore,
       handlers: createLangyIntentHandlers({ ports: effectPorts }),
       // The lease MUST outlive the slowest accepted dispatch, or a healthy
       // long-running turn loses its lease mid-flight and a second instance

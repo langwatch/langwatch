@@ -13,6 +13,11 @@ export {
   type HandleResult,
   type ProcessManagerServiceOptions,
 } from "./processManagerService";
+export {
+  ProcessWakeWorker,
+  type ProcessWakeWorkerOptions,
+  type WakeHandlerPort,
+} from "./wake/processWakeWorker";
 export type {
   Evolution,
   ProcessDefinition,

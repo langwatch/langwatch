@@ -671,7 +671,7 @@ export function initializeDefaultApp(options?: {
         ? new ClickHouseLangyAnalyticsEventRepository(resolveClickHouseClient)
         : new NullLangyAnalyticsEventRepository(),
     ),
-    langyProcessStore: new PrismaProcessStore(prisma),
+    processStore: new PrismaProcessStore(prisma),
     langyTurnAdmission,
   };
 
