@@ -172,7 +172,7 @@ describe("clusterTopicsForProject", () => {
         json: () => Promise.resolve(chRows),
       });
 
-      await clusterTopicsForProject("proj-1", undefined, false);
+      await clusterTopicsForProject("proj-1");
 
       // clustering service (langevals) was called
       expect(stagedLangevalsFetch).toHaveBeenCalled();
@@ -187,7 +187,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(getClickHouseClientForProject).mockResolvedValue(null);
 
       await expect(
-        clusterTopicsForProject("proj-1", undefined, false),
+        clusterTopicsForProject("proj-1"),
       ).rejects.toThrow("ClickHouse client not available for project proj-1");
     });
   });
@@ -213,7 +213,7 @@ describe("clusterTopicsForProject", () => {
       });
 
       const searchAfter: [number, string] = [1700000000000, "trace-xyz"];
-      await clusterTopicsForProject("proj-1", searchAfter, false);
+      await clusterTopicsForProject("proj-1", searchAfter);
 
       // Verify the search query included cursor params
       const searchCall = mockClickHouseQuery.mock.calls[1]!;
@@ -271,7 +271,7 @@ describe("clusterTopicsForProject", () => {
           ]),
       });
 
-      await clusterTopicsForProject("proj-1", undefined, false);
+      await clusterTopicsForProject("proj-1");
 
       // Traces with empty/null input should be filtered, leaving 10
       const fetchCall = vi.mocked(stagedLangevalsFetch).mock.calls[0];
