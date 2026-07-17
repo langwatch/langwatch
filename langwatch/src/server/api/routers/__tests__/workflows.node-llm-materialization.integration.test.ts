@@ -147,6 +147,7 @@ describe.skipIf(isTestcontainersOnly)(
       await prisma.user.delete({ where: { id: userId } });
     });
 
+    /** @scenario Creating a workflow on a fresh install starts it with a ready-to-use model */
     it("persists the registry flagship on LLM nodes when nothing is configured anywhere", async () => {
       const { workflow } = await createFromBlankTemplate();
 
@@ -155,10 +156,11 @@ describe.skipIf(isTestcontainersOnly)(
       expect(llm?.model).not.toBe("");
     });
 
+    /** @scenario Creating a workflow uses the configured default model when one is set */
     it("persists the cascade-resolved model when a project default is configured", async () => {
       const config = await prisma.modelDefaultConfig.create({
         data: {
-          config: { DEFAULT: "anthropic/claude-haiku-4-5" },
+          config: { DEFAULT: "anthropic/claude-haiku-4-5-20251001" },
           organizationId,
           scopes: {
             create: [{ scopeType: "PROJECT", scopeId: projectId }],
@@ -169,12 +171,13 @@ describe.skipIf(isTestcontainersOnly)(
       try {
         const { workflow } = await createFromBlankTemplate();
         const llm = await persistedLlmValue(workflow.id);
-        expect(llm?.model).toBe("anthropic/claude-haiku-4-5");
+        expect(llm?.model).toBe("anthropic/claude-haiku-4-5-20251001");
       } finally {
         await prisma.modelDefaultConfig.delete({ where: { id: config.id } });
       }
     });
 
+    /** @scenario A workflow created by an older client keeps its old workflow-wide model */
     it("folds a legacy client's default_llm into the node and drops the field", async () => {
       const { workflow } = await createFromBlankTemplate({
         default_llm: { model: "openai/gpt-5-mini", max_tokens: 256 },
@@ -192,6 +195,7 @@ describe.skipIf(isTestcontainersOnly)(
       ).toBe(false);
     });
 
+    /** @scenario An explicit node-owned model is never rewritten */
     it("keeps an explicit node-owned model untouched", async () => {
       const template = JSON.parse(
         JSON.stringify(blankTemplate),

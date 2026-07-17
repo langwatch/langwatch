@@ -52,6 +52,7 @@ const llmValueOf = (dsl: Workflow): LLMConfig | undefined =>
     | undefined;
 
 describe("migrateDSLVersion 1.4 → 1.5 (default_llm fold)", () => {
+  /** @scenario spec_version 1.4 workflows fold default_llm into modelless LLM nodes */
   it("folds default_llm into an llm parameter with no value", () => {
     const migrated = migrateDSLVersion(
       legacyWorkflow({
@@ -87,16 +88,17 @@ describe("migrateDSLVersion 1.4 → 1.5 (default_llm fold)", () => {
     const migrated = migrateDSLVersion(
       legacyWorkflow({
         default_llm: { model: "openai/gpt-5-mini" },
-        llmParamValue: { model: "anthropic/claude-haiku-4-5" },
+        llmParamValue: { model: "anthropic/claude-haiku-4-5-20251001" },
       }),
     );
 
     expect(llmValueOf(migrated)).toEqual({
-      model: "anthropic/claude-haiku-4-5",
+      model: "anthropic/claude-haiku-4-5-20251001",
     });
     expect("default_llm" in migrated).toBe(false);
   });
 
+  /** @scenario A 1.4 workflow with an empty default_llm model migrates without inventing a model */
   it("drops an empty-model default_llm without inventing a node model", () => {
     // The pre-fix bug shape: creation persisted default_llm.model = "".
     const migrated = migrateDSLVersion(

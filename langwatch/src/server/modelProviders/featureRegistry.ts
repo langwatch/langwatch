@@ -71,8 +71,7 @@ const REGISTRY: FeatureDescriptor[] = [
     key: "workflows.create_default",
     role: "DEFAULT",
     displayName: "New workflow model",
-    description:
-      "Model written into the LLM nodes of a freshly created workflow.",
+    description: "Starts new workflows with a ready-to-use model.",
   },
 
   // FAST — assistive / background surfaces.

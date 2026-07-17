@@ -150,7 +150,7 @@ describe("addEnvs", () => {
   // Nodes own their LLM config (spec_version 1.5): there is no
   // workflow-level default to fall back to at dispatch time. See
   // specs/workflows/workflow-node-owned-llm.feature.
-  describe("node-owned LLM configs", () => {
+  describe("when LLM configs are node-owned", () => {
     beforeEach(() => {
       vi.mocked(prisma.projectSecret.findMany).mockResolvedValue([]);
     });

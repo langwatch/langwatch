@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 
 import type { LLMConfig } from "../../optimization_studio/types/dsl";
 import { DEFAULT_MODEL } from "../../utils/constants";
+import { ModelNotConfiguredError } from "../modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "../modelProviders/resolveModelForFeature";
 
 type LlmParamLike = {
@@ -71,11 +72,19 @@ export const materializeNodeLlmConfigs = async ({
 
   let fallback: LLMConfig | undefined = legacyDefault;
   if (!fallback) {
-    const resolved = await resolveModelForFeature("workflows.create_default", {
-      prisma,
-      projectId,
-    }).catch(() => null);
-    fallback = { model: resolved?.model ?? DEFAULT_MODEL };
+    let resolvedModel: string | undefined;
+    try {
+      const resolved = await resolveModelForFeature(
+        "workflows.create_default",
+        { prisma, projectId },
+      );
+      resolvedModel = resolved.model;
+    } catch (error) {
+      // Only "nothing configured at any scope" falls back to the registry
+      // flagship — infrastructure failures must not silently pin a model.
+      if (!(error instanceof ModelNotConfiguredError)) throw error;
+    }
+    fallback = { model: resolvedModel ?? DEFAULT_MODEL };
   }
 
   for (const param of modellessParams) {

@@ -64,6 +64,8 @@ func TestParamLLMConfig_NullValueYieldsNoModel(t *testing.T) {
 // The engine-level guard: a signature node with no usable model fails
 // with the typed llm_model_not_set error instead of dispatching an
 // empty model for the gateway to 400 on.
+//
+// @scenario "The Go engine fails a modelless signature node with a typed error"
 func TestRunSignature_FailsClearlyWithoutModel(t *testing.T) {
 	core, _ := observer.New(zapcore.DebugLevel)
 	ctx := clog.Set(context.Background(), zap.New(core))

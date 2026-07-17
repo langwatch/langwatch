@@ -335,7 +335,7 @@ export const workflowJsonSchema = z
   })
   .passthrough();
 
-export const LATEST_SPEC_VERSION = "1.5";
+export const LATEST_SPEC_VERSION = "1.5" as const;
 
 export type Workflow = {
   spec_version: typeof LATEST_SPEC_VERSION;

@@ -27,7 +27,7 @@ export const useModelProviderKeys = ({
         "data" in node && typeof node.data === "object"
           ? (node.data as Signature).parameters
               ?.filter((p) => p.type === "llm")
-              .map((p) => (p.value as LLMConfig | undefined)?.model.split("/")[0])
+              .map((p) => (p.value as LLMConfig | undefined)?.model?.split("/")[0])
           : [],
       )
       .filter(
@@ -41,7 +41,7 @@ export const useModelProviderKeys = ({
   );
 
   for (const llm of extra_llms ?? []) {
-    const provider = llm.model.split("/")[0];
+    const provider = llm.model?.split("/")[0];
     if (provider) {
       nodeProviders.add(provider);
     }

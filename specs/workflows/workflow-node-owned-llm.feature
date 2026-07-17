@@ -24,34 +24,34 @@ Feature: Every LLM node owns its config; workflow-level default_llm is removed
   # runs already follow this exact pattern.
 
   Background:
-    Given a project whose scope chain has no model default configs at any tier
+    Given a project with no default models configured at any level
 
   # ============================================================================
-  # Creation: persisted DSLs always carry node-owned models
+  # Creation: saved workflows always carry node-owned models
   # ============================================================================
 
   @integration
-  Scenario: Creating a workflow on a fresh install materializes the registry flagship
-    When the user creates a workflow from a template with a modelless LLM node
-    Then the persisted LLM node carries the registry flagship model
-    And the persisted model is not empty
+  Scenario: Creating a workflow on a fresh install starts it with a ready-to-use model
+    When the user creates a workflow from a template without picking a model
+    Then the saved LLM node carries the platform's flagship model
+    And the saved model is not empty
 
   @integration
-  Scenario: Creating a workflow uses the cascade-resolved default when one is configured
-    Given a model default config at the project tier with a DEFAULT role model
-    When the user creates a workflow from a template with a modelless LLM node
-    Then the persisted LLM node carries the cascade-resolved model for "workflows.create_default"
+  Scenario: Creating a workflow uses the configured default model when one is set
+    Given a default model configured for the project
+    When the user creates a workflow from a template without picking a model
+    Then the saved LLM node carries the configured default model
 
   @integration
-  Scenario: A legacy client sending default_llm has it folded into the nodes
-    When a workflow is created with a legacy default_llm and a modelless LLM node
-    Then the persisted LLM node carries the legacy default model
-    And the persisted DSL has no default_llm field
+  Scenario: A workflow created by an older client keeps its old workflow-wide model
+    When a workflow is created by an older client that still sends a workflow-wide model
+    Then the saved LLM node carries that model
+    And the saved workflow no longer has a workflow-wide model
 
   @integration
   Scenario: An explicit node-owned model is never rewritten
     When a workflow is created whose LLM node already carries a model
-    Then the persisted LLM node keeps that model
+    Then the saved LLM node keeps that model
 
   @unit
   Scenario: Dragging a new signature node seeds it with the resolved default
@@ -78,21 +78,21 @@ Feature: Every LLM node owns its config; workflow-level default_llm is removed
     And the run path reports the missing model clearly
 
   @integration
-  Scenario: Published workflows run through the API migrate on read
-    Given a published workflow version persisted at spec_version 1.4 relying on default_llm
+  Scenario: Published workflows saved before the change still run with their old model
+    Given a published workflow saved before models lived on each node, relying on the workflow-wide model
     When it is executed through the workflow run API
-    Then its LLM nodes dispatch with the folded model
+    Then its LLM nodes dispatch with that model filled in
 
   # ============================================================================
   # Execution: a modelless node fails clearly, never an opaque 500
   # ============================================================================
 
   @integration
-  Scenario: post_event rejects a modelless LLM node as a configuration error
+  Scenario: Running a workflow with a modelless LLM node is rejected as a fixable problem
     When an execute event reaches the server with an LLM node that has no model
-    Then the response is a 422 with the LLM_MODEL_NOT_SET cause
+    Then the run is rejected as a configuration problem the user can fix
     And the error names the node and says to choose a model
-    And the error is not captured as a server fault
+    And it is not reported as a server fault
 
   @unit
   Scenario: The Go engine fails a modelless signature node with a typed error

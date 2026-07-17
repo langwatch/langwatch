@@ -67,6 +67,7 @@ describe.skipIf(isTestcontainersOnly)(
       await prisma.organization.delete({ where: { id: organizationId } });
     });
 
+    /** @scenario Running a workflow with a modelless LLM node is rejected as a fixable problem */
     it("returns 422 with the typed cause and the node name, not an opaque 500", async () => {
       const { app } = await import("../workflows");
 
