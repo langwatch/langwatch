@@ -6,7 +6,9 @@ import {
   readJobRoutingMeta,
 } from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
 import { RedisJobBlobStore } from "~/server/event-sourcing/queues/groupQueue/redisJobBlobStore";
+import { DLQ_RETENTION_SECONDS } from "~/server/event-sourcing/queues/groupQueue/blobConstants";
 import {
+  BLOB_LEASE_HELPER_LUA,
   GROUP_QUEUE_REGISTRY_KEY,
   PARK_HELPER_LUA,
   TTL_HELPER_LUA,
@@ -119,7 +121,9 @@ end
 return totalDropped
 `;
 
-const MOVE_TO_DLQ_LUA = `
+const MOVE_TO_DLQ_LUA =
+  BLOB_LEASE_HELPER_LUA +
+  `
 local srcJobsKey   = KEYS[1]
 local srcDataKey   = KEYS[2]
 local activeKey    = KEYS[3]
@@ -135,6 +139,10 @@ local strikesKey   = KEYS[12]
 local groupId      = ARGV[1]
 local ttl          = tonumber(ARGV[2])
 
+-- Key prefix ("<queue>:gq:") recovered from srcJobsKey so the blob-lease
+-- extension can derive blob keys without threading an extra ARGV.
+local kp = string.sub(srcJobsKey, 1, string.find(srcJobsKey, "group:", 1, true) - 1)
+
 local jobs = redis.call("ZRANGE", srcJobsKey, 0, -1, "WITHSCORES")
 local count = #jobs / 2
 if count > 0 then
@@ -146,6 +154,12 @@ end
 local data = redis.call("HGETALL", srcDataKey)
 for i = 1, #data, 2 do
   redis.call("HSET", dstDataKey, data[i], data[i+1])
+  -- The value now outlives the live queue: extend its redis-tier blob lease to
+  -- cover DLQ retention (ADR-046) so a replay within the window finds its body.
+  local projectId, hash = gqParseRedisBlobRef(data[i+1])
+  if projectId then
+    redis.call("EXPIRE", kp .. "blob:" .. projectId .. "/" .. hash, ttl, "GT")
+  end
 end
 
 local errorData = redis.call("HGETALL", srcErrorKey)
@@ -180,6 +194,7 @@ return count
 const REPLAY_FROM_DLQ_LUA =
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
+  BLOB_LEASE_HELPER_LUA +
   `
 local dlqJobsKey   = KEYS[1]
 local dlqDataKey   = KEYS[2]
@@ -192,6 +207,10 @@ local dlqIndexKey  = KEYS[8]
 local groupId      = ARGV[1]
 local nowMs        = tonumber(ARGV[2])
 
+-- Key prefix ("<queue>:gq:") recovered from dlqJobsKey so the blob-lease
+-- renewal can derive blob keys without threading an extra ARGV.
+local kp = string.sub(dlqJobsKey, 1, string.find(dlqJobsKey, "dlq:", 1, true) - 1)
+
 local jobs = redis.call("ZRANGE", dlqJobsKey, 0, -1, "WITHSCORES")
 local count = #jobs / 2
 if count > 0 then
@@ -203,6 +222,12 @@ end
 local data = redis.call("HGETALL", dlqDataKey)
 for i = 1, #data, 2 do
   redis.call("HSET", dstDataKey, data[i], data[i+1])
+  -- Replayed values re-enter the live flow: renew their blob leases so the
+  -- imminent dispatch finds the bodies even after a long DLQ dwell (ADR-046).
+  local projectId, hash = gqParseRedisBlobRef(data[i+1])
+  if projectId then
+    redis.call("EXPIRE", kp .. "blob:" .. projectId .. "/" .. hash, ${DLQ_RETENTION_SECONDS}, "GT")
+  end
 end
 
 redis.call("DEL", dlqJobsKey)
@@ -228,7 +253,6 @@ return count
 // ── Constants ────────────────────────────────────────────────────────
 
 const SUMMARY_TOP_N = 200;
-const DLQ_TTL_SECONDS = 604800;
 const SSCAN_BATCH = 500;
 const PENDING_RECONCILE_SCAN_COUNT = 1000;
 
@@ -983,7 +1007,7 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}dlq`,
       `${prefix}group:${params.groupId}:strikes`,
       params.groupId,
-      String(DLQ_TTL_SECONDS),
+      String(DLQ_RETENTION_SECONDS),
     );
     return { jobsMoved: Number(result) };
   }
@@ -1040,7 +1064,7 @@ export class QueueRedisRepository implements QueueRepository {
           `${prefix}dlq`,
           `${prefix}group:${groupId}:strikes`,
           groupId,
-          String(DLQ_TTL_SECONDS),
+          String(DLQ_RETENTION_SECONDS),
         );
       }
       const results = await pipeline.exec();

@@ -15,6 +15,7 @@ import {
   getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
 import { GroupQueueProcessor } from "../groupQueue";
+import { InMemoryObjectStore } from "./blobTestDoubles";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 
 // Skip when running without testcontainers (unit-only test runs)
@@ -73,10 +74,20 @@ describe.skipIf(!hasTestcontainers)(
     function createQueue(
       processFn: (payload: TestPayload) => Promise<void>,
       overrides?: Partial<EventSourcedQueueDefinition<TestPayload>>,
+      options?: { objectStore?: InMemoryObjectStore },
     ): GroupQueueProcessor<TestPayload> {
       const queue = new GroupQueueProcessor<TestPayload>(
         createQueueDefinition({ process: processFn, ...overrides }),
         redis,
+        options?.objectStore
+          ? {
+              objectStoreFor: () => options.objectStore!,
+              resolveStorageDestination: async () => ({
+                kind: "s3",
+                bucket: "test-bucket",
+              }),
+            }
+          : undefined,
       );
       queues.push(queue);
       return queue;
@@ -210,142 +221,132 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("envelope blob offload", () => {
-      describe("when a payload exceeds the blob offload threshold", () => {
-        it("stores the body under a blob key, delivers it intact, and deletes the blob on completion", async () => {
-          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
-          try {
-            const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
-            const blobKeysDuringProcessing: string[] = [];
-            const processed = vi.fn(async (_payload: TestPayload) => {
-              blobKeysDuringProcessing.push(
-                ...(await redis.keys(`${queueName}:gq:blob:*`)),
-              );
-            });
-
-            const queue = createQueue(processed, { name: queueName });
-            await queue.waitUntilReady();
-
-            const bigValue = "z".repeat(64 * 1024);
-            await queue.send({
-              id: "big-1",
-              groupId: "group-a",
-              value: bigValue,
-            });
-
-            await vi.waitFor(
-              () => {
-                expect(processed).toHaveBeenCalledTimes(1);
-              },
-              { timeout: 5000, interval: 50 },
+      describe("when a payload exceeds the inline ceiling", () => {
+        it("stores the body under a blob key, delivers it intact, and leaves the blob to its lease", async () => {
+          const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
+          const blobKeysDuringProcessing: string[] = [];
+          const processed = vi.fn(async (_payload: TestPayload) => {
+            blobKeysDuringProcessing.push(
+              ...(await redis.keys(`${queueName}:gq:blob:*`)),
             );
+          });
 
-            expect(processed.mock.calls[0]![0].value).toBe(bigValue);
-            expect(blobKeysDuringProcessing).toHaveLength(1);
+          const queue = createQueue(
+            processed,
+            { name: queueName },
+            { objectStore: new InMemoryObjectStore() },
+          );
+          await queue.waitUntilReady();
 
-            await vi.waitFor(
-              async () => {
-                expect(await redis.keys(`${queueName}:gq:blob:*`)).toHaveLength(
-                  0,
-                );
-              },
-              { timeout: 5000, interval: 50 },
-            );
-          } finally {
-            vi.unstubAllEnvs();
-          }
+          const bigValue = "z".repeat(64 * 1024);
+          await queue.send({
+            id: "big-1",
+            groupId: "proj_test/group-a",
+            value: bigValue,
+          });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+
+          expect(processed.mock.calls[0]![0].value).toBe(bigValue);
+          expect(blobKeysDuringProcessing).toHaveLength(1);
+
+          // ADR-046: completion reclaims nothing — the blob lives out its lease.
+          const blobs = await redis.keys(`${queueName}:gq:blob:*`);
+          expect(blobs).toHaveLength(1);
+          expect(await redis.ttl(blobs[0]!)).toBeGreaterThan(0);
         });
 
-        it("sets a TTL safety net on the blob key", async () => {
-          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
-          try {
-            const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
-            let release: () => void;
-            const gate = new Promise<void>((resolve) => {
-              release = resolve;
-            });
-            const processed = vi.fn(async (_payload: TestPayload) => {
-              await gate;
-            });
+        it("sets the lease TTL on the blob key at stage time", async () => {
+          const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
+          let release: () => void;
+          const gate = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          const processed = vi.fn(async (_payload: TestPayload) => {
+            await gate;
+          });
 
-            const queue = createQueue(processed, { name: queueName });
-            await queue.waitUntilReady();
-            await queue.send({
-              id: "big-2",
-              groupId: "group-a",
-              value: "z".repeat(64 * 1024),
-            });
+          const queue = createQueue(
+            processed,
+            { name: queueName },
+            { objectStore: new InMemoryObjectStore() },
+          );
+          await queue.waitUntilReady();
+          await queue.send({
+            id: "big-2",
+            groupId: "proj_test/group-a",
+            value: "z".repeat(64 * 1024),
+          });
 
-            await vi.waitFor(
-              async () => {
-                expect(await redis.keys(`${queueName}:gq:blob:*`)).toHaveLength(
-                  1,
-                );
-              },
-              { timeout: 5000, interval: 50 },
-            );
-            const [blobKey] = await redis.keys(`${queueName}:gq:blob:*`);
-            expect(await redis.ttl(blobKey!)).toBeGreaterThan(0);
-            release!();
-          } finally {
-            vi.unstubAllEnvs();
-          }
+          await vi.waitFor(
+            async () => {
+              expect(await redis.keys(`${queueName}:gq:blob:*`)).toHaveLength(
+                1,
+              );
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          const [blobKey] = await redis.keys(`${queueName}:gq:blob:*`);
+          expect(await redis.ttl(blobKey!)).toBeGreaterThan(0);
+          release!();
         });
       });
 
-      // Regression for the 2026-06-11 Redis capacity incident: a dedup squash
-      // displaced a blob-backed payload but nothing reclaimed the displaced
-      // blob, so ~280K orphans (~7.4 GB) accumulated until their 7-day TTL. The
-      // `delay` keeps both sends in staging so the second squash-replaces the
-      // first in place (the production path: a reactor re-folding a turn).
+      // ADR-046: a dedup squash's displaced blob is deliberately left to its
+      // lease (the eager-reclaim refcount that once handled it was removed
+      // after the 2026-07-09 phantom-hold leak). These tests pin the lease
+      // behaviour: the surviving value resolves, nothing is deleted, and
+      // every blob carries a finite TTL. The `delay` keeps both sends in
+      // staging so the second squash-replaces the first in place.
       describe("when a dedup squash displaces a large payload", () => {
         const bigPayload = (filler: string): TestPayload => ({
           id: "dup",
-          groupId: "group-a",
+          groupId: "proj_test/group-a",
           value: filler.repeat(64 * 1024),
         });
 
-        it("reclaims the displaced old blob on replace so it cannot leak", async () => {
-          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
-          try {
-            const queueName = `{test/gq/blob-dedup-${crypto.randomUUID().slice(0, 8)}}`;
-            const queue = createQueue(vi.fn().mockResolvedValue(undefined), {
+        it("leaves the displaced old blob to its lease and keeps the new value staged", async () => {
+          const queueName = `{test/gq/blob-dedup-${crypto.randomUUID().slice(0, 8)}}`;
+          const queue = createQueue(
+            vi.fn().mockResolvedValue(undefined),
+            {
               name: queueName,
               delay: 60_000,
               deduplication: { makeId: (p) => p.id, ttlMs: 120_000 },
-            });
-            await queue.waitUntilReady();
+            },
+            { objectStore: new InMemoryObjectStore() },
+          );
+          await queue.waitUntilReady();
 
-            await queue.send(bigPayload("a"));
-            const [firstBlob] = await redis.keys(`${queueName}:gq:blob:*`);
-            expect(firstBlob).toBeDefined();
+          await queue.send(bigPayload("a"));
+          const [firstBlob] = await redis.keys(`${queueName}:gq:blob:*`);
+          expect(firstBlob).toBeDefined();
 
-            // Squash-replace: a fresh blob is staged and the first is displaced.
-            await queue.send(bigPayload("b"));
+          // Squash-replace: a fresh blob is staged; the displaced one is left
+          // to its lease rather than reclaimed.
+          await queue.send(bigPayload("b"));
 
-            // The displaced blob is reclaimed fire-and-forget; only the new
-            // one survives.
-            await vi.waitFor(
-              async () => {
-                const blobs = await redis.keys(`${queueName}:gq:blob:*`);
-                expect(blobs).toHaveLength(1);
-                expect(blobs).not.toContain(firstBlob);
-              },
-              { timeout: 5000, interval: 50 },
-            );
-            // Staging holds exactly the one squashed job, referencing the new blob.
-            expect(
-              await redis.hlen(`${queueName}:gq:group:group-a:data`),
-            ).toBe(1);
-          } finally {
-            vi.unstubAllEnvs();
+          const blobs = await redis.keys(`${queueName}:gq:blob:*`);
+          expect(blobs).toHaveLength(2);
+          for (const key of blobs) {
+            expect(await redis.ttl(key)).toBeGreaterThan(0);
           }
+          // Staging holds exactly the one squashed job, referencing the new blob.
+          expect(
+            await redis.hlen(`${queueName}:gq:group:proj_test/group-a:data`),
+          ).toBe(1);
         });
 
-        it("reclaims the discarded new blob when the existing payload is kept (replace:false)", async () => {
-          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
-          try {
-            const queueName = `{test/gq/blob-keep-${crypto.randomUUID().slice(0, 8)}}`;
-            const queue = createQueue(vi.fn().mockResolvedValue(undefined), {
+        it("keeps the existing payload's blob on replace:false and leaves the discarded one to its lease", async () => {
+          const queueName = `{test/gq/blob-keep-${crypto.randomUUID().slice(0, 8)}}`;
+          const queue = createQueue(
+            vi.fn().mockResolvedValue(undefined),
+            {
               name: queueName,
               delay: 60_000,
               deduplication: {
@@ -354,31 +355,24 @@ describe.skipIf(!hasTestcontainers)(
                 extend: false,
                 replace: false,
               },
-            });
-            await queue.waitUntilReady();
+            },
+            { objectStore: new InMemoryObjectStore() },
+          );
+          await queue.waitUntilReady();
 
-            await queue.send(bigPayload("a"));
-            const [keptBlob] = await redis.keys(`${queueName}:gq:blob:*`);
-            expect(keptBlob).toBeDefined();
+          await queue.send(bigPayload("a"));
+          const [keptBlob] = await redis.keys(`${queueName}:gq:blob:*`);
+          expect(keptBlob).toBeDefined();
 
-            // Dedup hit without replace: the new value never lands, its blob is
-            // discarded and reclaimed fire-and-forget; the original blob stays.
-            await queue.send(bigPayload("b"));
+          // Dedup hit without replace: the new value never lands; its blob is
+          // left to its lease and the original stays referenced.
+          await queue.send(bigPayload("b"));
 
-            await vi.waitFor(
-              async () => {
-                expect(await redis.keys(`${queueName}:gq:blob:*`)).toEqual([
-                  keptBlob,
-                ]);
-              },
-              { timeout: 5000, interval: 50 },
-            );
-            expect(
-              await redis.hlen(`${queueName}:gq:group:group-a:data`),
-            ).toBe(1);
-          } finally {
-            vi.unstubAllEnvs();
-          }
+          const blobs = await redis.keys(`${queueName}:gq:blob:*`);
+          expect(blobs).toContain(keptBlob);
+          expect(
+            await redis.hlen(`${queueName}:gq:group:proj_test/group-a:data`),
+          ).toBe(1);
         });
       });
     });

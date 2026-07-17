@@ -9,60 +9,14 @@ import {
   decodeJobEnvelope,
   encodeJobEnvelope,
   PayloadTooLargeError,
-  readEnvelopeHold,
-  readEnvelopeRetirement,
+  readEnvelopeDescriptor,
   readJobRoutingMeta,
+  splitEnvelope,
 } from "../jobEnvelope";
 import { TieredBlobStore } from "../tieredBlobStore";
 import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blobTestDoubles";
 
 describe("jobEnvelope", () => {
-  beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  describe("given envelope writes are not enabled", () => {
-    const payload = {
-      __pipelineName: "traces",
-      __jobType: "command",
-      __jobName: "recordSpan",
-      bulk: "x".repeat(4096),
-    };
-
-    beforeEach(() => {
-      // Set "false" rather than unset: under the vmThreads pool process.env is
-      // shared and aggressively recycled, and vi.stubEnv(key, undefined) clears
-      // it via the metaEnv proxy's *delete* path (no deleteProperty trap — it
-      // only works by defaulting through to process.env), which races the
-      // outer "true" stub. Writing a value goes through the proxy set trap,
-      // which reliably forwards. Any non-"true" value exercises the same
-      // envelopeWritesEnabled() === false branch.
-      vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "false");
-    });
-
-    describe("when encoding", () => {
-      it("writes legacy bare JSON that a previous-release JSON.parse reader accepts", async () => {
-        const encoded = await encodeJobEnvelope({ jobData: payload });
-        expect(encoded.startsWith("GQ1|")).toBe(false);
-        expect(JSON.parse(encoded)).toEqual(payload);
-      });
-
-      it("still decodes and exposes routing meta through the dual readers", async () => {
-        const encoded = await encodeJobEnvelope({ jobData: payload });
-        expect(await decodeJobEnvelope({ value: encoded })).toEqual(payload);
-        expect(readJobRoutingMeta(encoded)).toEqual({
-          pipelineName: "traces",
-          jobType: "command",
-          jobName: "recordSpan",
-        });
-      });
-    });
-  });
-
   describe("given a payload over the compression threshold", () => {
     const largePayload = {
       __pipelineName: "traces",
@@ -82,7 +36,7 @@ describe("jobEnvelope", () => {
 
       it("stores the body gzip-compressed and smaller than the raw JSON", async () => {
         const encoded = await encodeJobEnvelope({ jobData: largePayload });
-        expect(encoded.startsWith("GQ1|")).toBe(true);
+        expect(encoded.startsWith("GQ2|")).toBe(true);
         expect(encoded).toContain('"e":"gz"');
         expect(encoded.length).toBeLessThan(
           JSON.stringify(largePayload).length,
@@ -165,7 +119,10 @@ describe("jobEnvelope", () => {
     });
   });
 
-  describe("given a payload over the blob offload threshold", () => {
+  describe("given a legacy GQ1 ref envelope staged by an earlier release", () => {
+    // GQ1 writes were retired by ADR-046; the READ path must keep resolving
+    // in-flight GQ1 values until their TTLs pass. Values here are crafted the
+    // way the retired writer produced them.
     const hugePayload = {
       __pipelineName: "traces",
       __jobType: "command",
@@ -173,80 +130,76 @@ describe("jobEnvelope", () => {
       bulk: "y".repeat(64 * 1024),
     };
 
-    describe("when a blob store is provided", () => {
-      it("offloads the body to the store and leaves a tiny ref envelope", async () => {
-        const blobs = new InMemoryJobBlobStore();
-        const encoded = await encodeJobEnvelope({
-          jobData: hugePayload,
-          blobs,
-        });
-        expect(encoded).toContain('"e":"ref"');
-        expect(encoded.length).toBeLessThan(256);
-        expect(blobs.store.size).toBe(1);
-        expect(readJobRoutingMeta(encoded)).toEqual({
-          pipelineName: "traces",
-          jobType: "command",
-          jobName: "recordSpan",
-        });
+    function gq1RefValue(blobId: string): string {
+      const header = JSON.stringify({
+        v: 1,
+        e: "ref",
+        r: blobId,
+        p: "traces",
+        t: "command",
+        n: "recordSpan",
       });
+      return `GQ1|${Buffer.byteLength(header)}|${header}`;
+    }
 
-      it("round-trips the payload through the store", async () => {
-        const blobs = new InMemoryJobBlobStore();
-        const encoded = await encodeJobEnvelope({
-          jobData: hugePayload,
-          blobs,
-        });
-        expect(await decodeJobEnvelope({ value: encoded, blobs })).toEqual(
-          hugePayload,
-        );
+    async function seededStore(blobId: string): Promise<InMemoryJobBlobStore> {
+      const blobs = new InMemoryJobBlobStore();
+      await blobs.put({
+        id: blobId,
+        data: gzipSync(Buffer.from(JSON.stringify(hugePayload), "utf8")),
       });
+      return blobs;
+    }
 
-      it("exposes the blob id for completion-time deletion", async () => {
-        const blobs = new InMemoryJobBlobStore();
-        const encoded = await encodeJobEnvelope({
-          jobData: hugePayload,
-          blobs,
-        });
-        const { blobId } = readEnvelopeRetirement(encoded);
-        expect(blobId).not.toBeNull();
-        expect(blobs.store.has(blobId!)).toBe(true);
-      });
-
-      it("rejects decode when the blob is missing or no store is given", async () => {
-        const blobs = new InMemoryJobBlobStore();
-        const encoded = await encodeJobEnvelope({
-          jobData: hugePayload,
-          blobs,
-        });
-        await expect(decodeJobEnvelope({ value: encoded })).rejects.toThrow(
-          /blob store/,
-        );
-        blobs.store.clear();
-        await expect(
-          decodeJobEnvelope({ value: encoded, blobs }),
-        ).rejects.toThrow(/missing/);
-      });
+    it("round-trips the payload through the store", async () => {
+      const blobs = await seededStore("legacy-blob-1");
+      const encoded = gq1RefValue("legacy-blob-1");
+      expect(await decodeJobEnvelope({ value: encoded, blobs })).toEqual(
+        hugePayload,
+      );
     });
 
-    describe("when no blob store is provided", () => {
-      it("falls back to inline gzip+base64", async () => {
-        const encoded = await encodeJobEnvelope({ jobData: hugePayload });
-        expect(encoded).toContain('"e":"gz"');
-        expect(await decodeJobEnvelope({ value: encoded })).toEqual(
-          hugePayload,
-        );
+    it("exposes routing meta and the blob id from the header alone", async () => {
+      const encoded = gq1RefValue("legacy-blob-2");
+      expect(readJobRoutingMeta(encoded)).toEqual({
+        pipelineName: "traces",
+        jobType: "command",
+        jobName: "recordSpan",
       });
+      expect(readEnvelopeDescriptor(encoded).blobId).toBe("legacy-blob-2");
+    });
+
+    it("rejects decode when the blob is missing or no store is given", async () => {
+      const blobs = await seededStore("legacy-blob-3");
+      const encoded = gq1RefValue("legacy-blob-3");
+      await expect(decodeJobEnvelope({ value: encoded })).rejects.toThrow(
+        /blob store/,
+      );
+      blobs.store.clear();
+      await expect(
+        decodeJobEnvelope({ value: encoded, blobs }),
+      ).rejects.toThrow(/missing/);
+    });
+  });
+
+  describe("given a large payload with no tiered store available", () => {
+    it("downgrades to an inline GQ2 gz body rather than GQ1", async () => {
+      const hugePayload = { __jobName: "big", bulk: "y".repeat(64 * 1024) };
+      const encoded = await encodeJobEnvelope({ jobData: hugePayload });
+      expect(encoded.startsWith("GQ2|")).toBe(true);
+      expect(encoded).toContain('"e":"gz"');
+      expect(await decodeJobEnvelope({ value: encoded })).toEqual(hugePayload);
     });
   });
 
   describe("given an inline-body envelope", () => {
-    it("carries no retirement blob id", async () => {
+    it("carries no blob id in its descriptor", async () => {
       const encoded = await encodeJobEnvelope({
         jobData: { __jobName: "tiny", value: 1 },
       });
-      expect(readEnvelopeRetirement(encoded).blobId).toBeNull();
-      expect(readEnvelopeRetirement('{"legacy":true}').blobId).toBeNull();
-      expect(readEnvelopeRetirement("GQ1|nonsense").blobId).toBeNull();
+      expect(readEnvelopeDescriptor(encoded).blobId).toBeNull();
+      expect(readEnvelopeDescriptor('{"legacy":true}').blobId).toBeNull();
+      expect(readEnvelopeDescriptor("GQ1|nonsense").blobId).toBeNull();
     });
   });
 
@@ -421,7 +374,7 @@ describe("jobEnvelope", () => {
         });
 
         expect(encoded.startsWith("GQ2|")).toBe(true);
-        expect(readEnvelopeHold(encoded)).toBeNull();
+        expect(splitEnvelope(encoded).header.ref).toBeUndefined();
         expect(
           await decodeJobEnvelope({ value: encoded, tieredBlobs }),
         ).toEqual(payload);
@@ -446,7 +399,7 @@ describe("jobEnvelope", () => {
         });
 
         expect(encoded).toContain('"e":"redis"');
-        expect(readEnvelopeHold(encoded)?.ref).toMatchObject({
+        expect(splitEnvelope(encoded).header.ref).toMatchObject({
           tier: "redis",
           projectId: PROJECT,
         });
@@ -466,7 +419,7 @@ describe("jobEnvelope", () => {
         });
 
         expect(encoded).toContain('"e":"s3"');
-        expect(readEnvelopeHold(encoded)?.ref.tier).toBe("s3");
+        expect(splitEnvelope(encoded).header.ref?.tier).toBe("s3");
         expect(objectStore.store.size).toBe(1);
         expect(
           await decodeJobEnvelope({ value: encoded, tieredBlobs }),
@@ -487,7 +440,7 @@ describe("jobEnvelope", () => {
         });
       });
 
-      it("stores one copy for byte-identical payloads, with distinct hold tokens", async () => {
+      it("stores one copy for byte-identical payloads (no per-stage tokens)", async () => {
         const { tieredBlobs, redisBlobs } = makeTiered();
 
         const e1 = await encodeJobEnvelope({
@@ -502,12 +455,12 @@ describe("jobEnvelope", () => {
         });
 
         expect(redisBlobs.store.size).toBe(1);
-        // One shared blob ref, but a distinct per-stage hold token each time —
-        // so N fan-out jobs share one body yet each holds its own reference.
-        expect(readEnvelopeHold(e1)?.ref).toEqual(readEnvelopeHold(e2)?.ref);
-        expect(readEnvelopeHold(e1)?.token).not.toBe(
-          readEnvelopeHold(e2)?.token,
+        // One shared blob ref; under leases (ADR-046) no hold token is minted,
+        // so byte-identical payloads produce byte-identical envelopes.
+        expect(splitEnvelope(e1).header.ref).toEqual(
+          splitEnvelope(e2).header.ref,
         );
+        expect(splitEnvelope(e1).header.h).toBeUndefined();
       });
 
       it("rejects decode when the tiered blob is missing or no store is given", async () => {

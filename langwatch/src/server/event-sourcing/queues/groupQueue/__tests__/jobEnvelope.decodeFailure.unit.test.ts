@@ -28,7 +28,6 @@ describe("jobEnvelope decode failures", () => {
   const projectId = createTenantId("project_5538");
 
   beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -84,15 +83,13 @@ describe("jobEnvelope decode failures", () => {
   });
 
   describe("given a legacy GQ1 envelope whose offloaded blob is gone", () => {
+    // GQ1 writes were retired (ADR-046); the value is crafted the way the
+    // retired writer produced it so the READ path stays covered.
     describe("when it is decoded", () => {
       it("names the failure missing_blob", async () => {
         const blobs = new InMemoryJobBlobStore();
-        const encoded = await encodeJobEnvelope({
-          jobData: offloadable(),
-          blobs,
-          projectId,
-        });
-        blobs.store.clear();
+        const header = JSON.stringify({ v: 1, e: "ref", r: "gone-blob" });
+        const encoded = `GQ1|${Buffer.byteLength(header)}|${header}`;
 
         const err = await decodeJobEnvelope({ value: encoded, blobs })
           .then(() => null)
@@ -357,13 +354,13 @@ describe("jobEnvelope decode failures", () => {
     });
 
     describe("given a legacy GQ1 envelope", () => {
-      it("reports the offloaded blob id", async () => {
-        const blobs = new InMemoryJobBlobStore();
-        const encoded = await encodeJobEnvelope({
-          jobData: offloadable(),
-          blobs,
-          projectId,
+      it("reports the offloaded blob id", () => {
+        const header = JSON.stringify({
+          v: 1,
+          e: "ref",
+          r: "0f7cf1c2-8e60-4b32-9a25-1f4dbf6f2a11",
         });
+        const encoded = `GQ1|${Buffer.byteLength(header)}|${header}`;
 
         const d = readEnvelopeDescriptor(encoded);
 

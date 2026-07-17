@@ -18,8 +18,7 @@ import {
 } from "../../../__tests__/integration/testContainers";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
-import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
-import { encodeJobEnvelope, readEnvelopeHold } from "../jobEnvelope";
+import { encodeJobEnvelope } from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
 import { GroupStagingScripts } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -72,7 +71,6 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     beforeEach(() => {
-      vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
       queues = [];
     });
 
@@ -223,10 +221,9 @@ describe.skipIf(!hasTestcontainers)(
           // named it a drop. Reverting removes gq_jobs_dropped_total entirely, so
           // dropsFor() stays empty and the waitFor above times out.
           expect(entry!.labels.reason).toBe("retry_encode_failed");
-          // Unlike every other reason, this one SHOULD release: the body was
-          // already read, so keeping it buys a later worker nothing — and holding
-          // it would leak the hold to the 4-day TTL backstop.
-          expect(objectStore.deleted.length).toBeGreaterThan(0);
+          // ADR-046: nothing releases — the already-read body lives out its
+          // lease rather than being deleted.
+          expect(objectStore.deleted).toEqual([]);
           // AC8 still holds here: a discard is not a completion.
           expect(await completedStat(name)).toBeNull();
         });
@@ -308,7 +305,7 @@ describe.skipIf(!hasTestcontainers)(
     describe("given a staged job whose referenced blob is genuinely gone", () => {
       describe("when a worker claims the group and the decode fails", () => {
         /** @scenario a missing-blob drop releases the absent blob's holder */
-        it("releases the blob's holder", async () => {
+        it("counts the loss and deletes nothing (ADR-046: no releases)", async () => {
           const name = freshName();
           const groupId = `${TENANT}/missing-blob-release`;
           const objectStore = new InMemoryObjectStore();
@@ -333,17 +330,10 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 10000, interval: 100 },
           );
 
-          // The stated exemption (AC2a): a missing_blob drop DOES release —
-          // there is nothing left to preserve, so the holder is dropped.
-          // Revert-check: this currently passes either way (release() always
-          // ran pre-fix); its value is guarding the *other* reason branches
-          // don't regress into skipping this legitimate release.
-          await vi.waitFor(
-            () => {
-              expect(objectStore.deleted).toContain(uri);
-            },
-            { timeout: 5000, interval: 50 },
-          );
+          // ADR-046: nothing releases or deletes — the (already-gone) object
+          // stays gone, no application-side delete fires, and the loss is
+          // counted rather than compensated.
+          expect(objectStore.deleted).not.toContain(uri);
         });
       });
     });
@@ -667,24 +657,8 @@ describe.skipIf(!hasTestcontainers)(
             },
             tieredBlobs: encodeTiered,
             projectId: PROJECT,
-            writesEnabled: true,
             queueName: name,
           });
-
-          // Acquire the holder that `send()` would have. Staging via
-          // encodeJobEnvelope + stageBatch bypasses `blobLifecycle.acquire()`, so
-          // WITHOUT this there is no holder — release() would delete nothing and
-          // `flaky.deleted === []` would pass even with the fix reverted. Caught
-          // by review after I shipped exactly that vacuous assertion; verified by
-          // reverting the release rule and watching this test stay green.
-          const lifecycle = new EnvelopeBlobLifecycle({
-            redis,
-            queueName: name,
-            objectStoreFor: () => flaky,
-            resolveStorageDestination: STORAGE_DESTINATION,
-          });
-          await lifecycle.acquire(envelope);
-          expect(readEnvelopeHold(envelope)).not.toBeNull(); // the holder is real
 
           const scripts = new GroupStagingScripts(redis, name);
           await scripts.stageBatch([
@@ -717,10 +691,9 @@ describe.skipIf(!hasTestcontainers)(
           // never counted the loss — an operator saw nothing while an event
           // that could not possibly recover via replay was thrown away.
           expect(entry!.labels.reason).toBe("transient_exhausted");
-          // The terminal's OTHER deliberate change, which had no coverage until a
-          // review caught it: it no longer releases. Eight failed READS mean the
-          // STORE was unreachable, not that the blob is gone — most likely it is
-          // still there, so retiring it would delete a body that exists.
+          // ADR-046: nothing releases. Sustained failed READS mean the STORE
+          // was unreachable, not that the blob is gone — it is most likely
+          // still there and lives out its lease.
           expect(flaky.deleted).toEqual([]);
         });
       });

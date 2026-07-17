@@ -48,7 +48,6 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
   });
 
   beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
     queues = [];
   });
 
@@ -93,11 +92,10 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
   }
 
   const blobKeys = (name: string) => redis.keys(`${name}:gq:blob:*`);
-  const holderKeys = (name: string) => redis.keys(`${name}:gq:blobholders:*`);
 
   describe("given a job whose payload exceeds the inline ceiling", () => {
     describe("when it is processed to completion", () => {
-      it("resolves the full payload on dispatch and reclaims the blob + holder", async () => {
+      it("resolves the full payload on dispatch and leaves the blob to its lease", async () => {
         const received: TestPayload[] = [];
         const { queue, name } = createQueue({
           processFn: async (p) => {
@@ -120,14 +118,12 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
         });
         expect(received[0]!.value).toBe(OFFLOADED_VALUE);
 
-        // The blob and its holder set are eagerly reclaimed once the last holder completes.
-        await vi.waitFor(
-          async () => {
-            expect(await blobKeys(name)).toHaveLength(0);
-            expect(await holderKeys(name)).toHaveLength(0);
-          },
-          { timeout: 5000, interval: 50 },
-        );
+        // ADR-046: completion reclaims nothing — the blob stays, carrying a
+        // lease that the dispatch read just renewed.
+        const keys = await blobKeys(name);
+        expect(keys).toHaveLength(1);
+        const ttl = await redis.ttl(keys[0]!);
+        expect(ttl).toBeGreaterThan(0);
       });
     });
   });
@@ -136,8 +132,7 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
   // jobEnvelope.unit.test.ts ("when two envelopes have identical user payloads
   // but different queue machinery → ONE stored blob"). A queue-level end-to-end
   // proof requires multi-reactor wiring (multiple reactor definitions over one
-  // event) — out of scope for this single-reactor harness. The holder reclaim
-  // sequence itself is proven in blobHolders.integration.test.ts.
+  // event) — out of scope for this single-reactor harness.
   describe("given an offloaded job", () => {
     describe("when it is staged", () => {
       it("keys the blob by tenant namespace and content hash", async () => {

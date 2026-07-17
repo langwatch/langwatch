@@ -7,7 +7,6 @@ import {
   describe,
   expect,
   it,
-  vi,
 } from "vitest";
 
 import {
@@ -15,9 +14,10 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
+import { readBlobLeaseSeconds } from "../blobConstants";
 import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
-import { readEnvelopeHold } from "../jobEnvelope";
-import { InMemoryObjectStore, incompressible } from "./blobTestDoubles";
+import { isEnvelope, splitEnvelope } from "../jobEnvelope";
+import { incompressible, InMemoryObjectStore } from "./blobTestDoubles";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL ||
@@ -43,7 +43,6 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
   });
 
   beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
     queueName = `{test/lifecycle/${crypto.randomUUID().slice(0, 8)}}`;
     objectStore = new InMemoryObjectStore();
     lifecycle = new EnvelopeBlobLifecycle({
@@ -61,254 +60,137 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
     // Scoped to this suite's hash-tagged namespace, not a global flushall.
     const keys = await redis.keys("{test/lifecycle/*");
     if (keys.length > 0) await redis.del(...keys);
-    vi.unstubAllEnvs();
   });
 
   afterAll(async () => {
     await stopTestContainers();
   });
 
-  const holderKey = (hash: string) =>
-    `${queueName}:gq:blobholders:proj1/${hash}`;
   const blobKey = (hash: string) => `${queueName}:gq:blob:proj1/${hash}`;
-  const hashOf = (value: string) => readEnvelopeHold(value)!.ref.hash;
+  const hashOf = (value: string) => splitEnvelope(value).header.ref!.hash;
 
-  describe("given an offloaded value whose holder TTL was shortened", () => {
-    describe("when it is decoded", () => {
-      it("refreshes the holder set on access (so it outlives the blob)", async () => {
-        const value = await lifecycle.encode({
-          jobData: REDIS_TIER_PAYLOAD,
-          groupId: TENANT_GROUP,
-        });
-        lifecycle.acquire(value);
-        const key = holderKey(hashOf(value));
-        await vi.waitFor(async () => expect(await redis.scard(key)).toBe(1));
-        await redis.expire(key, 100);
-
-        const decoded = await lifecycle.decode({
-          value,
-          groupId: TENANT_GROUP,
-        });
-
-        expect(decoded).toEqual(REDIS_TIER_PAYLOAD);
-        await vi.waitFor(async () =>
-          expect(await redis.ttl(key)).toBeGreaterThan(100),
-        );
+  describe("given a redis-tier payload", () => {
+    it("offloads at encode with the lease TTL and round-trips on decode", async () => {
+      const value = await lifecycle.encode({
+        jobData: REDIS_TIER_PAYLOAD,
+        groupId: TENANT_GROUP,
       });
+
+      expect(isEnvelope(value)).toBe(true);
+      const key = blobKey(hashOf(value));
+      const ttlAtPut = await redis.ttl(key);
+      expect(ttlAtPut).toBeGreaterThan(0);
+      expect(ttlAtPut).toBeLessThanOrEqual(readBlobLeaseSeconds());
+
+      const decoded = await lifecycle.decode({
+        value,
+        groupId: TENANT_GROUP,
+      });
+      expect(decoded).toEqual(REDIS_TIER_PAYLOAD);
+    });
+
+    it("renews the blob lease on every worker read (ADR-046)", async () => {
+      const value = await lifecycle.encode({
+        jobData: REDIS_TIER_PAYLOAD,
+        groupId: TENANT_GROUP,
+      });
+      const key = blobKey(hashOf(value));
+      // Simulate a blob deep into its lease.
+      await redis.expire(key, 100);
+
+      await lifecycle.decode({ value, groupId: TENANT_GROUP });
+
+      expect(await redis.ttl(key)).toBeGreaterThan(100);
+    });
+
+    it("leaves the blob in place after decode — nothing eagerly reclaims", async () => {
+      const value = await lifecycle.encode({
+        jobData: REDIS_TIER_PAYLOAD,
+        groupId: TENANT_GROUP,
+      });
+      const key = blobKey(hashOf(value));
+
+      await lifecycle.decode({ value, groupId: TENANT_GROUP });
+      await lifecycle.decode({ value, groupId: TENANT_GROUP });
+
+      expect(await redis.exists(key)).toBe(1);
     });
   });
 
   describe("given an offloaded value decoded under a different tenant's group", () => {
-    describe("when it is decoded", () => {
-      it("refuses the cross-tenant read", async () => {
-        const value = await lifecycle.encode({
-          jobData: REDIS_TIER_PAYLOAD,
-          groupId: TENANT_GROUP,
-        });
-
-        await expect(
-          lifecycle.decode({ value, groupId: "proj2/agg" }),
-        ).rejects.toThrow(/tenant mismatch/i);
+    it("refuses the cross-tenant read", async () => {
+      const value = await lifecycle.encode({
+        jobData: REDIS_TIER_PAYLOAD,
+        groupId: TENANT_GROUP,
       });
+
+      await expect(
+        lifecycle.decode({ value, groupId: "proj2/agg" }),
+      ).rejects.toThrow(/tenant mismatch/i);
     });
   });
 
-  describe("given a held value released under a different tenant's group", () => {
-    describe("when released", () => {
-      it("leaves the owning tenant's holder set untouched", async () => {
-        const value = await lifecycle.encode({
-          jobData: REDIS_TIER_PAYLOAD,
-          groupId: TENANT_GROUP, // tenant proj1
-        });
-        lifecycle.acquire(value);
-        const key = holderKey(hashOf(value));
-        await vi.waitFor(async () => expect(await redis.scard(key)).toBe(1));
-
-        // Release under a foreign group: the proj1 holder must NOT be dropped.
-        lifecycle.release({ values: [value], groupId: "proj2/agg" });
-
-        // Wait long enough that an unguarded release would have reclaimed it.
-        await new Promise((resolve) => setTimeout(resolve, 150));
-        expect(await redis.scard(key)).toBe(1);
-        expect(await redis.exists(blobKey(hashOf(value)))).toBe(1);
+  describe("given a re-encode with different queue machinery (the retry path)", () => {
+    it("hashes identically — machinery doesn't perturb the content hash (routing-exclusion)", async () => {
+      const first = await lifecycle.encode({
+        jobData: {
+          ...REDIS_TIER_PAYLOAD,
+          __jobName: "reactorA",
+          __attempt: 1,
+        },
+        groupId: TENANT_GROUP,
       });
+      const second = await lifecycle.encode({
+        jobData: {
+          ...REDIS_TIER_PAYLOAD,
+          __jobName: "reactorB",
+          __attempt: 2,
+        },
+        groupId: TENANT_GROUP,
+      });
+
+      // Same content hash → same stored blob; the re-PUT renewed its lease.
+      expect(hashOf(first)).toBe(hashOf(second));
+      const blobKeys = await redis.keys(`${queueName}:gq:blob:*`);
+      expect(blobKeys).toHaveLength(1);
     });
   });
 
-  describe("given a transfer whose new ref belongs to a different tenant", () => {
-    describe("when transferred", () => {
-      it("never acquires the foreign holder (mirror of the release-side guard)", async () => {
-        // Old value is tenant proj1's; new value is tenant proj2's. Under proj1's
-        // group, the transfer must NOT acquire proj2's hold.
-        const oldValue = await lifecycle.encode({
-          jobData: REDIS_TIER_PAYLOAD,
-          groupId: TENANT_GROUP, // proj1
-        });
-        const newValue = await lifecycle.encode({
-          jobData: { bulk: "y".repeat(8 * 1024) },
-          groupId: "proj2/agg",
-        });
-        const newHash = hashOf(newValue);
-        const newHolderKey = `${queueName}:gq:blobholders:proj2/${newHash}`;
-        lifecycle.acquire(oldValue);
-        const oldKey = holderKey(hashOf(oldValue));
-        await vi.waitFor(async () => expect(await redis.scard(oldKey)).toBe(1));
-
-        lifecycle.transfer({ newValue, oldValue, groupId: TENANT_GROUP });
-
-        await new Promise((resolve) => setTimeout(resolve, 150));
-        // proj2 holder must NOT have been created by the foreign-tenant transfer.
-        expect(await redis.exists(newHolderKey)).toBe(0);
-        // proj1's hold was released through the guarded path (matches the group's tenant).
-        expect(await redis.scard(oldKey)).toBe(0);
+  describe("given a group with no tenant prefix", () => {
+    it("downgrades to an inline GQ2 body rather than offloading", async () => {
+      const value = await lifecycle.encode({
+        jobData: REDIS_TIER_PAYLOAD,
+        groupId: "no-tenant-group",
       });
+
+      expect(value.startsWith("GQ2|")).toBe(true);
+      expect(splitEnvelope(value).header.ref).toBeUndefined();
+      expect(await redis.keys(`${queueName}:gq:blob:*`)).toHaveLength(0);
+      expect(
+        await lifecycle.decode({ value, groupId: "no-tenant-group" }),
+      ).toEqual(REDIS_TIER_PAYLOAD);
     });
   });
 
-  describe("given a same-content retry", () => {
-    describe("when the hold is transferred to the re-encoded value", () => {
-      it("swaps the slot on one holder set and keeps the blob", async () => {
-        const v1 = await lifecycle.encode({
-          jobData: REDIS_TIER_PAYLOAD,
-          groupId: TENANT_GROUP,
-        });
-        const v2 = await lifecycle.encode({
-          jobData: REDIS_TIER_PAYLOAD,
-          groupId: TENANT_GROUP,
-        });
-        const hash = hashOf(v1);
-        expect(hashOf(v2)).toBe(hash); // same content → same blob
-        lifecycle.acquire(v1);
-        await vi.waitFor(async () =>
-          expect(await redis.scard(holderKey(hash))).toBe(1),
-        );
-
-        lifecycle.transfer({
-          newValue: v2,
-          oldValue: v1,
-          groupId: TENANT_GROUP,
-        });
-
-        await vi.waitFor(async () => {
-          expect(await redis.scard(holderKey(hash))).toBe(1); // old out, new in
-          expect(await redis.exists(blobKey(hash))).toBe(1); // blob stays
-        });
+  describe("given an s3-tier payload", () => {
+    it("stores the object once and never deletes it from the application", async () => {
+      // Incompressible so the stored (compressed) bytes stay over the
+      // 256 KiB s3 threshold.
+      const big = { bulk: incompressible(400 * 1024) };
+      const value = await lifecycle.encode({
+        jobData: big,
+        groupId: TENANT_GROUP,
       });
-    });
 
-    describe("when the re-encoded value carries a different __attempt (the queue retry path)", () => {
-      it("hashes identically — machinery doesn't perturb the content hash (routing-exclusion)", async () => {
-        // This is the queue-level retry-cheapness guarantee: the retry re-encode
-        // produces the SAME blob hash, so the atomic transfer is a same-set
-        // SADD+SREM (one Lua eval, blob untouched) rather than a cross-set
-        // reclaim. Without routing-exclusion, __attempt would perturb the body
-        // bytes and each retry would churn through a fresh blob.
-        const v1 = await lifecycle.encode({
-          jobData: { ...REDIS_TIER_PAYLOAD, __attempt: 1 },
-          groupId: TENANT_GROUP,
-        });
-        const v2 = await lifecycle.encode({
-          jobData: { ...REDIS_TIER_PAYLOAD, __attempt: 2 },
-          groupId: TENANT_GROUP,
-        });
+      expect(splitEnvelope(value).header.ref?.tier).toBe("s3");
+      expect(objectStore.store.size).toBe(1);
 
-        expect(hashOf(v2)).toBe(hashOf(v1));
-        lifecycle.acquire(v1);
-        const key = holderKey(hashOf(v1));
-        await vi.waitFor(async () => expect(await redis.scard(key)).toBe(1));
+      await lifecycle.decode({ value, groupId: TENANT_GROUP });
+      await lifecycle.decode({ value, groupId: TENANT_GROUP });
 
-        lifecycle.transfer({
-          newValue: v2,
-          oldValue: v1,
-          groupId: TENANT_GROUP,
-        });
-
-        await vi.waitFor(async () => {
-          expect(await redis.scard(key)).toBe(1);
-          expect(await redis.exists(blobKey(hashOf(v1)))).toBe(1);
-        });
-      });
-    });
-  });
-
-  describe("given a dedup squash to different content", () => {
-    describe("when the hold is transferred across blobs", () => {
-      it("reclaims the displaced redis blob and holds the new one", async () => {
-        const vOld = await lifecycle.encode({
-          jobData: { bulk: "a".repeat(8 * 1024) },
-          groupId: TENANT_GROUP,
-        });
-        const vNew = await lifecycle.encode({
-          jobData: { bulk: "b".repeat(8 * 1024) },
-          groupId: TENANT_GROUP,
-        });
-        const oldHash = hashOf(vOld);
-        const newHash = hashOf(vNew);
-        expect(newHash).not.toBe(oldHash);
-        lifecycle.acquire(vOld);
-        await vi.waitFor(async () =>
-          expect(await redis.scard(holderKey(oldHash))).toBe(1),
-        );
-
-        lifecycle.transfer({
-          newValue: vNew,
-          oldValue: vOld,
-          groupId: TENANT_GROUP,
-        });
-
-        await vi.waitFor(async () => {
-          expect(await redis.exists(blobKey(oldHash))).toBe(0); // displaced blob reclaimed
-          expect(await redis.scard(holderKey(newHash))).toBe(1); // new blob held
-        });
-      });
-    });
-  });
-
-  describe("given an s3-tier blob held by one slot", () => {
-    describe("when the last holder releases", () => {
-      it("deletes the s3 object out-of-band", async () => {
-        const value = await lifecycle.encode({
-          jobData: { bulk: incompressible(768 * 1024) }, // > 256 KiB gzipped → s3
-          groupId: TENANT_GROUP,
-        });
-        expect(readEnvelopeHold(value)!.ref.tier).toBe("s3");
-        expect(objectStore.store.size).toBe(1);
-        lifecycle.acquire(value);
-
-        lifecycle.release({ values: [value], groupId: TENANT_GROUP });
-
-        await vi.waitFor(() => {
-          expect(objectStore.deleted).toHaveLength(1);
-          expect(objectStore.store.size).toBe(0);
-        });
-      });
-    });
-  });
-
-  describe("given a transfer where one side is not a GQ2 hold", () => {
-    describe("when a GQ2 value replaces an inline value", () => {
-      it("falls back to ordered acquire+release without throwing", async () => {
-        const inlineValue = await lifecycle.encode({
-          jobData: { small: 1 }, // under the inline ceiling → no hold
-          groupId: TENANT_GROUP,
-        });
-        const gq2Value = await lifecycle.encode({
-          jobData: REDIS_TIER_PAYLOAD,
-          groupId: TENANT_GROUP,
-        });
-        expect(readEnvelopeHold(inlineValue)).toBeNull();
-        expect(readEnvelopeHold(gq2Value)).not.toBeNull();
-
-        lifecycle.transfer({
-          newValue: gq2Value,
-          oldValue: inlineValue,
-          groupId: TENANT_GROUP,
-        });
-
-        await vi.waitFor(async () =>
-          expect(await redis.scard(holderKey(hashOf(gq2Value)))).toBe(1),
-        );
-      });
+      // Reclaim is the bucket lifecycle rule's job (ADR-046) — reads never
+      // delete, and there is no application-side reclaim path at all.
+      expect(objectStore.store.size).toBe(1);
     });
   });
 });

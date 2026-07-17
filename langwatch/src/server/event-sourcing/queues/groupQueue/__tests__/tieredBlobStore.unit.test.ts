@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import { BLOB_BACKSTOP_TTL_SECONDS } from "../blobConstants";
+import { DEFAULT_BLOB_LEASE_SECONDS } from "../blobConstants";
 import {
   type BlobRef,
   contentHash,
@@ -56,15 +56,15 @@ describe("TieredBlobStore", () => {
        * configured at 4 days"), so every leaked blob lived days longer than
        * designed (2026-07-09 Redis memory investigation).
        */
-      it("writes and refreshes with the 4-day GQ2 backstop, not GQ1's 7-day default", async () => {
+      it("writes and refreshes with the blob lease, not GQ1's 7-day default", async () => {
         const { store, redisBlobs } = makeStore();
         const data = Buffer.from("ttl pinning payload");
 
         const ref = await store.put({ projectId: PROJECT, data });
         await store.get(ref);
 
-        expect(redisBlobs.putTtls).toEqual([BLOB_BACKSTOP_TTL_SECONDS]);
-        expect(redisBlobs.getTtls).toEqual([BLOB_BACKSTOP_TTL_SECONDS]);
+        expect(redisBlobs.putTtls).toEqual([DEFAULT_BLOB_LEASE_SECONDS]);
+        expect(redisBlobs.getTtls).toEqual([DEFAULT_BLOB_LEASE_SECONDS]);
       });
 
       it("peeks without refreshing any TTL", async () => {

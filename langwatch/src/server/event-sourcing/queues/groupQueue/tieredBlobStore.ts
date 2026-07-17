@@ -8,7 +8,7 @@ import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { mintFileUri, mintS3Uri } from "~/server/stored-objects/uri";
 
-import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants";
+import { MAX_BLOB_BYTES, readBlobLeaseSeconds } from "./blobConstants";
 import { blobNamespaceId } from "./blobKeys";
 import type { JobBlobStore } from "./jobEnvelope";
 import { gqBlobDecodeCapExceededTotal } from "./metrics";
@@ -260,12 +260,12 @@ export class TieredBlobStore {
       await this.objectStoreFor(projectId).put(uri, data, mediaType);
       return { tier: "s3", projectId, hash };
     }
-    // GQ2 blobs are refcounted (holder-set eager reclaim), so the TTL is only
-    // the orphan backstop — 4 days, not GQ1's 7-day staged-residence window.
+    // The lease IS the lifetime (ADR-046): renewed on every read, extended by
+    // the block/DLQ paths. Nothing reference-counts or eagerly reclaims.
     await this.redisBlobs.put({
       id: redisBlobId({ projectId, hash }),
       data,
-      ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS,
+      ttlSeconds: readBlobLeaseSeconds(),
     });
     return { tier: "redis", projectId, hash };
   }
@@ -304,7 +304,7 @@ export class TieredBlobStore {
       // from a genuinely missing blob).
       try {
         return await (refresh
-          ? this.redisBlobs.get({ id, ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS })
+          ? this.redisBlobs.get({ id, ttlSeconds: readBlobLeaseSeconds() })
           : this.redisBlobs.peek({ id }));
       } catch (err) {
         throw new TransientBlobStoreError({
