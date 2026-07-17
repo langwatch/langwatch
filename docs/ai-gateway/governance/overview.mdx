@@ -106,19 +106,20 @@ attribute usage to the right person without leaking tokens.
 
 ## Rollout & permissions
 
-Governance ships behind two independent feature flags so pilots can
-turn on the data plane (gateway) without committing to the full
-governance UI surface:
+Governance ships on two independent feature flags so the data plane
+(gateway) and the governance UI surface can be controlled
+independently:
 
-- `release_ui_ai_gateway_menu_enabled` — exposes the AI Gateway nav
-  surface (virtual keys, providers, routing policies). Ships first.
-- `release_ui_ai_governance_enabled` — unlocks the Governance home
+- `release_ui_ai_gateway_menu_enabled`: exposes the AI Gateway nav
+  surface (virtual keys, providers, routing policies).
+- `release_ui_ai_governance_enabled`: unlocks the Governance home
   (`/governance`), ingestion sources, anomaly rules, compliance
-  export. Ships after gateway adoption is proven in the org.
+  export.
 
-Both flags are PostHog-controlled. Self-hosted deployers can force
-either one on with `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled`
-in `langwatch/.env`.
+Both flags are enabled by default on self-hosted; on SaaS, PostHog
+release conditions decide per organization. Self-hosted deployers can
+switch either one off with an env override, e.g.
+`RELEASE_UI_AI_GOVERNANCE_ENABLED=0` in `langwatch/.env`.
 
 When a gateway is wired up, the chrome is **persona-aware**: admins
 land on the org switcher + governance KPIs; engineers using a CLI
