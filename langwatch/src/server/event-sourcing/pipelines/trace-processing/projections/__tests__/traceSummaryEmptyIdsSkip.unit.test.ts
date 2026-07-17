@@ -5,6 +5,7 @@ import {
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST,
+  METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
 } from "../../schemas/constants";
 import type {
   LogRecordReceivedEvent,
@@ -19,7 +20,13 @@ function makeProjection() {
   });
 }
 
-function makeLogEvent(traceId: string, spanId: string): LogRecordReceivedEvent {
+function makeLogEvent({
+  traceId,
+  spanId,
+}: {
+  traceId: string;
+  spanId: string;
+}): LogRecordReceivedEvent {
   return {
     id: "evt-log",
     type: LOG_RECORD_RECEIVED_EVENT_TYPE,
@@ -73,23 +80,27 @@ function makeCorrelationEvent(): MetricDataPointCorrelatedEvent {
 }
 
 describe("TraceSummaryFoldProjection context guards", () => {
-  it("ignores context-free logs so no empty trace aggregate grows", () => {
-    const state = createInitState();
-    const after = makeProjection().handleTraceLogRecordReceived(
-      makeLogEvent("", ""),
-      state,
-    );
-    expect(after).toBe(state);
+  describe("when a log record carries no trace context", () => {
+    it("ignores it so no empty trace aggregate grows", () => {
+      const state = createInitState();
+      const after = makeProjection().handleTraceLogRecordReceived(
+        makeLogEvent({ traceId: "", spanId: "" }),
+        state,
+      );
+      expect(after).toBe(state);
+    });
   });
 
-  it("folds only the separately validated metric correlation event", () => {
-    const after = makeProjection().handleTraceMetricDataPointCorrelated(
-      makeCorrelationEvent(),
-      createInitState(),
-    );
-    expect(after.timeToFirstTokenMs).toBe(250);
-    expect(after.attributes["langwatch.reserved.metric_record_count"]).toBe(
-      "1",
-    );
+  describe("when a metric exemplar correlates to the trace", () => {
+    it("folds it and counts it as a correlation, not a data point", () => {
+      const after = makeProjection().handleTraceMetricDataPointCorrelated(
+        makeCorrelationEvent(),
+        createInitState(),
+      );
+      expect(after.timeToFirstTokenMs).toBe(250);
+      expect(
+        after.attributes[METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE],
+      ).toBe("1");
+    });
   });
 });

@@ -53,7 +53,7 @@ export class RecordMetricCorrelationCommand implements CommandHandler<
         },
         metadata: {},
         occurredAt: data.occurredAt,
-        idempotencyKey: `${data.pointId}:${data.traceId}:${data.spanId}`,
+        idempotencyKey: RecordMetricCorrelationCommand.makeJobId(data),
       }),
     ];
   }
@@ -62,7 +62,14 @@ export class RecordMetricCorrelationCommand implements CommandHandler<
     return payload.traceId;
   }
 
+  /**
+   * Tenant-scoped like every other trace command's. A PointId already hashes
+   * its tenant transitively (via SeriesId), so a collision is not reachable
+   * today — but nothing states that invariant at this layer, and a dedup key
+   * that silently depends on it would suppress another tenant's work the day
+   * it changes.
+   */
   static makeJobId(payload: RecordMetricCorrelationCommandData): string {
-    return `${payload.pointId}:${payload.traceId}:${payload.spanId}`;
+    return `${payload.tenantId}:${payload.traceId}:metric_correlation:${payload.pointId}:${payload.spanId}`;
   }
 }

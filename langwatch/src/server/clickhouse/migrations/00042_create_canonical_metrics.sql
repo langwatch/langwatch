@@ -180,5 +180,21 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.event_log
 -- a separate, reviewed post-cutover migration after all old instances stop.
 
 -- +goose Down
--- Canonical metric cutover is intentionally irreversible. The new event types
--- remain replayable, while legacy rows are intentionally not migrated.
+-- +goose ENVSUB ON
+--
+-- IRREVERSIBLE: the canonical metric cutover does not migrate the lossy legacy
+-- rows, so there is nothing for a down migration to restore them from. The new
+-- event types remain replayable, which is the supported recovery path.
+--
+-- Down migrations are intentionally commented out to prevent accidental data
+-- loss. To roll back, uncomment below and run manually.
+--
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.metric_usage_estimates;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.metric_time_rollups;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.metric_series;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.metric_data_points;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.event_log
+--   MODIFY COLUMN `_size_bytes` UInt32
+--     MATERIALIZED byteSize(EventPayload, ProcessingTraceparent)
+--     CODEC(Delta(4), ZSTD(1))
+--   SETTINGS alter_sync = 1, mutations_sync = 0;

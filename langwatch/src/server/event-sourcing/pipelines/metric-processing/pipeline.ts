@@ -1,6 +1,6 @@
 import { definePipeline } from "../..";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import { metricCommandGroupKey } from "./canonicalMetric";
+import { metricCommandGroupKey } from "./canonical/shards";
 import { RecordMetricDataPointCommand } from "./commands/recordMetricDataPointCommand";
 import { MetricDataPointStorageMapProjection } from "./projections/metricDataPointStorage.mapProjection";
 import { MetricSeriesCatalogMapProjection } from "./projections/metricSeriesCatalog.mapProjection";
@@ -41,7 +41,10 @@ export function createMetricProcessingPipeline(
     )
     .withCommand("recordDataPoint", RecordMetricDataPointCommand, {
       getGroupKey: (payload) =>
-        metricCommandGroupKey(payload.pointId, deps.metricCommandShardCount),
+        metricCommandGroupKey({
+          pointId: payload.pointId,
+          shardCount: deps.metricCommandShardCount,
+        }),
     })
     .build();
 }

@@ -21,14 +21,11 @@ abstract class MetricStoreBase implements AppendStore<CanonicalMetricDataPoint> 
     context: ProjectionStoreContext,
   ): Promise<void>;
 
-  async bulkAppend(
+  /** One repository call per chunk — replay writes these by the million. */
+  abstract bulkAppend(
     points: CanonicalMetricDataPoint[],
     context: BulkAppendContext,
-  ): Promise<void> {
-    for (const point of points) {
-      await this.append(point, context as ProjectionStoreContext);
-    }
-  }
+  ): Promise<void>;
 }
 
 export class MetricDataPointAppendStore extends MetricStoreBase {
@@ -36,7 +33,21 @@ export class MetricDataPointAppendStore extends MetricStoreBase {
     point: CanonicalMetricDataPoint,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    await this.repo.ensureDataPoint(point, this.retention(context));
+    await this.repo.ensureDataPoint({
+      point,
+      retentionDays: this.retention(context),
+    });
+  }
+
+  async bulkAppend(
+    points: CanonicalMetricDataPoint[],
+    context: BulkAppendContext,
+  ): Promise<void> {
+    if (points.length === 0) return;
+    await this.repo.ensureDataPoints({
+      points,
+      retentionDays: this.retention(context),
+    });
   }
 }
 
@@ -45,7 +56,21 @@ export class MetricSeriesCatalogAppendStore extends MetricStoreBase {
     point: CanonicalMetricDataPoint,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    await this.repo.upsertSeries(point, this.retention(context));
+    await this.repo.upsertSeries({
+      point,
+      retentionDays: this.retention(context),
+    });
+  }
+
+  async bulkAppend(
+    points: CanonicalMetricDataPoint[],
+    context: BulkAppendContext,
+  ): Promise<void> {
+    if (points.length === 0) return;
+    await this.repo.upsertSeriesMany({
+      points,
+      retentionDays: this.retention(context),
+    });
   }
 }
 
@@ -54,6 +79,20 @@ export class MetricTimeRollupAppendStore extends MetricStoreBase {
     point: CanonicalMetricDataPoint,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    await this.repo.recomputeAffectedRollups(point, this.retention(context));
+    await this.repo.recomputeAffectedRollups({
+      point,
+      retentionDays: this.retention(context),
+    });
+  }
+
+  async bulkAppend(
+    points: CanonicalMetricDataPoint[],
+    context: BulkAppendContext,
+  ): Promise<void> {
+    if (points.length === 0) return;
+    await this.repo.recomputeAffectedRollupsMany({
+      points,
+      retentionDays: this.retention(context),
+    });
   }
 }
