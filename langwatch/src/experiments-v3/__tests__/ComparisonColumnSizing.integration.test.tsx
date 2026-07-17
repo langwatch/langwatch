@@ -207,19 +207,23 @@ describe("given a comparison column with no explicit stored width", () => {
     useEvaluationsV3Store.getState().reset();
   });
 
-  it("counts the comparison column at its own wider default in the table's total width", async () => {
-    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+  describe("when calculating the table width", () => {
+    it("counts the comparison column at its own wider default", async () => {
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
-    // The table's overall width is set via a Chakra `css` prop, which Emotion
-    // compiles into an injected <style> rule rather than an inline attribute
-    // on the <table> itself — so the total is read from that stylesheet text.
-    // dataset "input" (16%) + target-1 (20%) + target-2 (20%) +
-    // comparison-target-1 (24%, NOT the plain 20% target default) = 80%.
-    await waitFor(() => {
-      const styleText = Array.from(document.head.querySelectorAll("style"))
-        .map((style) => style.textContent ?? "")
-        .join("\n");
-      expect(styleText).toContain("max(100%, 80%)");
+      // The table's overall width is set via a Chakra `css` prop, which Emotion
+      // compiles into an injected <style> rule rather than an inline attribute
+      // on the <table> itself — so the total is read from that stylesheet text.
+      // dataset "input" (16%) + target-1 (20%) + target-2 (20%) +
+      // comparison-target-1 (24%, NOT the plain 20% target default) = 80%.
+      await waitFor(() => {
+        const styleText = Array.from(document.head.querySelectorAll("style"))
+          .map((style) => style.textContent ?? "")
+          .join("\n");
+        expect(styleText).toContain("max(100%, 80%)");
+      });
     });
   });
 });

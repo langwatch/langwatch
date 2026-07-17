@@ -178,7 +178,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-describe("Reopening the comparison editor after a reload", () => {
+describe("given a reload reopens the comparison editor for an existing target", () => {
   beforeEach(() => {
     currentDrawer = "evaluatorEditor";
     drawerProps = {
@@ -247,65 +247,73 @@ describe("Reopening the comparison editor after a reload", () => {
     useEvaluationsV3Store.getState().reset();
   });
 
-  it("wires the reopened editor to update the existing target, not create one", async () => {
-    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
-
-    await waitFor(() => {
-      expect(flowCallbacksStore.evaluatorEditor).toBeDefined();
-    });
-
-    const callbacks = flowCallbacksStore.evaluatorEditor as {
-      onSave?: unknown;
-      onComparisonChange?: (config: unknown) => void;
-    };
-
-    // The add-flow's onSave (which always creates a fresh target) must not be
-    // wired when we resumed editing an existing target.
-    expect(callbacks.onSave).toBeUndefined();
-    expect(callbacks.onComparisonChange).toEqual(expect.any(Function));
-
-    const updatedComparison = {
-      variants: ["target-1", "target-2"],
-      hasGoldenAnswer: true,
-      goldenField: "expected_output",
-      includeMetrics: [],
-      randomizeOrder: true,
-    };
-    callbacks.onComparisonChange?.(updatedComparison);
-
-    const targets = useEvaluationsV3Store.getState().targets;
-    expect(targets).toHaveLength(3);
-    const comparisonTarget = targets.find((t) => t.id === "comparison-target-1");
-    expect(comparisonTarget?.comparison).toEqual(updatedComparison);
-  });
-
-  it("stays at one comparison column across repeated saves after reopening", async () => {
-    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
-
-    await waitFor(() => {
-      expect(flowCallbacksStore.evaluatorEditor).toBeDefined();
-    });
-
-    const callbacks = flowCallbacksStore.evaluatorEditor as {
-      onComparisonChange?: (config: unknown) => void;
-    };
-    const save = () =>
-      callbacks.onComparisonChange?.({
-        variants: ["target-1", "target-2"],
-        hasGoldenAnswer: false,
-        goldenField: "",
-        includeMetrics: [],
-        randomizeOrder: true,
+  describe("when the reopened editor saves", () => {
+    it("wires the reopened editor to update the existing target, not create one", async () => {
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
       });
 
-    // Two edits in the same reopened session — neither should add a target.
-    save();
-    save();
+      await waitFor(() => {
+        expect(flowCallbacksStore.evaluatorEditor).toBeDefined();
+      });
 
-    const comparisonTargets = useEvaluationsV3Store
-      .getState()
-      .targets.filter((t) => t.type === "evaluator");
-    expect(comparisonTargets).toHaveLength(1);
-    expect(comparisonTargets[0]?.id).toBe("comparison-target-1");
+      const callbacks = flowCallbacksStore.evaluatorEditor as {
+        onSave?: unknown;
+        onComparisonChange?: (config: unknown) => void;
+      };
+
+      // The add-flow's onSave (which always creates a fresh target) must not be
+      // wired when we resumed editing an existing target.
+      expect(callbacks.onSave).toBeUndefined();
+      expect(callbacks.onComparisonChange).toEqual(expect.any(Function));
+
+      const updatedComparison = {
+        variants: ["target-1", "target-2"],
+        hasGoldenAnswer: true,
+        goldenField: "expected_output",
+        includeMetrics: [],
+        randomizeOrder: true,
+      };
+      callbacks.onComparisonChange?.(updatedComparison);
+
+      const targets = useEvaluationsV3Store.getState().targets;
+      expect(targets).toHaveLength(3);
+      const comparisonTarget = targets.find(
+        (t) => t.id === "comparison-target-1",
+      );
+      expect(comparisonTarget?.comparison).toEqual(updatedComparison);
+    });
+
+    it("stays at one comparison column across repeated saves", async () => {
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
+
+      await waitFor(() => {
+        expect(flowCallbacksStore.evaluatorEditor).toBeDefined();
+      });
+
+      const callbacks = flowCallbacksStore.evaluatorEditor as {
+        onComparisonChange?: (config: unknown) => void;
+      };
+      const save = () =>
+        callbacks.onComparisonChange?.({
+          variants: ["target-1", "target-2"],
+          hasGoldenAnswer: false,
+          goldenField: "",
+          includeMetrics: [],
+          randomizeOrder: true,
+        });
+
+      // Two edits in the same reopened session — neither should add a target.
+      save();
+      save();
+
+      const comparisonTargets = useEvaluationsV3Store
+        .getState()
+        .targets.filter((t) => t.type === "evaluator");
+      expect(comparisonTargets).toHaveLength(1);
+      expect(comparisonTargets[0]?.id).toBe("comparison-target-1");
+    });
   });
 });
