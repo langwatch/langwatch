@@ -14,7 +14,7 @@ import type { api } from "./api";
  * refresh (#5827). Posting here on save lets every other open tab
  * invalidate immediately, focus or no focus.
  */
-const MODEL_PROVIDER_SYNC_CHANNEL = "langwatch:model-providers-updated";
+const MODEL_PROVIDER_SYNC_CHANNEL = "langwatch:model-providers-updated" as const;
 
 function getChannel(): BroadcastChannel | null {
   if (
@@ -23,7 +23,15 @@ function getChannel(): BroadcastChannel | null {
   ) {
     return null;
   }
-  return new BroadcastChannel(MODEL_PROVIDER_SYNC_CHANNEL);
+  try {
+    return new BroadcastChannel(MODEL_PROVIDER_SYNC_CHANNEL);
+  } catch {
+    // Some browsers throw (e.g. SecurityError) in restricted contexts —
+    // opaque-origin iframes, strict privacy modes. This runs on a
+    // mutation's success path, so degrade to null (falls back to focus
+    // refetch) rather than let it surface as a save-failed toast.
+    return null;
+  }
 }
 
 /** Call once a model-provider create/update/enable mutation has succeeded
@@ -57,8 +65,8 @@ type ModelProviderUtils = Pick<
 /** Every tRPC query surface whose freshness depends on the stored
  *  ModelProvider/ModelDefault rows. Shared by the same-tab mutation success
  *  path (useProviderFormSubmit) and the cross-tab listener
- *  (useModelProviderCrossTabSync) so the two invalidation lists can never
- *  drift apart. */
+ *  (ModelProviderCrossTabSync in api.tsx) so the two invalidation lists
+ *  can never drift apart. */
 export function invalidateModelProviderQueries(utils: ModelProviderUtils) {
   return Promise.all([
     utils.modelProvider.getAllForProject.invalidate(),
