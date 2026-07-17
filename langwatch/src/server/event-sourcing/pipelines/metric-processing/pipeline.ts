@@ -25,18 +25,21 @@ export function createMetricProcessingPipeline(
       "metricDataPointStorage",
       new MetricDataPointStorageMapProjection({
         store: deps.metricDataPointAppendStore,
+        shardCount: deps.metricCommandShardCount,
       }),
     )
     .withMapProjection(
       "metricSeriesCatalog",
       new MetricSeriesCatalogMapProjection({
         store: deps.metricSeriesCatalogAppendStore,
+        shardCount: deps.metricCommandShardCount,
       }),
     )
     .withMapProjection(
       "metricTimeRollup",
       new MetricTimeRollupMapProjection({
         store: deps.metricTimeRollupAppendStore,
+        shardCount: deps.metricCommandShardCount,
       }),
     )
     .withCommand("recordDataPoint", RecordMetricDataPointCommand, {
