@@ -101,8 +101,31 @@ export class LangyCredentialService {
     }
 
     const langwatchEndpoint = process.env.LANGWATCH_API_URL;
+    // Where the worker dials the AI gateway's OpenAI-compatible surface.
+    // Three candidate envs exist and only two of them name the gateway:
+    //
+    //   LW_GATEWAY_INTERNAL_URL  -> gateway (in-cluster). Reachable under the
+    //                               worker's NetworkPolicy, which permits only
+    //                               app pods (:5560) and gateway pods (:5563).
+    //   LW_GATEWAY_PUBLIC_URL    -> gateway (public ingress). The right target,
+    //                               reachable wherever no NetworkPolicy blocks
+    //                               external egress (self-hosted, `pnpm dev`).
+    //   LW_GATEWAY_BASE_URL      -> the CONTROL PLANE, not the gateway. The Go
+    //                               gateway reads this name to dial *back* at
+    //                               us (services/aigateway/config.go). Same name,
+    //                               opposite direction — see the naming-collision
+    //                               note in scripts/start.sh.
+    //
+    // So prefer the internal gateway address, then the public gateway address.
+    // LW_GATEWAY_BASE_URL is last and only for back-compat: the old SaaS dev
+    // cluster did point it at the gateway (`http://langwatch-gateway:80`), and
+    // dropping it would strand those deploys. Never promote it above
+    // LW_GATEWAY_PUBLIC_URL — on a modern deploy it resolves to the app, and
+    // the worker would POST completions at the control plane.
     const gatewayBaseUrl =
-      process.env.LW_GATEWAY_PUBLIC_URL ?? process.env.LW_GATEWAY_BASE_URL;
+      process.env.LW_GATEWAY_INTERNAL_URL ??
+      process.env.LW_GATEWAY_PUBLIC_URL ??
+      process.env.LW_GATEWAY_BASE_URL;
     if (!langwatchEndpoint) {
       throw new LangyCredentialResolutionError(
         "LANGWATCH_API_URL is not configured on the control plane.",
@@ -110,7 +133,7 @@ export class LangyCredentialService {
     }
     if (!gatewayBaseUrl) {
       throw new LangyCredentialResolutionError(
-        "LW_GATEWAY_BASE_URL is not configured on the control plane.",
+        "No AI gateway URL is configured on the control plane — set LW_GATEWAY_INTERNAL_URL (in-cluster) or LW_GATEWAY_PUBLIC_URL (self-hosted).",
       );
     }
 
