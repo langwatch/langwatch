@@ -95,23 +95,23 @@ describe("API router endpoint authorization guarantee", () => {
     });
   });
 
-  // Regression: pull request #4913 originally classified /github-langy/connect
-  // as publicEndpoint together with the protocol-mandated /callback. Connect is
+  // Regression: pull request #4913 originally classified the OAuth entry point
+  // as publicEndpoint together with the protocol-mandated callback. Install is
   // session-gated (it requires a logged-in user before signing state) — keeping
   // both under one policy made the registry lie about what is actually open to
   // the internet. Pin the policies separately so a future edit can't quietly
   // re-merge them.
   describe("when the GitHub OAuth endpoints are registered", () => {
-    it("treats /github-langy/connect as handler-managed (session-gated) and /github-langy/callback as public", () => {
+    it("treats /github-langy/install as handler-managed and /github-langy/setup as public", () => {
       const byPath = new Map(
         allRegisteredRoutes().map((r) => [`${r.method} ${r.path}`, r.policy]),
       );
-      const connect = byPath.get("GET /api/github-langy/connect");
-      const callback = byPath.get("GET /api/github-langy/callback");
-      expect(connect, "/connect must be registered").toBeDefined();
-      expect(callback, "/callback must be registered").toBeDefined();
-      expect(connect?.kind).toBe("handlerManaged");
-      expect(callback?.kind).toBe("public");
+      const install = byPath.get("GET /api/github-langy/install");
+      const setup = byPath.get("GET /api/github-langy/setup");
+      expect(install, "/install must be registered").toBeDefined();
+      expect(setup, "/setup must be registered").toBeDefined();
+      expect(install?.kind).toBe("handlerManaged");
+      expect(setup?.kind).toBe("public");
     });
   });
 });

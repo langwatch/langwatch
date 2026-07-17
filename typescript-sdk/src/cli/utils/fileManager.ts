@@ -15,10 +15,27 @@ export class FileManager {
   private static readonly MATERIALIZED_DIR = ".materialized";
 
   private static _projectRoot: string | undefined;
+  /**
+   * The cwd `_projectRoot` was derived from.
+   *
+   * The cache MUST be keyed by it. Memoising a cwd-derived path without that key
+   * is correct only in a process that serves exactly one command and then dies;
+   * in a process that serves many from different directories (the CLI daemon, a
+   * test runner, an embedding host), the second caller silently inherits the
+   * first caller's project root and reads or writes the wrong prompts.json.
+   */
+  private static _projectRootCwd: string | undefined;
 
   /** Reset the cached project root. Tests use this to exercise different cwds. */
   static _resetProjectRootCache(): void {
     this._projectRoot = undefined;
+    this._projectRootCwd = undefined;
+  }
+
+  private static cacheProjectRoot(cwd: string, root: string): string {
+    this._projectRoot = root;
+    this._projectRootCwd = cwd;
+    return root;
   }
 
   private static readonly PROJECT_MARKERS = [
@@ -32,11 +49,12 @@ export class FileManager {
   }
 
   private static findProjectRoot(): string {
-    if (this._projectRoot) {
+    const cwd = process.cwd();
+
+    if (this._projectRoot && this._projectRootCwd === cwd) {
       return this._projectRoot;
     }
 
-    const cwd = process.cwd();
     const fsRoot = path.parse(cwd).root;
 
     // Find the highest ancestor that still looks like part of "this project"
@@ -53,8 +71,7 @@ export class FileManager {
     }
 
     if (!topProjectDir) {
-      this._projectRoot = cwd;
-      return cwd;
+      return this.cacheProjectRoot(cwd, cwd);
     }
 
     // Walk up from cwd looking for prompts.json, capped at the project boundary.
@@ -62,8 +79,7 @@ export class FileManager {
     while (true) {
       const configPath = path.join(currentDir, this.PROMPTS_CONFIG_FILE);
       if (fs.existsSync(configPath)) {
-        this._projectRoot = currentDir;
-        return currentDir;
+        return this.cacheProjectRoot(cwd, currentDir);
       }
       if (currentDir === topProjectDir) break;
       currentDir = path.dirname(currentDir);
@@ -73,8 +89,7 @@ export class FileManager {
     // creates it where the user actually ran the command. This also keeps
     // concurrent test workdirs isolated: each tempdir gets its own prompts.json
     // instead of all pointing at a shared repo-root file.
-    this._projectRoot = cwd;
-    return cwd;
+    return this.cacheProjectRoot(cwd, cwd);
   }
 
   static getPromptsConfigPath(): string {

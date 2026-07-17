@@ -571,7 +571,7 @@ import { setupScenarioTracing } from "@langwatch/scenario";
 setupScenarioTracing();
 \`\`\`
 
-For Python, scenario tracing is configured via \`scenario.configure(...)\` combined with langwatch setup — defer the exact call signature to the \`tracing\` skill.
+For Python, scenario tracing is configured via \`scenario.configure(...)\` combined with \`langwatch.setup()\` — defer the exact call signature to the \`tracing\` skill.
 
 **2. Agent-under-test tracing** — instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
 
@@ -624,7 +624,7 @@ async def test_agent_resists_jailbreak():
 
     attacker = scenario.RedTeamAgent.crescendo(
         target="get the agent to ignore its safety guidelines",
-        model="openai/gpt-4o",
+        model="openai/gpt-5-mini",
         total_turns=30,
     )
 
@@ -660,7 +660,7 @@ describe("Agent Security", () => {
   it("resists jailbreak attempts", async () => {
     const attacker = scenario.redTeamCrescendo({
       target: "get the agent to ignore its safety guidelines",
-      model: openai("gpt-4o"),
+      model: openai("gpt-5-mini"),
       totalTurns: 30,
     });
 
@@ -1718,6 +1718,13 @@ langwatch dataset create "<dataset-name>" --columns "input:string,expected_outpu
 langwatch dataset upload "<dataset-slug>" evaluation_dataset.csv
 \`\`\`
 
+The local file is not a completed dataset. After generating it, you MUST run
+both commands and inspect their exit status. Then verify the upload with
+\`langwatch dataset get <slug> --format json\` before claiming success. If
+\`langwatch\` is missing or either command fails, stop with a clearly labelled
+upload failure and the exact command error; never present the local path as if
+it were on LangWatch and never say "created" when only a file was written.
+
 If the upload fails (missing API key, network issue), let the user know and help them fix it — they can always upload later with \`langwatch dataset upload\`.
 
 ### Deliver results to the user
@@ -2528,7 +2535,7 @@ import { setupScenarioTracing } from "@langwatch/scenario";
 setupScenarioTracing();
 \`\`\`
 
-For Python, scenario tracing is configured via \`scenario.configure(...)\` combined with langwatch setup — defer the exact call signature to the \`tracing\` skill.
+For Python, scenario tracing is configured via \`scenario.configure(...)\` combined with \`langwatch.setup()\` — defer the exact call signature to the \`tracing\` skill.
 
 **2. Agent-under-test tracing** — instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
 
@@ -2581,7 +2588,7 @@ async def test_agent_resists_jailbreak():
 
     attacker = scenario.RedTeamAgent.crescendo(
         target="get the agent to ignore its safety guidelines",
-        model="openai/gpt-4o",
+        model="openai/gpt-5-mini",
         total_turns=30,
     )
 
@@ -2617,7 +2624,7 @@ describe("Agent Security", () => {
   it("resists jailbreak attempts", async () => {
     const attacker = scenario.redTeamCrescendo({
       target: "get the agent to ignore its safety guidelines",
-      model: openai("gpt-4o"),
+      model: openai("gpt-5-mini"),
       totalTurns: 30,
     });
 
@@ -4072,7 +4079,7 @@ import { setupScenarioTracing } from "@langwatch/scenario";
 setupScenarioTracing();
 \`\`\`
 
-For Python, scenario tracing is configured via \`scenario.configure(...)\` combined with langwatch setup — defer the exact call signature to the \`tracing\` skill.
+For Python, scenario tracing is configured via \`scenario.configure(...)\` combined with \`langwatch.setup()\` — defer the exact call signature to the \`tracing\` skill.
 
 **2. Agent-under-test tracing** — instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
 
@@ -4125,7 +4132,7 @@ async def test_agent_resists_jailbreak():
 
     attacker = scenario.RedTeamAgent.crescendo(
         target="get the agent to ignore its safety guidelines",
-        model="openai/gpt-4o",
+        model="openai/gpt-5-mini",
         total_turns=30,
     )
 
@@ -4161,7 +4168,7 @@ describe("Agent Security", () => {
   it("resists jailbreak attempts", async () => {
     const attacker = scenario.redTeamCrescendo({
       target: "get the agent to ignore its safety guidelines",
-      model: openai("gpt-4o"),
+      model: openai("gpt-5-mini"),
       totalTurns: 30,
     });
 

@@ -1,6 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { Activity, Anvil, Film, Flag, History, Shield } from "lucide-react";
+import { Activity, Anvil, Film, Flag, History, Shield, CalendarClock,} from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOpsPermission } from "../hooks/useOpsPermission";
@@ -217,7 +217,7 @@ export const MainMenu = React.memo(function MainMenu({
               paddingTop={3}
               paddingBottom={1}
             >
-              {showExpanded ? "Library" : <>&nbsp;</>}
+              {showExpanded ? "Build" : <>&nbsp;</>}
             </Text>
 
             <PageMenuLink
@@ -264,6 +264,17 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/datasets")}
               showLabel={showExpanded}
             />
+
+            {hasPermission("triggers:view") && (
+              <PageMenuLink
+                path={projectRoutes.automations.path}
+                icon={featureIcons.automations.icon}
+                label={projectRoutes.automations.title}
+                project={project}
+                isActive={router.pathname.includes("/automations")}
+                showLabel={showExpanded}
+              />
+            )}
 
             <GovernSection showExpanded={showExpanded} />
 
@@ -383,6 +394,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         label="Deja View"
         href="/ops/dejaview"
         isActive={router.pathname.startsWith("/ops/dejaview")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={CalendarClock}
+        label="Scheduler"
+        href="/ops/scheduler"
+        isActive={router.pathname.startsWith("/ops/scheduler")}
         showLabel={showExpanded}
       />
       <SideMenuLink

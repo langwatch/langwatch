@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 import Router, { useRouter } from "~/utils/compat/next-router";
@@ -6,8 +7,6 @@ import type {
   DrawerProps,
   DrawerType,
 } from "../components/drawerRegistry";
-import { getTracesV2Preferred } from "../features/traces-v2/hooks/useTracesV2Preference";
-import { createLogger } from "../utils/logger";
 import { URL_QS_PARSE_OPTIONS } from "../utils/qsParseOptions";
 import { routeTraceDrawerForV2 } from "./traceDrawerV2Routing";
 
@@ -406,15 +405,16 @@ export const useDrawer = () => {
         replaceCurrentInStack?: boolean;
       } = {},
     ) => {
-      // Traces V2 opt-in (transitional during rollout): route any trace open
-      // to the new explorer when this device opted in, so every entry point
-      // honors the choice — not only the call sites that go through
-      // useTraceDetailsDrawer. See routeTraceDrawerForV2.
+      // The Trace Explorer drawer is the default for every trace open, from
+      // every entry point — not only the call sites that go through
+      // useTraceDetailsDrawer. Only the legacy Traces page keeps the legacy
+      // drawer, so operators who deliberately navigated there get a coherent
+      // legacy view until the page is removed. See routeTraceDrawerForV2.
       const { drawer: effectiveDrawer, props: effectiveProps } =
         routeTraceDrawerForV2(
           drawer,
           props as Record<string, unknown> | undefined,
-          getTracesV2Preferred(),
+          router.pathname === "/[project]/messages",
         );
 
       // Extract urlParams and merge with props

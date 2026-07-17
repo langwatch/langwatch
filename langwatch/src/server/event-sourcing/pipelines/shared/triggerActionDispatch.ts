@@ -1,21 +1,23 @@
+import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "~/automations/cadences";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {
   mapTraceToDatasetEntry,
   TRACE_EXPANSIONS,
   type TraceMapping,
 } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:trigger-action-dispatch");
 
@@ -41,6 +43,26 @@ export const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
   TriggerAction.ADD_TO_DATASET,
   TriggerAction.ADD_TO_ANNOTATION_QUEUE,
 ]);
+
+/**
+ * Whether a trigger's subject reads evaluation results — either via the legacy
+ * structured evaluation filters, or an ADR-043 trace-subject `filterQuery` that
+ * references an evaluator field. Such triggers are ALSO enqueued from the
+ * evaluation pipeline so they re-check when an evaluation lands: a trace may
+ * settle (and its trace-pipeline settle match run) before the evaluation ran,
+ * which is exactly when the eval half of the query is still false. The
+ * at-most-once `TriggerSent(triggerId, traceId)` gate dedupes the two enqueues,
+ * so whichever pipeline confirms the match first wins and the other no-ops.
+ */
+export function triggerReadsEvaluations(trigger: {
+  filters: TriggerSummary["filters"];
+  filterQuery: TriggerSummary["filterQuery"];
+}): boolean {
+  if (trigger.filterQuery != null) {
+    return queryNeeds(trigger.filterQuery).has("evaluations");
+  }
+  return classifyTriggerFilters(trigger.filters).hasEvaluationFilters;
+}
 
 /**
  * Resolves when a matched trigger should dispatch. This is the contract the

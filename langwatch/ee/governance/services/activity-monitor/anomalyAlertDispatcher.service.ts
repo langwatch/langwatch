@@ -17,15 +17,13 @@
  * Spec: specs/ai-gateway/governance/c3-alert-dispatch.feature
  */
 import { createHmac } from "node:crypto";
-
+import { createLogger } from "@langwatch/observability";
 import type { AnomalyAlert, AnomalyRule } from "@prisma/client";
-
-import { createLogger } from "~/utils/logger/server";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import {
-  safeParseDestinationConfig,
   type Destination,
+  safeParseDestinationConfig,
   type WebhookDestination,
 } from "./destinationConfig.schema";
 

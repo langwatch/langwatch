@@ -1,10 +1,10 @@
+import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import { createLogger } from "~/utils/logger/server";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import { capSerializedInputs, capText } from "../evaluation-column-caps";
 import type { EvalSummary, EvaluationRunData } from "../types";

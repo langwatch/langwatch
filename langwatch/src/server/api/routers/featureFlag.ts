@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import { createLogger } from "~/utils/logger/server";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
 import type { FeatureFlagKey } from "../../featureFlag/registry";

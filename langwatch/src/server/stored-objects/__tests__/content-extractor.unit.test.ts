@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 // Hoisted mocks — must be declared before any imports that trigger module load
 // ---------------------------------------------------------------------------
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

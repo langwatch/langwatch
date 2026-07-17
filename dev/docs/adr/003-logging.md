@@ -31,23 +31,22 @@ We use Node.js **AsyncLocalStorage** to propagate request context across async b
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `asyncContext.ts` | `src/server/context/` | Core context management |
-| `contextProvider.ts` | `src/server/context/` | Decoupled registry for logger |
-| `logger.ts` | `src/utils/` | Logger factory with context injection |
+| `context` | `packages/observability/src/context/` | Core context management and logger registration |
+| `logger.ts` | `packages/observability/src/` | Isomorphic logger factory with context injection |
 | `loggerMiddleware` | `src/app/api/middleware/` | Hono HTTP context setup |
-| `withPagesRouterLogger` | `src/middleware/` | Next.js Pages Router wrapper |
 
 ### RequestContext Shape
 
 ```typescript
 interface RequestContext {
-  traceId: string;      // 32-char hex (OTel-compatible)
-  spanId: string;       // 16-char hex (OTel-compatible)
   organizationId?: string;
   projectId?: string;
   userId?: string;
 }
 ```
+
+Trace and span IDs come directly from the active OpenTelemetry context; ALS
+stores only the business context.
 
 ### Background Job Context
 
@@ -56,10 +55,10 @@ Jobs receive context via payload metadata:
 ```typescript
 // When creating a job
 const metadata = getJobContextMetadata();
-await queue.add('job-name', { ...data, _context: metadata });
+await queue.add('job-name', { ...data, __context: metadata });
 
 // When processing a job
-const ctx = createContextFromJobData(job.data._context);
+const ctx = createContextFromJobData(job.data.__context);
 runWithContext(ctx, async () => {
   // Context is available here
 });
@@ -77,7 +76,7 @@ runWithContext(ctx, async () => {
 ### Negative
 
 - **AsyncLocalStorage overhead**: Small performance cost for context storage
-- **Module initialization order**: `asyncContext.ts` must be imported before `logger.ts` to register the provider
+- **Explicit server boundary**: Node context and trace helpers use package subpaths so the browser-safe root never loads OpenTelemetry or `node:async_hooks`
 
 ## Related
 

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { GatewayBudgetsApiService } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
@@ -9,7 +9,7 @@ export const listGatewayBudgetsCommand = async (options?: { format?: string }): 
   checkApiKey();
 
   const service = new GatewayBudgetsApiService();
-  const spinner = ora("Fetching gateway budgets...").start();
+  const spinner = createSpinner("Fetching gateway budgets...").start();
 
   try {
     const budgets = await service.list();
@@ -60,7 +60,7 @@ export const listGatewayBudgetsCommand = async (options?: { format?: string }): 
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch gateway budgets" });
+    failSpinner({ spinner, error, action: "fetch gateway budgets", format: options?.format });
     process.exit(1);
   }
 };

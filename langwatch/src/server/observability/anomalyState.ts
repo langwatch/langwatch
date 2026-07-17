@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch:observability:anomalyState");
 

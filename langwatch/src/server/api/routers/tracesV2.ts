@@ -4,7 +4,7 @@ import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
-import { ValidationError } from "~/server/app-layer/domain-error";
+import { ValidationError } from "~/server/app-layer/handled-error";
 import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
@@ -734,6 +734,12 @@ export const tracesV2Router = createTRPCRouter({
         sort: sortSchema,
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(1000).default(50),
+        cursor: z
+          .object({
+            sortValue: z.number().finite(),
+            traceId: z.string().min(1),
+          })
+          .optional(),
         query: z.string().nullish(),
       }),
     )
@@ -749,6 +755,7 @@ export const tracesV2Router = createTRPCRouter({
         sort: input.sort,
         page: input.page,
         pageSize: input.pageSize,
+        cursor: input.cursor,
         filterWhere: buildFilterWhere(input),
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
@@ -1087,7 +1094,7 @@ export const tracesV2Router = createTRPCRouter({
    * Lets a user rename a trace. Trim happens in the procedure so the event
    * always carries a canonical form, then the schema check rejects empty /
    * over-long names — when those rejections fire we surface them as a
-   * `ValidationError` (DomainError), so the client receives the rich
+   * `ValidationError` (HandledError), so the client receives the rich
    * `domainError` payload via tRPC's error formatter alongside the safe
    * user-facing message. The command pipeline still re-validates via Zod
    * as a defence-in-depth check (replays from a poisoned event store).

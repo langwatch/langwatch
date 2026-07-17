@@ -208,6 +208,13 @@ export const FEATURE_FLAGS = [
     description:
       "Opens the Langy in-product assistant. Default off: only LangWatch staff (isLangwatchStaff() — @langwatch.ai email) get Langy out of the box. To open it for a specific project/org/user, flip the flag on via a PostHog rule, an operator-store row via /ops/feature-flags, or RELEASE_LANGY_ENABLED=true for a blanket on. Staff always bypass the flag so a global kill switch still leaves us able to debug.",
   },
+  {
+    key: "release_langy_promo_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience via a PostHog rule.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

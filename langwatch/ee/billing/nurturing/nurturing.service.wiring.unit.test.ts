@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { NurturingService } from "./nurturing.service";
 
 /**
@@ -11,7 +11,7 @@ import { NurturingService } from "./nurturing.service";
  */
 
 // Suppress logger and captureException
-vi.mock("../../../src/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

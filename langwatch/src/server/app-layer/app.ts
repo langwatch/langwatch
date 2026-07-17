@@ -1,7 +1,7 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type { EventSourcing } from "../event-sourcing/eventSourcing";
-import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
+import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { AppConfig } from "./config";
 import type {
   AppDependencies,
@@ -24,6 +24,7 @@ export class App {
   readonly simulations: AppDependencies["simulations"] &
     AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
+  readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
   readonly triggerTemplates: AppDependencies["triggerTemplates"];
@@ -80,6 +81,7 @@ export class App {
     this.dspySteps = deps.dspySteps;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
+    this.langy = deps.langy;
     this.ops = deps.ops;
     this.retentionPolicyCache = deps.retentionPolicyCache;
     this.dataRetention = deps.dataRetention;

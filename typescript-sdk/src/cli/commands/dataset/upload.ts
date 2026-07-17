@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { basename } from "path";
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
@@ -54,7 +54,7 @@ export const uploadCommand = async (
       ? "Replacing records and uploading"
       : "Uploading (error if exists)";
 
-  const spinner = ora(
+  const spinner = createSpinner(
     `${strategyLabel} ${filename} to dataset "${slugOrId}"...`,
   ).start();
 

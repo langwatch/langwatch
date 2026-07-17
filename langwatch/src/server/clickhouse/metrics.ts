@@ -1,6 +1,6 @@
-import { Counter, Gauge, Histogram, register } from "prom-client";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
+import { Counter, Gauge, Histogram, register } from "prom-client";
 
 const logger = createLogger("langwatch:clickhouse:metrics");
 
@@ -232,6 +232,84 @@ const MONITORED_TABLES = [
 ];
 
 /**
+ * Collects ClickHouse backup status from system.backup_log into the backup gauges.
+ * Extracted so collectStorageStats can gate it behind the explicit opt-in (see the
+ * call site).
+ *
+ * We deliberately query system.backup_log instead of system.backups: system.backups
+ * is an in-memory table that gets wiped on CH restart, which happens on every app
+ * deploy (the CH image tag is bumped by the build pipeline). After a restart the
+ * in-memory table is empty until the next scheduled backup runs, so a freshly-rolled
+ * worker pod sees zero rows and never emits the gauge, tripping the "Backup Reporting
+ * Absent" alert despite backups being healthy. system.backup_log is a persistent
+ * system table that retains entries across restarts.
+ */
+async function collectBackupStats(client: ClickHouseClient): Promise<void> {
+  try {
+    interface BackupStats {
+      status: string;
+      cnt: string;
+      last_success_time: string;
+      last_success_size: string;
+    }
+
+    const backupResult = await client.query({
+      query: `
+        SELECT
+          status,
+          count() as cnt,
+          maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
+          argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
+        FROM system.backup_log
+        GROUP BY status
+      `,
+    });
+
+    const backupRows = await backupResult.json<BackupStats>();
+
+    ensureBackupStatusTotal().reset();
+    for (const row of backupRows.data) {
+      setClickHouseBackupStatusCount(row.status, parseInt(row.cnt, 10));
+
+      if (row.status === "BACKUP_CREATED" && row.last_success_time) {
+        const ts = new Date(row.last_success_time).getTime() / 1000;
+        if (!isNaN(ts) && ts > 0) {
+          setClickHouseBackupLastSuccessTimestamp(ts);
+        }
+        const size = parseInt(row.last_success_size, 10);
+        if (!isNaN(size)) {
+          setClickHouseBackupLastSizeBytes(size);
+        }
+      }
+    }
+
+    if (backupStatsCollectionFailing) {
+      logger.info(
+        "ClickHouse backup stats collection recovered from previous failure",
+      );
+      backupStatsCollectionFailing = false;
+    }
+  } catch (backupError) {
+    // Even where backups ARE configured the table can be transiently unavailable
+    // (a CH restart mid-tick), so a failure is handled, not fatal. Only
+    // deployments that opted in reach here, and they care — surface it
+    // edge-triggered, once, until it recovers.
+    if (!backupStatsCollectionFailing) {
+      logger.warn(
+        { error: backupError },
+        "Failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
+      );
+      backupStatsCollectionFailing = true;
+    } else {
+      logger.debug(
+        { error: backupError },
+        "Failed to collect ClickHouse backup stats from system.backup_log",
+      );
+    }
+  }
+}
+
+/**
  * Collects storage statistics for monitored tables.
  * Should be called periodically (e.g., every 15 seconds).
  */
@@ -270,78 +348,16 @@ export async function collectStorageStats(
       setClickHouseTableParts(row.table, parseInt(row.parts_count, 10));
     }
 
-    // Collect backup status metrics from system.backup_log (persistent).
-    // We deliberately query system.backup_log instead of system.backups:
-    // system.backups is an in-memory table that gets wiped on CH restart,
-    // which happens on every app deploy (the CH image tag is bumped by the
-    // build pipeline). After a restart the in-memory table is empty until
-    // the next scheduled backup runs, so a freshly-rolled worker pod sees
-    // zero rows and never emits the gauge, tripping the "Backup Reporting
-    // Absent" alert despite backups being healthy. system.backup_log is a
-    // persistent system table that retains entries across restarts.
-    try {
-      interface BackupStats {
-        status: string;
-        cnt: string;
-        last_success_time: string;
-        last_success_size: string;
-      }
-
-      const backupResult = await client.query({
-        query: `
-          SELECT
-            status,
-            count() as cnt,
-            maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
-            argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
-          FROM system.backup_log
-          GROUP BY status
-        `,
-      });
-
-      const backupRows = await backupResult.json<BackupStats>();
-
-      ensureBackupStatusTotal().reset();
-      for (const row of backupRows.data) {
-        setClickHouseBackupStatusCount(row.status, parseInt(row.cnt, 10));
-
-        if (row.status === "BACKUP_CREATED" && row.last_success_time) {
-          const ts = new Date(row.last_success_time).getTime() / 1000;
-          if (!isNaN(ts) && ts > 0) {
-            setClickHouseBackupLastSuccessTimestamp(ts);
-          }
-          const size = parseInt(row.last_success_size, 10);
-          if (!isNaN(size)) {
-            setClickHouseBackupLastSizeBytes(size);
-          }
-        }
-      }
-
-      if (backupStatsCollectionFailing) {
-        logger.info(
-          "ClickHouse backup stats collection recovered from previous failure",
-        );
-        backupStatsCollectionFailing = false;
-      }
-    } catch (backupError) {
-      // system.backup_log only exists once backups are configured, which is a
-      // production concern — locally the table is absent, so this "failure" is
-      // expected noise on every 15s tick. Only production surfaces it (and even
-      // there just once, edge-triggered, until it recovers). Off-prod it stays at
-      // debug, below the console floor, so a dev's terminal never sees it.
-      const isProd = process.env.NODE_ENV === "production";
-      if (isProd && !backupStatsCollectionFailing) {
-        logger.warn(
-          { error: backupError },
-          "Failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
-        );
-        backupStatsCollectionFailing = true;
-      } else {
-        logger.debug(
-          { error: backupError },
-          "Failed to collect ClickHouse backup stats from system.backup_log",
-        );
-      }
+    // Backup status only exists where backups are configured (the production
+    // cluster, via clickhouse-serverless's backup cronjobs) — everywhere else this
+    // query just fails on every 15s tick for nothing, and NODE_ENV can't tell
+    // "has backups" from "staging/self-hosted production build". So the deployment
+    // that has backups opts in explicitly (set on the worker alongside the backup
+    // cronjobs). Gating here (not at one call site) covers both the app under
+    // haven's in-process workers and the standalone worker.
+    // See specs/ops/clickhouse-backup-metrics.feature.
+    if (process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED === "true") {
+      await collectBackupStats(client);
     }
 
     // Collect per-disk storage metrics

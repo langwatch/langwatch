@@ -126,7 +126,7 @@ const { mockLogInfo, mockLogWarn, mockLogError, mockLogDebug } = vi.hoisted(
   }),
 );
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: mockLogInfo,
     warn: mockLogWarn,

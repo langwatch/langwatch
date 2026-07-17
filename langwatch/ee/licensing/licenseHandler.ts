@@ -1,17 +1,17 @@
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import type { PlanInfo } from "./planInfo";
-import { FREE_PLAN, PUBLIC_KEY } from "./constants";
-import { createLogger } from "../../src/utils/logger";
+import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import { getApp } from "../../src/server/app-layer/app";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../src/server/data-retention/retentionPolicy.schema";
+import { FREE_PLAN, PUBLIC_KEY } from "./constants";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
-import type { LicenseStatus, RemoveLicenseResult, StoreLicenseResult, LicensePlanLimits } from "./types";
-import { validateLicense, parseLicenseKey } from "./validation";
-import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+import type { PlanInfo } from "./planInfo";
+import type { LicensePlanLimits, LicenseStatus, RemoveLicenseResult, StoreLicenseResult } from "./types";
+import { parseLicenseKey, validateLicense } from "./validation";
 
 const logger = createLogger("langwatch:licensing:licenseHandler");
 

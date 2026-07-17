@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const revokeVirtualKeyCommand = async (
   checkApiKey();
 
   const service = new VirtualKeysApiService();
-  const spinner = ora(`Revoking virtual key "${id}"...`).start();
+  const spinner = createSpinner(`Revoking virtual key "${id}"...`).start();
 
   try {
     const vk = await service.revoke(id);
@@ -30,7 +30,7 @@ export const revokeVirtualKeyCommand = async (
     }
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "revoke virtual key" });
+    failSpinner({ spinner, error, action: "revoke virtual key", format: options?.format });
     process.exit(1);
   }
 };

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { deriveRunStatus } from "@/client-sdk/services/experiments/run-status";
 import { checkApiKey } from "../../utils/apiKey";
@@ -66,7 +66,7 @@ export const experimentStatusCommand = async (
   checkApiKey();
 
   const service = new ExperimentsApiService();
-  const spinner = ora(`Checking status for "${experimentSlug}"...`).start();
+  const spinner = createSpinner(`Checking status for "${experimentSlug}"...`).start();
 
   try {
     const runId = await resolveRunId({
@@ -152,7 +152,7 @@ export const experimentStatusCommand = async (
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "check experiment status" });
+    failSpinner({ spinner, error, action: "check experiment status", format: options?.format });
     process.exit(1);
   }
 };

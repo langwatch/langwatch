@@ -8,13 +8,21 @@
 *{{ digest.count }}* match{% if digest.count != 1 %}es{% endif %}{% if _window_label != "" %} · {{ _window_label }}{% endif %}
 {%- endcapture -%}
 {%- assign _groups = matches | group_by: "evaluation.evaluatorName" -%}
+{%- capture _segments -%}
+{%- for g in _groups limit: 12 -%}
+{% unless forloop.first %},{% endunless %}{ "label": {{ g.name | default: "Other" | truncate: 20 | json }}, "value": {{ g.items.size }} }
+{%- endfor -%}
+{%- endcapture -%}
 [
   { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | prepend: "📈 " | truncate: 140 | json }}, "emoji": true } },
-  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _summary | json }} }] },
-  { "type": "divider" }
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _summary | json }} }] }
+  {%- if _groups.size > 0 -%}
+  ,{ "type": "data_visualization", "block_id": "matches_by_evaluator", "title": "Matches by evaluator", "chart": { "type": "pie", "segments": [ {{ _segments }} ] } }
+  {%- endif -%}
+  ,{ "type": "divider" }
   {%- for g in _groups -%}
   {%- capture _row -%}
-*{{ g.name | default: "Other matches" | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}* — {{ g.items.size }} match{% if g.items.size != 1 %}es{% endif %}
+*{{ g.name | default: "Other matches" | mrkdwn_escape }}* — {{ g.items.size }} match{% if g.items.size != 1 %}es{% endif %}
   {%- endcapture -%}
   ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _row | json }} } }
   {%- endfor -%}

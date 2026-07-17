@@ -11,8 +11,10 @@ import type {
   MapProjectionDefinition,
   MapProjectionOptions,
 } from "../projections/mapProjection.types";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import type { PipelineMetadata } from "./types";
 
 /**
@@ -37,6 +39,8 @@ export interface KillSwitchOptions {
 export interface CommandHandlerOptions<Payload = any> {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
+  /** Share one command queue group per tenant and aggregate across command types. */
+  serializeByAggregate?: boolean;
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;
@@ -92,6 +96,9 @@ export interface StaticPipelineDefinition<
     }
   >;
 
+  /** Default operational state projections registered via `.withProjection()`. */
+  stateProjections?: Map<string, StateProjectionDefinition<any, EventType>>;
+
   /** Map projections (stateless, transform individual events) registered in this pipeline */
   mapProjections: Map<
     string,
@@ -146,6 +153,9 @@ export interface StaticPipelineDefinition<
       definition: OutboxReactorDefinition<EventType>;
     }
   >;
+
+  /** Live event consumers that are independent of fold/map projections. */
+  eventSubscribers: Map<string, EventSubscriberDefinition<EventType>>;
 
   /** Feature flag service for kill switches */
   featureFlagService?: FeatureFlagServiceInterface;

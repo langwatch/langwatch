@@ -13,10 +13,14 @@ import { havenHmrGate } from "./vite/havenHmrGate";
 // The API server (`server.mts`) loads its own copy via `dotenv.config()`
 // the same way; doing it here keeps both processes reading from one
 // source of truth.
-dotenv.config({ path: path.resolve(__dirname, ".env") });
+dotenv.config({ path: path.resolve(__dirname, ".env"), quiet: true });
 // Portless (haven) overlay wins: loaded after .env with override so the
 // resolved app port + api hostname take effect. Absent in non-portless runs.
-dotenv.config({ path: path.resolve(__dirname, ".env.portless"), override: true });
+dotenv.config({
+  path: path.resolve(__dirname, ".env.portless"),
+  override: true,
+  quiet: true,
+});
 
 const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
@@ -147,10 +151,6 @@ export default defineConfig(async (): Promise<UserConfig> => {
       "~": path.resolve(__dirname, "./src"),
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
       "@ee": path.resolve(__dirname, "./ee"),
-
-      // Browser stubs for Node.js-only modules
-      "pino-pretty": path.resolve(__dirname, "./src/noop-css.cjs"),
-      "pino": path.resolve(__dirname, "node_modules/pino/browser.js"),
     },
   },
   define: {

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const deleteProjectCommand = async (
   checkApiKey();
 
   const service = new ProjectsApiService();
-  const spinner = ora(`Archiving project "${id}"...`).start();
+  const spinner = createSpinner(`Archiving project "${id}"...`).start();
 
   try {
     const result = await service.archive(id);
@@ -28,7 +28,7 @@ export const deleteProjectCommand = async (
     console.log(chalk.gray("Archived at: ") + new Date(result.archivedAt).toLocaleString());
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "archive project" });
+    failSpinner({ spinner, error, action: "archive project", format: options?.format });
     process.exit(1);
   }
 };

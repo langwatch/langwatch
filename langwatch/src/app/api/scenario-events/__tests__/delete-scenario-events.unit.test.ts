@@ -4,7 +4,7 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

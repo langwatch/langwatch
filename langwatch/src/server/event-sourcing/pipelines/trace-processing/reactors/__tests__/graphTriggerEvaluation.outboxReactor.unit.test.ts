@@ -1,4 +1,4 @@
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
@@ -29,6 +29,7 @@ function makeGraphTrigger(id: string): TriggerSummary {
     projectId: PROJECT_ID,
     name: `Graph ${id}`,
     action: TriggerAction.SEND_EMAIL,
+    triggerKind: TriggerKind.ALERT,
     actionParams: {
       threshold: 10,
       operator: "gt",
@@ -40,6 +41,7 @@ function makeGraphTrigger(id: string): TriggerSummary {
     message: null,
     customGraphId: `graph-${id}`,
     notificationCadence: "immediate",
+    filterQuery: null,
     traceDebounceMs: 30_000,
     templates: {
       slackTemplateType: null,

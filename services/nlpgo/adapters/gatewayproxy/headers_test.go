@@ -87,6 +87,45 @@ func TestParseCredentialFromHeaders_Azure_PicksUpAllKnobs(t *testing.T) {
 	}
 }
 
+// Azure /go/proxy dispatch must resolve a deployment. Once the endpoint check
+// passes, Bifrost's Azure reader looks up AzureKeyConfig.Deployments[model] and
+// fails "deployment not found for model X" when the map is empty. The parser
+// must self-map the requested model so this path resolves like the sibling
+// dispatcheradapter path. Regression: #5760.
+func TestParseCredentialFromHeaders_Azure_BuildsDeploymentMap(t *testing.T) {
+	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+		"x-litellm-model", "azure/gpt-5-mini",
+		"x-litellm-api_key", "azk-secret",
+		"x-litellm-api_base", "https://acme.openai.azure.com",
+	))
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if got := cred.DeploymentMap["gpt-5-mini"]; got != "gpt-5-mini" {
+		t.Errorf("DeploymentMap[gpt-5-mini] = %q, want self-map to the model id", got)
+	}
+}
+
+// An explicit x-litellm-deployment (the Azure deployment name differs from the
+// model id) is captured into Extra and wins in the deployment map.
+func TestParseCredentialFromHeaders_Azure_HonorsExplicitDeploymentHeader(t *testing.T) {
+	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+		"x-litellm-model", "azure/gpt-5.4",
+		"x-litellm-api_key", "azk-secret",
+		"x-litellm-api_base", "https://acme.openai.azure.com",
+		"x-litellm-deployment", "my-gpt5-prod",
+	))
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if got := cred.Extra["deployment"]; got != "my-gpt5-prod" {
+		t.Errorf("Extra[deployment] = %q, want the header value", got)
+	}
+	if got := cred.DeploymentMap["gpt-5.4"]; got != "my-gpt5-prod" {
+		t.Errorf("DeploymentMap[gpt-5.4] = %q, want the explicit deployment name", got)
+	}
+}
+
 func TestParseCredentialFromHeaders_Bedrock_NoApiKeyButAWSExtras(t *testing.T) {
 	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "bedrock/anthropic.claude-3-sonnet-20240229-v1:0",

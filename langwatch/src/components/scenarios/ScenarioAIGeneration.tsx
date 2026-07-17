@@ -11,23 +11,28 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
+import {
+  LangyMark,
+  LangyMarkGradientDefs,
+} from "~/features/langy/components/LangyMark";
+import "~/features/langy/langyTheme.css";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { createLogger } from "../../utils/logger";
 import { toaster } from "../ui/toaster";
 import { ResolvedModelCaption } from "./ResolvedModelCaption";
 import type { ScenarioFormData } from "./ScenarioForm";
 import {
-  generateScenarioWithAI,
   type GeneratedScenario,
+  generateScenarioWithAI,
 } from "./services/scenarioGeneration";
+import { consumeStoredPrompt } from "./services/scenarioPromptStorage";
 import { classifyGenerationError } from "./utils/classifyGenerationError";
 import { getDefaultModelState } from "./utils/defaultModelState";
-import { consumeStoredPrompt } from "./services/scenarioPromptStorage";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");
 
@@ -280,30 +285,49 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
     }
 
     return (
-      <Card.Root>
+      <Card.Root className="langy-root" overflow="hidden">
+        <LangyMarkGradientDefs />
         <Card.Body>
           <VStack align="stretch" gap={3}>
             <HStack gap={3}>
-              <Box p={2} bg="blue.subtle" borderRadius="md" color="blue.500">
-                <Icon as={Sparkles} boxSize={4} />
+              <Box
+                display="grid"
+                placeItems="center"
+                width="34px"
+                height="34px"
+                bg="bg.surface"
+                borderWidth="1px"
+                borderColor="border"
+                borderRadius="10px"
+              >
+                <LangyMark size={22} />
               </Box>
-              <Text fontWeight="semibold" fontSize="sm">
-                Need Help?
-              </Text>
+              <Box>
+                <Text fontWeight="semibold" fontSize="sm">
+                  {hasHistory ? "Refine with Langy" : "Draft with Langy"}
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  {hasHistory
+                    ? "Your draft is ready to shape."
+                    : "Start from an idea, not a form."}
+                </Text>
+              </Box>
             </HStack>
 
             <Text fontSize="xs" color="fg.muted">
-              Let AI help you create a scenario. Describe your agent and the
-              situation you want to test.
+              {hasHistory
+                ? "Ask for harder edge cases, clearer criteria, or a different persona."
+                : "Describe the behavior you care about and Langy will draft the situation and criteria."}
             </Text>
 
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
               size="sm"
               onClick={() => setViewMode("input")}
+              aria-label="Generate with AI using Langy"
             >
               <Sparkles size={14} />
-              Generate with AI
+              {hasHistory ? "Refine the draft" : "Open Langy"}
             </Button>
 
             <ResolvedModelCaption model={resolvedDefault.data?.model} />
@@ -315,17 +339,32 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
   // "Input" view - AI generation interface
   return (
-    <Card.Root>
+    <Card.Root className="langy-root" overflow="hidden">
+      <LangyMarkGradientDefs />
       <Card.Body>
         <VStack align="stretch" gap={3}>
           <HStack justify="space-between">
             <HStack gap={3}>
-              <Box p={2} bg="blue.50" borderRadius="md" color="blue.500">
-                <Icon as={Sparkles} boxSize={4} />
+              <Box
+                display="grid"
+                placeItems="center"
+                width="34px"
+                height="34px"
+                bg="bg.surface"
+                borderWidth="1px"
+                borderColor="border"
+                borderRadius="10px"
+              >
+                <LangyMark size={22} />
               </Box>
-              <Text fontWeight="semibold" fontSize="sm">
-                AI Generation
-              </Text>
+              <Box>
+                <Text fontWeight="semibold" fontSize="sm">
+                  Langy
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  {hasHistory ? "Refine this draft" : "Draft this scenario"}
+                </Text>
+              </Box>
             </HStack>
             <Button
               variant="ghost"
@@ -338,40 +377,45 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
           </HStack>
 
           <Text fontSize="xs" color="fg.muted">
-            Describe what your agent does and the scenario you want to test.
+            {hasHistory
+              ? "Tell Langy what should change. The form stays editable."
+              : "Describe what your agent does and the behavior you want to test."}
           </Text>
 
-          {defaultModelState.ok === false && defaultModelState.reason === "no-default" && (
-            <DefaultModelErrorBanner>
-              No default model set. Configure one in{" "}
-              <Link
-                href="/settings/model-providers"
-                target="_blank"
-                rel="noopener noreferrer"
-                color="blue.500"
-                fontWeight="medium"
-              >
-                Settings → Model Providers
-              </Link>
-              .
-            </DefaultModelErrorBanner>
-          )}
+          {defaultModelState.ok === false &&
+            defaultModelState.reason === "no-default" && (
+              <DefaultModelErrorBanner>
+                No default model set. Configure one in{" "}
+                <Link
+                  href="/settings/model-providers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="blue.500"
+                  fontWeight="medium"
+                >
+                  Settings → Model Providers
+                </Link>
+                .
+              </DefaultModelErrorBanner>
+            )}
 
-          {defaultModelState.ok === false && defaultModelState.reason === "stale-default" && (
-            <DefaultModelErrorBanner>
-              Your default model&apos;s provider is disabled. Configure a new default in{" "}
-              <Link
-                href="/settings/model-providers"
-                target="_blank"
-                rel="noopener noreferrer"
-                color="blue.500"
-                fontWeight="medium"
-              >
-                Settings → Model Providers
-              </Link>
-              .
-            </DefaultModelErrorBanner>
-          )}
+          {defaultModelState.ok === false &&
+            defaultModelState.reason === "stale-default" && (
+              <DefaultModelErrorBanner>
+                Your default model&apos;s provider is disabled. Configure a new
+                default in{" "}
+                <Link
+                  href="/settings/model-providers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="blue.500"
+                  fontWeight="medium"
+                >
+                  Settings → Model Providers
+                </Link>
+                .
+              </DefaultModelErrorBanner>
+            )}
 
           {status === "done" && hasHistory && (
             <HStack
@@ -387,16 +431,30 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             </HStack>
           )}
 
-          {/* Prompt History - no truncation */}
+          {/* Keep refinement context useful without turning the narrow sidebar into a transcript. */}
           {hasHistory && (
-            <VStack align="stretch" gap={1} fontSize="xs" color="fg.muted">
-              {history.map((prompt, index) => (
-                <HStack key={index} align="start">
-                  <Text flexShrink={0}>{">"}</Text>
-                  <Text whiteSpace="pre-wrap">{prompt}</Text>
-                </HStack>
-              ))}
-            </VStack>
+            <Box
+              borderWidth="1px"
+              borderColor="border.subtle"
+              borderRadius="md"
+              bg="bg.surface"
+              padding={2.5}
+            >
+              <Text
+                fontSize="10px"
+                fontWeight="bold"
+                color="fg.muted"
+                letterSpacing="0.08em"
+                textTransform="uppercase"
+                marginBottom={1}
+              >
+                Latest request · {history.length}{" "}
+                {history.length === 1 ? "turn" : "turns"}
+              </Text>
+              <Text fontSize="xs" color="fg.muted" lineClamp={2}>
+                {history.at(-1)}
+              </Text>
+            </Box>
           )}
 
           <Textarea
@@ -414,7 +472,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
           />
 
           <Button
-            colorPalette="blue"
+            colorPalette="orange"
             size="sm"
             onClick={handleGenerate}
             disabled={!canGenerate}
@@ -422,12 +480,12 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             {status === "generating" ? (
               <>
                 <Spinner size="sm" />
-                Generating...
+                Langy is drafting…
               </>
             ) : (
               <>
                 <Sparkles size={14} />
-                {hasHistory ? "Refine" : "Generate"}
+                {hasHistory ? "Refine with Langy" : "Draft with Langy"}
               </>
             )}
           </Button>

@@ -19,6 +19,11 @@ export const projectRoutes = {
     path: "/[project]/traces",
     title: "Trace Explorer",
   },
+  traces_v2_trace: {
+    path: "/[project]/traces/[trace]",
+    title: "Trace",
+    parent: "traces_v2",
+  },
   evaluations: {
     path: "/[project]/evaluations",
     title: "Evaluations",
@@ -117,6 +122,10 @@ export const projectRoutes = {
   triggers: {
     path: "/[project]/triggers",
     title: "Triggers",
+  },
+  automations: {
+    path: "/[project]/automations",
+    title: "Automations",
   },
   prompts: {
     path: "/[project]/prompts",

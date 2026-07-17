@@ -17,8 +17,7 @@ import {
 } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
-import { provisionLangyApiKey } from "~/server/services/langy/langyApiKey";
-import { provisionLangyVirtualKey } from "~/server/services/langy/langyVirtualKey";
+import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -214,24 +213,9 @@ export const projectRouter = createTRPCRouter({
         },
       });
 
-      // Best-effort: mint Langy's dedicated, least-privilege service key so the
-      // assistant works the moment the project exists. A failure here must never
-      // block project creation — the backfill reconciler mints any that slip through.
-      try {
-        await provisionLangyApiKey({
-          prisma,
-          projectId: project.id,
-          organizationId: input.organizationId,
-          createdByUserId: userId,
-        });
-      } catch (error) {
-        captureException(toError(error), {
-          extra: {
-            projectId: project.id,
-            context: "provisionLangyApiKey:project.create",
-          },
-        });
-      }
+      // (The eager per-project Langy service key that used to be minted here is
+      // gone — Langy now mints a per-turn, per-user session key scoped to exactly
+      // what the caller holds; no long-lived project key is provisioned.)
 
       // Best-effort: mint Langy's gateway virtual key so it shows up in the
       // user's /virtual-keys list from day 1 (configurable model + fallback

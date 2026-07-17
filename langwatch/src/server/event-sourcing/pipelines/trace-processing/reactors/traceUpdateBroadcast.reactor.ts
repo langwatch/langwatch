@@ -1,4 +1,4 @@
-import { createLogger } from "../../../../../utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast.service";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";

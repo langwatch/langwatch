@@ -2,8 +2,9 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 
 /**
- * Redirect page for /[project]/messages/[trace]
- * Opens the traceDetails drawer on the messages page.
+ * Redirect page for the legacy /[project]/messages/[trace] deep link.
+ * Old notification links and bookmarks land here; they now open the
+ * Trace Explorer drawer, which is the default trace experience.
  */
 export default function TraceDetailsRedirect() {
   const router = useRouter();
@@ -11,10 +12,16 @@ export default function TraceDetailsRedirect() {
   const traceId = router.query.trace as string | undefined;
 
   useEffect(() => {
-    if (!projectSlug || !traceId || !router.isReady) return;
+    if (!router.isReady) return;
+    // A ready router with no slug/trace means a malformed or stale link;
+    // send it to 404 rather than leaving a permanently blank page.
+    if (!projectSlug || !traceId) {
+      void router.replace("/404");
+      return;
+    }
 
     void router.replace(
-      `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${encodeURIComponent(traceId)}`,
+      `/${projectSlug}/traces?drawer.open=traceV2Details&drawer.traceId=${encodeURIComponent(traceId)}`,
     );
   }, [projectSlug, traceId, router, router.isReady]);
 

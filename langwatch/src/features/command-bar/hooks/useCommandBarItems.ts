@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Search, BookOpen } from "lucide-react";
+import { Search, BookOpen, Sparkles } from "lucide-react";
 import type { ListItem } from "../getIconInfo";
 import type { Command, RecentItem, SearchResult } from "../types";
 import type { FilteredCommands } from "./useFilteredCommands";
@@ -23,14 +23,39 @@ export function useCommandBarItems(
   idResult: SearchResult | null,
   groupedItems: GroupedRecentItems,
   projectSlug: string | undefined,
+  langyEnabled: boolean,
 ): {
   allItems: ListItem[];
   recentItemsLimited: RecentItem[];
   searchInTracesItem: ListItem | null;
   searchInDocsItem: ListItem | null;
   easterEggItem: ListItem | null;
+  askLangyItem: ListItem | null;
 } {
   const availableTopLevelNav = topLevelNavigationCommands;
+
+  // The "Ask Langy" activation — the command bar's door into Langy. Synthesized
+  // (not a static registry command) so it can carry the live query and only
+  // appears where Langy can actually open: a real project, and the user in the
+  // rollout (langyEnabled mirrors useShowLangy). Selecting it flips the bar into
+  // AI mode rather than navigating — see CommandBar.handleSelect.
+  const askLangyItem = useMemo<ListItem | null>(() => {
+    if (!langyEnabled || !projectSlug) return null;
+    const trimmed = query.trim();
+    return {
+      type: "command",
+      data: {
+        id: "action-ask-langy",
+        label: trimmed ? `Ask Langy: "${trimmed}"` : "Ask Langy",
+        description: trimmed
+          ? "Hand this question to Langy"
+          : "Ask about your project in plain language",
+        icon: Sparkles,
+        category: "actions",
+        keywords: ["langy", "ask", "ai", "assistant", "chat", "help"],
+      } as Command,
+    };
+  }, [langyEnabled, projectSlug, query]);
 
   // Get top recent items across all time groups
   const recentItemsLimited = useMemo(() => {
@@ -59,7 +84,7 @@ export function useCommandBarItems(
         label: `Search "${query.trim()}" in traces`,
         icon: Search,
         category: "navigation",
-        path: `/${projectSlug}/messages?query=${encodeURIComponent(query.trim())}`,
+        path: `/${projectSlug}/traces#all-traces?q=${encodeURIComponent(query.trim())}`,
       } as Command,
     };
   }, [query, projectSlug]);
@@ -101,6 +126,12 @@ export function useCommandBarItems(
     const items: ListItem[] = [];
 
     if (query === "") {
+      // On an empty bar Ask Langy LEADS — nothing competes for index 0, so
+      // "Cmd+K, Enter" is the fast path into the assistant.
+      if (askLangyItem) {
+        items.push(askLangyItem);
+      }
+
       // Add up to 5 recent items first
       for (const item of recentItemsLimited) {
         items.push({ type: "recent", data: item });
@@ -148,6 +179,12 @@ export function useCommandBarItems(
       if (searchInDocsItem) {
         items.push(searchInDocsItem);
       }
+      // Ask Langy TRAILS while typing — a "or just ask" fallback under the
+      // matches, so a typed page name + Enter still navigates (index 0 stays the
+      // best match), the way Search-in-traces / Search-in-docs already do.
+      if (askLangyItem) {
+        items.push(askLangyItem);
+      }
     }
 
     return items;
@@ -155,6 +192,7 @@ export function useCommandBarItems(
     query,
     recentItemsLimited,
     availableTopLevelNav,
+    askLangyItem,
     easterEggItem,
     idResult,
     filteredCommands,
@@ -170,5 +208,6 @@ export function useCommandBarItems(
     searchInTracesItem,
     searchInDocsItem,
     easterEggItem,
+    askLangyItem,
   };
 }

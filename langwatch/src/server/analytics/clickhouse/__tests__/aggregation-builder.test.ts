@@ -267,7 +267,7 @@ describe("aggregation-builder", () => {
         aggregation: "p90",
         alias: "trace_time_to_first_token_ms",
         rawColumn: "TimeToFirstTokenMs",
-        outerAggregation: /\bquantileExact\(0\.9\)\s*\(\s*trace_time_to_first_token_ms\s*\)/,
+        outerAggregation: /\bquantileTDigest\(0\.9\)\s*\(\s*trace_time_to_first_token_ms\s*\)/,
       },
     ])(
       "routes $metric through the CTE alias in arrayJoin groupBy path",

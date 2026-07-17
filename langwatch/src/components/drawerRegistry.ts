@@ -50,6 +50,10 @@ const AutomationDrawer = lazyDefault({
   factory: () => import("~/features/automations/AutomationDrawer"),
   key: "AutomationDrawer",
 });
+const ViewAutomationDrawer = lazyDefault({
+  factory: () => import("~/features/automations/ViewAutomationDrawer"),
+  key: "ViewAutomationDrawer",
+});
 const AgentHistoryDrawer = lazyDefault({
   factory: () => import("./agents/AgentHistoryDrawer"),
   key: "AgentHistoryDrawer",
@@ -81,10 +85,6 @@ const AgentHttpEditorDrawerFromUrl = lazyDefault({
 const WorkflowSelectorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "WorkflowSelectorDrawerFromUrl",
-});
-const AlertDrawer = lazyDefault({
-  factory: () => import("./analytics/AlertDrawer"),
-  key: "AlertDrawer",
 });
 const DashboardNameDrawer = lazyDefault({
   factory: () => import("./analytics/DashboardNameDrawer"),
@@ -178,6 +178,10 @@ const CreateTeamDrawer = lazyDefault({
   factory: () => import("./settings/CreateTeamDrawer"),
   key: "CreateTeamDrawer",
 });
+const InviteMemberDrawer = lazyDefault({
+  factory: () => import("./settings/InviteMemberDrawer"),
+  key: "InviteMemberDrawer",
+});
 const DataPrivacyRuleDrawer = lazyDefault({
   factory: () => import("./settings/DataPrivacyRuleDrawer"),
   key: "DataPrivacyRuleDrawer",
@@ -226,6 +230,7 @@ export const drawers = {
   traceDetails: TraceDetailsDrawer,
   traceV2Details: TraceV2DrawerNoop,
   automation: AutomationDrawer,
+  viewAutomation: ViewAutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
   defaultModelOverride: DefaultModelOverrideDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
@@ -237,7 +242,6 @@ export const drawers = {
   editAutomationFilter: EditAutomationFilterDrawer,
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
-  customGraphAlert: AlertDrawer,
   dashboardName: DashboardNameDrawer,
   // Evaluations V3 drawers
   targetTypeSelector: TargetTypeSelectorDrawer,
@@ -270,6 +274,7 @@ export const drawers = {
   createProject: CreateProjectDrawer,
   editProject: EditProjectDrawer,
   createTeam: CreateTeamDrawer,
+  inviteMember: InviteMemberDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,

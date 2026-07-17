@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const runExperimentCommand = async (
   checkApiKey();
 
   const service = new ExperimentsApiService();
-  const spinner = ora(`Starting experiment "${slug}"...`).start();
+  const spinner = createSpinner(`Starting experiment "${slug}"...`).start();
 
   try {
     const runResult = await service.startRun(slug);
@@ -20,13 +20,15 @@ export const runExperimentCommand = async (
       `Experiment started! Run ID: ${chalk.cyan(runResult.runId)} (${runResult.total} cells)`,
     );
 
-    if (runResult.runUrl) {
+    // Human hint only — under `--format json` the URL is already in the
+    // document, and prose on stdout would corrupt what a parser reads.
+    if (runResult.runUrl && options.format !== "json") {
       console.log(chalk.gray(`  View at: ${runResult.runUrl}`));
     }
 
     // If --wait flag is set, poll until completion
     if (options.wait) {
-      const pollSpinner = ora("Waiting for completion...").start();
+      const pollSpinner = createSpinner("Waiting for completion...").start();
 
       let status = await service.getRunStatus(runResult.runId);
       while (status.status === "running" || status.status === "pending") {
@@ -70,7 +72,7 @@ export const runExperimentCommand = async (
       console.log(JSON.stringify(runResult, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "run experiment" });
+    failSpinner({ spinner, error, action: "run experiment", format: options?.format });
     process.exit(1);
   }
 };

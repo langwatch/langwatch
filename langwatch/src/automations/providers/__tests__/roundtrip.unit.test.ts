@@ -195,14 +195,24 @@ describe("provider slice round trips", () => {
   });
 
   describe("given a slack slice", () => {
-    describe("when serialised to a row and read back", () => {
+    const baseSlackSlice: SlackSlice = {
+      deliveryMethod: "webhook",
+      webhook: "",
+      botToken: "",
+      channelId: "",
+      botTokenAlreadySet: false,
+      isLegacyWebhook: true,
+      templateType: "block_kit",
+      template: { value: "", usingDefault: true },
+    };
+
+    describe("when a webhook slice is serialised to a row and read back", () => {
       it("preserves the webhook through actionParams", () => {
         const client =
           CLIENT_PROVIDERS[TriggerAction.SEND_SLACK_MESSAGE].client;
         const slice: SlackSlice = {
+          ...baseSlackSlice,
           webhook: "https://hooks.slack.com/services/T000/B000/xyz",
-          templateType: "block_kit",
-          template: { value: "", usingDefault: true },
         };
         const back = client.fromTriggerRow(
           rowFrom(
@@ -210,7 +220,40 @@ describe("provider slice round trips", () => {
             client.toActionParams(slice),
           ),
         ) as SlackSlice;
+        expect(back.deliveryMethod).toBe("webhook");
         expect(back.webhook).toBe(slice.webhook);
+      });
+    });
+
+    describe("when a bot slice is serialised, redacted, and read back", () => {
+      it("carries the channel and reports the token as already set", () => {
+        const client =
+          CLIENT_PROVIDERS[TriggerAction.SEND_SLACK_MESSAGE].client;
+        const slice: SlackSlice = {
+          ...baseSlackSlice,
+          deliveryMethod: "bot",
+          channelId: "C0123",
+          botToken: "xoxb-fresh-token",
+        };
+        // The server strips the token and echoes a "set" flag before the row
+        // ever reaches the browser (see `redactSlackActionParams`); emulate
+        // that so the read path sees what the client actually receives.
+        const persisted = client.toActionParams(slice) as Record<
+          string,
+          unknown
+        >;
+        const redacted = {
+          slackDelivery: persisted.slackDelivery,
+          slackChannelId: persisted.slackChannelId,
+          slackBotTokenSet: true,
+        };
+        const back = client.fromTriggerRow(
+          rowFrom(TriggerAction.SEND_SLACK_MESSAGE, redacted),
+        ) as SlackSlice;
+        expect(back.deliveryMethod).toBe("bot");
+        expect(back.channelId).toBe("C0123");
+        expect(back.botToken).toBe("");
+        expect(back.botTokenAlreadySet).toBe(true);
       });
     });
   });

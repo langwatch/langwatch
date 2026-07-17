@@ -1,14 +1,17 @@
+import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "~/server/app-layer/handled-error";
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
-import { grafanaConfigFromEnv, grafanaLinksForTrace } from "~/utils/grafanaLinks";
+import {
+  grafanaConfigFromEnv,
+  grafanaLinksForTrace,
+} from "~/utils/grafanaLinks";
 
 import { HttpError, NotFoundError } from "../shared/errors";
 import { errorSchema } from "../shared/schemas";
 
-const INVALID_TRACE_ID = "0".repeat(32);
 const INVALID_SPAN_ID = "0".repeat(16);
 
 /**
@@ -47,7 +50,10 @@ export const handleError = async (
  * trace/span ids are opaque correlation handles.
  */
 function withTraceInfo(response: object, c: Context): object {
-  const traceId = liveId(c.get("traceId") as string | undefined, INVALID_TRACE_ID);
+  const traceId = liveId(
+    c.get("traceId") as string | undefined,
+    INVALID_TRACE_ID,
+  );
   const spanId = liveId(c.get("spanId") as string | undefined, INVALID_SPAN_ID);
   if (!traceId && !spanId) return response;
 
@@ -67,16 +73,16 @@ function determineErrorResponse(
     name?: string;
   },
 ): { statusCode: ContentfulStatusCode; response: object } {
-  // DomainErrors are handled first — normalize to client-safe shape.
-  // Use kind + httpStatus check instead of instanceof to handle
+  // HandledErrors are handled first — normalize to client-safe shape.
+  // Use code + httpStatus check instead of instanceof to handle
   // module-boundary class identity mismatches in Next.js/turbopack.
-  // See domain-error.ts: "use kind instead of instanceof in cross-process cases"
-  if (DomainError.is(error) || ("kind" in error && "httpStatus" in error)) {
-    const { kind, message, httpStatus, meta } = error as DomainError;
+  // See handled-error.ts: "use code instead of instanceof in cross-process cases"
+  if (HandledError.is(error) || ("code" in error && "httpStatus" in error)) {
+    const { code, message, httpStatus, meta } = error as HandledError;
     return {
       statusCode: (httpStatus ?? 500) as ContentfulStatusCode,
       response: {
-        ...errorSchema.parse({ error: kind, message }),
+        ...errorSchema.parse({ error: code, message }),
         ...(meta ?? {}),
       },
     };
@@ -84,7 +90,6 @@ function determineErrorResponse(
 
   // Check if it's a "not found" error
   const isNotFoundError =
-    error.message?.includes("not found") ||
     // Prisma error code for "not found"
     error.code === "P2025" ||
     error instanceof NotFoundError ||
@@ -122,6 +127,15 @@ function determineErrorResponse(
 
   // Handle HttpError instances (can be parsed directly)
   if (error instanceof HttpError) {
+    if (error.status >= 500) {
+      return {
+        statusCode: error.status,
+        response: errorSchema.parse({
+          error: "Internal server error",
+          message: "An unknown error occurred",
+        }),
+      };
+    }
     return {
       statusCode: error.status,
       response: errorSchema.parse(error),
@@ -129,30 +143,27 @@ function determineErrorResponse(
   }
 
   if (error.status) {
+    const isServerError = error.status >= 500;
     return {
       statusCode: error.status,
       response: errorSchema.parse({
-        error: error.message || "An error occurred",
-        message: error.message,
+        error: isServerError
+          ? "Internal server error"
+          : error.message || "An error occurred",
+        message: isServerError ? "An unknown error occurred" : error.message,
       }),
     };
   }
 
-  // Treat unhandled errors as 500. Surface the underlying message — only
-  // API-key-holding callers see this, the codebase is public, and Prisma
-  // error messages don't leak credentials. Hiding the message behind a
-  // generic "Internal server error" in prod is exactly the problem this
-  // PR set out to fix.
-  const underlying = error.message ?? "";
-  const codeSuffix = error.code ? ` (${error.code})` : "";
-  const nameSuffix =
-    error.name && error.name !== "Error" ? ` [${error.name}]` : "";
-  const descriptive = (underlying + codeSuffix + nameSuffix).trim();
+  // Unexpected failures are logged and traced by the request middleware. The
+  // HTTP boundary must not turn their implementation detail (Prisma models,
+  // SQL, hosts, stack fragments) into public API copy. The structured trace
+  // block added by withTraceInfo remains the safe correlation channel.
   return {
     statusCode: 500,
     response: errorSchema.parse({
       error: "Internal server error",
-      message: descriptive || "Internal server error",
+      message: "An unknown error occurred",
     }),
   };
 }

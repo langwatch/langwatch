@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -8,7 +8,7 @@ export const deleteDashboardCommand = async (id: string, options?: { format?: st
   checkApiKey();
 
   const service = new DashboardsApiService();
-  const spinner = ora(`Deleting dashboard "${id}"...`).start();
+  const spinner = createSpinner(`Deleting dashboard "${id}"...`).start();
 
   try {
     const result = await service.delete(id);
@@ -18,7 +18,7 @@ export const deleteDashboardCommand = async (id: string, options?: { format?: st
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete dashboard" });
+    failSpinner({ spinner, error, action: "delete dashboard", format: options?.format });
     process.exit(1);
   }
 };

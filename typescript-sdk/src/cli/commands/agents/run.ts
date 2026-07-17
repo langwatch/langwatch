@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
@@ -16,7 +16,7 @@ export const runAgentCommand = async (
   const service = new AgentsApiService();
 
   // First get the agent to determine its type
-  const resolveSpinner = ora(`Fetching agent "${id}"...`).start();
+  const resolveSpinner = createSpinner(`Fetching agent "${id}"...`).start();
 
   let agent;
   try {
@@ -51,7 +51,7 @@ export const runAgentCommand = async (
       process.exit(1);
     }
 
-    const runSpinner = ora(`Calling HTTP agent at ${url}...`).start();
+    const runSpinner = createSpinner(`Calling HTTP agent at ${url}...`).start();
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -71,7 +71,7 @@ export const runAgentCommand = async (
         console.log();
       }
     } catch (error) {
-      failSpinner({ spinner: runSpinner, error, action: "call HTTP agent" });
+      failSpinner({ spinner: runSpinner, error, action: "call HTTP agent", format: options?.format });
       process.exit(1);
     }
   } else {
@@ -90,7 +90,7 @@ export const runAgentCommand = async (
       process.exit(1);
     }
 
-    const runSpinner = ora(`Running agent via workflow ${workflowId}...`).start();
+    const runSpinner = createSpinner(`Running agent via workflow ${workflowId}...`).start();
     try {
       const response = await fetch(
         `${endpoint}/api/workflows/${encodeURIComponent(workflowId)}/run`,

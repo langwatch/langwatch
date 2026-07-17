@@ -1,0 +1,166 @@
+import { describe, expect, it, vi } from "vitest";
+import { createTenantId } from "../../domain/tenantId";
+import type { Event } from "../../domain/types";
+import { StateProjectionExecutor } from "../stateProjectionExecutor";
+import type {
+  StateProjectionDefinition,
+  StateProjectionStore,
+  StoredProjection,
+} from "../stateProjection.types";
+
+interface CounterState {
+  count: number;
+}
+
+function event({
+  id,
+  acceptedAt,
+  occurredAt,
+  amount = 1,
+}: {
+  id: string;
+  acceptedAt: number;
+  occurredAt: number;
+  amount?: number;
+}): Event<{ amount: number }> {
+  return {
+    id,
+    aggregateId: "conversation-1",
+    aggregateType: "langy_conversation",
+    tenantId: createTenantId("project-1"),
+    createdAt: acceptedAt,
+    occurredAt,
+    type: "test.integration.event",
+    version: "2026-07-15",
+    data: { amount },
+  };
+}
+
+function setup(initial: StoredProjection<CounterState> | null = null) {
+  let stored = initial;
+  const store: StateProjectionStore<CounterState> = {
+    load: vi.fn(async () => stored),
+    store: vi.fn(async (projection) => {
+      stored = projection;
+    }),
+  };
+  const apply = vi.fn(
+    (state: CounterState, source: Event<{ amount: number }>) => ({
+      count: state.count + source.data.amount,
+    }),
+  );
+  const projection: StateProjectionDefinition<
+    CounterState,
+    Event<{ amount: number }>
+  > = {
+    name: "counter",
+    version: "2026-07-15",
+    eventTypes: ["test.integration.event"],
+    init: () => ({ count: 0 }),
+    apply,
+    store,
+  };
+  const context = {
+    aggregateId: "conversation-1",
+    tenantId: createTenantId("project-1"),
+  };
+  return { apply, context, projection, store };
+}
+
+describe("StateProjectionExecutor", () => {
+  describe("given an empty operational projection", () => {
+    describe("when an event is applied", () => {
+      it("stores deterministic entity timestamps and the canonical cursor", async () => {
+        const { context, projection, store } = setup();
+
+        await new StateProjectionExecutor().execute({
+          projection,
+          events: [event({ id: "event-a", acceptedAt: 200, occurredAt: 100 })],
+          context,
+        });
+
+        expect(store.store).toHaveBeenCalledWith(
+          {
+            state: { count: 1 },
+            cursor: { acceptedAt: 200, eventId: "event-a" },
+            occurredAt: 100,
+            createdAt: 100,
+            updatedAt: 100,
+            version: "2026-07-15",
+          },
+          context,
+        );
+      });
+    });
+  });
+
+  describe("given an event cursor already stored", () => {
+    describe("when the same or an older event is delivered", () => {
+      it("does not apply or write it again", async () => {
+        const initial: StoredProjection<CounterState> = {
+          state: { count: 3 },
+          cursor: { acceptedAt: 200, eventId: "event-b" },
+          occurredAt: 150,
+          createdAt: 50,
+          updatedAt: 150,
+          version: "2026-07-15",
+        };
+        const { apply, context, projection, store } = setup(initial);
+
+        await new StateProjectionExecutor().execute({
+          projection,
+          events: [
+            event({ id: "event-b", acceptedAt: 200, occurredAt: 150 }),
+            event({ id: "event-a", acceptedAt: 200, occurredAt: 140 }),
+          ],
+          context,
+        });
+
+        expect(apply).not.toHaveBeenCalled();
+        expect(store.store).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a coalesced batch", () => {
+    describe("when accepted timestamps tie", () => {
+      it("folds by accepted time and event id and stores the final cursor", async () => {
+        const { apply, context, projection, store } = setup();
+
+        await new StateProjectionExecutor().execute({
+          projection,
+          events: [
+            event({
+              id: "event-b",
+              acceptedAt: 200,
+              occurredAt: 90,
+              amount: 2,
+            }),
+            event({
+              id: "event-a",
+              acceptedAt: 200,
+              occurredAt: 100,
+              amount: 1,
+            }),
+          ],
+          context,
+        });
+
+        expect(apply.mock.calls.map((call) => call[1].id)).toEqual([
+          "event-a",
+          "event-b",
+        ]);
+        expect(store.store).toHaveBeenCalledWith(
+          expect.objectContaining({
+            state: { count: 3 },
+            cursor: { acceptedAt: 200, eventId: "event-b" },
+            createdAt: 100,
+            updatedAt: 100,
+            occurredAt: 90,
+          }),
+          context,
+        );
+      });
+    });
+  });
+});

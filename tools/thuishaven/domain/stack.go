@@ -27,13 +27,19 @@ type Stack struct {
 	// of its own: it is a backend of `app`, reached same-origin at
 	// app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort). One app URL, not
 	// two confusable ones — the frontend and its API share a single origin.
-	APIPort            int    `json:"apiPort"`
-	WorkerMetricsPort  int    `json:"workerMetricsPort"`
-	ClickHouseHTTPPort int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
-	ClickHouseDatabase string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
-	PostgresPort       int    `json:"postgresPort"`       // shared managed Postgres's port (0 = unmanaged)
-	PostgresDatabase   string `json:"postgresDatabase"`   // this stack's isolated PG database (lw_<slug>)
-	RedisPort          int    `json:"redisPort"`          // shared managed Redis's port (0 = unmanaged)
+	APIPort           int `json:"apiPort"`
+	WorkerMetricsPort int `json:"workerMetricsPort"`
+	// HasStandaloneWorkers is true only when this stack runs a separate `workers`
+	// lane (WorkerMetricsPort is that lane's own port). In the default in-process
+	// mode the app/api child hosts the workers and holds WorkerMetricsPort itself,
+	// so there is no separate group to bounce — `haven restart workers` must not
+	// target it (it would kill the API's group). See planChildren.
+	HasStandaloneWorkers bool   `json:"hasStandaloneWorkers,omitempty"`
+	ClickHouseHTTPPort   int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
+	ClickHouseDatabase   string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
+	PostgresPort         int    `json:"postgresPort"`       // shared managed Postgres's port (0 = unmanaged)
+	PostgresDatabase     string `json:"postgresDatabase"`   // this stack's isolated PG database (lw_<slug>)
+	RedisPort            int    `json:"redisPort"`          // shared managed Redis's port (0 = unmanaged)
 	// ObservabilityOTLPPort is the shared LGTM collector's OTLP/HTTP port when the
 	// stack is up, and 0 when it is not. Non-zero is what makes OverlayEnv emit the
 	// OTel wiring, so a worktree exports its logs/traces/metrics the moment the
@@ -55,8 +61,14 @@ type Stack struct {
 	LocalAPIKey string `json:"localApiKey"`
 	// IsBaseline marks this stack as the shared default other worktrees fall back to
 	// for services they do not run themselves (see Service.IsFallback).
-	IsBaseline bool      `json:"baseline,omitempty"`
-	Services   []Service `json:"services"`
+	IsBaseline bool `json:"baseline,omitempty"`
+	// LangyTier is the local isolation posture the langyagent worker runs under
+	// (see LangyTier). The zero value is LangyTierSandboxed — the safe, production-
+	// like default — so a stack persisted before this field existed reads back as
+	// sandboxed. It decides whether the worker runs in colima or on the host and
+	// which callback URLs the overlay hands the control plane.
+	LangyTier LangyTier `json:"langyTier,omitempty"`
+	Services  []Service `json:"services"`
 	// UpdatedAt is refreshed by the launcher's heartbeat; the daemon reaps a
 	// stack whose launcher has died or whose heartbeat has gone stale.
 	UpdatedAt time.Time `json:"updatedAt"`

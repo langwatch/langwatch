@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -7,7 +8,6 @@ import { type ProcessRole, roleRunsWorkers } from "~/server/app-layer/config";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/queues/makeQueueName";
-import { createLogger } from "~/utils/logger/server";
 import { resolveProjectStorageDestination } from "../stored-objects/project-storage-destination";
 import { createStorageRegistry } from "../stored-objects/stored-objects-factory";
 import { DisabledPipeline } from "./disabledPipeline";
@@ -727,6 +727,9 @@ function buildServiceOptions<
   const foldProjections = Array.from(definition.foldProjections.values()).map(
     ({ definition: fold }) => fold,
   );
+  const stateProjections = Array.from(
+    definition.stateProjections?.values() ?? [],
+  );
 
   const mapProjections = Array.from(definition.mapProjections.values()).map(
     ({ definition: mapProj }) => mapProj,
@@ -780,12 +783,19 @@ function buildServiceOptions<
 
   const reactors = foldReactorList.length > 0 ? foldReactorList : undefined;
   const mapReactors = mapReactorList.length > 0 ? mapReactorList : undefined;
+  const subscribers =
+    definition.eventSubscribers.size > 0
+      ? Array.from(definition.eventSubscribers.values())
+      : undefined;
 
   return {
     foldProjections: foldProjections.length > 0 ? foldProjections : undefined,
+    stateProjections:
+      stateProjections.length > 0 ? stateProjections : undefined,
     mapProjections: mapProjections.length > 0 ? mapProjections : undefined,
     commandRegistrations,
     reactors,
     mapReactors,
+    subscribers,
   };
 }

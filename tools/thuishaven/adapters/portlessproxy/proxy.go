@@ -167,6 +167,21 @@ func (p *Proxy) stateDir() string {
 	return filepath.Join(home, ".portless")
 }
 
+// CACertPath returns the filesystem path to the portless Local CA certificate
+// (PEM), or "" when it is not present yet. Bun and Node do NOT consult the macOS
+// system trust store — only their own bundled roots plus NODE_EXTRA_CA_CERTS — so
+// even though `ensureTrusted` put this CA in the system store (which fixes curl,
+// Go, and the browser), the app's and the langy worker's JS runtimes still reject
+// the portless HTTPS hostnames. The orchestrator points NODE_EXTRA_CA_CERTS at
+// this path (see planChildren) to close that gap in dev.
+func (p *Proxy) CACertPath() string {
+	ca := filepath.Join(p.stateDir(), "ca.pem")
+	if !fileExists(ca) {
+		return ""
+	}
+	return ca
+}
+
 // Running reports whether the portless proxy daemon is alive.
 func (p *Proxy) Running() bool {
 	b, err := os.ReadFile(filepath.Join(p.stateDir(), "proxy.pid"))

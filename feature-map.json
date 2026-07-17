@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "description": "Canonical information architecture for LangWatch. Every feature is defined here with its surfaces (code, platform, API, docs) and sync state. All implementations (sidebar, docs, skills, MCP) derive from this map.",
+  "description": "Canonical information architecture for LangWatch. Every feature is defined here with its surfaces (code, platform, API, docs) and sync state. All implementations (sidebar, docs, skills, MCP, CLI) derive from this map. A feature also declares what it can be chained with: `produces` (the resource kinds a result of this feature contains) and `consumes` (the resource kinds this feature can act on). Those are semantic facts about the feature, not about any one view — a view (e.g. the Langy panel) binds its own rendering and copy on top of them.",
   "features": [
     {
       "id": "observability",
@@ -40,7 +40,11 @@
             "api": "/api/collector",
             "docs": "https://langwatch.ai/docs/integration/overview.md"
           },
-          "sync": "code-to-platform"
+          "sync": "code-to-platform",
+          "produces": [
+            "traces"
+          ],
+          "consumes": []
         },
         {
           "id": "observability.analytics",
@@ -72,7 +76,13 @@
             "api": "/api/analytics",
             "docs": "https://langwatch.ai/docs/features/embedded-analytics.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "metrics"
+          ],
+          "consumes": [
+            "traces"
+          ]
         },
         {
           "id": "observability.user-events",
@@ -131,7 +141,13 @@
             "api": "/api/annotations",
             "docs": "https://langwatch.ai/docs/features/annotations.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "annotations"
+          ],
+          "consumes": [
+            "traces"
+          ]
         }
       ]
     },
@@ -154,8 +170,11 @@
                 "typescript": "langwatch.experiments"
               },
               "cli": [
-                "evaluation run",
-                "evaluation status"
+                "experiment list",
+                "experiment run",
+                "experiment status",
+                "experiment list-runs",
+                "experiment results"
               ],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/experiments/sdk.md"
@@ -172,7 +191,15 @@
             "api": "/api/experiment",
             "docs": "https://langwatch.ai/docs/evaluations/experiments/overview.md"
           },
-          "sync": "code-to-platform"
+          "sync": "code-to-platform",
+          "produces": [
+            "experiments"
+          ],
+          "consumes": [
+            "datasets",
+            "evaluators",
+            "prompts"
+          ]
         },
         {
           "id": "evaluations.online-evaluation",
@@ -210,6 +237,12 @@
             "docs": "https://langwatch.ai/docs/evaluations/online-evaluation/overview.md"
           },
           "sync": null,
+          "produces": [
+            "monitors"
+          ],
+          "consumes": [
+            "evaluators"
+          ],
           "notes": "Platform side uses Monitors. Code side includes guardrails (as_guardrail=True for sync blocking)."
         }
       ]
@@ -259,7 +292,14 @@
             "docs": "https://langwatch.ai/docs/agent-simulations/introduction.md"
           },
           "sync": null,
-          "plannedSync": "bidirectional"
+          "plannedSync": "bidirectional",
+          "produces": [
+            "scenarios"
+          ],
+          "consumes": [
+            "agents",
+            "prompts"
+          ]
         },
         {
           "id": "agent-simulations.runs",
@@ -290,7 +330,13 @@
             "api": "/api/simulation-runs",
             "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "simulation-runs"
+          ],
+          "consumes": [
+            "scenarios"
+          ]
         },
         {
           "id": "agent-simulations.suites",
@@ -330,7 +376,15 @@
             "api": "/api/suites",
             "docs": null
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "suites",
+            "simulation-runs"
+          ],
+          "consumes": [
+            "scenarios",
+            "agents"
+          ]
         }
       ]
     },
@@ -391,7 +445,11 @@
             "api": "/api/prompts",
             "docs": "https://langwatch.ai/docs/prompt-management/overview.md"
           },
-          "sync": "bidirectional"
+          "sync": "bidirectional",
+          "produces": [
+            "prompts"
+          ],
+          "consumes": []
         },
         {
           "id": "prompt-management.prompt-playground",
@@ -459,7 +517,13 @@
             "api": "/api/agents",
             "docs": null
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "agents"
+          ],
+          "consumes": [
+            "prompts"
+          ]
         },
         {
           "id": "library.workflows",
@@ -495,7 +559,14 @@
             "api": "/api/workflows",
             "docs": "https://langwatch.ai/docs/optimization-studio/overview.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "workflows"
+          ],
+          "consumes": [
+            "prompts",
+            "datasets"
+          ]
         },
         {
           "id": "library.evaluators",
@@ -532,7 +603,13 @@
             "api": "/api/evaluations",
             "docs": "https://langwatch.ai/docs/evaluations/evaluators/overview.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "evaluators"
+          ],
+          "consumes": [
+            "datasets"
+          ]
         },
         {
           "id": "library.datasets",
@@ -579,7 +656,13 @@
             "api": "/api/dataset",
             "docs": "https://langwatch.ai/docs/datasets/overview.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "datasets"
+          ],
+          "consumes": [
+            "traces"
+          ]
         }
       ],
       "surfaces": {
@@ -626,7 +709,14 @@
         "api": "/api/dashboards",
         "docs": null
       },
-      "sync": null
+      "sync": null,
+      "produces": [
+        "dashboards",
+        "graphs"
+      ],
+      "consumes": [
+        "metrics"
+      ]
     },
     {
       "id": "triggers",
@@ -662,7 +752,13 @@
         "api": "/api/triggers",
         "docs": null
       },
-      "sync": null
+      "sync": null,
+      "produces": [
+        "triggers"
+      ],
+      "consumes": [
+        "traces"
+      ]
     },
     {
       "id": "settings",
@@ -704,7 +800,11 @@
             "api": "/api/projects",
             "docs": null
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "projects"
+          ],
+          "consumes": []
         },
         {
           "id": "settings.api-keys",
@@ -737,7 +837,11 @@
             "api": "/api/api-keys",
             "docs": null
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "api-keys"
+          ],
+          "consumes": []
         },
         {
           "id": "settings.model-providers",
@@ -768,7 +872,11 @@
             "api": "/api/model-providers",
             "docs": "https://langwatch.ai/docs/integration/custom-models.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "model-providers"
+          ],
+          "consumes": []
         },
         {
           "id": "settings.secrets",
@@ -804,7 +912,11 @@
             "api": "/api/secrets",
             "docs": null
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "secrets"
+          ],
+          "consumes": []
         }
       ],
       "surfaces": {

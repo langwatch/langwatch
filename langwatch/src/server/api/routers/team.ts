@@ -135,7 +135,7 @@ export const teamRouter = createTRPCRouter({
   getTeamWithMembers: protectedProcedure
     .input(z.object({ slug: z.string(), organizationId: z.string() }))
     // Stays at organization:view for the same picker reasons as
-    // getTeamsWithMembers (AddAutomationDrawer, AlertDrawer, etc.).
+    // getTeamsWithMembers (the automations drawer's alert form, etc.).
     // Member emails are redacted below for non-admin callers, and a
     // non-admin lookup of someone else's personal workspace returns
     // NOT_FOUND (existence itself is private).

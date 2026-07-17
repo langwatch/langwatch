@@ -62,28 +62,18 @@ export function WaitingForTracesChip(): React.ReactElement {
     if (!project?.slug) return;
 
     const traceId = tracesQuery.data?.groups?.flat().at(0)?.trace_id ?? void 0;
-    const firstSpanId =
-      tracesQuery.data?.groups?.flat().at(0)?.spans?.at(0)?.span_id ?? void 0;
 
     if (!traceId) {
-      window.location.href = `/${project.slug}/messages`;
+      window.location.href = `/${project.slug}/traces`;
       return;
     }
 
     const params = new URLSearchParams({
-      view: "table",
-      project: project.slug,
-      pageOffset: "0",
-      pageSize: "25",
+      "drawer.open": "traceV2Details",
       "drawer.traceId": traceId,
-      "drawer.open": "traceDetails",
-      "drawer.selectedTab": "traceDetails",
     });
-    if (firstSpanId) {
-      params.set("span", firstSpanId);
-    }
 
-    window.location.href = `/${project.slug}/messages?${params.toString()}`;
+    window.location.href = `/${project.slug}/traces?${params.toString()}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     project?.slug,

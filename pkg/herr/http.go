@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 // StatusCode maps a herr Code to an HTTP status. Override with RegisterStatus.
@@ -84,6 +86,44 @@ func findErrorRecorder(w http.ResponseWriter) ErrorRecorder {
 		}
 		w = unwrapper.Unwrap()
 	}
+}
+
+// Body serializes an error to the wire envelope, for transports other than a
+// direct HTTP response (frame relays, queues). The same exposure rules as
+// WriteHTTP apply: code, message, meta, trace/span ids, herr reasons; never
+// stacks, and non-herr reasons collapse to "unknown".
+func Body(err error) ErrorBody {
+	var e E
+	if !errors.As(err, &e) {
+		e = E{Code: "unknown"}
+	}
+	return toErrorBody(e)
+}
+
+// FromBody reconstructs an E from a received wire envelope, so a typed error
+// continues across a process boundary: the caller can errors.Is/IsCode on the
+// code, attach it as a reason to its own herr, and re-serialize it losslessly
+// (message rides Meta["message"], exactly where toErrorBody promotes it from).
+// Stacks don't cross the wire; TraceID/SpanID survive when parseable.
+func FromBody(body ErrorBody) E {
+	meta := M{}
+	for k, v := range body.Meta {
+		meta[k] = v
+	}
+	if body.Message != "" && body.Message != body.Type {
+		meta["message"] = body.Message
+	}
+	e := E{Code: Code(body.Type), Meta: meta}
+	if tid, err := trace.TraceIDFromHex(body.TraceID); err == nil {
+		e.TraceID = tid
+	}
+	if sid, err := trace.SpanIDFromHex(body.SpanID); err == nil {
+		e.SpanID = sid
+	}
+	for _, reason := range body.Reasons {
+		e.Reasons = append(e.Reasons, FromBody(reason))
+	}
+	return e
 }
 
 func toErrorBody(e E) ErrorBody {

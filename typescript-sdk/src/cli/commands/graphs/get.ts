@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -16,7 +16,7 @@ export const getGraphCommand = async (
   const endpoint =
     resolveControlPlaneUrl();
 
-  const spinner = ora(`Fetching graph "${id}"...`).start();
+  const spinner = createSpinner(`Fetching graph "${id}"...`).start();
 
   try {
     const response = await fetch(`${endpoint}/api/graphs/${id}`, {
@@ -69,7 +69,7 @@ export const getGraphCommand = async (
     );
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch graph" });
+    failSpinner({ spinner, error, action: "fetch graph", format: options?.format });
     process.exit(1);
   }
 };

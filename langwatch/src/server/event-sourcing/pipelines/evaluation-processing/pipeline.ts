@@ -128,6 +128,7 @@ export function createEvaluationProcessingPipeline(
       ExecuteEvaluationCommand,
       deps.executeEvaluationCommand,
       {
+        serializeByAggregate: true,
         delay: 30_000,
         deduplication: {
           makeId: ExecuteEvaluationCommand.makeJobId,
@@ -135,8 +136,14 @@ export function createEvaluationProcessingPipeline(
         },
       },
     )
-    .withCommand("startEvaluation", StartEvaluationCommand)
-    .withCommand("completeEvaluation", CompleteEvaluationCommand)
-    .withCommand("reportEvaluation", ReportEvaluationCommand)
+    .withCommand("startEvaluation", StartEvaluationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("completeEvaluation", CompleteEvaluationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("reportEvaluation", ReportEvaluationCommand, {
+      serializeByAggregate: true,
+    })
     .build();
 }

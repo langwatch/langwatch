@@ -423,18 +423,23 @@ describe("MapAccumulator", () => {
 
       expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
 
-      const allRecords = bulkAppendSpy.mock.calls.flatMap(
-        (call: unknown[]) => call[0] as Array<{ doubled: number }>,
-      );
-      expect(allRecords).toHaveLength(3);
-      expect(allRecords).toContainEqual({ doubled: 2 });
-      expect(allRecords).toContainEqual({ doubled: 4 });
-      expect(allRecords).toContainEqual({ doubled: 6 });
+      const byTenant = new Map<string, Array<{ doubled: number }>>();
+      for (const [records, context] of bulkAppendSpy.mock.calls as Array<
+        [Array<{ doubled: number }>, { tenantId: string }]
+      >) {
+        byTenant.set(String(context.tenantId), records);
+      }
+      expect(byTenant.get("t-A")).toEqual([{ doubled: 2 }, { doubled: 6 }]);
+      expect(byTenant.get("t-B")).toEqual([{ doubled: 4 }]);
     });
   });
 
-  describe("when bulkAppend is used across multiple aggregates", () => {
-    it("groups records by aggregateId so each call carries the originating context", async () => {
+  describe("when events span multiple aggregates of one tenant", () => {
+    it("flushes them in a single tenant-scoped bulkAppend call, never one per aggregate", async () => {
+      // Regression: drain used to group buffered records per AGGREGATE and
+      // sequentially await one bulkAppend per group. For spanStorage the
+      // aggregate is a single trace, so a 1000-aggregate replay batch
+      // degenerated into ~1000 sequential awaited ClickHouse INSERTs.
       const { projection, bulkAppendSpy } = createTestMapProjection();
       const acc = new MapAccumulator(projection);
 
@@ -444,17 +449,17 @@ describe("MapAccumulator", () => {
 
       await acc.flush();
 
-      expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(1);
 
-      const byAggregate = new Map<string, Array<{ doubled: number }>>();
-      for (const [records, context] of bulkAppendSpy.mock.calls as Array<
-        [Array<{ doubled: number }>, { aggregateId: string }]
-      >) {
-        expect(context.aggregateId).not.toBe("");
-        byAggregate.set(context.aggregateId, records);
-      }
-      expect(byAggregate.get("agg-A")).toEqual([{ doubled: 2 }, { doubled: 6 }]);
-      expect(byAggregate.get("agg-B")).toEqual([{ doubled: 4 }]);
+      const [records, context] = bulkAppendSpy.mock.calls[0]! as [
+        Array<{ doubled: number }>,
+        { tenantId: string; aggregateId?: string },
+      ];
+      expect(records).toEqual([{ doubled: 2 }, { doubled: 4 }, { doubled: 6 }]);
+      // The context is tenant-scoped: no single aggregateId can describe a
+      // multi-aggregate chunk, so the contract no longer carries one.
+      expect(String(context.tenantId)).toBe("tenant-1");
+      expect(context.aggregateId).toBeUndefined();
     });
   });
 
@@ -539,21 +544,22 @@ describe("MapAccumulator", () => {
       expect(bulkAppendSpy).toHaveBeenCalledTimes(3);
     });
 
-    it("keeps per-aggregate context grouping on incremental writes", async () => {
+    it("chunks incremental writes across aggregates instead of splitting per aggregate", async () => {
       const { projection, bulkAppendSpy } = createTestMapProjection();
       const acc = new MapAccumulator(projection, { writeBatchSize: 2 });
 
       await acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 1 } }));
       await acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 2 } }));
 
-      // Incremental write fired: one call per aggregate, each with its context.
-      expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
-      for (const [records, context] of bulkAppendSpy.mock.calls as Array<
-        [Array<{ doubled: number }>, { aggregateId: string }]
-      >) {
-        expect(records).toHaveLength(1);
-        expect(["agg-A", "agg-B"]).toContain(context.aggregateId);
-      }
+      // Incremental write fired: ONE tenant-scoped call carrying both
+      // aggregates' records — not one call per aggregate.
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(1);
+      const [records, context] = bulkAppendSpy.mock.calls[0]! as [
+        Array<{ doubled: number }>,
+        { tenantId: string },
+      ];
+      expect(records).toEqual([{ doubled: 2 }, { doubled: 4 }]);
+      expect(String(context.tenantId)).toBe("tenant-1");
     });
   });
 

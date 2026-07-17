@@ -1,6 +1,6 @@
-import { createLogger } from "../../../src/utils/logger/server";
-import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
+import { createLogger } from "@langwatch/observability";
 import type { AppConfig } from "../../../src/server/app-layer/config";
+import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
 import type {
   CioBatchCall,
   CioEventName,

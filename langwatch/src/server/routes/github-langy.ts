@@ -1,85 +1,78 @@
 /**
- * Hono routes for the Langy GitHub App OAuth (per-user) flow.
+ * Hono routes for the Langy GitHub App INSTALLATION flow (issue #4747).
  *
  * Surfaces:
- *   GET /api/github-langy/connect    — start: redirect to github.com/login/oauth/authorize
- *   GET /api/github-langy/callback   — finish: exchange code, upsert UserGitHubCredential,
- *                                      either postMessage to the opener (popup mode) or 302
- *                                      back to settings (redirect mode).
+ *   GET  /api/github-langy/install  — start: session-gated redirect to
+ *        github.com/apps/<slug>/installations/new with a signed state.
+ *   GET  /api/github-langy/setup    — GitHub's post-install redirect. Verify the
+ *        signed state, record the installation against the organization it was
+ *        bound to, then postMessage the opener (popup) or 302 back (redirect).
+ *   POST /api/github-langy/webhook  — GitHub installation webhooks. Verifies the
+ *        X-Hub-Signature-256 HMAC and keeps the installation row + repo
+ *        selection fresh (created/deleted/suspend/unsuspend, repositories
+ *        added/removed). Idempotent.
  *
- * Why a public REST endpoint at all: OAuth redirect_uri is part of the protocol
- * and cannot live behind tRPC. The two surfaces here are the only public bits;
- * everything else (read connection / disconnect) is tRPC.
+ * There is no per-user OAuth: an installation IS the access boundary, PRs are
+ * bot-authored, and tokens are minted on demand from the App private key. The
+ * public surfaces are protocol-mandated (GitHub's Setup URL + webhook delivery)
+ * — every sensitive read is guarded by the signed state or the HMAC.
  *
- * The route is just HTTP plumbing — sign/verify state, validate query params,
- * shape responses. Everything else (DB writes, GitHub HTTP, popup HTML) lives
- * in services/langy/* siblings.
+ * The route is just HTTP plumbing. DB writes + GitHub HTTP live in
+ * app-layer/langy/langy-github-installations.service.ts.
  *
- * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-install.feature.
  */
-import { randomBytes } from "crypto";
+
+import { createLogger } from "@langwatch/observability";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { env } from "~/env.mjs";
 import {
   createServiceApp,
   handlerManagedAuth,
   publicEndpoint,
 } from "~/server/api/security";
+import { getApp } from "~/server/app-layer";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import {
-  exchangeCode,
-  fetchGithubUser,
-  type GithubTokenResponse,
-  type GithubUser,
-} from "~/server/services/langy/githubOauthClient";
+  consumeGithubInstallNonce,
+  registerGithubInstallNonce,
+} from "~/server/app-layer/langy/githubOauthNonce";
 import {
   popupErrorHtml,
   popupResponseHtml,
-} from "~/server/services/langy/githubOauthPopupHtml";
+} from "~/server/app-layer/langy/githubOauthPopupHtml";
 import {
   type GithubOauthStatePayload,
   STATE_TTL_MS,
   signGithubOauthState,
   verifyGithubOauthState,
-} from "~/server/services/langy/githubOauthState";
-import {
-  isOrganizationMember,
-  upsertGithubCredential,
-} from "~/server/services/langy/langyGithubConnection";
-import {
-  clearGithubTokenCache,
-  consumeGithubOauthNonce,
-  registerGithubOauthNonce,
-} from "~/server/services/langy/langyGithubToken";
-import { encrypt } from "~/utils/encryption";
+} from "~/server/app-layer/langy/githubOauthState";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
-import { createLogger } from "~/utils/logger/server";
 
 import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:github-langy");
 
-const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
+// /setup is GitHub's Setup URL — a protocol-mandated public redirect target.
+// All sensitive state is signed and bound to the session that started the flow.
+const SETUP_PUBLIC_REASON =
+  "GitHub App Setup URL — protocol-mandated public endpoint; all sensitive " +
+  "state is HMAC-signed and bound to the session that started the flow.";
 
-// /callback is genuinely public: GitHub's OAuth redirect_uri spec forbids
-// pre-auth on this endpoint — we only get a session via the signed state and
-// a re-check of the session cookie inside the handler.
-const CALLBACK_PUBLIC_REASON =
-  "GitHub App OAuth redirect URI — protocol-mandated public endpoint; " +
-  "all sensitive state is signed and bound to the session that started the flow.";
+// /webhook is GitHub's webhook delivery target — public by protocol, verified
+// in-handler by the X-Hub-Signature-256 HMAC against the shared webhook secret.
+const WEBHOOK_PUBLIC_REASON =
+  "GitHub App webhook delivery URL — protocol-mandated public endpoint; " +
+  "every payload is verified in-handler by its X-Hub-Signature-256 HMAC.";
 
-// /connect is session-gated: it requires a logged-in user and an org-membership
-// check before signing state and redirecting to github.com. The session check
-// runs in-handler (we need the session BEFORE the redirect so we can bind the
-// state to it), so we declare handlerManagedAuth to record that fact in the
-// route-auth registry rather than mis-classifying it as publicEndpoint.
-const CONNECT_HANDLER_AUTH_REASON =
-  "Connect-start endpoint: requires a valid application session " +
-  "(checked in-handler via getServerAuthSession) plus an org-membership " +
-  "check before any redirect to GitHub. State token is HMAC-signed and " +
-  "bound to that session id.";
+// /install is session-gated in-handler: it requires a logged-in user and an
+// org-membership check before signing state and redirecting to github.com.
+const INSTALL_HANDLER_AUTH_REASON =
+  "Install-start endpoint: requires a valid application session (checked " +
+  "in-handler via getServerAuthSession) plus an org-membership check before " +
+  "any redirect to GitHub. State token is HMAC-signed and bound to the session.";
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -100,11 +93,6 @@ function verifyState(token: string | null): GithubOauthStatePayload | null {
 }
 
 // Only allow internal relative paths as returnTo, to prevent open-redirects.
-// We block:
-//  - schemes (http://, javascript:, data:) — they don't start with `/`
-//  - protocol-relative (`//evil.com`) — second-char `/`
-//  - backslash-prefixed (`/\evil.com`) — some browsers normalize `\` → `/`
-//  - CRLF (response-splitting if echoed into a header)
 function safeReturnTo(raw: string | null | undefined): string {
   const fallback = "/settings/integrations#github";
   if (!raw) return fallback;
@@ -115,10 +103,6 @@ function safeReturnTo(raw: string | null | undefined): string {
   return raw;
 }
 
-// Origin used to construct the GitHub `redirect_uri`. Must match the App's
-// registered Callback URL EXACTLY, so derive it from server-side env, NOT a
-// client-controllable header. Falling back to the request URL only when env
-// isn't set keeps local dev usable.
 function appOrigin(reqUrl: string): string {
   const fromEnv = env.NEXTAUTH_URL;
   if (fromEnv) {
@@ -131,35 +115,22 @@ function appOrigin(reqUrl: string): string {
   return new URL(reqUrl).origin;
 }
 
-function appConfigured() {
-  return Boolean(env.GITHUB_LANGY_CLIENT_ID && env.GITHUB_LANGY_CLIENT_SECRET);
+// The App must have a private key (to mint tokens) + id (JWT issuer) + slug
+// (the install deep-link target) for the install flow to be usable.
+function installConfigured(): boolean {
+  return Boolean(
+    env.GITHUB_LANGY_PRIVATE_KEY &&
+      env.GITHUB_LANGY_APP_ID &&
+      env.GITHUB_LANGY_APP_SLUG,
+  );
 }
 
-// encrypt() (utils/encryption) requires a 32-byte hex CREDENTIALS_SECRET.
-// signingKey() above tolerates any string, so without this check a non-hex
-// secret lets the whole OAuth dance succeed at GitHub and then 500 at the
-// final upsert. Fail fast at /connect instead.
-function encryptionConfigured(): boolean {
-  const secret = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
-  return typeof secret === "string" && /^[0-9a-fA-F]{64}$/.test(secret);
-}
-
-// Append ?githubError=... while preserving a fragment in returnTo (the
-// default is `/settings/integrations#github` — naive `${returnTo}?x=y`
-// would bury the query inside the fragment where nothing can read it).
 function withGithubError(returnTo: string, message: string): string {
   const url = new URL(returnTo, "http://relative.invalid");
   url.searchParams.set("githubError", message);
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-// CSP for the popup HTMLs: deny everything except the page's own inline
-// script + style. The popup needs `unsafe-inline` because the template
-// literally inlines `<script>postMessage(...)</script>` — using a nonce
-// would require threading it through popupResponseHtml/popupErrorHtml,
-// which we'd need to also serve here. `frame-ancestors 'none'` blocks the
-// popup from being iframed by another site (defense-in-depth against
-// click-jacking the close-and-postMessage interaction).
 const POPUP_CSP =
   "default-src 'none'; " +
   "script-src 'unsafe-inline'; " +
@@ -168,9 +139,6 @@ const POPUP_CSP =
   "form-action 'none'; " +
   "frame-ancestors 'none'";
 
-// Untyped `c` here so we don't have to pull Hono's ContentfulStatusCode
-// internals through the helper signature. Every caller passes the route
-// `c` so type inference at the call site is unaffected.
 function popupHtml(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   c: any,
@@ -182,15 +150,8 @@ function popupHtml(
   return c.html(body, status);
 }
 
-// Render the callback's error path consistently across `popup` and
-// `redirect` modes. The four pre-credential rejection branches (invalid
-// state, session changed, state replay, non-member) used to always
-// return popup HTML — which is a UX dead end in redirect mode (the user
-// lands on a static page whose `window.close()` is a no-op in a top tab
-// and whose `postMessage` fires to a null opener). When the state has
-// been verified and carries a mode, honour it. Adversarial review N3
-// from goated-review round 4.
-function callbackError(
+// Render the setup error path consistently across popup and redirect modes.
+function setupError(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   c: any,
   state: GithubOauthStatePayload | null,
@@ -204,31 +165,16 @@ function callbackError(
   return popupHtml(c, popupErrorHtml(errorMessage), status);
 }
 
-// Sanitises an unexpected error message before it lands in a URL query
-// parameter the next page renders. The query-string value would otherwise
-// surface raw exception text (DB errors, internal paths) to the user —
-// and embedding an arbitrary string in the URL means anywhere that page
-// later renders ?githubError without its own escaping inherits the risk.
 function publicGithubErrorMessage(): string {
-  return "GitHub connection failed. Please try again.";
+  return "GitHub installation failed. Please try again.";
 }
 
 secured
-  .access(handlerManagedAuth(CONNECT_HANDLER_AUTH_REASON))
-  .get("/github-langy/connect", async (c) => {
-    if (!appConfigured()) {
+  .access(handlerManagedAuth(INSTALL_HANDLER_AUTH_REASON))
+  .get("/github-langy/install", async (c) => {
+    if (!installConfigured()) {
       return c.json(
-        { error: "GitHub integration is not configured on this instance." },
-        { status: 503 },
-      );
-    }
-    if (!encryptionConfigured()) {
-      return c.json(
-        {
-          error:
-            "CREDENTIALS_SECRET (or NEXTAUTH_SECRET) must be a 32-byte hex " +
-            "string to store GitHub credentials on this instance.",
-        },
+        { error: "The GitHub integration is not available on this instance." },
         { status: 503 },
       );
     }
@@ -238,12 +184,8 @@ secured
     if (!session?.user) {
       return c.json({ error: "Not authenticated" }, { status: 401 });
     }
-    // Gate /connect by release_langy_enabled so a member can't store a
-    // UserGitHubCredential before the assistant is rolled out for them.
-    // Staff bypass mirrors the same shape /langy/* uses (auth-middleware).
-    // /callback intentionally stays open — once a user has initiated the
-    // flow and GitHub has redirected back with a signed state, the state
-    // signature + session re-bind are the guard, not the flag.
+    // Gate by release_langy_enabled (staff bypass) so the install can't be
+    // started before the assistant is rolled out for the user.
     if (!isLangwatchStaff(session.user)) {
       const allowed = await featureFlagService.isEnabled(
         "release_langy_enabled",
@@ -251,9 +193,7 @@ secured
       );
       if (!allowed) {
         return c.json(
-          {
-            error: "GitHub connect is not currently enabled for this account.",
-          },
+          { error: "The GitHub integration is not enabled for this account." },
           { status: 404 },
         );
       }
@@ -265,16 +205,9 @@ secured
         { status: 400 },
       );
     }
-
-    // Cross-tenant guard: the user must be a member of the org they're
-    // connecting GitHub for. Without this, the callback would upsert a
-    // UserGitHubCredential under (userId, OTHER-ORG) — which the partition
-    // guard accepts (single org per row) but is still a tenant-boundary
-    // violation: the row appears in OTHER-ORG's footprint, and the audit log
-    // says "user X connected GitHub in org Y" against an org X is not in.
+    // Cross-tenant guard: the user must be a member of the org they install for.
     if (
-      !(await isOrganizationMember({
-        prisma,
+      !(await getApp().langy.githubInstallations.isOrganizationMember({
         userId: session.user.id,
         organizationId,
       }))
@@ -288,14 +221,7 @@ secured
     const mode = c.req.query("mode") === "popup" ? "popup" : "redirect";
     const returnTo = safeReturnTo(c.req.query("return"));
     const nonce = randomBytes(16).toString("base64url");
-
-    // Register the nonce in Redis with the same TTL as the signed state. The
-    // callback consumes it once and rejects replays. When Redis isn't wired
-    // the check skips silently — the signature + session-rebind still defend.
-    // Whether registration succeeded rides in the SIGNED state, so a Redis
-    // flap between connect (down — nonce never stored) and callback (up —
-    // "missing" looks like a replay) can't 401 a legitimate first use.
-    const nonceRegistered = await registerGithubOauthNonce(
+    const nonceRegistered = await registerGithubInstallNonce(
       nonce,
       Math.ceil(STATE_TTL_MS / 1000),
     );
@@ -310,128 +236,163 @@ secured
       nonceRegistered,
     });
 
-    const redirectUri = `${appOrigin(c.req.url)}/api/github-langy/callback`;
-
-    const url = new URL(GITHUB_AUTHORIZE_URL);
-    url.searchParams.set("client_id", env.GITHUB_LANGY_CLIENT_ID!);
-    url.searchParams.set("redirect_uri", redirectUri);
+    // GitHub redirects back to the App's configured Setup URL after install; the
+    // signed `state` round-trips so /setup can bind the installation to the org.
+    const url = new URL(
+      `https://github.com/apps/${encodeURIComponent(
+        env.GITHUB_LANGY_APP_SLUG!,
+      )}/installations/new`,
+    );
     url.searchParams.set("state", state);
-    // Scopes are governed by the App's installation permissions; this is a hint
-    // for the consent screen. Leave blank to use App defaults.
     return c.redirect(url.toString(), 302);
   });
 
 secured
-  .access(publicEndpoint(CALLBACK_PUBLIC_REASON))
-  .get("/github-langy/callback", async (c) => {
-    const code = c.req.query("code");
+  .access(publicEndpoint(SETUP_PUBLIC_REASON))
+  .get("/github-langy/setup", async (c) => {
     const state = verifyState(c.req.query("state") ?? null);
-    if (!code || !state) {
-      // No verified state → no mode known → default to popup (the most
-      // common /connect entry point). A redirect-mode caller landing
-      // here is rare (would mean a tampered or expired URL) and gets
-      // the same fallback page.
-      return callbackError(c, null, "Invalid state or missing code", 400);
+    const installationId = c.req.query("installation_id");
+    if (!state || !installationId) {
+      return setupError(c, state, "Invalid state or missing installation", 400);
     }
 
-    // Re-check the session matches the state's user. Defends against the case
-    // where the state cookie outlives the session or another user picked up
-    // the popup mid-flight.
+    // Re-bind the session to the state's user.
     const session = await getServerAuthSession({
       req: c.req.raw as NextRequestShim,
     });
     if (!session?.user || session.user.id !== state.userId) {
-      return callbackError(c, state, "Session changed mid-flow", 401);
+      return setupError(c, state, "Session changed mid-flow", 401);
     }
 
-    // Burn the nonce. If the nonce was registered at /connect and is missing
-    // now, the state was already used (replay) — reject. If it was never
-    // registered (Redis down at /connect — the signed flag says so) or Redis
-    // is down now (null), fall through to the signature + session defenses.
+    // Burn the single-use nonce (skips when Redis was down at /install).
     if (state.nonceRegistered) {
-      const nonceConsumed = await consumeGithubOauthNonce(state.nonce);
-      if (nonceConsumed === false) {
-        return callbackError(c, state, "State already used", 401);
+      const consumed = await consumeGithubInstallNonce(state.nonce);
+      if (consumed === false) {
+        return setupError(c, state, "Installation link already used", 401);
       }
     }
 
-    // Re-check tenant membership on the callback too. Same threat as in
-    // /connect — defense in depth in case a stale state outlives a
-    // membership change between connect and callback.
+    // Re-check tenant membership (defense in depth against a stale state).
     if (
-      !(await isOrganizationMember({
-        prisma,
+      !(await getApp().langy.githubInstallations.isOrganizationMember({
         userId: state.userId,
         organizationId: state.organizationId,
       }))
     ) {
-      return callbackError(c, state, "Not a member of this organization", 403);
+      return setupError(c, state, "Not a member of this organization", 403);
     }
 
-    const redirectUri = `${appOrigin(c.req.url)}/api/github-langy/callback`;
-
-    // The state is signed, but re-apply the returnTo allowlist anyway —
-    // defense in depth against a future signer that forgets to sanitize.
     const returnTo = safeReturnTo(state.returnTo);
 
-    let token: GithubTokenResponse;
-    let user: GithubUser;
+    let accountLogin: string;
     try {
-      token = await exchangeCode(code, redirectUri);
-      user = await fetchGithubUser(token.access_token!);
+      ({ accountLogin } =
+        await getApp().langy.githubInstallations.recordInstallation({
+          installationId,
+          organizationId: state.organizationId,
+        }));
     } catch (err) {
-      logger.warn({ err }, "github callback exchange failed");
-      // Real error in the server log; surface a generic message to the
-      // user so we don't leak internals (DB error text, GitHub HTTP
-      // response bodies) into the URL or the popup HTML.
+      logger.warn({ err }, "github installation record failed");
       const publicMsg = publicGithubErrorMessage();
       return state.mode === "popup"
         ? popupHtml(c, popupErrorHtml(publicMsg), 502)
         : c.redirect(withGithubError(returnTo, publicMsg), 302);
     }
 
-    await upsertGithubCredential({
-      prisma,
-      userId: state.userId,
-      organizationId: state.organizationId,
-      githubLogin: user.login,
-      githubUserId: String(user.id),
-      encryptedRefreshToken: encrypt(token.refresh_token!),
-      scopes: token.scope ?? null,
-    });
-
-    // A reconnect may follow a disconnect that revoked the previous grant;
-    // the mint cache could still hold a token from that dead grant. Clear it
-    // so the next chat mints from the refresh token we just stored.
-    await clearGithubTokenCache({
-      userId: state.userId,
-      organizationId: state.organizationId,
-    });
-
     try {
       await auditLog({
         userId: state.userId,
         organizationId: state.organizationId,
-        action: "langy.github.connect",
-        args: { githubLogin: user.login },
+        action: "langy.github.install",
+        args: { installationId, accountLogin },
       });
     } catch (err) {
-      // The credential is ALREADY persisted at this point. An auditLog
-      // throw used to bubble up as a 500 and silently drop the audit row
-      // even though the user's connection landed. Log and proceed — we
-      // honour the user's successful connect over the audit-completeness
-      // requirement. Operator-visible via the audit-write logger.
-      // Adversarial review N4 from goated-review round 4.
+      // The installation is already recorded — honour the success over audit
+      // completeness (operator-visible via this logger).
       logger.warn(
-        { err, userId: state.userId, organizationId: state.organizationId },
-        "audit log write failed after github connect — credential persisted",
+        { err, organizationId: state.organizationId },
+        "audit log write failed after github install — installation persisted",
       );
     }
 
     if (state.mode === "popup") {
-      return popupHtml(c, popupResponseHtml(user.login), 200);
+      return popupHtml(c, popupResponseHtml(accountLogin), 200);
     }
     return c.redirect(returnTo, 302);
+  });
+
+// GitHub webhook events: installation created/deleted/suspend/unsuspend and
+// installation_repositories added/removed. Verified by HMAC; idempotent.
+type WebhookAction =
+  | "created"
+  | "deleted"
+  | "suspend"
+  | "unsuspend"
+  | "added"
+  | "removed";
+
+function verifyWebhookSignature(rawBody: string, header: string | undefined): boolean {
+  const secret = env.GITHUB_LANGY_WEBHOOK_SECRET;
+  if (!secret || !header) return false;
+  const expected =
+    "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
+  const a = Buffer.from(header);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+secured
+  .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
+  .post("/github-langy/webhook", async (c) => {
+    if (!env.GITHUB_LANGY_WEBHOOK_SECRET) {
+      return c.json({ error: "Webhook not configured" }, { status: 404 });
+    }
+    // Read the RAW body — the HMAC is over the exact bytes GitHub sent.
+    const rawBody = await c.req.text();
+    if (
+      !verifyWebhookSignature(rawBody, c.req.header("x-hub-signature-256"))
+    ) {
+      return c.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    let payload: {
+      action?: string;
+      installation?: { id?: number };
+    };
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return c.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
+    const eventType = c.req.header("x-github-event");
+    const action = payload.action as WebhookAction | undefined;
+    const installationId =
+      payload.installation?.id != null
+        ? String(payload.installation.id)
+        : null;
+
+    if (
+      (eventType !== "installation" &&
+        eventType !== "installation_repositories") ||
+      !installationId ||
+      !action
+    ) {
+      // Unknown/unrelated event — ack so GitHub doesn't retry.
+      return c.json({ received: true });
+    }
+
+    try {
+      await getApp().langy.githubInstallations.handleWebhookEvent({
+        action,
+        installationId,
+      });
+    } catch (err) {
+      logger.warn({ err, action, installationId }, "github webhook handling failed");
+      // Still ack — retries won't help a persistent handling error, and the
+      // next event (or the setup callback) reconciles.
+    }
+    return c.json({ received: true });
   });
 
 export const app = secured.hono;

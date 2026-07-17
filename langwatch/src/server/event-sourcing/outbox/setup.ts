@@ -1,8 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
-import { handleSendEmail } from "~/pages/api/cron/triggers/actions/sendEmail";
-import { handleSendSlackMessage } from "~/pages/api/cron/triggers/actions/sendSlackMessage";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
@@ -20,7 +18,11 @@ import {
 } from "~/server/app-layer/triggers/graph-trigger-evaluation.service";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/triggers/repositories/trigger.prisma.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
+import { dispatchGraphAlertAction } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
+import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
+import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import { RedisCachedFoldStore } from "../projections/redisCachedFoldStore";
@@ -33,7 +35,6 @@ import {
 import {
   type CadenceStagePayload,
   type GraphEvalStagePayload,
-  graphEvalDedupId,
   type SettleStagePayload,
   settleDedupId,
 } from "./payload";
@@ -117,6 +118,18 @@ export function buildOutboxRuntime({
 }): OutboxRuntime {
   const auditAdapter = new PgOutboxAuditAdapter(prisma);
 
+  // dispatch5015-003: fail loud if BASE_HOST is missing. Every graph-alert
+  // and trace-alert dispatch interpolates baseHost into deep links
+  // (project.url, graph.url, editUrl, unsubscribe URL). An empty baseHost
+  // silently produces broken links for customers — detect at composition-root
+  // rather than a warn buried in a hot path.
+  const baseHost = env.BASE_HOST;
+  if (!baseHost) {
+    throw new Error(
+      "BASE_HOST is unset — the outbox runtime cannot render deep links (email + Slack alert templates interpolate baseHost). Set env.BASE_HOST before booting the worker.",
+    );
+  }
+
   // Shared trace fold store — settle stage cross-reads it to drive the
   // post-settle filter check against fresh state.
   // RedisCachedFoldStore takes a standalone `Redis` client; a Cluster
@@ -163,13 +176,16 @@ export function buildOutboxRuntime({
     return promise;
   };
 
-  // ADR-034 Phase 5: shared evaluator deps for graphEval-stage payloads.
-  // Constructed lazily once (no per-tick allocation). Notifier reuses the
-  // EXISTING cron handlers byte-for-byte (`handleSendEmail` /
-  // `handleSendSlackMessage`) — the spec requires `sendTriggerEmail` /
-  // `sendSlackWebhook` to be UNCHANGED. The TriggerSent repo mirrors the
-  // cron's dedup pattern exactly (find/create/update with the same WHERE
-  // clauses for `customGraphId != null` graph alerts).
+  // ADR-034 Phase 5/8.1: shared evaluator deps for graphEval-stage
+  // payloads. Constructed lazily once (no per-tick allocation). The
+  // notifier dispatches via the Liquid pipeline (`dispatchGraphAlertAction`)
+  // so per-trigger custom templates and the alert-default Liquid
+  // templates both apply — the cron's `handleSendEmail` /
+  // `handleSendSlackMessage` are NOT used here (they stay around for
+  // un-flagged projects that still ride the cron). Sender signatures
+  // (`sendRenderedTriggerEmail` / `sendRenderedSlackMessage`) are
+  // unchanged. The TriggerSent repo mirrors the cron's dedup pattern
+  // exactly.
   const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
   const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
     loadTrigger: async ({ triggerId, projectId }) =>
@@ -186,28 +202,73 @@ export function buildOutboxRuntime({
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),
     notifier: {
-      sendEmail: async (params) =>
-        handleSendEmail({
-          trigger: params.trigger,
-          projects: params.projects,
-          triggerData: params.triggerData,
-          projectSlug: params.projectSlug,
-        }),
-      sendSlack: async (params) =>
-        handleSendSlackMessage({
-          trigger: params.trigger,
-          projects: params.projects,
-          triggerData: params.triggerData,
-          projectSlug: params.projectSlug,
+      dispatch: async (input) =>
+        dispatchGraphAlertAction({
+          deps: {
+            sendEmail: sendRenderedTriggerEmail,
+            sendSlack: sendRenderedSlackMessage,
+            sendSlackBot: postSlackChatMessage,
+            // ADR-031: honour the same email suppression list the cron path
+            // does, so one-click unsubscribes are respected on the
+            // event-sourced graph-alert path too.
+            filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
+              emailSuppressions.filterSuppressed({
+                projectId,
+                triggerId,
+                emails,
+              }),
+            // ADR-031: the same two hard email caps the cron path consumes,
+            // bound from env exactly like the trace cadence wiring above —
+            // without them a flapping graph metric could mail unbounded past
+            // TRIGGER_EMAIL_HOURLY_CAP / TRIGGER_EMAIL_TENANT_DAILY_CAP.
+            // The dispatcher keys both claims on the fire digest, so an
+            // outbox retry of the same fire re-reads the count instead of
+            // burning a second slot.
+            consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
+              consumeEmailCapSlot({
+                projectId,
+                triggerId,
+                now,
+                cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+                dedupKey,
+              }),
+            emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
+            consumeTenantEmailCapSlot: ({
+              projectId,
+              now,
+              cap,
+              recipientCount,
+              dedupKey,
+            }) =>
+              consumeTenantEmailCapSlot({
+                projectId,
+                now,
+                cap,
+                recipientCount,
+                dedupKey,
+              }),
+            tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+            // ADR-031 per-recipient at-most-once ledger — the SAME TriggerSent
+            // claim store the trace cadence dispatcher threads into the mailer.
+            // The graph-alert incident row is written after the send, so an
+            // outbox retry of a fire that crashed mid-bookkeeping would
+            // otherwise re-notify every recipient.
+            isRecipientSent: (params) => triggers.isSendClaimed(params),
+            recordRecipientSent: async (params) => {
+              await triggers.claimSend(params);
+            },
+          },
+          input,
         }),
     },
+    baseHost,
     now: () => new Date(),
   };
 
   const dispatcher = createOutboxDispatcher({
     triggers,
     projects,
-    baseHost: env.BASE_HOST ?? "",
+    baseHost,
     traceSummaryStore,
     evaluationRuns: evaluations.runs,
     deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
@@ -308,11 +369,6 @@ export function buildOutboxRuntime({
       });
     },
     async enqueueGraphEval(payload, { ttlMs, makeDedupId }) {
-      // Avoid the unused-import warning on `graphEvalDedupId` here even
-      // though the caller is what produces the dedupKey — we expose the
-      // helper at the payload layer for any future caller that wants
-      // the canonical shape without going through `OutboxEnqueueRequest`.
-      void graphEvalDedupId;
       if (!queueHolder.current) {
         throw new Error(
           "Outbox runtime queue not attached — enqueueGraphEval called before attachQueue",

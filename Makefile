@@ -16,7 +16,7 @@ help:
 	@echo "    make quickstart dev-infra           local app + redis + workers compose; shared dev for PG/CH/NLP/S3"
 	@echo "    make quickstart frontend-only       no compose; pure pnpm dev against your .env URLs"
 	@echo "    make quickstart migration           postgres + clickhouse on host ports (prisma migrate; no workers)"
-	@echo "    make quickstart full-local          kitchen-sink local (dedicated workers container + bullboard + ai-server)"
+	@echo "    make quickstart full-local          kitchen-sink local (dedicated workers container + ai-server)"
 	@echo "    make quickstart-help                non-interactive preset reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo ""
@@ -161,7 +161,11 @@ test-scripts:
 
 # Stop all services
 down:
+ifneq (haven,$(firstword $(MAKECMDGOALS)))
 	$(COMPOSE) --profile full down
+else
+	@:
+endif
 
 # Tail logs
 logs:
@@ -179,8 +183,15 @@ clean:
 # LEGACY COMMANDS (run services locally, not in Docker)
 # =============================================================================
 
+# Guarded so `make haven install` (which go-installs the haven CLI via the
+# `haven` target in dev/haven.mk) doesn't ALSO run pnpm install: when `haven`
+# is the first goal this recipe is a no-op. Plain `make install` is unaffected.
 install:
+ifneq (haven,$(firstword $(MAKECMDGOALS)))
 	cd langwatch && pnpm install
+else
+	@:
+endif
 
 # Run the app (pnpm dev, which also auto-starts the Go aigateway) alongside
 # the Go nlpgo engine. nlpgo is the `nlpgo` subcommand of the cmd/service

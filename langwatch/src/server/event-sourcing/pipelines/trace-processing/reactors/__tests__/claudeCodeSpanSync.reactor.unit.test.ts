@@ -8,7 +8,7 @@ const loggerMock = vi.hoisted(() => ({
   warn: vi.fn(),
   error: vi.fn(),
 }));
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 
@@ -18,16 +18,16 @@ import {
   CLAUDE_TRUNCATED_LOGS_ATTR,
 } from "~/server/app-layer/traces/claude-code-log-to-span";
 import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
+import type { RecordSpanCommandData } from "../../schemas/commands";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
 } from "../../schemas/constants";
-import type { OtlpSpan } from "../../schemas/otlp";
-import type { RecordSpanCommandData } from "../../schemas/commands";
 import type {
   LogRecordReceivedEvent,
   SpanReceivedEvent,
 } from "../../schemas/events";
+import type { OtlpSpan } from "../../schemas/otlp";
 import { createClaudeCodeSpanSyncReactor } from "../claudeCodeSpanSync.reactor";
 
 const SCOPE = "com.anthropic.claude_code.events";

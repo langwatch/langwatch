@@ -16,9 +16,9 @@ export const generatedScenarioSchema = z.object({
  */
 export type GeneratedScenario = z.infer<typeof generatedScenarioSchema>;
 
-/** Serialized DomainError shape the generate endpoint attaches to handled failures */
-const serializedDomainErrorSchema = z.object({
-  kind: z.string(),
+/** Serialized HandledError shape the generate endpoint attaches to handled failures */
+const serializedHandledErrorSchema = z.object({
+  code: z.string(),
   meta: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -88,14 +88,14 @@ export async function generateScenarioWithAI(
   }
 
   if (!response.ok) {
-    const domainError = serializedDomainErrorSchema.safeParse(
+    const handled = serializedHandledErrorSchema.safeParse(
       payload.domainError,
     );
-    if (domainError.success) {
+    if (handled.success) {
       throw new ScenarioGenerationError(
         payload.error || "Failed to generate scenario",
-        domainError.data.kind,
-        domainError.data.meta,
+        handled.data.code,
+        handled.data.meta,
       );
     }
     throw new Error(payload.error || "Failed to generate scenario");

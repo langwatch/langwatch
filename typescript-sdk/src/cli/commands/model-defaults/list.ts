@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 
 import { ModelDefaultsApiService } from "@/client-sdk/services/model-defaults/model-defaults-api.service";
 
@@ -13,7 +13,7 @@ export const listModelDefaultsCommand = async (options?: {
   checkApiKey();
 
   const service = new ModelDefaultsApiService();
-  const spinner = ora("Fetching default-model configuration...").start();
+  const spinner = createSpinner("Fetching default-model configuration...").start();
 
   try {
     const snapshot = await service.getSnapshot();
@@ -74,7 +74,7 @@ export const listModelDefaultsCommand = async (options?: {
     }
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch default models" });
+    failSpinner({ spinner, error, action: "fetch default models", format: options?.format });
     process.exit(1);
   }
 };

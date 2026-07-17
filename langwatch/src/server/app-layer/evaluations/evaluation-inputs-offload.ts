@@ -20,8 +20,8 @@
  * not a safe home for GB-scale evaluator inputs.
  */
 import { createHash } from "node:crypto";
+import { createLogger } from "@langwatch/observability";
 import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
-import { createLogger } from "~/utils/logger/server";
 import { streamToBuffer } from "~/utils/streamToBuffer";
 
 /**

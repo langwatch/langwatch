@@ -11,8 +11,8 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import {
   ProjectsApiService,
-  ProjectsApiError,
 } from "../projects-api.service";
+import { LangWatchDomainError } from "@/internal/api/errors";
 
 const TEST_ENDPOINT = "http://localhost:5560";
 
@@ -110,8 +110,8 @@ describe("ProjectsApiService", () => {
         );
       });
 
-      it("throws ProjectsApiError", async () => {
-        await expect(service.list()).rejects.toThrow(ProjectsApiError);
+      it("throws LangWatchDomainError", async () => {
+        await expect(service.list()).rejects.toThrow(LangWatchDomainError);
       });
     });
   });
@@ -147,8 +147,8 @@ describe("ProjectsApiService", () => {
         );
       });
 
-      it("throws ProjectsApiError", async () => {
-        await expect(service.get("nonexistent")).rejects.toThrow(ProjectsApiError);
+      it("throws LangWatchDomainError", async () => {
+        await expect(service.get("nonexistent")).rejects.toThrow(LangWatchDomainError);
       });
     });
   });
@@ -197,7 +197,7 @@ describe("ProjectsApiService", () => {
         );
       });
 
-      it("throws ProjectsApiError", async () => {
+      it("throws LangWatchDomainError", async () => {
         await expect(
           service.create({
             name: "Duplicate",
@@ -205,7 +205,7 @@ describe("ProjectsApiService", () => {
             framework: "langchain",
             newTeamName: "Team",
           }),
-        ).rejects.toThrow(ProjectsApiError);
+        ).rejects.toThrow(LangWatchDomainError);
       });
     });
   });

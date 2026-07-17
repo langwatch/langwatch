@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   SuitesApiService,
   type SuiteTarget,
@@ -39,7 +39,7 @@ export const updateSuiteCommand = async (
   checkApiKey();
 
   const service = new SuitesApiService();
-  const spinner = ora(`Updating suite "${id}"...`).start();
+  const spinner = createSpinner(`Updating suite "${id}"...`).start();
 
   try {
     const updateData: Record<string, unknown> = {};
@@ -68,7 +68,7 @@ export const updateSuiteCommand = async (
     console.log(`  ${chalk.gray("Repeat:")}    ${suite.repeatCount}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update suite" });
+    failSpinner({ spinner, error, action: "update suite", format: options?.format });
     process.exit(1);
   }
 };

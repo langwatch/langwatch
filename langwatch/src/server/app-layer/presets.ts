@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
 import {
@@ -21,7 +22,6 @@ import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-
 import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
-import { createLogger } from "~/utils/logger/server";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
@@ -46,6 +46,21 @@ import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRete
 import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
+import {
+  NullScheduledJobRepository,
+  PrismaScheduledJobRepository,
+} from "./scheduler/scheduled-job.repository";
+import { schedulerRegistry } from "./scheduler/scheduler.registry";
+import { SchedulerService } from "./scheduler/scheduler.service";
+import { getAnalyticsService } from "./analytics";
+import { loadReportCharts } from "./reports/report-chart.service";
+import { dispatchScheduledReport } from "./reports/report-dispatch";
+import { toReportTraceRow } from "./reports/trace-report-row";
+import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
+import { REPORT_SCHEDULER_TARGET_TYPE } from "./triggers/report.builder";
+import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
+import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { EventSourcing } from "../event-sourcing";
 import { dispatchOutboxEnqueues } from "../event-sourcing/outbox/dispatchOutboxEnqueues";
 import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
@@ -61,6 +76,48 @@ import {
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
+import { LangyConversationService } from "./langy/langy-conversation.service";
+import { LangyTurnService } from "./langy/langy-turn.service";
+import { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
+import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
+import { getVercelAIModel } from "~/server/modelProviders/utils";
+import {
+  mintLangySessionApiKey,
+  revokeLangySessionApiKey,
+} from "~/server/app-layer/langy/langyApiKey";
+import {
+  LANGY_GITHUB_PRS_PER_DAY,
+  releaseLangyGithubPrPermit,
+  reserveLangyGithubPrPermit,
+} from "~/server/middleware/rate-limit-langy-github-prs";
+import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
+import {
+  LangyGithubAppTokenService,
+  type RedisLike,
+} from "./langy/langyGithubAppToken";
+import {
+  createLangyTrustedMessageReader,
+  LangyMessageService,
+} from "./langy/langy-message.service";
+import { PrismaLangyMessageRepository } from "./langy/repositories/langy-message.prisma.repository";
+import { NullLangyMessageRepository } from "./langy/repositories/langy-message.repository";
+import { NullLangyGithubInstallationsRepository } from "./langy/repositories/langy-github-installations.repository";
+import { PrismaLangyGithubInstallationsRepository } from "./langy/repositories/langy-github-installations.prisma.repository";
+import { createLangyConversationTitleGenerator } from "./langy/langy-title-generation.service";
+import { PrismaLangyConversationProjectionRepository } from "./langy/repositories/langy-conversation-projection.prisma.repository";
+import { PrismaLangyConversationTurnProjectionRepository } from "./langy/repositories/langy-conversation-turn-projection.prisma.repository";
+import { PrismaLangyMessageProjectionRepository } from "./langy/repositories/langy-message-projection.prisma.repository";
+import { PrismaLangyConversationRepository } from "./langy/repositories/langy-conversation.prisma.repository";
+import { NullLangyConversationRepository } from "./langy/repositories/langy-conversation.repository";
+import { PrismaLangyTurnAdmissionRepository } from "./langy/repositories/langy-turn-admission.prisma.repository";
+import { NullLangyTurnAdmissionRepository } from "./langy/repositories/langy-turn-admission.repository";
+import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
+import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
+import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
+import { PrismaProcessStore } from "../event-sourcing/process-manager";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,
@@ -115,6 +172,7 @@ import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.
 import { EventExplorerService } from "./ops/event-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
+import { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import { ReplayService } from "./ops/replay.service";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
@@ -186,7 +244,7 @@ import {
 import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
 import { TriggerService } from "./triggers/trigger.service";
-import { TriggerTemplateService } from "./triggers/trigger-template.service";
+import { testFireTrigger } from "./triggers/trigger-template.service";
 import { UsageService } from "./usage/usage.service";
 
 /**
@@ -477,15 +535,23 @@ export function initializeDefaultApp(options?: {
     new MonitorService(new PrismaMonitorRepository(prisma)),
     "MonitorService",
   );
-  const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
+  const triggers = new TriggerService(
+    new PrismaTriggerRepository(prisma),
+    new PrismaScheduledJobRepository(prisma),
+    redis,
+  );
   const emailSuppressions = new EmailSuppressionService(
     new PrismaEmailSuppressionRepository(prisma),
     new PrismaEmailSuppressionNameLookupRepository(prisma),
   );
-  const triggerTemplates = new TriggerTemplateService({
+  const triggerTemplateDeps = {
     baseHost: config.baseHost ?? env.BASE_HOST,
     notifier: liveTriggerNotifier,
-  });
+  };
+  const triggerTemplates = {
+    testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
+      testFireTrigger(triggerTemplateDeps, input),
+  };
   const tokenizer = new TokenizerService(
     config.disableTokenization
       ? new NullTokenizerClient()
@@ -540,6 +606,23 @@ export function initializeDefaultApp(options?: {
     "ShareService",
   );
 
+  const langyConversationRepository = new PrismaLangyConversationRepository(
+    prisma,
+  );
+  const langyTurnAdmission = new PrismaLangyTurnAdmissionRepository(prisma);
+  const langyMessageRepository = new PrismaLangyMessageRepository(prisma);
+  const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
+  const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
+  const langyWorker = createLangyWorkerPort({
+    agentUrl: langyAgentUrl ?? "",
+    internalSecret: langyInternalSecret ?? "",
+  });
+  const langyHandoffStore = createLangyTurnHandoffStore({ redis });
+  const langyTokenBuffer = createLangyTokenBuffer({ redis });
+  const langyTitleGenerator = createLangyConversationTitleGenerator({
+    messages: createLangyTrustedMessageReader(langyMessageRepository),
+  });
+
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
     suiteRunState: clickhouseEnabled
@@ -577,6 +660,19 @@ export function initializeDefaultApp(options?: {
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
+    langyConversationState: new PrismaLangyConversationProjectionRepository(
+      prisma,
+    ),
+    langyConversationTurnState:
+      new PrismaLangyConversationTurnProjectionRepository(prisma),
+    langyMessageStorage: new PrismaLangyMessageProjectionRepository(prisma),
+    langyAnalyticsEventStorage: new LangyAnalyticsEventAppendStore(
+      clickhouseEnabled
+        ? new ClickHouseLangyAnalyticsEventRepository(resolveClickHouseClient)
+        : new NullLangyAnalyticsEventRepository(),
+    ),
+    langyProcessStore: new PrismaProcessStore(prisma),
+    langyTurnAdmission,
   };
 
   const gatewayBudgetSync = clickhouseEnabled
@@ -610,26 +706,26 @@ export function initializeDefaultApp(options?: {
   // EventSourcing`), so its `.withOutbox` reactors can enqueue settle
   // payloads. Web processes don't build this (no settle traffic; no consumer
   // to drain).
-  const outbox =
-    roleRunsWorkers(config.processRole)
-      ? buildOutboxRuntime({
-          prisma,
-          redis: redis ?? null,
-          triggers,
-          emailSuppressions,
-          projects,
-          evaluations: { runs: evaluations.runs },
-          traces: { spans: spanStorage },
-          traceSummaryRepository: repositories.traceSummaryFold,
-        })
-      : undefined;
+  const outbox = roleRunsWorkers(config.processRole)
+    ? buildOutboxRuntime({
+        prisma,
+        redis: redis ?? null,
+        triggers,
+        emailSuppressions,
+        projects,
+        evaluations: { runs: evaluations.runs },
+        traces: { spans: spanStorage },
+        traceSummaryRepository: repositories.traceSummaryFold,
+      })
+    : undefined;
 
   // EventSourcing must be constructed AFTER `outbox` and be given it here: the
   // reactor adapter (`.withOutbox` → enqueueSettle) and the global queue's
   // settle/cadence routing + audit adapter all read `this._outbox`, set once at
   // construction. Passing `outbox` anywhere else (e.g. only to the registry)
   // leaves every outbox reactor on the silent drop path — the trigger dispatch
-  // regression fixed here. See presets.outboxWiring.integration.test.ts.
+  // regression fixed here (also found by /review-pr reg5014-001 +
+  // dispatch5015-001). See presets.outboxWiring.integration.test.ts.
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
@@ -680,11 +776,163 @@ export function initializeDefaultApp(options?: {
   }
   outboxHeartbeatScheduler?.start();
 
+  // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
+  // worker-only in-process loop that sleeps until the soonest due
+  // `ScheduledJob`, atomically claims each due row (a conditional nextRunAt
+  // update — the DB-level exactly-once guarantee), and fires it into a handler
+  // registered on `schedulerRegistry`. There is no leader-lock: because the
+  // claim guarantees exactly-once, every worker runs the loop and races the
+  // claim, sharing firing load across the fleet. Postgres is the sole
+  // correctness/locking layer; `redis` is passed only for the BEST-EFFORT
+  // cross-pod wake (a job created on one pod fires everywhere now instead of
+  // within one poll backstop) — a missing/flaky Redis just falls back to the
+  // poll, never affecting correctness. Kept dormant this phase — no consumers
+  // register yet (the report handler lands in a later phase), so the loop runs
+  // and log-and-skips any orphan targetType.
+  const scheduler = roleRunsWorkers(config.processRole)
+    ? new SchedulerService({
+        repo: new PrismaScheduledJobRepository(prisma),
+        registry: schedulerRegistry,
+        processRole: config.processRole,
+        logger: createLogger("langwatch:app-layer:scheduler"),
+        redis,
+      })
+    : undefined;
+  scheduler?.start();
+
+  // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
+  // renders + dispatches on schedule (worker-only, same notify pipeline as
+  // alerts). The scheduler registry is a process singleton.
+  if (roleRunsWorkers(config.processRole)) {
+    schedulerRegistry.register({
+      targetType: REPORT_SCHEDULER_TARGET_TYPE,
+      handler: (fire) =>
+        dispatchScheduledReport({
+          deps: {
+            loadTrigger: ({ projectId, triggerId }) =>
+              prisma.trigger.findFirst({
+                where: { id: triggerId, projectId },
+              }),
+            loadProject: (projectId) =>
+              prisma.project.findUnique({ where: { id: projectId } }),
+            sendEmail: sendRenderedTriggerEmail,
+            sendSlack: sendRenderedSlackMessage,
+            sendSlackBot: postSlackChatMessage,
+            filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
+              emailSuppressions.filterSuppressed({
+                projectId,
+                triggerId,
+                emails,
+              }),
+            // The top-N traces matching the report's Subject query over its
+            // window, via the shared TraceListService. The ADR-043 filter DSL
+            // compiles the author's query straight into the bare-column
+            // `filterWhere` getList takes, so a "top matching traces" report
+            // finally matches on what the author asked for. (The older
+            // filters-OBJECT builder could not: it emits `ts.`-aliased
+            // conditions for a JOIN context, invalid here.)
+            listReportTraces: async ({
+              projectId,
+              projectSlug,
+              query,
+              from,
+              to,
+              limit,
+            }) => {
+              const page = await traceList.getList({
+                tenantId: projectId,
+                timeRange: { from, to },
+                sort: { columnId: "time", direction: "desc" },
+                page: 1,
+                pageSize: limit,
+                visibilityCutoffMs: null,
+                filterWhere:
+                  translateFilterToClickHouse(query, projectId, { from, to }) ??
+                  undefined,
+              });
+              const projectUrl = `${config.baseHost ?? env.BASE_HOST}/${projectSlug}`;
+              return page.items.map((item) =>
+                toReportTraceRow({ item, projectUrl }),
+              );
+            },
+            // A report's fire is a completed EVENT, not an open incident, so
+            // `resolvedAt` is stamped at write time. The list's "currently
+            // firing" read looks for `customGraphId != null AND resolvedAt IS
+            // NULL`, so a report row can never masquerade as a live alert.
+            recordFire: async ({ projectId, triggerId, firedAt }) => {
+              await prisma.triggerSent.create({
+                data: {
+                  projectId,
+                  triggerId,
+                  traceId: null,
+                  customGraphId: null,
+                  createdAt: firedAt,
+                  resolvedAt: firedAt,
+                },
+              });
+            },
+            loadReportCharts: ({ projectId, source, from, to }) =>
+              loadReportCharts({
+                deps: {
+                  loadCustomGraph: ({ projectId, customGraphId }) =>
+                    prisma.customGraph.findFirst({
+                      where: { id: customGraphId, projectId },
+                    }),
+                  loadDashboardGraphs: ({ projectId, dashboardId }) =>
+                    prisma.customGraph.findMany({
+                      where: { dashboardId, projectId },
+                      orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
+                    }),
+                  getTimeseries: (input) =>
+                    getAnalyticsService().getTimeseries(input),
+                },
+                source,
+                projectId,
+                from,
+                to,
+              }),
+            baseHost: config.baseHost ?? env.BASE_HOST,
+          },
+          fire,
+        }),
+    });
+
+    // ADR-044 durable self-heal: the report upsert route writes the Trigger row
+    // and its ScheduledJob in two non-atomic steps, so a crash between them can
+    // leave an active report with no schedule. Repair any such gaps at boot
+    // (create-if-missing, race-safe on every worker). Fire-and-forget so boot is
+    // never blocked; a failure is logged, not fatal (the next boot retries).
+    const reconcileLogger = createLogger("langwatch:app-layer:scheduler");
+    void triggers
+      .reconcileReportSchedules()
+      .then(({ repaired }) => {
+        if (repaired > 0) {
+          reconcileLogger.info(
+            { repaired },
+            "Reconciled report schedules missing a ScheduledJob at boot",
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        reconcileLogger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Report-schedule reconciliation failed at boot (will retry next boot)",
+        );
+      });
+  }
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
     redis: redis!,
     broadcast,
+    langy: {
+      buffer: langyTokenBuffer,
+      handoffStore: langyHandoffStore,
+      worker: langyWorker,
+      titleGenerator: langyTitleGenerator,
+      runsWorkers: roleRunsWorkers(config.processRole),
+    },
     projects,
     monitors,
     triggers,
@@ -706,6 +954,58 @@ export function initializeDefaultApp(options?: {
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle =
     commands.scenarioExecutionHandle;
+
+  // Langy operational reads come from the Postgres projections; writes remain
+  // commands against the canonical ClickHouse event log.
+  const langyConversations = LangyConversationService.create(
+    commands.langy,
+    langyConversationRepository,
+    langyMessageRepository,
+  );
+  const langyMessages = new LangyMessageService(
+    langyMessageRepository,
+    langyConversationRepository,
+  );
+
+  // Langy GitHub App installations (issue #4747): the install/webhook lifecycle
+  // and the per-turn installation-token mint for bot-authored PRs. The App is
+  // optional per instance; when the private key is unset the service reports
+  // `configured=false` and every read short-circuits to "GitHub unavailable"
+  // without touching GitHub. The App private key is the only credential and it
+  // lives here in the control plane, never near a worker.
+  const langyGithubAppTokens = new LangyGithubAppTokenService(
+    env.GITHUB_LANGY_APP_ID ?? "",
+    env.GITHUB_LANGY_PRIVATE_KEY ?? "",
+    // ioredis Redis/Cluster satisfy the narrow RedisLike surface at runtime; the
+    // client's overloaded `set` signature just isn't structurally assignable.
+    (redis ?? null) as unknown as RedisLike | null,
+  );
+  const langyGithubInstallations = new LangyGithubInstallationsService(
+    new PrismaLangyGithubInstallationsRepository(prisma),
+    langyGithubAppTokens,
+  );
+
+  // Langy turn-start orchestration (LANGY_REWORK_PLAN.md S2 C): the pipeline the
+  // Hono route used to inline, now an app-layer service with injected ports. The
+  // worker port + turn stores are null when their infra is absent (no agent env /
+  // no Redis); the service raises LangyAgentUnavailableError in that case, exactly
+  // as the route 503'd.
+  const langyTurns = LangyTurnService.create({
+    conversations: langyConversations,
+    credentials: LangyCredentialService.create(prisma),
+    resolveModel: getVercelAIModel,
+    worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
+    reservePermit: reserveLangyGithubPrPermit,
+    releasePermit: releaseLangyGithubPrPermit,
+    perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
+    mintSessionKey: ({ session, projectId, organizationId }) =>
+      mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
+    revokeSessionKey: ({ apiKeyId }) =>
+      revokeLangySessionApiKey({ prisma, apiKeyId }).then(() => undefined),
+    admission: langyTurnAdmission,
+    accessStore: redis ? createLangyTurnAccessStore({ redis }) : null,
+    handoffStore: redis ? langyHandoffStore : null,
+  });
 
   const suiteRunService = SuiteRunService.create({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
@@ -814,6 +1114,10 @@ export function initializeDefaultApp(options?: {
       await broadcast.close();
     },
   });
+  gracefulCloseables.push({
+    name: "langy-process-outbox",
+    close: () => commands.processOutboxWorker.stop(),
+  });
   // The outbox runtime piggy-backs on the main event-sourcing queue
   // (ADR-030 revision 3), so there's nothing outbox-specific to close —
   // the event-sourcing queue's own close registration covers it.
@@ -823,6 +1127,12 @@ export function initializeDefaultApp(options?: {
       close: async () => {
         await outboxHeartbeatScheduler.stop();
       },
+    });
+  }
+  if (scheduler) {
+    gracefulCloseables.push({
+      name: "scheduler",
+      close: () => scheduler.stop(),
     });
   }
   gracefulCloseables.push({
@@ -863,6 +1173,9 @@ export function initializeDefaultApp(options?: {
 
   const ops = {
     queues: new QueueService(queueRepo),
+    scheduler: new SchedulerOpsService(
+      new PrismaScheduledJobRepository(prisma),
+    ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
     replay: new ReplayService(replayRepo),
     metricsCollector: redis
@@ -883,6 +1196,12 @@ export function initializeDefaultApp(options?: {
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
+    langy: {
+      conversations: langyConversations,
+      turns: langyTurns,
+      messages: langyMessages,
+      githubInstallations: langyGithubInstallations,
+    },
     organizations,
     projects,
     tokenizer,
@@ -1025,17 +1344,26 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       new NullEmailSuppressionRepository(),
       new NullEmailSuppressionNameLookupRepository(),
     ),
-    triggerTemplates: new TriggerTemplateService({
-      baseHost: config.baseHost ?? env.BASE_HOST,
-      notifier: {
-        sendEmail: async () => {
-          /* test no-op */
+    triggerTemplates: (() => {
+      const testDeps = {
+        baseHost: config.baseHost ?? env.BASE_HOST,
+        notifier: {
+          sendEmail: async () => {
+            /* test no-op */
+          },
+          sendSlack: async () => {
+            /* test no-op */
+          },
+          sendSlackBot: async () => {
+            /* test no-op */
+          },
         },
-        sendSlack: async () => {
-          /* test no-op */
-        },
-      },
-    }),
+      };
+      return {
+        testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
+          testFireTrigger(testDeps, input),
+      };
+    })(),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: {
       runs: SuiteRunService.create({
@@ -1043,6 +1371,59 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         startSuiteRun: noop,
         queueSimulationRun: noop,
       }),
+    },
+    langy: {
+      conversations: LangyConversationService.create(
+        {
+          createConversation: noop,
+          forkConversation: noop,
+          recordMessage: noop,
+          importMessage: noop,
+          acceptAgentTurn: noop,
+          initiateToolCall: noop,
+          succeedToolCall: noop,
+          failToolCall: noop,
+          updatePlan: noop,
+          failAgentResponse: noop,
+          recordAgentResponse: noop,
+          archiveConversation: noop,
+          updateConversationMetadata: noop,
+          recordTurnHandoff: noop,
+          consumeTurnHandoff: noop,
+          generateConversationTitle: noop,
+        },
+        new NullLangyConversationRepository(),
+      ),
+      turns: LangyTurnService.create({
+        conversations: void 0 as unknown as LangyConversationService,
+        credentials: void 0 as unknown as LangyCredentialService,
+        resolveModel: async () => {
+          throw new Error("no model provider in test app");
+        },
+        worker: null,
+        reservePermit: async () => ({
+          reserved: false,
+          allowed: false,
+          resetAt: 0,
+        }),
+        releasePermit: noop,
+        perDayPrCap: 0,
+        mintSessionKey: async () => {
+          throw new Error("no session-key mint in test app");
+        },
+        revokeSessionKey: noop,
+        admission: new NullLangyTurnAdmissionRepository(),
+        accessStore: null,
+        handoffStore: null,
+      }),
+      messages: new LangyMessageService(
+        new NullLangyMessageRepository(),
+        new NullLangyConversationRepository(),
+      ),
+      githubInstallations: new LangyGithubInstallationsService(
+        new NullLangyGithubInstallationsRepository(),
+        new LangyGithubAppTokenService("", "", null),
+      ),
     },
     organizations: nullOrganizations,
     projects: nullProjects,
@@ -1064,6 +1445,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     usageLimits: UsageLimitService.createNull(),
     ops: {
       queues: new QueueService(new NullQueueRepository()),
+      scheduler: new SchedulerOpsService(new NullScheduledJobRepository()),
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),
@@ -1111,6 +1493,24 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordSuiteRunItemStarted: noop,
         completeSuiteRunItem: noop,
       } as AppCommands["suiteRuns"],
+      langy: {
+        createConversation: noop,
+        forkConversation: noop,
+        recordMessage: noop,
+        importMessage: noop,
+        acceptAgentTurn: noop,
+        initiateToolCall: noop,
+        succeedToolCall: noop,
+        failToolCall: noop,
+        updatePlan: noop,
+        failAgentResponse: noop,
+        recordAgentResponse: noop,
+        archiveConversation: noop,
+        updateConversationMetadata: noop,
+        recordTurnHandoff: noop,
+        consumeTurnHandoff: noop,
+        generateConversationTitle: noop,
+      } as AppCommands["langy"],
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
@@ -1125,6 +1525,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         setPool: () => {
           /* noop */
         },
+      },
+      processOutboxWorker: {
+        stop: async () => {},
       },
     },
     retentionPolicyCache: testRetentionPolicyCache,

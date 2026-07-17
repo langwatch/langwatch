@@ -1,4 +1,5 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { ClickHouseLogger } from "~/server/clickhouse/clickhouseLogger";
 import { createResilientClickHouseClient } from "./clickhouse.resilient";
 
 export interface ClickHouseFactoryOptions {
@@ -26,6 +27,7 @@ export function createClickHouseClientFromConfig(
       enabled: true,
       idle_socket_ttl: 1500,
     },
+    log: { LoggerClass: ClickHouseLogger },
   });
 
   return createResilientClickHouseClient({ client: raw });

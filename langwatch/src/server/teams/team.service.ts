@@ -1,5 +1,5 @@
 import { Prisma, RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
-import { NotFoundError, ValidationError } from "~/server/app-layer/domain-error";
+import { NotFoundError, ValidationError } from "~/server/app-layer/handled-error";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,

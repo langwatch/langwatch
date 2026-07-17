@@ -167,7 +167,7 @@ describe("generateScenarioWithAI()", () => {
           Promise.resolve({
             error: "bad_request",
             domainError: {
-              kind: "missing_provider",
+              code: "missing_provider",
               meta: { reason: "missing_provider" },
               httpStatus: 400,
             },

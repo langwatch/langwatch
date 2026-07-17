@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -34,7 +34,7 @@ export const updateProjectCommand = async (
   }
 
   const service = new ProjectsApiService();
-  const spinner = ora(`Updating project "${id}"...`).start();
+  const spinner = createSpinner(`Updating project "${id}"...`).start();
 
   try {
     const updated = await service.update(id, {
@@ -61,7 +61,7 @@ export const updateProjectCommand = async (
     console.log(`${chalk.bold("Updated:")}         ${new Date(updated.updatedAt).toLocaleString()}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update project" });
+    failSpinner({ spinner, error, action: "update project", format: options?.format });
     process.exit(1);
   }
 };

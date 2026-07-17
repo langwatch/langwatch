@@ -59,7 +59,7 @@ make quickstart dev-storage            # Local DBs + workers, stored-objects -> 
 make quickstart dev-infra              # Local app + redis + workers compose; shared dev for PG/CH/NLP/S3
 make quickstart frontend-only          # No compose, fastest — UI / design work
 make quickstart migration              # postgres + clickhouse on host ports for prisma migrate (no app, no workers)
-make quickstart full-local             # Kitchen-sink local: all-local-nlp + dedicated workers container + bullboard + ai-server
+make quickstart full-local             # Kitchen-sink local: all-local-nlp + dedicated workers container + ai-server
 make quickstart-help                   # Non-interactive preset reference
 make down                              # Stop all services
 make service svc=aigateway             # Start the Go AI Gateway data plane on :5563

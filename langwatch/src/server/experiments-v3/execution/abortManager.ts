@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import { connection } from "~/server/redis";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("experiments-v3:abort-manager");
 

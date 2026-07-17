@@ -9,9 +9,11 @@
  * ALERTS (`alertDefaults` below). The shape of an alert is "metric X
  * crossed threshold Y" — not "this trace happened matching filters" —
  * so the default subject + body + Slack mrkdwn all read in metric-
- * crossed-threshold terms instead of trace terms. Selection happens
- * via `pickTriggerDefaults({ hasCustomGraph })`; per-trigger custom
- * Liquid still overrides whichever default it picks.
+ * crossed-threshold terms instead of trace terms. Callers pick the set
+ * directly — graph-alert dispatch passes `ALERT_TRIGGER_DEFAULTS` as the
+ * `defaults` override on `renderTriggerEmail` / `renderTriggerSlack`,
+ * trace dispatch relies on the renderers' built-in trace defaults —
+ * and per-trigger custom Liquid still overrides whichever default applies.
  */
 
 export const DEFAULT_EMAIL_SUBJECT_TEMPLATE =
@@ -67,33 +69,39 @@ export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ�
  * DEFAULT_SLACK_TEMPLATE comment above.
  */
 /**
- * ADR-034 Phase 5: alert-default templates for custom-graph threshold
- * alerts. These render in metric-crossed-threshold language instead of
- * the trace-iteration shape the trace defaults use. The dispatcher /
- * test-fire path picks these via `pickTriggerDefaults({ hasCustomGraph:
- * true })` whenever the trigger has a `customGraphId` set. The matched
- * `m.trace.input` carries "Graph: <name>" and `m.trace.output` carries
- * "Current value: <v> (threshold: <op> <thr>)" — the EXACT triggerData
- * shape the cron and the new handler both produce, so the variables
- * line up without an extra context contract.
+ * ADR-034 Phase 5/8.1: alert-default templates for custom-graph threshold
+ * alerts. Render in metric-crossed-threshold language against
+ * `GraphAlertTemplateContext` — `trigger`, `graph`, `metric`,
+ * `condition`, `currentValue`, `occurredAt`, `reason`, `project`.
+ *
+ * Phase 8.1 wires the graph-trigger evaluator through the same Liquid
+ * pipeline trace triggers use, so these defaults must read those
+ * fields directly instead of the trace-iteration shape Phase 5 used as
+ * a placeholder. Graph-alert dispatch passes `ALERT_TRIGGER_DEFAULTS`
+ * explicitly as the renderers' `defaults`; per-trigger custom Liquid
+ * (the four Trigger columns) still overrides it.
  */
 export const DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE =
-  "[Alert] {{ trigger.name }}";
+  "[Alert] {{ trigger.name }} — {{ metric.label }} {{ condition.operatorLabel }} {{ condition.threshold }}";
 
 export const DEFAULT_ALERT_EMAIL_BODY_TEMPLATE = `# [Alert] {{ trigger.name }}
 
-{% for m in matches %}**{{ m.trace.input }}**
+**{{ metric.label }}** {{ condition.operatorLabel }} **{{ condition.threshold }}** over the {{ condition.timePeriodLabel }}.
+{% if reason == "heartbeat-absence" %}
+No qualifying data was seen in the window.
+{% endif %}
+Current value: **{{ currentValue }}**{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operatorLabel }} {{ condition.threshold }}.
+{% if sparkline != "" %}
+Trend: \`{{ sparkline }}\`
+{% endif %}
+[Open dashboard ↗]({{ graph.url }})`;
 
-{{ m.trace.output }}
-
-[Open dashboard ↗]({{ m.trace.url }})
-{% endfor %}`;
-
-export const DEFAULT_ALERT_SLACK_TEMPLATE = `:rotating_light: *{{ trigger.name }}*{% if trigger.alertType %} _({{ trigger.alertType }})_{% endif %}
-{% for m in matches %}*{{ m.trace.input | mrkdwn_escape }}*
-{{ m.trace.output | mrkdwn_escape }}
-<{{ m.trace.url }}|Open dashboard>{% unless forloop.last %}
-{% endunless %}{% endfor %}`;
+export const DEFAULT_ALERT_SLACK_TEMPLATE = `:rotating_light: *{{ trigger.name | mrkdwn_escape }}*{% if trigger.alertType %} _({{ trigger.alertType }})_{% endif %}
+*{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} *{{ condition.threshold }}* over the {{ condition.timePeriodLabel }}.{% if reason == "heartbeat-absence" %}
+No qualifying data was seen in the window.{% endif %}
+Current value: *{{ currentValue }}*{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operatorLabel }} {{ condition.threshold }}.{% if sparkline != "" %}
+Trend: \`{{ sparkline }}\`{% endif %}
+<{{ graph.url }}|Open dashboard>`;
 
 export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
   {
@@ -112,27 +120,36 @@ export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
     ]
   },
   {% endif %}
-  {% for m in matches %}
+  {%- capture _metric_line -%}*{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} *{{ condition.threshold }}* over the {{ condition.timePeriodLabel }}.{%- endcapture -%}
   {
     "type": "section",
-    "text": { "type": "mrkdwn", "text": {{ m.trace.input | mrkdwn_escape | prepend: "*" | append: "*" | json }} }
+    "text": { "type": "mrkdwn", "text": {{ _metric_line | json }} }
   },
+  {%- capture _value_line -%}Current value: *{{ currentValue }}*{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operatorLabel }} {{ condition.threshold }}.{%- endcapture -%}
   {
     "type": "section",
-    "text": { "type": "mrkdwn", "text": {{ m.trace.output | mrkdwn_escape | json }} }
+    "text": { "type": "mrkdwn", "text": {{ _value_line | json }} }
   },
-  {%- capture _link -%}<{{ m.trace.url }}|Open dashboard>{%- endcapture -%}
+  {% if sparkline != "" %}
+  {%- capture _trend_line -%}Trend: \`{{ sparkline }}\`{%- endcapture -%}
+  {
+    "type": "context",
+    "elements": [
+      { "type": "mrkdwn", "text": {{ _trend_line | json }} }
+    ]
+  },
+  {% endif %}
+  {%- capture _link -%}<{{ graph.url }}|Open dashboard>{%- endcapture -%}
   {
     "type": "context",
     "elements": [
       { "type": "mrkdwn", "text": {{ _link | json }} }
     ]
   },
-  {% endfor %}
   {
     "type": "divider"
   },
-  {%- capture _footer_text -%}<{{ trigger.editUrl }}|Edit automation>{%- endcapture -%}
+  {%- capture _footer_text -%}<{{ trigger.editUrl }}|Edit alert>{%- endcapture -%}
   {
     "type": "context",
     "elements": [
@@ -142,10 +159,10 @@ export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
 ]`;
 
 /**
- * The four default-template strings a renderer needs, picked together
- * to keep email + slack defaults aligned. `pickTriggerDefaults`
- * returns the trace-shape set or the alert-shape set based on whether
- * the trigger is a custom-graph alert.
+ * The four default-template strings a renderer needs, grouped together
+ * to keep email + slack defaults aligned. Callers select the set that
+ * matches the trigger directly — `ALERT_TRIGGER_DEFAULTS` for custom-graph
+ * threshold alerts, `TRACE_TRIGGER_DEFAULTS` for trace triggers.
  */
 export interface TriggerTemplateDefaults {
   emailSubject: string;
@@ -225,18 +242,111 @@ export const TRACE_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
   slackBlockKit: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
 };
 
+
 /**
- * ADR-034 Phase 5: pick the trace-shape or alert-shape default set.
- * Selection by `hasCustomGraph` matches the cron's discriminator (a
- * trigger with `customGraphId != null` IS the graph-alert path, full
- * stop). A per-trigger custom Liquid template STILL overrides whichever
- * default set this returns — the dispatcher checks `hasCustomEmail` /
- * `hasCustomSlack` before reaching for any default.
+ * ADR-044: default templates for a SCHEDULED REPORT. Reads as "here is your
+ * {source} for {period}" — `report.sourceLabel`, `report.scheduleLabel`,
+ * `viewUrl`, plus the report's data: `traces` for a trace-query report,
+ * `charts` for a graph or dashboard one. Rendered through the same Liquid
+ * pipeline; per-trigger custom templates still override.
+ *
+ * These are the FALLBACK, so they must say something useful for any source —
+ * hence both branches. The gallery layouts (`templates/report_*.liquid`) are
+ * what a report normally renders with, and those are source-specific.
  */
-export function pickTriggerDefaults({
-  hasCustomGraph,
-}: {
-  hasCustomGraph: boolean;
-}): TriggerTemplateDefaults {
-  return hasCustomGraph ? ALERT_TRIGGER_DEFAULTS : TRACE_TRIGGER_DEFAULTS;
+export const DEFAULT_REPORT_EMAIL_SUBJECT_TEMPLATE =
+  "[Report] {{ trigger.name }} — {{ report.scheduleLabel }}";
+
+export const DEFAULT_REPORT_EMAIL_BODY_TEMPLATE = `# {{ trigger.name }}
+
+{{ report.sourceLabel }} · {{ report.scheduleLabel }}.
+{% if report.isEmpty %}
+Nothing to show for this period.
+{% else %}{% for t in traces %}- [{{ t.traceId }}]({{ t.url }}) — {{ t.input }} _({{ t.model }} · \${{ t.costUsd | round: 4 }} · {{ t.durationMs | round: 0 }} ms)_
+{% endfor %}{% for chart in charts %}- **{{ chart.title }}** — {% if chart.isEmpty %}no data{% else %}{{ chart.total | round: 2 }}{% endif %}
+{% endfor %}{% endif %}
+[View in LangWatch ↗]({{ viewUrl }})`;
+
+/**
+ * How many rows the default Slack report message lists inline. A report can
+ * match up to 100 traces, and Slack rejects a `section` whose text runs past
+ * 3000 characters — with a non-retryable `invalid_blocks`, so an over-long
+ * message is not delivered at all. The default therefore lists the first rows
+ * and tells the reader how many more there are; the full set is one click away
+ * in LangWatch.
+ */
+const REPORT_SLACK_ROW_LIMIT = 10;
+
+export const DEFAULT_REPORT_SLACK_TEMPLATE = `:bar_chart: *{{ trigger.name | mrkdwn_escape }}*
+{{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}{% if report.isEmpty %}
+_Nothing to show for this period._{% else %}
+{% for t in traces limit: ${REPORT_SLACK_ROW_LIMIT} %}• <{{ t.url }}|{{ t.traceId }}> {{ t.input | mrkdwn_escape }}
+{% endfor %}{% if traces.size > ${REPORT_SLACK_ROW_LIMIT} %}_…and {{ traces.size | minus: ${REPORT_SLACK_ROW_LIMIT} }} more_
+{% endif %}{% for chart in charts limit: ${REPORT_SLACK_ROW_LIMIT} %}• *{{ chart.title | mrkdwn_escape }}* — {% if chart.isEmpty %}_no data_{% else %}{{ chart.total | round: 2 }}{% endif %}
+{% endfor %}{% if charts.size > ${REPORT_SLACK_ROW_LIMIT} %}_…and {{ charts.size | minus: ${REPORT_SLACK_ROW_LIMIT} }} more_
+{% endif %}{% endif %}
+<{{ viewUrl }}|View in LangWatch>`;
+
+export const DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE = `[
+  {
+    "type": "header",
+    "text": { "type": "plain_text", "text": {{ trigger.name | prepend: ":bar_chart: " | json }}, "emoji": true }
+  },
+  {%- capture _sub -%}{{ report.sourceLabel }} · {{ report.scheduleLabel }}{%- endcapture -%}
+  {
+    "type": "section",
+    "text": { "type": "mrkdwn", "text": {{ _sub | json }} }
+  },
+  {%- if report.isEmpty -%}
+  {
+    "type": "section",
+    "text": { "type": "mrkdwn", "text": "_Nothing to show for this period._" }
+  },
+  {%- else -%}
+  {%- capture _rows -%}{% for t in traces limit: ${REPORT_SLACK_ROW_LIMIT} %}• <{{ t.url }}|{{ t.traceId }}> {{ t.input | mrkdwn_escape }}
+{% endfor %}{% if traces.size > ${REPORT_SLACK_ROW_LIMIT} %}_…and {{ traces.size | minus: ${REPORT_SLACK_ROW_LIMIT} }} more_
+{% endif %}{% for chart in charts limit: ${REPORT_SLACK_ROW_LIMIT} %}• *{{ chart.title | mrkdwn_escape }}* — {% if chart.isEmpty %}_no data_{% else %}{{ chart.total | round: 2 }}{% endif %}
+{% endfor %}{% if charts.size > ${REPORT_SLACK_ROW_LIMIT} %}_…and {{ charts.size | minus: ${REPORT_SLACK_ROW_LIMIT} }} more_
+{% endif %}{%- endcapture -%}
+  {
+    "type": "section",
+    "text": { "type": "mrkdwn", "text": {{ _rows | json }} }
+  },
+  {%- endif -%}
+  {
+    "type": "context",
+    "elements": [{ "type": "mrkdwn", "text": {{ viewUrl | prepend: "<" | append: "|View in LangWatch>" | json }} }]
+  }
+]`;
+
+export const REPORT_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
+  emailSubject: DEFAULT_REPORT_EMAIL_SUBJECT_TEMPLATE,
+  emailBody: DEFAULT_REPORT_EMAIL_BODY_TEMPLATE,
+  slackString: DEFAULT_REPORT_SLACK_TEMPLATE,
+  slackBlockKit: DEFAULT_REPORT_SLACK_BLOCK_KIT_TEMPLATE,
+};
+
+/** What a trigger is about — trace data, a custom-graph threshold alert, or a
+ *  scheduled report. Each renders against its own variable contract, so each
+ *  has its own default template set. */
+export type TemplateSourceKind = "trace" | "graphAlert" | "report";
+
+/**
+ * The single answer to "which default templates apply to this source kind".
+ * Every surface that seeds, previews, or dispatches a template asks here — the
+ * editor an author types into, the preview beside it, and the message that is
+ * actually sent must all resolve the same set, or the author is shown a
+ * template that will never be sent.
+ */
+export function defaultsForSourceKind(
+  sourceKind: TemplateSourceKind,
+): TriggerTemplateDefaults {
+  switch (sourceKind) {
+    case "graphAlert":
+      return ALERT_TRIGGER_DEFAULTS;
+    case "report":
+      return REPORT_TRIGGER_DEFAULTS;
+    case "trace":
+      return TRACE_TRIGGER_DEFAULTS;
+  }
 }

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -42,7 +42,7 @@ export const createVirtualKeyCommand = async (options: CreateVirtualKeyOptions):
   }
 
   const service = new VirtualKeysApiService();
-  const spinner = ora(`Creating virtual key "${options.name}"...`).start();
+  const spinner = createSpinner(`Creating virtual key "${options.name}"...`).start();
 
   try {
     const { virtual_key, secret } = await service.create({
@@ -85,7 +85,7 @@ export const createVirtualKeyCommand = async (options: CreateVirtualKeyOptions):
     }
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "create virtual key" });
+    failSpinner({ spinner, error, action: "create virtual key", format: options?.format });
     process.exit(1);
   }
 };
