@@ -143,8 +143,8 @@ importers:
         specifier: ^2.0.8
         version: 2.0.10(hono@4.12.30)
       '@hono/zod-validator':
-        specifier: ^0.8.0
-        version: 0.8.0(hono@4.12.30)(zod@3.25.76)
+        specifier: ^0.4.3
+        version: 0.4.3(hono@4.12.30)(zod@3.25.76)
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.81.0(react@19.2.7))
@@ -408,7 +408,7 @@ importers:
         version: 4.12.30
       hono-openapi:
         specifier: ^0.4.8
-        version: 0.4.8(@hono/zod-validator@0.8.0(hono@4.12.30)(zod@3.25.76))(hono@4.12.30)(openapi-types@12.1.3)(zod-openapi@4.2.4(zod@3.25.76))(zod@3.25.76)
+        version: 0.4.8(@hono/zod-validator@0.4.3(hono@4.12.30)(zod@3.25.76))(hono@4.12.30)(openapi-types@12.1.3)(zod-openapi@4.2.4(zod@3.25.76))(zod@3.25.76)
       immer:
         specifier: ^11.1.11
         version: 11.1.15
@@ -2162,12 +2162,6 @@ packages:
     peerDependencies:
       hono: '>=4.12.25'
       zod: ^3.19.1
-
-  '@hono/zod-validator@0.8.0':
-    resolution: {integrity: sha512-5uS4S1/LKtZQYvD4BtpPUFkOv8d1wNxHHrChm26buMiEYc1FrHWvDUaKVBwkiVtvSExHSpLGDvcnpI2Copyj9w==}
-    peerDependencies:
-      hono: '>=4.12.25'
-      zod: ^3.25.0 || ^4.0.0
 
   '@hookform/resolvers@5.4.0':
     resolution: {integrity: sha512-EIsqr/t/qbinPIhGjMdtvutIN1Kk4uwbROE9/UQ93CAVGR7GkA7Y92+fX80OzXi/OB67jVFYwKGO1WzkxmkFZw==}
@@ -13071,7 +13065,7 @@ snapshots:
       zod: 3.25.76
     optional: true
 
-  '@hono/zod-validator@0.8.0(hono@4.12.30)(zod@3.25.76)':
+  '@hono/zod-validator@0.4.3(hono@4.12.30)(zod@3.25.76)':
     dependencies:
       hono: 4.12.30
       zod: 3.25.76
@@ -19690,12 +19684,12 @@ snapshots:
       zod: 3.25.76
       zod-openapi: 4.2.4(zod@3.25.76)
 
-  hono-openapi@0.4.8(@hono/zod-validator@0.8.0(hono@4.12.30)(zod@3.25.76))(hono@4.12.30)(openapi-types@12.1.3)(zod-openapi@4.2.4(zod@3.25.76))(zod@3.25.76):
+  hono-openapi@0.4.8(@hono/zod-validator@0.4.3(hono@4.12.30)(zod@3.25.76))(hono@4.12.30)(openapi-types@12.1.3)(zod-openapi@4.2.4(zod@3.25.76))(zod@3.25.76):
     dependencies:
       json-schema-walker: 2.0.0
       openapi-types: 12.1.3
     optionalDependencies:
-      '@hono/zod-validator': 0.8.0(hono@4.12.30)(zod@3.25.76)
+      '@hono/zod-validator': 0.4.3(hono@4.12.30)(zod@3.25.76)
       hono: 4.12.30
       zod: 3.25.76
       zod-openapi: 4.2.4(zod@3.25.76)
