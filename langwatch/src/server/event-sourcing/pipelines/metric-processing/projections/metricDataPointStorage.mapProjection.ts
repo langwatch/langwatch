@@ -3,6 +3,7 @@ import {
   type MapEventHandlers,
 } from "../../../projections/abstractMapProjection";
 import type { AppendStore } from "../../../projections/mapProjection.types";
+import { metricMapGroupKey } from "../canonical/shards";
 import { METRIC_MAP_COALESCE_MAX_BATCH } from "../schemas/constants";
 import {
   type MetricDataPointReceivedEvent,
@@ -19,14 +20,21 @@ export class MetricDataPointStorageMapProjection
   readonly name = "metricDataPointStorage";
   readonly store: AppendStore<CanonicalMetricDataPoint>;
   protected readonly events = events;
-  override options = {
-    groupKeyFn: () => "tenant-batch",
-    coalesceMaxBatch: METRIC_MAP_COALESCE_MAX_BATCH,
-  };
 
-  constructor(deps: { store: AppendStore<CanonicalMetricDataPoint> }) {
+  constructor(deps: {
+    store: AppendStore<CanonicalMetricDataPoint>;
+    shardCount: number;
+  }) {
     super();
     this.store = deps.store;
+    this.options = {
+      groupKeyFn: (event: MetricDataPointReceivedEvent) =>
+        metricMapGroupKey({
+          identity: event.data.pointId,
+          shardCount: deps.shardCount,
+        }),
+      coalesceMaxBatch: METRIC_MAP_COALESCE_MAX_BATCH,
+    };
   }
 
   mapMetricDataPointReceived(
