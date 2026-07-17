@@ -1,24 +1,24 @@
 import IORedis from "ioredis";
 import { getApp } from "../../app-layer/app";
+import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
+import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
+import { EvaluationRunStore } from "../pipelines/evaluation-processing/projections/evaluationRun.store";
+import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-processing/projections/experimentRunState.store";
+import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
+import { SimulationRunStateRepositoryClickHouse } from "../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
+import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processing/schemas/constants";
+import { SuiteRunStateRepositoryClickHouse } from "../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository";
+import { SUITE_RUN_PROJECTION_VERSIONS } from "../pipelines/suite-run-processing/schemas/constants";
+import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
+import type { FoldProjectionStore } from "../projections/foldProjection.types";
+import { RepositoryFoldStore } from "../projections/repositoryFoldStore";
 import { ReplayService } from "./replayService";
 import type {
   RegisteredFoldProjection,
   RegisteredMapProjection,
   RegisteredStateProjection,
 } from "./types";
-import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
-import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
-import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
-import { EvaluationRunStore } from "../pipelines/evaluation-processing/projections/evaluationRun.store";
-import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
-import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-processing/projections/experimentRunState.store";
-import { SimulationRunStateRepositoryClickHouse } from "../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
-import { SuiteRunStateRepositoryClickHouse } from "../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository";
-import { RepositoryFoldStore } from "../projections/repositoryFoldStore";
-import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processing/schemas/constants";
-import { SUITE_RUN_PROJECTION_VERSIONS } from "../pipelines/suite-run-processing/schemas/constants";
-import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
-import type { FoldProjectionStore } from "../projections/foldProjection.types";
 
 export interface ReplayRuntime {
   service: ReplayService;
@@ -39,6 +39,7 @@ export interface ReplayRuntime {
 const MAP_TARGET_TABLE: Record<string, string> = {
   spanStorage: "stored_spans",
   logRecordStorage: "stored_log_records",
+  canonicalLogStorage: "log_records",
   metricDataPointStorage: "metric_data_points",
   metricSeriesCatalog: "metric_series",
   metricTimeRollup: "metric_time_rollups",
@@ -59,17 +60,45 @@ export function createReplayRuntime(config: {
 
   const clientResolver = async (tenantId: string) => {
     const client = await getClickHouseClientForProject(tenantId);
-    if (!client) throw new Error(`No ClickHouse client available for tenant ${tenantId}`);
+    if (!client)
+      throw new Error(`No ClickHouse client available for tenant ${tenantId}`);
     return client;
   };
 
   // Raw CH stores (no Redis cache) — keyed by pipeline name
   const storeByPipeline = new Map<string, FoldProjectionStore<any>>([
-    ["trace_processing", new TraceSummaryStore(new TraceSummaryClickHouseRepository(clientResolver))],
-    ["evaluation_processing", new EvaluationRunStore(new EvaluationRunClickHouseRepository(clientResolver))],
-    ["experiment_run_processing", createExperimentRunStateFoldStore(new ExperimentRunStateRepositoryClickHouse(clientResolver))],
-    ["simulation_processing", new RepositoryFoldStore(new SimulationRunStateRepositoryClickHouse(clientResolver), SIMULATION_PROJECTION_VERSIONS.RUN_STATE)],
-    ["suite_run_processing", new RepositoryFoldStore(new SuiteRunStateRepositoryClickHouse(clientResolver), SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE)],
+    [
+      "trace_processing",
+      new TraceSummaryStore(
+        new TraceSummaryClickHouseRepository(clientResolver),
+      ),
+    ],
+    [
+      "evaluation_processing",
+      new EvaluationRunStore(
+        new EvaluationRunClickHouseRepository(clientResolver),
+      ),
+    ],
+    [
+      "experiment_run_processing",
+      createExperimentRunStateFoldStore(
+        new ExperimentRunStateRepositoryClickHouse(clientResolver),
+      ),
+    ],
+    [
+      "simulation_processing",
+      new RepositoryFoldStore(
+        new SimulationRunStateRepositoryClickHouse(clientResolver),
+        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      ),
+    ],
+    [
+      "suite_run_processing",
+      new RepositoryFoldStore(
+        new SuiteRunStateRepositoryClickHouse(clientResolver),
+        SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
+      ),
+    ],
   ]);
 
   const definitions = getApp().eventSourcing?.definitions ?? [];

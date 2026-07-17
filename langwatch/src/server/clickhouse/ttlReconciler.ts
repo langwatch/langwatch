@@ -104,6 +104,13 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 49,
   },
   {
+    table: "log_records",
+    ttlColumn: "TimeUnixMs",
+    retentionTTLColumn: "TimeUnixMs",
+    envVar: "CLICKHOUSE_COLD_STORAGE_CANONICAL_LOG_RECORDS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
     table: "suite_runs",
     ttlColumn: "StartedAt",
     retentionTTLColumn: "StartedAt",

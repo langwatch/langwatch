@@ -4,6 +4,7 @@
  * Domain files can import type identifiers from here without triggering schema evaluation.
  */
 
+import { BILLING_REPORTING_COMMAND_TYPES } from "../pipelines/billing-reporting/schemas/constants";
 import {
   EVALUATION_PROCESSING_COMMAND_TYPES,
   EVALUATION_PROCESSING_EVENT_TYPES,
@@ -21,11 +22,16 @@ import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "../pipelines/langy-conversation-processing/schemas/constants";
 import {
-  BILLING_REPORTING_COMMAND_TYPES,
-} from "../pipelines/billing-reporting/schemas/constants";
+  LOG_PROCESSING_COMMAND_TYPES,
+  LOG_PROCESSING_EVENT_TYPES,
+} from "../pipelines/log-processing/schemas/constants";
 import {
-  SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
+  METRIC_PROCESSING_COMMAND_TYPES,
+  METRIC_PROCESSING_EVENT_TYPES,
+} from "../pipelines/metric-processing/schemas/constants";
+import {
   SIMULATION_PROCESSING_EVENT_TYPES,
+  SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
 } from "../pipelines/simulation-processing/schemas/constants";
 import {
   SUITE_RUN_PROCESSING_COMMAND_TYPES,
@@ -35,10 +41,6 @@ import {
   TRACE_PROCESSING_COMMAND_TYPES,
   TRACE_PROCESSING_EVENT_TYPES,
 } from "../pipelines/trace-processing/schemas/constants";
-import {
-  METRIC_PROCESSING_COMMAND_TYPES,
-  METRIC_PROCESSING_EVENT_TYPES,
-} from "../pipelines/metric-processing/schemas/constants";
 
 /**
  * Test event type identifiers for integration tests.
@@ -53,6 +55,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
   ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
   ...METRIC_PROCESSING_EVENT_TYPES,
+  ...LOG_PROCESSING_EVENT_TYPES,
   ...EVALUATION_PROCESSING_EVENT_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
   ...SIMULATION_PROCESSING_EVENT_TYPES,
@@ -68,6 +71,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...METRIC_PROCESSING_COMMAND_TYPES,
+  ...LOG_PROCESSING_COMMAND_TYPES,
   ...EVALUATION_PROCESSING_COMMAND_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
   ...SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
@@ -91,6 +95,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "trigger",
   "trace",
   "metric",
+  "log",
   "evaluation",
   "experiment_run",
   "simulation_run",

@@ -172,6 +172,7 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   event_log: "traces",
   stored_spans: "traces",
   stored_log_records: "traces",
+  log_records: "traces",
   metric_data_points: "traces",
   metric_series: "traces",
   metric_time_rollups: "traces",
@@ -213,7 +214,6 @@ const SHADOW_METRIC_STORAGE_TABLES = new Set<RetentionManagedTable>([
   "metric_time_rollups",
 ]);
 
-export const PRODUCTION_STORAGE_METER_TABLES =
-  RETENTION_MANAGED_TABLES.filter(
-    (table) => !SHADOW_METRIC_STORAGE_TABLES.has(table),
-  );
+export const PRODUCTION_STORAGE_METER_TABLES = RETENTION_MANAGED_TABLES.filter(
+  (table) => !SHADOW_METRIC_STORAGE_TABLES.has(table),
+);

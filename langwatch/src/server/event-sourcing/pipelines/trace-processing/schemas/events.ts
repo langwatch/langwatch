@@ -1,11 +1,13 @@
 import { z } from "zod";
 
 import { EventSchema } from "../../../domain/types";
+import { logTraceContributionSchema } from "../../log-processing/schemas/logRecord";
 import { piiRedactionLevelSchema } from "./commands";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_REMOVED_EVENT_TYPE,
   ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
+  LOG_CONTRIBUTED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_TYPE,
@@ -144,6 +146,28 @@ export function isLogRecordReceivedEvent(
   event: TraceProcessingEvent,
 ): event is LogRecordReceivedEvent {
   return event.type === LOG_RECORD_RECEIVED_EVENT_TYPE;
+}
+
+export const logContributedEventDataSchema = logTraceContributionSchema.omit({
+  tenantId: true,
+  occurredAt: true,
+});
+
+export const logContributedEventSchema = EventSchema.extend({
+  type: z.literal(LOG_CONTRIBUTED_EVENT_TYPE),
+  data: logContributedEventDataSchema,
+  metadata: eventMetadataBaseSchema,
+});
+
+export type LogContributedEventData = z.infer<
+  typeof logContributedEventDataSchema
+>;
+export type LogContributedEvent = z.infer<typeof logContributedEventSchema>;
+
+export function isLogContributedEvent(
+  event: TraceProcessingEvent,
+): event is LogContributedEvent {
+  return event.type === LOG_CONTRIBUTED_EVENT_TYPE;
 }
 
 /**
@@ -351,10 +375,7 @@ export const traceNameChangedEventMetadataSchema = z
 export const traceNameChangedEventDataSchema = z.object({
   traceId: z.string(),
   /** New name. Trim happens at the command boundary; the event stores the canonical form. */
-  newName: z
-    .string()
-    .min(TRACE_NAME_MIN_LENGTH)
-    .max(TRACE_NAME_MAX_LENGTH),
+  newName: z.string().min(TRACE_NAME_MIN_LENGTH).max(TRACE_NAME_MAX_LENGTH),
   /** User who made the change, if available — for audit + UI attribution. */
   changedByUserId: z.string().nullable(),
 });
@@ -386,6 +407,7 @@ export type TraceProcessingEvent =
   | SpanReceivedEvent
   | TopicAssignedEvent
   | LogRecordReceivedEvent
+  | LogContributedEvent
   | MetricDataPointCorrelatedEvent
   | OriginResolvedEvent
   | AnnotationAddedEvent
