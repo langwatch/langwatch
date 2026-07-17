@@ -27,6 +27,8 @@ const isOrganizationMember = vi.fn();
 const recordInstallation = vi.fn();
 const handleWebhookEvent = vi.fn();
 const auditLog = vi.fn();
+const isEnabled = vi.fn();
+const isLangwatchStaff = vi.fn();
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) => getServerAuthSession(...args),
@@ -46,11 +48,16 @@ vi.mock("~/server/auditLog", () => ({
   auditLog: (...args: unknown[]) => auditLog(...args),
 }));
 vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: { isEnabled: async () => true },
+  featureFlagService: { isEnabled: (...args: unknown[]) => isEnabled(...args) },
 }));
-vi.mock("~/utils/isLangwatchStaff", () => ({
-  isLangwatchStaff: () => true,
-}));
+vi.mock("~/utils/isLangwatchStaff", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("~/utils/isLangwatchStaff")>();
+  return {
+    ...actual,
+    isLangwatchStaff: (...args: unknown[]) => isLangwatchStaff(...args),
+  };
+});
 
 async function request(path: string, init?: RequestInit) {
   const { app } = await import("../github-langy");
@@ -88,6 +95,10 @@ beforeEach(() => {
   getServerAuthSession.mockResolvedValue({ user: { id: "u1" } });
   isOrganizationMember.mockResolvedValue(true);
   recordInstallation.mockResolvedValue({ accountLogin: "acme" });
+  // Default: caller is staff, so the rollout flag is bypassed. Non-staff
+  // rollout behaviour is asserted explicitly in the gate tests below.
+  isLangwatchStaff.mockReturnValue(true);
+  isEnabled.mockResolvedValue(true);
 });
 
 describe("GET /api/github-langy/install", () => {
@@ -121,6 +132,37 @@ describe("GET /api/github-langy/install", () => {
         "http://localhost/api/github-langy/install",
       );
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe("when the caller is non-staff and the rollout is enabled for the org", () => {
+    it("evaluates the flag against the organization and allows the install", async () => {
+      isLangwatchStaff.mockReturnValue(false);
+      isEnabled.mockResolvedValue(true);
+
+      const res = await request(
+        "http://localhost/api/github-langy/install?organizationId=org1&mode=redirect",
+      );
+
+      expect(res.status).toBe(302);
+      // The org scope must reach the flag, not just the user's distinctId.
+      expect(isEnabled).toHaveBeenCalledWith(
+        "release_langy_enabled",
+        expect.objectContaining({ organizationId: "org1" }),
+      );
+    });
+  });
+
+  describe("when the caller is non-staff and the rollout is disabled for the org", () => {
+    it("returns 404 ahead of the 400 org-required check", async () => {
+      isLangwatchStaff.mockReturnValue(false);
+      isEnabled.mockResolvedValue(false);
+
+      const res = await request(
+        "http://localhost/api/github-langy/install?organizationId=org1",
+      );
+
+      expect(res.status).toBe(404);
     });
   });
 });
@@ -189,6 +231,25 @@ describe("GET /api/github-langy/setup", () => {
       );
       expect(res.status).toBe(401);
       expect(recordInstallation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when Langy access was revoked after the install began", () => {
+    it("re-checks the gate and refuses to persist the installation", async () => {
+      // Install started while allowed; the rollout is now off for this
+      // non-staff caller. The kill switch must be immediate on the persisting
+      // path, so setup denies before recordInstallation runs.
+      isLangwatchStaff.mockReturnValue(false);
+      isEnabled.mockResolvedValue(false);
+      const state = await makeState({ mode: "popup" });
+
+      const res = await request(
+        `http://localhost/api/github-langy/setup?installation_id=555&state=${encodeURIComponent(state)}`,
+      );
+
+      expect(res.status).toBe(404);
+      expect(recordInstallation).not.toHaveBeenCalled();
+      expect(auditLog).not.toHaveBeenCalled();
     });
   });
 });

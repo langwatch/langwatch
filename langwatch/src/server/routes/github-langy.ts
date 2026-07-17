@@ -278,6 +278,25 @@ secured
       return setupError(c, state, "Not a member of this organization", 403);
     }
 
+    // Re-check the Langy gate before persisting anything. The install may have
+    // begun while the flag was on; if the rollout was disabled (or the caller's
+    // access revoked) in between, the internal-only boundary must still hold, so
+    // the kill switch is immediate for this customer-facing path. The nonce was
+    // already burned above, so a denied caller can't retry the signed state.
+    if (
+      !(await hasLangyAccess({
+        user: session.user,
+        organizationId: state.organizationId,
+      }))
+    ) {
+      return setupError(
+        c,
+        state,
+        "The GitHub integration is not enabled for this account.",
+        404,
+      );
+    }
+
     const returnTo = safeReturnTo(state.returnTo);
 
     let accountLogin: string;
