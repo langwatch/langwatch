@@ -1,4 +1,4 @@
-import { createTraceAlertTriggerMatchSubscriber } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
+import { createTraceAlertTriggerMatchFeed } from "@ee/governance/feeds/traceAlertTriggerMatch.feed";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
@@ -65,7 +65,10 @@ import {
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
-import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
+import {
+  createEvaluationProcessingPipeline,
+  type EvaluationProcessingPipelineDeps,
+} from "./pipelines/evaluation-processing/pipeline";
 import type { EvaluationAnalyticsData } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import { EvaluationAnalyticsStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
 import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
@@ -78,17 +81,9 @@ import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-pr
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import type { AutomationDispatchPorts } from "../app-layer/triggers/dispatch/automationDispatch.wiring";
-import {
-  GRAPH_ALERT_SWEEP_PROCESS_NAME,
-  TRIGGER_SETTLEMENT_PROCESS_NAME,
-  createGraphAlertSweepIntentHandlers,
-  createTriggerSettlementIntentHandlers,
-  graphAlertSweepBootstrapEnvelope,
-  graphAlertSweepProcessDefinition,
-  triggerSettlementProcessDefinition,
-} from "../app-layer/triggers/process-manager";
-import { createEvaluationAlertTriggerMatchSubscriber } from "../app-layer/triggers/subscribers/evaluationAlertTriggerMatch.subscriber";
-import { createGraphTriggerActivitySubscriber } from "../app-layer/triggers/subscribers/graphTriggerActivity.subscriber";
+import { TRIGGER_SETTLEMENT_PROCESS_NAME } from "../app-layer/triggers/process-manager/triggerSettlement.process";
+import { createEvaluationAlertTriggerMatchFeed } from "../app-layer/triggers/process-manager/evaluationAlertTriggerMatch.feed";
+import { createGraphTriggerActivityHandler } from "../app-layer/triggers/subscribers/graphTriggerActivity.subscriber";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -136,7 +131,6 @@ import {
   OutboxDispatcherService,
   ProcessManagerService,
   ProcessOutboxWorker,
-  ProcessWakeWorker,
   type ProcessStore,
 } from "./process-manager";
 import type { EvaluationRunData } from "../app-layer/evaluations/types";
@@ -157,7 +151,10 @@ import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/r
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
 import { resolveLogCommandShardCount } from "./pipelines/trace-processing/commands/logCommandGroupKey";
 import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
-import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
+import {
+  createTraceProcessingPipeline,
+  type TraceProcessingPipelineDeps,
+} from "./pipelines/trace-processing/pipeline";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
@@ -295,12 +292,11 @@ export interface PipelineRegistryDeps {
   /**
    * ADR-052: automation dispatch ports (settlement digest/persist deps,
    * the shared graph-trigger evaluator, and the sweep candidate
-   * discovery), built in presets. `runsWorkers` gates the process outbox
-   * + wake worker loops the same way langy's flag does.
+   * discovery), built in presets. Worker gating lives in the runtime —
+   * the registry only assembles dependencies.
    */
   automations: {
     ports: AutomationDispatchPorts;
-    runsWorkers: boolean;
   };
   projects: ProjectService;
   monitors: MonitorService;
@@ -365,17 +361,38 @@ export class PipelineRegistry {
       this.deps.evaluations.runs.repository,
     );
 
-    // ADR-052: automation process managers + their process-outbox/wake
-    // workers, built BEFORE the trace/eval pipelines so the match and
-    // activity subscribers can be registered on them.
-    const automations = this.registerAutomationRuntime({
+    // ADR-052: automation reaction deps. The process managers themselves
+    // are mounted by the pipeline factories; the runtime (EventSourcing)
+    // owns their workers. The registry only assembles dependencies.
+    const automationPorts = this.deps.automations.ports;
+    const graphActivityHandler = createGraphTriggerActivityHandler({
+      triggers: this.deps.triggers,
+      evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
+    });
+    const evalMatchFeed = createEvaluationAlertTriggerMatchFeed({
+      triggers: this.deps.triggers,
       traceSummaryStore,
-      evaluationRunStore,
     });
 
     const evalPipeline = this.registerEvaluationPipeline({
       evaluationRunStore,
-      subscribers: automations.evaluationSubscribers,
+      automations: {
+        // Feeds the settlement PM (mounted on the trace pipeline) through
+        // the runtime's fact port — lazy by name, resolved once boot
+        // registration completes.
+        settlementMatchHandler: async (event, context) => {
+          const facts = await evalMatchFeed(event, context);
+          if (facts.length === 0) return;
+          await this.deps.eventSourcing.processRuntime.publishFacts({
+            processName: TRIGGER_SETTLEMENT_PROCESS_NAME,
+            sourceEventId: event.id,
+            occurredAt: event.occurredAt,
+            tenantId: context.tenantId,
+            facts,
+          });
+        },
+        graphActivityHandler,
+      },
     });
     const {
       pipeline: tracePipeline,
@@ -384,7 +401,21 @@ export class PipelineRegistry {
     } = this.registerTracePipeline({
       evalPipeline,
       traceSummaryStore,
-      subscribers: automations.traceSubscribers,
+      automations: {
+        settlement: {
+          dispatch: automationPorts.settlementDeps,
+          matchFeed: createTraceAlertTriggerMatchFeed({
+            triggers: this.deps.triggers,
+          }),
+        },
+        sweep: {
+          decideSweepCandidates: automationPorts.decideSweepCandidates,
+          evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+        graphActivityHandler,
+      },
     });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
     const { pipeline: simulationPipeline, scenarioExecutionHandle } =
@@ -415,142 +446,11 @@ export class PipelineRegistry {
       scenarioExecutionHandle,
       // Starting and notifying are private composition concerns so a web role
       // cannot accidentally start the worker. App shutdown only needs stop().
+      // The automation PM workers are owned by the EventSourcing runtime
+      // and stop with es.close(); only langy's hand-rolled worker remains
+      // here (until it migrates onto withProcessManager).
       processOutboxWorker: {
-        stop: async () => {
-          await Promise.all([
-            processOutboxWorker.stop(),
-            automations.stop(),
-          ]);
-        },
-      },
-    };
-  }
-
-  /**
-   * ADR-052: the automation process runtime — the triggerSettlement and
-   * graphAlertSweep process managers, one scoped OutboxDispatcherService
-   * over the shared ProcessManagerOutbox, the outbox + wake worker loops,
-   * and the subscriber definitions the trace/eval pipelines register.
-   */
-  private registerAutomationRuntime({
-    traceSummaryStore,
-    evaluationRunStore,
-  }: {
-    traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-    evaluationRunStore: FoldProjectionStore<EvaluationRunData>;
-  }) {
-    const { ports, runsWorkers } = this.deps.automations;
-    const store = this.deps.repositories.processStore;
-
-    const settlementManager = new ProcessManagerService({
-      definition: triggerSettlementProcessDefinition,
-      store,
-    });
-    const sweepManager = new ProcessManagerService({
-      definition: graphAlertSweepProcessDefinition,
-      store,
-    });
-
-    const outboxDispatcher = new OutboxDispatcherService({
-      store,
-      handlers: {
-        ...createTriggerSettlementIntentHandlers(ports.settlementDeps),
-        ...createGraphAlertSweepIntentHandlers({
-          decideSweepCandidates: ports.decideSweepCandidates,
-          evaluateGraphTrigger: ports.evaluateGraphTrigger,
-          deleteDispatchedBefore: (params) =>
-            store.deleteDispatchedBefore(params),
-        }),
-      },
-      // Parity with the legacy ReactorOutbox rows (maxAttempts 8).
-      maxAttempts: 8,
-      // A digest dispatch renders + fetches + sends for its whole batch; the
-      // lease must outlive the slowest accepted dispatch or a healthy digest
-      // loses its lease mid-flight and double-delivers.
-      leaseDurationMs: 120_000,
-      // The outbox table is shared across process managers (ADR-051); an
-      // unscoped dispatcher would lease other domains' intents and
-      // retry-churn them for lack of a handler.
-      processNames: [
-        TRIGGER_SETTLEMENT_PROCESS_NAME,
-        GRAPH_ALERT_SWEEP_PROCESS_NAME,
-      ],
-    });
-    const outboxWorker = new ProcessOutboxWorker({
-      dispatcher: outboxDispatcher,
-      logger,
-    });
-    const wakeWorker = new ProcessWakeWorker({
-      store,
-      managers: {
-        [TRIGGER_SETTLEMENT_PROCESS_NAME]: settlementManager,
-        [GRAPH_ALERT_SWEEP_PROCESS_NAME]: sweepManager,
-      },
-      logger,
-      notifyOutbox: () => outboxWorker.notify(),
-    });
-
-    const notifyOutbox = () => outboxWorker.notify();
-    const traceSubscribers = [
-      createTraceAlertTriggerMatchSubscriber({
-        triggers: this.deps.triggers,
-        traceSummaryStore,
-        settlement: settlementManager,
-        notifyOutbox,
-      }),
-      createGraphTriggerActivitySubscriber<TraceProcessingEvent>({
-        pipeline: "trace",
-        eventTypes: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
-        deps: {
-          triggers: this.deps.triggers,
-          evaluateGraphTrigger: ports.evaluateGraphTrigger,
-        },
-      }),
-    ];
-    const evaluationSubscribers = [
-      createEvaluationAlertTriggerMatchSubscriber({
-        triggers: this.deps.triggers,
-        evaluationRunStore,
-        traceSummaryStore,
-        settlement: settlementManager,
-        notifyOutbox,
-      }),
-      createGraphTriggerActivitySubscriber<EvaluationProcessingEvent>({
-        pipeline: "evaluation",
-        eventTypes: [
-          EVALUATION_COMPLETED_EVENT_TYPE,
-          EVALUATION_REPORTED_EVENT_TYPE,
-        ],
-        deps: {
-          triggers: this.deps.triggers,
-          evaluateGraphTrigger: ports.evaluateGraphTrigger,
-        },
-      }),
-    ];
-
-    if (runsWorkers) {
-      outboxWorker.start();
-      wakeWorker.start();
-      // Seed the sweep singleton (date-keyed, so repeated boots the same
-      // day no-op via the process inbox). Fire-and-forget: a failed seed
-      // self-heals on the next boot, and the sweep's own wakes keep it
-      // alive once armed.
-      const now = Date.now();
-      void sweepManager
-        .handleEvent({ envelope: graphAlertSweepBootstrapEnvelope(now), now })
-        .catch((error: unknown) => {
-          logger.error(
-            { error: error instanceof Error ? error.message : String(error) },
-            "graphAlertSweep bootstrap failed; will retry on next worker boot",
-          );
-        });
-    }
-
-    return {
-      traceSubscribers,
-      evaluationSubscribers,
-      stop: async () => {
-        await Promise.all([outboxWorker.stop(), wakeWorker.stop()]);
+        stop: () => processOutboxWorker.stop(),
       },
     };
   }
@@ -704,10 +604,10 @@ export class PipelineRegistry {
 
   private registerEvaluationPipeline({
     evaluationRunStore,
-    subscribers,
+    automations,
   }: {
     evaluationRunStore: FoldProjectionStore<EvaluationRunData>;
-    subscribers: EventSubscriberDefinition<EvaluationProcessingEvent>[];
+    automations: EvaluationProcessingPipelineDeps["automations"];
   }) {
     const executeEvaluationCommand = new ExecuteEvaluationCommand({
       monitors: this.deps.monitors,
@@ -779,7 +679,7 @@ export class PipelineRegistry {
             this.deps.repositories.evaluationAnalyticsRollup,
           ),
         executeEvaluationCommand,
-        subscribers,
+        automations,
       }),
     );
   }
@@ -787,11 +687,11 @@ export class PipelineRegistry {
   private registerTracePipeline({
     evalPipeline,
     traceSummaryStore,
-    subscribers,
+    automations,
   }: {
     evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-    subscribers: EventSubscriberDefinition<TraceProcessingEvent>[];
+    automations: TraceProcessingPipelineDeps["automations"];
   }) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
@@ -933,7 +833,7 @@ export class PipelineRegistry {
           this.deps.repositories.metricRecordStorage,
         ),
         traceSummaryStore,
-        subscribers,
+        automations,
         originGateReactor,
         evaluationTriggerReactor,
         customEvaluationSyncReactor,

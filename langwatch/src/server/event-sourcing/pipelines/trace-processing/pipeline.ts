@@ -1,10 +1,24 @@
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import {
+  GRAPH_ALERT_SWEEP_PROCESS_NAME,
+  graphAlertSweepPM,
+  type GraphAlertSweepDeps,
+} from "~/server/app-layer/triggers/process-manager/graphAlertSweep.process";
+import {
+  TRIGGER_SETTLEMENT_PROCESS_NAME,
+  triggerSettlementPM,
+  type TriggerSettlementPmDeps,
+} from "~/server/app-layer/triggers/process-manager/triggerSettlement.process";
+import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/app-layer/triggers/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
-import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import {
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+} from "./schemas/constants";
 import {
   AddAnnotationCommand,
   BulkSyncAnnotationsCommand,
@@ -84,12 +98,21 @@ export interface TraceProcessingPipelineDeps {
     TraceSummaryData
   >;
   /**
-   * ADR-052: automation subscribers (alert-trigger match detection + the
-   * real-time graph-trigger activity path). Event-only consumers of the
-   * committed events; the process manager + process outbox own timing,
-   * retry, and dispatch.
+   * ADR-052: the automation reactions. The triggerSettlement process
+   * manager (settle debounce + cadence digest) is MOUNTED here with its
+   * trace-side match feed on post-fold traceSummary semantics; the
+   * graphAlertSweep scheduled singleton owns the 30s absence/resolve
+   * sweep; the activity subscriber is the stateless real-time graph
+   * evaluation path.
    */
-  subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
+  automations?: {
+    settlement: TriggerSettlementPmDeps;
+    sweep: GraphAlertSweepDeps;
+    graphActivityHandler: (
+      event: TraceProcessingEvent,
+      context: { tenantId: string },
+    ) => Promise<void>;
+  };
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
   claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<
@@ -264,10 +287,32 @@ export function createTraceProcessingPipeline(
     );
   }
 
-  // ADR-052: automation subscribers — event-only consumers registered on
-  // the live delivery path (never invoked by replay).
-  for (const subscriber of deps.subscribers ?? []) {
-    builder = builder.withEventSubscriber(subscriber.name, subscriber);
+  // ADR-052: the automation reactions.
+  if (deps.automations) {
+    const automations = deps.automations;
+    builder = builder
+      .withProcessManager(
+        TRIGGER_SETTLEMENT_PROCESS_NAME,
+        triggerSettlementPM(automations.settlement),
+      )
+      .withProcessManager(
+        GRAPH_ALERT_SWEEP_PROCESS_NAME,
+        graphAlertSweepPM(automations.sweep),
+      )
+      .withSubscriber("graphTriggerActivity", {
+        events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
+        delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+        dedup: {
+          makeId: (event) => `graph-trigger-activity:${event.tenantId}`,
+          ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+          // Collapse-within-window, do NOT debounce-extend: constant
+          // traffic must still evaluate every window.
+          extend: false,
+          replace: false,
+        },
+        handler: (event, context) =>
+          automations.graphActivityHandler(event, context),
+      });
   }
 
   // Span-command sharding: when the shard count is > 1, install a getGroupKey

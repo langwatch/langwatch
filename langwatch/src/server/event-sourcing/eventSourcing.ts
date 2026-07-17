@@ -11,6 +11,9 @@ import { makeQueueName } from "~/server/queues/makeQueueName";
 import { resolveProjectStorageDestination } from "../stored-objects/project-storage-destination";
 import { createStorageRegistry } from "../stored-objects/stored-objects-factory";
 import { DisabledPipeline } from "./disabledPipeline";
+import { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore";
+import { ProcessRuntime } from "./process-manager/processRuntime";
+import type { ProcessStore } from "./process-manager/stores/processStore.types";
 import type { Event, Projection } from "./domain/types";
 import type {
   NoCommands,
@@ -52,6 +55,12 @@ export interface EventSourcingOptions {
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /**
+   * Durable persistence for `withProcess` declarations (inbox, state,
+   * outbox). Production passes the PrismaProcessStore; when absent, an
+   * in-memory store backs the processes (tests / no-Postgres dev).
+   */
+  processStore?: ProcessStore;
 }
 
 /**
@@ -108,6 +117,8 @@ export class EventSourcing {
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
   private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
+  private readonly _processStore?: ProcessStore;
+  private _processRuntimeInstance?: ProcessRuntime;
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
@@ -115,6 +126,7 @@ export class EventSourcing {
     this._redis = options.redis;
     this._processRole = options.processRole;
     this._retentionPolicyResolver = options.retentionPolicyResolver;
+    this._processStore = options.processStore;
 
     // Create projection registry and register SaaS-only projections
     this.projectionRegistry = new ProjectionRegistry<Event>();
@@ -136,6 +148,21 @@ export class EventSourcing {
 
   get isEnabled(): boolean {
     return this._enabled;
+  }
+
+  /**
+   * The `withProcess` runtime — lazily constructed so an EventSourcing
+   * instance with no process declarations pays nothing. Public so the
+   * composition root can feed lifecycle envelopes from outside a pipeline.
+   */
+  get processRuntime(): ProcessRuntime {
+    if (!this._processRuntimeInstance) {
+      this._processRuntimeInstance = new ProcessRuntime({
+        store: this._processStore ?? new InMemoryProcessStore(),
+        consumersEnabled: roleRunsWorkers(this._processRole),
+      });
+    }
+    return this._processRuntimeInstance;
   }
 
   get eventStore(): EventStore | undefined {
@@ -242,6 +269,35 @@ export class EventSourcing {
 
         const serviceOptions = buildServiceOptions(definition);
 
+        // ADR-052: `withProcessManager` declarations — the runtime
+        // generates the trigger adapters (subscribers + fold/map hooks)
+        // and owns the managers, per-PM outbox workers, and the shared
+        // wake worker.
+        if (definition.processManagers.size > 0) {
+          const artifacts = this.processRuntime.registerPipeline<EventType>({
+            pipelineName: definition.metadata.name,
+            processManagers: definition.processManagers,
+          });
+          if (artifacts.subscribers.length > 0) {
+            serviceOptions.subscribers = [
+              ...(serviceOptions.subscribers ?? []),
+              ...artifacts.subscribers,
+            ];
+          }
+          if (artifacts.foldReactors.length > 0) {
+            serviceOptions.reactors = [
+              ...(serviceOptions.reactors ?? []),
+              ...artifacts.foldReactors,
+            ];
+          }
+          if (artifacts.mapReactors.length > 0) {
+            serviceOptions.mapReactors = [
+              ...(serviceOptions.mapReactors ?? []),
+              ...artifacts.mapReactors,
+            ];
+          }
+        }
+
         // Initialize the projection registry if it has projections and hasn't been initialized yet
         if (
           this.projectionRegistry.hasProjections &&
@@ -294,6 +350,13 @@ export class EventSourcing {
    * Gracefully closes all pipelines, the projection registry, and the global queue.
    */
   async close(): Promise<void> {
+    if (this._processRuntimeInstance) {
+      try {
+        await this._processRuntimeInstance.stop();
+      } catch (error) {
+        logger.error({ error }, "Failed to stop process runtime");
+      }
+    }
     for (const [name, pipeline] of this.pipelines) {
       try {
         await pipeline.service.close();

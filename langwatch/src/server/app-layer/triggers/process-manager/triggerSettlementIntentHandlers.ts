@@ -10,7 +10,7 @@ import type { ProjectService } from "~/server/app-layer/projects/project.service
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
-import type { IntentHandler } from "~/server/event-sourcing/process-manager";
+import type { IntentExecutor } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
@@ -44,8 +44,8 @@ import {
 import { dispatchTriggerAction } from "../dispatch/triggerActionDispatch";
 import {
   TRIGGER_SETTLEMENT_INTENT_TYPES,
-  notifyDigestIntentSchema,
-  persistMatchIntentSchema,
+  type NotifyDigestIntent,
+  type PersistMatchIntent,
 } from "./triggerSettlementProcess.types";
 
 const logger = createLogger("langwatch:triggers:settlement-dispatch");
@@ -141,52 +141,50 @@ function rethrowIfRetryable(error: unknown, context: Record<string, unknown>) {
   if (retryable) throw error;
 }
 
-export function createTriggerSettlementIntentHandlers(
+/** `notify-digest` handler for the withProcess declaration. */
+export function createNotifyDigestHandler(
   deps: TriggerSettlementDispatchDeps,
-): Record<string, IntentHandler> {
-  return {
-    [TRIGGER_SETTLEMENT_INTENT_TYPES.NOTIFY_DIGEST]: async ({ message }) => {
-      const { triggerId, traceIds } = notifyDigestIntentSchema.parse(
-        message.payload,
-      );
-      try {
-        await dispatchNotifyDigest({
-          deps,
-          projectId: message.projectId,
-          triggerId,
-          traceIds,
-        });
-      } catch (error) {
-        rethrowIfRetryable(error, {
-          projectId: message.projectId,
-          triggerId,
-          intent: message.intentType,
-          attempt: message.attempt,
-        });
-      }
-    },
+): IntentExecutor<NotifyDigestIntent> {
+  return async (payload, context) => {
+    try {
+      await dispatchNotifyDigest({
+        deps,
+        projectId: context.projectId,
+        triggerId: payload.triggerId,
+        traceIds: payload.traceIds,
+      });
+    } catch (error) {
+      rethrowIfRetryable(error, {
+        projectId: context.projectId,
+        triggerId: payload.triggerId,
+        intent: TRIGGER_SETTLEMENT_INTENT_TYPES.NOTIFY_DIGEST,
+        attempt: context.attempt,
+      });
+    }
+  };
+}
 
-    [TRIGGER_SETTLEMENT_INTENT_TYPES.PERSIST_MATCH]: async ({ message }) => {
-      const { triggerId, traceId } = persistMatchIntentSchema.parse(
-        message.payload,
-      );
-      try {
-        await dispatchPersistMatch({
-          deps,
-          projectId: message.projectId,
-          triggerId,
-          traceId,
-        });
-      } catch (error) {
-        rethrowIfRetryable(error, {
-          projectId: message.projectId,
-          triggerId,
-          traceId,
-          intent: message.intentType,
-          attempt: message.attempt,
-        });
-      }
-    },
+/** `persist-match` handler for the withProcess declaration. */
+export function createPersistMatchHandler(
+  deps: TriggerSettlementDispatchDeps,
+): IntentExecutor<PersistMatchIntent> {
+  return async (payload, context) => {
+    try {
+      await dispatchPersistMatch({
+        deps,
+        projectId: context.projectId,
+        triggerId: payload.triggerId,
+        traceId: payload.traceId,
+      });
+    } catch (error) {
+      rethrowIfRetryable(error, {
+        projectId: context.projectId,
+        triggerId: payload.triggerId,
+        traceId: payload.traceId,
+        intent: TRIGGER_SETTLEMENT_INTENT_TYPES.PERSIST_MATCH,
+        attempt: context.attempt,
+      });
+    }
   };
 }
 

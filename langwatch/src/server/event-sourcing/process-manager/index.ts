@@ -40,3 +40,7 @@ export type {
 } from "./stores/processStore.types";
 export { InMemoryProcessStore } from "./stores/inMemoryProcessStore";
 export { PrismaProcessStore } from "./stores/prismaProcessStore";
+export {
+  ProcessRuntime,
+  type GeneratedTriggerArtifacts,
+} from "./processRuntime";

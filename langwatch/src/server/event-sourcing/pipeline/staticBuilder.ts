@@ -26,6 +26,15 @@ import type { StateProjectionDefinition } from "../projections/stateProjection.t
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import { ConfigurationError } from "../services/errorHandling";
+import {
+  buildProcessManager,
+  type ProcessManagerApplier,
+} from "./processBuilder";
+import type {
+  ProcessManagerDefinition,
+  SubscriberSpec,
+  TriggerContext,
+} from "./processManagerDefinition";
 
 // Turns a union like {name:"a"; payload:A} | {name:"b"; payload:B}
 // into a record { a: A; b: B }
@@ -134,6 +143,7 @@ export class StaticPipelineBuilderWithNameAndType<
     string,
     { projectionName: string; definition: ReactorDefinition<EventType> }
   >();
+  private processManagers = new Map<string, ProcessManagerDefinition>();
   private eventSubscribers = new Map<
     string,
     EventSubscriberDefinition<EventType>
@@ -275,6 +285,163 @@ export class StaticPipelineBuilderWithNameAndType<
       );
     }
     this.eventSubscribers.set(subscriberName, definition);
+    return this;
+  }
+
+  /**
+   * The best-effort reaction primitive (ADR-052). One trigger descriptor:
+   * `fold`/`map` stages the handler after that projection commits the event
+   * (with the committed state in `ctx.state`); `events` fires on raw
+   * delivery and doubles as a filter when combined with `fold`/`map`.
+   * Retry is queue redelivery — use only where losing one is harmless.
+   */
+  withSubscriber<Fold extends FoldNames & string>(
+    subscriberName: string,
+    spec: SubscriberSpec<EventType> & {
+      fold: Fold;
+      handler: (
+        event: EventType,
+        context: TriggerContext<RegisteredProjections[Fold]>,
+      ) => Promise<void>;
+    },
+  ): this;
+  withSubscriber(
+    subscriberName: string,
+    spec: SubscriberSpec<EventType>,
+  ): this;
+  withSubscriber(
+    subscriberName: string,
+    spec: SubscriberSpec<EventType>,
+  ): this {
+    const nameTaken =
+      this.eventSubscribers.has(subscriberName) ||
+      this.foldReactors.has(subscriberName) ||
+      this.mapReactors.has(subscriberName);
+    if (nameTaken) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Subscriber with name "${subscriberName}" already exists`,
+        { subscriberName },
+      );
+    }
+
+    if (spec.fold !== undefined || spec.map !== undefined) {
+      const projectionName = (spec.fold ?? spec.map)!;
+      const isFold = spec.fold !== undefined;
+      if (isFold && !this.foldProjections.has(projectionName)) {
+        throw new ConfigurationError(
+          "StaticPipelineBuilder",
+          `Subscriber "${subscriberName}" fold "${projectionName}" — projection not found on this pipeline`,
+          { subscriberName, projectionName },
+        );
+      }
+      if (!isFold && !this.mapProjections.has(projectionName)) {
+        throw new ConfigurationError(
+          "StaticPipelineBuilder",
+          `Subscriber "${subscriberName}" map "${projectionName}" — projection not found on this pipeline`,
+          { subscriberName, projectionName },
+        );
+      }
+      const eventFilter =
+        spec.events !== undefined ? new Set<string>(spec.events) : null;
+      const passes = (event: EventType): boolean => {
+        if (eventFilter && !eventFilter.has(event.type)) return false;
+        return spec.when?.(event) ?? true;
+      };
+      const definition: ReactorDefinition<EventType> = {
+        name: subscriberName,
+        options: {
+          makeJobId: (payload: { event: Event; foldState: unknown }) =>
+            `subscriber:${subscriberName}:${payload.event.tenantId}:${String(payload.event.aggregateId)}`,
+          ttl: spec.ttl ?? 30_000,
+          delay: spec.delay ?? 0,
+        },
+        // Pre-enqueue rejection: a filtered event never pays serialization.
+        shouldReact: passes,
+        handle: async (event, context) => {
+          if (!passes(event)) return;
+          await spec.handler(event, {
+            tenantId: context.tenantId,
+            aggregateId: context.aggregateId,
+            state: context.foldState,
+          });
+        },
+      };
+      if (isFold) {
+        this.foldReactors.set(subscriberName, { projectionName, definition });
+      } else {
+        this.mapReactors.set(subscriberName, { projectionName, definition });
+      }
+      return this;
+    }
+
+    this.eventSubscribers.set(subscriberName, {
+      name: subscriberName,
+      eventTypes: spec.events ?? [],
+      options: {
+        delay: spec.delay,
+        deduplication: spec.dedup,
+      },
+      handle: async (event, context) => {
+        if (spec.when && !spec.when(event)) return;
+        await spec.handler(event, {
+          tenantId: context.tenantId,
+          aggregateId: context.aggregateId,
+          state: undefined,
+        });
+      },
+    });
+    return this;
+  }
+
+  /**
+   * Mount a process manager (ADR-049/052) on this pipeline — the promised
+   * reaction primitive. Author it with the staged callback builder:
+   *
+   *   .withProcessManager("triggerSettlement", triggerSettlementPM(deps))
+   *
+   * where the domain exports `(deps) => (pm) => pm.state(…).intent(…)…`.
+   * The runtime owns its manager, the shared process-outbox and wake
+   * workers, and the trigger adapters generated from its triggers.
+   */
+  withProcessManager(
+    name: string,
+    applier: ProcessManagerApplier<EventType>,
+  ): this;
+  withProcessManager(definition: ProcessManagerDefinition<any, any, any, any>): this;
+  withProcessManager(
+    definitionOrName: ProcessManagerDefinition<any, any, any, any> | string,
+    applier?: ProcessManagerApplier<EventType>,
+  ): this {
+    const definition =
+      typeof definitionOrName === "string"
+        ? buildProcessManager(definitionOrName, applier!)
+        : definitionOrName;
+    const name = definition.config.name;
+    if (this.processManagers.has(name)) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Process manager "${name}" already declared on this pipeline`,
+        { name },
+      );
+    }
+    for (const trigger of definition.config.triggers) {
+      if (trigger.fold !== undefined && !this.foldProjections.has(trigger.fold)) {
+        throw new ConfigurationError(
+          "StaticPipelineBuilder",
+          `Process manager "${name}" trigger fold "${trigger.fold}" — projection not found on this pipeline`,
+          { name, projectionName: trigger.fold },
+        );
+      }
+      if (trigger.map !== undefined && !this.mapProjections.has(trigger.map)) {
+        throw new ConfigurationError(
+          "StaticPipelineBuilder",
+          `Process manager "${name}" trigger map "${trigger.map}" — projection not found on this pipeline`,
+          { name, projectionName: trigger.map },
+        );
+      }
+    }
+    this.processManagers.set(name, definition);
     return this;
   }
 
@@ -475,6 +642,7 @@ export class StaticPipelineBuilderWithNameAndType<
       foldReactors: this.foldReactors,
       mapReactors: this.mapReactors,
       eventSubscribers: this.eventSubscribers,
+      processManagers: this.processManagers,
       featureFlagService: this.featureFlagService,
 
       // Purely for typing: lets downstream code infer the command names + payloads

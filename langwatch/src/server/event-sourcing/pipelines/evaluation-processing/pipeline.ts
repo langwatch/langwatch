@@ -1,5 +1,11 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/app-layer/triggers/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
+import type { TriggerContext } from "../../pipeline/processManagerDefinition";
+import {
+  EVALUATION_COMPLETED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_TYPE,
+} from "./schemas/constants";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
@@ -31,10 +37,21 @@ export interface EvaluationProcessingPipelineDeps {
   evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
   /**
-   * ADR-052: automation subscribers (evaluation-side alert-trigger match
-   * detection + the real-time eval-metric graph-trigger activity path).
+   * ADR-052: the evaluation-side automation attachments — a subscriber
+   * feeding the triggerSettlement process manager (mounted on the trace
+   * pipeline, reached through the runtime's fact port) and the stateless
+   * real-time graph-activity subscriber.
    */
-  subscribers?: EventSubscriberDefinition<EvaluationProcessingEvent>[];
+  automations?: {
+    settlementMatchHandler: (
+      event: EvaluationProcessingEvent,
+      context: TriggerContext<EvaluationRunData>,
+    ) => Promise<void>;
+    graphActivityHandler: (
+      event: EvaluationProcessingEvent,
+      context: { tenantId: string },
+    ) => Promise<void>;
+  };
   customerIoEvaluationSyncReactor?: ReactorDefinition<
     EvaluationProcessingEvent,
     EvaluationRunData
@@ -78,10 +95,44 @@ export function createEvaluationProcessingPipeline(
       }),
     );
 
-  // ADR-052: automation subscribers — event-only consumers registered on
-  // the live delivery path (never invoked by replay).
-  for (const subscriber of deps.subscribers ?? []) {
-    builder = builder.withEventSubscriber(subscriber.name, subscriber);
+  // ADR-052: the evaluation-side automation reactions. The settlement
+  // match subscriber keeps the legacy reactor's window (10s fold-settle
+  // delay, 30s per-evaluation collapse).
+  if (deps.automations) {
+    const automations = deps.automations;
+    builder = builder
+      .withSubscriber("evaluationAlertTriggerMatch", {
+        fold: "evaluationRun",
+        events: [
+          EVALUATION_COMPLETED_EVENT_TYPE,
+          EVALUATION_REPORTED_EVENT_TYPE,
+        ],
+        delay: 10_000,
+        ttl: 30_000,
+        // The registered-projections map does not carry concrete fold
+        // state types yet, so the committed evaluationRun state arrives
+        // widened; the cast narrows it back for the handler.
+        handler: (event, context) =>
+          automations.settlementMatchHandler(
+            event,
+            context as TriggerContext<EvaluationRunData>,
+          ),
+      })
+      .withSubscriber("graphTriggerActivity", {
+        events: [
+          EVALUATION_COMPLETED_EVENT_TYPE,
+          EVALUATION_REPORTED_EVENT_TYPE,
+        ],
+        delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+        dedup: {
+          makeId: (event) => `graph-trigger-activity:${event.tenantId}`,
+          ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+          extend: false,
+          replace: false,
+        },
+        handler: (event, context) =>
+          automations.graphActivityHandler(event, context),
+      });
   }
 
   if (deps.customerIoEvaluationSyncReactor) {

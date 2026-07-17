@@ -14,6 +14,7 @@ import type { StateProjectionDefinition } from "../projections/stateProjection.t
 import type { DeduplicationStrategy } from "../queues/queue.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import type { ProcessManagerDefinition } from "./processManagerDefinition";
 import type { PipelineMetadata } from "./types";
 
 /**
@@ -133,6 +134,9 @@ export interface StaticPipelineDefinition<
 
   /** Live event consumers that are independent of fold/map projections. */
   eventSubscribers: Map<string, EventSubscriberDefinition<EventType>>;
+
+  /** Process managers mounted on this pipeline (ADR-049/052). */
+  processManagers: Map<string, ProcessManagerDefinition>;
 
   /** Feature flag service for kill switches */
   featureFlagService?: FeatureFlagServiceInterface;

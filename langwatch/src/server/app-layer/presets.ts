@@ -700,6 +700,9 @@ export function initializeDefaultApp(options?: {
     isSaas: config.isSaas,
     processRole: config.processRole,
     retentionPolicyResolver: retentionPolicyCache,
+    // ADR-052: durable persistence for withProcessManager declarations —
+    // the SAME store instance the registry's dependency assembly uses.
+    processStore: repositories.processStore,
   });
 
   // ADR-052: automation dispatch ports for the process-manager runtime the
@@ -876,7 +879,6 @@ export function initializeDefaultApp(options?: {
     },
     automations: {
       ports: automationPorts,
-      runsWorkers: roleRunsWorkers(config.processRole),
     },
     projects,
     monitors,
