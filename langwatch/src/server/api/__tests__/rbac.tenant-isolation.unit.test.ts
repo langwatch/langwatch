@@ -5,7 +5,7 @@ import {
 } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 
 import { hasProjectPermission, hasTeamPermission } from "../rbac";
 
