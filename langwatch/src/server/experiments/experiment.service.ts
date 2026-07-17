@@ -358,6 +358,31 @@ export class ExperimentService {
   }
 
   /**
+   * Overwrites an experiment's workbenchState in place. Used by the API-key
+   * mutating routes (e.g. attach-comparison) that patch an existing
+   * EVALUATIONS_V3 experiment's targets/evaluators rather than replacing the
+   * whole row the way the session-only saveEvaluationsV3 mutation does.
+   */
+  async updateWorkbenchState({
+    projectId,
+    id,
+    workbenchState,
+  }: {
+    projectId: string;
+    id: string;
+    workbenchState: unknown;
+  }): Promise<Experiment> {
+    const workbenchStateJson = JSON.parse(
+      JSON.stringify(workbenchState),
+    ) as Prisma.InputJsonValue;
+    return this.repository.updateById({
+      id,
+      projectId,
+      data: { workbenchState: workbenchStateJson },
+    });
+  }
+
+  /**
    * Generates a unique slug for an experiment within a project.
    *
    * If the base slug already exists (belonging to a different experiment),

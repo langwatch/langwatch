@@ -27,6 +27,7 @@ vi.mock("ora", () => ({
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { runExperimentCommand } from "../run";
 import { experimentStatusCommand } from "../status";
+import { addComparisonCommand, parseVariantSpec } from "../add-comparison";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -168,6 +169,172 @@ describe("experimentStatusCommand()", () => {
 
       await expect(
         experimentStatusCommand("doc-qa", { runId: "nonexistent" }),
+      ).rejects.toThrow(ProcessExitError);
+    });
+  });
+});
+
+describe("parseVariantSpec()", () => {
+  it("parses target:<id>", () => {
+    expect(parseVariantSpec("target:target-a")).toEqual({
+      kind: "existingTarget",
+      targetId: "target-a",
+    });
+  });
+
+  it("parses prompt:<handle>", () => {
+    expect(parseVariantSpec("prompt:draft-v1")).toEqual({
+      kind: "prompt",
+      handle: "draft-v1",
+    });
+  });
+
+  it("parses prompt:<handle>@<version>", () => {
+    expect(parseVariantSpec("prompt:draft-v1@3")).toEqual({
+      kind: "prompt",
+      handle: "draft-v1",
+      version: 3,
+    });
+  });
+
+  it("parses agent:<id>", () => {
+    expect(parseVariantSpec("agent:agent_123")).toEqual({
+      kind: "agent",
+      agentId: "agent_123",
+    });
+  });
+
+  it("throws on an unknown prefix", () => {
+    expect(() => parseVariantSpec("workflow:wf_1")).toThrow(/Invalid --variant/);
+  });
+
+  it("throws when the prefix has no value", () => {
+    expect(() => parseVariantSpec("prompt:")).toThrow(/missing prompt handle/);
+  });
+});
+
+describe("addComparisonCommand()", () => {
+  let mockAttachComparison: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAttachComparison = vi.fn();
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        attachComparison: mockAttachComparison,
+      } as unknown as ExperimentsApiService;
+    });
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
+
+  describe("when fewer than two --variant flags are given", () => {
+    it("exits with code 1 without calling the API", async () => {
+      await expect(
+        addComparisonCommand("quality-check", { variant: ["prompt:draft-v1"] }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockAttachComparison).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when two variants are given", () => {
+    it("calls attachComparison with the parsed variants", async () => {
+      mockAttachComparison.mockResolvedValue({
+        comparisonTargetId: "target_new",
+        createdTargetIds: [],
+        reusedTargetIds: ["target-a", "target-b"],
+        targets: [],
+      });
+
+      await addComparisonCommand("quality-check", {
+        variant: ["target:target-a", "prompt:draft-v2"],
+        goldenField: "expected_output",
+      });
+
+      expect(mockAttachComparison).toHaveBeenCalledWith({
+        slug: "quality-check",
+        body: {
+          variants: [
+            { kind: "existingTarget", targetId: "target-a" },
+            { kind: "prompt", handle: "draft-v2" },
+          ],
+          goldenField: "expected_output",
+          inputField: undefined,
+          includeMetrics: undefined,
+          randomizeOrder: undefined,
+        },
+      });
+    });
+  });
+
+  describe("when --golden-field is passed as an empty string", () => {
+    it("treats it the same as omitting the flag", async () => {
+      mockAttachComparison.mockResolvedValue({
+        comparisonTargetId: "target_new",
+        createdTargetIds: [],
+        reusedTargetIds: [],
+        targets: [],
+      });
+
+      await addComparisonCommand("quality-check", {
+        variant: ["target:target-a", "target:target-b"],
+        goldenField: "",
+        inputField: "",
+      });
+
+      expect(mockAttachComparison).toHaveBeenCalledWith({
+        slug: "quality-check",
+        body: expect.objectContaining({
+          goldenField: undefined,
+          inputField: undefined,
+        }),
+      });
+    });
+  });
+
+  describe("when format is json", () => {
+    it("outputs raw JSON", async () => {
+      const result = {
+        comparisonTargetId: "target_new",
+        createdTargetIds: ["target_new_variant"],
+        reusedTargetIds: [],
+        targets: [],
+      };
+      mockAttachComparison.mockResolvedValue(result);
+
+      await addComparisonCommand("quality-check", {
+        variant: ["prompt:draft-v1", "prompt:draft-v2"],
+        format: "json",
+      });
+
+      expect(console.log).toHaveBeenCalledWith(JSON.stringify(result, null, 2));
+    });
+  });
+
+  describe("when an invalid --variant spec is given", () => {
+    it("exits with code 1 without calling the API", async () => {
+      await expect(
+        addComparisonCommand("quality-check", {
+          variant: ["prompt:draft-v1", "not-a-valid-spec"],
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockAttachComparison).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the API call fails", () => {
+    it("exits with code 1", async () => {
+      mockAttachComparison.mockRejectedValue(
+        new ExperimentsApiServiceError("Experiment not found", "attach comparison"),
+      );
+
+      await expect(
+        addComparisonCommand("quality-check", {
+          variant: ["prompt:draft-v1", "prompt:draft-v2"],
+        }),
       ).rejects.toThrow(ProcessExitError);
     });
   });
