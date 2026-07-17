@@ -1,5 +1,4 @@
-import { createAlertTriggerReactor } from "@ee/governance/reactors/alertTrigger.reactor";
-import { createAlertTriggerNotifyOutboxReactor } from "@ee/governance/reactors/alertTriggerNotifyOutbox.reactor";
+import { createTraceAlertTriggerMatchSubscriber } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
@@ -71,9 +70,6 @@ import type { EvaluationAnalyticsData } from "./pipelines/evaluation-processing/
 import { EvaluationAnalyticsStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
 import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
-import { createEvaluationAlertTriggerReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTrigger.reactor";
-import { createEvaluationAlertTriggerNotifyOutboxReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTriggerNotifyOutbox.reactor";
-import { createEvaluationGraphTriggerEvaluationOutboxReactor } from "./pipelines/evaluation-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
@@ -81,7 +77,18 @@ import type { ExperimentRunStateData } from "./pipelines/experiment-run-processi
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
-import type { TriggerActionDispatchDeps } from "../app-layer/triggers/dispatch/triggerActionDispatch";
+import type { AutomationDispatchPorts } from "../app-layer/triggers/dispatch/automationDispatch.wiring";
+import {
+  GRAPH_ALERT_SWEEP_PROCESS_NAME,
+  TRIGGER_SETTLEMENT_PROCESS_NAME,
+  createGraphAlertSweepIntentHandlers,
+  createTriggerSettlementIntentHandlers,
+  graphAlertSweepBootstrapEnvelope,
+  graphAlertSweepProcessDefinition,
+  triggerSettlementProcessDefinition,
+} from "../app-layer/triggers/process-manager";
+import { createEvaluationAlertTriggerMatchSubscriber } from "../app-layer/triggers/subscribers/evaluationAlertTriggerMatch.subscriber";
+import { createGraphTriggerActivitySubscriber } from "../app-layer/triggers/subscribers/graphTriggerActivity.subscriber";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -129,8 +136,21 @@ import {
   OutboxDispatcherService,
   ProcessManagerService,
   ProcessOutboxWorker,
+  ProcessWakeWorker,
   type ProcessStore,
 } from "./process-manager";
+import type { EvaluationRunData } from "../app-layer/evaluations/types";
+import type { EventSubscriberDefinition } from "./subscribers/eventSubscriber.types";
+import {
+  EVALUATION_COMPLETED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_TYPE,
+} from "./pipelines/evaluation-processing/schemas/constants";
+import type { EvaluationProcessingEvent } from "./pipelines/evaluation-processing/schemas/events";
+import {
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+} from "./pipelines/trace-processing/schemas/constants";
+import type { TraceProcessingEvent } from "./pipelines/trace-processing/schemas/events";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -150,7 +170,6 @@ import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/re
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
-import { createGraphTriggerEvaluationOutboxReactor } from "./pipelines/trace-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import {
   createDeferredOriginHandler,
   createOriginGateReactor,
@@ -273,6 +292,16 @@ export interface PipelineRegistryDeps {
     titleGenerator: LangyTitleGenerator;
     runsWorkers: boolean;
   };
+  /**
+   * ADR-052: automation dispatch ports (settlement digest/persist deps,
+   * the shared graph-trigger evaluator, and the sweep candidate
+   * discovery), built in presets. `runsWorkers` gates the process outbox
+   * + wake worker loops the same way langy's flag does.
+   */
+  automations: {
+    ports: AutomationDispatchPorts;
+    runsWorkers: boolean;
+  };
   projects: ProjectService;
   monitors: MonitorService;
   triggers: TriggerService;
@@ -332,13 +361,31 @@ export class PipelineRegistry {
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
       "trace_summaries",
     );
+    const evaluationRunStore = new EvaluationRunStore(
+      this.deps.evaluations.runs.repository,
+    );
 
-    const evalPipeline = this.registerEvaluationPipeline({ traceSummaryStore });
+    // ADR-052: automation process managers + their process-outbox/wake
+    // workers, built BEFORE the trace/eval pipelines so the match and
+    // activity subscribers can be registered on them.
+    const automations = this.registerAutomationRuntime({
+      traceSummaryStore,
+      evaluationRunStore,
+    });
+
+    const evalPipeline = this.registerEvaluationPipeline({
+      evaluationRunStore,
+      subscribers: automations.evaluationSubscribers,
+    });
     const {
       pipeline: tracePipeline,
       simComputeRunMetrics,
       wireExperimentDeps,
-    } = this.registerTracePipeline({ evalPipeline, traceSummaryStore });
+    } = this.registerTracePipeline({
+      evalPipeline,
+      traceSummaryStore,
+      subscribers: automations.traceSubscribers,
+    });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
     const { pipeline: simulationPipeline, scenarioExecutionHandle } =
       this.registerSimulationPipeline({
@@ -369,7 +416,141 @@ export class PipelineRegistry {
       // Starting and notifying are private composition concerns so a web role
       // cannot accidentally start the worker. App shutdown only needs stop().
       processOutboxWorker: {
-        stop: () => processOutboxWorker.stop(),
+        stop: async () => {
+          await Promise.all([
+            processOutboxWorker.stop(),
+            automations.stop(),
+          ]);
+        },
+      },
+    };
+  }
+
+  /**
+   * ADR-052: the automation process runtime — the triggerSettlement and
+   * graphAlertSweep process managers, one scoped OutboxDispatcherService
+   * over the shared ProcessManagerOutbox, the outbox + wake worker loops,
+   * and the subscriber definitions the trace/eval pipelines register.
+   */
+  private registerAutomationRuntime({
+    traceSummaryStore,
+    evaluationRunStore,
+  }: {
+    traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+    evaluationRunStore: FoldProjectionStore<EvaluationRunData>;
+  }) {
+    const { ports, runsWorkers } = this.deps.automations;
+    const store = this.deps.repositories.processStore;
+
+    const settlementManager = new ProcessManagerService({
+      definition: triggerSettlementProcessDefinition,
+      store,
+    });
+    const sweepManager = new ProcessManagerService({
+      definition: graphAlertSweepProcessDefinition,
+      store,
+    });
+
+    const outboxDispatcher = new OutboxDispatcherService({
+      store,
+      handlers: {
+        ...createTriggerSettlementIntentHandlers(ports.settlementDeps),
+        ...createGraphAlertSweepIntentHandlers({
+          decideSweepCandidates: ports.decideSweepCandidates,
+          evaluateGraphTrigger: ports.evaluateGraphTrigger,
+          deleteDispatchedBefore: (params) =>
+            store.deleteDispatchedBefore(params),
+        }),
+      },
+      // Parity with the legacy ReactorOutbox rows (maxAttempts 8).
+      maxAttempts: 8,
+      // A digest dispatch renders + fetches + sends for its whole batch; the
+      // lease must outlive the slowest accepted dispatch or a healthy digest
+      // loses its lease mid-flight and double-delivers.
+      leaseDurationMs: 120_000,
+      // The outbox table is shared across process managers (ADR-051); an
+      // unscoped dispatcher would lease other domains' intents and
+      // retry-churn them for lack of a handler.
+      processNames: [
+        TRIGGER_SETTLEMENT_PROCESS_NAME,
+        GRAPH_ALERT_SWEEP_PROCESS_NAME,
+      ],
+    });
+    const outboxWorker = new ProcessOutboxWorker({
+      dispatcher: outboxDispatcher,
+      logger,
+    });
+    const wakeWorker = new ProcessWakeWorker({
+      store,
+      managers: {
+        [TRIGGER_SETTLEMENT_PROCESS_NAME]: settlementManager,
+        [GRAPH_ALERT_SWEEP_PROCESS_NAME]: sweepManager,
+      },
+      logger,
+      notifyOutbox: () => outboxWorker.notify(),
+    });
+
+    const notifyOutbox = () => outboxWorker.notify();
+    const traceSubscribers = [
+      createTraceAlertTriggerMatchSubscriber({
+        triggers: this.deps.triggers,
+        traceSummaryStore,
+        settlement: settlementManager,
+        notifyOutbox,
+      }),
+      createGraphTriggerActivitySubscriber<TraceProcessingEvent>({
+        pipeline: "trace",
+        eventTypes: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
+        deps: {
+          triggers: this.deps.triggers,
+          evaluateGraphTrigger: ports.evaluateGraphTrigger,
+        },
+      }),
+    ];
+    const evaluationSubscribers = [
+      createEvaluationAlertTriggerMatchSubscriber({
+        triggers: this.deps.triggers,
+        evaluationRunStore,
+        traceSummaryStore,
+        settlement: settlementManager,
+        notifyOutbox,
+      }),
+      createGraphTriggerActivitySubscriber<EvaluationProcessingEvent>({
+        pipeline: "evaluation",
+        eventTypes: [
+          EVALUATION_COMPLETED_EVENT_TYPE,
+          EVALUATION_REPORTED_EVENT_TYPE,
+        ],
+        deps: {
+          triggers: this.deps.triggers,
+          evaluateGraphTrigger: ports.evaluateGraphTrigger,
+        },
+      }),
+    ];
+
+    if (runsWorkers) {
+      outboxWorker.start();
+      wakeWorker.start();
+      // Seed the sweep singleton (date-keyed, so repeated boots the same
+      // day no-op via the process inbox). Fire-and-forget: a failed seed
+      // self-heals on the next boot, and the sweep's own wakes keep it
+      // alive once armed.
+      const now = Date.now();
+      void sweepManager
+        .handleEvent({ envelope: graphAlertSweepBootstrapEnvelope(now), now })
+        .catch((error: unknown) => {
+          logger.error(
+            { error: error instanceof Error ? error.message : String(error) },
+            "graphAlertSweep bootstrap failed; will retry on next worker boot",
+          );
+        });
+    }
+
+    return {
+      traceSubscribers,
+      evaluationSubscribers,
+      stop: async () => {
+        await Promise.all([outboxWorker.stop(), wakeWorker.stop()]);
       },
     };
   }
@@ -522,9 +703,11 @@ export class PipelineRegistry {
   }
 
   private registerEvaluationPipeline({
-    traceSummaryStore,
+    evaluationRunStore,
+    subscribers,
   }: {
-    traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+    evaluationRunStore: FoldProjectionStore<EvaluationRunData>;
+    subscribers: EventSubscriberDefinition<EvaluationProcessingEvent>[];
   }) {
     const executeEvaluationCommand = new ExecuteEvaluationCommand({
       monitors: this.deps.monitors,
@@ -578,34 +761,9 @@ export class PipelineRegistry {
       },
     });
 
-    // ADR-035: the persist branch is now an outbox reactor that only
-    // enqueues settle payloads. Filter evaluation + dispatch (traceById /
-    // addToDataset / addToAnnotationQueue) moved to the outbox dispatcher
-    // (see buildOutboxRuntime), so this reactor needs just the trigger
-    // service and the trace fold store for the enqueue breadcrumb.
-    const evaluationAlertTriggerReactor = createEvaluationAlertTriggerReactor({
-      triggers: this.deps.triggers,
-      traceSummaryStore,
-    });
-
-    const evaluationAlertTriggerNotifyOutboxReactor =
-      createEvaluationAlertTriggerNotifyOutboxReactor({
-        triggers: this.deps.triggers,
-        traceSummaryStore,
-      });
-
-    // ADR-034 Phase 6: real-time graph-trigger reactor on the slim eval fold.
-    // The sole path — the K8s cron was removed (ADR-034).
-    const graphTriggerEvaluationOutboxReactor =
-      createEvaluationGraphTriggerEvaluationOutboxReactor({
-        triggers: this.deps.triggers,
-      });
-
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
-        evalRunStore: new EvaluationRunStore(
-          this.deps.evaluations.runs.repository,
-        ),
+        evalRunStore: evaluationRunStore,
         // Redis cache is the eval slim fold's ONLY warm read path — its
         // store's get() returns null by design (lossy row, no read-back),
         // and on a cache miss the fold's refoldOnStoreMiss option rebuilds
@@ -621,9 +779,7 @@ export class PipelineRegistry {
             this.deps.repositories.evaluationAnalyticsRollup,
           ),
         executeEvaluationCommand,
-        evaluationAlertTriggerReactor,
-        evaluationAlertTriggerNotifyOutboxReactor,
-        graphTriggerEvaluationOutboxReactor,
+        subscribers,
       }),
     );
   }
@@ -631,9 +787,11 @@ export class PipelineRegistry {
   private registerTracePipeline({
     evalPipeline,
     traceSummaryStore,
+    subscribers,
   }: {
     evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+    subscribers: EventSubscriberDefinition<TraceProcessingEvent>[];
   }) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
@@ -661,28 +819,6 @@ export class PipelineRegistry {
       monitors: this.deps.monitors,
       evaluation: evalCommands.executeEvaluation,
     });
-
-    // ADR-035: the persist branch is now an outbox reactor that only
-    // enqueues settle payloads; dispatch deps live on the outbox
-    // dispatcher (see buildOutboxRuntime), so this reactor needs just the
-    // trigger service.
-    const alertTriggerReactor = createAlertTriggerReactor({
-      triggers: this.deps.triggers,
-    });
-
-    const alertTriggerNotifyOutboxReactor =
-      createAlertTriggerNotifyOutboxReactor({
-        triggers: this.deps.triggers,
-      });
-
-    // ADR-034 Phase 5: real-time path for custom-graph threshold alerts.
-    // Flag-gated per project inside `decide` so a flag-OFF project sees
-    // an empty enqueue list and the cron handles its graph triggers
-    // unchanged.
-    const graphTriggerEvaluationOutboxReactor =
-      createGraphTriggerEvaluationOutboxReactor({
-        triggers: this.deps.triggers,
-      });
 
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
       reportEvaluation: evalCommands.reportEvaluation,
@@ -797,11 +933,9 @@ export class PipelineRegistry {
           this.deps.repositories.metricRecordStorage,
         ),
         traceSummaryStore,
+        subscribers,
         originGateReactor,
         evaluationTriggerReactor,
-        alertTriggerReactor,
-        alertTriggerNotifyOutboxReactor,
-        graphTriggerEvaluationOutboxReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,

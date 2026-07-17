@@ -1,9 +1,9 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { definePipeline } from "../../";
-import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import {
   CompleteEvaluationCommand,
   ReportEvaluationCommand,
@@ -30,30 +30,11 @@ export interface EvaluationProcessingPipelineDeps {
    *  `traceAnalyticsRollupAppendStore`). */
   evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
-  /** PERSIST-class branch of the evaluation alert trigger, routed
-   *  through the framework's `.withOutbox` plumbing (ADR-030 + ADR-035).
-   *  Emits settle payloads stamped `actionClass: "persist"`. */
-  evaluationAlertTriggerReactor: OutboxReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationRunData
-  >;
-  /** NOTIFY-class branch of the evaluation alert trigger, routed
-   *  through the framework's `.withOutbox` plumbing (ADR-030). */
-  evaluationAlertTriggerNotifyOutboxReactor: OutboxReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationRunData
-  >;
   /**
-   * ADR-034 Phase 6: real-time path for eval-metric custom-graph threshold
-   * alerts. Attached on `evaluationAnalytics` (the slim eval fold) so it
-   * fires on every slim-fold update; debounced per (triggerId, projectId)
-   * inside the reactor's `decide`. This is the sole path — the K8s cron
-   * was removed (ADR-034).
+   * ADR-052: automation subscribers (evaluation-side alert-trigger match
+   * detection + the real-time eval-metric graph-trigger activity path).
    */
-  graphTriggerEvaluationOutboxReactor: OutboxReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationAnalyticsData
-  >;
+  subscribers?: EventSubscriberDefinition<EvaluationProcessingEvent>[];
   customerIoEvaluationSyncReactor?: ReactorDefinition<
     EvaluationProcessingEvent,
     EvaluationRunData
@@ -95,22 +76,13 @@ export function createEvaluationProcessingPipeline(
       new EvaluationAnalyticsRollupMapProjection({
         store: deps.evaluationAnalyticsRollupAppendStore,
       }),
-    )
-    .withOutbox(
-      "evaluationRun",
-      "evaluationAlertTrigger",
-      deps.evaluationAlertTriggerReactor,
-    )
-    .withOutbox(
-      "evaluationRun",
-      "evaluationAlertTriggerNotifyOutbox",
-      deps.evaluationAlertTriggerNotifyOutboxReactor,
-    )
-    .withOutbox(
-      "evaluationAnalytics",
-      "graphTriggerEvaluation",
-      deps.graphTriggerEvaluationOutboxReactor,
     );
+
+  // ADR-052: automation subscribers — event-only consumers registered on
+  // the live delivery path (never invoked by replay).
+  for (const subscriber of deps.subscribers ?? []) {
+    builder = builder.withEventSubscriber(subscriber.name, subscriber);
+  }
 
   if (deps.customerIoEvaluationSyncReactor) {
     builder = builder.withReactor(

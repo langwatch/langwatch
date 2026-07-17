@@ -1,0 +1,277 @@
+import type { PrismaClient } from "@prisma/client";
+import { Cluster, type Redis } from "ioredis";
+import { env } from "~/env.mjs";
+import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
+import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
+import { getProtectionsForProject } from "~/server/api/utils";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
+import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
+import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { EmailSuppressionService } from "~/server/app-layer/triggers/emailSuppression.service";
+import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
+import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
+import { RedisCachedFoldStore } from "~/server/event-sourcing/projections/redisCachedFoldStore";
+import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
+import { TraceService } from "~/server/traces/trace.service";
+import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import { sendWebhook } from "~/server/triggers/sendWebhook";
+import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
+
+import { WebhookDeliveryService } from "../webhook-delivery.service";
+import {
+  evaluateGraphTrigger,
+  type GraphTriggerEvaluationDeps,
+  type GraphTriggerEvaluationReason,
+} from "../graph-trigger-evaluation.service";
+import {
+  decideGraphTriggerHeartbeat,
+  defaultCandidateSources,
+  defaultGraphTriggerHeartbeatDeps,
+  type GraphTriggerSweepCandidate,
+} from "../graph-trigger-heartbeat";
+import { PrismaGraphTriggerSentRepository } from "../repositories/trigger.prisma.repository";
+import type { TriggerService } from "../trigger.service";
+import { dispatchGraphAlertAction } from "./graphAlertActionDispatch";
+import {
+  consumeEmailCapSlot,
+  consumeTenantEmailCapSlot,
+} from "./emailCaps";
+import type { TriggerSettlementDispatchDeps } from "../process-manager/triggerSettlementIntentHandlers";
+
+/**
+ * ADR-052 composition root for automation dispatch: builds the deps the
+ * settlement intent handlers and the graph-alert paths need. This is the
+ * legacy `buildOutboxRuntime` wiring minus queue transport — the process
+ * outbox owns retry now.
+ */
+export interface AutomationDispatchPorts {
+  settlementDeps: TriggerSettlementDispatchDeps;
+  evaluateGraphTrigger: (params: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }) => Promise<void>;
+  decideSweepCandidates: (params: {
+    now: Date;
+  }) => Promise<GraphTriggerSweepCandidate[]>;
+}
+
+export function buildAutomationDispatchPorts({
+  prisma,
+  redis,
+  triggers,
+  emailSuppressions,
+  projects,
+  evaluations,
+  traces,
+  traceSummaryRepository,
+}: {
+  prisma: PrismaClient;
+  redis: Redis | Cluster | null;
+  triggers: TriggerService;
+  emailSuppressions: EmailSuppressionService;
+  projects: ProjectService;
+  evaluations: { runs: EvaluationRunService };
+  traces: { spans: SpanStorageService };
+  traceSummaryRepository: TraceSummaryRepository;
+}): AutomationDispatchPorts {
+  // Fail loud if BASE_HOST is missing: every alert dispatch interpolates it
+  // into deep links; an empty baseHost silently ships broken links.
+  const baseHost = env.BASE_HOST;
+  if (!baseHost) {
+    throw new Error(
+      "BASE_HOST is unset — automation dispatch cannot render deep links (email + Slack alert templates interpolate baseHost). Set env.BASE_HOST before booting the worker.",
+    );
+  }
+
+  // Shared trace fold store — dispatch re-reads it for the settle confirm.
+  // RedisCachedFoldStore takes a standalone `Redis` client; a Cluster
+  // client falls back to the uncached store.
+  const traceSummaryStore: FoldProjectionStore<TraceSummaryData> =
+    redis && !(redis instanceof Cluster)
+      ? new RedisCachedFoldStore(
+          new TraceSummaryStore(traceSummaryRepository),
+          redis,
+          { keyPrefix: "trace_summaries" },
+        )
+      : new TraceSummaryStore(traceSummaryRepository);
+
+  const traceReadDerivation = new TraceReadDerivationService(traces.spans);
+
+  // Constructed once — `traceById` runs per trace per digest on the hot
+  // path. Concurrent lookups within one dispatch share a single in-flight
+  // protections query per project; the entry drops once settled so
+  // protections aren't cached stale across dispatches.
+  const traceService = TraceService.create(prisma);
+  const protectionsInFlight = new Map<
+    string,
+    ReturnType<typeof getProtectionsForProject>
+  >();
+  const getProtectionsDeduped = (projectId: string) => {
+    let promise = protectionsInFlight.get(projectId);
+    if (!promise) {
+      promise = getProtectionsForProject(prisma, { projectId }).finally(() => {
+        protectionsInFlight.delete(projectId);
+      });
+      protectionsInFlight.set(projectId, promise);
+    }
+    return promise;
+  };
+
+  // ADR-034 Phase 5/8.1: shared evaluator deps. The notifier dispatches via
+  // the Liquid pipeline (`dispatchGraphAlertAction`) so per-trigger custom
+  // templates and the alert-default Liquid templates both apply. The
+  // TriggerSent repo mirrors the legacy dedup pattern exactly.
+  const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
+  // ADR-040 §6: one delivery-log writer shared by the digest dispatch and
+  // the graph-alert path.
+  const webhookDeliveries = WebhookDeliveryService.create(prisma);
+  const recordWebhookDelivery = (
+    input: Parameters<typeof webhookDeliveries.record>[0],
+  ) => webhookDeliveries.record(input);
+  const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
+    loadTrigger: async ({ triggerId, projectId }) =>
+      prisma.trigger.findUnique({ where: { id: triggerId, projectId } }),
+    loadCustomGraph: async ({ customGraphId, projectId }) =>
+      prisma.customGraph.findUnique({
+        where: { id: customGraphId, projectId },
+      }),
+    loadProject: async (projectId) =>
+      prisma.project.findUnique({ where: { id: projectId } }),
+    getTimeseries: async (input) => getAnalyticsService().getTimeseries(input),
+    triggerSent: graphTriggerSentRepo,
+    updateLastRunAt: async ({ triggerId, projectId }) =>
+      triggers.updateLastRunAt(triggerId, projectId),
+    notifier: {
+      dispatch: async (input) =>
+        dispatchGraphAlertAction({
+          deps: {
+            sendEmail: sendRenderedTriggerEmail,
+            sendSlack: sendRenderedSlackMessage,
+            sendSlackBot: postSlackChatMessage,
+            sendWebhook,
+            recordWebhookDelivery,
+            // ADR-031: honour the same suppression list + hard caps the
+            // digest path consumes; claims keyed on the fire digest so a
+            // retry re-reads the count instead of burning a second slot.
+            filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
+              emailSuppressions.filterSuppressed({
+                projectId,
+                triggerId,
+                emails,
+              }),
+            consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
+              consumeEmailCapSlot({
+                projectId,
+                triggerId,
+                now,
+                cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+                dedupKey,
+              }),
+            emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
+            consumeTenantEmailCapSlot: ({
+              projectId,
+              now,
+              cap,
+              recipientCount,
+              dedupKey,
+            }) =>
+              consumeTenantEmailCapSlot({
+                projectId,
+                now,
+                cap,
+                recipientCount,
+                dedupKey,
+              }),
+            tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+            // ADR-031 per-recipient at-most-once ledger — the SAME
+            // TriggerSent claim store the digest dispatch threads in.
+            isRecipientSent: (params) => triggers.isSendClaimed(params),
+            recordRecipientSent: async (params) => {
+              await triggers.claimSend(params);
+            },
+          },
+          input,
+        }),
+    },
+    baseHost,
+    now: () => new Date(),
+  };
+
+  const boundEvaluateGraphTrigger = async (params: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }) => {
+    await evaluateGraphTrigger({
+      deps: graphTriggerEvalDeps,
+      triggerId: params.triggerId,
+      projectId: params.projectId,
+      reason: params.reason,
+    });
+  };
+
+  const heartbeatDeps = defaultGraphTriggerHeartbeatDeps({ triggers, prisma });
+  const heartbeatSources = defaultCandidateSources(prisma);
+
+  const settlementDeps: TriggerSettlementDispatchDeps = {
+    triggers,
+    projects,
+    baseHost,
+    traceSummaryStore,
+    evaluationRuns: evaluations.runs,
+    deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
+    emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
+    consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
+      consumeEmailCapSlot({
+        projectId,
+        triggerId,
+        now,
+        cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+        dedupKey,
+      }),
+    tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+    consumeTenantEmailCapSlot: ({
+      projectId,
+      now,
+      cap,
+      recipientCount,
+      dedupKey,
+    }) =>
+      consumeTenantEmailCapSlot({
+        projectId,
+        now,
+        cap,
+        recipientCount,
+        dedupKey,
+      }),
+    filterSuppressedEmails: ({ projectId, triggerId, emails }) =>
+      emailSuppressions.filterSuppressed({ projectId, triggerId, emails }),
+    traceById: async (projectId, traceId) => {
+      const protections = await getProtectionsDeduped(projectId);
+      return traceService.getById(projectId, traceId, protections);
+    },
+    addToAnnotationQueue: async (params) => {
+      await createOrUpdateQueueItems({ ...params, prisma });
+    },
+    addToDataset: async (params) => {
+      await createManyDatasetRecords(params);
+    },
+    recordWebhookDelivery,
+  };
+
+  return {
+    settlementDeps,
+    evaluateGraphTrigger: boundEvaluateGraphTrigger,
+    decideSweepCandidates: ({ now }) =>
+      decideGraphTriggerHeartbeat({
+        deps: heartbeatDeps,
+        sources: heartbeatSources,
+        now,
+      }),
+  };
+}

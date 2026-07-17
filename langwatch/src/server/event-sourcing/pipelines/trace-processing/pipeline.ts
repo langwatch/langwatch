@@ -1,10 +1,10 @@
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { definePipeline } from "../../";
-import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import {
   AddAnnotationCommand,
   BulkSyncAnnotationsCommand,
@@ -83,33 +83,13 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
-  /** PERSIST-class branch of the alert trigger, routed through the
-   *  framework's `.withOutbox` plumbing (ADR-030 + ADR-035). Emits settle
-   *  payloads stamped `actionClass: "persist"`; the dispatcher's cadence
-   *  stage runs `dispatchTriggerAction` for them. */
-  alertTriggerReactor: OutboxReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  /** NOTIFY-class branch of the alert trigger, routed through the
-   *  framework's `.withOutbox` plumbing (ADR-030). Always provided;
-   *  the framework adapter no-ops on process roles without an outbox
-   *  runtime, so unconditional registration is safe. */
-  alertTriggerNotifyOutboxReactor: OutboxReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
   /**
-   * ADR-034 Phase 5: real-time path for custom-graph threshold alerts.
-   * Attached on `traceAnalytics` (the slim fold) so it fires on every
-   * slim-fold update; debounced per (triggerId, projectId) inside the
-   * reactor's `decide`. Flag-gated per project — disabled = empty
-   * decide; cron handles the project's graph triggers as today.
+   * ADR-052: automation subscribers (alert-trigger match detection + the
+   * real-time graph-trigger activity path). Event-only consumers of the
+   * committed events; the process manager + process outbox own timing,
+   * retry, and dispatch.
    */
-  graphTriggerEvaluationOutboxReactor: OutboxReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
   claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<
@@ -233,17 +213,6 @@ export function createTraceProcessingPipeline(
       "experimentMetricsSync",
       deps.experimentMetricsSyncReactor,
     )
-    .withOutbox("traceSummary", "alertTrigger", deps.alertTriggerReactor)
-    .withOutbox(
-      "traceSummary",
-      "alertTriggerNotifyOutbox",
-      deps.alertTriggerNotifyOutboxReactor,
-    )
-    .withOutbox(
-      "traceAnalytics",
-      "graphTriggerEvaluation",
-      deps.graphTriggerEvaluationOutboxReactor,
-    )
     .withReactor(
       "spanStorage",
       "spanStorageBroadcast",
@@ -293,6 +262,12 @@ export function createTraceProcessingPipeline(
       "retentionOrphanSweep",
       deps.retentionOrphanSweepReactor,
     );
+  }
+
+  // ADR-052: automation subscribers — event-only consumers registered on
+  // the live delivery path (never invoked by replay).
+  for (const subscriber of deps.subscribers ?? []) {
+    builder = builder.withEventSubscriber(subscriber.name, subscriber);
   }
 
   // Span-command sharding: when the shard count is > 1, install a getGroupKey
