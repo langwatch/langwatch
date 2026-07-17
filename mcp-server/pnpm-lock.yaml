@@ -62,8 +62,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.6.0)
       '@langwatch/scenario':
-        specifier: ^0.5.1
-        version: 0.5.1(9f7f6fc532f4d4293b93fb647f9ba65e)
+        specifier: ^0.4.6
+        version: 0.4.15(9f7f6fc532f4d4293b93fb647f9ba65e)
       '@types/debug':
         specifier: ^4.1.13
         version: 4.1.13
@@ -499,8 +499,8 @@ packages:
     peerDependencies:
       '@langchain/core': '>=0.2.21 <0.4.0'
 
-  '@langwatch/scenario@0.5.1':
-    resolution: {integrity: sha512-zXYq2OD8qbj3qj5bebsa67xGLqjk8XO3WLVvbMM7RXQV0+P0ld2Avexdj2H8t4QFqe3o/9xAVLW71aPczrOigA==}
+  '@langwatch/scenario@0.4.15':
+    resolution: {integrity: sha512-RV/Fuki2+fMUgiC/M+XC0Da/WR9eZKhCkn+l1f17ThF2Igmjes+UoWthCN/G94v60L243iXJQ961SlGlfBOrMg==}
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
       '@google/genai': '>=2.0.0'
@@ -3322,7 +3322,7 @@ snapshots:
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.219.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.9.0(@opentelemetry/api@1.9.1))(openai@6.46.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0)
       js-tiktoken: 1.0.21
 
-  '@langwatch/scenario@0.5.1(9f7f6fc532f4d4293b93fb647f9ba65e)':
+  '@langwatch/scenario@0.4.15(9f7f6fc532f4d4293b93fb647f9ba65e)':
     dependencies:
       '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 3.0.83(zod@3.25.76)
