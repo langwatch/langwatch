@@ -222,6 +222,10 @@ export class EventSourcedQueueProcessorMemory<
         "pipeline.process",
         {
           kind: SpanKind.INTERNAL,
+          // Root the span per job, mirroring the Redis-backed GroupQueue: each
+          // processed job is its own bounded trace rather than a child of any
+          // ambient context, so dev/test traces never chain into one another.
+          root: true,
           attributes,
         },
         async () => {

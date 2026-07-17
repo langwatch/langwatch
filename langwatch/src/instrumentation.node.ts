@@ -83,6 +83,18 @@ if (
       detectors: [awsEksDetector, envDetector],
     }),
     advanced: {},
+    // Cap per-span payload growth. OTel's defaults are unbounded
+    // (`attributeValueLengthLimit: Infinity`, `attributeCountLimit: 128` only
+    // in newer SDKs) — a single span carrying an oversized `db.statement` or a
+    // huge attribute bag can bloat a trace and, in bulk, pressure the
+    // collector's WAL. These caps bound each span's attribute footprint:
+    // values are truncated at 12k chars and no more than 128 attributes are
+    // kept per span. This is defense-in-depth alongside the per-job root-trace
+    // scoping and ioredis `requireParentSpan` scoping.
+    spanLimits: {
+      attributeValueLengthLimit: 12_000,
+      attributeCountLimit: 128,
+    },
     spanProcessors: spanProcessors,
     logRecordProcessors: logRecordProcessors,
     textMapPropagator: new CompositePropagator({
@@ -121,9 +133,25 @@ if (
         "@opentelemetry/instrumentation-cucumber": { enabled: false },
         "@opentelemetry/instrumentation-router": { enabled: false },
 
-        // Truncate ioredis db.statement to command + first key
-        // (avoid logging content + large attributes)
+        // ioredis auto-instrumentation emits one span PER Redis command. The
+        // event-sourcing GroupQueue worker runs continuous background loops on
+        // Redis — BRPOP signal polling, Lua-script leasing (evalsha), holder-set
+        // bookkeeping (sadd/srem), active-key heartbeats (expire), and stats
+        // pushes (lpush) — none of which sit under any application span. Left
+        // unscoped, those loops produced an unbounded per-command span flood
+        // that (together with the mega-trace bug fixed in the GroupQueue) OOM
+        // crash-looped the self-observability Tempo.
+        //
+        // `requireParentSpan: true` scopes ioredis so a command is only traced
+        // when it already runs inside an application span (an HTTP request, a
+        // per-job CONSUMER span, etc.). The queue's own plumbing loops — which
+        // have no active parent span — stop creating spans entirely, while
+        // Redis calls made inside real request/job work are still captured
+        // (and remain bounded now that each job is its own root trace).
         "@opentelemetry/instrumentation-ioredis": {
+          requireParentSpan: true,
+          // Truncate ioredis db.statement to command + first key
+          // (avoid logging content + large attributes)
           dbStatementSerializer: (
             cmdName: string,
             cmdArgs: Array<string | Buffer | number | unknown[]>,
