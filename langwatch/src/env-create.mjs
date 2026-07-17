@@ -223,13 +223,22 @@ export function createEnvConfig() {
       GITHUB_CLIENT_ID: z.string().optional(),
       GITHUB_CLIENT_SECRET: z.string().optional(),
 
-      // GitHub App used by Langy to open PRs as the requesting user.
-      // Separate from the GITHUB_CLIENT_* identity-login app above. All
-      // optional: when unset, the Langy GitHub feature is silently off and
-      // unconnected users get a "Connect GitHub" reply. Issue #4747.
+      // GitHub App used by Langy to open bot-authored PRs on repositories the
+      // App is installed on. Separate from the GITHUB_CLIENT_* identity-login
+      // app above. All optional: when the private key is unset the Langy GitHub
+      // feature is silently off, the connect card explains it is unavailable,
+      // and no installation token can be minted. Issue #4747.
+      //   GITHUB_LANGY_APP_ID        — numeric App ID (JWT `iss`).
+      //   GITHUB_LANGY_PRIVATE_KEY   — the App's RSA private key PEM (signs the
+      //                                app JWT used to mint installation tokens).
+      //   GITHUB_LANGY_WEBHOOK_SECRET— verifies X-Hub-Signature-256 on inbound
+      //                                installation webhooks.
+      //   GITHUB_LANGY_APP_SLUG      — the App's slug, for the install deep-link
+      //                                github.com/apps/<slug>/installations/new.
       GITHUB_LANGY_APP_ID: z.string().optional(),
-      GITHUB_LANGY_CLIENT_ID: z.string().optional(),
-      GITHUB_LANGY_CLIENT_SECRET: z.string().optional(),
+      GITHUB_LANGY_PRIVATE_KEY: z.string().optional(),
+      GITHUB_LANGY_WEBHOOK_SECRET: z.string().optional(),
+      GITHUB_LANGY_APP_SLUG: z.string().optional(),
 
       // Gitlab
       GITLAB_CLIENT_ID: z.string().optional(),
@@ -392,8 +401,9 @@ export function createEnvConfig() {
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
       GITHUB_LANGY_APP_ID: process.env.GITHUB_LANGY_APP_ID,
-      GITHUB_LANGY_CLIENT_ID: process.env.GITHUB_LANGY_CLIENT_ID,
-      GITHUB_LANGY_CLIENT_SECRET: process.env.GITHUB_LANGY_CLIENT_SECRET,
+      GITHUB_LANGY_PRIVATE_KEY: process.env.GITHUB_LANGY_PRIVATE_KEY,
+      GITHUB_LANGY_WEBHOOK_SECRET: process.env.GITHUB_LANGY_WEBHOOK_SECRET,
+      GITHUB_LANGY_APP_SLUG: process.env.GITHUB_LANGY_APP_SLUG,
       GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
       GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

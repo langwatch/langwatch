@@ -247,8 +247,8 @@ export class StorageMeterService {
 
   /**
    * Sums per-table `_size_bytes` totals for a tenant in a single query. Each
-   * table is pre-aggregated inside a UNION ALL so only the 11 scalar subtotals
-   * (not every row's `_size_bytes`) reach the outer sum.
+   * table is pre-aggregated inside a UNION ALL so only one scalar subtotal per
+   * managed table (not every row's `_size_bytes`) reaches the outer sum.
    *
    * On parts where `_size_bytes` was never materialized this still recomputes
    * `byteSize(...)` over the heavy payload columns, which for the largest
@@ -266,7 +266,7 @@ export class StorageMeterService {
     if (!this.resolveClickHouseClient) return 0;
 
     const client = await this.resolveClickHouseClient(tenantId);
-    // Aggregate per-table first, then sum the 11 scalars. The naive
+    // Aggregate per-table first, then sum the scalar subtotals. The naive
     // UNION ALL on raw rows materializes every _size_bytes value into the
     // intermediate set before summing — explodes memory for tenants with
     // tens of millions of rows.

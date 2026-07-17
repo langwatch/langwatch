@@ -723,4 +723,5 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrChainExhausted, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
+	herr.RegisterStatus(domain.ErrNoProviderConfigured, http.StatusBadRequest)
 }

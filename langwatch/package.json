@@ -31,7 +31,7 @@
     "dev:clean": "rm -rf node_modules/.vite .dev-certs && echo 'Vite cache and dev certs cleared. Restart dev server.'",
     "start": "./scripts/start.sh",
     "start:app": "tsx src/server.mts",
-    "start:prepare:files": "pnpm run ensure:ai-gateway-secrets && pnpm run copy:langevals-types && pnpm run prisma:generate:typescript && pnpm run build:mcp-server",
+    "start:prepare:files": "pnpm run ensure:ai-gateway-secrets && pnpm run copy:langevals-types && pnpm run prisma:generate:typescript && pnpm run build:mcp-server && pnpm run generate:langy-skills",
     "ensure:ai-gateway-secrets": "bash scripts/ensure-ai-gateway-secrets.sh",
     "build:mcp-server": "./scripts/build-mcp-server.sh",
     "start:prepare:db": "pnpm run prisma:migrate && pnpm run clickhouse:migrate",
@@ -54,6 +54,8 @@
     "prisma:migrate": "sh -c 'if [ \"$SKIP_PRISMA_MIGRATE\" != \"true\" ]; then pnpm prisma migrate deploy; else echo \"Skipping Prisma migrations\"; fi'",
     "prisma:seed": "tsx prisma/seed.ts",
     "seed:sample-traces": "tsx scripts/seed-sample-traces.ts",
+    "seed:realistic-platform": "tsx scripts/seed-realistic-platform-data.ts",
+    "seed:langy-prompts": "tsx scripts/seed-langy-prompts.ts",
     "clickhouse:migrate": "sh -c 'if [ \"$SKIP_CLICKHOUSE_MIGRATE\" != \"true\" ]; then pnpm run task clickhouseMigrate; else echo \"Skipping ClickHouse migrations\"; fi'",
     "copy:langevals-types": "cp ../langevals/ts-integration/evaluators.generated.ts src/server/evaluations/evaluators.generated.ts",
     "tsc-watch": "tsc --noEmit --watch",
@@ -61,7 +63,8 @@
     "test:e2e:save-auth-state": "tsx e2e/save-auth-state.ts",
     "test:e2e:codegen": "playwright codegen --load-storage=./e2e/auth.json http://localhost:5560/",
     "test:e2e:langevals-staging": "bash -c 'eval \"$(aws --profile ${AWS_PROFILE:-lw-dev} configure export-credentials --format env)\" && S3_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY S3_SESSION_TOKEN=$AWS_SESSION_TOKEN S3_BUCKET_NAME=${S3_BUCKET_NAME:-runtime-storage-dev} S3_REGION=${S3_REGION:-eu-central-1} LANGEVALS_E2E_ENABLED=1 LANGEVALS_STAGING_THRESHOLD_BYTES=200 EVAL_MAX_PAYLOAD_BYTES=20000000 TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES=200000000 vitest run src/server/langevals/__tests__/stagedFetch.e2e.test.ts --reporter verbose'",
-    "licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\""
+    "licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\"",
+    "generate:langy-skills": "tsx scripts/generate-langy-skills.ts"
   },
   "dependencies": {
     "@ag-ui/core": "~0.0.57",
@@ -93,6 +96,7 @@
     "@hono/node-server": "^2.0.6",
     "@hono/zod-validator": "^0.4.3",
     "@hookform/resolvers": "^5.4.0",
+    "@langwatch/cli-cards": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/mcp-server": "workspace:*",
     "@langwatch/scenario": "file:vendor/langwatch-scenario-0.4.10.tgz",

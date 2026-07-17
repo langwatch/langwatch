@@ -175,21 +175,19 @@ function formatError({
     return finalizeErrorResponse({
       status,
       isVersioned,
-      body: { code: "http_error", message: err.message },
+      body: {
+        code: status >= 500 ? "internal_error" : "http_error",
+        message: status >= 500 ? "An unknown error occurred" : err.message,
+      },
     });
   }
 
   // 4. Unknown errors -- 500
-  const isDev =
-    typeof process !== "undefined" &&
-    process.env?.["NODE_ENV"] === "development";
-  const message =
-    isDev && err instanceof Error ? err.message : "Internal server error";
   const status: ContentfulStatusCode = 500;
   return finalizeErrorResponse({
     status,
     isVersioned,
-    body: { code: "internal_error", message },
+    body: { code: "internal_error", message: "An unknown error occurred" },
   });
 }
 

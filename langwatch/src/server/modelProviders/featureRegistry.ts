@@ -115,6 +115,13 @@ const REGISTRY: FeatureDescriptor[] = [
     displayName: "Topic clustering",
     description: "Names the clusters surfaced in Analytics → Topics.",
   },
+  {
+    key: "langy.conversation_title",
+    role: "FAST",
+    displayName: "Langy chat titles",
+    description:
+      "Names each Langy conversation from its messages. Point this at a cheap model.",
+  },
 
   // EMBEDDINGS — single line, no per-feature expand surfaced in the UI.
   {

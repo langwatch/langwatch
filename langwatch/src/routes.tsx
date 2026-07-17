@@ -345,7 +345,7 @@ const routes: RouteObject[] = [
   // lazily via page() so Langy's chat bundle stays out of the initial load.
   // See ProjectLangyLayout + specs/langy/langy-navigation-persistence.feature
   {
-    ...page(() => import("./components/langy/ProjectLangyLayout")),
+    ...page(() => import("./features/langy/ProjectLangyLayout")),
     children: [
       {
         path: "/:project",

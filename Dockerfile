@@ -31,6 +31,10 @@ ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 # (via start:prepare:files → build:mcp-server).
 COPY mcp-server ./mcp-server
 COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+COPY packages ./packages
+COPY skills ./skills
+COPY Dockerfile.langyagent ./Dockerfile.langyagent
+COPY feature-map.json ./feature-map.json
 
 COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
 # The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
@@ -63,9 +67,18 @@ WORKDIR /app
 # Copy built artifacts from builder.
 # mcp-server must be copied alongside langwatch because pnpm workspace
 # symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
+# cli-cards is another root workspace package linked the same way and is loaded
+# by migration tasks as well as the running server.
 COPY --from=builder /app/langwatch ./langwatch
 COPY --from=builder /app/mcp-server ./mcp-server
+COPY --from=builder /app/packages/cli-cards/package.json ./packages/cli-cards/package.json
+COPY --from=builder /app/packages/cli-cards/src ./packages/cli-cards/src
+# cli-cards deliberately declares zod as a peer. Because the workspace package
+# lives outside /app/langwatch, expose the app's production zod at the nearest
+# shared node_modules boundary after dev dependencies have been pruned.
+RUN mkdir -p ./node_modules && ln -s ../langwatch/node_modules/zod ./node_modules/zod
 COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
 EXPOSE 5560

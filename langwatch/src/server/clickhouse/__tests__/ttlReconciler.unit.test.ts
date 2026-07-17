@@ -342,6 +342,7 @@ describe("ttlReconciler", () => {
         "dspy_steps",
         "evaluation_runs",
         "event_log",
+        "langy_analytics_events",
         "experiment_run_items",
         "experiment_runs",
         "simulation_runs",

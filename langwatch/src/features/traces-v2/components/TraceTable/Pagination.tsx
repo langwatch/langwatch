@@ -2,11 +2,16 @@ import { Button, Flex, IconButton, Skeleton, Text } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type React from "react";
 import { useFilterStore } from "../../stores/filterStore";
+import type { TraceListCursor } from "../../stores/filterStore";
+import { useTraceTableScrollElement } from "./scrollContext";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;
 
 interface PaginationProps {
   totalHits: number;
+  /** Cursor returned by the current batch; null means the end. */
+  nextCursor?: TraceListCursor | null;
+  visibleCount?: number;
   /**
    * Renders a placeholder bar in place of the rows-per-page selector +
    * "Page X of Y" copy while data is loading, so the pagination row
@@ -16,18 +21,45 @@ interface PaginationProps {
    * visual end of the row.
    */
   isLoading?: boolean;
+  /** Prevent page-racing only while a different page key is replacing data. */
+  isTransitioning?: boolean;
 }
 
 export const Pagination: React.FC<PaginationProps> = ({
   totalHits,
+  nextCursor = null,
+  visibleCount = 0,
   isLoading = false,
+  isTransitioning = false,
 }) => {
   const page = useFilterStore((s) => s.page);
   const pageSize = useFilterStore((s) => s.pageSize);
   const setPage = useFilterStore((s) => s.setPage);
+  const setPageCursor = useFilterStore((s) => s.setPageCursor);
   const setPageSize = useFilterStore((s) => s.setPageSize);
+  const scrollElement = useTraceTableScrollElement();
 
-  const totalPages = Math.max(1, Math.ceil(totalHits / pageSize));
+  const safePage = Math.max(page, 1);
+  const rangeStart = (safePage - 1) * pageSize + 1;
+  const rangeEnd = rangeStart + Math.max(visibleCount - 1, 0);
+  // A background refresh of the CURRENT page must not lock navigation. On a
+  // busy live project SSE can keep `isFetching` true almost continuously;
+  // disabling Next for that signal made pagination appear broken. Only a key
+  // transition (React Query is showing previous-page data) is a page lock.
+  const busy = isLoading || isTransitioning;
+
+  const goToPrevious = () => {
+    if (busy) return;
+    setPage(Math.max(safePage - 1, 1));
+    scrollElement?.scrollTo({ top: 0, behavior: "auto" });
+  };
+
+  const goToNext = () => {
+    if (busy || !nextCursor) return;
+    setPageCursor(safePage + 1, nextCursor);
+    setPage(safePage + 1);
+    scrollElement?.scrollTo({ top: 0, behavior: "auto" });
+  };
 
   if (!isLoading && totalHits === 0) return null;
 
@@ -67,7 +99,8 @@ export const Pagination: React.FC<PaginationProps> = ({
             ))}
           </Flex>
           <Text textStyle="xs" color="fg.subtle">
-            Page {page} of {totalPages} ({totalHits} traces)
+            {totalHits.toLocaleString()} traces · showing {rangeStart}–
+            {rangeEnd}
           </Text>
         </>
       )}
@@ -76,8 +109,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           aria-label="Previous page"
           variant="ghost"
           size="xs"
-          disabled={isLoading || page <= 1}
-          onClick={() => setPage(page - 1)}
+          disabled={busy || safePage <= 1}
+          onClick={goToPrevious}
         >
           <ChevronLeft size={12} />
         </IconButton>
@@ -85,8 +118,8 @@ export const Pagination: React.FC<PaginationProps> = ({
           aria-label="Next page"
           variant="ghost"
           size="xs"
-          disabled={isLoading || page >= totalPages}
-          onClick={() => setPage(page + 1)}
+          disabled={busy || !nextCursor}
+          onClick={goToNext}
         >
           <ChevronRight size={12} />
         </IconButton>

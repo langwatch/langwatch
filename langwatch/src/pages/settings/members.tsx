@@ -5,6 +5,7 @@ import {
   Card,
   Heading,
   HStack,
+  Input,
   Spacer,
   Table,
   Text,
@@ -13,12 +14,12 @@ import {
 } from "@chakra-ui/react";
 import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useEffect, useMemo, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { OverflownTextWithTooltip } from "~/components/OverflownText";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { AddMembersForm } from "../../components/AddMembersForm";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import { useDepartmentColumn } from "../../components/settings/useDepartmentColumn";
 import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
@@ -98,10 +99,6 @@ function MembersList({
   const department = useDepartmentColumn(organization.id);
   const showDepartment = department.show && hasOrganizationManagePermission;
 
-  const teamOptions = teams.map((team) => ({
-    label: team.name,
-    value: team.id,
-  }));
   const queryClient = api.useContext();
 
   const [selectedMember, setSelectedMember] = useState<{
@@ -110,11 +107,9 @@ function MembersList({
     user: { name: string | null; email: string | null };
   } | null>(null);
 
-  const {
-    open: isAddMembersOpen,
-    onOpen: onAddMembersOpen,
-    onClose: onAddMembersClose,
-  } = useDisclosure();
+  // "Add members" is now a URL-routed drawer (see drawers.md), openable from
+  // here, the command bar, and the inline invite box below.
+  const { openDrawer } = useDrawer();
 
   const {
     open: isInviteLinkOpen,
@@ -145,18 +140,14 @@ function MembersList({
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
-  const {
-    onSubmit,
-    approveInvite,
-    rejectInvite,
-    deleteInvite,
-    isSubmitting,
-  } = useInviteActions({
+  // The add-member flow (create invites) now lives in the invite drawer; the
+  // page keeps these handlers for the invites table's approve / reject / delete.
+  const { approveInvite, rejectInvite, deleteInvite } = useInviteActions({
     organizationId: organization.id,
     isAdmin: hasOrganizationManagePermission,
     hasEmailProvider: hasEmailProvider ?? false,
     onInviteCreated: setSelectedInvites,
-    onClose: onAddMembersClose,
+    onClose: () => {},
     refetchInvites: () => void pendingInvites.refetch(),
     pricingModel: (organization as { pricingModel?: string }).pricingModel,
     activePlanFree: activePlan.free,
@@ -280,10 +271,22 @@ function MembersList({
           <Heading>Organization Members</Heading>
           <Spacer />
           {hasOrganizationManagePermission && (
-            <PageLayout.HeaderButton onClick={onAddMembersOpen}>
-              <Plus size={20} />
-              Add members
-            </PageLayout.HeaderButton>
+            <HStack gap={2}>
+              <InlineInviteBox
+                onStartTyping={(email) =>
+                  openDrawer(
+                    "inviteMember",
+                    email ? { initialEmail: email } : undefined,
+                  )
+                }
+              />
+              <PageLayout.HeaderButton
+                onClick={() => openDrawer("inviteMember")}
+              >
+                <Plus size={20} />
+                Add members
+              </PageLayout.HeaderButton>
+            </HStack>
           )}
         </HStack>
         <Card.Root width="full" overflow="hidden">
@@ -301,9 +304,13 @@ function MembersList({
                 <Table.Row>
                   <Table.ColumnHeader width="56px" />
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader maxWidth="280px">Email</Table.ColumnHeader>
+                  <Table.ColumnHeader maxWidth="280px">
+                    Email
+                  </Table.ColumnHeader>
                   {hasOrganizationManagePermission && (
-                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">
+                      Access
+                    </Table.ColumnHeader>
                   )}
                   {showDepartment && (
                     <Table.ColumnHeader>Department</Table.ColumnHeader>
@@ -335,7 +342,10 @@ function MembersList({
                               setSelectedMember({
                                 userId: member.userId,
                                 role: member.role,
-                                user: { name: member.user.name ?? null, email: member.user.email ?? null },
+                                user: {
+                                  name: member.user.name ?? null,
+                                  email: member.user.email ?? null,
+                                },
                               });
                             }}
                           >
@@ -396,7 +406,10 @@ function MembersList({
                                   setSelectedMember({
                                     userId: member.userId,
                                     role: member.role,
-                                    user: { name: member.user.name ?? null, email: member.user.email ?? null },
+                                    user: {
+                                      name: member.user.name ?? null,
+                                      email: member.user.email ?? null,
+                                    },
                                   });
                                 }}
                               >
@@ -488,34 +501,41 @@ function MembersList({
           </Dialog.Body>
         </Dialog.Content>
       </Dialog.Root>
-
-      <Dialog.Root
-        open={isAddMembersOpen}
-        onOpenChange={({ open }) =>
-          open ? onAddMembersOpen() : onAddMembersClose()
-        }
-      >
-        <Dialog.Content bg="bg" width="100%" maxWidth="1024px">
-          <Dialog.Header>
-            <Dialog.Title>
-              <Heading>Add members</Heading>
-            </Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body>
-            <AddMembersForm
-              teamOptions={teamOptions}
-              organizationId={organization.id}
-              onSubmit={onSubmit}
-              isLoading={isSubmitting}
-              hasEmailProvider={hasEmailProvider ?? false}
-              onClose={onAddMembersClose}
-              isInviterAdmin={hasOrganizationManagePermission}
-            />
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+      {/* The "Add members" flow itself is the URL-routed invite drawer
+          (registry key "inviteMember"), rendered by <CurrentDrawer /> — opened
+          from the header button, the inline invite box, and the command bar. */}
     </SettingsLayout>
+  );
+}
+
+/**
+ * Inline invite box: the moment someone starts typing an email here, hand off
+ * to the invite drawer carrying what they typed, so the box is a fast launcher
+ * rather than a second, competing invite form.
+ */
+function InlineInviteBox({
+  onStartTyping,
+}: {
+  onStartTyping: (email: string) => void;
+}) {
+  const [value, setValue] = useState("");
+  return (
+    <Input
+      value={value}
+      size="sm"
+      maxWidth="240px"
+      placeholder="Invite by email…"
+      aria-label="Invite a teammate by email"
+      onChange={(event) => {
+        const next = event.target.value;
+        if (next.trim().length > 0) {
+          onStartTyping(next);
+          setValue("");
+        } else {
+          setValue(next);
+        }
+      }}
+    />
   );
 }
 
@@ -531,12 +551,26 @@ function roleBadgeColor(role: string) {
   return "gray";
 }
 
-function MemberAccessDisplay({ bindings, isLoading }: { bindings: Binding[]; isLoading?: boolean }) {
+function MemberAccessDisplay({
+  bindings,
+  isLoading,
+}: {
+  bindings: Binding[];
+  isLoading?: boolean;
+}) {
   if (isLoading) {
-    return <Text fontSize="xs" color="fg.subtle" textAlign="right">-</Text>;
+    return (
+      <Text fontSize="xs" color="fg.subtle" textAlign="right">
+        -
+      </Text>
+    );
   }
   if (bindings.length === 0) {
-    return <Text fontSize="xs" color="fg.subtle" textAlign="right">No access configured</Text>;
+    return (
+      <Text fontSize="xs" color="fg.subtle" textAlign="right">
+        No access configured
+      </Text>
+    );
   }
   return (
     <VStack gap={1} align="end">
@@ -547,10 +581,15 @@ function MemberAccessDisplay({ bindings, isLoading }: { bindings: Binding[]; isL
           </Badge>
           <Text color="fg.muted">on</Text>
           <Badge colorPalette="purple" size="sm">
-            {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
+            {scopeTypeLabel(b.scopeType)}{" "}
+            {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
           </Badge>
           {b.groupId && (
-            <Text color="fg.subtle" fontSize="xs" title={`via group: ${b.groupName ?? b.groupId}`}>
+            <Text
+              color="fg.subtle"
+              fontSize="xs"
+              title={`via group: ${b.groupName ?? b.groupId}`}
+            >
               via {b.groupName ?? "group"}
             </Text>
           )}

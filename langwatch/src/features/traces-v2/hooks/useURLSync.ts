@@ -2,7 +2,9 @@
  * URL fragment synchronization for traces-v2 bar state.
  *
  * The bar state (active lens + query + timeRange + page) is encoded into the
- * URL fragment so it survives refresh and is shareable. When the in-memory
+ * URL fragment so it survives refresh and is shareable. Cursor pagination is
+ * deliberately session-local: a deep batch is not a stable shareable address.
+ * When the in-memory
  * state matches a built-in lens exactly, the fragment collapses to just
  * `#<lensId>`. Deep-link query params (trace, span, viz, mode) are
  * intentionally left untouched.
@@ -44,10 +46,9 @@ export function useURLSync(): void {
 
   const queryText = useFilterStore((s) => s.queryText);
   const timeRange = useFilterStore((s) => s.timeRange);
-  const page = useFilterStore((s) => s.page);
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const setTimeRange = useFilterStore((s) => s.setTimeRange);
-  const setPage = useFilterStore((s) => s.setPage);
+  const resetPagination = useFilterStore((s) => s.resetPagination);
 
   const activeLensId = useViewStore((s) => s.activeLensId);
   const allLenses = useViewStore((s) => s.allLenses);
@@ -59,6 +60,7 @@ export function useURLSync(): void {
       // Fragment was cleared (e.g. user navigated to a default-state URL).
       // Reset to the default lens so the page matches what's in the bar.
       selectLens(DEFAULT_LENS_ID);
+      resetPagination();
       return;
     }
 
@@ -84,9 +86,8 @@ export function useURLSync(): void {
         preset ? { ...range, label: preset.label, presetId: preset.id } : range,
       );
     }
-    // Apply page last — applyQueryText/setTimeRange reset it to 1.
-    if (overrides.page !== undefined) setPage(overrides.page);
-  }, [allLenses, selectLens, applyQueryText, setTimeRange, setPage]);
+    resetPagination();
+  }, [allLenses, selectLens, applyQueryText, setTimeRange, resetPagination]);
 
   // Initialize from fragment on mount
   useEffect(() => {
@@ -119,7 +120,6 @@ export function useURLSync(): void {
         query: queryText,
         timeRange,
         defaultPresetId: DEFAULT_PRESET_ID,
-        page,
       });
 
       if (activeLensId === DEFAULT_LENS_ID && isOverridesEmpty(overrides)) {
@@ -130,5 +130,5 @@ export function useURLSync(): void {
     }, 150);
 
     return () => window.clearTimeout(handle);
-  }, [activeLensId, allLenses, queryText, timeRange, page]);
+  }, [activeLensId, allLenses, queryText, timeRange]);
 }
