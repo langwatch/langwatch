@@ -119,7 +119,7 @@ import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-an
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
 import { PrismaProcessStore } from "../event-sourcing/process-manager";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
-import { clusterTopicsForProject } from "../topicClustering/topicClustering";
+import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,

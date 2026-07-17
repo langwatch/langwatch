@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { IntentHandler } from "~/server/event-sourcing/process-manager";
-import type { ClusteringPageOutcome } from "~/server/topicClustering/topicClustering";
+import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
+import { classifyClusteringError } from "../clustering-error";
 
 import {
   TOPIC_CLUSTERING_PROCESS_INTENT_TYPES,
@@ -61,6 +62,8 @@ export interface TopicClusteringOutcomeCommands {
     runId: string;
     page: number;
     error: string;
+    errorCode: string;
+    userActionable: boolean;
   }): Promise<void>;
 }
 
@@ -121,8 +124,16 @@ export function createTopicClusteringIntentHandlers(params: {
         );
         throw error;
       }
+      const classified = classifyClusteringError(error);
       logger.error(
-        { projectId, runId: intent.runId, page: intent.page, attempt: message.attempt, error: errorMessage },
+        {
+          projectId,
+          runId: intent.runId,
+          page: intent.page,
+          attempt: message.attempt,
+          error: errorMessage,
+          errorCode: classified.code,
+        },
         "Clustering page failed on final attempt; recording run_failed",
       );
       await params.commands.recordClusteringRunFailed({
@@ -131,6 +142,8 @@ export function createTopicClusteringIntentHandlers(params: {
         runId: intent.runId,
         page: intent.page,
         error: errorMessage,
+        errorCode: classified.code,
+        userActionable: classified.userActionable,
       });
     }
   };

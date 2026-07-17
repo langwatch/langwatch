@@ -48,7 +48,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
 
 vi.mock("fetch-h2", () => ({ fetch: vi.fn() }));
 
-import { storeResults } from "../topicClustering";
+import { storeResults } from "../clustering";
 
 const sampleClusteringResult = {
   topics: [

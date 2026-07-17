@@ -51,6 +51,19 @@ Feature: Event-sourced topic clustering scheduling
     And the failure is recorded on the project's durable state
     And the settings page can show the failed outcome
 
+  Scenario: A failure the user can fix shows guidance, not a stack trace
+    Given clustering failed because no default model is configured
+    When the user opens the topic clustering settings page
+    Then they see guidance pointing at the model provider settings
+    And the failure is marked as something they can resolve
+
+  Scenario: Internal failures never expose raw error detail to the user
+    Given clustering failed inside the clustering service
+    When the user opens the topic clustering settings page
+    Then they see that the run failed on our side and will retry
+    And the raw error text is not returned to the product surface
+    And the full error remains recorded for operators
+
   Scenario: Duplicate event delivery cannot double-run a slot
     Given a committed clustering event is delivered twice
     Then the process consumes it once

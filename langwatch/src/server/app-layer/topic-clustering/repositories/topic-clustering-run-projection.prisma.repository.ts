@@ -1,4 +1,6 @@
+import { generate } from "@langwatch/ksuid";
 import type { Prisma } from "@prisma/client";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
@@ -79,7 +81,11 @@ export class PrismaTopicClusteringRunProjectionRepository
 
     await this.prisma.topicClusteringRunProjection.upsert({
       where: { projectId },
-      create: { projectId, ...data },
+      create: {
+        id: generate(KSUID_RESOURCES.TOPIC_CLUSTERING_RUN).toString(),
+        projectId,
+        ...data,
+      },
       update: data,
     });
   }

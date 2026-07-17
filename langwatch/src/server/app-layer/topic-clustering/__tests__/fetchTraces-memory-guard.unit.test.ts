@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 
 describe("topicClustering page fetch memory guard", () => {
   const source = fs.readFileSync(
-    path.resolve(__dirname, "..", "topicClustering.ts"),
+    path.resolve(__dirname, "..", "clustering.ts"),
     "utf-8",
   );
 
