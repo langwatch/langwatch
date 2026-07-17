@@ -1,11 +1,11 @@
-import { forwardRef, useMemo } from "react";
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { CommandGroup } from "./CommandGroup";
-import type { ListItem } from "../getIconInfo";
-import type { Command, RecentItem, SearchResult } from "../types";
-import type { FilteredProject } from "../hooks/useFilteredProjects";
-import { COMMAND_BAR_MAX_HEIGHT } from "../constants";
+import { forwardRef, useMemo } from "react";
 import { topLevelNavigationCommands } from "../command-registry";
+import { COMMAND_BAR_MAX_HEIGHT } from "../constants";
+import type { ListItem } from "../getIconInfo";
+import type { FilteredProject } from "../hooks/useFilteredProjects";
+import type { Command, RecentItem, SearchResult } from "../types";
+import { CommandGroup } from "./CommandGroup";
 
 interface CommandBarResultsProps {
   query: string;
@@ -25,6 +25,7 @@ interface CommandBarResultsProps {
   idResult: SearchResult | null;
   recentItemsLimited: RecentItem[];
   easterEggItem: ListItem | null;
+  askLangyItem: ListItem | null;
   isLoading: boolean;
 }
 
@@ -59,6 +60,7 @@ export const CommandBarResults = forwardRef<
     idResult,
     recentItemsLimited,
     easterEggItem,
+    askLangyItem,
     isLoading,
   },
   ref,
@@ -202,7 +204,15 @@ export const CommandBarResults = forwardRef<
     searchInDocsItem,
   ]);
 
-  const groups = query === "" ? emptyQueryGroups : queryGroups;
+  // Ask Langy leads on an empty bar and trails while typing — matching
+  // useCommandBarItems exactly so the running keyboard index lines up (on a
+  // typed query index 0 must stay the best match, not the assistant).
+  const groups = useMemo<GroupConfig[]>(() => {
+    const base = query === "" ? emptyQueryGroups : queryGroups;
+    if (!askLangyItem) return base;
+    const askGroup: GroupConfig = { label: "Ask Langy", items: [askLangyItem] };
+    return query === "" ? [askGroup, ...base] : [...base, askGroup];
+  }, [query, emptyQueryGroups, queryGroups, askLangyItem]);
 
   // Render groups with running index calculation
   const renderGroups = () => {
@@ -233,9 +243,9 @@ export const CommandBarResults = forwardRef<
       ref={ref}
       maxHeight={COMMAND_BAR_MAX_HEIGHT}
       overflowY="auto"
-      paddingBottom={3}
+      paddingBottom={2.5}
       borderTop="1px solid"
-      borderColor="border.muted"
+      borderColor="border.subtle"
     >
       <VStack align="stretch" gap={0}>
         {renderGroups()}

@@ -1,39 +1,44 @@
-import { useRouter } from "~/utils/compat/next-router";
-import { useTheme } from "next-themes";
-import { useSession } from "~/utils/auth-client";
 import { subDays } from "date-fns";
+import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useDrawer } from "~/hooks/useDrawer";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
+import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
+import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { useSession } from "~/utils/auth-client";
+import type { NextRouter } from "~/utils/compat/next-router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCommandBar } from "./CommandBarContext";
-import { useCommandSearch } from "./useCommandSearch";
-import { useRecentItems } from "./useRecentItems";
-import type { ListItem } from "./getIconInfo";
-import { COMMAND_BAR_TOP_MARGIN, COMMAND_BAR_MAX_WIDTH } from "./constants";
-import { HintsSection } from "./components/HintsSection";
-import { CommandBarInput } from "./components/CommandBarInput";
-import { CommandBarResults } from "./components/CommandBarResults";
 import { CommandBarFooter } from "./components/CommandBarFooter";
-import {
-  useFilteredCommands,
-  useFilteredProjects,
-  useCommandBarItems,
-  useCommandBarKeyboard,
-  useScrollIntoView,
-  useAutoFocusInput,
-} from "./hooks";
-import {
-  handleCommandSelect,
-  handleSearchResultSelect,
-  handleRecentItemSelect,
-  handleProjectSelect,
-} from "./selectHandlers";
+import { CommandBarInput } from "./components/CommandBarInput";
+import { CommandBarLangyMode } from "./components/CommandBarLangyMode";
+import { CommandBarResults } from "./components/CommandBarResults";
+import { HintsSection } from "./components/HintsSection";
+import { COMMAND_BAR_MAX_WIDTH, COMMAND_BAR_TOP_MARGIN } from "./constants";
 import { findEasterEgg } from "./easterEggs";
 import { useEasterEggEffects } from "./effects/useEasterEggEffects";
-import type { NextRouter } from "~/utils/compat/next-router";
+import type { ListItem } from "./getIconInfo";
+import {
+  useAutoFocusInput,
+  useCommandBarItems,
+  useCommandBarKeyboard,
+  useFilteredCommands,
+  useFilteredProjects,
+  useScrollIntoView,
+} from "./hooks";
+import { beginLangyHandoff } from "./langyHandoff";
+import {
+  handleCommandSelect,
+  handleProjectSelect,
+  handleRecentItemSelect,
+  handleSearchResultSelect,
+} from "./selectHandlers";
+import { useCommandSearch } from "./useCommandSearch";
+import { useRecentItems } from "./useRecentItems";
 
 /**
  * Handle page-specific commands for the traces page.
@@ -161,6 +166,16 @@ export function CommandBar() {
   const resultsRef = useRef<HTMLDivElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
+  // Langy activation: whether to offer "Ask Langy" (same gate as the panel), the
+  // store hand-off, and the local Langy-mode state the bar flips into on activation.
+  const langyEnabled = useShowLangy();
+  const askLangy = useLangyStore((s) => s.askLangy);
+  const reduceMotion = useReducedMotion();
+  const [langyMode, setLangyMode] = useState(false);
+  const [langyExiting, setLangyExiting] = useState(false);
+  const handoffTimerRef = useRef<number | null>(null);
+  const handoffInFlightRef = useRef(false);
+
   // Detect platform for keyboard hints
   const isMac =
     typeof navigator !== "undefined" &&
@@ -187,6 +202,7 @@ export function CommandBar() {
     searchInTracesItem,
     searchInDocsItem,
     easterEggItem,
+    askLangyItem,
   } = useCommandBarItems(
     query,
     filteredCommands,
@@ -195,6 +211,7 @@ export function CommandBar() {
     idResult,
     groupedItems,
     project?.slug,
+    langyEnabled,
   );
 
   // Easter egg effects
@@ -219,6 +236,15 @@ export function CommandBar() {
 
       if (item.type === "command") {
         const cmd = item.data;
+
+        // Ask Langy doesn't navigate — it focuses the bar into Langy's own
+        // input mode. Enter from there performs the panel handoff.
+        if (cmd.id === "action-ask-langy") {
+          handoffInFlightRef.current = false;
+          setLangyExiting(false);
+          setLangyMode(true);
+          return;
+        }
 
         // Handle external URLs
         if (cmd.externalUrl) {
@@ -302,6 +328,53 @@ export function CommandBar() {
     ],
   );
 
+  // Reset Langy mode whenever the bar closes, so it never reopens mid-transition
+  // and the next Cmd+K lands on the normal command view. A pending handoff is
+  // cancelled as well; otherwise a fast Escape/unmount could close a later bar.
+  useEffect(() => {
+    if (!isOpen) {
+      if (handoffTimerRef.current !== null) {
+        window.clearTimeout(handoffTimerRef.current);
+        handoffTimerRef.current = null;
+      }
+      handoffInFlightRef.current = false;
+      setLangyMode(false);
+      setLangyExiting(false);
+    }
+  }, [isOpen]);
+
+  useEffect(
+    () => () => {
+      if (handoffTimerRef.current !== null) {
+        window.clearTimeout(handoffTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  // Escape / Backspace-on-empty in Langy mode — back to normal command mode.
+  const exitLangyMode = useCallback(() => {
+    handoffInFlightRef.current = false;
+    setLangyMode(false);
+    setLangyExiting(false);
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
+
+  // Enter in Langy mode — open the panel FIRST, then let this surface dissolve over
+  // the panel's entrance. Reduced motion keeps the same state ordering but
+  // closes synchronously, with no decorative overlap.
+  const submitLangyMode = useCallback(() => {
+    if (handoffInFlightRef.current) return;
+    handoffInFlightRef.current = true;
+    handoffTimerRef.current = beginLangyHandoff({
+      prompt: query,
+      askLangy,
+      closeCommandBar: close,
+      reducedMotion: reduceMotion,
+      setExiting: setLangyExiting,
+    });
+  }, [query, askLangy, close, reduceMotion]);
+
   // Copy link to clipboard
   const handleCopyLink = useCallback(() => {
     const item = allItems[selectedIndex];
@@ -343,47 +416,77 @@ export function CommandBar() {
       placement="top"
       motionPreset="slide-in-top"
     >
-      <Dialog.Content bg="bg"
-        width={COMMAND_BAR_MAX_WIDTH}
-        maxWidth="90vw"
-        marginTop={COMMAND_BAR_TOP_MARGIN}
+      <Dialog.Content
+        background="bg.surface/92"
+        width={{ base: "calc(100vw - 24px)", md: COMMAND_BAR_MAX_WIDTH }}
+        maxWidth={COMMAND_BAR_MAX_WIDTH}
+        marginTop={{ base: "8vh", md: COMMAND_BAR_TOP_MARGIN }}
         padding={0}
         overflow="hidden"
-        borderRadius="xl"
+        borderWidth="1px"
+        borderColor="border.subtle"
+        borderRadius={{ base: "18px", md: "20px" }}
+        boxShadow="0 2px 8px rgba(20, 20, 23, 0.08), 0 24px 70px -20px rgba(20, 20, 23, 0.35)"
+        backdropFilter="blur(20px) saturate(1.15)"
+        backdropProps={{ backdropFilter: "blur(12px) saturate(1.05)" }}
+        data-langy-handoff={langyExiting ? "exiting" : undefined}
+        style={{
+          opacity: langyExiting ? 0 : 1,
+          transform: langyExiting
+            ? "translate3d(18px, 4px, 0) scale(0.985)"
+            : undefined,
+          filter: langyExiting ? "blur(2px)" : undefined,
+          transition: reduceMotion
+            ? undefined
+            : "opacity 160ms ease, transform 220ms cubic-bezier(0.32, 0.72, 0, 1), filter 160ms ease",
+        }}
       >
-        <CommandBarInput
-          inputRef={inputRef}
-          query={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          isLoading={searchLoading}
-        />
+        {langyMode ? (
+          <CommandBarLangyMode
+            query={query}
+            onQueryChange={setQuery}
+            onSubmit={submitLangyMode}
+            onExit={exitLangyMode}
+            exiting={langyExiting}
+          />
+        ) : (
+          <>
+            <CommandBarInput
+              inputRef={inputRef}
+              query={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              isLoading={searchLoading}
+            />
 
-        <CommandBarResults
-          ref={resultsRef}
-          query={query}
-          allItems={allItems}
-          selectedIndex={selectedIndex}
-          onSelect={handleSelect}
-          onMouseEnter={setSelectedIndex}
-          filteredNavigation={filteredCommands.navigation}
-          filteredActions={filteredCommands.actions}
-          filteredSupport={filteredCommands.support}
-          filteredTheme={filteredCommands.theme}
-          filteredPage={filteredCommands.page}
-          searchResults={searchResults}
-          filteredProjects={filteredProjects}
-          searchInTracesItem={searchInTracesItem}
-          searchInDocsItem={searchInDocsItem}
-          idResult={idResult}
-          recentItemsLimited={recentItemsLimited}
-          easterEggItem={easterEggItem}
-          isLoading={searchLoading}
-        />
+            <CommandBarResults
+              ref={resultsRef}
+              query={query}
+              allItems={allItems}
+              selectedIndex={selectedIndex}
+              onSelect={handleSelect}
+              onMouseEnter={setSelectedIndex}
+              filteredNavigation={filteredCommands.navigation}
+              filteredActions={filteredCommands.actions}
+              filteredSupport={filteredCommands.support}
+              filteredTheme={filteredCommands.theme}
+              filteredPage={filteredCommands.page}
+              searchResults={searchResults}
+              filteredProjects={filteredProjects}
+              searchInTracesItem={searchInTracesItem}
+              searchInDocsItem={searchInDocsItem}
+              idResult={idResult}
+              recentItemsLimited={recentItemsLimited}
+              easterEggItem={easterEggItem}
+              askLangyItem={askLangyItem}
+              isLoading={searchLoading}
+            />
 
-        <HintsSection />
+            <HintsSection />
 
-        <CommandBarFooter isMac={isMac} />
+            <CommandBarFooter isMac={isMac} />
+          </>
+        )}
       </Dialog.Content>
     </Dialog.Root>
   );
