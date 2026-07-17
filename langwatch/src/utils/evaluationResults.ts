@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { SerializedHandledError } from "~/server/app-layer/handled-error";
 
 /**
@@ -28,42 +29,55 @@ export type ParsedEvaluationResult = {
   domainError?: SerializedHandledError;
 };
 
+// `code` is HandledError's real discriminant; `kind` is a deprecated
+// back-compat alias (see handled-error.ts). Older serialised payloads may
+// carry only one of the two, so at least one is required and the other is
+// derived from it.
+const serializedReasonSchema: z.ZodType<{
+  code: string;
+  kind: string;
+  meta?: Record<string, unknown>;
+  reasons?: unknown[];
+}> = z.lazy(() =>
+  z.object({
+    code: z.string(),
+    kind: z.string(),
+    meta: z.record(z.unknown()).optional(),
+    reasons: z.array(serializedReasonSchema).optional(),
+  }),
+);
+
+const serializedHandledErrorSchema = z
+  .object({
+    code: z.string().optional(),
+    kind: z.string().optional(),
+    meta: z.record(z.unknown()).optional(),
+    traceId: z.string().optional(),
+    spanId: z.string().optional(),
+    traceUrl: z.string().optional(),
+    httpStatus: z.number(),
+    reasons: z.array(serializedReasonSchema).optional(),
+  })
+  .refine((value) => value.code !== undefined || value.kind !== undefined)
+  .transform((value): SerializedHandledError => {
+    const code = value.code ?? value.kind!;
+    return {
+      code,
+      kind: value.kind ?? code,
+      httpStatus: value.httpStatus,
+      meta: value.meta ?? {},
+      traceId: value.traceId,
+      spanId: value.spanId,
+      traceUrl: value.traceUrl,
+      reasons: (value.reasons ?? []) as SerializedHandledError["reasons"],
+    };
+  });
+
 function readSerializedDomainError(
   candidate: unknown,
 ): SerializedHandledError | undefined {
-  if (!candidate || typeof candidate !== "object") return undefined;
-
-  const value = candidate as {
-    code?: unknown;
-    kind?: unknown;
-    meta?: unknown;
-    traceId?: unknown;
-    spanId?: unknown;
-    traceUrl?: unknown;
-    httpStatus?: unknown;
-    reasons?: unknown;
-  };
-
-  const code = typeof value.code === "string" ? value.code : value.kind;
-  if (typeof code !== "string") return undefined;
-  if (typeof value.httpStatus !== "number") return undefined;
-
-  return {
-    code,
-    kind: typeof value.kind === "string" ? value.kind : code,
-    httpStatus: value.httpStatus,
-    meta:
-      value.meta && typeof value.meta === "object"
-        ? (value.meta as Record<string, unknown>)
-        : {},
-    traceId: typeof value.traceId === "string" ? value.traceId : undefined,
-    spanId: typeof value.spanId === "string" ? value.spanId : undefined,
-    traceUrl:
-      typeof value.traceUrl === "string" ? value.traceUrl : undefined,
-    reasons: Array.isArray(value.reasons)
-      ? (value.reasons as SerializedHandledError["reasons"])
-      : [],
-  };
+  const result = serializedHandledErrorSchema.safeParse(candidate);
+  return result.success ? result.data : undefined;
 }
 
 /**

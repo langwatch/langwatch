@@ -320,6 +320,11 @@ def test_metrics_injected_into_prompt_when_requested():
     prompt = captured[0]
     assert "cost=$0.001200" in prompt
     assert "duration=0.450s" in prompt
+    # The metrics annotations alone are unexplained noise unless the judge is
+    # actually told to weigh them (see select_best_compare.py's include_metrics
+    # branch). This is the feature the metrics toggle exists to deliver, not
+    # just a formatting detail.
+    assert "Factor these into your decision" in prompt
 
 
 def test_metrics_not_injected_by_default():
@@ -346,6 +351,7 @@ def test_metrics_not_injected_by_default():
     user_msg = mock_completion.call_args.kwargs["messages"][1]["content"]
     assert "cost=$" not in user_msg
     assert "duration=" not in user_msg
+    assert "Factor these into your decision" not in user_msg
 
 
 def test_five_candidates_use_exactly_one_call():

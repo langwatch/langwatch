@@ -68,7 +68,7 @@ import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 // mid-selection any time an unrelated field in the drawer re-rendered it.
 const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
   variants: [],
-  hasGoldenAnswer: true,
+  hasGoldenAnswer: false,
   goldenField: "",
   includeMetrics: [],
   randomizeOrder: true,

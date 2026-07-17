@@ -277,7 +277,7 @@ export const LEGACY_PAIRWISE_EVALUATOR_TYPE = "langevals/pairwise_compare";
 export const comparisonEvaluatorConfigSchema = z.object({
   variants: z.array(z.string()).default([]),
   variantOutputPaths: z.record(z.string(), z.array(z.string())).optional(),
-  hasGoldenAnswer: z.boolean().default(true),
+  hasGoldenAnswer: z.boolean().default(false),
   goldenField: z.string().optional(),
   inputField: z.string().optional(),
   includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),

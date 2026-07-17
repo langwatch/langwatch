@@ -213,6 +213,88 @@ describe("parseEvaluationResult", () => {
         score: 0.5,
       });
     });
+
+    describe("given a domainError payload", () => {
+      it("parses a full current-shape payload", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: {
+            code: "evaluator_execution_error",
+            httpStatus: 401,
+            meta: { httpStatus: 401 },
+            traceId: "trace-1",
+            spanId: "span-1",
+            traceUrl: "https://grafana.example.com/trace-1",
+            reasons: [{ code: "invalid_api_key", kind: "invalid_api_key" }],
+          },
+        });
+
+        expect(result.domainError).toEqual({
+          code: "evaluator_execution_error",
+          kind: "evaluator_execution_error",
+          httpStatus: 401,
+          meta: { httpStatus: 401 },
+          traceId: "trace-1",
+          spanId: "span-1",
+          traceUrl: "https://grafana.example.com/trace-1",
+          reasons: [{ code: "invalid_api_key", kind: "invalid_api_key" }],
+        });
+      });
+
+      it("derives code from a legacy kind-only payload", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: { kind: "evaluator_execution_error", httpStatus: 401 },
+        });
+
+        expect(result.domainError).toEqual({
+          code: "evaluator_execution_error",
+          kind: "evaluator_execution_error",
+          httpStatus: 401,
+          meta: {},
+          traceId: undefined,
+          spanId: undefined,
+          traceUrl: undefined,
+          reasons: [],
+        });
+      });
+
+      it("derives kind from a code-only payload", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: { code: "evaluator_execution_error", httpStatus: 401 },
+        });
+
+        expect(result.domainError?.kind).toBe("evaluator_execution_error");
+      });
+
+      it("drops the domainError when httpStatus is missing", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: { code: "evaluator_execution_error" },
+        });
+
+        expect(result.domainError).toBeUndefined();
+      });
+
+      it("drops the domainError when neither code nor kind is present", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: { httpStatus: 401 },
+        });
+
+        expect(result.domainError).toBeUndefined();
+      });
+
+      it("drops a non-object domainError", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: "not an object",
+        });
+
+        expect(result.domainError).toBeUndefined();
+      });
+    });
   });
 
   describe("skipped status", () => {
