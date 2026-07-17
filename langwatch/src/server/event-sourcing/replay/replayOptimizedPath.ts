@@ -55,6 +55,19 @@ export async function replayOptimized({
   config: ReplayConfig;
   callbacks?: ReplayCallbacks & { log?: ReplayLogWriter };
 }): Promise<ReplayResult> {
+  // State projections are not supported on the optimized path: its per-batch
+  // pause/drain/marker protocol and per-aggregate accumulators assume a live,
+  // in-place ClickHouse rebuild, whereas a state projection is a from-init
+  // operational rebuild keyed across aggregates. Fail loudly rather than silently
+  // dropping them — run state projections through `ReplayService.replay`.
+  if (config.stateProjections && config.stateProjections.length > 0) {
+    throw new Error(
+      `Optimized replay does not support state projections (${config.stateProjections
+        .map((p) => p.projectionName)
+        .join(", ")}); run them through the normal replay path`,
+    );
+  }
+
   const log = callbacks?.log ?? nullLog;
   const aggregateBatchSize = config.aggregateBatchSize ?? 1000;
   const concurrency = config.concurrency ?? 10;

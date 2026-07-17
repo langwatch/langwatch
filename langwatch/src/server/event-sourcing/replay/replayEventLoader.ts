@@ -90,7 +90,10 @@ export async function discoverAffectedAggregates({
   tenantId?: string;
 }): Promise<DiscoveredAggregateWithEventTypes[]> {
   const tenantFilter = tenantId ? "AND TenantId = {tenantId:String}" : "";
-  const params: Record<string, unknown> = { eventTypes: [...eventTypes], sinceMs };
+  const params: Record<string, unknown> = {
+    eventTypes: [...eventTypes],
+    sinceMs,
+  };
   if (tenantId) params.tenantId = tenantId;
 
   const result = await client.query({
@@ -128,7 +131,10 @@ export async function countEventsForAggregates({
   sinceMs: number;
   tenantId?: string;
 }): Promise<number> {
-  const params: Record<string, unknown> = { eventTypes: [...eventTypes], sinceMs };
+  const params: Record<string, unknown> = {
+    eventTypes: [...eventTypes],
+    sinceMs,
+  };
   if (tenantId) params.tenantId = tenantId;
 
   const result = await client.query({
@@ -155,6 +161,34 @@ export async function countEventsForAggregates({
 export interface CutoffInfo {
   timestamp: number;
   eventId: string;
+}
+
+/** Compare canonical event-log positions. Aggregate IDs never define order. */
+export function compareEventPositions(
+  left: CutoffInfo,
+  right: CutoffInfo,
+): number {
+  if (left.timestamp !== right.timestamp) {
+    return left.timestamp - right.timestamp;
+  }
+  return left.eventId.localeCompare(right.eventId);
+}
+
+/** Return the latest canonical position from a non-empty collection. */
+export function maxEventPosition(positions: Iterable<CutoffInfo>): CutoffInfo {
+  const iterator = positions[Symbol.iterator]();
+  const first = iterator.next();
+  if (first.done) {
+    throw new Error(
+      "Cannot find the latest event position in an empty collection",
+    );
+  }
+
+  let latest = first.value;
+  for (let next = iterator.next(); !next.done; next = iterator.next()) {
+    if (compareEventPositions(next.value, latest) > 0) latest = next.value;
+  }
+  return latest;
 }
 
 /**
@@ -282,7 +316,12 @@ export async function batchGetCutoffEventIds({
         ${pruning.sql}
       GROUP BY AggregateType, AggregateId
     `,
-    query_params: { tenantId, eventTypes: [...eventTypes], aggregateIds, ...pruning.params },
+    query_params: {
+      tenantId,
+      eventTypes: [...eventTypes],
+      aggregateIds,
+      ...pruning.params,
+    },
     format: "JSONEachRow",
   });
 
@@ -337,7 +376,10 @@ export async function getBoundedCutoffs({
     aggregateIds,
   });
   if (!occurredAtBounds) {
-    return { cutoffs: new Map<string, CutoffInfo>(), occurredAtBounds: undefined };
+    return {
+      cutoffs: new Map<string, CutoffInfo>(),
+      occurredAtBounds: undefined,
+    };
   }
 
   const cutoffs = await batchGetCutoffEventIds({
@@ -402,7 +444,8 @@ export async function loadEventsForAggregatesBulk({
           ? parseInt(row.EventTimestamp, 10)
           : row.EventTimestamp;
       if (eventTimestamp > cutoff.timestamp) continue;
-      if (eventTimestamp === cutoff.timestamp && row.EventId > cutoff.eventId) continue;
+      if (eventTimestamp === cutoff.timestamp && row.EventId > cutoff.eventId)
+        continue;
     }
 
     let list = grouped.get(key);
@@ -424,8 +467,8 @@ export async function batchLoadAggregateEvents({
   tenantId,
   aggregateIds,
   eventTypes,
-  maxCutoffEventId,
-  cursorEventId,
+  maxCutoff,
+  cursor,
   batchSize,
   occurredAtBounds,
 }: {
@@ -433,12 +476,11 @@ export async function batchLoadAggregateEvents({
   tenantId: string;
   aggregateIds: string[];
   eventTypes: readonly string[];
-  maxCutoffEventId: string;
-  cursorEventId: string;
+  maxCutoff: CutoffInfo;
+  cursor?: CutoffInfo;
   batchSize: number;
   occurredAtBounds?: OccurredAtBounds;
 }): Promise<ReplayEvent[]> {
-  const hasCursor = cursorEventId.length > 0;
   const pruning = occurredAtPredicate(occurredAtBounds);
 
   const query = `
@@ -449,10 +491,26 @@ export async function batchLoadAggregateEvents({
     WHERE TenantId = {tenantId:String}
       AND EventType IN ({eventTypes:Array(String)})
       AND AggregateId IN ({aggregateIds:Array(String)})
-      AND EventId <= {maxCutoffEventId:String}
-      ${hasCursor ? "AND EventId > {cursorEventId:String}" : ""}
+      AND (
+        EventTimestamp < {maxCutoffTimestamp:UInt64}
+        OR (
+          EventTimestamp = {maxCutoffTimestamp:UInt64}
+          AND EventId <= {maxCutoffEventId:String}
+        )
+      )
+      ${
+        cursor
+          ? `AND (
+        EventTimestamp > {cursorTimestamp:UInt64}
+        OR (
+          EventTimestamp = {cursorTimestamp:UInt64}
+          AND EventId > {cursorEventId:String}
+        )
+      )`
+          : ""
+      }
       ${pruning.sql}
-    ORDER BY EventId ASC
+    ORDER BY EventTimestamp ASC, EventId ASC
     LIMIT {batchSize:UInt32}
   `;
 
@@ -462,8 +520,14 @@ export async function batchLoadAggregateEvents({
       tenantId,
       eventTypes: [...eventTypes],
       aggregateIds,
-      maxCutoffEventId,
-      ...(hasCursor ? { cursorEventId } : {}),
+      maxCutoffTimestamp: maxCutoff.timestamp,
+      maxCutoffEventId: maxCutoff.eventId,
+      ...(cursor
+        ? {
+            cursorTimestamp: cursor.timestamp,
+            cursorEventId: cursor.eventId,
+          }
+        : {}),
       batchSize,
       ...pruning.params,
     },
