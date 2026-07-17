@@ -29,6 +29,10 @@ import { context } from "@opentelemetry/api";
 export class LangWatchLoggerInternal implements LangWatchLogger {
   constructor(private logger: Logger) {}
 
+  enabled(options?: Parameters<Logger["enabled"]>[0]): boolean {
+    return this.logger.enabled(options);
+  }
+
   emit(logRecord: LangWatchLogRecord, options?: EmitOptions): void {
     // Handle output capture configuration
     if (!shouldCaptureOutput()) {
