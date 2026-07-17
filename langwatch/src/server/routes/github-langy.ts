@@ -183,15 +183,18 @@ secured
     if (!session?.user) {
       return c.json({ error: "Not authenticated" }, { status: 401 });
     }
+    const organizationId = c.req.query("organizationId") ?? "";
     // Same authoritative gate as Langy's tRPC surface so the GitHub install
-    // cannot become a rollout bypass.
-    if (!(await hasLangyAccess({ user: session.user }))) {
+    // cannot become a rollout bypass. Forward organizationId so an org-scoped
+    // rollout rule resolves the same way it does on the tRPC surface (the gate
+    // drops an empty value). The 404 stays ahead of the 400 so a denied account
+    // can't probe the endpoint via param validation.
+    if (!(await hasLangyAccess({ user: session.user, organizationId }))) {
       return c.json(
         { error: "The GitHub integration is not enabled for this account." },
         { status: 404 },
       );
     }
-    const organizationId = c.req.query("organizationId") ?? "";
     if (!organizationId) {
       return c.json(
         { error: "organizationId query param is required" },
