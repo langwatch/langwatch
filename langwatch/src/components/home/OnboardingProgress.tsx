@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { useAnalytics } from "react-contextual-analytics";
+import type { IconType } from "react-icons";
 import {
   LuCheck,
   LuDatabase,
@@ -25,7 +26,7 @@ import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { HomeCard } from "./HomeCard";
 
-type OnboardingStepKey =
+export type OnboardingStepKey =
   | "createProject"
   | "syncFirstMessage"
   | "inviteTeamMembers"
@@ -35,6 +36,19 @@ type OnboardingStepKey =
   | "setupEvaluation"
   | "createWorkflow"
   | "createDataset";
+
+/** The icon for each step, shared with the receded setup hairline. */
+export const STEP_ICON: Record<OnboardingStepKey, IconType> = {
+  createProject: LuCheck,
+  syncFirstMessage: LuMessageSquare,
+  inviteTeamMembers: LuUsers,
+  setupModelProviders: LuKey,
+  createPrompt: LuScroll,
+  createSimulation: LuPlay,
+  setupEvaluation: LuGauge,
+  createWorkflow: LuWorkflow,
+  createDataset: LuDatabase,
+};
 
 type OnboardingStep = {
   key: OnboardingStepKey;

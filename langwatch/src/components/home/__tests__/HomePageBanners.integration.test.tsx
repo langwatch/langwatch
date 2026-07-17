@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,18 +37,22 @@ vi.mock("~/components/ui/link", () => ({
 }));
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { HomePageBanners } from "../HomePageBanners";
 
 const useOrganizationTeamProjectMock = vi.mocked(useOrganizationTeamProject);
+const useReducedMotionMock = vi.mocked(useReducedMotion);
 
 const VOICE_KEY = "langwatch:voice-agents-home-banner-dismissed:v1:project-1";
 const AUTOMATIONS_KEY =
   "langwatch:automations-home-banner-dismissed:v1:project-1";
 
+/** The pill row next to a slide's heading — where the "New" badge lives. */
+const headingRow = (name: string) =>
+  within(screen.getByRole("heading", { name }).parentElement!);
+
 function renderWithProviders(ui: React.ReactElement) {
-  return render(
-    <ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>,
-  );
+  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 }
 
 describe("<HomePageBanners />", () => {
@@ -58,6 +62,7 @@ describe("<HomePageBanners />", () => {
     useOrganizationTeamProjectMock.mockReturnValue({
       project: { id: "project-1", slug: "my-project" },
     } as ReturnType<typeof useOrganizationTeamProject>);
+    useReducedMotionMock.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -77,6 +82,19 @@ describe("<HomePageBanners />", () => {
     expect(
       screen.getByRole("button", { name: "Show announcement 2 of 2" }),
     ).toBeDefined();
+  });
+
+  it("keeps the full-colour banner for users outside the Langy rollout", () => {
+    const { container } = renderWithProviders(
+      <HomePageBanners variant="legacy" />,
+    );
+
+    expect(
+      container.querySelector('[data-banner-variant="legacy"]'),
+    ).not.toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Previous announcement" }),
+    ).toBeNull();
   });
 
   it("shows the last remaining banner with no dots when only one is eligible", () => {
@@ -126,5 +144,16 @@ describe("<HomePageBanners />", () => {
         name: "Voice agent simulations are here",
       }),
     ).toBeNull();
+  });
+
+  it("does not reintroduce a Langy promo into the announcement carousel", () => {
+    renderWithProviders(<HomePageBanners />);
+    expect(screen.queryByRole("heading", { name: "Meet Langy" })).toBeNull();
+    expect(
+      screen.queryByRole("heading", { name: "Langy is on its way" }),
+    ).toBeNull();
+    expect(
+      headingRow("Voice agent simulations are here").getByText("New"),
+    ).toBeDefined();
   });
 });
