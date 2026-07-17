@@ -54,7 +54,7 @@ describe("overlayResolvedIO", () => {
         recomputedOutput: null,
       };
 
-      const result = overlayResolvedIO(stored, originalSpans, resolved);
+      const result = overlayResolvedIO({ stored, originalSpans, resolved });
 
       // Should NOT flag inputTruncated — stored value is complete
       expect(result.inputTruncated).toBe(false);
@@ -93,7 +93,7 @@ describe("overlayResolvedIO", () => {
         recomputedOutput: null, // fold-excluded span's result
       };
 
-      const result = overlayResolvedIO(stored, originalSpans, resolved);
+      const result = overlayResolvedIO({ stored, originalSpans, resolved });
 
       expect(result.inputTruncated).toBe(false);
       expect(result.outputTruncated).toBe(false);
@@ -133,7 +133,7 @@ describe("overlayResolvedIO", () => {
         recomputedOutput: null,
       };
 
-      const result = overlayResolvedIO(stored, originalSpans, resolved);
+      const result = overlayResolvedIO({ stored, originalSpans, resolved });
 
       // SHOULD flag inputTruncated — stored preview incomplete, resolution failed
       expect(result.inputTruncated).toBe(true);
@@ -171,7 +171,7 @@ describe("overlayResolvedIO", () => {
         recomputedOutput: null,
       };
 
-      const result = overlayResolvedIO(stored, originalSpans, resolved);
+      const result = overlayResolvedIO({ stored, originalSpans, resolved });
 
       expect(result.inputTruncated).toBe(false);
       expect(result.outputTruncated).toBe(true);
@@ -209,7 +209,7 @@ describe("overlayResolvedIO", () => {
         recomputedOutput: null,
       };
 
-      const result = overlayResolvedIO(stored, originalSpans, resolved);
+      const result = overlayResolvedIO({ stored, originalSpans, resolved });
 
       // Should NOT flag inputTruncated — no preview to complete
       expect(result.inputTruncated).toBe(false);
@@ -245,7 +245,7 @@ describe("overlayResolvedIO", () => {
         recomputedOutput: null,
       };
 
-      const result = overlayResolvedIO(stored, originalSpans, resolved);
+      const result = overlayResolvedIO({ stored, originalSpans, resolved });
 
       expect(result.inputTruncated).toBe(false);
       expect(result.outputTruncated).toBe(false);
@@ -285,7 +285,7 @@ describe("overlayResolvedIO", () => {
         recomputedOutput: null,
       };
 
-      const result = overlayResolvedIO(stored, originalSpans, resolved);
+      const result = overlayResolvedIO({ stored, originalSpans, resolved });
 
       expect(result.inputTruncated).toBe(true);
       expect(result.outputTruncated).toBe(false);
@@ -324,7 +324,7 @@ describe("overlayResolvedIO", () => {
         recomputedOutput: null,
       };
 
-      const result = overlayResolvedIO(stored, originalSpans, resolved);
+      const result = overlayResolvedIO({ stored, originalSpans, resolved });
 
       // Should overlay the full content and NOT flag truncated
       expect(result.inputTruncated).toBe(false);
@@ -362,7 +362,7 @@ describe("overlayResolvedIO", () => {
         recomputedOutput: { raw: fullOutput, text: fullOutput, source: "langwatch" },
       };
 
-      const result = overlayResolvedIO(stored, originalSpans, resolved);
+      const result = overlayResolvedIO({ stored, originalSpans, resolved });
 
       expect(result.inputTruncated).toBe(false);
       expect(result.outputTruncated).toBe(false);

@@ -569,7 +569,7 @@ export class TraceListService {
     // rather than the 64 KB preview. A no-op returning `result.rows` untouched
     // when `resolveFullIO` is unset or no deps were wired: the grid's path,
     // which must issue zero span/event_log reads (AC5).
-    const rows = await this.resolveFullIOForRows(result.rows, params);
+    const rows = await this.resolveFullIOForRows({ rows: result.rows, params });
 
     const items = rows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
@@ -621,10 +621,13 @@ export class TraceListService {
    * `TraceSummaryService.resolveOffloadedIO` (#5835), so the rule lives in
    * exactly one place.
    */
-  private async resolveFullIOForRows(
-    rows: TraceSummaryData[],
-    params: ListParams,
-  ): Promise<TraceSummaryData[]> {
+  private async resolveFullIOForRows({
+    rows,
+    params,
+  }: {
+    rows: TraceSummaryData[];
+    params: ListParams;
+  }): Promise<TraceSummaryData[]> {
     const deps = this.blobResolutionDeps;
     if (!params.resolveFullIO || !deps || rows.length === 0) return rows;
 
@@ -656,7 +659,11 @@ export class TraceListService {
     });
 
     return rows.map((row, i) =>
-      overlayResolvedIO(row, spansPerTrace[i]!, resolvedPerTrace[i]!),
+      overlayResolvedIO({
+        stored: row,
+        originalSpans: spansPerTrace[i]!,
+        resolved: resolvedPerTrace[i]!,
+      }),
     );
   }
 

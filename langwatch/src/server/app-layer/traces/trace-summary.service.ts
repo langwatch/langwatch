@@ -151,6 +151,10 @@ export class TraceSummaryService {
       logger: this.logger,
     });
 
-    return overlayResolvedIO(stored, normalizedSpans, resolved);
+    return overlayResolvedIO({
+      stored,
+      originalSpans: normalizedSpans,
+      resolved,
+    });
   }
 }

@@ -80,11 +80,15 @@ export function detectOffloadedIOFields(spans: NormalizedSpan[]): {
  * resolved ref" from "winner span's ref failed", so we conservatively avoid
  * false-positive truncation warnings in ambiguous cases.
  */
-export function overlayResolvedIO(
-  stored: TraceSummaryData,
-  originalSpans: NormalizedSpan[],
-  resolved: ResolvedTraceSpans,
-): TraceSummaryData {
+export function overlayResolvedIO({
+  stored,
+  originalSpans,
+  resolved,
+}: {
+  stored: TraceSummaryData;
+  originalSpans: NormalizedSpan[];
+  resolved: ResolvedTraceSpans;
+}): TraceSummaryData {
   const { inputHadRef, outputHadRef } = detectOffloadedIOFields(originalSpans);
   const { recomputedInput, recomputedOutput, anyResolved } = resolved;
 
