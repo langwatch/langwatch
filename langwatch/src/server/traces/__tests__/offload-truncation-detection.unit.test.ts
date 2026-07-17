@@ -253,6 +253,46 @@ describe("overlayResolvedIO", () => {
     });
   });
 
+  describe("when a span carries a malformed eventref value", () => {
+    it("flags inputTruncated — a ref whose value is not valid JSON can never resolve, so the stored preview stays incomplete", () => {
+      const stored: TraceSummaryData = {
+        traceId: "trace-malformed",
+        computedInput: JSON.stringify({ preview: "Truncated..." }),
+        computedOutput: null,
+        inputTruncated: false,
+        outputTruncated: false,
+      } as TraceSummaryData;
+
+      // Reserved eventref value is NOT valid JSON → parseSpanEventRefs records
+      // it in malformedKeys (not eventrefEntries/missingEventIdKeys), so the
+      // input direction still carried an unresolvable ref.
+      const originalSpans: NormalizedSpan[] = [
+        {
+          spanId: "span-malformed",
+          spanAttributes: {
+            [ATTR_KEYS.LANGWATCH_INPUT]: JSON.stringify({ preview: "..." }),
+            [`${EVENTREF_ATTR_PREFIX}${ATTR_KEYS.LANGWATCH_INPUT}`]:
+              "{ not valid json",
+          },
+          spanKind: "llm",
+        } as unknown as NormalizedSpan,
+      ];
+
+      const resolved: ResolvedTraceSpans = {
+        resolvedSpans: [],
+        anyResolved: false,
+        recomputedInput: null,
+        recomputedOutput: null,
+      };
+
+      const result = overlayResolvedIO(stored, originalSpans, resolved);
+
+      expect(result.inputTruncated).toBe(true);
+      expect(result.outputTruncated).toBe(false);
+      expect(result.computedInput).toBe(stored.computedInput);
+    });
+  });
+
   describe("when eventref resolves successfully and recomputed value is available", () => {
     it("overlays recomputedInput and does not flag truncated", () => {
       const stored: TraceSummaryData = {

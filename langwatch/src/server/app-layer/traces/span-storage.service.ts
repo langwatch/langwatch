@@ -70,18 +70,19 @@ const applyVisibilityGate = <T extends Span>(
  * `langwatch.reserved.eventref.*` pointer did NOT get replaced with its full
  * value — the resolved value is still the write-time preview, so the span is
  * showing truncated content. Mirrors the summary/list path's
- * `detectOffloadedIOFields`: a ref carrying no usable eventId can never resolve
- * and likewise counts as incomplete.
+ * `detectOffloadedIOFields`: a ref carrying no usable eventId, or whose value
+ * failed to parse, can never resolve and likewise counts as incomplete.
  */
 export function spanHasIncompleteAttributes(
   preResolutionAttrs: Record<string, string>,
   resolvedAttrs: Record<string, string>,
 ): boolean {
   if (!hasEventRefs(preResolutionAttrs)) return false;
-  const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
+  const { cleanedAttrs, eventrefEntries, missingEventIdKeys, malformedKeys } =
     parseSpanEventRefs(preResolutionAttrs);
-  // A ref with no usable eventId can never resolve — its value stays a preview.
-  if (missingEventIdKeys.length > 0) return true;
+  // A ref with no usable eventId — or whose value is not valid JSON — can never
+  // resolve, so its value stays the write-time preview (#5835 AC4b).
+  if (missingEventIdKeys.length > 0 || malformedKeys.length > 0) return true;
   // A well-formed ref is unresolved when its resolved value still equals the
   // write-time preview (a successful resolution overwrote it with the full value).
   return eventrefEntries.some(

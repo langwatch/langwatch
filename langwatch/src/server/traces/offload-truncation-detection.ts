@@ -38,8 +38,9 @@ const OUTPUT_IO_ATTR_KEYS: ReadonlySet<string> = new Set([
  * winner here would duplicate the fold's selection algorithm. Over-flagging is
  * bounded to the rare shape where a non-winning span's ref fails while the
  * winning span's value was complete — acceptable for a narrow "may be
- * incomplete" hint. `missingEventIdKeys` count too: a ref with no usable eventId
- * cannot be resolved, so its field is likewise still a preview.
+ * incomplete" hint. `missingEventIdKeys` and `malformedKeys` count too: a ref
+ * with no usable eventId, or whose value is not valid JSON, cannot be resolved,
+ * so its field is likewise still a preview.
  */
 export function detectOffloadedIOFields(spans: NormalizedSpan[]): {
   inputHadRef: boolean;
@@ -50,10 +51,12 @@ export function detectOffloadedIOFields(spans: NormalizedSpan[]): {
   for (const span of spans) {
     const attrs = span.spanAttributes as Record<string, string>;
     if (!hasEventRefs(attrs)) continue;
-    const { eventrefEntries, missingEventIdKeys } = parseSpanEventRefs(attrs);
+    const { eventrefEntries, missingEventIdKeys, malformedKeys } =
+      parseSpanEventRefs(attrs);
     const refAttrKeys = [
       ...eventrefEntries.map((entry) => entry.attrKey),
       ...missingEventIdKeys,
+      ...malformedKeys,
     ];
     for (const attrKey of refAttrKeys) {
       if (INPUT_IO_ATTR_KEYS.has(attrKey)) inputHadRef = true;

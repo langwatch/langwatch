@@ -457,6 +457,50 @@ describe("SpanStorageService hasIncompleteAttributes flag (#5835)", () => {
     });
   });
 
+  describe("given a span whose eventref value is malformed JSON", () => {
+    // The reserved eventref value is not valid JSON, so parseSpanEventRefs
+    // records it in malformedKeys (never in eventrefEntries): it can never
+    // resolve, resolution keeps the preview, and the span is still showing
+    // truncated content — it must be flagged incomplete (#5835 AC4b).
+    const spanMalformed = makeNormalizedSpan({
+      spanId: "span-malformed",
+      traceId: "trace-flag",
+      spanAttributes: {
+        "langwatch.output": PREVIEW_OUTPUT,
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: "{ not valid json",
+      },
+    });
+
+    describe("when getSpansByTraceId returns it", () => {
+      it("flags the span as having incomplete attributes", async () => {
+        const repo = makeStubRepository([spanMalformed]);
+        const blobStore = makeBlobStore({});
+        const spans = await wiredService(repo, blobStore).getSpansByTraceId({
+          tenantId: "proj-1",
+          traceId: "trace-flag",
+        });
+
+        expect(spans).toHaveLength(1);
+        expect(spans[0]?.hasIncompleteAttributes).toBe(true);
+      });
+    });
+
+    describe("when getSpanById returns it", () => {
+      it("flags the returned span as having incomplete attributes", async () => {
+        const repo = makeStubRepository([spanMalformed]);
+        const blobStore = makeBlobStore({});
+        const span = await wiredService(repo, blobStore).getSpanById({
+          tenantId: "proj-1",
+          traceId: "trace-flag",
+          spanId: "span-malformed",
+        });
+
+        expect(span).not.toBeNull();
+        expect(span?.hasIncompleteAttributes).toBe(true);
+      });
+    });
+  });
+
   describe("given a span with no eventref pointer at all", () => {
     const cleanSpan = makeNormalizedSpan({
       spanId: "span-clean",
