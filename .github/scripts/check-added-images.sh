@@ -35,9 +35,13 @@ IMAGE_EXTENSIONS='\.(png|jpg|jpeg|gif|webp|bmp|tiff?|avif)$'
 
 # Added files only (-A). Renaming or deleting an existing image is not this
 # check's business, and neither is touching one already in an allowed home.
+#
+# git diff runs on its own line so a bad BASE_REF fails the script loudly under
+# `set -e` — folding it into the pipe would let `|| true` (there only to absorb
+# grep's exit 1 on no match) swallow the git error and silently pass the guard.
+added_files=$(git diff --name-only --diff-filter=A "${BASE_REF}...HEAD")
 mapfile -t added_images < <(
-  git diff --name-only --diff-filter=A "${BASE_REF}...HEAD" \
-    | grep -iE "${IMAGE_EXTENSIONS}" || true
+  printf '%s\n' "${added_files}" | grep -iE "${IMAGE_EXTENSIONS}" || true
 )
 
 if [ ${#added_images[@]} -eq 0 ]; then
