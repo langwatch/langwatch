@@ -46,8 +46,6 @@ import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle";
 import {
   DecodeFailureError,
   type DecodeFailureReason,
-  decodeJobEnvelope,
-  encodeJobEnvelope,
   PayloadTooLargeError,
   readEnvelopeDescriptor,
   readJobRoutingMeta,
@@ -70,7 +68,6 @@ import {
   gqRetryEncodeFailuresTotal,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
-import { RedisJobBlobStore } from "./redisJobBlobStore";
 import {
   type DispatchResult,
   type DrainedJob,
