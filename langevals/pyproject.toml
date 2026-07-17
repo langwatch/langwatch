@@ -81,6 +81,9 @@ override-dependencies = [
     "pydantic-settings>=2.14.2",  # security: pydantic-settings advisory (#1517)
     # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
     "json-repair>=0.60.1",
+    # security: GHSA-p4gq-832x-fm9v — URL-encoded path traversal in nltk.data.load()
+    # allows arbitrary local file read; patched in 3.10.0. Pulled in by rouge-score.
+    "nltk>=3.10.0",
 ]
 
 [tool.uv.workspace]
