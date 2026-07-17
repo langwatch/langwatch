@@ -405,7 +405,7 @@ export class LangyCredentialService {
   /**
    * Returns the `modelsAllowed` array on the project's Langy VK. Null means
    * "no allowlist set" — every eligible model is allowed (the gateway is the
-   * final allowlist in that case). Used by /langy/chat to validate the
+   * final allowlist in that case). Used by the Langy turn path to validate the
    * picker's per-send `modelOverride` server-side so the gateway isn't the
    * only line of defense.
    *

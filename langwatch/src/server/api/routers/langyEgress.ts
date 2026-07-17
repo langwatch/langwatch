@@ -13,6 +13,10 @@
  * customer reads and sets the value; a change takes effect on the
  * conversation's next turn (the worker recycles when its egress signature
  * changes).
+ *
+ * Both procedures sit behind the authoritative Langy internal-only gate
+ * (`enforceLangyAccess`) as well as their `project:*` permission — this is Langy
+ * config, so it stays dark for accounts that don't have Langy.
  */
 
 import { z } from "zod";
@@ -23,11 +27,13 @@ import {
   LangyCredentialService,
 } from "~/server/app-layer/langy/LangyCredentialService";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { enforceLangyAccess } from "./langyAccessMiddleware";
 
 export const langyEgressRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:view"))
+    .use(enforceLangyAccess)
     .query(async ({ ctx, input }) => {
       const service = LangyCredentialService.create(ctx.prisma);
       const allowlist = await service.getEgressAllowlist({
@@ -46,6 +52,7 @@ export const langyEgressRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("project:update"))
+    .use(enforceLangyAccess)
     .mutation(async ({ ctx, input }) => {
       const service = LangyCredentialService.create(ctx.prisma);
       const saved = await service.setEgressAllowlist({

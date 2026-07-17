@@ -17,6 +17,15 @@
  * keep testing locally.
  */
 
+/**
+ * The rollout flag Langy access hangs off. Shared by the server-side decision
+ * (`hasLangyAccess`) and the client visibility hook (`useShowLangy`) so the two
+ * can never drift onto different keys. Registered in the feature-flag registry
+ * with `defaultValue: false`, so non-staff are dark until it is explicitly
+ * flipped on.
+ */
+export const LANGY_RELEASE_FLAG = "release_langy_enabled" as const;
+
 // Temporary production lockdown while Langy is being hardened. Widen or
 // remove once the feature is stable enough for the whole team again.
 const LANGY_PROD_ALLOWLIST = new Set(["aryan@langwatch.ai"]);

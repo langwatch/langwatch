@@ -9,10 +9,13 @@
  *                      deep link to GitHub's uninstall page; the webhook cleans up
  *                      the local row once GitHub confirms.
  *
- * Transport only: org-membership gate + audit, delegating every operation to the
- * app-layer service. The install flow itself is the public REST callback in
- * src/server/routes/github-langy.ts (GitHub's Setup URL can't live behind tRPC).
- * Issue #4747.
+ * Transport only: the authoritative Langy internal-only gate
+ * (`enforceLangyAccess`) + org-membership gate + audit, delegating every
+ * operation to the app-layer service. The gate matters here as much as on the
+ * install route — a non-staff org member must not read or manage Langy's GitHub
+ * App state while Langy is disabled for the account. The install flow itself is
+ * the public REST callback in src/server/routes/github-langy.ts (GitHub's Setup
+ * URL can't live behind tRPC). Issue #4747.
  */
 
 import { TRPCError } from "@trpc/server";
@@ -21,6 +24,7 @@ import { authorizeInResolver } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
 import { auditLog } from "~/server/auditLog";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { enforceLangyAccess } from "./langyAccessMiddleware";
 
 async function ensureOrganizationMember(
   userId: string,
@@ -53,6 +57,7 @@ export const langyGithubRouter = createTRPCRouter({
   getInstallStatus: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(authorizeInResolver)
+    .use(enforceLangyAccess)
     .query(async ({ ctx, input }) => {
       await ensureOrganizationMember(ctx.session.user.id, input.organizationId);
       const service = getApp().langy.githubInstallations;
@@ -80,6 +85,7 @@ export const langyGithubRouter = createTRPCRouter({
   listRepos: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(authorizeInResolver)
+    .use(enforceLangyAccess)
     .query(async ({ ctx, input }) => {
       await ensureOrganizationMember(ctx.session.user.id, input.organizationId);
       return getApp().langy.githubInstallations.listRepositoriesForOrganization(
@@ -92,6 +98,7 @@ export const langyGithubRouter = createTRPCRouter({
       z.object({ organizationId: z.string(), installationId: z.string() }),
     )
     .use(authorizeInResolver)
+    .use(enforceLangyAccess)
     .mutation(async ({ ctx, input }) => {
       await ensureOrganizationMember(ctx.session.user.id, input.organizationId);
       const installation =

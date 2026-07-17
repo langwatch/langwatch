@@ -52,4 +52,36 @@ describe("hasLangyAccess", () => {
       organizationId: "org-1",
     });
   });
+
+  it("does NOT treat an unverified @langwatch.ai email as staff", async () => {
+    const isEnabled = vi.fn().mockResolvedValue(false);
+
+    // No emailVerified — the very case self-hosted email signups land in, so it
+    // must fall through to the (off) rollout flag, not the staff bypass.
+    await expect(
+      hasLangyAccess({
+        user: { id: "impostor-1", email: "attacker@langwatch.ai" },
+        flags: { isEnabled },
+      }),
+    ).resolves.toBe(false);
+
+    expect(isEnabled).toHaveBeenCalledOnce();
+  });
+
+  it("evaluates the flag user-scoped when no project or org is given", async () => {
+    const isEnabled = vi.fn().mockResolvedValue(false);
+
+    // The GitHub install route has neither a projectId nor an organizationId in
+    // hand, so the gate evaluates at user scope only.
+    await expect(
+      hasLangyAccess({
+        user: { id: "customer-3", email: "user@example.com" },
+        flags: { isEnabled },
+      }),
+    ).resolves.toBe(false);
+
+    expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
+      distinctId: "customer-3",
+    });
+  });
 });

@@ -23,7 +23,7 @@ export const langyJsonValueSchema: z.ZodType<LangyJsonValue> = z.lazy(() =>
 );
 
 /**
- * A chat message role. Mirrors the roles the /langy/chat surface accepts plus
+ * A chat message role. Mirrors the roles the Langy turn surface accepts plus
  * "tool" for tool-result messages the agent may record.
  */
 export const langyMessageRoleSchema = z.enum([
