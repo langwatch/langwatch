@@ -771,28 +771,14 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
 }
 
 /**
- * Header-taking variant of {@link readEnvelopeBlobId} — for callers that have
- * already parsed the envelope and don't want a second `Buffer.from + JSON.parse`.
+ * The GQ1 offloaded-blob id from a parsed envelope header, or null for inline
+ * bodies, GQ2 tiered refs, and legacy JSON. The retirement paths read it via
+ * {@link readEnvelopeRetirement} so completion/restage pay a single parse.
  */
 export function readEnvelopeBlobIdFromHeader(
   header: EnvelopeHeader,
 ): string | null {
   return header.e === "ref" && typeof header.r === "string" ? header.r : null;
-}
-
-/**
- * Returns the GQ1 offloaded-blob id of an envelope value, or null for inline
- * bodies, GQ2 tiered refs, legacy JSON, and unreadable values. Used by the
- * completion and restage paths to delete blobs whose staged value is retired.
- */
-export function readEnvelopeBlobId(value: string): string | null {
-  try {
-    if (!isEnvelope(value)) return null;
-    const { header } = splitEnvelope(value);
-    return readEnvelopeBlobIdFromHeader(header);
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -833,7 +819,7 @@ export function readEnvelopeHold(
 /**
  * Single parse for retirement: given a staged value, return the GQ2 hold and/or
  * GQ1 blob id from ONE `splitEnvelope`. Prefer over calling `readEnvelopeHold`
- * + `readEnvelopeBlobId` in sequence on the completion / restage hot path
+ * + the blob-id read in sequence on the completion / restage hot path
  * (2026-06-24 review).
  */
 export function readEnvelopeRetirement(value: string): {

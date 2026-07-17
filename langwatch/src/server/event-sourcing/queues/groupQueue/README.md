@@ -149,7 +149,7 @@ For pipelines where multiple jobs in the same group can be processed together (e
 }
 ```
 
-The drain happens atomically inside `DISPATCH_LUA`. If `processBatch` throws, every job in the batch is re-staged (preserving FIFO order at the head of the group).
+The drain happens atomically inside `DISPATCH_BATCH_LUA`. If `processBatch` throws, every job in the batch is re-staged (preserving FIFO order at the head of the group).
 
 ---
 

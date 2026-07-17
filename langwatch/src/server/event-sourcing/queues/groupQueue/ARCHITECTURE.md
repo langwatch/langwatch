@@ -47,7 +47,7 @@ producer.send(payload)
   │
   ▼  signals list  ──BRPOP──▶  dispatcher loop  (idle workers wake up here)
   │
-  ▼  DISPATCH_LUA: pick next eligible group (weighted RR), LPOP its job,
+  ▼  DISPATCH_BATCH_LUA: pick next eligible groups (weighted RR), LPOP its job,
   │                read envelope, mark group active with TTL
   │
   ▼  fastq processing slot (local node concurrency)
@@ -71,7 +71,7 @@ A failure anywhere in this chain takes one of three paths:
 
 ## Cross-Aggregate Parallelism + Fair Scheduling
 
-The dispatcher pulls one signal at a time off `BRPOP` and then runs `DISPATCH_LUA`, which:
+The dispatcher pulls one signal at a time off `BRPOP` and then runs `DISPATCH_BATCH_LUA`, which:
 
 1. Picks the next eligible group from the `active` sorted set (`ZRANGEBYSCORE 0 now`).
 2. Weights groups by `sqrt(pendingCount)` so a backed-up group gets more turns without starving fresher work.
@@ -190,7 +190,7 @@ When a `process()` handler throws, the queue:
    - `Retryable` → re-stage with exponential backoff
    - `NonRetryable` → drop to the fail-safe; the slot is completed and the work is expected to recover via event replay
    - `Transient` (blob-store specific) → re-stage the SAME envelope (same hold token, no re-encode)
-2. **Computes backoff** via `getBackoffMs(attempt)` (exponential with jitter, capped).
+2. **Computes backoff** via `getBackoffMs(attempt)` (exponential, capped at 10 min — no jitter, so simultaneous failures retry in lockstep).
 3. **Re-encodes** the payload with `__attempt: N+1` and atomically transfers the hold from the old envelope to the new one.
 4. **Re-stages** at the head of the group with a future score (the group is briefly blocked so the retry is the next one dispatched).
 5. **Exhausts** after `JOB_RETRY_CONFIG.maxAttempts` and increments `gqJobsExhaustedTotal`; the slot is completed.
@@ -226,7 +226,7 @@ The `{queue}:group:{groupId}:blocked` marker is set by:
 - A retry (`RESTAGE_AND_BLOCK_LUA`) — briefly blocks the group so the retry is next out.
 - An explicit pause from the queue-pausing pipeline (see [`specs/queue-pausing/queue-pausing.feature`](../../../../../../specs/queue-pausing/queue-pausing.feature)).
 
-`DISPATCH_LUA` skips blocked groups when picking the next eligible group; the active sorted set is unchanged but the group is invisible to the dispatcher until unblocked. Unblock is just deleting the marker.
+`DISPATCH_BATCH_LUA` skips blocked groups when picking the next eligible group; the active sorted set is unchanged but the group is invisible to the dispatcher until unblocked. Unblock is just deleting the marker.
 
 The active key (`{queue}:active:{groupId}`) is a separate safety net: a TTL'd marker that says "this group is being processed by someone right now." On crash, the TTL expires (default 5 min) and the group becomes dispatchable again — a stuck job is recoverable without manual intervention.
 

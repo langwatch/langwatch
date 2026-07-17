@@ -9,8 +9,8 @@ import {
   decodeJobEnvelope,
   encodeJobEnvelope,
   PayloadTooLargeError,
-  readEnvelopeBlobId,
   readEnvelopeHold,
+  readEnvelopeRetirement,
   readJobRoutingMeta,
 } from "../jobEnvelope";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -207,7 +207,7 @@ describe("jobEnvelope", () => {
           jobData: hugePayload,
           blobs,
         });
-        const blobId = readEnvelopeBlobId(encoded);
+        const { blobId } = readEnvelopeRetirement(encoded);
         expect(blobId).not.toBeNull();
         expect(blobs.store.has(blobId!)).toBe(true);
       });
@@ -240,13 +240,13 @@ describe("jobEnvelope", () => {
   });
 
   describe("given an inline-body envelope", () => {
-    it("readEnvelopeBlobId returns null", async () => {
+    it("carries no retirement blob id", async () => {
       const encoded = await encodeJobEnvelope({
         jobData: { __jobName: "tiny", value: 1 },
       });
-      expect(readEnvelopeBlobId(encoded)).toBeNull();
-      expect(readEnvelopeBlobId('{"legacy":true}')).toBeNull();
-      expect(readEnvelopeBlobId("GQ1|nonsense")).toBeNull();
+      expect(readEnvelopeRetirement(encoded).blobId).toBeNull();
+      expect(readEnvelopeRetirement('{"legacy":true}').blobId).toBeNull();
+      expect(readEnvelopeRetirement("GQ1|nonsense").blobId).toBeNull();
     });
   });
 
