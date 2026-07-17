@@ -117,10 +117,13 @@ export type OrchestratorInput = {
  * `full`/`target`/`evaluator-all-rows` span the dataset; the rest are pinned to
  * the rows the user picked.
  */
-export const resolveScopedRowIndices = (
-  scope: ExecutionScope,
-  rowCount: number,
-): number[] => {
+export const resolveScopedRowIndices = ({
+  scope,
+  rowCount,
+}: {
+  scope: ExecutionScope;
+  rowCount: number;
+}): number[] => {
   const allRows = () => Array.from({ length: rowCount }, (_, i) => i);
   const inRange = (i: number) => i >= 0 && i < rowCount;
 
@@ -244,7 +247,10 @@ export const generateCells = (
 
   // Determine which rows to process. Shared with Phase 2's comparison cells so
   // the two phases can never disagree about what's in scope.
-  const rowIndices = resolveScopedRowIndices(scope, datasetRows.length);
+  const rowIndices = resolveScopedRowIndices({
+    scope,
+    rowCount: datasetRows.length,
+  });
 
   // Determine which targets to process.
   //
@@ -2289,7 +2295,10 @@ export async function* runOrchestrator(
           loadedEvaluators,
           // Only the rows this run owns. Without this, re-running row 1 alone
           // wrote "waiting on …" over every other row's verdict.
-          scopedRowIndices: resolveScopedRowIndices(scope, datasetRows.length),
+          scopedRowIndices: resolveScopedRowIndices({
+            scope,
+            rowCount: datasetRows.length,
+          }),
         });
 
         // Fold Phase-2 cells into the run total now that we know how many
@@ -2362,7 +2371,7 @@ export async function* runOrchestrator(
         // matches what the workbench shows for the same cells.
         if (phase2Cells.length > 0 && seedTargetOutputs) {
           const rowsThisRunOwns = new Set(
-            resolveScopedRowIndices(scope, datasetRows.length),
+            resolveScopedRowIndices({ scope, rowCount: datasetRows.length }),
           );
           for (const [key, seeded] of Object.entries(seedTargetOutputs)) {
             if (producedTargetKeys.has(key)) continue;

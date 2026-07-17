@@ -242,6 +242,7 @@ export function EvaluationsV3Table({
     toggleColumnVisibility,
     addTarget,
     updateTarget,
+    updateTargetComparison,
     removeTarget,
     setTargetMapping,
     removeTargetMapping,
@@ -282,6 +283,7 @@ export function EvaluationsV3Table({
       toggleColumnVisibility: state.toggleColumnVisibility,
       addTarget: state.addTarget,
       updateTarget: state.updateTarget,
+      updateTargetComparison: state.updateTargetComparison,
       removeTarget: state.removeTarget,
       setTargetMapping: state.setTargetMapping,
       removeTargetMapping: state.removeTargetMapping,
@@ -993,9 +995,11 @@ export function EvaluationsV3Table({
   // reload — so ComparisonConfigForm's `isComparison && comparisonContext &&
   // onComparisonChange` guard fails and only the generic Name/Model/Prompt
   // editor shows. Rebuild them from the workbench store and re-attach reactively
-  // via setComplexProps + setFlowCallbacks (both notify CurrentDrawer to
-  // re-render, which re-reads the getters — no URL change, no flushSync, no
-  // flicker). Loop-safe: setting the callback flips the guard below, so a re-run
+  // via setFlowCallbacks + setComplexProps. Only setComplexProps notifies
+  // CurrentDrawer to re-render (setFlowCallbacks deliberately does not, see
+  // its own comment) — calling it second means that one re-render re-reads
+  // both getters together (no URL change, no flushSync, no flicker).
+  // Loop-safe: setting the callback flips the guard below, so a re-run
   // bails; the effect's deps don't change from these calls, so it fires once.
   useEffect(() => {
     if (currentDrawer !== "evaluatorEditor") return;
@@ -1046,12 +1050,28 @@ export function EvaluationsV3Table({
       datasetName: activeDs?.name,
     };
 
+    // targetMatch means this reload resumed editing an EXISTING comparison
+    // column, not the New Comparison add flow. Wire the same target-bound
+    // callbacks openTargetEditor uses (targetId + updateTarget +
+    // updateTargetComparison) so a save updates that target in place. Without
+    // this branch, onSave fell through to handleComparisonEvaluatorSave —
+    // built for the add flow — which always creates a fresh target via
+    // handleSelectEvaluatorAsTarget, duplicating the column on every
+    // reload-then-save.
     setFlowCallbacks(
       "evaluatorEditor",
-      createEvaluatorEditorCallbacks({
-        onSave: handleComparisonEvaluatorSave,
-        onComparisonChange: handlePendingComparisonChange,
-      }),
+      targetMatch
+        ? createEvaluatorEditorCallbacks({
+            targetId: targetMatch.id,
+            updateTarget,
+            onComparisonChange: (next) => {
+              updateTargetComparison(targetMatch.id, next);
+            },
+          })
+        : createEvaluatorEditorCallbacks({
+            onSave: handleComparisonEvaluatorSave,
+            onComparisonChange: handlePendingComparisonChange,
+          }),
     );
     setComplexProps({ comparisonContext });
     // drawerParams read through the stable drawerParamsKey signature.
@@ -1062,6 +1082,8 @@ export function EvaluationsV3Table({
     experimentId,
     handleComparisonEvaluatorSave,
     handlePendingComparisonChange,
+    updateTarget,
+    updateTargetComparison,
   ]);
 
   // Handler for switching a target (replace with another prompt/agent/evaluator)
@@ -1690,6 +1712,42 @@ export function EvaluationsV3Table({
   const resizeStartXRef = useRef<number>(0);
   const resizeStartWidthRef = useRef<number>(0);
 
+  // Single source of truth for a column's default/minimum width, by id and
+  // type — every sizing path (drag start, drag clamp, double-click reset,
+  // total-width sum, rendered width) reads through this instead of each
+  // re-deriving "is this a comparison column" on its own, which is how the
+  // comparison 24%/14% sizing previously only applied to rendering while the
+  // other paths silently fell back to the ordinary target defaults.
+  const getDefaultPctForColumn = useCallback(
+    (columnId: string, columnType: string): number => {
+      if (columnType === "dataset") return DATASET_COL_DEFAULT_PCT;
+      if (columnType === "comparison") return COMPARISON_COL_DEFAULT_PCT;
+      if (columnType === "target") {
+        const targetId = columnId.replace(/^target\./, "");
+        return comparisonTargetIds.has(targetId)
+          ? COMPARISON_COL_DEFAULT_PCT
+          : TARGET_COL_DEFAULT_PCT;
+      }
+      return TARGET_COL_DEFAULT_PCT;
+    },
+    [comparisonTargetIds],
+  );
+
+  const getMinPctForColumn = useCallback(
+    (columnId: string, columnType: string): number => {
+      if (columnType === "dataset") return 8;
+      if (columnType === "comparison") return COMPARISON_COL_MIN_PCT;
+      if (columnType === "target") {
+        const targetId = columnId.replace(/^target\./, "");
+        return comparisonTargetIds.has(targetId)
+          ? COMPARISON_COL_MIN_PCT
+          : 10;
+      }
+      return 10;
+    },
+    [comparisonTargetIds],
+  );
+
   // Custom resize handler - converts pixel movements to percentage changes
   // This gives us fine-grained control over resize sensitivity
   const createResizeHandler = useCallback(
@@ -1703,9 +1761,7 @@ export function EvaluationsV3Table({
         // Get current width percentage
         const currentPct =
           columnSizing[columnId] ??
-          (columnType === "dataset"
-            ? DATASET_COL_DEFAULT_PCT
-            : TARGET_COL_DEFAULT_PCT);
+          getDefaultPctForColumn(columnId, columnType);
 
         resizingColumnRef.current = columnId;
         resizeStartXRef.current = startX;
@@ -1723,8 +1779,13 @@ export function EvaluationsV3Table({
           // This ensures consistent resize feel regardless of screen size
           const deltaPct = (deltaX / containerWidth) * 100;
 
-          // Calculate new width percentage
-          const newPct = Math.max(5, resizeStartWidthRef.current + deltaPct);
+          // Calculate new width percentage, clamped to this column's own
+          // minimum rather than a flat 5% every column shared regardless of
+          // its declared minSize.
+          const newPct = Math.max(
+            getMinPctForColumn(columnId, columnType),
+            resizeStartWidthRef.current + deltaPct,
+          );
 
           // Update column sizing state
           setColumnSizing((prev) => ({
@@ -1759,7 +1820,13 @@ export function EvaluationsV3Table({
         document.addEventListener("touchend", handleEnd);
       };
     },
-    [columnSizing, containerWidth, setColumnWidths],
+    [
+      columnSizing,
+      containerWidth,
+      setColumnWidths,
+      getDefaultPctForColumn,
+      getMinPctForColumn,
+    ],
   );
 
   // Check if a column is currently being resized
@@ -1771,10 +1838,7 @@ export function EvaluationsV3Table({
   // Double-click handler to reset column to default width
   const handleResizeDoubleClick = useCallback(
     (columnId: string, columnType: string) => {
-      const defaultPct =
-        columnType === "dataset"
-          ? DATASET_COL_DEFAULT_PCT
-          : TARGET_COL_DEFAULT_PCT;
+      const defaultPct = getDefaultPctForColumn(columnId, columnType);
 
       setColumnSizing((prev) => ({
         ...prev,
@@ -1792,7 +1856,7 @@ export function EvaluationsV3Table({
         });
       }, 100);
     },
-    [setColumnWidths],
+    [setColumnWidths, getDefaultPctForColumn],
   );
 
   const table = useReactTable({
@@ -1850,7 +1914,8 @@ export function EvaluationsV3Table({
 
     // Sum target column percentages
     for (const target of targets) {
-      total += columnSizing[`target.${target.id}`] ?? TARGET_COL_DEFAULT_PCT;
+      const colId = `target.${target.id}`;
+      total += columnSizing[colId] ?? getDefaultPctForColumn(colId, "target");
     }
 
     // Sum dedicated comparison result column percentages — omitting these left
@@ -1859,12 +1924,18 @@ export function EvaluationsV3Table({
     // was left over, rendering near-zero-width with its text wrapping one
     // character per line.
     for (const compEval of stableComparisonEvaluators) {
-      total +=
-        columnSizing[`comparison.${compEval.id}`] ?? TARGET_COL_DEFAULT_PCT;
+      const colId = `comparison.${compEval.id}`;
+      total += columnSizing[colId] ?? getDefaultPctForColumn(colId, "comparison");
     }
 
     return total;
-  }, [datasetColumns, targets, stableComparisonEvaluators, columnSizing]);
+  }, [
+    datasetColumns,
+    targets,
+    stableComparisonEvaluators,
+    columnSizing,
+    getDefaultPctForColumn,
+  ]);
 
   // Get column width as CSS string
   // Converts stored percentage values to CSS percentage strings
@@ -1881,26 +1952,22 @@ export function EvaluationsV3Table({
         return `${storedPct}%`;
       }
 
-      // Use default percentages based on column type
-      if (columnType === "dataset") return `${DATASET_COL_DEFAULT_PCT}%`;
-      // A comparison reaches here as either a column-style TARGET
-      // ("target.<id>") or a dedicated comparison column; both carry the extra
-      // verdict + metrics in their header and need the wider share. This — not
-      // the column def's `size` — is what actually drives the rendered <col>.
-      if (columnType === "target") {
-        const targetId = columnId.replace(/^target\./, "");
-        return comparisonTargetIds.has(targetId)
-          ? `${COMPARISON_COL_DEFAULT_PCT}%`
-          : `${TARGET_COL_DEFAULT_PCT}%`;
+      // Use default percentages based on column type. A comparison reaches
+      // here as either a column-style TARGET ("target.<id>") or a dedicated
+      // comparison column; both carry the extra verdict + metrics in their
+      // header and need the wider share — getDefaultPctForColumn is the one
+      // place that knows this, so every sizing path (this render, drag
+      // start/clamp, double-click reset, total-width sum) agrees.
+      if (
+        columnType === "dataset" ||
+        columnType === "target" ||
+        columnType === "comparison"
+      ) {
+        return `${getDefaultPctForColumn(columnId, columnType)}%`;
       }
-      // The dedicated comparison result column needs a real percentage too —
-      // falling through to "auto" here left it competing with the filler
-      // column for whatever sliver of space was left over, collapsing its
-      // <th> to zero width.
-      if (columnType === "comparison") return `${COMPARISON_COL_DEFAULT_PCT}%`;
       return "auto";
     },
-    [columnSizing, comparisonTargetIds],
+    [columnSizing, getDefaultPctForColumn],
   );
 
   return (

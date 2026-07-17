@@ -55,7 +55,7 @@ const ALL_DEFAULT_JUDGE_PROMPTS = [
   JUDGE_PROMPT_GOLDEN_NO_INPUT,
   JUDGE_PROMPT_NO_GOLDEN_INPUT,
   JUDGE_PROMPT_NO_GOLDEN_NO_INPUT,
-];
+] as const;
 
 /** The default prompt for a given presence combo — the judge prompt adapts
  * to what the row actually gives it (a reference answer, task context, both,

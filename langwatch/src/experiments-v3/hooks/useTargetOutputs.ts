@@ -66,6 +66,10 @@ export const useTargetOutputs = (
       promptQueries[index]?.data as { outputs?: TargetOutputs } | undefined
     )?.outputs;
 
-    return promptOutputs ?? own;
+    // needsSchema means `own` is the known-invalid schema-less copy — if the
+    // prompt lookup came back empty (deleted prompt, fetch error), returning
+    // `own` here would silently restore that exact invalid value instead of
+    // surfacing the unresolved state to the caller.
+    return needsSchema ? promptOutputs : (promptOutputs ?? own);
   });
 };

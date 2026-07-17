@@ -109,7 +109,7 @@ Briefly explain WHY it's better than the others, then pick the winning
 slot label. Use "tie" only when no candidate is clearly better.
 """
 
-# Every shipped default judge prompt, one per (golden × input) presence combo.
+# Every shipped default judge prompt, one per (golden x input) presence combo.
 # Kept VERBATIM in sync with the four JUDGE_PROMPT_* constants in the frontend
 # ComparisonConfigForm.tsx. Used to detect an untouched default so the runtime
 # can swap in the one that matches what the row actually provides; a hand-tuned
@@ -123,7 +123,7 @@ ALL_DEFAULT_SELECT_BEST_PROMPTS = [
 
 
 def _pick_default_select_best_prompt(*, has_golden: bool, has_input: bool) -> str:
-    """The default judge prompt for a given (golden × input) presence combo —
+    """The default judge prompt for a given (golden x input) presence combo —
     the prompt adapts to what the row actually gives it (a reference answer,
     task context, both, or neither)."""
     if has_golden:

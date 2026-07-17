@@ -10,6 +10,7 @@ Refs:
 
 import json
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -17,9 +18,7 @@ import pytest
 from langevals_langevals.select_best_compare import (
     CandidateInput,
     DEFAULT_SELECT_BEST_PROMPT,
-    DEFAULT_SELECT_BEST_PROMPT_GOLDEN_NO_INPUT,
     DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN,
-    DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN_NO_INPUT,
     SelectBestCompareEntry,
     SelectBestCompareEvaluator,
     SelectBestCompareSettings,
@@ -32,7 +31,7 @@ def _capture_rendered_prompt(evaluator, entry) -> str:
     (rendered judge prompt) the evaluator sent to `completion`."""
     captured: list[str] = []
 
-    def capture(**kwargs):
+    def capture(**kwargs: Any) -> SimpleNamespace:
         captured.append(kwargs["messages"][1]["content"])
         return _mock_completion_response("ok", "A")
 
@@ -203,7 +202,7 @@ def test_deterministic_shuffle_by_row_index():
 
     captured_prompts: list[str] = []
 
-    def capture(**kwargs):
+    def capture(**kwargs: Any) -> SimpleNamespace:
         captured_prompts.append(kwargs["messages"][1]["content"])
         return _mock_completion_response("ok", "A")
 
@@ -235,7 +234,7 @@ def test_shuffle_actually_reorders_candidates():
 
     captured: list[str] = []
 
-    def capture(**kwargs):
+    def capture(**kwargs: Any) -> SimpleNamespace:
         captured.append(kwargs["messages"][1]["content"])
         return _mock_completion_response("ok", "A")
 
@@ -268,7 +267,7 @@ def test_no_shuffle_when_randomize_order_disabled():
 
     captured: list[str] = []
 
-    def capture(**kwargs):
+    def capture(**kwargs: Any) -> SimpleNamespace:
         captured.append(kwargs["messages"][1]["content"])
         return _mock_completion_response("ok", "A")
 
@@ -305,7 +304,7 @@ def test_metrics_injected_into_prompt_when_requested():
 
     captured: list[str] = []
 
-    def capture(**kwargs):
+    def capture(**kwargs: Any) -> SimpleNamespace:
         captured.append(kwargs["messages"][1]["content"])
         return _mock_completion_response("ok", "A")
 
@@ -465,7 +464,7 @@ def test_default_prompt_carries_golden_slot_and_no_golden_variant_drops_it():
     assert "{candidates}" in DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
 
 
-# The four shipped defaults form a (golden × input) grid. When the user hasn't
+# The four shipped defaults form a (golden x input) grid. When the user hasn't
 # customized the prompt, the runtime picks the one matching what THIS row
 # actually provides: the golden axis is the has_golden_answer setting, the
 # input axis is whether the row has a non-empty input. A missing axis drops its
@@ -556,13 +555,13 @@ def test_runtime_selects_no_golden_no_input_default_when_row_has_neither():
 @pytest.mark.parametrize("has_golden", [True, False])
 @pytest.mark.parametrize(
     "entry_kwargs",
-    [dict(input="q", golden="g"), dict(input=None, golden=None)],
+    [{"input": "q", "golden": "g"}, {"input": None, "golden": None}],
 )
 def test_customized_prompt_is_never_swapped_by_runtime_selection(
     has_golden, entry_kwargs
 ):
     """A hand-tuned prompt matches none of the four shipped defaults, so the
-    runtime leaves it untouched across every (golden × input) combination."""
+    runtime leaves it untouched across every (golden x input) combination."""
     custom_prompt = (
         "SENTINEL judge prompt\nTask: {input}\nRef: {golden}\n{candidates}"
     )

@@ -261,7 +261,7 @@ describe("ComparisonConfigForm", () => {
   // was folded into the Golden field picker ("None — judge on merits" turns
   // it off). Golden and Input now render together as a two-column row, and the
   // golden picker is always visible.
-  describe("the golden field and input field", () => {
+  describe("when the golden and input fields render", () => {
     it("renders both pickers together, with no separate toggle", () => {
       renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
 
@@ -934,7 +934,7 @@ describe("ComparisonConfigForm", () => {
       await waitFor(() =>
         expect(
           screen.getByTestId("comparison-variant-output-t1-option-whole"),
-        ).toBeVisible(),
+        ).toHaveTextContent(/^Whole output$/),
       );
     });
   });
