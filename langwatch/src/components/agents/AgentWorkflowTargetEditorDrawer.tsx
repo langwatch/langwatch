@@ -1,6 +1,5 @@
-import { Button, Field, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import { Button, Field, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
-import { useMemo } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -8,7 +7,6 @@ import { Link } from "~/components/ui/link";
 import {
   type AvailableSource,
   type FieldMapping,
-  type Variable,
   VariablesSection,
 } from "~/components/variables";
 import {
@@ -18,11 +16,8 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
-import type { Field as DSLField, Workflow } from "~/optimization_studio/types/dsl";
 import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
-import type { TypedAgent } from "~/server/agents/agent.repository";
-import { api } from "~/utils/api";
+import { useWorkflowTargetAgentData } from "./useWorkflowTargetAgentData";
 
 export type AgentWorkflowTargetEditorDrawerProps = {
   open?: boolean;
@@ -39,23 +34,6 @@ export type AgentWorkflowTargetEditorDrawerProps = {
     mapping: FieldMapping | undefined,
   ) => void;
 };
-
-/**
- * Derives the mapping-surface inputs (identifier + type) from a workflow's
- * entry node, the same extraction AgentWorkflowEditorDrawer uses for
- * scenario mapping. Falls back to a single generic "input" field when the
- * workflow has no declared entry outputs yet, matching the runtime's own
- * fallback (see workflowBuilder.ts / code-agent adapter).
- */
-function extractWorkflowInputs(dsl: Workflow | undefined): Variable[] {
-  if (!dsl) return [];
-  const rawInputs = getMappingSurfaceInputs(dsl.edges, dsl.nodes);
-  return rawInputs.flatMap((i) =>
-    typeof i.identifier === "string"
-      ? [{ identifier: i.identifier, type: "str" as DSLField["type"] }]
-      : [],
-  );
-}
 
 /**
  * Drawer for a workflow-type agent target in the Experiments Workbench.
@@ -92,39 +70,13 @@ export function AgentWorkflowTargetEditorDrawer(
   const onInputMappingsChange =
     props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
 
-  const agentQuery = api.agents.getById.useQuery(
-    { id: agentId ?? "", projectId: project?.id ?? "" },
-    { enabled: !!agentId && !!project?.id && isOpen },
-  );
-
-  const workflowId = useMemo(() => {
-    if (!agentQuery.data) return undefined;
-    const agent = agentQuery.data as TypedAgent & { workflowId?: string | null };
-    if (agent.workflowId) return agent.workflowId;
-    const config = agent.config as { workflow_id?: string };
-    return config.workflow_id;
-  }, [agentQuery.data]);
-
-  const workflowQuery = api.workflow.getById.useQuery(
-    { projectId: project?.id ?? "", workflowId: workflowId ?? "" },
-    { enabled: !!workflowId && !!project?.id && isOpen },
-  );
-
-  const workflowInputs = useMemo(
-    () =>
-      extractWorkflowInputs(
-        workflowQuery.data?.currentVersion?.dsl as Workflow | undefined,
-      ),
-    [workflowQuery.data],
-  );
-
-  const variablesForUI: Variable[] =
-    workflowInputs.length > 0 ? workflowInputs : [{ identifier: "input", type: "str" }];
-
-  const editorHref =
-    project && workflowId ? `/${project.slug}/studio/${workflowId}` : undefined;
-
-  const isLoading = !!agentId && (agentQuery.isLoading || workflowQuery.isLoading);
+  const { workflowQuery, variablesForUI, editorHref, isLoading, hasLookupFailed } =
+    useWorkflowTargetAgentData({
+      agentId,
+      projectId: project?.id,
+      projectSlug: project?.slug,
+      isOpen,
+    });
 
   return (
     <Drawer.Root
@@ -213,20 +165,32 @@ export function AgentWorkflowTargetEditorDrawer(
                 </Field.Root>
               )}
 
-              <VariablesSection
-                title="Input Variables"
-                variables={variablesForUI}
-                onChange={() => {
-                  // The variable list comes from the workflow's own entry
-                  // node — not user-editable here, only mappable.
-                }}
-                showMappings={true}
-                availableSources={availableSources}
-                mappings={inputMappings}
-                onMappingChange={onInputMappingsChange}
-                canAddRemove={false}
-                readOnly={false}
-              />
+              {hasLookupFailed ? (
+                <Text
+                  fontSize="sm"
+                  color="fg.error"
+                  data-testid="workflow-lookup-error"
+                >
+                  Couldn't load this workflow's agent or its linked workflow,
+                  so its real input fields aren't known. Mapping is
+                  unavailable until it loads successfully.
+                </Text>
+              ) : (
+                <VariablesSection
+                  title="Input Variables"
+                  variables={variablesForUI}
+                  onChange={() => {
+                    // The variable list comes from the workflow's own entry
+                    // node — not user-editable here, only mappable.
+                  }}
+                  showMappings={true}
+                  availableSources={availableSources}
+                  mappings={inputMappings}
+                  onMappingChange={onInputMappingsChange}
+                  canAddRemove={false}
+                  readOnly={false}
+                />
+              )}
             </VStack>
           )}
         </Drawer.Body>

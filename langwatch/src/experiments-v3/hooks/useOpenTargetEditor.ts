@@ -218,30 +218,26 @@ export const useOpenTargetEditor = () => {
             const uiMappings = buildUIMappings(target, activeDatasetId);
 
             setFlowCallbacks("agentWorkflowTargetEditor", {
+              // Capture activeDatasetId (and isDatasetSource, which already
+              // derives from this render's datasets) rather than re-reading
+              // the store live at edit time — this drawer isn't modal, so
+              // the user can switch the active dataset while it's still
+              // open, and a live read would then write the mapping into the
+              // wrong dataset's bucket instead of the one this drawer opened
+              // against.
               onInputMappingsChange: (
                 identifier: string,
                 mapping: UIFieldMapping | undefined,
               ) => {
-                const currentActiveDatasetId =
-                  useEvaluationsV3Store.getState().activeDatasetId;
-                const currentDatasets =
-                  useEvaluationsV3Store.getState().datasets;
-                const checkIsDatasetSource = (sourceId: string) =>
-                  currentDatasets.some((d) => d.id === sourceId);
-
                 if (mapping) {
                   setTargetMapping(
                     target.id,
-                    currentActiveDatasetId,
+                    activeDatasetId,
                     identifier,
-                    convertFromUIMapping(mapping, checkIsDatasetSource),
+                    convertFromUIMapping(mapping, isDatasetSource),
                   );
                 } else {
-                  removeTargetMapping(
-                    target.id,
-                    currentActiveDatasetId,
-                    identifier,
-                  );
+                  removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
               },
             });
@@ -265,30 +261,22 @@ export const useOpenTargetEditor = () => {
 
             // Set flow callbacks for the HTTP editor
             setFlowCallbacks("agentHttpEditor", {
+              // See the workflow-agent branch above for why this captures
+              // activeDatasetId/isDatasetSource instead of reading the store
+              // live: this drawer isn't modal either.
               onInputMappingsChange: (
                 identifier: string,
                 mapping: UIFieldMapping | undefined,
               ) => {
-                const currentActiveDatasetId =
-                  useEvaluationsV3Store.getState().activeDatasetId;
-                const currentDatasets =
-                  useEvaluationsV3Store.getState().datasets;
-                const checkIsDatasetSource = (sourceId: string) =>
-                  currentDatasets.some((d) => d.id === sourceId);
-
                 if (mapping) {
                   setTargetMapping(
                     target.id,
-                    currentActiveDatasetId,
+                    activeDatasetId,
                     identifier,
-                    convertFromUIMapping(mapping, checkIsDatasetSource),
+                    convertFromUIMapping(mapping, isDatasetSource),
                   );
                 } else {
-                  removeTargetMapping(
-                    target.id,
-                    currentActiveDatasetId,
-                    identifier,
-                  );
+                  removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
               },
             });
@@ -311,32 +299,24 @@ export const useOpenTargetEditor = () => {
             const availableSources = buildAvailableSources();
             const uiMappings = buildUIMappings(target, activeDatasetId);
 
-            // Set flow callbacks for the code editor
+            // Set flow callbacks for the code editor. See the workflow-agent
+            // branch above for why this captures
+            // activeDatasetId/isDatasetSource instead of reading the store
+            // live: this drawer isn't modal either.
             setFlowCallbacks("agentCodeEditor", {
               onInputMappingsChange: (
                 identifier: string,
                 mapping: UIFieldMapping | undefined,
               ) => {
-                const currentActiveDatasetId =
-                  useEvaluationsV3Store.getState().activeDatasetId;
-                const currentDatasets =
-                  useEvaluationsV3Store.getState().datasets;
-                const checkIsDatasetSource = (sourceId: string) =>
-                  currentDatasets.some((d) => d.id === sourceId);
-
                 if (mapping) {
                   setTargetMapping(
                     target.id,
-                    currentActiveDatasetId,
+                    activeDatasetId,
                     identifier,
-                    convertFromUIMapping(mapping, checkIsDatasetSource),
+                    convertFromUIMapping(mapping, isDatasetSource),
                   );
                 } else {
-                  removeTargetMapping(
-                    target.id,
-                    currentActiveDatasetId,
-                    identifier,
-                  );
+                  removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
               },
             });
@@ -415,29 +395,22 @@ export const useOpenTargetEditor = () => {
         const availableSources = buildAvailableSources();
         const uiMappings = buildUIMappings(target, activeDatasetId);
 
+        // See the workflow-agent branch above for why this captures
+        // activeDatasetId/isDatasetSource instead of reading the store live:
+        // this drawer isn't modal either.
         const handleMappingChange = (
           identifier: string,
           mapping: UIFieldMapping | undefined,
         ) => {
-          const currentActiveDatasetId =
-            useEvaluationsV3Store.getState().activeDatasetId;
-          const currentDatasets = useEvaluationsV3Store.getState().datasets;
-          const checkIsDatasetSource = (sourceId: string) =>
-            currentDatasets.some((d) => d.id === sourceId);
-
           if (mapping) {
             setTargetMapping(
               target.id,
-              currentActiveDatasetId,
+              activeDatasetId,
               identifier,
-              convertFromUIMapping(mapping, checkIsDatasetSource),
+              convertFromUIMapping(mapping, isDatasetSource),
             );
           } else {
-            removeTargetMapping(
-              target.id,
-              currentActiveDatasetId,
-              identifier,
-            );
+            removeTargetMapping(target.id, activeDatasetId, identifier);
           }
         };
 

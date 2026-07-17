@@ -116,42 +116,67 @@ describe("AgentWorkflowTargetEditorDrawer", () => {
   });
 
   describe("given a workflow-type agent target", () => {
-    it("shows the linked workflow's name with a link to open it in Studio", () => {
-      renderDrawer();
+    describe("when the drawer opens with a resolved workflow", () => {
+      it("renders the linked workflow's name with a link to open it in Studio", () => {
+        renderDrawer();
 
-      expect(screen.getByText("fast resolution agent workflow")).toBeInTheDocument();
+        expect(
+          screen.getByText("fast resolution agent workflow"),
+        ).toBeInTheDocument();
 
-      expect(screen.getByTestId("open-workflow-link")).toHaveAttribute(
-        "href",
-        "/test-project/studio/workflow-123",
-      );
+        expect(screen.getByTestId("open-workflow-link")).toHaveAttribute(
+          "href",
+          "/test-project/studio/workflow-123",
+        );
+      });
+
+      it("renders the workflow's real input fields for mapping, not a code editor", () => {
+        renderDrawer();
+
+        expect(screen.getByText("question")).toBeInTheDocument();
+      });
+
+      it("renders a Close button and no Save button, since mappings persist immediately", () => {
+        renderDrawer();
+
+        expect(screen.getByTestId("close-drawer-button")).toBeInTheDocument();
+        expect(screen.queryByText(/save/i)).not.toBeInTheDocument();
+      });
     });
 
-    it("shows the workflow's real input fields for mapping, not a code editor", () => {
-      renderDrawer();
+    describe("when the workflow has no declared entry outputs", () => {
+      it("renders a generic input field as a fallback", () => {
+        workflowQueryData = {
+          id: "workflow-123",
+          name: "empty workflow",
+          currentVersion: {
+            dsl: { nodes: [{ id: "entry", type: "entry", data: {} }], edges: [] },
+          },
+        };
 
-      expect(screen.getByText("question")).toBeInTheDocument();
+        renderDrawer();
+
+        expect(screen.getByText("input")).toBeInTheDocument();
+      });
     });
 
-    it("falls back to a generic input field when the workflow has no declared entry outputs", () => {
-      workflowQueryData = {
-        id: "workflow-123",
-        name: "empty workflow",
-        currentVersion: {
-          dsl: { nodes: [{ id: "entry", type: "entry", data: {} }], edges: [] },
-        },
-      };
+    describe("when the agent or its linked workflow fails to load", () => {
+      it("renders an error message instead of a mapping UI for an unresolved workflow", () => {
+        workflowQueryData = null;
 
-      renderDrawer();
+        renderDrawer();
 
-      expect(screen.getByText("input")).toBeInTheDocument();
-    });
+        expect(screen.getByTestId("workflow-lookup-error")).toBeInTheDocument();
+        expect(screen.queryByText("input")).not.toBeInTheDocument();
+      });
 
-    it("has a Close button and no Save button, since mappings persist immediately", () => {
-      renderDrawer();
+      it("renders an error message instead of a mapping UI for an unresolved agent", () => {
+        agentQueryData = null;
 
-      expect(screen.getByTestId("close-drawer-button")).toBeInTheDocument();
-      expect(screen.queryByText(/save/i)).not.toBeInTheDocument();
+        renderDrawer();
+
+        expect(screen.getByTestId("workflow-lookup-error")).toBeInTheDocument();
+      });
     });
   });
 });
