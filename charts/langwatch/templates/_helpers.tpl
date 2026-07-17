@@ -385,6 +385,27 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
+{{/* Langy needs a gateway the WORKER can actually reach, which is two separate
+     things: the app must resolve a gateway URL, and the agent's deny-by-default
+     NetworkPolicy must permit egress to it. A chart-managed gateway satisfies
+     both (internal URL + the podSelector egress rule). An external gateway does
+     not: reached over the public ingress it needs allowExternalHttps (or a
+     hand-written egressToGateway rule), and with no URL at all the app throws
+     "is not configured on the control plane" on the first chat. Both configs
+     render happily today and fail only at runtime — catch them at install. */}}
+{{- $langy := index .Values "langy-agent" | default dict }}
+{{- if and $langy.chartManaged (not $gw.chartManaged) }}
+  {{- $gwInternal := $gw.internalUrl | default "" }}
+  {{- $gwPublic := $gw.publicUrl | default "" }}
+  {{- $np := $langy.networkPolicy | default dict }}
+  {{- $customEgress := $np.egressToGateway | default list }}
+  {{- if not (or $gwInternal $gwPublic) }}
+    {{- $errors = append $errors "langy-agent.chartManaged=true but gateway.chartManaged=false and neither gateway.internalUrl nor gateway.publicUrl is set. The control plane has no AI gateway address to hand the Langy worker, so every chat fails with \"is not configured on the control plane\". Set gateway.internalUrl to the in-cluster gateway Service (preferred), or gateway.publicUrl if the gateway is only reachable over the public ingress." }}
+  {{- else if and (not $gwInternal) (not $np.allowExternalHttps) (not $customEgress) }}
+    {{- $errors = append $errors (printf "langy-agent.chartManaged=true with an external gateway reachable only at %q, but the agent NetworkPolicy denies that egress: langy-agent.networkPolicy.allowExternalHttps=false and egressToGateway is empty. The worker resolves the URL and every LLM call is dropped. Either set gateway.internalUrl to an in-cluster gateway Service, or set langy-agent.networkPolicy.allowExternalHttps=true, or pin a tighter rule via langy-agent.networkPolicy.egressToGateway (+ networkPolicy.gatewayPort=443)." $gwPublic) }}
+  {{- end }}
+{{- end }}
+
 {{/* Output errors and warnings */}}
 {{- if $errors }}
 {{- fail (printf "Secret validation failed:\n%s" (join "\n" $errors)) }}

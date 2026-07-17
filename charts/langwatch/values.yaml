@@ -1680,6 +1680,9 @@ gateway:
   ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
   publicUrl: ""
 
+  ## @param gateway.internalUrl [string, default: ""] Cluster-internal URL the control plane uses to reach the gateway (LW_GATEWAY_INTERNAL_URL) — the Langy worker's OPENAI_BASE_URL and the HMAC-signed /internal/* OTTL surface. Distinct from gateway.publicUrl: the langy-agent NetworkPolicy denies external HTTPS egress, so the worker can only reach the gateway's in-cluster Service. Leave empty to auto-derive from the chart-managed gateway Service; set it when gateway.chartManaged=false and the gateway runs elsewhere in-cluster.
+  internalUrl: ""
+
   # The gateway needs its OWN externally-reachable endpoint, separate from
   # the main app — point a second ingress / load balancer at gateway.ingress
   # below (the LLM clients hit the gateway, the browser hits the app). The
@@ -1738,8 +1741,10 @@ langy-agent:
   chartManaged: false
 
   ## @param langy-agent.controlPlane.agentUrl [string, default: http://<release>-langy-agent:80] URL the app uses to reach the agent Service. Leave empty to auto-derive from the release name.
+  ## @param langy-agent.controlPlane.langwatchApiUrl [string, default: http://<release>-app:<app.service.port>] Cluster-internal LangWatch API URL (LANGWATCH_API_URL) the control plane hands to the Langy worker's MCP server. Must be in-cluster: the agent NetworkPolicy permits egress only to the app pod on app.service.port. Leave empty to auto-derive from the release name.
   controlPlane:
     agentUrl: ""
+    langwatchApiUrl: ""
 
   ## @param langy-agent.secrets.existingSecretName [string, default: langwatch-langy-agent-auth] Secret carrying LANGY_INTERNAL_SECRET, shared between the app and the agent pod. Created out-of-band (terraform / external-secrets); the umbrella chart does NOT materialise it.
   ## @param langy-agent.secrets.internalSecretKey [string, default: LANGY_INTERNAL_SECRET] Key inside the existing Secret that holds the shared internal secret.

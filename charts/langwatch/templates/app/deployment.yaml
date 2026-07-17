@@ -239,6 +239,16 @@ spec:
                 secretKeyRef:
                   name: {{ (index .Values "langy-agent").secrets.existingSecretName | default "langwatch-langy-agent-auth" }}
                   key: {{ (index .Values "langy-agent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+
+            # LANGWATCH_API_URL — the control plane reads this from its own env
+            # and hands it to the Langy worker as the MCP server's
+            # LANGWATCH_ENDPOINT (LangyCredentialService.getOrProvision, which
+            # throws "LANGWATCH_API_URL is not configured on the control plane"
+            # when unset). Must be the CLUSTER-INTERNAL app Service: the agent's
+            # NetworkPolicy permits egress only to the app pod on
+            # networkPolicy.controlPlanePort, never to a public ingress.
+            - name: LANGWATCH_API_URL
+              value: {{ (index .Values "langy-agent").controlPlane.langwatchApiUrl | default (printf "http://%s-app:%v" .Release.Name .Values.app.service.port) | quote }}
             {{- end }}
 
             # LW_GATEWAY_PUBLIC_URL — the externally-reachable AI Gateway URL
@@ -262,6 +272,24 @@ spec:
             {{- if $gwPublic }}
             - name: LW_GATEWAY_PUBLIC_URL
               value: {{ $gwPublic | quote }}
+            {{- end }}
+
+            # LW_GATEWAY_INTERNAL_URL — the cluster-internal gateway URL, used
+            # for control-plane -> gateway calls: the Langy worker's
+            # OPENAI_BASE_URL and the HMAC-signed /internal/* OTTL surface.
+            # Deliberately NOT LW_GATEWAY_PUBLIC_URL (the langy-agent
+            # NetworkPolicy denies external HTTPS egress, so a public ingress is
+            # unreachable from the worker) and NOT LW_GATEWAY_BASE_URL, which
+            # names the CONTROL PLANE — the Go gateway reads that same key to
+            # dial back at us (services/aigateway/config.go), the opposite
+            # direction. See the naming-collision note in scripts/start.sh.
+            {{- $gwInternal := .Values.gateway.internalUrl | default "" }}
+            {{- if and (not $gwInternal) .Values.gateway.chartManaged }}
+            {{- $gwInternal = printf "http://%s-gateway:%v" .Release.Name .Values.gateway.service.port }}
+            {{- end }}
+            {{- if $gwInternal }}
+            - name: LW_GATEWAY_INTERNAL_URL
+              value: {{ $gwInternal | quote }}
             {{- end }}
 
             # NextAuth configuration (NEXTAUTH_SECRET lives in sharedEnv —
