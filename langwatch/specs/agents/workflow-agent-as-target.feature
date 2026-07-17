@@ -17,11 +17,12 @@ Feature: Workflow agent as an experiment target
     Given the workflow agent is added as a target in the Experiments Workbench
     Then the target column shows a workflow icon, not a code icon
 
-  Scenario: Editing the target opens the workflow in a sidebar
+  Scenario: Editing the target opens the underlying Studio workflow
     Given the workflow agent is added as a target in the Experiments Workbench
-    When the user opens the target's edit menu
-    Then the workflow opens in a sidebar drawer within the workbench
-    And the workbench does not navigate away or open a new tab
+    When the user opens the target's edit menu and selects Edit Agent
+    Then the linked Studio workflow opens in a new tab
+    And the workbench keeps its own state, since a full graph editor
+      cannot be edited meaningfully inside a narrow sidebar drawer
 
   Scenario: Switching away from a workflow target
     Given the workflow agent is added as a target in the Experiments Workbench

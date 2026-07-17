@@ -446,10 +446,13 @@ export const loadExecutionData = async (
   // Load studio workflows for workflow targets (the committed DSL run per row)
   const loadedWorkflows = new Map<string, LoadedWorkflow>();
 
-  const loadPublishedWorkflow = async (
-    workflowId: string,
-    workflowVersionId?: string,
-  ): Promise<LoadedWorkflow | { error: string; status: number }> => {
+  const loadPublishedWorkflow = async ({
+    workflowId,
+    workflowVersionId,
+  }: {
+    workflowId: string;
+    workflowVersionId?: string;
+  }): Promise<LoadedWorkflow | { error: string; status: number }> => {
     const workflow = await prisma.workflow.findUnique({
       where: { id: workflowId, projectId },
     });
@@ -484,10 +487,10 @@ export const loadExecutionData = async (
     if (target.type !== "workflow" || !target.workflowId) continue;
     if (loadedWorkflows.has(workflowLoadKey(target))) continue;
 
-    const result = await loadPublishedWorkflow(
-      target.workflowId,
-      target.workflowVersionId,
-    );
+    const result = await loadPublishedWorkflow({
+      workflowId: target.workflowId,
+      workflowVersionId: target.workflowVersionId,
+    });
     if ("error" in result) return result;
     loadedWorkflows.set(workflowLoadKey(target), result);
   }
@@ -511,7 +514,7 @@ export const loadExecutionData = async (
     const key = workflowLoadKey({ workflowId: linkedWorkflowId });
     if (loadedWorkflows.has(key)) continue;
 
-    const result = await loadPublishedWorkflow(linkedWorkflowId);
+    const result = await loadPublishedWorkflow({ workflowId: linkedWorkflowId });
     if ("error" in result) return result;
     loadedWorkflows.set(key, result);
   }
