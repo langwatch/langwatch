@@ -145,8 +145,6 @@ function makeCapturingEvaluationDispatcher() {
   };
 }
 
-const noopReactor = { name: "noop", options: {}, handle: async () => {} };
-
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -269,14 +267,11 @@ describe.skipIf(!hasTestcontainers)(
       // a deliberate dedup window but unhelpful for tests.
       const monitorService = new MonitorService(makeFakeMonitorRepository());
       dispatcher = makeCapturingEvaluationDispatcher();
-      const realReactor = createEvaluationTriggerReactor({
+      const realSubscriber = createEvaluationTriggerReactor({
         monitors: monitorService,
         evaluation: dispatcher.dispatch,
       });
-      const fastReactor = {
-        ...realReactor,
-        options: { ...realReactor.options, delay: 0 },
-      };
+      const fastSpec = { ...realSubscriber.spec, delay: 0 };
 
       const pipelineName = `trace_loop_prevention_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const pipelineDef = definePipeline<TraceProcessingEvent>()
@@ -290,12 +285,28 @@ describe.skipIf(!hasTestcontainers)(
           "spanStorage",
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withReactor("traceSummary", "evaluationTrigger", fastReactor as any)
-        .withReactor("traceSummary", "customEvaluationSync", noopReactor as any)
-        .withReactor("traceSummary", "traceUpdateBroadcast", noopReactor as any)
-        .withReactor("traceSummary", "simulationMetricsSync", noopReactor as any)
-        .withReactor("traceSummary", "projectMetadata", noopReactor as any)
-        .withReactor("spanStorage", "spanStorageBroadcast", noopReactor as any)
+        .withSubscriber(realSubscriber.name, fastSpec)
+        // No-op subscribers for the other slots
+        .withSubscriber("customEvaluationSync", {
+          fold: "traceSummary",
+          handler: async () => {},
+        })
+        .withSubscriber("traceUpdateBroadcast", {
+          fold: "traceSummary",
+          handler: async () => {},
+        })
+        .withSubscriber("simulationMetricsSync", {
+          fold: "traceSummary",
+          handler: async () => {},
+        })
+        .withSubscriber("projectMetadata", {
+          fold: "traceSummary",
+          handler: async () => {},
+        })
+        .withSubscriber("spanStorageBroadcast", {
+          map: "spanStorage",
+          handler: async () => {},
+        })
         .withCommand("recordSpan", TestRecordSpanCommand as any)
         .withCommand("assignTopic", AssignTopicCommand as any)
         .build();
@@ -350,10 +361,9 @@ describe.skipIf(!hasTestcontainers)(
 
       await waitFor(
         async () => {
-          const fold = await traceSummaryStore.get(
-            (span as any).traceId,
-            { tenantId: tenantIdString } as any,
-          );
+          const fold = await traceSummaryStore.get((span as any).traceId, {
+            tenantId: tenantIdString,
+          } as any);
           return !!fold?.attributes?.["langwatch.origin"];
         },
         {
@@ -406,49 +416,49 @@ describe.skipIf(!hasTestcontainers)(
       describe("when the span is recorded after a depth=0 seed", () => {
         /** @scenario Incoming span with causality_depth=1 does not trigger evaluations */
         it("blocks dispatch and increments the loop-blocked counter", async () => {
-      const traceId = generateId("trace");
+          const traceId = generateId("trace");
 
-      // Seed: app-origin depth=0 span establishes the trace's origin
-      // on the fold (required for the originGuardedReactor wrapper
-      // to fire its inner handler at all).
-      await recordSpan(
-        buildAppOriginSpan({
-          traceId,
-          spanId: generateId("seed"),
-          depth: 0,
-        }),
-      );
-      // The seed itself triggers one dispatch. Wait for it so we
-      // have a stable baseline to assert no further dispatch happens.
-      await waitFor(() => dispatcher.captured.length >= 1, {
-        timeoutMs: 20_000,
-        label: "seed depth=0 dispatched",
-      });
-      const dispatchesBefore = dispatcher.captured.length;
-      const beforeBlocked = await readBlockedCounter("depth_direct");
+          // Seed: app-origin depth=0 span establishes the trace's origin
+          // on the fold (required for the originGuardedReactor wrapper
+          // to fire its inner handler at all).
+          await recordSpan(
+            buildAppOriginSpan({
+              traceId,
+              spanId: generateId("seed"),
+              depth: 0,
+            }),
+          );
+          // The seed itself triggers one dispatch. Wait for it so we
+          // have a stable baseline to assert no further dispatch happens.
+          await waitFor(() => dispatcher.captured.length >= 1, {
+            timeoutMs: 20_000,
+            label: "seed depth=0 dispatched",
+          });
+          const dispatchesBefore = dispatcher.captured.length;
+          const beforeBlocked = await readBlockedCounter("depth_direct");
 
-      // Eval-emitted span (depth=1) — must be blocked by the reactor.
-      await recordSpan(
-        buildAppOriginSpan({
-          traceId,
-          spanId: generateId("eval"),
-          depth: 1,
-        }),
-      );
-      // Poll the prom counter instead of sleeping a fixed 1500ms. The
-      // reactor → BullMQ → metric write chain can take longer than that
-      // under parallel CI load, which flaked this test (PR #4189 CI:
-      // `expected 0 to be greater than or equal to 1`). The dispatch
-      // assertion stays as a post-condition: by the time the blocked
-      // counter ticks the reactor has decided not to dispatch.
-      await waitFor(
-        async () =>
-          (await readBlockedCounter("depth_direct")) > beforeBlocked,
-        {
-          timeoutMs: 20_000,
-          label: "loop-blocked counter incremented for depth_direct",
-        },
-      );
+          // Eval-emitted span (depth=1) — must be blocked by the reactor.
+          await recordSpan(
+            buildAppOriginSpan({
+              traceId,
+              spanId: generateId("eval"),
+              depth: 1,
+            }),
+          );
+          // Poll the prom counter instead of sleeping a fixed 1500ms. The
+          // reactor → BullMQ → metric write chain can take longer than that
+          // under parallel CI load, which flaked this test (PR #4189 CI:
+          // `expected 0 to be greater than or equal to 1`). The dispatch
+          // assertion stays as a post-condition: by the time the blocked
+          // counter ticks the reactor has decided not to dispatch.
+          await waitFor(
+            async () =>
+              (await readBlockedCounter("depth_direct")) > beforeBlocked,
+            {
+              timeoutMs: 20_000,
+              label: "loop-blocked counter incremented for depth_direct",
+            },
+          );
 
           expect(dispatcher.captured.length).toBe(dispatchesBefore);
           const afterBlocked = await readBlockedCounter("depth_direct");
@@ -461,67 +471,67 @@ describe.skipIf(!hasTestcontainers)(
       describe("when a fresh depth=0 span arrives later on the same trace", () => {
         /** @scenario Causality guard is per-span — fresh app activity still re-triggers */
         it("re-dispatches because the depth check is per-span, not per-trace", async () => {
-      const traceId = generateId("trace");
+          const traceId = generateId("trace");
 
-      // 1. Initial app-origin span — should dispatch.
-      await recordSpan(
-        buildAppOriginSpan({
-          traceId,
-          spanId: generateId("s1"),
-          depth: 0,
-        }),
-      );
-      await waitFor(() => dispatcher.captured.length >= 1, {
-        timeoutMs: 20_000,
-        label: "first depth=0 dispatched",
-      });
-      const dispatchesAfter1 = dispatcher.captured.length;
-      expect(dispatchesAfter1).toBe(1);
+          // 1. Initial app-origin span — should dispatch.
+          await recordSpan(
+            buildAppOriginSpan({
+              traceId,
+              spanId: generateId("s1"),
+              depth: 0,
+            }),
+          );
+          await waitFor(() => dispatcher.captured.length >= 1, {
+            timeoutMs: 20_000,
+            label: "first depth=0 dispatched",
+          });
+          const dispatchesAfter1 = dispatcher.captured.length;
+          expect(dispatchesAfter1).toBe(1);
 
-      // 2. Eval-emitted span on same trace (depth=1) — must NOT add a
-      //    dispatch. The reactor dedup window (30s makeJobId TTL) is
-      //    irrelevant here because the depth check returns BEFORE the
-      //    queue's dedup applies — that's exactly the guarantee.
-      await recordSpan(
-        buildAppOriginSpan({
-          traceId,
-          spanId: generateId("s2"),
-          depth: 1,
-        }),
-      );
-      await quietReactorWindow();
-      expect(dispatcher.captured.length).toBe(dispatchesAfter1);
+          // 2. Eval-emitted span on same trace (depth=1) — must NOT add a
+          //    dispatch. The reactor dedup window (30s makeJobId TTL) is
+          //    irrelevant here because the depth check returns BEFORE the
+          //    queue's dedup applies — that's exactly the guarantee.
+          await recordSpan(
+            buildAppOriginSpan({
+              traceId,
+              spanId: generateId("s2"),
+              depth: 1,
+            }),
+          );
+          await quietReactorWindow();
+          expect(dispatcher.captured.length).toBe(dispatchesAfter1);
 
-      // 3. Fresh app-origin span (depth=0) later on SAME trace —
-      //    legitimate new activity, MUST dispatch again. The reactor
-      //    has `makeJobId(...) = eval-trigger:tenant:trace` plus a
-      //    30s TTL — to bypass the queue-side dedup of this case we
-      //    nuke the dedup keys for this trace before re-dispatching.
-      //    (In production, the 30s window IS the dedup; tests just
-      //    need to prove the depth check itself doesn't pin the
-      //    trace forever.)
-      const redis = getTestRedisConnection()!;
-      const dedupKeys = await redis.keys(
-        `*eval-trigger:${tenantIdString}:${traceId}*`,
-      );
-      if (dedupKeys.length > 0) {
-        await redis.del(...dedupKeys);
-      }
+          // 3. Fresh app-origin span (depth=0) later on SAME trace —
+          //    legitimate new activity, MUST dispatch again. The reactor
+          //    has `makeJobId(...) = eval-trigger:tenant:trace` plus a
+          //    30s TTL — to bypass the queue-side dedup of this case we
+          //    nuke the dedup keys for this trace before re-dispatching.
+          //    (In production, the 30s window IS the dedup; tests just
+          //    need to prove the depth check itself doesn't pin the
+          //    trace forever.)
+          const redis = getTestRedisConnection()!;
+          const dedupKeys = await redis.keys(
+            `*eval-trigger:${tenantIdString}:${traceId}*`,
+          );
+          if (dedupKeys.length > 0) {
+            await redis.del(...dedupKeys);
+          }
 
-      await recordSpan(
-        buildAppOriginSpan({
-          traceId,
-          spanId: generateId("s3"),
-          depth: 0,
-        }),
-      );
-      await waitFor(
-        () => dispatcher.captured.length >= dispatchesAfter1 + 1,
-        {
-          timeoutMs: 20_000,
-          label: "fresh depth=0 re-dispatched on the same trace",
-        },
-      );
+          await recordSpan(
+            buildAppOriginSpan({
+              traceId,
+              spanId: generateId("s3"),
+              depth: 0,
+            }),
+          );
+          await waitFor(
+            () => dispatcher.captured.length >= dispatchesAfter1 + 1,
+            {
+              timeoutMs: 20_000,
+              label: "fresh depth=0 re-dispatched on the same trace",
+            },
+          );
           expect(dispatcher.captured.length).toBe(dispatchesAfter1 + 1);
         });
       });
@@ -531,57 +541,57 @@ describe.skipIf(!hasTestcontainers)(
       describe("when a depth=1 span arrives that would normally be blocked", () => {
         /** @scenario LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses depth check */
         it("the kill switch lets the dispatch through anyway", async () => {
-      const traceId = generateId("trace");
+          const traceId = generateId("trace");
 
-      // Seed to establish origin on fold + clear baseline.
-      await recordSpan(
-        buildAppOriginSpan({
-          traceId,
-          spanId: generateId("seed"),
-          depth: 0,
-        }),
-      );
-      await waitFor(() => dispatcher.captured.length >= 1, {
-        timeoutMs: 20_000,
-        label: "seed dispatched",
-      });
-      const dispatchesBefore = dispatcher.captured.length;
-
-      // Clear queue-side dedup so the next eval-trigger isn't suppressed
-      // by the 30s window for this trace.
-      const redis = getTestRedisConnection()!;
-      const dedupKeys = await redis.keys(
-        `*eval-trigger:${tenantIdString}:${traceId}*`,
-      );
-      if (dedupKeys.length > 0) {
-        await redis.del(...dedupKeys);
-      }
-
-      const prev = process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD;
-      process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = "1";
-      try {
-        await recordSpan(
-          buildAppOriginSpan({
-            traceId,
-            spanId: generateId("eval"),
-            depth: 1,
-          }),
-        );
-        await waitFor(
-          () => dispatcher.captured.length >= dispatchesBefore + 1,
-          {
+          // Seed to establish origin on fold + clear baseline.
+          await recordSpan(
+            buildAppOriginSpan({
+              traceId,
+              spanId: generateId("seed"),
+              depth: 0,
+            }),
+          );
+          await waitFor(() => dispatcher.captured.length >= 1, {
             timeoutMs: 20_000,
-            label: "kill switch lets depth=1 dispatch through the queue",
-          },
-        );
-        expect(dispatcher.captured.length).toBe(dispatchesBefore + 1);
-      } finally {
-        if (prev === undefined) {
-          delete process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD;
-        } else {
-          process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = prev;
-        }
-      }
+            label: "seed dispatched",
+          });
+          const dispatchesBefore = dispatcher.captured.length;
+
+          // Clear queue-side dedup so the next eval-trigger isn't suppressed
+          // by the 30s window for this trace.
+          const redis = getTestRedisConnection()!;
+          const dedupKeys = await redis.keys(
+            `*eval-trigger:${tenantIdString}:${traceId}*`,
+          );
+          if (dedupKeys.length > 0) {
+            await redis.del(...dedupKeys);
+          }
+
+          const prev = process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD;
+          process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = "1";
+          try {
+            await recordSpan(
+              buildAppOriginSpan({
+                traceId,
+                spanId: generateId("eval"),
+                depth: 1,
+              }),
+            );
+            await waitFor(
+              () => dispatcher.captured.length >= dispatchesBefore + 1,
+              {
+                timeoutMs: 20_000,
+                label: "kill switch lets depth=1 dispatch through the queue",
+              },
+            );
+            expect(dispatcher.captured.length).toBe(dispatchesBefore + 1);
+          } finally {
+            if (prev === undefined) {
+              delete process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD;
+            } else {
+              process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = prev;
+            }
+          }
         });
       });
     });

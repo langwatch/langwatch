@@ -38,7 +38,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
@@ -55,7 +55,7 @@ vi.mock("@langwatch/observability", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 const FIXED_OCCURRED_AT_MS = 1_700_000_000_000;
@@ -130,11 +130,11 @@ function mockDeps(): {
   };
 }
 
-function ctx(foldState: TraceSummaryData): ReactorContext<TraceSummaryData> {
+function ctx(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "gov-project-1",
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
@@ -145,7 +145,7 @@ describe("governanceOcsfEventsSync reactor", () => {
     it("skips silently — application traces never reach OCSF export", async () => {
       const { deps, insertEvent } = mockDeps();
       const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-      await reactor.handle(event, ctx(createFoldState({})));
+      await reactor.spec.handler(event, ctx(createFoldState({})));
       expect(insertEvent).not.toHaveBeenCalled();
     });
   });
@@ -154,7 +154,7 @@ describe("governanceOcsfEventsSync reactor", () => {
     it("skips — origin.kind is reserved for governance ingest only", async () => {
       const { deps, insertEvent } = mockDeps();
       const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-      await reactor.handle(
+      await reactor.spec.handler(
         event,
         ctx(createFoldState({ "langwatch.origin.kind": "personal_workspace" })),
       );
@@ -166,7 +166,7 @@ describe("governanceOcsfEventsSync reactor", () => {
     it("warns + skips — defensive against malformed governance traffic", async () => {
       const { deps, insertEvent } = mockDeps();
       const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-      await reactor.handle(
+      await reactor.spec.handler(
         event,
         ctx(createFoldState({ "langwatch.origin.kind": "ingestion_source" })),
       );
@@ -178,7 +178,7 @@ describe("governanceOcsfEventsSync reactor", () => {
     it("skips — fold has not yet observed any spans", async () => {
       const { deps, insertEvent } = mockDeps();
       const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-      await reactor.handle(
+      await reactor.spec.handler(
         event,
         ctx(
           createFoldState(
@@ -209,7 +209,7 @@ describe("governanceOcsfEventsSync reactor", () => {
         "gen_ai.request.model": "claude-sonnet-4",
       });
 
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
 
       expect(insertEvent).toHaveBeenCalledTimes(1);
       const [row] = insertEvent.mock.calls[0]!;
@@ -238,7 +238,7 @@ describe("governanceOcsfEventsSync reactor", () => {
         "langwatch.ingestion_source.source_type": "otel_generic",
         "langwatch.user_id": "user-42",
       });
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       const parsed = JSON.parse(row.rawOcsfJson);
       expect(parsed.class_uid).toBe(6003);
@@ -261,7 +261,7 @@ describe("governanceOcsfEventsSync reactor", () => {
         "langwatch.ingestion_source.source_type": "claude_cowork",
         "langwatch.governance.anomaly_alert_id": "alert-anomaly-123",
       });
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.severityId).toBe(OCSF_SEVERITY.MEDIUM);
       expect(row.anomalyAlertId).toBe("alert-anomaly-123");
@@ -277,7 +277,7 @@ describe("governanceOcsfEventsSync reactor", () => {
         "langwatch.ingestion_source.id": "is-1",
         "langwatch.ingestion_source.source_type": "otel_generic",
       });
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.actionName).toBe("trace.recorded");
     });
@@ -292,7 +292,7 @@ describe("governanceOcsfEventsSync reactor", () => {
         "langwatch.ingestion_source.id": "is-1",
         "gen_ai.request.model": "claude-haiku-4-5",
       });
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.targetName).toBe("claude-haiku-4-5");
     });
@@ -307,7 +307,7 @@ describe("governanceOcsfEventsSync reactor", () => {
         },
         { models: ["fallback-model"] },
       );
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.targetName).toBe("fallback-model");
     });
@@ -322,7 +322,7 @@ describe("governanceOcsfEventsSync reactor", () => {
         },
         { models: [] },
       );
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.targetName).toBe("");
     });
@@ -343,21 +343,22 @@ describe("governanceOcsfEventsSync reactor", () => {
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
       });
-      await expect(reactor.handle(event, ctx(state))).resolves.toBeUndefined();
+      await expect(
+        reactor.spec.handler(event, ctx(state)),
+      ).resolves.toBeUndefined();
       expect(insertEvent).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("dedup contract", () => {
-    it("declares a per-(tenant, trace) job-id for BullMQ debounce", () => {
+    it("collapses per (tenant, trace) via the default dedup identity", () => {
       const { deps } = mockDeps();
       const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-      expect(reactor.options?.makeJobId).toBeDefined();
-      const jobId = reactor.options!.makeJobId!({
-        event: { tenantId: "t-1", aggregateId: "trace-x" },
-      } as any);
-      expect(jobId).toBe("governance-ocsf-events-sync-t-1-trace-x");
-      expect(reactor.options?.ttl).toBeGreaterThan(0);
+      // No custom dedupId — the framework's default collapse identity is
+      // `subscriber:<name>:<tenantId>:<aggregateId>`, i.e. per (tenant, trace).
+      expect(reactor.spec.fold).toBe("traceSummary");
+      expect(reactor.spec.dedupId).toBeUndefined();
+      expect(reactor.spec.ttl).toBeGreaterThan(0);
     });
   });
 });

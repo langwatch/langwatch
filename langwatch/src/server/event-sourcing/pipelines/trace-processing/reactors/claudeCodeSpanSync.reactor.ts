@@ -12,12 +12,15 @@ import type {
   OtlpResource,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import type { CommandDispatcher } from "../../../deferred";
-import type { ReactorDefinition } from "../../../reactors/reactor.types";
+import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import {
   piiRedactionLevelSchema,
   type RecordSpanCommandData,
 } from "../schemas/commands";
-import { isLogRecordReceivedEvent, type TraceProcessingEvent } from "../schemas/events";
+import {
+  isLogRecordReceivedEvent,
+  type TraceProcessingEvent,
+} from "../schemas/events";
 
 const logger = createLogger(
   "langwatch:trace-processing:claude-code-span-sync-reactor",
@@ -81,138 +84,141 @@ export interface ClaudeCodeSpanSyncReactorDeps {
  */
 export function createClaudeCodeSpanSyncReactor(
   deps: ClaudeCodeSpanSyncReactorDeps,
-): ReactorDefinition<TraceProcessingEvent> {
+): { name: string; spec: SubscriberSpec<TraceProcessingEvent> } {
   return {
     name: "claudeCodeSpanSync",
-    options: {
-      runIn: ["worker"],
+    spec: {
+      map: "logRecordStorage",
+      // Only claude_code LOG ingestion drives the fold. Spans the subscriber
+      // emits arrive as span events, which never pass this guard — no
+      // feedback loop, and non-claude events never pay an enqueue.
+      when: (event) =>
+        isLogRecordReceivedEvent(event) &&
+        event.data.scopeName === CLAUDE_CODE_EVENT_SCOPE,
       // Coalesce a batch's claude logs into one re-fold; correctness does not
       // depend on the exact debounce (the completeness nudge makes a later,
       // more complete re-fold win), it just bounds re-reads of the turn.
-      makeJobId: (payload) =>
-        `claude-span-sync:${payload.event.tenantId}:${payload.event.aggregateId}`,
       ttl: 2_000,
       delay: 1_500,
-    },
+      handler: async (event) => {
+        // Re-checked here so the handler stays safe for any caller.
+        if (!isLogRecordReceivedEvent(event)) return;
+        if (event.data.scopeName !== CLAUDE_CODE_EVENT_SCOPE) return;
 
-    async handle(event: TraceProcessingEvent): Promise<void> {
-      // Only claude_code LOG ingestion drives the fold. Spans the reactor
-      // emits arrive as span events, which are ignored here — no feedback loop.
-      if (!isLogRecordReceivedEvent(event)) return;
-      if (event.data.scopeName !== CLAUDE_CODE_EVENT_SCOPE) return;
+        const tenantId = event.tenantId;
+        const traceId = String(event.aggregateId);
+        const turnLogCap = deps.turnLogCap ?? CLAUDE_TURN_LOG_CAP;
 
-      const tenantId = event.tenantId;
-      const traceId = String(event.aggregateId);
-      const turnLogCap = deps.turnLogCap ?? CLAUDE_TURN_LOG_CAP;
+        try {
+          // The triggering log event's occurredAt bounds the stored_log_records
+          // scan to the turn's partitions instead of cold-scanning S3. Fetch one
+          // past the cap so an overflowing turn is detectable while still bounding
+          // the read; a pathological turn never materializes all of its records.
+          const fetched = await deps.getMarkedClaudeCodeLogs(
+            tenantId,
+            traceId,
+            event.occurredAt,
+            turnLogCap + 1,
+          );
+          if (fetched.length === 0) return;
 
-      try {
-        // The triggering log event's occurredAt bounds the stored_log_records
-        // scan to the turn's partitions instead of cold-scanning S3. Fetch one
-        // past the cap so an overflowing turn is detectable while still bounding
-        // the read; a pathological turn never materializes all of its records.
-        const fetched = await deps.getMarkedClaudeCodeLogs(
-          tenantId,
-          traceId,
-          event.occurredAt,
-          turnLogCap + 1,
-        );
-        if (fetched.length === 0) return;
+          // Bound the conversion: keep the first `turnLogCap` records (turn order).
+          const overflowed = fetched.length > turnLogCap;
+          const rows = overflowed ? fetched.slice(0, turnLogCap) : fetched;
 
-        // Bound the conversion: keep the first `turnLogCap` records (turn order).
-        const overflowed = fetched.length > turnLogCap;
-        const rows = overflowed ? fetched.slice(0, turnLogCap) : fetched;
-
-        // Record how many were dropped so the root span is marked truncated. The
-        // fetch is capped at `turnLogCap + 1`, so `fetched.length - turnLogCap` is
-        // only ever a lower bound (>= 1); a turn with 50,000 marked logs would
-        // stamp 1, badly underestimating during an incident. Query the uncapped
-        // count to stamp the TRUE total. If that count call fails, fall back to
-        // the lower bound - the truncation marker must still stamp either way.
-        let droppedLogCount = 0;
-        if (overflowed) {
-          const lowerBound = Math.max(1, fetched.length - turnLogCap);
-          droppedLogCount = lowerBound;
-          try {
-            const total = await deps.countMarkedClaudeCodeLogs(
-              tenantId,
-              traceId,
-              event.occurredAt,
-            );
-            droppedLogCount = Math.max(1, total - turnLogCap);
-          } catch (countError) {
-            logger.debug(
+          // Record how many were dropped so the root span is marked truncated. The
+          // fetch is capped at `turnLogCap + 1`, so `fetched.length - turnLogCap` is
+          // only ever a lower bound (>= 1); a turn with 50,000 marked logs would
+          // stamp 1, badly underestimating during an incident. Query the uncapped
+          // count to stamp the TRUE total. If that count call fails, fall back to
+          // the lower bound - the truncation marker must still stamp either way.
+          let droppedLogCount = 0;
+          if (overflowed) {
+            const lowerBound = Math.max(1, fetched.length - turnLogCap);
+            droppedLogCount = lowerBound;
+            try {
+              const total = await deps.countMarkedClaudeCodeLogs(
+                tenantId,
+                traceId,
+                event.occurredAt,
+              );
+              droppedLogCount = Math.max(1, total - turnLogCap);
+            } catch (countError) {
+              logger.debug(
+                {
+                  tenantId,
+                  traceId,
+                  turnLogCap,
+                  lowerBound,
+                  error:
+                    countError instanceof Error
+                      ? countError.message
+                      : String(countError),
+                },
+                "Failed to count Claude Code turn's marked logs; stamping the lower-bound dropped count",
+              );
+            }
+            logger.warn(
               {
                 tenantId,
                 traceId,
                 turnLogCap,
-                lowerBound,
-                error:
-                  countError instanceof Error
-                    ? countError.message
-                    : String(countError),
+                convertedLogCount: rows.length,
+                droppedLogCount,
               },
-              "Failed to count Claude Code turn's marked logs; stamping the lower-bound dropped count",
+              "Claude Code turn exceeded the per-turn conversion cap; converting the capped set and marking the trace truncated",
             );
           }
-          logger.warn(
+
+          const records = rows.map(rowToRecord);
+          const piiRedactionLevel = resolvePiiLevel(rows);
+          // The user-typed prompt per prompt.id, so a model call whose request
+          // body claude truncated inline (~60KB) still shows the turn's input
+          // instead of nothing.
+          const promptTextById = new Map<string, string>();
+          for (const record of records) {
+            if (record.eventName !== "user_prompt") continue;
+            const promptId = record.attrs["prompt.id"];
+            const promptText = record.attrs.prompt;
+            if (promptId && promptText)
+              promptTextById.set(promptId, promptText);
+          }
+          const spans = convertClaudeCodeTurnToSpans(records, promptTextById, {
+            droppedLogCount,
+          });
+
+          for (const synthesized of spans) {
+            await deps.recordSpan({
+              tenantId,
+              span: synthesized.span,
+              resource: synthesized.resource,
+              instrumentationScope: synthesized.instrumentationScope,
+              piiRedactionLevel,
+              occurredAt: event.occurredAt,
+            });
+          }
+
+          logger.debug(
             {
               tenantId,
               traceId,
-              turnLogCap,
-              convertedLogCount: rows.length,
+              logCount: rows.length,
               droppedLogCount,
+              spanCount: spans.length,
             },
-            "Claude Code turn exceeded the per-turn conversion cap; converting the capped set and marking the trace truncated",
+            "Synced Claude Code logs into spans",
+          );
+        } catch (error) {
+          logger.error(
+            {
+              tenantId,
+              traceId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Failed to sync Claude Code logs into spans",
           );
         }
-
-        const records = rows.map(rowToRecord);
-        const piiRedactionLevel = resolvePiiLevel(rows);
-        // The user-typed prompt per prompt.id, so a model call whose request
-        // body claude truncated inline (~60KB) still shows the turn's input
-        // instead of nothing.
-        const promptTextById = new Map<string, string>();
-        for (const record of records) {
-          if (record.eventName !== "user_prompt") continue;
-          const promptId = record.attrs["prompt.id"];
-          const promptText = record.attrs.prompt;
-          if (promptId && promptText) promptTextById.set(promptId, promptText);
-        }
-        const spans = convertClaudeCodeTurnToSpans(records, promptTextById, {
-          droppedLogCount,
-        });
-
-        for (const synthesized of spans) {
-          await deps.recordSpan({
-            tenantId,
-            span: synthesized.span,
-            resource: synthesized.resource,
-            instrumentationScope: synthesized.instrumentationScope,
-            piiRedactionLevel,
-            occurredAt: event.occurredAt,
-          });
-        }
-
-        logger.debug(
-          {
-            tenantId,
-            traceId,
-            logCount: rows.length,
-            droppedLogCount,
-            spanCount: spans.length,
-          },
-          "Synced Claude Code logs into spans",
-        );
-      } catch (error) {
-        logger.error(
-          {
-            tenantId,
-            traceId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Failed to sync Claude Code logs into spans",
-        );
-      }
+      },
     },
   };
 }

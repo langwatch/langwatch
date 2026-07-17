@@ -9,12 +9,7 @@ import {
   GovernanceKpisClickHouseRepository,
 } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type {
-  ReactorContext,
-  ReactorDefinition,
-} from "~/server/event-sourcing/reactors/reactor.types";
+import type { TraceSummarySubscriber } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedSubscriber";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger(
@@ -58,75 +53,70 @@ export interface GovernanceKpisSyncReactorDeps {
  */
 export function createGovernanceKpisSyncReactor(
   deps: GovernanceKpisSyncReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+): TraceSummarySubscriber {
   return {
     name: "governanceKpisSync",
-    options: {
-      makeJobId: (payload) =>
-        `governance-kpis-sync-${payload.event.tenantId}-${payload.event.aggregateId}`,
+    spec: {
+      fold: "traceSummary",
       ttl: GOVERNANCE_KPIS_SYNC_DEBOUNCE_TTL_MS,
-    },
+      handler: async (_event, context) => {
+        const { tenantId, state: foldState } = context;
 
-    async handle(
-      _event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
-      const { tenantId, foldState } = context;
-
-      const originKind = foldState.attributes[ATTR_ORIGIN_KIND];
-      if (originKind !== ORIGIN_KIND_VALUE) {
-        return;
-      }
-
-      const sourceId = foldState.attributes[ATTR_INGESTION_SOURCE_ID];
-      const sourceType =
-        foldState.attributes[ATTR_INGESTION_SOURCE_TYPE] ?? "unknown";
-
-      if (!sourceId) {
-        logger.warn(
-          {
-            tenantId,
-            traceId: foldState.traceId,
-          },
-          "governance trace missing langwatch.ingestion_source.id — skipping fold",
-        );
-        return;
-      }
-
-      try {
-        const occurredAtMs = foldState.occurredAt;
-        if (!occurredAtMs || occurredAtMs <= 0) {
+        const originKind = foldState.attributes[ATTR_ORIGIN_KIND];
+        if (originKind !== ORIGIN_KIND_VALUE) {
           return;
         }
-        const hourBucket = new Date(
-          Math.floor(occurredAtMs / (60 * 60 * 1000)) * 60 * 60 * 1000,
-        );
 
-        const contribution: GovernanceKpiContribution = {
-          tenantId,
-          sourceId,
-          sourceType,
-          hourBucket,
-          traceId: foldState.traceId,
-          spendUsd: foldState.totalCost ?? 0,
-          promptTokens: foldState.totalPromptTokenCount ?? 0,
-          completionTokens: foldState.totalCompletionTokenCount ?? 0,
-          lastEventOccurredAt: new Date(occurredAtMs),
-        };
+        const sourceId = foldState.attributes[ATTR_INGESTION_SOURCE_ID];
+        const sourceType =
+          foldState.attributes[ATTR_INGESTION_SOURCE_TYPE] ?? "unknown";
 
-        await deps.governanceKpisRepository.insertContribution(contribution);
-      } catch (error) {
-        logger.error(
-          {
+        if (!sourceId) {
+          logger.warn(
+            {
+              tenantId,
+              traceId: foldState.traceId,
+            },
+            "governance trace missing langwatch.ingestion_source.id — skipping fold",
+          );
+          return;
+        }
+
+        try {
+          const occurredAtMs = foldState.occurredAt;
+          if (!occurredAtMs || occurredAtMs <= 0) {
+            return;
+          }
+          const hourBucket = new Date(
+            Math.floor(occurredAtMs / (60 * 60 * 1000)) * 60 * 60 * 1000,
+          );
+
+          const contribution: GovernanceKpiContribution = {
             tenantId,
             sourceId,
+            sourceType,
+            hourBucket,
             traceId: foldState.traceId,
-            error,
-          },
-          "failed to fold governance trace into governance_kpis",
-        );
-        captureException(toError(error));
-      }
+            spendUsd: foldState.totalCost ?? 0,
+            promptTokens: foldState.totalPromptTokenCount ?? 0,
+            completionTokens: foldState.totalCompletionTokenCount ?? 0,
+            lastEventOccurredAt: new Date(occurredAtMs),
+          };
+
+          await deps.governanceKpisRepository.insertContribution(contribution);
+        } catch (error) {
+          logger.error(
+            {
+              tenantId,
+              sourceId,
+              traceId: foldState.traceId,
+              error,
+            },
+            "failed to fold governance trace into governance_kpis",
+          );
+          captureException(toError(error));
+        }
+      },
     },
   };
 }

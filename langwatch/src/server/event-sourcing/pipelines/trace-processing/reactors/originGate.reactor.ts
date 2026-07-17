@@ -1,19 +1,17 @@
 import { createLogger } from "@langwatch/observability";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { ResolveOriginCommandData } from "../schemas/commands";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceSummarySubscriber } from "./_originGuardedSubscriber";
 
-const logger = createLogger(
-  "langwatch:trace-processing:origin-gate-reactor",
-);
+const logger = createLogger("langwatch:trace-processing:origin-gate-reactor");
 
 /** Delay (ms) before the deferred origin resolution fires */
 export const DEFERRED_CHECK_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 
 export type DeferredOriginPayload = {
-  id: string;       // traceId — used as staged job ID for debuggability
+  id: string; // traceId — used as staged job ID for debuggability
   tenantId: string;
   traceId: string;
 };
@@ -34,9 +32,9 @@ export interface OriginGateReactorDeps {
  * handles that independently.
  */
 /**
- * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
- * (fail-open path): skip stale resync traces and traces whose origin is
- * already resolved.
+ * Pure relevance guard, run at the top of the handler (its event-only stale
+ * check also runs pre-enqueue via `when`): skip stale resync traces and
+ * traces whose origin is already resolved.
  */
 function needsOriginResolution(
   event: TraceProcessingEvent,
@@ -48,36 +46,33 @@ function needsOriginResolution(
 
 export function createOriginGateReactor(
   deps: OriginGateReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+): TraceSummarySubscriber {
   return {
     name: "originGate",
-    shouldReact: (event, context) =>
-      needsOriginResolution(event, context.foldState),
-    options: {
-      makeJobId: (payload) =>
-        `origin-gate:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: 15_000,   // 15s dedup — debounce multi-span trace bursts
-      delay: 5_000,  // 5s delay — settle before checking origin
-    },
+    spec: {
+      fold: "traceSummary",
+      // Pre-enqueue: only the event-only half of the guard can run here; the
+      // fold-state half (origin already resolved) re-runs in the handler.
+      when: (event) =>
+        event.occurredAt >= Date.now() - STALE_TRACE_THRESHOLD_MS,
+      ttl: 15_000, // 15s dedup — debounce multi-span trace bursts
+      delay: 5_000, // 5s delay — settle before checking origin
+      handler: async (event, context) => {
+        const { tenantId, aggregateId: traceId, state } = context;
 
-    async handle(
-      event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
-      const { tenantId, aggregateId: traceId, foldState } = context;
+        if (!needsOriginResolution(event, state)) return;
 
-      if (!needsOriginResolution(event, foldState)) return;
-
-      // No origin — schedule deferred resolution (5-min delay)
-      logger.debug(
-        { tenantId, traceId },
-        "No origin resolved, scheduling deferred origin resolution",
-      );
-      await deps.scheduleDeferred({
-        id: traceId,
-        tenantId,
-        traceId,
-      });
+        // No origin — schedule deferred resolution (5-min delay)
+        logger.debug(
+          { tenantId, traceId },
+          "No origin resolved, scheduling deferred origin resolution",
+        );
+        await deps.scheduleDeferred({
+          id: traceId,
+          tenantId,
+          traceId,
+        });
+      },
     },
   };
 }

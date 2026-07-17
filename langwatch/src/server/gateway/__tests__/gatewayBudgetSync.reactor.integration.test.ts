@@ -6,7 +6,7 @@
  * Exercises the full CH-fold loop with REAL PG + REAL CH (testcontainers),
  * NO MOCKS:
  *
- *   reactor.handle(event)
+ *   reactor.spec.handler(event)
  *     → insertDebit() → gateway_budget_ledger_events (ReplacingMergeTree)
  *     → MV fires into gateway_budget_scope_totals (AggregatingMergeTree)
  *     → GatewayBudgetService.check() reads via sumMerge(SpendUSD)
@@ -33,7 +33,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { createGatewayBudgetSyncReactor } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 
 const suffix = nanoid(8);
@@ -114,11 +114,11 @@ function buildEvent(): TraceProcessingEvent {
   } as unknown as TraceProcessingEvent;
 }
 
-function ctx(foldState: TraceSummaryData): ReactorContext<TraceSummaryData> {
+function ctx(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
   return {
     tenantId: PROJECT_ID,
     aggregateId: `trace-${suffix}`,
-    foldState,
+    state,
   };
 }
 
@@ -195,19 +195,16 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
   }, 60_000);
 
   it("folds a gateway trace into CH and /budget/check reflects the spend", async () => {
-    const chRepo = new GatewayBudgetClickHouseRepository(
-      async (_tenantId) => {
-        // testContainers resolver — single shared client in test environment
-        const { getTestClickHouseClient } = await import(
-          "~/server/event-sourcing/__tests__/integration/testContainers"
-        );
-        const client = getTestClickHouseClient();
-        if (!client) {
-          throw new Error("Test CH client not initialised");
-        }
-        return client;
-      },
-    );
+    const chRepo = new GatewayBudgetClickHouseRepository(async (_tenantId) => {
+      // testContainers resolver — single shared client in test environment
+      const { getTestClickHouseClient } =
+        await import("~/server/event-sourcing/__tests__/integration/testContainers");
+      const client = getTestClickHouseClient();
+      if (!client) {
+        throw new Error("Test CH client not initialised");
+      }
+      return client;
+    });
     const pgRepo = new GatewayBudgetRepository(prisma);
     const reactor = createGatewayBudgetSyncReactor({
       prisma,
@@ -216,7 +213,7 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
     });
 
     // Fire the reactor for a $0.0125 spend trace
-    await reactor.handle(
+    await reactor.spec.handler(
       buildEvent(),
       ctx(
         buildFoldState({
@@ -248,9 +245,8 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
 
   it("fires the reactor idempotently — same gateway_request_id collapses", async () => {
     const chRepo = new GatewayBudgetClickHouseRepository(async () => {
-      const { getTestClickHouseClient } = await import(
-        "~/server/event-sourcing/__tests__/integration/testContainers"
-      );
+      const { getTestClickHouseClient } =
+        await import("~/server/event-sourcing/__tests__/integration/testContainers");
       const client = getTestClickHouseClient();
       if (!client) throw new Error("Test CH client not initialised");
       return client;
@@ -268,9 +264,9 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
     });
 
     // Fire three times
-    await reactor.handle(buildEvent(), ctx(fold));
-    await reactor.handle(buildEvent(), ctx(fold));
-    await reactor.handle(buildEvent(), ctx(fold));
+    await reactor.spec.handler(buildEvent(), ctx(fold));
+    await reactor.spec.handler(buildEvent(), ctx(fold));
+    await reactor.spec.handler(buildEvent(), ctx(fold));
 
     const service = GatewayBudgetService.create(prisma, chRepo);
     const result = await service.check({
@@ -300,9 +296,8 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
 
   it("burst: 100 distinct traces folded in parallel — all spend reflects in /budget/check", async () => {
     const chRepo = new GatewayBudgetClickHouseRepository(async () => {
-      const { getTestClickHouseClient } = await import(
-        "~/server/event-sourcing/__tests__/integration/testContainers"
-      );
+      const { getTestClickHouseClient } =
+        await import("~/server/event-sourcing/__tests__/integration/testContainers");
       const client = getTestClickHouseClient();
       if (!client) throw new Error("Test CH client not initialised");
       return client;
@@ -336,7 +331,7 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
     const start = Date.now();
     await Promise.all(
       Array.from({ length: N }, (_, i) =>
-        reactor.handle(
+        reactor.spec.handler(
           buildEvent(),
           ctx(
             buildFoldState(
@@ -395,7 +390,7 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
 
     // The handle() call must NOT throw — pipeline isolation invariant.
     await expect(
-      reactor.handle(
+      reactor.spec.handler(
         buildEvent(),
         ctx(
           buildFoldState(
@@ -431,9 +426,8 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
     // is captured as a follow-up perf row; this slice
     // intentionally does NOT assert against the parallel case.
     const chRepo = new GatewayBudgetClickHouseRepository(async () => {
-      const { getTestClickHouseClient } = await import(
-        "~/server/event-sourcing/__tests__/integration/testContainers"
-      );
+      const { getTestClickHouseClient } =
+        await import("~/server/event-sourcing/__tests__/integration/testContainers");
       const client = getTestClickHouseClient();
       if (!client) throw new Error("Test CH client not initialised");
       return client;
@@ -469,7 +463,7 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
     );
     const N = 50;
     for (let i = 0; i < N; i++) {
-      await reactor.handle(buildEvent(), ctx(fold));
+      await reactor.spec.handler(buildEvent(), ctx(fold));
     }
 
     const after = await service.check({

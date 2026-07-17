@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NurturingService } from "../../../../../../../ee/billing/nurturing/nurturing.service";
 import type { ProjectService } from "../../../../../app-layer/projects/project.service";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import type { SimulationRunStateData } from "../../projections/simulationRunState.foldProjection";
+import { SIMULATION_RUN_EVENT_TYPES } from "../../schemas/constants";
 import type { SimulationProcessingEvent } from "../../schemas/events";
 import {
-  type CustomerIoSimulationSyncReactorDeps,
-  createCustomerIoSimulationSyncReactor,
+  type CustomerIoSimulationSyncSubscriberDeps,
+  createCustomerIoSimulationSyncSubscriber,
 } from "../customerIoSimulationSync.reactor";
 
 // Suppress logger output
@@ -24,7 +25,7 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
 }));
 
-function createFoldState(
+function createState(
   overrides: Partial<SimulationRunStateData> = {},
 ): SimulationRunStateData {
   return {
@@ -84,13 +85,13 @@ function createEvent(
 }
 
 function createContext(
-  foldState: SimulationRunStateData,
+  state: SimulationRunStateData,
   tenantId = "project-1",
-): ReactorContext<SimulationRunStateData> {
+): TriggerContext<SimulationRunStateData> {
   return {
     tenantId,
     aggregateId: "run-1",
-    foldState,
+    state,
   };
 }
 
@@ -117,8 +118,8 @@ function createMockProjectService(
 }
 
 function createDeps(
-  overrides: Partial<CustomerIoSimulationSyncReactorDeps> = {},
-): CustomerIoSimulationSyncReactorDeps {
+  overrides: Partial<CustomerIoSimulationSyncSubscriberDeps> = {},
+): CustomerIoSimulationSyncSubscriberDeps {
   return {
     projects: createMockProjectService(),
     nurturing: createMockNurturing(),
@@ -127,7 +128,7 @@ function createDeps(
   };
 }
 
-describe("customerIoSimulationSync reactor", () => {
+describe("customerIoSimulationSync subscriber", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-15T12:00:00Z"));
@@ -137,19 +138,14 @@ describe("customerIoSimulationSync reactor", () => {
     vi.useRealTimers();
   });
 
-  describe("makeJobId", () => {
+  describe("dedupId", () => {
     /** @scenario 'Simulation sync reactor uses project-scoped job ID for debouncing' */
-    it("returns cio-sim-sync-{tenantId}", () => {
+    it("scopes the collapse identity to the tenant", () => {
       const deps = createDeps();
-      const reactor = createCustomerIoSimulationSyncReactor(deps);
+      const { spec } = createCustomerIoSimulationSyncSubscriber(deps);
       const event = createEvent({ tenantId: "project-42" });
 
-      const jobId = reactor.options!.makeJobId!({
-        event,
-        foldState: createFoldState(),
-      });
-
-      expect(jobId).toBe("cio-sim-sync-project-42");
+      expect(spec.dedupId!(event)).toBe("project-42");
     });
   });
 
@@ -161,11 +157,11 @@ describe("customerIoSimulationSync reactor", () => {
         const deps = createDeps({
           simulationCountFn: vi.fn().mockResolvedValue(1),
         });
-        const reactor = createCustomerIoSimulationSyncReactor(deps);
+        const { spec } = createCustomerIoSimulationSyncSubscriber(deps);
 
-        await reactor.handle(
+        await spec.handler(
           createEvent(),
-          createContext(createFoldState()),
+          createContext(createState()),
         );
 
         expect(deps.nurturing.identifyUser).toHaveBeenCalledWith({
@@ -183,11 +179,11 @@ describe("customerIoSimulationSync reactor", () => {
         const deps = createDeps({
           simulationCountFn: vi.fn().mockResolvedValue(1),
         });
-        const reactor = createCustomerIoSimulationSyncReactor(deps);
+        const { spec } = createCustomerIoSimulationSyncSubscriber(deps);
 
-        await reactor.handle(
+        await spec.handler(
           createEvent(),
-          createContext(createFoldState()),
+          createContext(createState()),
         );
 
         expect(deps.nurturing.trackEvent).toHaveBeenCalledWith({
@@ -208,11 +204,11 @@ describe("customerIoSimulationSync reactor", () => {
         const deps = createDeps({
           simulationCountFn: vi.fn().mockResolvedValue(6),
         });
-        const reactor = createCustomerIoSimulationSyncReactor(deps);
+        const { spec } = createCustomerIoSimulationSyncSubscriber(deps);
 
-        await reactor.handle(
+        await spec.handler(
           createEvent(),
-          createContext(createFoldState()),
+          createContext(createState()),
         );
 
         expect(deps.nurturing.identifyUser).toHaveBeenCalledWith({
@@ -228,11 +224,11 @@ describe("customerIoSimulationSync reactor", () => {
         const deps = createDeps({
           simulationCountFn: vi.fn().mockResolvedValue(6),
         });
-        const reactor = createCustomerIoSimulationSyncReactor(deps);
+        const { spec } = createCustomerIoSimulationSyncSubscriber(deps);
 
-        await reactor.handle(
+        await spec.handler(
           createEvent(),
-          createContext(createFoldState()),
+          createContext(createState()),
         );
 
         expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();
@@ -246,11 +242,11 @@ describe("customerIoSimulationSync reactor", () => {
         const deps = createDeps({
           simulationCountFn: vi.fn().mockResolvedValue(null),
         });
-        const reactor = createCustomerIoSimulationSyncReactor(deps);
+        const { spec } = createCustomerIoSimulationSyncSubscriber(deps);
 
-        await reactor.handle(
+        await spec.handler(
           createEvent(),
-          createContext(createFoldState()),
+          createContext(createState()),
         );
 
         expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
@@ -270,11 +266,11 @@ describe("customerIoSimulationSync reactor", () => {
           }),
         }),
       });
-      const reactor = createCustomerIoSimulationSyncReactor(deps);
+      const { spec } = createCustomerIoSimulationSyncSubscriber(deps);
 
-      await reactor.handle(
+      await spec.handler(
         createEvent(),
-        createContext(createFoldState()),
+        createContext(createState()),
       );
 
       expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
@@ -284,28 +280,15 @@ describe("customerIoSimulationSync reactor", () => {
 
   describe("given the simulation is not in a finished state", () => {
     /** @scenario 'Simulation tracking is independent of scenario template creation' */
-    it("does not call nurturing methods for started events", async () => {
+    it("subscribes only to FINISHED events, so started and message_snapshot events never reach the handler", () => {
       const deps = createDeps();
-      const reactor = createCustomerIoSimulationSyncReactor(deps);
+      const { spec } = createCustomerIoSimulationSyncSubscriber(deps);
 
-      await reactor.handle(
-        createEvent({ type: "lw.simulation_run.started" } as any),
-        createContext(createFoldState({ Status: "IN_PROGRESS" })),
+      expect(spec.events).toEqual([SIMULATION_RUN_EVENT_TYPES.FINISHED]);
+      expect(spec.events).not.toContain(SIMULATION_RUN_EVENT_TYPES.STARTED);
+      expect(spec.events).not.toContain(
+        SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
       );
-
-      expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
-    });
-
-    it("does not call nurturing methods for message_snapshot events", async () => {
-      const deps = createDeps();
-      const reactor = createCustomerIoSimulationSyncReactor(deps);
-
-      await reactor.handle(
-        createEvent({ type: "lw.simulation_run.message_snapshot" } as any),
-        createContext(createFoldState({ Status: "IN_PROGRESS" })),
-      );
-
-      expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
     });
   });
 
@@ -316,10 +299,10 @@ describe("customerIoSimulationSync reactor", () => {
         new Error("CIO down"),
       );
       const deps = createDeps({ nurturing });
-      const reactor = createCustomerIoSimulationSyncReactor(deps);
+      const { spec } = createCustomerIoSimulationSyncSubscriber(deps);
 
       await expect(
-        reactor.handle(createEvent(), createContext(createFoldState())),
+        spec.handler(createEvent(), createContext(createState())),
       ).resolves.toBeUndefined();
     });
   });
@@ -331,10 +314,10 @@ describe("customerIoSimulationSync reactor", () => {
           resolveOrgAdmin: vi.fn().mockRejectedValue(new Error("DB down")),
         }),
       });
-      const reactor = createCustomerIoSimulationSyncReactor(deps);
+      const { spec } = createCustomerIoSimulationSyncSubscriber(deps);
 
       await expect(
-        reactor.handle(createEvent(), createContext(createFoldState())),
+        spec.handler(createEvent(), createContext(createState())),
       ).resolves.toBeUndefined();
     });
   });

@@ -10,11 +10,11 @@ import type {
   SimulationRunFinishedEvent,
   SimulationTextMessageEndEvent,
 } from "../../schemas/events";
-import { createSuiteRunSyncReactor, type SuiteRunSyncReactorDeps } from "../suiteRunSync.reactor";
+import { createSuiteRunSyncSubscriber, type SuiteRunSyncSubscriberDeps } from "../suiteRunSync.reactor";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 
-function createDeps(): SuiteRunSyncReactorDeps & {
+function createDeps(): SuiteRunSyncSubscriberDeps & {
   recordSuiteRunItemStarted: ReturnType<typeof vi.fn>;
   completeSuiteRunItem: ReturnType<typeof vi.fn>;
 } {
@@ -24,7 +24,7 @@ function createDeps(): SuiteRunSyncReactorDeps & {
   };
 }
 
-function createFoldState(overrides: Partial<SimulationRunStateData> = {}): SimulationRunStateData {
+function createState(overrides: Partial<SimulationRunStateData> = {}): SimulationRunStateData {
   return {
     ScenarioRunId: "run-1",
     ScenarioId: "scenario-1",
@@ -96,17 +96,17 @@ function createFinishedEvent(): SimulationRunFinishedEvent {
   };
 }
 
-describe("suiteRunSync reactor", () => {
+describe("suiteRunSync subscriber", () => {
   describe("when ScenarioSetId is a suite set ID", () => {
     it("dispatches recordSuiteRunItemStarted on STARTED event", async () => {
       const deps = createDeps();
-      const reactor = createSuiteRunSyncReactor(deps);
-      const foldState = createFoldState();
+      const { spec } = createSuiteRunSyncSubscriber(deps);
+      const state = createState();
 
-      await reactor.handle(createStartedEvent(), {
+      await spec.handler(createStartedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "run-1",
-        foldState,
+        state,
       });
 
       expect(deps.recordSuiteRunItemStarted).toHaveBeenCalledWith({
@@ -120,18 +120,18 @@ describe("suiteRunSync reactor", () => {
 
     it("dispatches completeSuiteRunItem on FINISHED event", async () => {
       const deps = createDeps();
-      const reactor = createSuiteRunSyncReactor(deps);
-      const foldState = createFoldState({
+      const { spec } = createSuiteRunSyncSubscriber(deps);
+      const state = createState({
         Status: "SUCCESS",
         Verdict: "success",
         DurationMs: 3000,
         Reasoning: "All criteria met",
       });
 
-      await reactor.handle(createFinishedEvent(), {
+      await spec.handler(createFinishedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "run-1",
-        foldState,
+        state,
       });
 
       expect(deps.completeSuiteRunItem).toHaveBeenCalledWith({
@@ -152,15 +152,15 @@ describe("suiteRunSync reactor", () => {
   describe("when ScenarioSetId is not a suite set ID", () => {
     it("skips non-suite simulation runs", async () => {
       const deps = createDeps();
-      const reactor = createSuiteRunSyncReactor(deps);
-      const foldState = createFoldState({
+      const { spec } = createSuiteRunSyncSubscriber(deps);
+      const state = createState({
         ScenarioSetId: "external-set-123",
       });
 
-      await reactor.handle(createStartedEvent(), {
+      await spec.handler(createStartedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "run-1",
-        foldState,
+        state,
       });
 
       expect(deps.recordSuiteRunItemStarted).not.toHaveBeenCalled();
@@ -168,13 +168,13 @@ describe("suiteRunSync reactor", () => {
 
     it("skips when ScenarioSetId is empty", async () => {
       const deps = createDeps();
-      const reactor = createSuiteRunSyncReactor(deps);
-      const foldState = createFoldState({ ScenarioSetId: "" });
+      const { spec } = createSuiteRunSyncSubscriber(deps);
+      const state = createState({ ScenarioSetId: "" });
 
-      await reactor.handle(createStartedEvent(), {
+      await spec.handler(createStartedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "run-1",
-        foldState,
+        state,
       });
 
       expect(deps.recordSuiteRunItemStarted).not.toHaveBeenCalled();
@@ -182,10 +182,19 @@ describe("suiteRunSync reactor", () => {
   });
 
   describe("when handling non-lifecycle events", () => {
+    it("subscribes only to STARTED and FINISHED events", () => {
+      const { spec } = createSuiteRunSyncSubscriber(createDeps());
+
+      expect(spec.events).toEqual([
+        SIMULATION_RUN_EVENT_TYPES.STARTED,
+        SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      ]);
+    });
+
     it("ignores text message events", async () => {
       const deps = createDeps();
-      const reactor = createSuiteRunSyncReactor(deps);
-      const foldState = createFoldState();
+      const { spec } = createSuiteRunSyncSubscriber(deps);
+      const state = createState();
 
       const textEndEvent: SimulationTextMessageEndEvent = {
         id: "event-3",
@@ -204,14 +213,27 @@ describe("suiteRunSync reactor", () => {
         },
       };
 
-      await reactor.handle(textEndEvent, {
+      await spec.handler(textEndEvent, {
         tenantId: TEST_TENANT_ID,
         aggregateId: "run-1",
-        foldState,
+        state,
       });
 
       expect(deps.recordSuiteRunItemStarted).not.toHaveBeenCalled();
       expect(deps.completeSuiteRunItem).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when deduplicating jobs", () => {
+    it("scopes the collapse identity to the event type so STARTED and FINISHED never merge", () => {
+      const { spec } = createSuiteRunSyncSubscriber(createDeps());
+
+      const startedId = spec.dedupId!(createStartedEvent());
+      const finishedId = spec.dedupId!(createFinishedEvent());
+
+      expect(startedId).not.toBe(finishedId);
+      expect(startedId).toContain("run-1");
+      expect(startedId).toContain(TEST_TENANT_ID);
     });
   });
 });

@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast.service";
-import type { ReactorDefinition } from "../../../reactors/reactor.types";
+import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "../schemas/events";
 
 const logger = createLogger(
@@ -21,47 +21,45 @@ export interface SpanStorageBroadcastReactorDeps {
  */
 export function createSpanStorageBroadcastReactor(
   deps: SpanStorageBroadcastReactorDeps,
-): ReactorDefinition<TraceProcessingEvent> {
+): { name: string; spec: SubscriberSpec<TraceProcessingEvent> } {
   return {
     name: "spanStorageBroadcast",
-    options: {
-      runIn: ["worker"],
-      disabled: deps.hasRedis === false,
-      makeJobId: (payload) =>
-        `span-stored:${payload.event.tenantId}:${payload.event.aggregateId}`,
+    spec: {
+      map: "spanStorage",
+      // Without Redis, worker-to-web pub/sub bridge is unavailable
+      when: () => deps.hasRedis !== false,
       ttl: 15_000, // Debounce — notification only, frontend refetches
-    },
+      handler: async (event) => {
+        const tenantId = event.tenantId;
+        const traceId = String(event.aggregateId);
 
-    async handle(event: TraceProcessingEvent): Promise<void> {
-      const tenantId = event.tenantId;
-      const traceId = String(event.aggregateId);
-
-      try {
-        const payload = JSON.stringify({
-          event: "span_stored",
-          traceId,
-        });
-
-        await deps.broadcast.broadcastToTenant(
-          tenantId,
-          payload,
-          "trace_updated",
-        );
-
-        logger.debug(
-          { tenantId, traceId },
-          "Broadcasted trace update after span storage",
-        );
-      } catch (error) {
-        logger.warn(
-          {
-            tenantId,
+        try {
+          const payload = JSON.stringify({
+            event: "span_stored",
             traceId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Failed to broadcast trace update after span storage — non-fatal",
-        );
-      }
+          });
+
+          await deps.broadcast.broadcastToTenant(
+            tenantId,
+            payload,
+            "trace_updated",
+          );
+
+          logger.debug(
+            { tenantId, traceId },
+            "Broadcasted trace update after span storage",
+          );
+        } catch (error) {
+          logger.warn(
+            {
+              tenantId,
+              traceId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Failed to broadcast trace update after span storage — non-fatal",
+          );
+        }
+      },
     },
   };
 }

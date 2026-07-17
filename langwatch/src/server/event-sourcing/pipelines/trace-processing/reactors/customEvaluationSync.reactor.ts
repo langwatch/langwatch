@@ -1,16 +1,12 @@
 import crypto from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
-import type {
-  ReactorContext,
-  ReactorDefinition,
-} from "../../../reactors/reactor.types";
 import type { ReportEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 import { isSpanReceivedEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
+import type { TraceSummarySubscriber } from "./_originGuardedSubscriber";
 
 const logger = createLogger(
   "langwatch:trace-processing:custom-evaluation-sync-reactor",
@@ -120,9 +116,9 @@ function spanHasEvaluationEvents(span: OtlpSpan): boolean {
 }
 
 /**
- * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
+ * Pure relevance guard, shared by `when` (pre-enqueue) and the handler
  * (fail-open path): only span events that are recent (not a resync) and
- * actually carry `langwatch.evaluation.custom` events need this reactor.
+ * actually carry `langwatch.evaluation.custom` events need this subscriber.
  */
 function hasSyncableEvaluations(event: TraceProcessingEvent): boolean {
   if (!isSpanReceivedEvent(event)) return false;
@@ -140,95 +136,95 @@ function hasSyncableEvaluations(event: TraceProcessingEvent): boolean {
  */
 export function createCustomEvaluationSyncReactor(
   deps: CustomEvaluationSyncReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+): TraceSummarySubscriber {
   return {
     name: "customEvaluationSync",
-    shouldReact: (event) => hasSyncableEvaluations(event),
-    options: {
-      makeJobId: (payload) =>
-        `custom-eval-sync:${payload.event.tenantId}:${payload.event.aggregateId}:${payload.event.id}`,
+    spec: {
+      fold: "traceSummary",
+      when: (event) => hasSyncableEvaluations(event),
+      // Per-event collapse identity (includes event.id): each span's custom
+      // evaluations must sync — a per-aggregate collapse would drop the
+      // evaluations carried by a burst's later spans.
+      dedupId: (event) =>
+        `${event.tenantId}:${String(event.aggregateId)}:${event.id}`,
       ttl: 30_000,
       delay: 5_000,
-    },
+      handler: async (event, context) => {
+        if (!isSpanReceivedEvent(event)) return;
+        if (!hasSyncableEvaluations(event)) return;
 
-    async handle(
-      event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
-      if (!isSpanReceivedEvent(event)) return;
-      if (!hasSyncableEvaluations(event)) return;
+        const { tenantId, aggregateId: traceId } = context;
 
-      const { tenantId, aggregateId: traceId } = context;
+        const evaluations = extractEvaluationsFromSpan(event.data.span);
+        if (evaluations.length === 0) return;
 
-      const evaluations = extractEvaluationsFromSpan(event.data.span);
-      if (evaluations.length === 0) return;
+        logger.debug(
+          { tenantId, traceId, evaluationCount: evaluations.length },
+          "Syncing custom SDK evaluations",
+        );
 
-      logger.debug(
-        { tenantId, traceId, evaluationCount: evaluations.length },
-        "Syncing custom SDK evaluations",
-      );
+        const errors: Error[] = [];
 
-      const errors: Error[] = [];
+        for (const evaluation of evaluations) {
+          const evaluationId =
+            evaluation.evaluation_id ??
+            deterministicEvaluationId({ traceId, evaluation });
+          const evaluatorId =
+            evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name);
+          const status =
+            evaluation.status ?? (evaluation.error ? "error" : "processed");
+          const occurredAt = event.occurredAt;
 
-      for (const evaluation of evaluations) {
-        const evaluationId =
-          evaluation.evaluation_id ??
-          deterministicEvaluationId({ traceId, evaluation });
-        const evaluatorId =
-          evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name);
-        const status =
-          evaluation.status ?? (evaluation.error ? "error" : "processed");
-        const occurredAt = event.occurredAt;
-
-        try {
-          await deps.reportEvaluation({
-            tenantId,
-            evaluationId,
-            evaluatorId,
-            evaluatorType: "custom",
-            evaluatorName: evaluation.name,
-            traceId,
-            isGuardrail: evaluation.is_guardrail ?? undefined,
-            status,
-            score: evaluation.score ?? null,
-            passed: evaluation.passed ?? null,
-            label: evaluation.label ?? null,
-            details: evaluation.details ?? null,
-            error: evaluation.error?.message ?? null,
-            errorDetails: evaluation.error?.stacktrace?.join("\n") ?? null,
-            costId: evaluation.cost_id ?? null,
-            occurredAt,
-          });
-        } catch (error) {
-          logger.error(
-            {
+          try {
+            await deps.reportEvaluation({
               tenantId,
-              traceId,
               evaluationId,
               evaluatorId,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Failed to sync custom evaluation",
-          );
-          errors.push(
-            error instanceof Error ? error : new Error(String(error)),
-          );
+              evaluatorType: "custom",
+              evaluatorName: evaluation.name,
+              traceId,
+              isGuardrail: evaluation.is_guardrail ?? undefined,
+              status,
+              score: evaluation.score ?? null,
+              passed: evaluation.passed ?? null,
+              label: evaluation.label ?? null,
+              details: evaluation.details ?? null,
+              error: evaluation.error?.message ?? null,
+              errorDetails: evaluation.error?.stacktrace?.join("\n") ?? null,
+              costId: evaluation.cost_id ?? null,
+              occurredAt,
+            });
+          } catch (error) {
+            logger.error(
+              {
+                tenantId,
+                traceId,
+                evaluationId,
+                evaluatorId,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Failed to sync custom evaluation",
+            );
+            errors.push(
+              error instanceof Error ? error : new Error(String(error)),
+            );
+          }
         }
-      }
 
-      logger.debug(
-        {
-          tenantId,
-          traceId,
-          evaluationCount: evaluations.length,
-          failedCount: errors.length,
-        },
-        "Custom SDK evaluations synced",
-      );
+        logger.debug(
+          {
+            tenantId,
+            traceId,
+            evaluationCount: evaluations.length,
+            failedCount: errors.length,
+          },
+          "Custom SDK evaluations synced",
+        );
 
-      if (errors.length > 0) {
-        throw errors[0];
-      }
+        if (errors.length > 0) {
+          throw errors[0];
+        }
+      },
     },
   };
 }

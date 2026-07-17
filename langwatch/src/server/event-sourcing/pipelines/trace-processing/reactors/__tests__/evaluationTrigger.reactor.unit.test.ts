@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
@@ -120,12 +120,12 @@ function createOriginEvent(origin = "application"): TraceProcessingEvent {
 }
 
 function createContext(
-  foldState: TraceSummaryData,
-): ReactorContext<TraceSummaryData> {
+  state: TraceSummaryData,
+): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
@@ -222,7 +222,7 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await reactor.spec.handler(createOriginEvent(), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
         "tenant-1",
@@ -240,7 +240,10 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createTopicAssignedEvent(), createContext(state));
+      await reactor.spec.handler(
+        createTopicAssignedEvent(),
+        createContext(state),
+      );
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -257,7 +260,7 @@ describe("evaluationTrigger reactor", () => {
         occurredAt: Date.now() - 8 * 24 * 60 * 60 * 1000,
       });
 
-      await reactor.handle(createSpanEvent(), createContext(state));
+      await reactor.spec.handler(createSpanEvent(), createContext(state));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
     });
@@ -271,7 +274,7 @@ describe("evaluationTrigger reactor", () => {
         occurredAt: Date.now(),
       });
 
-      await reactor.handle(createSpanEvent(), createContext(state));
+      await reactor.spec.handler(createSpanEvent(), createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -288,7 +291,7 @@ describe("evaluationTrigger reactor", () => {
         occurredAt: Date.now(),
       });
 
-      await reactor.handle(createSpanEvent(), createContext(state));
+      await reactor.spec.handler(createSpanEvent(), createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -303,7 +306,7 @@ describe("evaluationTrigger reactor", () => {
         occurredAt: Date.now(),
       });
 
-      await reactor.handle(createSpanEvent(), createContext(state));
+      await reactor.spec.handler(createSpanEvent(), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -322,7 +325,7 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "evaluation" },
       });
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createOriginEvent("evaluation"),
         createContext(state),
       );
@@ -345,7 +348,7 @@ describe("evaluationTrigger reactor", () => {
         ],
       });
 
-      await reactor.handle(event, createContext(state));
+      await reactor.spec.handler(event, createContext(state));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
     });
@@ -363,7 +366,7 @@ describe("evaluationTrigger reactor", () => {
         ],
       });
 
-      await reactor.handle(event, createContext(state));
+      await reactor.spec.handler(event, createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -383,7 +386,7 @@ describe("evaluationTrigger reactor", () => {
         ],
       });
 
-      await reactor.handle(event, createContext(state));
+      await reactor.spec.handler(event, createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -396,7 +399,7 @@ describe("evaluationTrigger reactor", () => {
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({ attributes: {} });
 
-      await reactor.handle(createOriginEvent(""), createContext(state));
+      await reactor.spec.handler(createOriginEvent(""), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -411,7 +414,7 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await reactor.spec.handler(createOriginEvent(), createContext(state));
 
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
@@ -429,7 +432,7 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await reactor.spec.handler(createOriginEvent(), createContext(state));
 
       // The reactor can fire a second time after the command was already
       // dispatched (a late span, then the deferred OriginResolvedEvent). The
@@ -463,7 +466,7 @@ describe("evaluationTrigger reactor", () => {
         },
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await reactor.spec.handler(createOriginEvent(), createContext(state));
 
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       // delay == threadIdleTimeout * 1000 confirms the thread-level branch was taken.
@@ -482,7 +485,7 @@ describe("evaluationTrigger reactor", () => {
         computedOutput: null,
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await reactor.spec.handler(createOriginEvent(), createContext(state));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
     });
@@ -497,7 +500,7 @@ describe("evaluationTrigger reactor", () => {
       });
       const event = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
 
-      await reactor.handle(event, createContext(state));
+      await reactor.spec.handler(event, createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
     });
@@ -510,7 +513,7 @@ describe("evaluationTrigger reactor", () => {
       });
       const event = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
 
-      await reactor.handle(event, createContext(state));
+      await reactor.spec.handler(event, createContext(state));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
     });
@@ -525,7 +528,7 @@ describe("evaluationTrigger reactor", () => {
       });
       const event = createSpanEvent({ spanName: "openai.chat" });
 
-      await reactor.handle(event, createContext(state));
+      await reactor.spec.handler(event, createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
         "tenant-1",
@@ -542,7 +545,7 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await reactor.spec.handler(createOriginEvent(), createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -550,10 +553,13 @@ describe("evaluationTrigger reactor", () => {
 });
 
 /**
- * The guards below used to live inside `handle`, so every span of a 10k-span
- * trace was serialized, gzipped and blobbed into Redis before the queue's dedup
- * threw the job away. They are pure and read only the payload `handle` receives,
- * so `shouldReact` rejects them pre-enqueue instead (ADR-026). See
+ * The guards below used to live inside the handler, so every span of a
+ * 10k-span trace was serialized, gzipped and blobbed into Redis before the
+ * queue's dedup threw the job away. The event-only guards are pure, so the
+ * spec's `events` filter and `when` reject them pre-enqueue instead
+ * (ADR-026/052). Fold-state guards cannot run pre-enqueue any more (`when`
+ * sees only the event); they run at the top of the handler against the
+ * committed fold state. See
  * specs/event-sourcing/hot-trace-fold-amplification.feature.
  */
 describe("evaluationTrigger relevance check", () => {
@@ -563,43 +569,42 @@ describe("evaluationTrigger relevance check", () => {
       ...overrides,
     });
 
-  const shouldReact = (
-    event: TraceProcessingEvent,
-    state: TraceSummaryData,
-  ): boolean => {
-    const reactor = createEvaluationTriggerReactor(createDeps());
-    // biome-ignore lint/style/noNonNullAssertion: the reactor always declares one.
-    return reactor.shouldReact!(event, createContext(state));
+  /** Mirrors the framework's pre-enqueue check: events filter AND `when`. */
+  const preEnqueuePasses = (event: TraceProcessingEvent): boolean => {
+    const { spec } = createEvaluationTriggerReactor(createDeps());
+    if (spec.events && !spec.events.includes(event.type)) return false;
+    // biome-ignore lint/style/noNonNullAssertion: the subscriber always declares one.
+    return spec.when!(event);
   };
 
   describe("given a trace with a resolved origin", () => {
     /** @scenario "The origin guard admits a genuine message event before enqueue" */
     it("agrees to react to a recent span event", () => {
-      expect(shouldReact(createSpanEvent(), withOrigin())).toBe(true);
+      expect(preEnqueuePasses(createSpanEvent())).toBe(true);
     });
 
     /** @scenario "The origin guard filters a non-message event before enqueue" */
     it("declines a topic-assigned event", () => {
-      expect(shouldReact(createTopicAssignedEvent(), withOrigin())).toBe(false);
+      expect(preEnqueuePasses(createTopicAssignedEvent())).toBe(false);
     });
 
     /** @scenario "The evaluation trigger declines a synthetic span before enqueue" */
     it("declines a synthetic span", () => {
       const synthetic = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
-      expect(shouldReact(synthetic, withOrigin())).toBe(false);
+      expect(preEnqueuePasses(synthetic)).toBe(false);
     });
 
     /** @scenario "The evaluation trigger dispatches nothing past the span processing cap" */
     it("dispatches no evaluation once the span count reaches the processing cap", async () => {
-      // The cap guard deliberately lives in handle, not shouldReact: shouldReact
-      // runs once per event of a coalesced batch and would multiply the
-      // once-per-crossing warn by the batch size.
+      // The cap guard deliberately lives in the handler, not the pre-enqueue
+      // `when`: `when` runs once per event of a coalesced batch and would
+      // multiply the once-per-crossing warn by the batch size.
       const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
-      expect(shouldReact(createSpanEvent(), atCap)).toBe(true);
+      expect(preEnqueuePasses(createSpanEvent())).toBe(true);
 
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
-      await reactor.handle(createSpanEvent(), createContext(atCap));
+      await reactor.spec.handler(createSpanEvent(), createContext(atCap));
       expect(deps.evaluation).not.toHaveBeenCalled();
 
       // A coalesced batch can jump the span count clean past the cap without
@@ -607,21 +612,32 @@ describe("evaluationTrigger relevance check", () => {
       const pastCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS + 1 });
       const depsPast = createDeps();
       const reactorPast = createEvaluationTriggerReactor(depsPast);
-      await reactorPast.handle(createSpanEvent(), createContext(pastCap));
+      await reactorPast.spec.handler(createSpanEvent(), createContext(pastCap));
       expect(depsPast.evaluation).not.toHaveBeenCalled();
 
       const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
       const depsBelow = createDeps();
       const reactorBelow = createEvaluationTriggerReactor(depsBelow);
-      await reactorBelow.handle(createSpanEvent(), createContext(belowCap));
+      await reactorBelow.spec.handler(
+        createSpanEvent(),
+        createContext(belowCap),
+      );
       expect(depsBelow.evaluation).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("given a trace whose origin is unresolved", () => {
     /** @scenario "The origin guard filters a trace with no resolved origin before enqueue" */
-    it("declines a span event", () => {
-      expect(shouldReact(createSpanEvent(), createFoldState())).toBe(false);
+    it("skips the span event in the handler (fold state is not visible pre-enqueue)", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+
+      await reactor.spec.handler(
+        createSpanEvent(),
+        createContext(createFoldState()),
+      );
+
+      expect(deps.evaluation).not.toHaveBeenCalled();
     });
   });
 });

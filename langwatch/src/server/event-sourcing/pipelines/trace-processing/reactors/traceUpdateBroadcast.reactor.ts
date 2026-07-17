@@ -1,8 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast.service";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceSummarySubscriber } from "./_originGuardedSubscriber";
 
 const logger = createLogger(
   "langwatch:trace-processing:trace-update-broadcast-reactor",
@@ -22,53 +20,47 @@ export interface TraceUpdateBroadcastReactorDeps {
  */
 export function createTraceUpdateBroadcastReactor(
   deps: TraceUpdateBroadcastReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+): TraceSummarySubscriber {
   return {
     name: "traceUpdateBroadcast",
-    options: {
-      runIn: ["worker"],
+    spec: {
+      fold: "traceSummary",
       // Without Redis, worker-to-web pub/sub bridge is unavailable
-      disabled: deps.hasRedis === false,
-      makeJobId: (payload) =>
-        `trace-update:${payload.event.tenantId}:${payload.event.aggregateId}`,
+      when: () => deps.hasRedis !== false,
       ttl: 30_000, // Debounce broadcasts — frontend already debounces duplicate events
-    },
+      handler: async (_event, context) => {
+        const { tenantId, aggregateId: traceId } = context;
 
-    async handle(
-      _event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
-      const { tenantId, aggregateId: traceId } = context;
-
-      try {
-        const payload = JSON.stringify({
-          event: "trace_summary_updated",
-          traceId,
-        });
-
-        await deps.broadcast.broadcastToTenant(
-          tenantId,
-          payload,
-          "trace_updated",
-        );
-
-        logger.debug(
-          {
-            tenantId,
+        try {
+          const payload = JSON.stringify({
+            event: "trace_summary_updated",
             traceId,
-          },
-          "Broadcasted trace update",
-        );
-      } catch (error) {
-        logger.warn(
-          {
+          });
+
+          await deps.broadcast.broadcastToTenant(
             tenantId,
-            traceId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Failed to broadcast trace update — non-fatal",
-        );
-      }
+            payload,
+            "trace_updated",
+          );
+
+          logger.debug(
+            {
+              tenantId,
+              traceId,
+            },
+            "Broadcasted trace update",
+          );
+        } catch (error) {
+          logger.warn(
+            {
+              tenantId,
+              traceId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Failed to broadcast trace update — non-fatal",
+          );
+        }
+      },
     },
   };
 }

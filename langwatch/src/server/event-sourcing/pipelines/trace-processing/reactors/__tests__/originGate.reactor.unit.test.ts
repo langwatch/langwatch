@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createOriginGateReactor,
@@ -78,12 +78,12 @@ function createEvent(
 }
 
 function createContext(
-  foldState: TraceSummaryData,
-): ReactorContext<TraceSummaryData> {
+  state: TraceSummaryData,
+): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
@@ -106,24 +106,23 @@ describe("originGate reactor", () => {
     vi.useRealTimers();
   });
 
-  describe("reactor options", () => {
+  describe("subscriber spec", () => {
     it("uses 5s debounce and dedup to settle initial span burst", () => {
       const deps = createDeps();
-      const reactor = createOriginGateReactor(deps);
+      const subscriber = createOriginGateReactor(deps);
 
-      expect(reactor.options?.delay).toBe(5_000);
-      expect(reactor.options?.ttl).toBe(15_000);
+      expect(subscriber.spec.delay).toBe(5_000);
+      expect(subscriber.spec.ttl).toBe(15_000);
     });
 
-    it("generates dedup key from tenant and trace", () => {
+    it("collapses per tenant and trace via the default dedup identity", () => {
       const deps = createDeps();
-      const reactor = createOriginGateReactor(deps);
+      const subscriber = createOriginGateReactor(deps);
 
-      const jobId = reactor.options?.makeJobId?.({
-        event: { tenantId: "t1", aggregateId: "tr1" } as any,
-        foldState: {} as any,
-      });
-      expect(jobId).toBe("origin-gate:t1:tr1");
+      // No custom dedupId — the framework's default collapse identity is
+      // `subscriber:<name>:<tenantId>:<aggregateId>`, i.e. per (tenant, trace).
+      expect(subscriber.spec.fold).toBe("traceSummary");
+      expect(subscriber.spec.dedupId).toBeUndefined();
     });
   });
 
@@ -135,20 +134,25 @@ describe("originGate reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createEvent(), createContext(state));
+      await reactor.spec.handler(createEvent(), createContext(state));
 
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
 
     it("skips for all origin types", async () => {
-      for (const origin of ["application", "evaluation", "simulation", "workflow"]) {
+      for (const origin of [
+        "application",
+        "evaluation",
+        "simulation",
+        "workflow",
+      ]) {
         const deps = createDeps();
         const reactor = createOriginGateReactor(deps);
         const state = createFoldState({
           attributes: { "langwatch.origin": origin },
         });
 
-        await reactor.handle(createEvent(), createContext(state));
+        await reactor.spec.handler(createEvent(), createContext(state));
 
         expect(deps.scheduleDeferred).not.toHaveBeenCalled();
       }
@@ -162,7 +166,7 @@ describe("originGate reactor", () => {
       const reactor = createOriginGateReactor(deps);
       const state = createFoldState({ attributes: {} });
 
-      await reactor.handle(createEvent(), createContext(state));
+      await reactor.spec.handler(createEvent(), createContext(state));
 
       expect(deps.scheduleDeferred).toHaveBeenCalledWith({
         id: "trace-1",
@@ -181,48 +185,43 @@ describe("originGate reactor", () => {
         occurredAt: Date.now() - 2 * 60 * 60 * 1000, // 2 hours ago
       });
 
-      await reactor.handle(oldEvent, createContext(state));
+      await reactor.spec.handler(oldEvent, createContext(state));
 
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
   });
 
-  describe("when deciding whether to react", () => {
-    describe("when origin is absent on a recent trace", () => {
+  describe("when deciding whether to enqueue (when guard)", () => {
+    describe("when the event is recent", () => {
       it("returns true", () => {
         const reactor = createOriginGateReactor(createDeps());
-        const state = createFoldState({ attributes: {} });
 
-        expect(reactor.shouldReact!(createEvent(), createContext(state))).toBe(
-          true,
-        );
+        expect(reactor.spec.when!(createEvent())).toBe(true);
       });
     });
 
     describe("when origin is already resolved", () => {
-      it("returns false", () => {
-        const reactor = createOriginGateReactor(createDeps());
+      it("skips in the handler (fold state is not visible pre-enqueue)", async () => {
+        const deps = createDeps();
+        const reactor = createOriginGateReactor(deps);
         const state = createFoldState({
           attributes: { "langwatch.origin": "application" },
         });
 
-        expect(reactor.shouldReact!(createEvent(), createContext(state))).toBe(
-          false,
-        );
+        expect(reactor.spec.when!(createEvent())).toBe(true);
+        await reactor.spec.handler(createEvent(), createContext(state));
+        expect(deps.scheduleDeferred).not.toHaveBeenCalled();
       });
     });
 
     describe("when the trace is old (resyncing)", () => {
       it("returns false", () => {
         const reactor = createOriginGateReactor(createDeps());
-        const state = createFoldState({ attributes: {} });
         const oldEvent = createEvent({
           occurredAt: Date.now() - 2 * 60 * 60 * 1000,
         });
 
-        expect(reactor.shouldReact!(oldEvent, createContext(state))).toBe(
-          false,
-        );
+        expect(reactor.spec.when!(oldEvent)).toBe(false);
       });
     });
   });
@@ -258,7 +257,9 @@ describe("createDeferredOriginHandler()", () => {
 
   describe("when resolveOrigin throws", () => {
     it("propagates the error", async () => {
-      const resolveOriginFn = vi.fn().mockRejectedValue(new Error("command failed"));
+      const resolveOriginFn = vi
+        .fn()
+        .mockRejectedValue(new Error("command failed"));
       const handler = createDeferredOriginHandler(resolveOriginFn);
       const payload: DeferredOriginPayload = {
         id: "trace-1",

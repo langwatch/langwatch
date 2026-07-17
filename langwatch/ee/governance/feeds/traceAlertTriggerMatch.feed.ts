@@ -8,7 +8,7 @@ import type {
   Fact,
   FeedFn,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
+import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedSubscriber";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 

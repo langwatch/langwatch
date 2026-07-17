@@ -1,8 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceSummarySubscriber } from "./_originGuardedSubscriber";
 
 const logger = createLogger(
   "langwatch:trace-processing:project-metadata-reactor",
@@ -21,8 +20,8 @@ export interface ProjectMetadataReactorDeps {
  * Uses a long dedup TTL so we only hit the database once per project in a given window.
  */
 /**
- * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
- * (fail-open path). Sample traces (seeded from the empty-state "Seed
+ * Pure relevance guard, run at the top of the handler against the committed
+ * fold state. Sample traces (seeded from the empty-state "Seed
  * sample traces" path; every span carries `langwatch.origin = "sample"`)
  * are not a real first ingest. Flipping `firstMessage` / `integrated` on
  * them would prematurely dismiss the empty-state onboarding card even
@@ -35,45 +34,44 @@ function isRealFirstIngest(foldState: TraceSummaryData): boolean {
 
 export function createProjectMetadataReactor(
   deps: ProjectMetadataReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+): TraceSummarySubscriber {
   return {
     name: "projectMetadata",
-    shouldReact: (_event, context) => isRealFirstIngest(context.foldState),
-    options: {
-      runIn: ["worker"],
-      makeJobId: (payload) =>
-        `project-meta:${payload.event.tenantId}`,
+    spec: {
+      fold: "traceSummary",
+      // Collapse per PROJECT (not per trace) with a long TTL so one burst
+      // costs one database hit.
+      dedupId: (event) => event.tenantId,
       ttl: 60_000, // 60s dedup — avoid repeated writes for the same project
-    },
+      handler: async (_event, context) => {
+        const { tenantId, state: foldState } = context;
+        const attrs = foldState.attributes ?? {};
 
-    async handle(
-      _event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
-      const { tenantId, foldState } = context;
-      const attrs = foldState.attributes ?? {};
+        // Sample-trace guard needs fold state, so it runs here rather than
+        // in a pre-enqueue `when`.
+        if (!isRealFirstIngest(foldState)) return;
 
-      if (!isRealFirstIngest(foldState)) return;
+        try {
+          const project = await deps.projects.getById(tenantId);
 
-      try {
-        const project = await deps.projects.getById(tenantId);
+          if (!project) {
+            logger.warn(
+              { tenantId },
+              "Project not found — skipping metadata update",
+            );
+            return;
+          }
 
-        if (!project) {
-          logger.warn({ tenantId }, "Project not found — skipping metadata update");
-          return;
-        }
+          // Already marked — nothing to do
+          if (project.firstMessage && project.integrated) {
+            return;
+          }
 
-        // Already marked — nothing to do
-        if (project.firstMessage && project.integrated) {
-          return;
-        }
+          const isOptimizationStudio =
+            attrs["langwatch.platform"] === "optimization_studio";
 
-        const isOptimizationStudio =
-          attrs["langwatch.platform"] === "optimization_studio";
-
-        const sdkLanguage = attrs["sdk.language"];
-        const language =
-          isOptimizationStudio
+          const sdkLanguage = attrs["sdk.language"];
+          const language = isOptimizationStudio
             ? "other"
             : sdkLanguage === "python"
               ? "python"
@@ -81,24 +79,24 @@ export function createProjectMetadataReactor(
                 ? "typescript"
                 : "other";
 
-        await deps.projects.updateMetadata({
-          id: tenantId,
-          data: {
-            firstMessage: true,
-            integrated: isOptimizationStudio ? project.integrated : true,
-            language,
-          },
-        });
-
-      } catch (error) {
-        logger.error(
-          {
-            tenantId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Failed to update project metadata — non-fatal",
-        );
-      }
+          await deps.projects.updateMetadata({
+            id: tenantId,
+            data: {
+              firstMessage: true,
+              integrated: isOptimizationStudio ? project.integrated : true,
+              language,
+            },
+          });
+        } catch (error) {
+          logger.error(
+            {
+              tenantId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Failed to update project metadata — non-fatal",
+          );
+        }
+      },
     },
   };
 }

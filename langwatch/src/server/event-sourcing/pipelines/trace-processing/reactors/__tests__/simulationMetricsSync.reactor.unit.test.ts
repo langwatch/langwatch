@@ -5,7 +5,10 @@ import {
 } from "../simulationMetricsSync.reactor";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { SPAN_RECEIVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_VERSION_LATEST } from "../../schemas/constants";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "../../schemas/constants";
 import type { SpanReceivedEvent } from "../../schemas/events";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
@@ -18,7 +21,9 @@ function createDeps(): SimulationMetricsSyncReactorDeps & {
   };
 }
 
-function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
+function createTraceSummaryState(
+  overrides: Partial<TraceSummaryData> = {},
+): TraceSummaryData {
   return {
     traceId: "trace-1",
     traceName: "",
@@ -90,14 +95,15 @@ function createSpanReceivedEvent(): SpanReceivedEvent {
 
 describe("simulationMetricsSync reactor (trace-side metrics publisher)", () => {
   describe("when reactor is created", () => {
-    it("has dedup options with makeJobId, ttl, and delay", () => {
+    it("declares fold, ttl, and delay on the subscriber spec", () => {
       const deps = createDeps();
       const reactor = createSimulationMetricsSyncReactor(deps);
 
-      expect(reactor.options).toBeDefined();
-      expect(reactor.options?.makeJobId).toBeTypeOf("function");
-      expect(reactor.options?.ttl).toBe(60_000);
-      expect(reactor.options?.delay).toBe(60_000);
+      expect(reactor.spec.fold).toBe("traceSummary");
+      // Default dedup identity (per tenant + trace); 60s collapse + delay.
+      expect(reactor.spec.dedupId).toBeUndefined();
+      expect(reactor.spec.ttl).toBe(60_000);
+      expect(reactor.spec.delay).toBe(60_000);
     });
   });
 
@@ -111,10 +117,10 @@ describe("simulationMetricsSync reactor (trace-side metrics publisher)", () => {
         totalCost: 0.001,
       });
 
-      await reactor.handle(createSpanReceivedEvent(), {
+      await reactor.spec.handler(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
-        foldState,
+        state: foldState,
       });
 
       // No metrics carried: computeRunMetrics derives role cost/latency from
@@ -138,10 +144,10 @@ describe("simulationMetricsSync reactor (trace-side metrics publisher)", () => {
         attributes: { "langwatch.origin": "sdk" },
       });
 
-      await reactor.handle(createSpanReceivedEvent(), {
+      await reactor.spec.handler(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
-        foldState,
+        state: foldState,
       });
 
       expect(deps.computeRunMetrics).not.toHaveBeenCalled();
@@ -159,10 +165,10 @@ describe("simulationMetricsSync reactor (trace-side metrics publisher)", () => {
         totalCost: null,
       });
 
-      await reactor.handle(createSpanReceivedEvent(), {
+      await reactor.spec.handler(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
-        foldState,
+        state: foldState,
       });
 
       expect(deps.computeRunMetrics).not.toHaveBeenCalled();
@@ -181,66 +187,69 @@ describe("simulationMetricsSync reactor (trace-side metrics publisher)", () => {
       });
 
       await expect(
-        reactor.handle(createSpanReceivedEvent(), {
+        reactor.spec.handler(createSpanReceivedEvent(), {
           tenantId: TEST_TENANT_ID,
           aggregateId: "trace-1",
-          foldState,
+          state: foldState,
         }),
       ).resolves.toBeUndefined();
     });
   });
 
-  describe("when deciding whether to react", () => {
+  describe("when deciding whether to run (fold-state guard in the handler)", () => {
     describe("when trace has scenario.run_id and data to aggregate", () => {
-      it("returns true", () => {
-        const reactor = createSimulationMetricsSyncReactor(createDeps());
+      it("dispatches", async () => {
+        const deps = createDeps();
+        const reactor = createSimulationMetricsSyncReactor(deps);
         const foldState = createTraceSummaryState({
           attributes: { "scenario.run_id": "run-1" },
         });
 
-        expect(
-          reactor.shouldReact!(createSpanReceivedEvent(), {
-            tenantId: TEST_TENANT_ID,
-            aggregateId: "trace-1",
-            foldState,
-          }),
-        ).toBe(true);
+        await reactor.spec.handler(createSpanReceivedEvent(), {
+          tenantId: TEST_TENANT_ID,
+          aggregateId: "trace-1",
+          state: foldState,
+        });
+
+        expect(deps.computeRunMetrics).toHaveBeenCalledTimes(1);
       });
     });
 
     describe("when trace has no scenario.run_id", () => {
-      it("returns false", () => {
-        const reactor = createSimulationMetricsSyncReactor(createDeps());
+      it("does not dispatch", async () => {
+        const deps = createDeps();
+        const reactor = createSimulationMetricsSyncReactor(deps);
         const foldState = createTraceSummaryState({
           attributes: { "langwatch.origin": "sdk" },
         });
 
-        expect(
-          reactor.shouldReact!(createSpanReceivedEvent(), {
-            tenantId: TEST_TENANT_ID,
-            aggregateId: "trace-1",
-            foldState,
-          }),
-        ).toBe(false);
+        await reactor.spec.handler(createSpanReceivedEvent(), {
+          tenantId: TEST_TENANT_ID,
+          aggregateId: "trace-1",
+          state: foldState,
+        });
+
+        expect(deps.computeRunMetrics).not.toHaveBeenCalled();
       });
     });
 
     describe("when trace has no spans and no cost", () => {
-      it("returns false", () => {
-        const reactor = createSimulationMetricsSyncReactor(createDeps());
+      it("does not dispatch", async () => {
+        const deps = createDeps();
+        const reactor = createSimulationMetricsSyncReactor(deps);
         const foldState = createTraceSummaryState({
           attributes: { "scenario.run_id": "run-1" },
           spanCount: 0,
           totalCost: null,
         });
 
-        expect(
-          reactor.shouldReact!(createSpanReceivedEvent(), {
-            tenantId: TEST_TENANT_ID,
-            aggregateId: "trace-1",
-            foldState,
-          }),
-        ).toBe(false);
+        await reactor.spec.handler(createSpanReceivedEvent(), {
+          tenantId: TEST_TENANT_ID,
+          aggregateId: "trace-1",
+          state: foldState,
+        });
+
+        expect(deps.computeRunMetrics).not.toHaveBeenCalled();
       });
     });
   });
@@ -256,10 +265,10 @@ describe("simulationMetricsSync reactor (trace-side metrics publisher)", () => {
         totalCost: 0,
       });
 
-      await reactor.handle(createSpanReceivedEvent(), {
+      await reactor.spec.handler(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
-        foldState,
+        state: foldState,
       });
 
       expect(deps.computeRunMetrics).toHaveBeenCalledTimes(1);

@@ -2,7 +2,7 @@ import type { GatewayBudget } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
@@ -19,7 +19,7 @@ vi.mock("@langwatch/observability", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 function createFoldState(
@@ -91,12 +91,16 @@ const event: TraceProcessingEvent = {
 } as unknown as TraceProcessingEvent;
 
 function mockDeps(
-  vk:
-    | { id: string; organizationId: string; principalUserId: string | null }
-    | null,
-  project:
-    | { id: string; teamId: string; team: { organizationId: string } }
-    | null,
+  vk: {
+    id: string;
+    organizationId: string;
+    principalUserId: string | null;
+  } | null,
+  project: {
+    id: string;
+    teamId: string;
+    team: { organizationId: string };
+  } | null,
   budgets: GatewayBudget[] = [],
 ): {
   deps: GatewayBudgetSyncReactorDeps;
@@ -124,11 +128,11 @@ function mockDeps(
   };
 }
 
-function ctx(foldState: TraceSummaryData): ReactorContext<TraceSummaryData> {
+function ctx(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "project-1",
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
@@ -140,7 +144,7 @@ describe("gatewayBudgetSync reactor", () => {
       const { deps, insertDebit } = mockDeps(null, null, []);
       const reactor = createGatewayBudgetSyncReactor(deps);
 
-      await reactor.handle(event, ctx(createFoldState({})));
+      await reactor.spec.handler(event, ctx(createFoldState({})));
 
       expect(insertDebit).not.toHaveBeenCalled();
       expect(deps.prisma.virtualKey.findUnique).not.toHaveBeenCalled();
@@ -152,7 +156,7 @@ describe("gatewayBudgetSync reactor", () => {
       const { deps, insertDebit } = mockDeps(null, null, []);
       const reactor = createGatewayBudgetSyncReactor(deps);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         event,
         ctx(
           createFoldState({
@@ -178,7 +182,7 @@ describe("gatewayBudgetSync reactor", () => {
       );
       const reactor = createGatewayBudgetSyncReactor(deps);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         event,
         ctx(
           createFoldState({
@@ -205,7 +209,7 @@ describe("gatewayBudgetSync reactor", () => {
       );
       const reactor = createGatewayBudgetSyncReactor(deps);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         event,
         ctx(
           createFoldState({
@@ -239,7 +243,7 @@ describe("gatewayBudgetSync reactor", () => {
       );
       const reactor = createGatewayBudgetSyncReactor(deps);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         event,
         ctx(
           createFoldState({
@@ -289,7 +293,7 @@ describe("gatewayBudgetSync reactor", () => {
       );
       const reactor = createGatewayBudgetSyncReactor(deps);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         event,
         ctx(
           createFoldState(

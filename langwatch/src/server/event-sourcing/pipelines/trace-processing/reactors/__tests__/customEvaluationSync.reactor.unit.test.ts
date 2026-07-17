@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
-import type { SpanReceivedEvent, TraceProcessingEvent } from "../../schemas/events";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
+import type {
+  SpanReceivedEvent,
+  TraceProcessingEvent,
+} from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";
 import {
   createCustomEvaluationSyncReactor,
@@ -127,12 +130,12 @@ function createNonSpanEvent(): TraceProcessingEvent {
 }
 
 function createContext(
-  foldState: TraceSummaryData,
-): ReactorContext<TraceSummaryData> {
+  state: TraceSummaryData,
+): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
@@ -211,7 +214,7 @@ describe("customEvaluationSync reactor", () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const state = createFoldState();
 
-      await reactor.handle(createNonSpanEvent(), createContext(state));
+      await reactor.spec.handler(createNonSpanEvent(), createContext(state));
 
       expect(deps.reportEvaluation).not.toHaveBeenCalled();
     });
@@ -223,7 +226,7 @@ describe("customEvaluationSync reactor", () => {
       const span = makeOtlpSpan([]);
       span.events = [];
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -240,7 +243,7 @@ describe("customEvaluationSync reactor", () => {
         { name: "relevance", score: 0.9, passed: true, label: "good" },
       ]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -252,7 +255,7 @@ describe("customEvaluationSync reactor", () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -265,7 +268,7 @@ describe("customEvaluationSync reactor", () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([{ name: "My Custom Eval", score: 0.5 }]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -278,7 +281,7 @@ describe("customEvaluationSync reactor", () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -291,7 +294,7 @@ describe("customEvaluationSync reactor", () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -313,7 +316,7 @@ describe("customEvaluationSync reactor", () => {
         },
       ]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -330,7 +333,7 @@ describe("customEvaluationSync reactor", () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -345,7 +348,7 @@ describe("customEvaluationSync reactor", () => {
         { evaluation_id: "my-eval-1", name: "toxicity", score: 0.1 },
       ]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -360,7 +363,7 @@ describe("customEvaluationSync reactor", () => {
         { evaluator_id: "my-evaluator", name: "toxicity", score: 0.1 },
       ]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -377,7 +380,7 @@ describe("customEvaluationSync reactor", () => {
         occurredAt: eventOccurredAt,
       } as any);
 
-      await reactor.handle(event, createContext(createFoldState()));
+      await reactor.spec.handler(event, createContext(createFoldState()));
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.occurredAt).toBe(eventOccurredAt);
@@ -392,7 +395,7 @@ describe("customEvaluationSync reactor", () => {
         occurredAt: Date.now() - 2 * 60 * 60 * 1000,
       } as any);
 
-      await reactor.handle(oldEvent, createContext(createFoldState()));
+      await reactor.spec.handler(oldEvent, createContext(createFoldState()));
 
       expect(deps.reportEvaluation).not.toHaveBeenCalled();
     });
@@ -409,7 +412,7 @@ describe("customEvaluationSync reactor", () => {
         },
       ]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -434,7 +437,7 @@ describe("customEvaluationSync reactor", () => {
       ]);
 
       await expect(
-        reactor.handle(
+        reactor.spec.handler(
           createSpanReceivedEvent(span),
           createContext(createFoldState()),
         ),
@@ -450,11 +453,13 @@ describe("customEvaluationSync reactor", () => {
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
       const event = createSpanReceivedEvent(span);
 
-      await reactor.handle(event, createContext(createFoldState()));
-      await reactor.handle(event, createContext(createFoldState()));
+      await reactor.spec.handler(event, createContext(createFoldState()));
+      await reactor.spec.handler(event, createContext(createFoldState()));
 
-      const id1 = vi.mocked(deps.reportEvaluation).mock.calls[0]![0].evaluationId;
-      const id2 = vi.mocked(deps.reportEvaluation).mock.calls[1]![0].evaluationId;
+      const id1 = vi.mocked(deps.reportEvaluation).mock.calls[0]![0]
+        .evaluationId;
+      const id2 = vi.mocked(deps.reportEvaluation).mock.calls[1]![0]
+        .evaluationId;
       expect(id1).toBe(id2);
     });
   });
@@ -466,7 +471,7 @@ describe("customEvaluationSync reactor", () => {
         { name: "content filter", score: 1.0, is_guardrail: true },
       ]);
 
-      await reactor.handle(
+      await reactor.spec.handler(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -476,18 +481,13 @@ describe("customEvaluationSync reactor", () => {
     });
   });
 
-  describe("when deciding whether to react", () => {
+  describe("when deciding whether to enqueue (when guard)", () => {
     describe("when span carries evaluation events", () => {
       it("returns true", () => {
         const reactor = createCustomEvaluationSyncReactor(deps);
         const span = makeOtlpSpan([{ name: "quality", score: 0.9 }]);
 
-        expect(
-          reactor.shouldReact!(
-            createSpanReceivedEvent(span),
-            createContext(createFoldState()),
-          ),
-        ).toBe(true);
+        expect(reactor.spec.when!(createSpanReceivedEvent(span))).toBe(true);
       });
     });
 
@@ -496,12 +496,7 @@ describe("customEvaluationSync reactor", () => {
         const reactor = createCustomEvaluationSyncReactor(deps);
         const span = makeOtlpSpan([]);
 
-        expect(
-          reactor.shouldReact!(
-            createSpanReceivedEvent(span),
-            createContext(createFoldState()),
-          ),
-        ).toBe(false);
+        expect(reactor.spec.when!(createSpanReceivedEvent(span))).toBe(false);
       });
     });
 
@@ -509,12 +504,7 @@ describe("customEvaluationSync reactor", () => {
       it("returns false", () => {
         const reactor = createCustomEvaluationSyncReactor(deps);
 
-        expect(
-          reactor.shouldReact!(
-            createNonSpanEvent(),
-            createContext(createFoldState()),
-          ),
-        ).toBe(false);
+        expect(reactor.spec.when!(createNonSpanEvent())).toBe(false);
       });
     });
 
@@ -526,9 +516,18 @@ describe("customEvaluationSync reactor", () => {
           occurredAt: Date.now() - 2 * 60 * 60 * 1000,
         });
 
-        expect(
-          reactor.shouldReact!(staleEvent, createContext(createFoldState())),
-        ).toBe(false);
+        expect(reactor.spec.when!(staleEvent)).toBe(false);
+      });
+    });
+
+    describe("dedup identity", () => {
+      it("collapses per (tenant, trace, event) so each span's evaluations sync", () => {
+        const reactor = createCustomEvaluationSyncReactor(deps);
+        const event = createSpanReceivedEvent(makeOtlpSpan([]));
+
+        expect(reactor.spec.dedupId!(event)).toBe(
+          `${event.tenantId}:${String(event.aggregateId)}:${event.id}`,
+        );
       });
     });
   });

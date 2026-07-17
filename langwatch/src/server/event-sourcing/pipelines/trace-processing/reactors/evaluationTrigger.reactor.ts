@@ -6,7 +6,6 @@ import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { featureFlagService } from "../../../../featureFlag";
 import { evaluatorLoopBlockedCounter } from "../../../../metrics";
 import type { QueueSendOptions } from "../../../queues";
-import type { ReactorDefinition } from "../../../reactors/reactor.types";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import {
@@ -17,7 +16,10 @@ import {
   isSpanReceivedEvent,
   type TraceProcessingEvent,
 } from "../schemas/events";
-import { defineOriginGuardedTraceReactor } from "./_originGuardedReactor";
+import {
+  defineOriginGuardedTraceSubscriber,
+  type TraceSummarySubscriber,
+} from "./_originGuardedSubscriber";
 import { DEFERRED_CHECK_DELAY_MS } from "./originGate.reactor";
 
 const CAUSALITY_LOOP_GUARD_DISABLED_FLAG =
@@ -36,16 +38,16 @@ export interface EvaluationTriggerReactorDeps {
 }
 
 /**
- * Pure relevance guard, evaluated pre-enqueue via `shouldReact` (and again in
- * `handle`, the fail-open path). Reads only the payload the handler receives, so
- * hoisting it out of `handle` changes nothing but where the work is skipped —
+ * Pure relevance guard, evaluated pre-enqueue via `when` (and again in the
+ * handler, the fail-open path). Reads only the event the handler receives, so
+ * hoisting it out of the handler changes nothing but where the work is skipped —
  * before the queue serializes, gzips and blobs a payload it would immediately
  * dedup away, rather than after.
  *
- * Side-effect free, per the `ExtraGuard` contract: `shouldReact` is evaluated
+ * Side-effect free, per the `ExtraGuard` contract: `when` is evaluated
  * once per event of a coalesced batch, so anything logged here is multiplied by
- * the batch size. The oversized-trace guard lives in `handle` for exactly that
- * reason — see below.
+ * the batch size. The oversized-trace guard lives in the handler for exactly
+ * that reason — see below.
  */
 function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
   // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
@@ -67,13 +69,12 @@ function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
  */
 export function createEvaluationTriggerReactor(
   deps: EvaluationTriggerReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  return defineOriginGuardedTraceReactor({
+): TraceSummarySubscriber {
+  return defineOriginGuardedTraceSubscriber({
     name: "evaluationTrigger",
-    jobIdPrefix: "eval-trigger",
     isRelevant: isDispatchableEvaluationEvent,
-    async handle(event, context) {
-      const { tenantId, aggregateId: traceId, foldState } = context;
+    async handler(event, context) {
+      const { tenantId, aggregateId: traceId, state: foldState } = context;
 
       // Oversized-trace guard (2026-05-28 incident follow-up). Past the same
       // processing cap the fold uses to stop deriving the summary
@@ -83,8 +84,8 @@ export function createEvaluationTriggerReactor(
       // eval dispatch (lighter processing). The span itself is still stored and
       // the trace stays fully queryable: we drop the WORK, never the DATA.
       //
-      // This stays in `handle`, not in the pre-enqueue `shouldReact`, so the
-      // once-per-crossing warn below fires once: `shouldReact` runs per event of
+      // This stays in the handler, not in the pre-enqueue `when`, so the
+      // once-per-crossing warn below fires once: `when` runs per event of
       // a coalesced batch, and would multiply the log by the batch size. The
       // enqueue it no longer skips is already collapsed to one job per batch by
       // the router's dedup-id collapse, so there is nothing left to save.

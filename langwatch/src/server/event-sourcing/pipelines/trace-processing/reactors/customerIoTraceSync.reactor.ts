@@ -1,10 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import type { NurturingService } from "../../../../../../ee/billing/nurturing/nurturing.service";
-import { captureException, toError } from "../../../../../utils/posthogErrorCapture";
+import {
+  captureException,
+  toError,
+} from "../../../../../utils/posthogErrorCapture";
 import type { ProjectService } from "../../../../app-layer/projects/project.service";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceSummarySubscriber } from "./_originGuardedSubscriber";
 
 const logger = createLogger(
   "langwatch:trace-processing:customer-io-trace-sync-reactor",
@@ -38,78 +39,96 @@ export interface CustomerIoTraceSyncReactorDeps {
  */
 export function createCustomerIoTraceSyncReactor(
   deps: CustomerIoTraceSyncReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+): TraceSummarySubscriber {
   return {
     name: "customerIoTraceSync",
-    options: {
-      makeJobId: (payload) =>
-        `cio-trace-sync-${payload.event.tenantId}`,
+    spec: {
+      fold: "traceSummary",
+      // Collapse per PROJECT (not per trace) with a long TTL — one CIO sync
+      // per project per debounce window.
+      dedupId: (event) => event.tenantId,
       ttl: CIO_REACTOR_DEBOUNCE_TTL_MS,
-    },
+      handler: async (_event, context) => {
+        const { tenantId: projectId, state: foldState } = context;
 
-    async handle(
-      _event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
-      const { tenantId: projectId, foldState } = context;
+        try {
+          const { userId, firstMessage } =
+            await deps.projects.resolveOrgAdmin(projectId);
 
-      try {
-        const { userId, firstMessage } = await deps.projects.resolveOrgAdmin(projectId);
+          if (!userId) {
+            logger.warn(
+              { projectId },
+              "No admin user found for project — skipping CIO trace sync",
+            );
+            return;
+          }
 
-        if (!userId) {
-          logger.warn(
-            { projectId },
-            "No admin user found for project — skipping CIO trace sync",
+          const sdkLanguage = foldState.attributes["sdk.language"] ?? "unknown";
+          const sdkFramework =
+            foldState.attributes["langwatch.sdk.framework"] ?? "unknown";
+          const traceOccurredAt = new Date(foldState.occurredAt).toISOString();
+
+          if (!firstMessage) {
+            // First trace — fire immediately, fire-and-forget
+            void deps.nurturing
+              .identifyUser({
+                userId,
+                traits: {
+                  has_traces: true,
+                  sdk_language: sdkLanguage,
+                  sdk_framework: sdkFramework,
+                  first_trace_at: traceOccurredAt,
+                },
+              })
+              .catch((error) => {
+                logger.error(
+                  { projectId, error },
+                  "Failed to identify user for first trace",
+                );
+                captureException(toError(error));
+              });
+            void deps.nurturing
+              .trackEvent({
+                userId,
+                event: "first_trace_integrated",
+                properties: {
+                  sdk_language: sdkLanguage,
+                  sdk_framework: sdkFramework,
+                  project_id: projectId,
+                },
+              })
+              .catch((error) => {
+                logger.error(
+                  { projectId, error },
+                  "Failed to track first_trace_integrated event",
+                );
+                captureException(toError(error));
+              });
+          } else {
+            // Subsequent trace — debounced via makeJobId, fire-and-forget
+            void deps.nurturing
+              .identifyUser({
+                userId,
+                traits: {
+                  last_trace_at: traceOccurredAt,
+                },
+              })
+              .catch((error) => {
+                logger.error(
+                  { projectId, error },
+                  "Failed to identify user for trace update",
+                );
+                captureException(toError(error));
+              });
+          }
+        } catch (error) {
+          logger.error(
+            { projectId, error },
+            "Failed to process CIO trace sync — non-fatal",
           );
-          return;
+          captureException(toError(error));
         }
-
-        const sdkLanguage = foldState.attributes["sdk.language"] ?? "unknown";
-        const sdkFramework =
-          foldState.attributes["langwatch.sdk.framework"] ?? "unknown";
-        const traceOccurredAt = new Date(foldState.occurredAt).toISOString();
-
-        if (!firstMessage) {
-          // First trace — fire immediately, fire-and-forget
-          void deps.nurturing
-            .identifyUser({ userId, traits: {
-              has_traces: true,
-              sdk_language: sdkLanguage,
-              sdk_framework: sdkFramework,
-              first_trace_at: traceOccurredAt,
-            }})
-            .catch((error) => {
-              logger.error({ projectId, error }, "Failed to identify user for first trace");
-              captureException(toError(error));
-            });
-          void deps.nurturing
-            .trackEvent({ userId, event: "first_trace_integrated", properties: {
-              sdk_language: sdkLanguage,
-              sdk_framework: sdkFramework,
-              project_id: projectId,
-            }})
-            .catch((error) => {
-              logger.error({ projectId, error }, "Failed to track first_trace_integrated event");
-              captureException(toError(error));
-            });
-        } else {
-          // Subsequent trace — debounced via makeJobId, fire-and-forget
-          void deps.nurturing
-            .identifyUser({ userId, traits: {
-              last_trace_at: traceOccurredAt,
-            }})
-            .catch((error) => {
-              logger.error({ projectId, error }, "Failed to identify user for trace update");
-              captureException(toError(error));
-            });
-        }
-      } catch (error) {
-        logger.error(
-          { projectId, error },
-          "Failed to process CIO trace sync — non-fatal",
-        );
-        captureException(toError(error));
-      }
+      },
     },
   };
 }

@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createProjectMetadataReactor,
   type ProjectMetadataReactorDeps,
 } from "../projectMetadata.reactor";
-
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -79,12 +78,12 @@ function createEvent(tenantId: string): TraceProcessingEvent {
 
 function createContext(
   tenantId: string,
-  foldState: TraceSummaryData,
-): ReactorContext<TraceSummaryData> {
+  state: TraceSummaryData,
+): TriggerContext<TraceSummaryData> {
   return {
     tenantId,
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
@@ -126,7 +125,7 @@ describe("createProjectMetadataReactor()", () => {
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
-      await reactor.handle(event, context);
+      await reactor.spec.handler(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -139,7 +138,7 @@ describe("createProjectMetadataReactor()", () => {
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
-      await reactor.handle(event, context);
+      await reactor.spec.handler(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -166,7 +165,7 @@ describe("createProjectMetadataReactor()", () => {
       });
       const context = createContext(tenantId, foldState);
 
-      await reactor.handle(event, context);
+      await reactor.spec.handler(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -193,7 +192,7 @@ describe("createProjectMetadataReactor()", () => {
       });
       const context = createContext(tenantId, foldState);
 
-      await reactor.handle(event, context);
+      await reactor.spec.handler(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -220,7 +219,7 @@ describe("createProjectMetadataReactor()", () => {
       });
       const context = createContext(tenantId, foldState);
 
-      await reactor.handle(event, context);
+      await reactor.spec.handler(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -243,7 +242,7 @@ describe("createProjectMetadataReactor()", () => {
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
-      await reactor.handle(event, context);
+      await reactor.spec.handler(event, context);
 
       expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
     });
@@ -259,7 +258,7 @@ describe("createProjectMetadataReactor()", () => {
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
-      await reactor.handle(event, context);
+      await reactor.spec.handler(event, context);
 
       expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
     });
@@ -283,7 +282,7 @@ describe("createProjectMetadataReactor()", () => {
       });
       const context = createContext(tenantId, foldState);
 
-      await reactor.handle(event, context);
+      await reactor.spec.handler(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -299,7 +298,7 @@ describe("createProjectMetadataReactor()", () => {
       });
       const context = createContext(tenantId, foldState);
 
-      await reactor.handle(event, context);
+      await reactor.spec.handler(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -326,66 +325,56 @@ describe("createProjectMetadataReactor()", () => {
       const context = createContext(tenantId, createFoldState());
 
       // Must not throw
-      await expect(reactor.handle(event, context)).resolves.toBeUndefined();
+      await expect(
+        reactor.spec.handler(event, context),
+      ).resolves.toBeUndefined();
     });
-
-
   });
 
-  it("uses dedup makeJobId based on tenantId", () => {
+  it("uses a project-scoped dedup identity (tenantId)", () => {
     const reactor = createProjectMetadataReactor(deps);
     const event = createEvent(tenantId);
 
-    const jobId = reactor.options!.makeJobId!({
-      event: event as any,
-      foldState: {} as any,
-    });
-
-    expect(jobId).toBe(`project-meta:${tenantId}`);
+    expect(reactor.spec.dedupId!(event)).toBe(tenantId);
   });
 
   it("has a 60-second dedup TTL", () => {
     const reactor = createProjectMetadataReactor(deps);
 
-    expect(reactor.options!.ttl).toBe(60_000);
+    expect(reactor.spec.ttl).toBe(60_000);
   });
 
-  it("runs only in worker", () => {
-    const reactor = createProjectMetadataReactor(deps);
-
-    expect(reactor.options!.runIn).toEqual(["worker"]);
-  });
-
-  describe("when deciding whether to react", () => {
+  describe("when deciding whether to run", () => {
     describe("when the trace is a real ingest", () => {
-      it("returns true", () => {
+      it("proceeds to the project lookup", async () => {
         const reactor = createProjectMetadataReactor(deps);
         const foldState = createFoldState({
           attributes: { "langwatch.origin": "application" },
         });
 
-        expect(
-          reactor.shouldReact!(
-            createEvent("tenant-1"),
-            createContext("tenant-1", foldState),
-          ),
-        ).toBe(true);
+        await reactor.spec.handler(
+          createEvent("tenant-1"),
+          createContext("tenant-1", foldState),
+        );
+
+        expect(mockProjects.getById).toHaveBeenCalledWith("tenant-1");
       });
     });
 
     describe("when the trace is a seeded sample", () => {
-      it("returns false", () => {
+      it("skips before touching the project service", async () => {
         const reactor = createProjectMetadataReactor(deps);
         const foldState = createFoldState({
           attributes: { "langwatch.origin": "sample" },
         });
 
-        expect(
-          reactor.shouldReact!(
-            createEvent("tenant-1"),
-            createContext("tenant-1", foldState),
-          ),
-        ).toBe(false);
+        await reactor.spec.handler(
+          createEvent("tenant-1"),
+          createContext("tenant-1", foldState),
+        );
+
+        expect(mockProjects.getById).not.toHaveBeenCalled();
+        expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
       });
     });
   });

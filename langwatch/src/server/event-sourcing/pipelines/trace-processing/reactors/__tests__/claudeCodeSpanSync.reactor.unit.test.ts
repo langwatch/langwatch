@@ -43,7 +43,11 @@ const row = (
   traceId: TRACE,
   spanId,
   timeUnixMs,
-  attributes: { "event.name": eventName, [CLAUDE_CODE_KIND_ATTR]: "x", ...attrs },
+  attributes: {
+    "event.name": eventName,
+    [CLAUDE_CODE_KIND_ATTR]: "x",
+    ...attrs,
+  },
   resourceAttributes: { "service.name": "claude-code" },
   scopeName: SCOPE,
   scopeVersion: "2.1.62",
@@ -53,7 +57,12 @@ const row = (
 // request body lands first, the anchor + response + tool_result later, and the
 // tool's output only appears in the NEXT model call's request body transcript.
 const turnRows = (): StoredLogRecordRow[] => [
-  row("user_prompt", { "session.id": "s", "prompt.id": "p", prompt: "List /tmp" }, 100, "aa00000000000001"),
+  row(
+    "user_prompt",
+    { "session.id": "s", "prompt.id": "p", prompt: "List /tmp" },
+    100,
+    "aa00000000000001",
+  ),
   row(
     "api_request_body",
     {
@@ -62,7 +71,9 @@ const turnRows = (): StoredLogRecordRow[] => [
       query_source: "repl_main_thread",
       body: JSON.stringify({
         model: "claude-opus-4-8",
-        messages: [{ role: "user", content: [{ type: "text", text: "List /tmp" }] }],
+        messages: [
+          { role: "user", content: [{ type: "text", text: "List /tmp" }] },
+        ],
       }),
     },
     200,
@@ -103,7 +114,9 @@ const turnRows = (): StoredLogRecordRow[] => [
       model: "claude-opus-4-8",
       request_id: "req_1",
       query_source: "repl_main_thread",
-      body: JSON.stringify({ content: [{ type: "text", text: "There are 3 files." }] }),
+      body: JSON.stringify({
+        content: [{ type: "text", text: "There are 3 files." }],
+      }),
     },
     1_200,
     "aa00000000000005",
@@ -121,7 +134,11 @@ const turnRows = (): StoredLogRecordRow[] => [
           {
             role: "user",
             content: [
-              { tool_use_id: "toolu_1", type: "tool_result", content: "a.txt\nb.txt\nc.txt" },
+              {
+                tool_use_id: "toolu_1",
+                type: "tool_result",
+                content: "a.txt\nb.txt\nc.txt",
+              },
             ],
           },
         ],
@@ -142,8 +159,11 @@ const logEvent = (): LogRecordReceivedEvent =>
   }) as unknown as LogRecordReceivedEvent;
 
 const spanType = (s: OtlpSpan): string | undefined =>
-  (s.attributes.find((a) => a.key === "langwatch.span.type")?.value as { stringValue?: string })
-    ?.stringValue;
+  (
+    s.attributes.find((a) => a.key === "langwatch.span.type")?.value as {
+      stringValue?: string;
+    }
+  )?.stringValue;
 const strAttr = (s: OtlpSpan, key: string): string | undefined =>
   (s.attributes.find((a) => a.key === key)?.value as { stringValue?: string })
     ?.stringValue;
@@ -212,7 +232,12 @@ const manyCallTurnRows = (calls: number): StoredLogRecordRow[] => {
   const rows: StoredLogRecordRow[] = [
     row(
       "user_prompt",
-      { "session.id": "s", "prompt.id": "p", prompt: "Do many things", "event.sequence": "0" },
+      {
+        "session.id": "s",
+        "prompt.id": "p",
+        prompt: "Do many things",
+        "event.sequence": "0",
+      },
       100,
       "aa00000000000001",
     ),
@@ -284,10 +309,10 @@ describe("createClaudeCodeSpanSyncReactor", () => {
   describe("when a claude_code log is folded over the whole turn", () => {
     it("emits a root turn span with the model + tool spans as complete children", async () => {
       const { reactor, recorded } = setup(turnRows());
-      await reactor.handle(logEvent(), {
+      await reactor.spec.handler(logEvent(), {
         tenantId: TENANT,
         aggregateId: TRACE,
-        foldState: undefined,
+        state: undefined,
       });
 
       const spans = recorded.map((r) => r.span);
@@ -321,11 +346,11 @@ describe("createClaudeCodeSpanSyncReactor", () => {
 
     it("re-fires idempotently: the same logs produce the same span ids", async () => {
       const { reactor, recorded } = setup(turnRows());
-      const ctx = { tenantId: TENANT, aggregateId: TRACE, foldState: undefined };
-      await reactor.handle(logEvent(), ctx);
+      const ctx = { tenantId: TENANT, aggregateId: TRACE, state: undefined };
+      await reactor.spec.handler(logEvent(), ctx);
       const firstIds = recorded.map((r) => r.span.spanId).sort();
       recorded.length = 0;
-      await reactor.handle(logEvent(), ctx);
+      await reactor.spec.handler(logEvent(), ctx);
       const secondIds = recorded.map((r) => r.span.spanId).sort();
       expect(secondIds).toEqual(firstIds);
     });
@@ -333,7 +358,8 @@ describe("createClaudeCodeSpanSyncReactor", () => {
 
   describe("the reactor gate", () => {
     it("ignores non-log events so the spans it emits never re-trigger it", async () => {
-      const { reactor, getMarkedClaudeCodeLogs, recordSpan } = setup(turnRows());
+      const { reactor, getMarkedClaudeCodeLogs, recordSpan } =
+        setup(turnRows());
       const spanEvent = {
         type: SPAN_RECEIVED_EVENT_TYPE,
         tenantId: TENANT,
@@ -341,10 +367,10 @@ describe("createClaudeCodeSpanSyncReactor", () => {
         occurredAt: 1,
         data: {},
       } as unknown as SpanReceivedEvent;
-      await reactor.handle(spanEvent, {
+      await reactor.spec.handler(spanEvent, {
         tenantId: TENANT,
         aggregateId: TRACE,
-        foldState: undefined,
+        state: undefined,
       });
       expect(getMarkedClaudeCodeLogs).not.toHaveBeenCalled();
       expect(recordSpan).not.toHaveBeenCalled();
@@ -359,10 +385,10 @@ describe("createClaudeCodeSpanSyncReactor", () => {
         occurredAt: 1,
         data: { scopeName: "com.openai.codex.events" },
       } as unknown as LogRecordReceivedEvent;
-      await reactor.handle(codexLog, {
+      await reactor.spec.handler(codexLog, {
         tenantId: TENANT,
         aggregateId: TRACE,
-        foldState: undefined,
+        state: undefined,
       });
       expect(getMarkedClaudeCodeLogs).not.toHaveBeenCalled();
     });
@@ -374,7 +400,7 @@ describe("createClaudeCodeSpanSyncReactor", () => {
       loggerMock.debug.mockClear();
     });
 
-    const ctx = { tenantId: TENANT, aggregateId: TRACE, foldState: undefined };
+    const ctx = { tenantId: TENANT, aggregateId: TRACE, state: undefined };
     const rootOf = (recorded: RecordSpanCommandData[]): OtlpSpan =>
       recorded.map((r) => r.span).find((s) => s.parentSpanId === null)!;
 
@@ -389,7 +415,7 @@ describe("createClaudeCodeSpanSyncReactor", () => {
           turnLogCap,
         );
 
-        await reactor.handle(logEvent(), ctx);
+        await reactor.spec.handler(logEvent(), ctx);
 
         // The read is bounded to cap+1 so an overflow is detectable without
         // materializing the whole turn.
@@ -424,7 +450,7 @@ describe("createClaudeCodeSpanSyncReactor", () => {
           countMarkedClaudeCodeLogs,
         );
 
-        await reactor.handle(logEvent(), ctx);
+        await reactor.spec.handler(logEvent(), ctx);
 
         expect(countMarkedClaudeCodeLogs).toHaveBeenCalledWith(
           TENANT,
@@ -448,7 +474,7 @@ describe("createClaudeCodeSpanSyncReactor", () => {
           countMarkedClaudeCodeLogs,
         );
 
-        await reactor.handle(logEvent(), ctx);
+        await reactor.spec.handler(logEvent(), ctx);
 
         // The truncation marker MUST still stamp, and the dropped count falls back
         // to the `fetched - cap` lower bound (7 - 6 = 1).
@@ -464,7 +490,7 @@ describe("createClaudeCodeSpanSyncReactor", () => {
         // Count dep returns the real total (13 rows), cap 6 -> dropped 7.
         const { reactor } = capSetup(manyCallTurnRows(4), 6);
 
-        await reactor.handle(logEvent(), ctx);
+        await reactor.spec.handler(logEvent(), ctx);
 
         expect(loggerMock.warn).toHaveBeenCalledTimes(1);
         const [payload] = loggerMock.warn.mock.calls[0]!;
@@ -482,7 +508,7 @@ describe("createClaudeCodeSpanSyncReactor", () => {
         // The full 6-row canonical turn under a generous cap.
         const { reactor, recorded } = capSetup(turnRows(), 2000);
 
-        await reactor.handle(logEvent(), ctx);
+        await reactor.spec.handler(logEvent(), ctx);
 
         const root = rootOf(recorded);
         expect(boolAttr(root, CLAUDE_TRUNCATED_LOGS_ATTR)).toBeUndefined();
@@ -496,7 +522,7 @@ describe("createClaudeCodeSpanSyncReactor", () => {
 
       it("does not warn when the turn fits under the cap", async () => {
         const { reactor } = capSetup(turnRows(), 2000);
-        await reactor.handle(logEvent(), ctx);
+        await reactor.spec.handler(logEvent(), ctx);
         expect(loggerMock.warn).not.toHaveBeenCalled();
       });
     });

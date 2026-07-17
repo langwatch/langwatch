@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NurturingService } from "../../../../../../../ee/billing/nurturing/nurturing.service";
 import type { ProjectService } from "../../../../../app-layer/projects/project.service";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   type CustomerIoTraceSyncReactorDeps,
@@ -21,7 +21,7 @@ vi.mock("@langwatch/observability", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 function createFoldState(
@@ -97,13 +97,13 @@ function createEvent(
 }
 
 function createContext(
-  foldState: TraceSummaryData,
+  state: TraceSummaryData,
   tenantId = "project-1",
-): ReactorContext<TraceSummaryData> {
+): TriggerContext<TraceSummaryData> {
   return {
     tenantId,
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
@@ -149,19 +149,14 @@ describe("customerIoTraceSync reactor", () => {
     vi.useRealTimers();
   });
 
-  describe("makeJobId", () => {
+  describe("dedup identity", () => {
     /** @scenario 'Trace sync reactor uses project-scoped job ID for debouncing' */
-    it("returns cio-trace-sync-{projectId}", () => {
+    it("collapses per project (tenantId), not per trace", () => {
       const deps = createDeps();
       const reactor = createCustomerIoTraceSyncReactor(deps);
       const event = createEvent({ tenantId: "project-42" });
 
-      const jobId = reactor.options!.makeJobId!({
-        event,
-        foldState: createFoldState(),
-      });
-
-      expect(jobId).toBe("cio-trace-sync-project-42");
+      expect(reactor.spec.dedupId!(event)).toBe("project-42");
     });
   });
 
@@ -181,7 +176,7 @@ describe("customerIoTraceSync reactor", () => {
           },
         });
 
-        await reactor.handle(createEvent(), createContext(state));
+        await reactor.spec.handler(createEvent(), createContext(state));
 
         expect(deps.nurturing.identifyUser).toHaveBeenCalledWith({
           userId: "user-1",
@@ -205,7 +200,7 @@ describe("customerIoTraceSync reactor", () => {
           },
         });
 
-        await reactor.handle(createEvent(), createContext(state));
+        await reactor.spec.handler(createEvent(), createContext(state));
 
         expect(deps.nurturing.trackEvent).toHaveBeenCalledWith({
           userId: "user-1",
@@ -237,7 +232,7 @@ describe("customerIoTraceSync reactor", () => {
         const traceTime = new Date("2026-03-15T10:00:00Z").getTime();
         const state = createFoldState({ spanCount: 5, occurredAt: traceTime });
 
-        await reactor.handle(createEvent(), createContext(state));
+        await reactor.spec.handler(createEvent(), createContext(state));
 
         expect(deps.nurturing.identifyUser).toHaveBeenCalledWith({
           userId: "user-1",
@@ -260,7 +255,7 @@ describe("customerIoTraceSync reactor", () => {
         const reactor = createCustomerIoTraceSyncReactor(deps);
         const state = createFoldState({ spanCount: 5 });
 
-        await reactor.handle(createEvent(), createContext(state));
+        await reactor.spec.handler(createEvent(), createContext(state));
 
         expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();
       });
@@ -280,7 +275,10 @@ describe("customerIoTraceSync reactor", () => {
       });
       const reactor = createCustomerIoTraceSyncReactor(deps);
 
-      await reactor.handle(createEvent(), createContext(createFoldState()));
+      await reactor.spec.handler(
+        createEvent(),
+        createContext(createFoldState()),
+      );
 
       expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
       expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();
@@ -300,7 +298,10 @@ describe("customerIoTraceSync reactor", () => {
       });
       const reactor = createCustomerIoTraceSyncReactor(deps);
 
-      await reactor.handle(createEvent(), createContext(createFoldState()));
+      await reactor.spec.handler(
+        createEvent(),
+        createContext(createFoldState()),
+      );
 
       expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
     });
@@ -317,7 +318,7 @@ describe("customerIoTraceSync reactor", () => {
 
       // Should not throw
       await expect(
-        reactor.handle(createEvent(), createContext(createFoldState())),
+        reactor.spec.handler(createEvent(), createContext(createFoldState())),
       ).resolves.toBeUndefined();
     });
   });
@@ -328,7 +329,10 @@ describe("customerIoTraceSync reactor", () => {
       const deps = createDeps();
       const reactor = createCustomerIoTraceSyncReactor(deps);
 
-      await reactor.handle(createEvent(), createContext(createFoldState()));
+      await reactor.spec.handler(
+        createEvent(),
+        createContext(createFoldState()),
+      );
 
       expect(deps.projects.resolveOrgAdmin).toHaveBeenCalledWith("project-1");
     });

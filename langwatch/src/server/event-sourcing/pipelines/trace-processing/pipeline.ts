@@ -12,9 +12,10 @@ import {
 } from "~/server/app-layer/triggers/process-manager/triggerSettlement.process";
 import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/app-layer/triggers/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
+import type { SubscriberSpec } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
+import type { TraceSummarySubscriber } from "./reactors/_originGuardedSubscriber";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -72,31 +73,13 @@ export interface TraceProcessingPipelineDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** ADR-034 Phase 2: slim per-trace fold writer (silent dual-tap, no read path). */
   traceAnalyticsStore: FoldProjectionStore<TraceAnalyticsData>;
-  originGateReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  evaluationTriggerReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  customEvaluationSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  traceUpdateBroadcastReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  projectMetadataReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  simulationMetricsSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  experimentMetricsSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  originGateReactor: TraceSummarySubscriber;
+  evaluationTriggerReactor: TraceSummarySubscriber;
+  customEvaluationSyncReactor: TraceSummarySubscriber;
+  traceUpdateBroadcastReactor: TraceSummarySubscriber;
+  projectMetadataReactor: TraceSummarySubscriber;
+  simulationMetricsSyncReactor: TraceSummarySubscriber;
+  experimentMetricsSyncReactor: TraceSummarySubscriber;
   /**
    * ADR-052: the automation reactions. The triggerSettlement process
    * manager (settle debounce + cadence digest) is MOUNTED here with its
@@ -113,16 +96,16 @@ export interface TraceProcessingPipelineDeps {
       context: { tenantId: string },
     ) => Promise<void>;
   };
-  spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
-  claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
-  customerIoTraceSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  gatewayBudgetSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  spanStorageBroadcastReactor: {
+    name: string;
+    spec: SubscriberSpec<TraceProcessingEvent>;
+  };
+  claudeCodeSpanSyncReactor: {
+    name: string;
+    spec: SubscriberSpec<TraceProcessingEvent>;
+  };
+  customerIoTraceSyncReactor?: TraceSummarySubscriber;
+  gatewayBudgetSyncReactor?: TraceSummarySubscriber;
   /**
    * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
    * commands (fetch from S3 spool) and best-effort delete the spool after
@@ -146,18 +129,9 @@ export interface TraceProcessingPipelineDeps {
    * run on their own aggregate-keyed queue. See logCommandGroupKey.ts.
    */
   logCommandShardCount?: number;
-  governanceKpisSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  retentionOrphanSweepReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  governanceOcsfEventsSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  governanceKpisSyncReactor?: TraceSummarySubscriber;
+  retentionOrphanSweepReactor?: TraceSummarySubscriber;
+  governanceOcsfEventsSyncReactor?: TraceSummarySubscriber;
 }
 
 /**
@@ -209,81 +183,72 @@ export function createTraceProcessingPipeline(
         store: deps.metricRecordAppendStore,
       }),
     )
-    .withReactor("traceSummary", "originGate", deps.originGateReactor)
-    .withReactor(
-      "traceSummary",
-      "evaluationTrigger",
-      deps.evaluationTriggerReactor,
+    .withSubscriber(deps.originGateReactor.name, deps.originGateReactor.spec)
+    .withSubscriber(
+      deps.evaluationTriggerReactor.name,
+      deps.evaluationTriggerReactor.spec,
     )
-    .withReactor(
-      "traceSummary",
-      "customEvaluationSync",
-      deps.customEvaluationSyncReactor,
+    .withSubscriber(
+      deps.customEvaluationSyncReactor.name,
+      deps.customEvaluationSyncReactor.spec,
     )
-    .withReactor(
-      "traceSummary",
-      "traceUpdateBroadcast",
-      deps.traceUpdateBroadcastReactor,
+    .withSubscriber(
+      deps.traceUpdateBroadcastReactor.name,
+      deps.traceUpdateBroadcastReactor.spec,
     )
-    .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
-    .withReactor(
-      "traceSummary",
-      "simulationMetricsSync",
-      deps.simulationMetricsSyncReactor,
+    .withSubscriber(
+      deps.projectMetadataReactor.name,
+      deps.projectMetadataReactor.spec,
     )
-    .withReactor(
-      "traceSummary",
-      "experimentMetricsSync",
-      deps.experimentMetricsSyncReactor,
+    .withSubscriber(
+      deps.simulationMetricsSyncReactor.name,
+      deps.simulationMetricsSyncReactor.spec,
     )
-    .withReactor(
-      "spanStorage",
-      "spanStorageBroadcast",
-      deps.spanStorageBroadcastReactor,
+    .withSubscriber(
+      deps.experimentMetricsSyncReactor.name,
+      deps.experimentMetricsSyncReactor.spec,
     )
-    .withReactor(
-      "logRecordStorage",
-      "claudeCodeSpanSync",
-      deps.claudeCodeSpanSyncReactor,
+    .withSubscriber(
+      deps.spanStorageBroadcastReactor.name,
+      deps.spanStorageBroadcastReactor.spec,
+    )
+    .withSubscriber(
+      deps.claudeCodeSpanSyncReactor.name,
+      deps.claudeCodeSpanSyncReactor.spec,
     );
 
   if (deps.customerIoTraceSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "customerIoTraceSync",
-      deps.customerIoTraceSyncReactor,
+    builder = builder.withSubscriber(
+      deps.customerIoTraceSyncReactor.name,
+      deps.customerIoTraceSyncReactor.spec,
     );
   }
 
   if (deps.gatewayBudgetSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "gatewayBudgetSync",
-      deps.gatewayBudgetSyncReactor,
+    builder = builder.withSubscriber(
+      deps.gatewayBudgetSyncReactor.name,
+      deps.gatewayBudgetSyncReactor.spec,
     );
   }
 
   if (deps.governanceKpisSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "governanceKpisSync",
-      deps.governanceKpisSyncReactor,
+    builder = builder.withSubscriber(
+      deps.governanceKpisSyncReactor.name,
+      deps.governanceKpisSyncReactor.spec,
     );
   }
 
   if (deps.governanceOcsfEventsSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "governanceOcsfEventsSync",
-      deps.governanceOcsfEventsSyncReactor,
+    builder = builder.withSubscriber(
+      deps.governanceOcsfEventsSyncReactor.name,
+      deps.governanceOcsfEventsSyncReactor.spec,
     );
   }
 
   if (deps.retentionOrphanSweepReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "retentionOrphanSweep",
-      deps.retentionOrphanSweepReactor,
+    builder = builder.withSubscriber(
+      deps.retentionOrphanSweepReactor.name,
+      deps.retentionOrphanSweepReactor.spec,
     );
   }
 

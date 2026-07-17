@@ -46,9 +46,16 @@ vi.mock("../commands/recordSpanCommand", async (importOriginal) => {
  * store / reactor is ever invoked.
  */
 
-const reactorStub = (name: string) => ({ name, handle: async () => {} }) as any;
-const outboxReactorStub = (name: string) =>
-  ({ name, decide: async () => [] }) as any;
+const subscriberStub = (name: string, projection = "traceSummary") =>
+  ({
+    name,
+    spec: { fold: projection, handler: async () => {} },
+  }) as any;
+const mapSubscriberStub = (name: string, projection: string) =>
+  ({
+    name,
+    spec: { map: projection, handler: async () => {} },
+  }) as any;
 
 function buildTraceDeps(
   overrides: Partial<TraceProcessingPipelineDeps> = {},
@@ -61,22 +68,21 @@ function buildTraceDeps(
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
-    originGateReactor: reactorStub("originGate"),
-    evaluationTriggerReactor: reactorStub("evaluationTrigger"),
-    customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
-    traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
-    projectMetadataReactor: reactorStub("projectMetadata"),
-    simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),
-    experimentMetricsSyncReactor: reactorStub("experimentMetricsSync"),
-    alertTriggerReactor: outboxReactorStub("alertTrigger"),
-    alertTriggerNotifyOutboxReactor: outboxReactorStub(
-      "alertTriggerNotifyOutbox",
+    originGateReactor: subscriberStub("originGate"),
+    evaluationTriggerReactor: subscriberStub("evaluationTrigger"),
+    customEvaluationSyncReactor: subscriberStub("customEvaluationSync"),
+    traceUpdateBroadcastReactor: subscriberStub("traceUpdateBroadcast"),
+    projectMetadataReactor: subscriberStub("projectMetadata"),
+    simulationMetricsSyncReactor: subscriberStub("simulationMetricsSync"),
+    experimentMetricsSyncReactor: subscriberStub("experimentMetricsSync"),
+        spanStorageBroadcastReactor: mapSubscriberStub(
+      "spanStorageBroadcast",
+      "spanStorage",
     ),
-    graphTriggerEvaluationOutboxReactor: outboxReactorStub(
-      "graphTriggerEvaluation",
+    claudeCodeSpanSyncReactor: mapSubscriberStub(
+      "claudeCodeSpanSync",
+      "logRecordStorage",
     ),
-    spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
-    claudeCodeSpanSyncReactor: reactorStub("claudeCodeSpanSync"),
     ...overrides,
   };
 }

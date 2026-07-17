@@ -1,4 +1,5 @@
 import { definePipeline } from "../../";
+import type { SubscriberSpec } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
@@ -18,33 +19,24 @@ import {
 } from "./projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "./schemas/events";
 
+/** A named best-effort subscriber attachment (ADR-052). */
+export interface SimulationSubscriber {
+  name: string;
+  spec: SubscriberSpec<SimulationProcessingEvent>;
+}
+
 export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
-  snapshotUpdateBroadcastReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
-  cancellationBroadcastReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
+  snapshotUpdateBroadcastSubscriber: SimulationSubscriber;
+  cancellationBroadcastSubscriber: SimulationSubscriber;
   scenarioExecutionReactor: ReactorDefinition<
     SimulationProcessingEvent,
     SimulationRunStateData
   >;
-  suiteRunSyncReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
-  traceMetricsSyncReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
+  suiteRunSyncSubscriber: SimulationSubscriber;
+  traceMetricsSyncSubscriber: SimulationSubscriber;
   computeRunMetricsCommand: ComputeRunMetricsCommand;
-  customerIoSimulationSyncReactor?: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
+  customerIoSimulationSyncSubscriber?: SimulationSubscriber;
 }
 
 /**
@@ -77,21 +69,21 @@ export function createSimulationProcessingPipeline(
         store: deps.simulationRunStore,
       }),
     )
-    .withReactor(
-      "simulationRunState",
-      "snapshotUpdateBroadcast",
-      deps.snapshotUpdateBroadcastReactor,
+    .withSubscriber(
+      deps.snapshotUpdateBroadcastSubscriber.name,
+      deps.snapshotUpdateBroadcastSubscriber.spec,
     )
-    .withReactor(
-      "simulationRunState",
-      "cancellationBroadcast",
-      deps.cancellationBroadcastReactor,
+    .withSubscriber(
+      deps.cancellationBroadcastSubscriber.name,
+      deps.cancellationBroadcastSubscriber.spec,
     )
-    .withReactor("simulationRunState", "suiteRunSync", deps.suiteRunSyncReactor)
-    .withReactor(
-      "simulationRunState",
-      "traceMetricsSync",
-      deps.traceMetricsSyncReactor,
+    .withSubscriber(
+      deps.suiteRunSyncSubscriber.name,
+      deps.suiteRunSyncSubscriber.spec,
+    )
+    .withSubscriber(
+      deps.traceMetricsSyncSubscriber.name,
+      deps.traceMetricsSyncSubscriber.spec,
     )
     .withReactor(
       "simulationRunState",
@@ -99,11 +91,10 @@ export function createSimulationProcessingPipeline(
       deps.scenarioExecutionReactor,
     );
 
-  if (deps.customerIoSimulationSyncReactor) {
-    builder = builder.withReactor(
-      "simulationRunState",
-      "customerIoSimulationSync",
-      deps.customerIoSimulationSyncReactor,
+  if (deps.customerIoSimulationSyncSubscriber) {
+    builder = builder.withSubscriber(
+      deps.customerIoSimulationSyncSubscriber.name,
+      deps.customerIoSimulationSyncSubscriber.spec,
     );
   }
 

@@ -1,11 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type {
-  ReactorContext,
-  ReactorDefinition,
-} from "../../../reactors/reactor.types";
 import type { ComputeRunMetricsCommandData } from "../../simulation-processing/schemas/commands";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceSummarySubscriber } from "./_originGuardedSubscriber";
 
 const logger = createLogger(
   "langwatch:trace-processing:simulation-metrics-publisher",
@@ -28,8 +24,8 @@ export interface SimulationMetricsSyncReactorDeps {
  * in their hoisted span attributes.
  */
 /**
- * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
- * (fail-open path): only simulation traces (scenario.run_id present)
+ * Pure relevance guard, run at the top of the handler against the committed
+ * fold state: only simulation traces (scenario.run_id present)
  * with something to aggregate need this reactor. Role cost/latency are
  * no longer accumulated on the fold; computeRunMetrics derives them
  * per-trace from stored_spans, so we dispatch in pull mode rather than
@@ -42,47 +38,43 @@ function hasSimulationMetrics(foldState: TraceSummaryData): boolean {
 
 export function createSimulationMetricsSyncReactor(
   deps: SimulationMetricsSyncReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+): TraceSummarySubscriber {
   return {
     name: "simulationMetricsSync",
-    shouldReact: (_event, context) => hasSimulationMetrics(context.foldState),
-    options: {
-      makeJobId: (payload) =>
-        `sim-metrics:${payload.event.tenantId}:${payload.event.aggregateId}`,
+    spec: {
+      fold: "traceSummary",
       ttl: 60_000,
       delay: 60_000,
-    },
+      handler: async (_event, context) => {
+        const { tenantId, state: foldState } = context;
+        // Relevance guard needs fold state, so it runs here rather than in a
+        // pre-enqueue `when`.
+        if (!hasSimulationMetrics(foldState)) return;
 
-    async handle(
-      _event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
-      const { tenantId, foldState } = context;
-      if (!hasSimulationMetrics(foldState)) return;
+        const scenarioRunId = foldState.attributes["scenario.run_id"]!;
 
-      const scenarioRunId = foldState.attributes["scenario.run_id"]!;
+        const traceId = foldState.traceId;
 
-      const traceId = foldState.traceId;
-
-      logger.debug(
-        { traceId, tenantId, scenarioRunId },
-        "Publishing trace metrics to simulation run (derived on compute)",
-      );
-
-      try {
-        await deps.computeRunMetrics({
-          tenantId,
-          scenarioRunId,
-          traceId,
-          retryCount: 0,
-          occurredAt: Date.now(),
-        });
-      } catch (error) {
-        logger.warn(
-          { traceId, tenantId, scenarioRunId, error },
-          "Failed to dispatch computeRunMetrics from trace-side reactor",
+        logger.debug(
+          { traceId, tenantId, scenarioRunId },
+          "Publishing trace metrics to simulation run (derived on compute)",
         );
-      }
+
+        try {
+          await deps.computeRunMetrics({
+            tenantId,
+            scenarioRunId,
+            traceId,
+            retryCount: 0,
+            occurredAt: Date.now(),
+          });
+        } catch (error) {
+          logger.warn(
+            { traceId, tenantId, scenarioRunId, error },
+            "Failed to dispatch computeRunMetrics from trace-side reactor",
+          );
+        }
+      },
     },
   };
 }

@@ -7,12 +7,7 @@ import {
   OCSF_SEVERITY,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type {
-  ReactorContext,
-  ReactorDefinition,
-} from "~/server/event-sourcing/reactors/reactor.types";
+import type { TraceSummarySubscriber } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedSubscriber";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger(
@@ -70,128 +65,123 @@ export interface GovernanceOcsfEventsSyncReactorDeps {
  */
 export function createGovernanceOcsfEventsSyncReactor(
   deps: GovernanceOcsfEventsSyncReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+): TraceSummarySubscriber {
   return {
     name: "governanceOcsfEventsSync",
-    options: {
-      makeJobId: (payload) =>
-        `governance-ocsf-events-sync-${payload.event.tenantId}-${payload.event.aggregateId}`,
+    spec: {
+      fold: "traceSummary",
       ttl: GOVERNANCE_OCSF_EVENTS_SYNC_DEBOUNCE_TTL_MS,
-    },
+      handler: async (_event, context) => {
+        const { tenantId, state: foldState } = context;
 
-    async handle(
-      _event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
-      const { tenantId, foldState } = context;
+        const originKind = foldState.attributes[ATTR_ORIGIN_KIND];
+        if (originKind !== ORIGIN_KIND_VALUE) {
+          return;
+        }
 
-      const originKind = foldState.attributes[ATTR_ORIGIN_KIND];
-      if (originKind !== ORIGIN_KIND_VALUE) {
-        return;
-      }
-
-      const sourceId = foldState.attributes[ATTR_INGESTION_SOURCE_ID];
-      if (!sourceId) {
-        logger.warn(
-          {
-            tenantId,
-            traceId: foldState.traceId,
-          },
-          "governance trace missing langwatch.ingestion_source.id — skipping OCSF fold",
-        );
-        return;
-      }
-
-      const occurredAtMs = foldState.occurredAt;
-      if (!occurredAtMs || occurredAtMs <= 0) {
-        return;
-      }
-
-      try {
-        const sourceType =
-          foldState.attributes[ATTR_INGESTION_SOURCE_TYPE] ?? "unknown";
-        const actorUserId = foldState.attributes[ATTR_USER_ID] ?? "";
-        const actorEmail = foldState.attributes[ATTR_USER_EMAIL] ?? "";
-        const actorEnduserId = foldState.attributes[ATTR_ENDUSER_ID] ?? "";
-
-        // Action: prefer the trace's first model invocation as the verb.
-        // For non-LLM activity (tool calls, agent CRUD), action will fall
-        // back to a generic "trace.recorded" — better than empty.
-        const actionName =
-          foldState.attributes[ATTR_TOOL_NAME] ?? "trace.recorded";
-
-        // Target: prefer gen_ai.request.model for LLM invocations; fall
-        // back to the rolled-up Models[0] from the fold state. For
-        // non-LLM events, Models[] may be empty — empty target is
-        // acceptable per OCSF spec (target is optional).
-        const targetName =
-          foldState.attributes[ATTR_GEN_AI_REQUEST_MODEL] ??
-          foldState.models[0] ??
-          "";
-
-        const anomalyAlertId =
-          foldState.attributes[ATTR_ANOMALY_ALERT_ID] ?? "";
-        const severityId = anomalyAlertId
-          ? OCSF_SEVERITY.MEDIUM
-          : OCSF_SEVERITY.INFO;
-
-        const eventTime = new Date(occurredAtMs);
-        const rawOcsfJson = JSON.stringify({
-          class_uid: 6003,
-          category_uid: 6,
-          activity_id: OCSF_ACTIVITY.INVOKE,
-          type_uid: 6003 * 100 + OCSF_ACTIVITY.INVOKE,
-          severity_id: severityId,
-          time: occurredAtMs,
-          actor: {
-            user: { uid: actorUserId, email_addr: actorEmail },
-            enduser: { uid: actorEnduserId },
-          },
-          api: { operation: actionName },
-          dst_endpoint: { name: targetName },
-          metadata: {
-            product: { name: "LangWatch", vendor_name: "LangWatch" },
-            extension: {
-              uid: "langwatch.governance",
-              source_type: sourceType,
-              source_id: sourceId,
-              trace_id: foldState.traceId,
-              anomaly_alert_id: anomalyAlertId || undefined,
+        const sourceId = foldState.attributes[ATTR_INGESTION_SOURCE_ID];
+        if (!sourceId) {
+          logger.warn(
+            {
+              tenantId,
+              traceId: foldState.traceId,
             },
-          },
-        });
+            "governance trace missing langwatch.ingestion_source.id — skipping OCSF fold",
+          );
+          return;
+        }
 
-        const row: GovernanceOcsfEventInput = {
-          tenantId,
-          eventId: foldState.traceId,
-          traceId: foldState.traceId,
-          sourceId,
-          sourceType,
-          activityId: OCSF_ACTIVITY.INVOKE,
-          severityId,
-          eventTime,
-          actorUserId,
-          actorEmail,
-          actorEnduserId,
-          actionName,
-          targetName,
-          anomalyAlertId,
-          rawOcsfJson,
-        };
+        const occurredAtMs = foldState.occurredAt;
+        if (!occurredAtMs || occurredAtMs <= 0) {
+          return;
+        }
 
-        await deps.governanceOcsfEventsRepository.insertEvent(row);
-      } catch (error) {
-        logger.error(
-          {
+        try {
+          const sourceType =
+            foldState.attributes[ATTR_INGESTION_SOURCE_TYPE] ?? "unknown";
+          const actorUserId = foldState.attributes[ATTR_USER_ID] ?? "";
+          const actorEmail = foldState.attributes[ATTR_USER_EMAIL] ?? "";
+          const actorEnduserId = foldState.attributes[ATTR_ENDUSER_ID] ?? "";
+
+          // Action: prefer the trace's first model invocation as the verb.
+          // For non-LLM activity (tool calls, agent CRUD), action will fall
+          // back to a generic "trace.recorded" — better than empty.
+          const actionName =
+            foldState.attributes[ATTR_TOOL_NAME] ?? "trace.recorded";
+
+          // Target: prefer gen_ai.request.model for LLM invocations; fall
+          // back to the rolled-up Models[0] from the fold state. For
+          // non-LLM events, Models[] may be empty — empty target is
+          // acceptable per OCSF spec (target is optional).
+          const targetName =
+            foldState.attributes[ATTR_GEN_AI_REQUEST_MODEL] ??
+            foldState.models[0] ??
+            "";
+
+          const anomalyAlertId =
+            foldState.attributes[ATTR_ANOMALY_ALERT_ID] ?? "";
+          const severityId = anomalyAlertId
+            ? OCSF_SEVERITY.MEDIUM
+            : OCSF_SEVERITY.INFO;
+
+          const eventTime = new Date(occurredAtMs);
+          const rawOcsfJson = JSON.stringify({
+            class_uid: 6003,
+            category_uid: 6,
+            activity_id: OCSF_ACTIVITY.INVOKE,
+            type_uid: 6003 * 100 + OCSF_ACTIVITY.INVOKE,
+            severity_id: severityId,
+            time: occurredAtMs,
+            actor: {
+              user: { uid: actorUserId, email_addr: actorEmail },
+              enduser: { uid: actorEnduserId },
+            },
+            api: { operation: actionName },
+            dst_endpoint: { name: targetName },
+            metadata: {
+              product: { name: "LangWatch", vendor_name: "LangWatch" },
+              extension: {
+                uid: "langwatch.governance",
+                source_type: sourceType,
+                source_id: sourceId,
+                trace_id: foldState.traceId,
+                anomaly_alert_id: anomalyAlertId || undefined,
+              },
+            },
+          });
+
+          const row: GovernanceOcsfEventInput = {
             tenantId,
-            sourceId,
+            eventId: foldState.traceId,
             traceId: foldState.traceId,
-            error,
-          },
-          "failed to fold governance trace into governance_ocsf_events",
-        );
-        captureException(toError(error));
-      }
+            sourceId,
+            sourceType,
+            activityId: OCSF_ACTIVITY.INVOKE,
+            severityId,
+            eventTime,
+            actorUserId,
+            actorEmail,
+            actorEnduserId,
+            actionName,
+            targetName,
+            anomalyAlertId,
+            rawOcsfJson,
+          };
+
+          await deps.governanceOcsfEventsRepository.insertEvent(row);
+        } catch (error) {
+          logger.error(
+            {
+              tenantId,
+              sourceId,
+              traceId: foldState.traceId,
+              error,
+            },
+            "failed to fold governance trace into governance_ocsf_events",
+          );
+          captureException(toError(error));
+        }
+      },
     },
   };
 }

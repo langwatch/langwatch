@@ -90,12 +90,12 @@ import {
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
-import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
+import { createCancellationBroadcastSubscriber } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
 import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
-import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
-import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
-import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
+import { createSnapshotUpdateBroadcastSubscriber } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
+import { createSuiteRunSyncSubscriber } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
+import { createTraceMetricsSyncSubscriber } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
@@ -949,21 +949,21 @@ export class PipelineRegistry {
       ),
       "simulation_runs",
     );
-    const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
-      {
+    const snapshotUpdateBroadcastSubscriber =
+      createSnapshotUpdateBroadcastSubscriber({
         broadcast: this.deps.broadcast,
-        hasRedis: !!this.deps.eventSourcing.redisConnection,
+      });
+
+    const cancellationBroadcastSubscriber = createCancellationBroadcastSubscriber(
+      {
+        publisher: this.deps.eventSourcing.redisConnection ?? null,
       },
     );
-
-    const cancellationBroadcastReactor = createCancellationBroadcastReactor({
-      publisher: this.deps.eventSourcing.redisConnection ?? null,
-    });
 
     const scenarioExecutionHandle = createScenarioExecutionReactor();
 
     const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
-    const suiteRunSyncReactor = createSuiteRunSyncReactor({
+    const suiteRunSyncSubscriber = createSuiteRunSyncSubscriber({
       recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
       completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
     });
@@ -986,18 +986,18 @@ export class PipelineRegistry {
         traceReadDerivation.deriveScenarioRoleMetrics(params),
     });
 
-    const traceMetricsSyncReactor = createTraceMetricsSyncReactor({
+    const traceMetricsSyncSubscriber = createTraceMetricsSyncSubscriber({
       computeRunMetrics: selfComputeRunMetrics.fn,
     });
 
     const simulationPipeline = this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
-        snapshotUpdateBroadcastReactor,
-        cancellationBroadcastReactor,
+        snapshotUpdateBroadcastSubscriber,
+        cancellationBroadcastSubscriber,
         scenarioExecutionReactor: scenarioExecutionHandle.reactor,
-        suiteRunSyncReactor,
-        traceMetricsSyncReactor,
+        suiteRunSyncSubscriber,
+        traceMetricsSyncSubscriber,
         computeRunMetricsCommand,
       }),
     );

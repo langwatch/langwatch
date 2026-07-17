@@ -26,7 +26,7 @@ import type { GovernanceKpisClickHouseRepository } from "@ee/governance/services
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,
@@ -43,11 +43,12 @@ vi.mock("@langwatch/observability", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 const FIXED_OCCURRED_AT_MS = 1_700_000_000_000; // 2023-11-14T22:13:20Z
-const EXPECTED_HOUR_BUCKET_MS = 1_700_000_000_000 - (1_700_000_000_000 % 3_600_000);
+const EXPECTED_HOUR_BUCKET_MS =
+  1_700_000_000_000 - (1_700_000_000_000 % 3_600_000);
 
 function createFoldState(
   attributes: Record<string, string> = {},
@@ -119,11 +120,11 @@ function mockDeps(): {
   };
 }
 
-function ctx(foldState: TraceSummaryData): ReactorContext<TraceSummaryData> {
+function ctx(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "gov-project-1",
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
@@ -136,7 +137,7 @@ describe("governanceKpisSync reactor", () => {
       const reactor = createGovernanceKpisSyncReactor(deps);
       const state = createFoldState({});
 
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -150,7 +151,7 @@ describe("governanceKpisSync reactor", () => {
         "langwatch.origin.kind": "personal_workspace",
       });
 
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -164,7 +165,7 @@ describe("governanceKpisSync reactor", () => {
         "langwatch.origin.kind": "ingestion_source",
       });
 
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -183,7 +184,7 @@ describe("governanceKpisSync reactor", () => {
         { occurredAt: 0 },
       );
 
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -199,7 +200,7 @@ describe("governanceKpisSync reactor", () => {
         "langwatch.ingestion_source.source_type": "claude_cowork",
       });
 
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
 
       expect(insertContribution).toHaveBeenCalledTimes(1);
       const [row] = insertContribution.mock.calls[0]!;
@@ -224,7 +225,7 @@ describe("governanceKpisSync reactor", () => {
         "langwatch.ingestion_source.id": "is-2",
       });
 
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
 
       expect(insertContribution).toHaveBeenCalledTimes(1);
       const [row] = insertContribution.mock.calls[0]!;
@@ -246,7 +247,7 @@ describe("governanceKpisSync reactor", () => {
         { occurredAt: occurredAtMs },
       );
 
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
 
       const [row] = insertContribution.mock.calls[0]!;
       expect(row.hourBucket.getTime()).toBe(expectedHourBucketMs);
@@ -268,7 +269,7 @@ describe("governanceKpisSync reactor", () => {
         },
       );
 
-      await reactor.handle(event, ctx(state));
+      await reactor.spec.handler(event, ctx(state));
 
       const [row] = insertContribution.mock.calls[0]!;
       expect(row.spendUsd).toBe(0);
@@ -294,21 +295,22 @@ describe("governanceKpisSync reactor", () => {
         "langwatch.ingestion_source.source_type": "otel_generic",
       });
 
-      await expect(reactor.handle(event, ctx(state))).resolves.toBeUndefined();
+      await expect(
+        reactor.spec.handler(event, ctx(state)),
+      ).resolves.toBeUndefined();
       expect(insertContribution).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("dedup contract", () => {
-    it("declares a per-(tenant, trace) job-id for BullMQ debounce", () => {
+    it("collapses per (tenant, trace) via the default dedup identity", () => {
       const { deps } = mockDeps();
       const reactor = createGovernanceKpisSyncReactor(deps);
-      expect(reactor.options?.makeJobId).toBeDefined();
-      const jobId = reactor.options!.makeJobId!({
-        event: { tenantId: "t-1", aggregateId: "trace-x" },
-      } as any);
-      expect(jobId).toBe("governance-kpis-sync-t-1-trace-x");
-      expect(reactor.options?.ttl).toBeGreaterThan(0);
+      // No custom dedupId — the framework's default collapse identity is
+      // `subscriber:<name>:<tenantId>:<aggregateId>`, i.e. per (tenant, trace).
+      expect(reactor.spec.fold).toBe("traceSummary");
+      expect(reactor.spec.dedupId).toBeUndefined();
+      expect(reactor.spec.ttl).toBeGreaterThan(0);
     });
   });
 });

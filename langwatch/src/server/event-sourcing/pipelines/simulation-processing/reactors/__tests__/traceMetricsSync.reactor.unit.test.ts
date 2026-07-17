@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { createTraceMetricsSyncReactor } from "../traceMetricsSync.reactor";
-import type { TraceMetricsSyncReactorDeps } from "../traceMetricsSync.reactor";
+import { createTraceMetricsSyncSubscriber } from "../traceMetricsSync.reactor";
+import type { TraceMetricsSyncSubscriberDeps } from "../traceMetricsSync.reactor";
 import type { SimulationRunStateData } from "../../projections/simulationRunState.foldProjection";
+import { SIMULATION_RUN_EVENT_TYPES } from "../../schemas/constants";
 import { createTenantId } from "../../../../domain/tenantId";
 
 const TEST_TENANT = createTenantId("tenant-1");
 
-function makeDeps(overrides: Partial<TraceMetricsSyncReactorDeps> = {}): TraceMetricsSyncReactorDeps {
+function makeDeps(overrides: Partial<TraceMetricsSyncSubscriberDeps> = {}): TraceMetricsSyncSubscriberDeps {
   return {
     computeRunMetrics: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -65,7 +66,13 @@ function makeFinishedEvent() {
   } as any;
 }
 
-describe("traceMetricsSync reactor (simulation-side)", () => {
+describe("traceMetricsSync subscriber (simulation-side)", () => {
+  it("subscribes only to FINISHED events", () => {
+    const { spec } = createTraceMetricsSyncSubscriber(makeDeps());
+
+    expect(spec.events).toEqual([SIMULATION_RUN_EVENT_TYPES.FINISHED]);
+  });
+
   describe("when computeRunMetrics dispatch fails", () => {
     it("rethrows so the GroupQueue retries", async () => {
       const dispatchError = new Error("Redis connection lost");
@@ -73,13 +80,13 @@ describe("traceMetricsSync reactor (simulation-side)", () => {
         computeRunMetrics: vi.fn().mockRejectedValue(dispatchError),
       });
 
-      const reactor = createTraceMetricsSyncReactor(deps);
+      const { spec } = createTraceMetricsSyncSubscriber(deps);
 
       await expect(
-        reactor.handle(makeFinishedEvent(), {
+        spec.handler(makeFinishedEvent(), {
           tenantId: TEST_TENANT,
           aggregateId: "run-1",
-          foldState: makeSimState(),
+          state: makeSimState(),
         }),
       ).rejects.toThrow("Redis connection lost");
     });
@@ -88,12 +95,12 @@ describe("traceMetricsSync reactor (simulation-side)", () => {
   describe("when trace already has metrics in TraceMetrics", () => {
     it("skips the trace", async () => {
       const deps = makeDeps();
-      const reactor = createTraceMetricsSyncReactor(deps);
+      const { spec } = createTraceMetricsSyncSubscriber(deps);
 
-      await reactor.handle(makeFinishedEvent(), {
+      await spec.handler(makeFinishedEvent(), {
         tenantId: TEST_TENANT,
         aggregateId: "run-1",
-        foldState: makeSimState({
+        state: makeSimState({
           TraceMetrics: {
             "trace-1": { totalCost: 0.003, roleCosts: { Agent: 0.003 }, roleLatencies: { Agent: 4000 } },
           },
@@ -107,12 +114,12 @@ describe("traceMetricsSync reactor (simulation-side)", () => {
   describe("when trace has no metrics yet", () => {
     it("dispatches computeRunMetrics in pull mode", async () => {
       const deps = makeDeps();
-      const reactor = createTraceMetricsSyncReactor(deps);
+      const { spec } = createTraceMetricsSyncSubscriber(deps);
 
-      await reactor.handle(makeFinishedEvent(), {
+      await spec.handler(makeFinishedEvent(), {
         tenantId: TEST_TENANT,
         aggregateId: "run-1",
-        foldState: makeSimState(),
+        state: makeSimState(),
       });
 
       expect(deps.computeRunMetrics).toHaveBeenCalledWith(
