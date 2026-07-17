@@ -32,6 +32,10 @@ import {
   SUITE_RUN_PROCESSING_EVENT_TYPES,
 } from "../pipelines/suite-run-processing/schemas/constants";
 import {
+  TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES,
+  TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
+} from "../pipelines/topic-clustering-processing/schemas/constants";
+import {
   TRACE_PROCESSING_COMMAND_TYPES,
   TRACE_PROCESSING_EVENT_TYPES,
 } from "../pipelines/trace-processing/schemas/constants";
@@ -53,6 +57,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
   ...SIMULATION_PROCESSING_EVENT_TYPES,
   ...SUITE_RUN_PROCESSING_EVENT_TYPES,
   ...LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
+  ...TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -67,6 +72,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
   ...SUITE_RUN_PROCESSING_COMMAND_TYPES,
   ...LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
+  ...TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES,
   ...BILLING_REPORTING_COMMAND_TYPES,
 ] as const;
 
@@ -90,6 +96,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "simulation_set",
   "suite_run",
   "langy_conversation",
+  "topic_clustering",
   "billing_report",
   "global",
   TEST_AGGREGATE_TYPE,
