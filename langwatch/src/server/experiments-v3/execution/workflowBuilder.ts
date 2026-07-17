@@ -274,7 +274,6 @@ const buildTargetNode = (
             targetNodeId,
           };
         case "code":
-        case "workflow":
           return {
             targetNode: buildCodeNodeFromAgent(
               targetNodeId,
@@ -284,6 +283,16 @@ const buildTargetNode = (
             ),
             targetNodeId,
           };
+        case "workflow":
+          // A workflow-type agent has no code of its own — the orchestrator
+          // must resolve its linked workflow and dispatch it to
+          // executeWorkflowCell before ever reaching buildTargetNode. Reaching
+          // here means that resolution was skipped (e.g. the linked workflow
+          // failed to load), so fail loudly instead of silently building an
+          // empty code node.
+          throw new Error(
+            `Workflow agent target ${targetConfig.id} has no loaded workflow — it must be dispatched to executeWorkflowCell, not buildTargetNode`,
+          );
         default: {
           const _exhaustive: never = loadedData.agent.type;
           throw new Error(`Unknown agent type: ${_exhaustive}`);
