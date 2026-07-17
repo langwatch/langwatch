@@ -360,12 +360,12 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
 
         // The pointer must survive deserializeAttributes as a resolvable
         // eventref entry so the read path can fetch the full value from
-        // event_log. Currently deserializeAttributes auto-JSON.parses the
-        // reserved key's value (it is object-shaped) into an object before
-        // parseSpanEventRefs ever sees it; parseSpanEventRefs then calls
-        // JSON.parse on that object, which stringifies to "[object Object]",
-        // throws, and is silently swallowed by its own malformed-JSON catch —
-        // so the pointer is dropped and eventrefEntries comes back empty.
+        // event_log. Regression guard: without the RESERVED_PREFIX
+        // short-circuit in deserializeAttributes, this reserved value would
+        // get auto-JSON.parsed into an object before parseSpanEventRefs ever
+        // sees it; parseSpanEventRefs's JSON.parse on that object would then
+        // stringify to "[object Object]", throw, and be silently swallowed by
+        // its own malformed-JSON catch — dropping the pointer.
         expect(eventrefEntries).toEqual([
           { attrKey: "langwatch.input", field: "langwatch.input", eventId },
         ]);

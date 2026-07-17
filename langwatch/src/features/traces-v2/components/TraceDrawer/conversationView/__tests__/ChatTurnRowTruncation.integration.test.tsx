@@ -99,26 +99,35 @@ function renderRow(
 afterEach(cleanup);
 
 describe("ChatTurnRow content-incomplete notice", () => {
-  describe("given the turn's input is still a truncated preview", () => {
-    it("warns the message may be incomplete", () => {
-      renderRow({ inputTruncated: true }, { user: "what is the funnel rate?" });
-      expect(screen.getByText(/could not be fully loaded/i)).toBeInTheDocument();
+  describe("given a conversation turn", () => {
+    describe("when the input is still a truncated preview", () => {
+      it("warns the message may be incomplete", () => {
+        renderRow(
+          { inputTruncated: true },
+          { user: "what is the funnel rate?" },
+        );
+        expect(
+          screen.getByText(/could not be fully loaded/i),
+        ).toBeInTheDocument();
+      });
     });
-  });
 
-  describe("given the turn's output is still a truncated preview", () => {
-    it("warns the response may be incomplete", () => {
-      renderRow({ outputTruncated: true }, { assistant: "the answer" });
-      expect(screen.getByText(/could not be fully loaded/i)).toBeInTheDocument();
+    describe("when the output is still a truncated preview", () => {
+      it("warns the response may be incomplete", () => {
+        renderRow({ outputTruncated: true }, { assistant: "the answer" });
+        expect(
+          screen.getByText(/could not be fully loaded/i),
+        ).toBeInTheDocument();
+      });
     });
-  });
 
-  describe("given a turn whose content loaded fully", () => {
-    it("does not render the notice", () => {
-      renderRow({}, { user: "hi", assistant: "hello" });
-      expect(
-        screen.queryByText(/could not be fully loaded/i),
-      ).not.toBeInTheDocument();
+    describe("when the content loaded fully", () => {
+      it("does not render the notice", () => {
+        renderRow({}, { user: "hi", assistant: "hello" });
+        expect(
+          screen.queryByText(/could not be fully loaded/i),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 });
