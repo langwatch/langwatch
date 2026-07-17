@@ -666,9 +666,17 @@ async function hydrateLlmParameters({
   // versions that were never re-saved. On 1.5+ DSLs a modelless llm
   // parameter is stale state and must NOT be silently substituted — leave
   // it unhydrated so the engine raises its typed llm_model_not_set error.
-  const specVersion =
-    typeof dsl.spec_version === "string" ? parseFloat(dsl.spec_version) : NaN;
-  const legacyDsl = !Number.isFinite(specVersion) || specVersion < 1.5;
+  const specParts =
+    typeof dsl.spec_version === "string"
+      ? dsl.spec_version.split(".").map(Number)
+      : [];
+  const specMajor = specParts[0] ?? NaN;
+  const specMinor = specParts[1] ?? 0;
+  const legacyDsl =
+    !Number.isFinite(specMajor) ||
+    !Number.isFinite(specMinor) ||
+    specMajor < 1 ||
+    (specMajor === 1 && specMinor < 5);
   const defaultLlm =
     legacyDsl && typeof dsl.default_llm === "object" && dsl.default_llm !== null
       ? (dsl.default_llm as Record<string, unknown>)
