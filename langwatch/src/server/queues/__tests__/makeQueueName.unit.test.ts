@@ -16,7 +16,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { makeQueueName } from "../makeQueueName";
 import { SCENARIO_QUEUE } from "~/server/scenarios/scenario.constants";
-import { TOPIC_CLUSTERING_QUEUE } from "~/server/topicClustering/topicClusteringQueue.constants";
 
 // PULLER_QUEUE lives in the puller worker module, whose transitive imports
 // touch Prisma / Redis / ClickHouse at load — stub those storage edges so
@@ -64,7 +63,6 @@ describe("queue name constants", () => {
   describe("when checking every queue that runs on BullMQ", () => {
     /** @scenario Every queue name produced by the system contains a hash tag */
     it.each([
-      ["TOPIC_CLUSTERING_QUEUE", TOPIC_CLUSTERING_QUEUE.NAME],
       ["PULLER_QUEUE", PULLER_QUEUE.NAME],
       ["SCENARIO_QUEUE", SCENARIO_QUEUE.NAME],
     ])("%s contains a hash tag", (_label, queueName) => {

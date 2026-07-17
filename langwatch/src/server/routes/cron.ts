@@ -11,7 +11,6 @@ import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
-import { scheduleTopicClustering } from "~/server/topicClustering/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -79,31 +78,6 @@ secured
 secured
   .access(cronPolicy())
   .post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
-
-// ---------- GET|POST /api/cron/schedule_topic_clustering ----------
-const scheduleTopicClusteringHandler = async (c: CronContext) => {
-  if (!validateCronKey(c)) {
-    return c.body(null, 401);
-  }
-  try {
-    await scheduleTopicClustering();
-    return c.json({ message: "Topic clustering scheduled" });
-  } catch (error: any) {
-    return c.json(
-      {
-        message: "Error scheduling topic clustering",
-        error: error?.message ? error?.message.toString() : `${error}`,
-      },
-      500,
-    );
-  }
-};
-secured
-  .access(cronPolicy())
-  .get("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
-secured
-  .access(cronPolicy())
-  .post("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
 
 // ---------- GET /api/cron/trace_analytics ----------
 secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {

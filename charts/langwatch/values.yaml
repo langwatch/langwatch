@@ -1092,16 +1092,8 @@ cronjobs:
   # Individual cron job configurations
   ## @extra cronjobs.jobs Individual cron job endpoints and schedules.
   jobs:
-    # Topic clustering job - groups conversations by topic
-    # See: https://kubespec.dev/batch/v1/CronJob#spec.schedule
-    ## @extra cronjobs.jobs.topicClustering Topic clustering job.
-    ## @param cronjobs.jobs.topicClustering.enabled [default: true] Enable topic clustering job.
-    ## @param cronjobs.jobs.topicClustering.schedule [string, default: 0 0 * * *] Cron schedule.
-    ## @param cronjobs.jobs.topicClustering.endpoint [string, default: /api/cron/schedule_topic_clustering] Endpoint path.
-    topicClustering:
-      enabled: true
-      schedule: "0 0 * * *" # At midnight every day
-      endpoint: "/api/cron/schedule_topic_clustering"
+    # Topic clustering scheduling moved into the app's event-sourcing
+    # runtime (ADR-051: per-project process wakes) — no CronJob needed.
 
     # Alert triggers job - checks and fires alerts
     # See: https://kubespec.dev/batch/v1/CronJob#spec.schedule
