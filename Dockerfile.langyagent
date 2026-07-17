@@ -161,7 +161,7 @@ FROM debian:bookworm-slim
 # services/langyagent/internal/assets/AGENTS.md.
 ARG LANGWATCH_CLI_VERSION=0.31.0
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git ca-certificates python3 \
+    curl git ca-certificates python3 util-linux \
     && rm -rf /var/lib/apt/lists/*
 # NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
 # rule (services/langyagent/iptables.go) that closed the sibling-worker

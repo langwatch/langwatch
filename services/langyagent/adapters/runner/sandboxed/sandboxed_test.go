@@ -1,9 +1,26 @@
 package sandboxed
 
 import (
+	"context"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
+
+func TestCommandContext_AppliesPerWorkerRlimits(t *testing.T) {
+	cmd := Runner{}.CommandContext(context.Background(), "/usr/local/bin/opencode", "serve")
+	if cmd.Path != "/usr/bin/prlimit" {
+		t.Fatalf("command path = %q, want prlimit", cmd.Path)
+	}
+	want := []string{
+		"/usr/bin/prlimit", "--nproc=64:64", "--nofile=1024:1024",
+		"--fsize=1073741824:1073741824", "--core=0:0", "--",
+		"/usr/local/bin/opencode", "serve",
+	}
+	if !reflect.DeepEqual(cmd.Args, want) {
+		t.Fatalf("command args = %#v, want %#v", cmd.Args, want)
+	}
+}
 
 // SysProcAttr must drop the child into the per-conversation UID (setuid
 // Credential + empty supplementary groups) and keep Setpgid so the manager can

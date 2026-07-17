@@ -8,7 +8,9 @@
 package localunsafe
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 	"syscall"
 
@@ -45,6 +47,10 @@ func New(environment string) (Runner, error) {
 
 // Name identifies the runner in logs and telemetry.
 func (Runner) Name() string { return "local-unsafe" }
+
+func (Runner) CommandContext(ctx context.Context, binary string, args ...string) *exec.Cmd {
+	return exec.CommandContext(ctx, binary, args...)
+}
 
 // Chown is a no-op: the unprivileged manager already owns the files it wrote, and
 // mode 0700 alone gates them (there is no sibling-UID separation in this mode).

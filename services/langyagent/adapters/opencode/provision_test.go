@@ -12,7 +12,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
-func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
+func TestWorkerBaseEnv_AllowsOnlyExplicitKeys(t *testing.T) {
 	for k, v := range map[string]string{
 		"LANGY_INTERNAL_SECRET": "must-not-leak",
 		"GITHUB_LANGY_APP_ID":   "must-not-leak",
@@ -44,15 +44,19 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		"GH_TOKEN":          "ghp_inherited_must_not_leak",
 		"GITHUB_TOKEN":      "ghp_ci_token_must_not_leak",
 		"POSTGRES_PASSWORD": "must-not-leak",
+		// A novel secret-looking name and innocuous manager tuning are both
+		// absent: inheritance is allowlisted, not classified by name.
+		"MY_APIKEY":         "must-not-leak",
+		"LANGY_MAX_WORKERS": "must-not-leak",
+		"HOME":              "must-not-leak",
 		// PASS-THROUGH cases.
-		"LANGY_MAX_WORKERS":       "keep-me", // LANGY_ prefix but not the secret one
-		"HOME":                    "keep-me",
-		"LANGWATCH_API_KEY_OUTER": "keep-me", // worker injects its own after; _OUTER is neither _KEY nor _SECRET
+		"PATH": "/safe/bin",
+		"LANG": "C.UTF-8",
 	} {
 		t.Setenv(k, v)
 	}
 
-	env := filterSensitiveEnv()
+	env := workerBaseEnv()
 
 	mustBeAbsent := []string{
 		"LANGY_INTERNAL_SECRET=",
@@ -80,6 +84,9 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		"GH_TOKEN=",
 		"GITHUB_TOKEN=",
 		"POSTGRES_PASSWORD=",
+		"MY_APIKEY=",
+		"LANGY_MAX_WORKERS=",
+		"HOME=",
 	}
 	for _, prefix := range mustBeAbsent {
 		for _, kv := range env {
@@ -89,10 +96,7 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		}
 	}
 
-	mustBePresent := []string{
-		"LANGY_MAX_WORKERS=keep-me",
-		"LANGWATCH_API_KEY_OUTER=keep-me",
-	}
+	mustBePresent := []string{"PATH=/safe/bin", "LANG=C.UTF-8"}
 	for _, want := range mustBePresent {
 		found := false
 		for _, kv := range env {
@@ -106,8 +110,15 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		}
 	}
 
-	if len(env) == 0 {
-		t.Fatalf("filterSensitiveEnv returned empty slice; PATH was %q", os.Getenv("PATH"))
+	allowed := make(map[string]bool, len(workerInheritedEnvKeys))
+	for _, key := range workerInheritedEnvKeys {
+		allowed[key] = true
+	}
+	for _, kv := range env {
+		key, _, _ := strings.Cut(kv, "=")
+		if !allowed[key] {
+			t.Fatalf("workerBaseEnv inherited non-allowlisted key %q", key)
+		}
 	}
 }
 

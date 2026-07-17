@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -259,7 +258,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 // the turn that spawned it and only dies on idle/shutdown, but binding to the pool
 // context means a pool Shutdown / deadline still propagates to the subprocess.
 func (a *Agent) Spawn(ctx context.Context, in SpawnInput) (*exec.Cmd, error) {
-	cmd := exec.CommandContext(ctx, in.BinaryPath,
+	cmd := in.Runner.CommandContext(ctx, in.BinaryPath,
 		"serve", "--port", strconv.Itoa(in.Port), "--hostname", "127.0.0.1",
 	)
 	cmd.Env = buildWorkerEnv(in.ConversationID, in.Home, in.Creds, in.OpenCodePassword, in.EgressPort, in.Mediation, in.Capabilities)
@@ -289,68 +288,31 @@ func skillsDir(workerHome string) string {
 	return filepath.Join(workerHome, ".config", "opencode", "skills")
 }
 
-// sensitiveEnvPattern matches env names that must never reach a worker. The JS
-// manager listed these by name; the Go version mirrors that policy and extends
-// it with two suffix classes so arbitrary provider keys inherited from a
-// local-dev .env (OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY,
-// API_TOKEN_JWT_SECRET, ...) cannot reach a per-conversation OpenCode
-// subprocess. The worker still receives its own llmVirtualKey + langwatch API
-// key via Credentials.* — those are written into the env explicitly after this
-// filter, so blocking the inherited variants is the desired posture (only the
-// per-project Langy VK reaches the model, never the human's personal provider
-// key).
-//
-// This stays a DENYLIST for compatibility. ACKNOWLEDGED SUFFIX-GAP (ADR-047,
-// left as a comment ONLY — not widened in this PR): a denylist can never be
-// exhaustive; a var like `MY_APIKEY` (no separator before KEY) or a novel
-// secret prefix slips through. A true ALLOWLIST (PATH, HOME, LANG, USER, TZ +
-// the OTEL_/LANGY_/OPENCODE_ vars actually needed) is the more secure
-// long-term shape but requires testing every var an OpenCode subprocess might
-// legitimately read. Add new prefixes here when introducing manager-only
-// secrets; the allowlist migration is tracked separately.
-var sensitiveEnvPattern = regexp.MustCompile(
-	`^(LANGY_INTERNAL_SECRET$|GITHUB_LANGY_|CREDENTIALS_SECRET$|NEXTAUTH_|DATABASE_URL$|AWS_SECRET_|LW_GATEWAY_|LW_VIRTUAL_KEY_)` +
-		// `AWS_ACCESS_KEY_ID` ends in `_ID`, NOT `_KEY` — the suffix rules below
-		// would miss it. Anchor an explicit literal so the access-key half of an
-		// AWS credential pair can't leak.
-		`|^AWS_ACCESS_KEY_ID$` +
-		`|_(API_)?KEY$` +
-		`|_SECRET(_|$)` +
-		// `_TOKEN(_|$)` catches `GH_TOKEN`, `GITHUB_TOKEN`, `API_TOKEN_*`, etc. —
-		// the worker still receives an explicit `GH_TOKEN=` from buildWorkerEnv
-		// AFTER this filter, so blocking the inherited variant is correct (it
-		// would shadow the per-conversation creds otherwise). `_PASSWORD(_|$)`
-		// catches `POSTGRES_PASSWORD`/`REDIS_PASSWORD` and anything else an
-		// `envFrom: secretRef` mounts under that convention.
-		`|_TOKEN(_|$)` +
-		`|_PASSWORD(_|$)` +
-		// `_URL$` / `_URI$` block credential-bearing connection strings
-		// (`REDIS_URL=redis://user:pass@host:6379/0`, `POSTGRES_URL`,
-		// `MONGODB_URI`, `CLICKHOUSE_URL`, ...). The worker runs model-driven
-		// shell with HTTPS egress, so a prompt-injected turn could otherwise
-		// `env | grep -iE 'redis|postgres'` and exfiltrate the password embedded
-		// in the URL userinfo. `_DSN$` covers `SENTRY_DSN` and similar telemetry
-		// creds (DSNs embed the project key in the URL).
-		`|_URL$` +
-		`|_URI$` +
-		`|_DSN$`,
-)
+// workerInheritedEnvKeys is the complete set of manager environment variables
+// a worker may inherit. Everything security-sensitive is injected explicitly
+// below from the turn's scoped Credentials/Capabilities instead of relying on
+// naming conventions. An allowlist means a newly introduced manager secret is
+// private by default, regardless of its name.
+var workerInheritedEnvKeys = []string{
+	"PATH",
+	"LANG",
+	"LC_ALL",
+	"LC_CTYPE",
+	"TZ",
+	"TERM",
+	"COLORTERM",
+	"NO_COLOR",
+	"FORCE_COLOR",
+	"SSL_CERT_FILE",
+	"SSL_CERT_DIR",
+}
 
-// filterSensitiveEnv returns the process env minus anything matching
-// sensitiveEnvPattern. The worker gets its own credentials injected explicitly
-// after this filter.
-func filterSensitiveEnv() []string {
-	env := os.Environ()
-	out := make([]string, 0, len(env))
-	for _, kv := range env {
-		eq := strings.IndexByte(kv, '=')
-		if eq < 0 {
-			continue
+func workerBaseEnv() []string {
+	out := make([]string, 0, len(workerInheritedEnvKeys))
+	for _, key := range workerInheritedEnvKeys {
+		if value, ok := os.LookupEnv(key); ok {
+			out = append(out, key+"="+value)
 		}
-		if sensitiveEnvPattern.MatchString(kv[:eq]) {
-			continue
-		}
-		out = append(out, kv)
 	}
 	return out
 }
@@ -362,7 +324,7 @@ func filterSensitiveEnv() []string {
 const mediatedLLMPlaceholderKey = "langy-mediated"
 
 // buildWorkerEnv assembles the environment for a worker's opencode subprocess:
-// the filtered inherited env plus per-worker credentials and the per-worker
+// the allowlisted inherited env plus per-worker credentials and the per-worker
 // OPENCODE_SERVER_PASSWORD. Pure and side-effect free — factored out of Spawn so
 // it's unit-testable without spawning a real subprocess.
 //
@@ -376,7 +338,7 @@ const mediatedLLMPlaceholderKey = "langy-mediated"
 // rules; routing them through the per-worker proxy would add a hop and expose
 // LLM streaming to the throttle).
 func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials, openCodePassword string, egressPort int, med Mediation, caps []app.Capability) []string {
-	env := filterSensitiveEnv()
+	env := workerBaseEnv()
 
 	// LLM wiring. Mediated (phase 2): OPENAI_BASE_URL points at the manager's
 	// loopback relay, which injects the REAL virtual key + the turn's traceparent

@@ -1,6 +1,10 @@
 package app
 
-import "syscall"
+import (
+	"context"
+	"os/exec"
+	"syscall"
+)
 
 // Runner is the isolation substrate a worker's coding-agent process runs in —
 // the ADR-033 secure-vs-local seam, chosen ONCE at the composition root instead
@@ -15,6 +19,9 @@ import "syscall"
 // Implemented by adapters/runner/sandboxed and adapters/runner/localunsafe. The three
 // methods are precisely the operations that used to branch on the bool.
 type Runner interface {
+	// CommandContext builds the coding-agent command. Production wraps the
+	// binary with prlimit; local development executes it directly.
+	CommandContext(ctx context.Context, binary string, args ...string) *exec.Cmd
 	// Chown gives a provisioned file to the worker's per-conversation UID so a
 	// sibling worker cannot read it. A no-op in local mode (mode 0700 alone gates
 	// there, since the manager owns the files).
