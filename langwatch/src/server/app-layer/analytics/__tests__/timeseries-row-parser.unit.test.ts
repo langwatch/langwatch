@@ -57,7 +57,7 @@ describe("parseTimeseriesRows", () => {
         expect(result.currentPeriod[2]?.[seriesName]).toBe(1);
       });
 
-      /** @scenario Buckets without processed runs carry no pass-rate value */
+      /** @scenario Days without evaluations show no pass rate instead of a fabricated 0% */
       it("carries no value for buckets without processed runs", () => {
         expect(result.currentPeriod[0]).not.toHaveProperty(seriesName);
         expect(result.currentPeriod[1]).not.toHaveProperty(seriesName);
@@ -97,7 +97,7 @@ describe("parseTimeseriesRows", () => {
       const passRateName = buildSeriesName(passRateSeries, 0);
       const runsName = buildSeriesName(runsSeries, 1);
 
-      /** @scenario Count-type series still default missing buckets to zero */
+      /** @scenario Days without evaluations still count zero runs */
       it("defaults the count series to 0 in the empty bucket", () => {
         expect(result.currentPeriod[0]?.[runsName]).toBe(0);
       });
@@ -130,6 +130,39 @@ describe("parseTimeseriesRows", () => {
 
       it("keeps the previous-period bucket free of a fabricated 0", () => {
         expect(result.previousPeriod[0]).not.toHaveProperty(seriesName);
+      });
+    });
+  });
+
+  describe("given a count series whose value is null in every bucket", () => {
+    const passRateAlias = alias(passRateSeries, 0);
+    const runsAlias = alias(runsSeries, 1);
+    const rows = [
+      {
+        period: "current",
+        date: "2026-07-15",
+        [passRateAlias]: 0.5,
+        [runsAlias]: null,
+      },
+      {
+        period: "current",
+        date: "2026-07-16",
+        [passRateAlias]: 1,
+        [runsAlias]: null,
+      },
+    ];
+
+    describe("when the rows are parsed", () => {
+      const result = parseTimeseriesRows({
+        rows,
+        series: [passRateSeries, runsSeries],
+        timeScale: 1440,
+      });
+      const runsName = buildSeriesName(runsSeries, 1);
+
+      it("still defaults the count to 0 in every bucket", () => {
+        expect(result.currentPeriod[0]?.[runsName]).toBe(0);
+        expect(result.currentPeriod[1]?.[runsName]).toBe(0);
       });
     });
   });
@@ -177,7 +210,7 @@ describe("parseTimeseriesRows", () => {
         expect(groups.failed?.[runsName]).toBe(2);
       });
 
-      /** @scenario Grouped buckets follow the same fabrication rules */
+      /** @scenario Grouped charts keep zero counts without inventing scores */
       it("keeps the average score absent for the group without a value", () => {
         expect(groups.passed).not.toHaveProperty(scoreName);
       });

@@ -1525,9 +1525,18 @@ function MonitorGraph({
     : currentAndPreviousData
         ?.map((entry) => entry[firstKey]!)
         .filter((x) => x !== undefined && x !== null);
+
+  // Fallback statistic from the REAL daily values (never the sparkline's
+  // filled data — for pass rates that substitutes 1 for empty days and would
+  // inflate the average).
+  const realDailyValues = currentAndPreviousData
+    ?.map((entry) => entry[firstKey]!)
+    .filter((x) => x !== undefined && x !== null);
   const dailyAverage =
-    (allValues?.reduce((acc, curr) => acc + curr, 0) ?? 0) /
-    (allValues?.length ?? 1);
+    realDailyValues && realDailyValues.length > 0
+      ? realDailyValues.reduce((acc, curr) => acc + curr, 0) /
+        realDailyValues.length
+      : undefined;
 
   // The headline is the run-weighted value over the whole period (one "full"
   // bucket), so it matches the run-counting charts on the analytics page. The
@@ -1538,7 +1547,7 @@ function MonitorGraph({
   const summaryValue =
     typeof summaryRaw === "number"
       ? summaryRaw
-      : summaryTimeseries.isError && allValues && allValues.length > 0
+      : summaryTimeseries.isError
         ? dailyAverage
         : undefined;
   const hasData = summaryValue !== undefined;

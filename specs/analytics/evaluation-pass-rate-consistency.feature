@@ -11,48 +11,45 @@ Feature: Evaluation pass-rate consistency across surfaces
 
   Two defects historically made them diverge:
 
-  1. The timeseries parser defaulted every bucket missing a series value to 0.
-     Average-type metrics (pass rate, score) are only missing when the
-     evaluator produced no processed runs in that bucket, so the 0 fabricated
-     a "0% pass rate" for days the evaluator never ran. An evaluator that ran
-     on one of four active days with every run passing showed 25% instead of
-     100%.
+  1. Days where an evaluator produced no processed runs were reported as a 0%
+     pass rate instead of no data. An evaluator that ran on one of four active
+     days with every run passing showed 25% instead of 100%.
 
-  2. The card headline averaged the daily bucket values with equal weight
-     (an average of averages). The donut counts runs over the whole period
-     (run-weighted). The card now reads a single full-period bucket for the
-     headline, which is run-weighted by construction.
+  2. The card headline averaged the daily rates with equal weight (an average
+     of averages), while the donut counts runs over the whole period. The card
+     now shows the run-weighted rate over the whole period, matching the donut
+     even when run volume differs wildly between days.
 
   Background:
     Given a project with online evaluations writing evaluation runs
 
   # ---------------------------------------------------------------------------
-  # Parser: no fabricated values for average-type metrics
+  # Days without runs are "no data", never a fabricated value
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Buckets without processed runs carry no pass-rate value
-    Given a bucketed timeseries result for an average pass-rate series
-    And the evaluator produced processed runs in only one bucket
-    When the rows are parsed
-    Then buckets without processed runs carry no value for the series
-    And they do not report a 0% pass rate
+  Scenario: Days without evaluations show no pass rate instead of a fabricated 0%
+    Given an evaluator with processed runs on only one day of the period
+    And other evaluators ran on the remaining days
+    When the pass-rate data for the period is read
+    Then days without processed runs carry no pass-rate value
+    And no day reports a 0% pass rate the evaluator never produced
 
   @unit
-  Scenario: Count-type series still default missing buckets to zero
-    Given a bucketed timeseries result with a run-count series and a pass-rate series
-    And one bucket has no value for either series
-    When the rows are parsed
-    Then the run-count series defaults to 0 in that bucket
-    And the pass-rate series stays absent in that bucket
+  Scenario: Days without evaluations still count zero runs
+    Given a chart showing both a run count and a pass rate
+    And one day has no runs at all
+    When the data for the period is read
+    Then that day counts 0 runs
+    And that day carries no pass-rate value
 
   @unit
-  Scenario: Grouped buckets follow the same fabrication rules
-    Given a grouped timeseries result with a count series and an average score series
-    And a group is present in a bucket with only the count value
-    When the rows are parsed
-    Then the count value is preserved
-    And the average score stays absent for that group
+  Scenario: Grouped charts keep zero counts without inventing scores
+    Given a chart grouped by evaluation result showing run counts and average scores
+    And one group has runs but no score values
+    When the data for the period is read
+    Then the group keeps its run count
+    And the group carries no average score
 
   # ---------------------------------------------------------------------------
   # Monitor card: headline is the run-weighted pass rate for the whole period

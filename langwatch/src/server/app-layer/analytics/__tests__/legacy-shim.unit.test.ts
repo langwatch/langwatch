@@ -55,7 +55,7 @@ describe("ClickHouseLegacyAnalyticsShim", () => {
   });
 
   describe("when the request carries negateFilters", () => {
-    /** @scenario Legacy shim forwards negated filters to the query builder */
+    /** @scenario Negating filters inverts the data selection */
     it("forwards negateFilters to the query builder", async () => {
       await shim.run(makeInput({ negateFilters: true }));
 
@@ -66,7 +66,7 @@ describe("ClickHouseLegacyAnalyticsShim", () => {
   });
 
   describe("when the request is scoped to explicit trace ids", () => {
-    /** @scenario Legacy shim forwards trace scoping to the query builder */
+    /** @scenario A graph scoped to specific traces reads only those traces */
     it("forwards traceIds to the query builder", async () => {
       await shim.run(makeInput({ traceIds: ["trace-1", "trace-2"] }));
 

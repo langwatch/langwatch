@@ -213,8 +213,20 @@ function normalizeMetricKeys(
     }
   }
 
+  // Additive keys default even when the value was NULL in every row — the
+  // observed-key sets alone would leave such a series absent everywhere. On a
+  // grouped query the series values live inside the group sub-objects, so the
+  // top level only fills what was observed there.
+  const topLevelFillKeys = groupBy
+    ? allMetricKeys
+    : new Set([...allMetricKeys, ...zeroFillableKeys]);
+  const groupedFillKeys = new Set([
+    ...allGroupedMetricSubKeys,
+    ...zeroFillableKeys,
+  ]);
+
   for (const bucket of [...previousPeriod, ...currentPeriod]) {
-    for (const key of allMetricKeys) {
+    for (const key of topLevelFillKeys) {
       if (bucket[key] === undefined && zeroFillableKeys.has(key)) {
         bucket[key] = 0;
       }
@@ -225,7 +237,7 @@ function normalizeMetricKeys(
         Record<string, number>
       >;
       for (const groupKey of Object.keys(groupData)) {
-        for (const metricKey of allGroupedMetricSubKeys) {
+        for (const metricKey of groupedFillKeys) {
           if (
             groupData[groupKey]![metricKey] === undefined &&
             zeroFillableKeys.has(metricKey)

@@ -1,43 +1,39 @@
-Feature: Negate filters and trace scoping reach the analytics query
+Feature: Negate filters and trace scoping affect analytics results
   As a platform user
   I want the Negate Filters toggle and trace-scoped graphs to affect the data
   So that the charts show what the controls say they show
 
-  The analytics read API accepts `negateFilters` (invert the user's filter
-  selection, wired to the toolbar toggle) and `traceIds` (narrow a graph to an
-  explicit trace set). The legacy ClickHouse query builder implements both.
-  They must survive the trip from the API input to the builder:
-
-  1. The legacy shim forwards them verbatim.
-  2. The routed fast paths (slim / rollup tables) do not implement them, so
-     any query carrying either must route to the legacy fallback table for
-     its source rather than silently ignoring the parameter.
+  The analytics toolbar offers a Negate Filters toggle (show everything EXCEPT
+  the selected filters) and some graphs are scoped to an explicit set of
+  traces. Both must reach the executed query: a negated query that silently
+  returns non-negated results, or a trace-scoped graph that silently covers
+  all traces, misleads the user without any visible error.
 
   Background:
-    Given a project with analytics data in ClickHouse
+    Given a project with analytics data
 
   @unit
-  Scenario: Legacy shim forwards negated filters to the query builder
-    Given a timeseries request with filters and negateFilters enabled
-    When the legacy shim builds the query
-    Then the builder receives negateFilters enabled
+  Scenario: Negating filters inverts the data selection
+    Given a timeseries request with filters and the negate toggle enabled
+    When the query is executed
+    Then the executed query carries the negation
 
   @unit
-  Scenario: Legacy shim forwards trace scoping to the query builder
+  Scenario: A graph scoped to specific traces reads only those traces
     Given a timeseries request scoped to specific trace ids
-    When the legacy shim builds the query
-    Then the builder receives the trace ids
+    When the query is executed
+    Then the executed query carries the trace scope
 
   @unit
-  Scenario: Negated queries never route to the fast-path tables
-    Given the event-sourced analytics read flag is enabled
-    And a timeseries request that the rollup table could otherwise serve
-    When the request carries negateFilters
-    Then the query routes to the legacy fallback table for its metric source
+  Scenario: Negated filters stay accurate on optimized analytics storage
+    Given a project with the optimized analytics read path enabled
+    And a timeseries request the optimized storage could otherwise serve
+    When the request carries the negate toggle
+    Then the query is served by the storage that honors the negation
 
   @unit
-  Scenario: Trace-scoped queries never route to the fast-path tables
-    Given the event-sourced analytics read flag is enabled
-    And a timeseries request that the rollup table could otherwise serve
-    When the request carries trace ids
-    Then the query routes to the legacy fallback table for its metric source
+  Scenario: Trace-scoped graphs stay accurate on optimized analytics storage
+    Given a project with the optimized analytics read path enabled
+    And a timeseries request the optimized storage could otherwise serve
+    When the request is scoped to specific trace ids
+    Then the query is served by the storage that honors the trace scope
