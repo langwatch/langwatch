@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
@@ -9,7 +9,7 @@ export const listDashboardsCommand = async (options?: { format?: string }): Prom
   checkApiKey();
 
   const service = new DashboardsApiService();
-  const spinner = ora("Fetching dashboards...").start();
+  const spinner = createSpinner("Fetching dashboards...").start();
 
   try {
     const result = await service.list();
@@ -57,7 +57,7 @@ export const listDashboardsCommand = async (options?: { format?: string }): Prom
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch dashboards" });
+    failSpinner({ spinner, error, action: "fetch dashboards", format: options?.format });
     process.exit(1);
   }
 };

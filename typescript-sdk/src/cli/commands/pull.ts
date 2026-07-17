@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../utils/spinner";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import {
   PromptsApiService,
@@ -43,7 +43,7 @@ export const pullPrompts = async ({
   );
 
   if (remoteDeps.length > 0) {
-    const fetchSpinner = ora(
+    const fetchSpinner = createSpinner(
       `Checking ${remoteDeps.length} remote prompts...`
     ).start();
 

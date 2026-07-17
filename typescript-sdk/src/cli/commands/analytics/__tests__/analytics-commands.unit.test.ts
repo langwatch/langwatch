@@ -88,6 +88,23 @@ describe("queryAnalyticsCommand()", () => {
         }),
       );
     });
+
+    it("maps the natural-language latency alias to average completion time", async () => {
+      mockTimeseries.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
+
+      await queryAnalyticsCommand({ metric: "latency" });
+
+      expect(mockTimeseries).toHaveBeenCalledWith(
+        expect.objectContaining({
+          series: [
+            expect.objectContaining({
+              metric: "performance.completion_time",
+              aggregation: "avg",
+            }),
+          ],
+        }),
+      );
+    });
   });
 
   describe("when format is json", () => {
@@ -101,7 +118,11 @@ describe("queryAnalyticsCommand()", () => {
       await queryAnalyticsCommand({ format: "json" });
 
       expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(result, null, 2),
+        JSON.stringify(
+          { ...result, metric: "metadata.trace_id", aggregation: "cardinality" },
+          null,
+          2,
+        ),
       );
     });
   });

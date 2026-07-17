@@ -57,6 +57,7 @@
     "test:seed": "dotenv -e .env.test -- bash -c 'cd ../langwatch && pnpm prisma:seed'",
     "prebuild": "pnpm run prepare",
     "build": "tsc --noEmit && tsup",
+    "build:binary": "bun run scripts/build-cli-binary.ts",
     "tarball": "pnpm build && pnpm pack",
     "typecheck": "tsc --noEmit",
     "prepublish": "pnpm run build",
@@ -66,6 +67,7 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@langchain/core": ">=0.3.68 <0.4.0",
+    "@langwatch/cli-cards": "workspace:*",
     "@langchain/langgraph": ">=0.4.0 <1.0.0",
     "@langchain/openai": ">=0.6.0 <1.0.0",
     "@opentelemetry/sdk-node": "0.219.0",

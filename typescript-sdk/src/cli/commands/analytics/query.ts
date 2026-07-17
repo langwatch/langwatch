@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -13,6 +13,19 @@ const METRIC_PRESETS: Record<string, { metric: string; aggregation: string }> = 
   "total-tokens": { metric: "performance.total_tokens", aggregation: "sum" },
   "avg-tokens": { metric: "performance.total_tokens", aggregation: "avg" },
   "eval-pass-rate": { metric: "evaluations.evaluation_pass_rate", aggregation: "avg" },
+};
+
+// Natural-language requests often arrive as `--metric latency` or `--metric
+// errors`. Keep those useful aliases at the CLI boundary instead of forwarding
+// them as invalid backend enum values and turning a good request into a generic
+// validation error.
+const METRIC_ALIASES: Record<string, keyof typeof METRIC_PRESETS> = {
+  latency: "avg-latency",
+  "average-latency": "avg-latency",
+  cost: "total-cost",
+  traces: "trace-count",
+  "trace-counts": "trace-count",
+  "pass-rate": "eval-pass-rate",
 };
 
 export const queryAnalyticsCommand = async (options: {
@@ -32,8 +45,13 @@ export const queryAnalyticsCommand = async (options: {
   let metric: string;
   let aggregation: string;
 
-  if (options.metric && options.metric in METRIC_PRESETS) {
-    const preset = METRIC_PRESETS[options.metric]!;
+  const requestedMetric = options.metric?.trim().toLowerCase();
+  const presetName = requestedMetric
+    ? (METRIC_ALIASES[requestedMetric] ?? requestedMetric)
+    : undefined;
+
+  if (presetName && presetName in METRIC_PRESETS) {
+    const preset = METRIC_PRESETS[presetName]!;
     metric = preset.metric;
     aggregation = options.aggregation ?? preset.aggregation;
   } else {
@@ -51,7 +69,7 @@ export const queryAnalyticsCommand = async (options: {
     ? new Date(options.endDate).getTime()
     : now;
 
-  const spinner = ora(`Querying ${metric} (${aggregation})...`).start();
+  const spinner = createSpinner(`Querying ${metric} (${aggregation})...`).start();
 
   try {
     const result = await service.timeseries({
@@ -71,7 +89,11 @@ export const queryAnalyticsCommand = async (options: {
     spinner.succeed("Analytics query complete");
 
     if (options.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
+      // Keep the requested series alongside the timeseries so Langy and other
+      // consumers can label a result without guessing from the numeric keys.
+      console.log(
+        JSON.stringify({ ...result, metric, aggregation }, null, 2),
+      );
       return;
     }
 
@@ -128,7 +150,7 @@ export const queryAnalyticsCommand = async (options: {
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "query analytics" });
+    failSpinner({ spinner, error, action: "query analytics", format: options?.format });
     process.exit(1);
   }
 };

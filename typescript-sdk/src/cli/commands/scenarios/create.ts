@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const createScenarioCommand = async (
   checkApiKey();
 
   const service = new ScenariosApiService();
-  const spinner = ora(`Creating scenario "${name}"...`).start();
+  const spinner = createSpinner(`Creating scenario "${name}"...`).start();
 
   try {
     const criteria = options.criteria
@@ -38,7 +38,7 @@ export const createScenarioCommand = async (
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`);
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "create scenario" });
+    failSpinner({ spinner, error, action: "create scenario", format: options?.format });
     process.exit(1);
   }
 };

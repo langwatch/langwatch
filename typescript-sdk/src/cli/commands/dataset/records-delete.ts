@@ -1,6 +1,10 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "../../utils/errorOutput";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
@@ -10,16 +14,20 @@ import { handleDatasetCommandError } from "./error-handler";
 export const recordsDeleteCommand = async (
   slugOrId: string,
   recordIds: string[],
+  options?: { format?: string },
 ): Promise<void> => {
   checkApiKey();
 
   if (recordIds.length === 0) {
-    console.error(chalk.red("Error: At least one record ID is required."));
+    reportCommandError({
+      error: commandValidationError("At least one record ID is required."),
+      format: options?.format,
+    });
     process.exit(1);
   }
 
   const service = createDatasetService();
-  const spinner = ora(
+  const spinner = createSpinner(
     `Deleting ${recordIds.length} record${recordIds.length !== 1 ? "s" : ""} from "${slugOrId}"...`,
   ).start();
 
@@ -29,6 +37,10 @@ export const recordsDeleteCommand = async (
     spinner.succeed(
       `Deleted ${result.deletedCount} record${result.deletedCount !== 1 ? "s" : ""} from "${chalk.cyan(slugOrId)}"`,
     );
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify(result, null, 2));
+    }
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "delete records" });
   }

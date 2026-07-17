@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
@@ -9,7 +9,7 @@ export const listEvaluatorsCommand = async (options?: { format?: string }): Prom
   checkApiKey();
 
   const service = new EvaluatorsApiService();
-  const spinner = ora("Fetching evaluators...").start();
+  const spinner = createSpinner("Fetching evaluators...").start();
 
   try {
     const evaluators = await service.getAll();
@@ -67,7 +67,7 @@ export const listEvaluatorsCommand = async (options?: { format?: string }): Prom
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch evaluators" });
+    failSpinner({ spinner, error, action: "fetch evaluators", format: options?.format });
     process.exit(1);
   }
 };

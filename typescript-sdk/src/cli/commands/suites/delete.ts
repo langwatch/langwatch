@@ -1,4 +1,4 @@
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -10,7 +10,7 @@ export const deleteSuiteCommand = async (
   checkApiKey();
 
   const service = new SuitesApiService();
-  const spinner = ora(`Archiving suite "${id}"...`).start();
+  const spinner = createSpinner(`Archiving suite "${id}"...`).start();
 
   try {
     const result = await service.delete(id);
@@ -21,7 +21,7 @@ export const deleteSuiteCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete suite" });
+    failSpinner({ spinner, error, action: "delete suite", format: options?.format });
     process.exit(1);
   }
 };

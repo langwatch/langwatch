@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   SuitesApiService,
   type SuiteTarget,
@@ -41,7 +41,7 @@ export const runScenarioCommand = async (
   const suitesService = new SuitesApiService();
 
   // Create a temporary suite to execute this scenario
-  const spinner = ora(`Preparing scenario run for "${id}"...`).start();
+  const spinner = createSpinner(`Preparing scenario run for "${id}"...`).start();
 
   try {
     // Create an ephemeral suite for this single scenario run
@@ -86,7 +86,7 @@ export const runScenarioCommand = async (
 
     // Poll for completion
     console.log();
-    const pollSpinner = ora("Waiting for scenario run to complete...").start();
+    const pollSpinner = createSpinner("Waiting for scenario run to complete...").start();
 
     const apiKey = process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
@@ -156,7 +156,7 @@ export const runScenarioCommand = async (
     // Clean up ephemeral suite
     await suitesService.delete(suite.id).catch(() => undefined);
   } catch (error) {
-    failSpinner({ spinner, error, action: "run scenario" });
+    failSpinner({ spinner, error, action: "run scenario", format: options?.format });
     process.exit(1);
   }
 };

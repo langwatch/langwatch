@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
@@ -12,7 +12,7 @@ export const updateScenarioCommand = async (
   checkApiKey();
 
   const service = new ScenariosApiService();
-  const spinner = ora(`Updating scenario "${id}"...`).start();
+  const spinner = createSpinner(`Updating scenario "${id}"...`).start();
 
   try {
     const body: UpdateScenarioBody = {};
@@ -33,7 +33,7 @@ export const updateScenarioCommand = async (
       console.log(JSON.stringify(scenario, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "update scenario" });
+    failSpinner({ spinner, error, action: "update scenario", format: options?.format });
     process.exit(1);
   }
 };

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -8,7 +8,7 @@ export const getProjectCommand = async (id: string, options?: { format?: string 
   checkApiKey();
 
   const service = new ProjectsApiService();
-  const spinner = ora(`Fetching project "${id}"...`).start();
+  const spinner = createSpinner(`Fetching project "${id}"...`).start();
 
   try {
     const project = await service.get(id);
@@ -32,7 +32,7 @@ export const getProjectCommand = async (id: string, options?: { format?: string 
     console.log(`${chalk.bold("Updated:")}         ${new Date(project.updatedAt).toLocaleString()}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch project" });
+    failSpinner({ spinner, error, action: "fetch project", format: options?.format });
     process.exit(1);
   }
 };

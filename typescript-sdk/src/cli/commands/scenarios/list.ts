@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
@@ -9,7 +9,7 @@ export const listScenariosCommand = async (options?: { format?: string }): Promi
   checkApiKey();
 
   const service = new ScenariosApiService();
-  const spinner = ora("Fetching scenarios...").start();
+  const spinner = createSpinner("Fetching scenarios...").start();
 
   try {
     const scenarios = await service.getAll();
@@ -61,7 +61,7 @@ export const listScenariosCommand = async (options?: { format?: string }): Promi
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch scenarios" });
+    failSpinner({ spinner, error, action: "fetch scenarios", format: options?.format });
     process.exit(1);
   }
 };

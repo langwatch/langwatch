@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
@@ -16,7 +16,7 @@ export const listSecretsCommand = async (options?: {
   const endpoint =
     resolveControlPlaneUrl();
 
-  const spinner = ora("Fetching secrets...").start();
+  const spinner = createSpinner("Fetching secrets...").start();
 
   try {
     const response = await fetch(`${endpoint}/api/secrets`, {
@@ -74,7 +74,7 @@ export const listSecretsCommand = async (options?: {
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch secrets" });
+    failSpinner({ spinner, error, action: "fetch secrets", format: options?.format });
     process.exit(1);
   }
 };

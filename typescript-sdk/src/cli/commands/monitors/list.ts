@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
@@ -16,7 +16,7 @@ export const listMonitorsCommand = async (options?: {
   const endpoint =
     resolveControlPlaneUrl();
 
-  const spinner = ora("Fetching monitors...").start();
+  const spinner = createSpinner("Fetching monitors...").start();
 
   try {
     const response = await fetch(`${endpoint}/api/monitors`, {
@@ -81,7 +81,7 @@ export const listMonitorsCommand = async (options?: {
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch monitors" });
+    failSpinner({ spinner, error, action: "fetch monitors", format: options?.format });
     process.exit(1);
   }
 };

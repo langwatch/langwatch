@@ -39,8 +39,10 @@ export class TracesService {
       typeof error === "string"
         ? error
         : error?.error ?? error?.message ?? "Unknown error occurred";
+    const message = `Failed to ${operation}: ${errorMessage}`;
+
     throw new TracesError(
-      `Failed to ${operation}: ${errorMessage}`,
+      message,
       operation,
       error,
     );

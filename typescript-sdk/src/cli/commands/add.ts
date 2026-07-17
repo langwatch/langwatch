@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../utils/spinner";
 import { FileManager } from "../utils/fileManager";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { PromptConverter } from "../utils/promptConverter";
@@ -93,7 +93,7 @@ export const addCommand = async (
     const version = options.version ?? "latest";
 
     // Fetch and materialize the prompt (like sync does for individual prompts)
-    const spinner = ora(
+    const spinner = createSpinner(
       `Adding ${chalk.cyan(`${name}@${version}`)}...`,
     ).start();
 
