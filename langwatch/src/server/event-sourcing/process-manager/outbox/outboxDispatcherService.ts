@@ -47,6 +47,13 @@ export interface OutboxDispatcherServiceOptions {
   retryDelayMs?: (params: { attempt: number }) => number;
   /** How long a leased message stays invisible to other loops. Default 30s. */
   leaseDurationMs?: number;
+  /**
+   * Which processNames this dispatcher serves. The outbox table is shared
+   * across domains, so every domain-scoped dispatcher must set this — an
+   * unfiltered dispatcher leases other domains' intents and retry-churns
+   * them for lack of a handler. Omitted means unfiltered.
+   */
+  processNames?: readonly string[];
   tracer?: Tracer;
 }
 
@@ -75,6 +82,7 @@ export class OutboxDispatcherService {
   private readonly maxAttempts: number;
   private readonly retryDelayMs: (params: { attempt: number }) => number;
   private readonly leaseDurationMs: number;
+  private readonly processNames: readonly string[] | undefined;
   private readonly tracer: Tracer;
 
   constructor(options: OutboxDispatcherServiceOptions) {
@@ -83,6 +91,7 @@ export class OutboxDispatcherService {
     this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     this.retryDelayMs = options.retryDelayMs ?? defaultRetryDelayMs;
     this.leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
+    this.processNames = options.processNames;
     this.tracer =
       options.tracer ?? trace.getTracer("langwatch.process-manager");
   }
@@ -92,6 +101,7 @@ export class OutboxDispatcherService {
       now: params.now,
       limit: params.limit ?? 10,
       leaseDurationMs: this.leaseDurationMs,
+      ...(this.processNames ? { processNames: this.processNames } : {}),
     });
 
     const report: DispatchReport = { dispatched: [], retried: [], dead: [] };

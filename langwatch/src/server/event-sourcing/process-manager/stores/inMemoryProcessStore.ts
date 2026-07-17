@@ -137,11 +137,14 @@ export class InMemoryProcessStore implements ProcessStore {
     now: number;
     limit: number;
     leaseDurationMs: number;
+    processNames?: readonly string[];
   }): Promise<LeasedOutboxMessageRecord[]> {
     const leased: LeasedOutboxMessageRecord[] = [];
     for (const message of this.messages.values()) {
       if (leased.length >= params.limit) break;
       if (message.status !== "pending") continue;
+      if (params.processNames && !params.processNames.includes(message.processName))
+        continue;
       if (message.nextAttemptAt > params.now) continue;
       if (message.leasedUntil > params.now) continue;
       message.leasedUntil = params.now + params.leaseDurationMs;

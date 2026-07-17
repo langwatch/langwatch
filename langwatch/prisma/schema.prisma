@@ -3092,6 +3092,41 @@ model ProcessManagerOutbox {
   @@index([status, nextAttemptAt, leasedUntil])
 }
 
+/// Per-project topic clustering run status (ADR-051): the rebuildable
+/// operational read model behind the settings page. One row per project;
+/// folded from run_completed/run_failed events, never written directly.
+model TopicClusteringRunProjection {
+  id        String @id @default(nanoid())
+  projectId String
+
+  LastRequestedAt        Float?  @map("lastRequestedAt")
+  LastRequestTrigger     String? @map("lastRequestTrigger")
+  LastRunAt              Float?  @map("lastRunAt")
+  /// completed | skipped | failed
+  LastRunOutcome         String? @map("lastRunOutcome")
+  LastRunMode            String? @map("lastRunMode")
+  LastRunSkippedReason   String? @map("lastRunSkippedReason")
+  LastRunError           String? @map("lastRunError")
+  LastRunTracesProcessed Int     @default(0) @map("lastRunTracesProcessed")
+  LastRunTopicsCount     Int     @default(0) @map("lastRunTopicsCount")
+  LastRunSubtopicsCount  Int     @default(0) @map("lastRunSubtopicsCount")
+  LastRunPages           Int     @default(0) @map("lastRunPages")
+  InProgressRunId        String? @map("inProgressRunId")
+  InProgressTraces       Int     @default(0) @map("inProgressTraces")
+  InProgressPages        Int     @default(0) @map("inProgressPages")
+
+  CreatedAt         Float  @map("createdAt")
+  UpdatedAt         Float  @map("updatedAt")
+  /// Business time of the latest applied event.
+  OccurredAt        Float  @map("occurredAt")
+  /// Event-log acceptance time. Together with lastEventId this is the cursor.
+  AcceptedAt        Float  @map("acceptedAt")
+  LastEventId       String @map("lastEventId")
+  ProjectionVersion String @map("projectionVersion")
+
+  @@unique([projectId])
+}
+
 // Durable outbox for stake-sensitive reactor dispatch (ADR-025). Reactors
 // registered via `.withOutbox` enqueue rows here; a queue-side audit
 // adapter projects every queue lifecycle event into the row's status.
