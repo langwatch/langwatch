@@ -15,6 +15,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
+import { createTenantId } from "../../../domain/tenantId";
 import { encodeJobEnvelope } from "../jobEnvelope";
 import {
   type DispatchResult,
@@ -23,6 +24,8 @@ import {
   GroupStagingScripts,
   PARK_RECONCILE_MAX_DRAIN,
 } from "../scripts";
+import { TieredBlobStore } from "../tieredBlobStore";
+import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blobTestDoubles";
 
 let redis: Redis;
 let scripts: GroupStagingScripts;
@@ -1853,6 +1856,55 @@ describe("GroupStagingScripts", () => {
         expect(Number(score)).toBeGreaterThan(Date.now());
       });
     });
+
+    describe("when a stale heartbeat fires after retryRestage", () => {
+      // The worker's heartbeat interval stays armed for a few awaits after
+      // retryRestage returns (blob-hold transfer, audit write). Before the
+      // active key was rotated to the retry's id, a heartbeat landing in that
+      // window matched the retired id, reset the lock TTL from the backoff
+      // window back to the full activeTtlSec, and pushed the ready score out
+      // with it — delaying the retry by up to activeTtlSec (5 min at defaults)
+      // instead of the intended backoff.
+      it("does not extend the retry lock or push out the ready score", async () => {
+        await scripts.stage(
+          makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }),
+        );
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 300 });
+
+        const restaged = await scripts.retryRestage({
+          groupId: "group-a",
+          stagedJobId: "j1",
+          newStagedJobId: "j1/r/1",
+          dispatchAfterMs: 5_000,
+          jobDataJson: JSON.stringify({ attempt: 2 }),
+          backoffMs: 3_000,
+        });
+        expect(restaged).toBe(true);
+
+        // The lock now names the retry id, so the retired id can't refresh it.
+        expect(await inspectActiveKey("group-a")).toBe("j1/r/1");
+        const backoffTtl = await redis.ttl(
+          `${keyPrefix()}group:group-a:active`,
+        );
+
+        const ok = await scripts.refreshActiveKey({
+          groupId: "group-a",
+          stagedJobId: "j1",
+          activeTtlSec: 300,
+        });
+        expect(ok).toBe(false);
+
+        // Lock TTL is still the backoff-sized one, not reset to activeTtlSec.
+        const ttlAfterHeartbeat = await redis.ttl(
+          `${keyPrefix()}group:group-a:active`,
+        );
+        expect(ttlAfterHeartbeat).toBeLessThanOrEqual(backoffTtl);
+        // Ready score is still the retry's dispatchAfterMs, not now + activeTtl.
+        expect(
+          Number(await redis.zscore(`${keyPrefix()}ready`, "group-a")),
+        ).toBe(5_000);
+      });
+    });
   });
 
   describe("restageAndBlock", () => {
@@ -2268,6 +2320,128 @@ describe("GroupStagingScripts", () => {
             stagedJobId: "j1",
             dispatchAfterMs: 100,
             jobDataJson: await makeEnvelopeJobData(),
+          }),
+        );
+        const dispatched = (await scripts.dispatch({
+          nowMs: 200,
+          activeTtlSec: 60,
+        }))!;
+
+        await scripts.restageAndBlock({
+          groupId: "group-a",
+          newStagedJobId: "j1/r/1",
+          score: 100,
+          jobDataJson: dispatched.jobDataJson,
+        });
+
+        const perJobName = await redis.get(
+          `${keyPrefix()}stats:failed:traceProjection`,
+        );
+        expect(perJobName).toBe("1");
+      });
+    });
+
+    // ADR-029: GQ2 envelopes carry the same p/t/n routing header as GQ1. The
+    // Lua routing helper was GQ1-only for a while, which silently disabled
+    // pipeline/jobType/jobName-level pause (and the per-job-name failed
+    // counter) for every GQ2 value — these tests pin the GQ2 side of the
+    // pause contract (specs/queue-pausing/queue-pausing.feature).
+    describe("when head-of-line job is a GQ2 envelope", () => {
+      beforeEach(() => {
+        vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      async function makeGq2JobData(): Promise<string> {
+        const objectStore = new InMemoryObjectStore();
+        const tieredBlobs = new TieredBlobStore({
+          redisBlobs: new InMemoryJobBlobStore(),
+          objectStoreFor: () => objectStore,
+          resolveDestination: async () => ({
+            kind: "file" as const,
+            root: "/tmp/gq2-test",
+          }),
+        });
+        // >4 KiB body so the payload is offloaded and the staged value is
+        // header-ONLY — proving the Lua pause-check reads the GQ2 header.
+        return await encodeJobEnvelope({
+          jobData: {
+            __pipelineName: "ingestion",
+            __jobType: "projection",
+            __jobName: "traceProjection",
+            bulk: "x".repeat(5000),
+          },
+          tieredBlobs,
+          projectId: createTenantId("proj_test"),
+        });
+      }
+
+      it("produces a GQ2 value (test-setup sanity)", async () => {
+        expect((await makeGq2JobData()).startsWith("GQ2|")).toBe(true);
+      });
+
+      it("skips group whose GQ2 header matches a paused pipeline", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dispatchAfterMs: 100,
+            jobDataJson: await makeGq2JobData(),
+          }),
+        );
+        await scripts.addPauseKey("ingestion");
+
+        const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        expect(result).toBeNull();
+      });
+
+      it("skips group when paused at jobType level via the GQ2 header", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dispatchAfterMs: 100,
+            jobDataJson: await makeGq2JobData(),
+          }),
+        );
+        await scripts.addPauseKey("ingestion/projection");
+
+        const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        expect(result).toBeNull();
+      });
+
+      it("skips group when paused at jobType/jobName level via the GQ2 header", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dispatchAfterMs: 100,
+            jobDataJson: await makeGq2JobData(),
+          }),
+        );
+        await scripts.addPauseKey("ingestion/projection/traceProjection");
+
+        const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        expect(result).toBeNull();
+      });
+
+      it("dispatches the GQ2 envelope intact when nothing is paused", async () => {
+        const jobDataJson = await makeGq2JobData();
+        await scripts.stage(
+          makeJob({ stagedJobId: "j1", dispatchAfterMs: 100, jobDataJson }),
+        );
+
+        const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        expect(result).not.toBeNull();
+        expect(result!.jobDataJson).toBe(jobDataJson);
+      });
+
+      it("increments the per-job-name failed counter from the GQ2 header", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dispatchAfterMs: 100,
+            jobDataJson: await makeGq2JobData(),
           }),
         );
         const dispatched = (await scripts.dispatch({
@@ -2945,6 +3119,39 @@ describe("GroupStagingScripts", () => {
         // expiry can't cause drift. This was the root cause of the
         // 826K phantom counter in production.
         expect(await inspectTotalPending()).toBe(0);
+      });
+    });
+
+    describe("when the same stagedJobId is staged twice (at-least-once redelivery)", () => {
+      /** @scenario Counter equals sum of all :jobs ZSET cardinalities */
+      it("counts the job once in total-pending", async () => {
+        await scripts.stage(
+          makeJob({ stagedJobId: "j-dup", groupId: "g-dup", dispatchAfterMs: 100 }),
+        );
+        // Re-delivery of the same event id: the ZADD updates the member in
+        // place, so the counter must not INCR a second time.
+        await scripts.stage(
+          makeJob({ stagedJobId: "j-dup", groupId: "g-dup", dispatchAfterMs: 150 }),
+        );
+
+        expect(await redis.zcard(`${keyPrefix()}group:g-dup:jobs`)).toBe(1);
+        expect(await inspectTotalPending()).toBe(1);
+      });
+
+      it("counts the job once when the duplicate arrives inside one stageBatch call", async () => {
+        const job = makeJob({
+          stagedJobId: "j-dup-batch",
+          groupId: "g-dup-batch",
+          dispatchAfterMs: 100,
+        });
+        const { newStagedCount } = await scripts.stageBatch([
+          job,
+          { ...job, dispatchAfterMs: 150 },
+        ]);
+
+        expect(newStagedCount).toBe(1);
+        expect(await redis.zcard(`${keyPrefix()}group:g-dup-batch:jobs`)).toBe(1);
+        expect(await inspectTotalPending()).toBe(1);
       });
     });
 
@@ -3761,7 +3968,7 @@ describe("GroupStagingScripts", () => {
       expect(Math.abs(score - expectedExpiry)).toBeLessThanOrEqual(2000);
     });
 
-    /** @scenario DISPATCH_LUA refuses to dispatch when tenant is at cap */
+    /** @scenario DISPATCH_BATCH_LUA refuses to dispatch when tenant is at cap */
     it("refuses to dispatch a group whose tenant is already at cap", async () => {
       process.env[TENANT_CAP_ENV] = "2";
       // Three groups, all same tenant, all eligible
