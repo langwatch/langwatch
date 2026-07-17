@@ -6,7 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { FormProvider, useForm } from "react-hook-form";
+import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // All mocks need to be set up before any imports
@@ -237,11 +237,17 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-// Mock the form components since they're complex
+// Mock the form components since they're complex. Reads the live model
+// value via useFormContext (not mocked) rather than a hardcoded string, so
+// tests can assert on rendered output instead of only inspecting captured
+// form methods directly.
 vi.mock("~/prompts/forms/fields/ModelSelectFieldMini", () => ({
-  ModelSelectFieldMini: () => (
-    <button data-testid="model-select">gpt-4o</button>
-  ),
+  ModelSelectFieldMini: () => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { watch } = useFormContext();
+    const model = watch("version.configData.llm.model");
+    return <button data-testid="model-select">{model || "(no model)"}</button>;
+  },
 }));
 
 vi.mock(
@@ -525,97 +531,158 @@ describe("PromptEditorDrawer", () => {
     });
   });
 
-  describe("given a project with zero enabled providers when the drawer first opens (#5827 continuation)", () => {
-    /**
-     * @scenario The drawer's init effect runs once and locks in
-     * model: "" when getResolvedDefault has nothing to resolve yet. A
-     * provider gets added in another tab; the cross-tab BroadcastChannel
-     * fix (#5827) refreshes getResolvedDefault here too — but the init
-     * effect is one-shot and never re-fires, so without a dedicated
-     * backfill the form stayed stuck on a blank model forever, showing
-     * an empty selector even though isEmpty had already flipped false.
-     */
-    it("adopts the model once getResolvedDefault resolves after initial mount", async () => {
-      mockGetResolvedDefault.mockReturnValue({
-        data: undefined,
-        isLoading: false,
+  describe("given a project with zero enabled providers", () => {
+    describe("when getResolvedDefault resolves after the drawer already opened (#5827 continuation)", () => {
+      /**
+       * @scenario The drawer's init effect runs once and locks in
+       * model: "" when getResolvedDefault has nothing to resolve yet. A
+       * provider gets added in another tab; the cross-tab BroadcastChannel
+       * fix (#5827) refreshes getResolvedDefault here too — but the init
+       * effect is one-shot and never re-fires, so without a dedicated
+       * backfill the form stayed stuck on a blank model forever, showing
+       * an empty selector even though isEmpty had already flipped false.
+       */
+      it("adopts the model in the rendered selector once getResolvedDefault resolves", async () => {
+        mockGetResolvedDefault.mockReturnValue({
+          data: undefined,
+          isLoading: false,
+        });
+
+        const { rerender } = renderWithProviders(
+          <PromptEditorDrawer open={true} />,
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "(no model)",
+          );
+        });
+
+        // A provider was added in another tab; getResolvedDefault now
+        // resolves on refetch (simulated here via a re-render with new
+        // mock data, since the query itself is mocked out).
+        mockGetResolvedDefault.mockReturnValue({
+          data: {
+            model: "openai/gpt-4o",
+            source: "provider",
+            scope: "PROJECT",
+          },
+          isLoading: false,
+        });
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <PromptEditorDrawer open={true} />
+          </ChakraProvider>,
+        );
+
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "openai/gpt-4o",
+          );
+        });
       });
 
-      const { rerender } = renderWithProviders(
-        <PromptEditorDrawer open={true} />,
-      );
+      it("does not clobber a model the user already picked in the rendered selector", async () => {
+        mockGetResolvedDefault.mockReturnValue({
+          data: undefined,
+          isLoading: false,
+        });
 
-      await waitFor(() => {
-        expect(capturedFormMethods.length).toBeGreaterThan(0);
-      });
-      await waitFor(() => {
-        const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
-        expect(methods.getValues("version.configData.llm.model")).toBe("");
-      });
+        const { rerender } = renderWithProviders(
+          <PromptEditorDrawer open={true} />,
+        );
 
-      // A provider was added in another tab; getResolvedDefault now
-      // resolves on refetch (simulated here via a re-render with new
-      // mock data, since the query itself is mocked out).
-      mockGetResolvedDefault.mockReturnValue({
-        data: { model: "openai/gpt-4o", source: "provider", scope: "PROJECT" },
-        isLoading: false,
-      });
-      rerender(
-        <ChakraProvider value={defaultSystem}>
-          <PromptEditorDrawer open={true} />
-        </ChakraProvider>,
-      );
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "(no model)",
+          );
+        });
 
-      await waitFor(() => {
-        const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
-        expect(methods.getValues("version.configData.llm.model")).toBe(
-          "openai/gpt-4o",
+        // User manually picks a model before any provider resolves.
+        const methodsBeforeBackfill =
+          capturedFormMethods[capturedFormMethods.length - 1]!;
+        methodsBeforeBackfill.setValue(
+          "version.configData.llm.model",
+          "anthropic/claude-3-5-sonnet",
+        );
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "anthropic/claude-3-5-sonnet",
+          );
+        });
+
+        mockGetResolvedDefault.mockReturnValue({
+          data: {
+            model: "openai/gpt-4o",
+            source: "provider",
+            scope: "PROJECT",
+          },
+          isLoading: false,
+        });
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <PromptEditorDrawer open={true} />
+          </ChakraProvider>,
+        );
+
+        // The backfill only fills a genuinely empty model — it must never
+        // overwrite a real (even if not yet saved) user selection.
+        expect(screen.getByTestId("model-select")).toHaveTextContent(
+          "anthropic/claude-3-5-sonnet",
         );
       });
-    });
 
-    it("does not clobber a model the user already picked before resolution arrived", async () => {
-      mockGetResolvedDefault.mockReturnValue({
-        data: undefined,
-        isLoading: false,
-      });
+      it("does not clobber a maxTokens value the user already edited", async () => {
+        mockGetResolvedDefault.mockReturnValue({
+          data: undefined,
+          isLoading: false,
+        });
 
-      const { rerender } = renderWithProviders(
-        <PromptEditorDrawer open={true} />,
-      );
+        const { rerender } = renderWithProviders(
+          <PromptEditorDrawer open={true} />,
+        );
 
-      await waitFor(() => {
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "(no model)",
+          );
+        });
+
+        // User edits the token limit before any provider resolves.
+        const methodsBeforeBackfill =
+          capturedFormMethods[capturedFormMethods.length - 1]!;
+        methodsBeforeBackfill.setValue(
+          "version.configData.llm.maxTokens",
+          777,
+          { shouldDirty: true },
+        );
+
+        mockGetResolvedDefault.mockReturnValue({
+          data: {
+            model: "openai/gpt-4o",
+            source: "provider",
+            scope: "PROJECT",
+          },
+          isLoading: false,
+        });
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <PromptEditorDrawer open={true} />
+          </ChakraProvider>,
+        );
+
+        // The model still backfills (it was never dirtied)...
+        await waitFor(() => {
+          expect(screen.getByTestId("model-select")).toHaveTextContent(
+            "openai/gpt-4o",
+          );
+        });
+        // ...but the user's manually-edited token limit survives.
         const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
-        expect(methods.getValues("version.configData.llm.model")).toBe("");
+        expect(methods.getValues("version.configData.llm.maxTokens")).toBe(
+          777,
+        );
       });
-
-      // User manually picks a model before any provider resolves.
-      const methodsBeforeBackfill =
-        capturedFormMethods[capturedFormMethods.length - 1]!;
-      methodsBeforeBackfill.setValue(
-        "version.configData.llm.model",
-        "anthropic/claude-3-5-sonnet",
-      );
-
-      mockGetResolvedDefault.mockReturnValue({
-        data: { model: "openai/gpt-4o", source: "provider", scope: "PROJECT" },
-        isLoading: false,
-      });
-      rerender(
-        <ChakraProvider value={defaultSystem}>
-          <PromptEditorDrawer open={true} />
-        </ChakraProvider>,
-      );
-
-      // The backfill only fills a genuinely empty model — it must never
-      // overwrite a real (even if not yet saved) user selection.
-      await waitFor(() => {
-        expect(capturedFormMethods.length).toBeGreaterThan(0);
-      });
-      const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
-      expect(methods.getValues("version.configData.llm.model")).toBe(
-        "anthropic/claude-3-5-sonnet",
-      );
     });
   });
 

@@ -564,8 +564,15 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     methods.setValue("version.configData.llm.model", resolvedDefaultModel, {
       shouldDirty: false,
     });
+    // Only backfill maxTokens alongside the model if the user hasn't
+    // already edited it — a manual token-limit change must survive the
+    // late-arriving default same as it would survive anything else.
+    const maxTokensIsDirty = methods.getFieldState(
+      "version.configData.llm.maxTokens",
+      methods.formState,
+    ).isDirty;
     const maxTokens = getMaxTokenLimit(modelMetadata?.[resolvedDefaultModel]);
-    if (maxTokens) {
+    if (maxTokens && !maxTokensIsDirty) {
       methods.setValue("version.configData.llm.maxTokens", maxTokens, {
         shouldDirty: false,
       });
