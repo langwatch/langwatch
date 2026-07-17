@@ -8,7 +8,9 @@
 package sandboxed
 
 import (
+	"context"
 	"os"
+	"os/exec"
 	"syscall"
 
 	"github.com/langwatch/langwatch/services/langyagent/app"
@@ -27,6 +29,22 @@ func New() Runner { return Runner{} }
 
 // Name identifies the runner in logs and telemetry.
 func (Runner) Name() string { return "sandboxed" }
+
+// CommandContext applies per-worker process/file limits before execing
+// OpenCode. RLIMIT_NPROC is accounted per UID, which matches this runner's
+// per-conversation identity boundary. Memory remains a pod-level cgroup limit;
+// Bun's large virtual address reservation makes RLIMIT_AS unsuitable.
+func (Runner) CommandContext(ctx context.Context, binary string, args ...string) *exec.Cmd {
+	limitArgs := []string{
+		"--nproc=64:64",
+		"--nofile=1024:1024",
+		"--fsize=1073741824:1073741824",
+		"--core=0:0",
+		"--",
+		binary,
+	}
+	return exec.CommandContext(ctx, "/usr/bin/prlimit", append(limitArgs, args...)...)
+}
 
 // Chown gives path to the per-conversation UID. Explicit chown is what makes
 // "only the worker UID can read this" literal — without it the root manager

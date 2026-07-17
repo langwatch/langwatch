@@ -1,9 +1,21 @@
 package localunsafe
 
 import (
+	"context"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
+
+func TestCommandContext_ExecutesBinaryDirectly(t *testing.T) {
+	cmd := Runner{}.CommandContext(context.Background(), "/tmp/opencode", "serve")
+	if cmd.Path != "/tmp/opencode" {
+		t.Fatalf("command path = %q, want direct binary", cmd.Path)
+	}
+	if want := []string{"/tmp/opencode", "serve"}; !reflect.DeepEqual(cmd.Args, want) {
+		t.Fatalf("command args = %#v, want %#v", cmd.Args, want)
+	}
+}
 
 // SysProcAttr must omit the setuid Credential (opencode runs as the manager's own
 // user) but keep Setpgid so the manager can group-signal it on shutdown.
