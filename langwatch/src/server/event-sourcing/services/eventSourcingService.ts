@@ -61,9 +61,11 @@ export class EventSourcingService<
     aggregateType,
     eventStore,
     foldProjections,
+    stateProjections,
     mapProjections,
     reactors,
     mapReactors,
+    subscribers,
     serviceOptions,
     logger,
     globalQueue,
@@ -90,7 +92,9 @@ export class EventSourcingService<
       process.env.NODE_ENV === "production" &&
       !globalQueue &&
       ((foldProjections && foldProjections.length > 0) ||
-        (mapProjections && mapProjections.length > 0))
+        (stateProjections && stateProjections.length > 0) ||
+        (mapProjections && mapProjections.length > 0) ||
+        (subscribers && subscribers.length > 0))
     ) {
       this.logger.warn(
         { aggregateType },
@@ -198,6 +202,14 @@ export class EventSourcingService<
       }
     }
 
+    // Default state projections deliberately receive no event-log loaders.
+    // Their injected repository is read directly under the queue's key lock.
+    if (stateProjections) {
+      for (const projection of stateProjections) {
+        this.router.registerStateProjection(projection);
+      }
+    }
+
     // Register map projections
     if (mapProjections) {
       for (const mapProj of mapProjections) {
@@ -241,6 +253,12 @@ export class EventSourcingService<
       }
     }
 
+    if (subscribers) {
+      for (const subscriber of subscribers) {
+        this.router.registerEventSubscriber(subscriber);
+      }
+    }
+
     // All processes register all entries — the shared pipeline queue's Worker
     // must know every job type so it can dispatch any job it picks up.
     if (globalQueue && mapProjections && mapProjections.length > 0) {
@@ -249,6 +267,14 @@ export class EventSourcingService<
 
     if (globalQueue && foldProjections && foldProjections.length > 0) {
       this.router.initializeFoldQueues();
+    }
+
+    if (globalQueue && stateProjections && stateProjections.length > 0) {
+      this.router.initializeStateProjectionQueues();
+    }
+
+    if (globalQueue && subscribers && subscribers.length > 0) {
+      this.router.initializeSubscriberQueues();
     }
 
     if (
@@ -343,7 +369,10 @@ export class EventSourcingService<
         // Dispatch events to all projections (fold + map) via unified router
         if (
           leanedEvents.length > 0 &&
-          (this.router.hasFoldProjections || this.router.hasMapProjections)
+          (this.router.hasFoldProjections ||
+            this.router.hasStateProjections ||
+            this.router.hasMapProjections ||
+            this.router.hasEventSubscribers)
         ) {
           span.addEvent("projection.dispatch.start");
           try {

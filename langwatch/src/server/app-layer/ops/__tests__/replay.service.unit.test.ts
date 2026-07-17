@@ -77,9 +77,35 @@ function stubRuntime(
       },
     ],
     mapProjections: [],
+    stateProjections: [],
     service: { replayOptimized } as StubbedRuntime["service"],
     close: vi.fn(async () => undefined),
   } satisfies StubbedRuntime);
+}
+
+function stubStateRuntime(
+  replay: StubbedRuntime["service"]["replay"],
+) {
+  const replayOptimized = vi.fn();
+  mockedCreateReplayRuntime.mockReturnValue({
+    projections: [],
+    mapProjections: [],
+    stateProjections: [
+      {
+        projectionName: "langyConversationState",
+        pipelineName: "langy_conversation_processing",
+        aggregateType: "langy_conversation",
+        source: "pipeline",
+        pauseKey:
+          "langy_conversation_processing/stateProjection/langyConversationState",
+        kind: "state",
+        definition: {} as never,
+      },
+    ],
+    service: { replay, replayOptimized } as unknown as StubbedRuntime["service"],
+    close: vi.fn(async () => undefined),
+  } satisfies StubbedRuntime);
+  return { replayOptimized };
 }
 
 function buildProgress(
@@ -108,6 +134,42 @@ function buildProgress(
 }
 
 describe("ops ReplayService", () => {
+  it("routes operational state projections through the safe normal replay path", async () => {
+    const repo = createFakeRepo();
+    const service = new ReplayService(repo);
+    const replay = vi.fn(async () => ({
+      aggregatesReplayed: 1,
+      totalEvents: 3,
+      batchErrors: 0,
+    }));
+    const { replayOptimized } = stubStateRuntime(replay);
+
+    await service.startReplay({
+      projectionNames: ["langyConversationState"],
+      since: "2026-01-01",
+      tenantIds: ["project_1"],
+      description: "state rebuild",
+      userName: "tester",
+    });
+
+    await vi.waitFor(async () => {
+      expect((await service.getStatus()).state).toBe("completed");
+    });
+    expect(replay).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projections: [],
+        mapProjections: [],
+        stateProjections: [
+          expect.objectContaining({
+            projectionName: "langyConversationState",
+          }),
+        ],
+      }),
+      expect.objectContaining({ onProgress: expect.any(Function) }),
+    );
+    expect(replayOptimized).not.toHaveBeenCalled();
+  });
+
   describe("given a single batch phase emitting no callbacks for longer than the lock refresh interval", () => {
     describe("when the heartbeat interval elapses during the runtime call", () => {
       it("refreshes the lock from the standalone timer", async () => {

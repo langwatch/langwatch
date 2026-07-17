@@ -6,13 +6,25 @@ import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:fold-executor");
 
+function compareFoldEvents<State, E extends Event>(
+  projection: FoldProjectionDefinition<State, E>,
+  a: E,
+  b: E,
+): number {
+  if (projection.options?.eventOrdering === "acceptedAt") {
+    if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  }
+
+  return a.occurredAt - b.occurredAt;
+}
+
 /**
  * Whether an out-of-order event should replay the aggregate's history rather
  * than being applied on top of the state already loaded.
  *
  * See `FoldProjectionOptions.refoldOnOutOfOrder` for why an order-insensitive
- * fold must opt out. Either way the caller still applies the events in
- * occurredAt order, so declining costs nothing but the replay.
+ * business-time fold may opt out. Accepted-order folds never enter this path.
  */
 function canRefold<State, E extends Event>(
   projection: FoldProjectionDefinition<State, E>,
@@ -58,11 +70,13 @@ function withOccurredAtHint(
  * 4. If out-of-order detected and the projection admits a re-fold → re-fold from scratch
  * 5. `projection.store.store(state, context)`
  *
- * Out-of-order detection: compares event.occurredAt against the state's
- * LastEventOccurredAt (tracked by AbstractFoldProjection). If the event
- * occurred earlier than what we've already seen, all events are re-loaded
- * in occurredAt order and replayed from init() — unless the projection set
- * `options.refoldOnOutOfOrder` to false (see {@link canRefold}).
+ * For business-time folds, out-of-order detection compares event.occurredAt
+ * against the state's LastEventOccurredAt (tracked by
+ * AbstractFoldProjection). If the event occurred earlier than what we've
+ * already seen, all events are re-loaded in occurredAt order and replayed
+ * from init() — unless the projection set `options.refoldOnOutOfOrder` to
+ * false (see {@link canRefold}). Accepted-order folds rely on their serialized
+ * queue lane and do not business-time re-fold a backdated event.
  *
  * Store-miss re-fold (`options.refoldOnStoreMiss`): a fold whose persisted
  * row cannot be read back into fold state (lossy analytics rows) returns
@@ -130,6 +144,7 @@ export class FoldProjectionExecutor {
     // distinct ClickHouse rows regardless.
     const eventOccurredAt = (event as Record<string, unknown>).occurredAt;
     if (
+      projection.options?.eventOrdering !== "acceptedAt" &&
       typeof eventOccurredAt === "number" &&
       eventOccurredAt > 0 &&
       typeof prevLastOccurred === "number" &&
@@ -170,14 +185,16 @@ export class FoldProjectionExecutor {
    * Applies a batch of events for the same aggregate in a single load/store cycle.
    *
    * Equivalent to calling `execute()` once per event, but reads the existing
-   * state once, folds every event in occurredAt order, and writes the result
-   * once. This turns a backed-up group of N events from N load+store round-trips
-   * (O(n²) on growing fold state) into a single one (O(n)).
+   * state once, folds every event in the projection's declared order, and
+   * writes the result once. This turns a backed-up group of N events from N
+   * load+store round-trips (O(n²) on growing fold state) into a single one
+   * (O(n)).
    *
-   * Out-of-order handling matches `execute()`: if the earliest event in the
-   * batch occurred before the persisted checkpoint, the aggregate is re-folded
-   * from scratch via `eventLoader` — when one exists and the projection has not
-   * opted out via `options.refoldOnOutOfOrder` (see {@link canRefold}).
+   * Business-time out-of-order handling matches `execute()`: if the earliest
+   * event in the batch occurred before the persisted checkpoint, the aggregate
+   * is re-folded from scratch via `eventLoader` — when one exists and the
+   * projection has not opted out via `options.refoldOnOutOfOrder` (see
+   * {@link canRefold}).
    */
   async executeBatch<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
@@ -194,12 +211,11 @@ export class FoldProjectionExecutor {
       return this.execute(projection, matching[0]!, context);
     }
 
-    // Process in occurredAt order so the fold sees events as they happened,
-    // regardless of the order they were dispatched/drained in.
-    const ordered = [...matching].sort(
-      (a, b) =>
-        (((a as Record<string, unknown>).occurredAt as number) ?? 0) -
-        (((b as Record<string, unknown>).occurredAt as number) ?? 0),
+    // Most folds follow business time. Lifecycle folds may instead select the
+    // canonical accepted cursor so a backdated transition cannot jump ahead of
+    // an event the log accepted first.
+    const ordered = [...matching].sort((a, b) =>
+      compareFoldEvents(projection, a, b),
     );
 
     const key = context.key ?? context.aggregateId;
@@ -237,6 +253,7 @@ export class FoldProjectionExecutor {
     // otherwise apply the batch on top (matches the single-event executor's
     // degraded behavior when no eventLoader exists).
     const isOutOfOrder =
+      projection.options?.eventOrdering !== "acceptedAt" &&
       typeof earliestOccurredAt === "number" &&
       earliestOccurredAt > 0 &&
       typeof prevLastOccurred === "number" &&
@@ -358,16 +375,13 @@ export class FoldProjectionExecutor {
       "Store miss with refoldOnStoreMiss — re-folding from the event log",
     );
 
-    // Merge delivered events the history read missed back into occurredAt
-    // order before folding — a tail-append would let an event that belongs in
-    // the middle of the history overwrite last-write-wins fields. Stable sort
-    // keeps arrival order for equal occurredAt, same as executeBatch.
+    // Merge delivered events the history read missed back into the fold's
+    // declared order before folding — a tail append could let an event that
+    // belongs in the middle overwrite last-write-wins fields.
     const seen = new Set(history.map((e) => e.id));
     const missing = delivered.filter((e) => !seen.has(e.id));
-    const combined = [...(history as E[]), ...missing].sort(
-      (a, b) =>
-        (((a as Record<string, unknown>).occurredAt as number) ?? 0) -
-        (((b as Record<string, unknown>).occurredAt as number) ?? 0),
+    const combined = [...(history as E[]), ...missing].sort((a, b) =>
+      compareFoldEvents(projection, a, b),
     );
     let state = projection.init();
     for (const e of combined) {
