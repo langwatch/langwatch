@@ -57,6 +57,70 @@ describe("useTargetOutputs", () => {
     });
   });
 
+  describe("given a target with an unsaved local prompt draft", () => {
+    it("prefers the draft's outputs over the target's saved copy", () => {
+      // Clicking "Apply" in the prompt editor only writes to
+      // localPromptConfig — target.outputs is untouched until a real
+      // prompt "Save"/"Update to v2". The field picker must reflect the
+      // draft immediately, or a just-applied JSON schema edit is invisible
+      // until the prompt is saved as a new version.
+      mockQueryResults = [{ data: undefined, isLoading: false }];
+      const draftOutputs = [
+        {
+          identifier: "output",
+          type: "json_schema" as const,
+          json_schema: {
+            type: "object",
+            properties: {
+              document_type: { type: "string" },
+              confidence: { type: "number" },
+            },
+          },
+        },
+      ];
+      const target: TargetConfig = {
+        id: "t1",
+        type: "prompt",
+        promptId: "prompt-1",
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+        mappings: {},
+        localPromptConfig: {
+          llm: { model: "openai/gpt-5-mini" },
+          messages: [],
+          inputs: [],
+          outputs: draftOutputs,
+        },
+      };
+
+      const { result } = renderHook(() => useTargetOutputs([target]));
+
+      expect(result.current[0]).toEqual(draftOutputs);
+    });
+
+    it("falls back to the target's own outputs when the draft has no outputs yet", () => {
+      mockQueryResults = [{ data: undefined, isLoading: false }];
+      const target: TargetConfig = {
+        id: "t1",
+        type: "prompt",
+        promptId: "prompt-1",
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+        mappings: {},
+        localPromptConfig: {
+          llm: { model: "openai/gpt-5-mini" },
+          messages: [],
+          inputs: [],
+          outputs: [],
+        },
+      };
+
+      const { result } = renderHook(() => useTargetOutputs([target]));
+
+      expect(result.current[0]).toBe(target.outputs);
+    });
+  });
+
   describe("given a schema-less output and the prompt query is still loading", () => {
     it("returns undefined instead of the schema-less copy", () => {
       mockQueryResults = [{ data: undefined, isLoading: true }];

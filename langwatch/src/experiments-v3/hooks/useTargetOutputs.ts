@@ -5,8 +5,16 @@ import type { TargetConfig } from "../types";
 type TargetOutputs = TargetConfig["outputs"];
 
 /**
- * The output fields a target actually produces, preferring the target's own
- * copy but falling back to the saved prompt's.
+ * The output fields a target actually produces, preferring an unsaved local
+ * draft, then the target's own copy, then falling back to the saved prompt's.
+ *
+ * Clicking "Apply" in the prompt editor only writes the edit to
+ * `target.localPromptConfig` — it does not touch `target.outputs`, which only
+ * gets refreshed on a real prompt "Save" (`onSave`/`onVersionChange` in
+ * promptEditorCallbacks.ts). Without checking the draft first, a variant's
+ * just-applied JSON schema is invisible to the comparison field picker until
+ * the prompt is actually saved as a new version — surprising, since every
+ * other part of the UI (re-opening the prompt editor) already shows the draft.
  *
  * A workbench target carries a COPY of its prompt's output fields. Until
  * recently the code that wrote that copy mapped it down to `{identifier, type}`
@@ -45,6 +53,14 @@ export const useTargetOutputs = (
 
   return targets.map((target, index) => {
     if (!target) return undefined;
+
+    const draft = target.localPromptConfig?.outputs as
+      | TargetOutputs
+      | undefined;
+    const draftNeedsSchema = (draft ?? []).some(
+      (field) => field.type === "json_schema" && !field.json_schema,
+    );
+    if (draft && draft.length > 0 && !draftNeedsSchema) return draft;
 
     const own = target.outputs;
     // Only reach for the prompt when the target's own copy is missing a schema
