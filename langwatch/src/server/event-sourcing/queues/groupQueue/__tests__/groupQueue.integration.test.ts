@@ -1,3 +1,4 @@
+import type { Redis } from "ioredis";
 import {
   afterAll,
   afterEach,
@@ -8,14 +9,14 @@ import {
   it,
   vi,
 } from "vitest";
-import type { Redis } from "ioredis";
 import {
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-  getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
-import { GroupQueueProcessor } from "../groupQueue";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
+import { GroupQueueProcessor } from "../groupQueue";
+import { GroupStagingScripts } from "../scripts";
 
 // Skip when running without testcontainers (unit-only test runs)
 const hasTestcontainers = !!(
@@ -59,10 +60,9 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
+      vi.restoreAllMocks();
       // Close all queues created during the test
-      await Promise.all(
-        queues.map((q) => q.close().catch(() => {})),
-      );
+      await Promise.all(queues.map((q) => q.close().catch(() => {})));
       await redis.flushall();
     });
 
@@ -333,9 +333,9 @@ describe.skipIf(!hasTestcontainers)(
               { timeout: 5000, interval: 50 },
             );
             // Staging holds exactly the one squashed job, referencing the new blob.
-            expect(
-              await redis.hlen(`${queueName}:gq:group:group-a:data`),
-            ).toBe(1);
+            expect(await redis.hlen(`${queueName}:gq:group:group-a:data`)).toBe(
+              1,
+            );
           } finally {
             vi.unstubAllEnvs();
           }
@@ -373,9 +373,9 @@ describe.skipIf(!hasTestcontainers)(
               },
               { timeout: 5000, interval: 50 },
             );
-            expect(
-              await redis.hlen(`${queueName}:gq:group:group-a:data`),
-            ).toBe(1);
+            expect(await redis.hlen(`${queueName}:gq:group:group-a:data`)).toBe(
+              1,
+            );
           } finally {
             vi.unstubAllEnvs();
           }
@@ -616,7 +616,8 @@ describe.skipIf(!hasTestcontainers)(
 
           await vi.waitFor(
             () => {
-              const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              const total =
+                batches.reduce((n, b) => n + b.length, 0) + singles.length;
               expect(total).toBe(10);
             },
             { timeout: 30000, interval: 50 },
@@ -643,7 +644,11 @@ describe.skipIf(!hasTestcontainers)(
 
           // Send shuffled; the queue must still fold them in score order.
           await queue.sendBatch(
-            [4, 2, 0, 3, 1].map((n) => ({ id: `j${n}`, groupId: "group-a", value: String(n) })),
+            [4, 2, 0, 3, 1].map((n) => ({
+              id: `j${n}`,
+              groupId: "group-a",
+              value: String(n),
+            })),
           );
 
           await vi.waitFor(
@@ -674,12 +679,17 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           await queue.sendBatch(
-            Array.from({ length: 9 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+            Array.from({ length: 9 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
           );
 
           await vi.waitFor(
             () => {
-              const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              const total =
+                batches.reduce((n, b) => n + b.length, 0) + singles.length;
               expect(total).toBe(9);
             },
             { timeout: 30000, interval: 50 },
@@ -713,7 +723,11 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           await queue.sendBatch(
-            Array.from({ length: 5 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+            Array.from({ length: 5 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
           );
 
           await vi.waitFor(
@@ -729,6 +743,10 @@ describe.skipIf(!hasTestcontainers)(
       describe("when a coalesced batch fails", () => {
         /** @scenario 'A failed coalesced batch re-stages its drained siblings' */
         it("re-stages drained siblings so none are lost", async () => {
+          const stageBatch = vi.spyOn(
+            GroupStagingScripts.prototype,
+            "stageBatch",
+          );
           let attempts = 0;
           const succeeded: TestPayload[] = [];
           const queue = createQueue(
@@ -750,7 +768,11 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           await queue.sendBatch(
-            Array.from({ length: 4 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+            Array.from({ length: 4 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+            })),
           );
 
           // Despite the first batch throwing, every event is eventually
@@ -765,6 +787,9 @@ describe.skipIf(!hasTestcontainers)(
             },
             { timeout: 45000, interval: 100 },
           );
+          // One producer stage plus one atomic sibling re-stage. The failed
+          // coalesced handler does not issue one Redis stage call per sibling.
+          expect(stageBatch).toHaveBeenCalledTimes(2);
         });
       });
     });

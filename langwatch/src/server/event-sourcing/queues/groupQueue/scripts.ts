@@ -1,8 +1,7 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-
-import { CachedLuaScript } from "./cachedLuaScript";
 import { BLOB_HOLDER_TTL_SECONDS } from "./blobConstants";
+import { CachedLuaScript } from "./cachedLuaScript";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -1557,6 +1556,8 @@ export interface DrainedJob {
   stagedJobId: string;
   jobDataJson: string;
   originalScore: number;
+  /** Set after this worker has terminally dropped the drained job. */
+  dropped?: boolean;
 }
 
 /**
@@ -1905,7 +1906,11 @@ export class GroupStagingScripts {
           : [],
       };
     }
-    return { newStagedCount: Number(result), orphanedValues: [], reclaimS3Flags: [] };
+    return {
+      newStagedCount: Number(result),
+      orphanedValues: [],
+      reclaimS3Flags: [],
+    };
   }
 
   /**

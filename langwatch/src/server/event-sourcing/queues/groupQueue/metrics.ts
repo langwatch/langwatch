@@ -10,6 +10,8 @@ const metricNames = [
   "gq_jobs_staged_total",
   "gq_jobs_dispatched_total",
   "gq_jobs_completed_total",
+  "gq_handler_invocations_total",
+  "gq_handler_batch_size",
   "gq_jobs_deduped_total",
   "gq_jobs_retried_total",
   "gq_jobs_exhausted_total",
@@ -81,8 +83,21 @@ export const gqJobsDispatchedTotal = new Counter({
 
 export const gqJobsCompletedTotal = new Counter({
   name: "gq_jobs_completed_total",
-  help: "Total number of jobs completed successfully",
+  help: "Total number of payloads completed successfully, including every payload in a coalesced handler batch",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
+});
+
+export const gqHandlerInvocationsTotal = new Counter({
+  name: "gq_handler_invocations_total",
+  help: "Total number of handler attempts; one coalesced batch is one invocation",
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
+});
+
+export const gqHandlerBatchSize = new Histogram({
+  name: "gq_handler_batch_size",
+  help: "Number of payloads passed to each handler attempt, including singleton invocations",
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
+  buckets: [1, 2, 4, 8, 16, 32, 64, 128, 256, 500],
 });
 
 export const gqJobsDedupedTotal = new Counter({
@@ -150,10 +165,10 @@ export const gqRetryBackoffMilliseconds = new Histogram({
   buckets: [100, 500, 1000, 2000, 5000, 10000, 30000, 60000],
 });
 
-// --- Per-job duration metric ---
+// --- Per-handler-invocation duration metric ---
 export const gqJobDurationMilliseconds = new Histogram({
   name: "gq_job_duration_milliseconds",
-  help: "Duration of individual job processing in milliseconds",
+  help: "Duration of one handler invocation in milliseconds; a coalesced batch produces one observation",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
   buckets: [
     1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000,

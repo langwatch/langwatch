@@ -55,11 +55,14 @@ import {
 import {
   gqGroupsBlockedTotal,
   gqGroupsPoisonParkedTotal,
+  gqHandlerBatchSize,
+  gqHandlerInvocationsTotal,
   gqJobDelayMilliseconds,
   gqJobDurationMilliseconds,
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
+  gqJobsDispatchedTotal,
   gqJobsDroppedTotal,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
@@ -861,6 +864,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           nowMs: Date.now(),
           maxJobs: maxBatch - 1,
         });
+        if (drainedSiblings.length > 0) {
+          gqJobsDispatchedTotal.inc(
+            { queue_name: this.queueName },
+            drainedSiblings.length,
+          );
+        }
       } catch (err) {
         this.logger.warn(
           {
@@ -874,10 +883,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }
       if (drainedSiblings.length > 0) {
         try {
-          const parsedSiblings = await Promise.all(
+          const parseResults = await Promise.allSettled(
             drainedSiblings.map((sibling) =>
               this.parseDrainedPayload({ sibling, groupId }),
             ),
+          );
+          // Wait for every parse to settle before handling a transient or
+          // oversized sibling. A terminal parse marks its sibling as dropped;
+          // short-circuiting here could re-stage it before that mark is set.
+          const rejected = parseResults.find(
+            (result) => result.status === "rejected",
+          );
+          if (rejected) {
+            throw rejected.reason;
+          }
+          const parsedSiblings = parseResults.flatMap((result) =>
+            result.status === "fulfilled" ? [result.value] : [],
           );
           const siblingPayloads = parsedSiblings.filter(
             (parsed) => parsed !== null,
@@ -1017,6 +1038,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
               // Run the actual handler with request context propagation
               const requestContext = createContextFromJobData(contextMetadata);
+              const handlerPayloadCount = batchPayloads?.length ?? 1;
+              gqHandlerInvocationsTotal.inc(routingLabels);
+              gqHandlerBatchSize.observe(routingLabels, handlerPayloadCount);
               await runWithContext(requestContext, async () => {
                 if (batchPayloads && this.processBatch) {
                   span.setAttribute(
@@ -1040,7 +1064,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 ],
                 groupId,
               });
-              gqJobsCompletedTotal.inc(routingLabels);
+              gqJobsCompletedTotal.inc(routingLabels, handlerPayloadCount);
 
               // Audit hook: onDispatched fires once per dispatched payload
               // (dispatched + every drained sibling on success).
@@ -1070,10 +1094,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               const category = categorizeError(err);
               const isRetryable = isRetryableJobError(err);
 
-              // The batch stores its fold state only once, at the very end, so a
-              // failure means nothing was persisted for the drained siblings.
-              // Re-stage them so they are re-dispatched (and re-coalesced) on the
-              // dispatched job's retry, rather than lost until an event replay.
+              // Re-stage drained siblings so they are re-dispatched (and
+              // re-coalesced) on the active job's retry. Batch handlers are
+              // at-least-once: stores must tolerate a partial side effect before
+              // throwing, just as they must tolerate a single-job retry.
               if (drainedSiblings.length > 0) {
                 await this.restageDrainedSiblings(groupId, drainedSiblings);
               }
@@ -1334,36 +1358,40 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           ? err.reason === "missing_blob"
           : false),
       });
+      sibling.dropped = true;
       return null;
     }
   }
 
   /**
    * Re-stages siblings drained for a batch that ultimately failed, so they are
-   * re-dispatched instead of lost. Each is staged with its original score and
-   * raw job data (context metadata preserved). Best-effort: a re-stage failure
-   * is logged, not thrown, so it never masks the original processing error.
+   * re-dispatched instead of lost. One atomic stageBatch call restores every
+   * sibling with its original score and raw job data. Their blob holds survive
+   * the drain, so no per-sibling hold acquisition is needed.
    */
   private async restageDrainedSiblings(
     groupId: string,
     siblings: DrainedJob[],
   ): Promise<void> {
-    for (const sibling of siblings) {
-      try {
-        await this.scripts.stage({
+    const restageableSiblings = siblings.filter((sibling) => !sibling.dropped);
+    if (restageableSiblings.length === 0) {
+      return;
+    }
+    try {
+      await this.scripts.stageBatch(
+        restageableSiblings.map((sibling) => ({
           stagedJobId: sibling.stagedJobId,
           groupId,
           dispatchAfterMs: sibling.originalScore,
           dedupId: "",
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
-        });
-        // Re-acquire the sibling's hold (idempotent: it kept its hold through
-        // the drain, and its value — hence token — is unchanged).
-        await this.blobLifecycle.acquire(sibling.jobDataJson);
-      } catch (err) {
-        // The sibling never made it back into staging, so nothing will dispatch
-        // it again — that is a discard, whatever the re-stage intended (#5538).
+        })),
+      );
+    } catch (err) {
+      // Redis applies the script atomically, so it cannot leave only a subset
+      // restored. Record the failed re-stage per payload for drop accounting.
+      for (const sibling of restageableSiblings) {
         this.recordDrop({
           groupId,
           stagedJobId: sibling.stagedJobId,
