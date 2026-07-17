@@ -1,5 +1,5 @@
 import type { Node } from "@xyflow/react";
-import type { Entry, Workflow } from "./dsl";
+import type { Entry, LLMConfig, Workflow } from "./dsl";
 
 export const migrateDSLVersion = (dsl_: Workflow) => {
   const dsl = JSON.parse(JSON.stringify(dsl_)) as Workflow;
@@ -80,8 +80,30 @@ export const migrateDSLVersion = (dsl_: Workflow) => {
 
   // @ts-expect-error
   if (dsl.spec_version === "1.3") {
+    // @ts-expect-error
     dsl.spec_version = "1.4";
     dsl.template_adapter = "dspy_chat_adapter";
+  }
+
+  // @ts-expect-error
+  if (dsl.spec_version === "1.4") {
+    dsl.spec_version = "1.5";
+    // Workflow-level default_llm is gone: every LLM node owns its config.
+    // Fold the old default into any llm parameter that has no model of its
+    // own, then drop the field. A node keeps its explicit sampling params
+    // when only the model was missing.
+    const defaultLLM = (dsl as { default_llm?: LLMConfig }).default_llm;
+    if (typeof defaultLLM?.model === "string" && defaultLLM.model !== "") {
+      dsl.nodes.forEach((node) => {
+        node.data.parameters = node.data.parameters?.map((p) => {
+          if (p.type !== "llm") return p;
+          const value = p.value as LLMConfig | undefined | null;
+          if (value?.model) return p;
+          return { ...p, value: { ...defaultLLM, ...value, model: defaultLLM.model } };
+        });
+      });
+    }
+    delete (dsl as { default_llm?: LLMConfig }).default_llm;
   }
 
   return dsl;

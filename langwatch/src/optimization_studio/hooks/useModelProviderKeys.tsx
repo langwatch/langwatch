@@ -17,8 +17,6 @@ export const useModelProviderKeys = ({
     (modelProvider) => !modelProvider.enabled && !modelProvider.customKeys,
   );
 
-  const defaultModelProvider = workflow.default_llm.model.split("/")[0];
-
   const nodesWithLLMParameter = workflow.nodes.filter((node) =>
     node.data.parameters?.find((p) => p.type === "llm"),
   );
@@ -29,14 +27,13 @@ export const useModelProviderKeys = ({
         "data" in node && typeof node.data === "object"
           ? (node.data as Signature).parameters
               ?.filter((p) => p.type === "llm")
-              .map(
-                (p) =>
-                  (p.value as LLMConfig | undefined)?.model.split("/")[0] ??
-                  defaultModelProvider,
-              )
+              .map((p) => (p.value as LLMConfig | undefined)?.model.split("/")[0])
           : [],
       )
-      .filter((provider): provider is string => provider !== undefined);
+      .filter(
+        (provider): provider is string =>
+          provider !== undefined && provider !== "",
+      );
   };
 
   const nodeProviders = new Set(

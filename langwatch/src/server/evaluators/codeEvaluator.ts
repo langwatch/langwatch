@@ -1,12 +1,6 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import type {
-  Code,
-  End,
-  Entry,
-  Field,
-  Workflow,
-} from "~/optimization_studio/types/dsl";
+import { LATEST_SPEC_VERSION, type Code, type End, type Entry, type Field, type Workflow } from "~/optimization_studio/types/dsl";
 
 /**
  * Code evaluators: custom Python evaluation logic stored directly on the
@@ -163,17 +157,12 @@ export const buildCodeEvaluatorDsl = ({
   };
 
   return {
-    spec_version: "1.4",
+    spec_version: LATEST_SPEC_VERSION,
     workflow_id: `code_evaluator_${nanoid(8)}`,
     name,
     icon: "🧩",
     description: "Code evaluator execution",
     version: "1.0",
-    default_llm: {
-      model: "openai/gpt-4o-mini",
-      temperature: 0,
-      max_tokens: 2048,
-    },
     template_adapter: "default",
     enable_tracing: true,
     nodes: [entryNode, codeNode, endNode] as Workflow["nodes"],

@@ -660,7 +660,10 @@ async function hydrateLlmParameters({
   const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
   if (nodes.length === 0) return { success: true, dsl };
 
-  // Resolve the fallback model: workflow.default_llm.model or DEFAULT_MODEL
+  // Resolve the fallback model. `default_llm` only exists on raw persisted
+  // DSLs from spec_version <= 1.4 (nodes own their config since 1.5); this
+  // reader keeps tolerating it because scenario agents can reference old
+  // workflow versions that were never re-saved.
   const defaultLlm =
     typeof dsl.default_llm === "object" && dsl.default_llm !== null
       ? (dsl.default_llm as Record<string, unknown>)

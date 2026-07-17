@@ -67,6 +67,13 @@ const REGISTRY: FeatureDescriptor[] = [
     description:
       "Model that judges whether a scenario met its success criteria.",
   },
+  {
+    key: "workflows.create_default",
+    role: "DEFAULT",
+    displayName: "New workflow model",
+    description:
+      "Model written into the LLM nodes of a freshly created workflow.",
+  },
 
   // FAST — assistive / background surfaces.
   {
