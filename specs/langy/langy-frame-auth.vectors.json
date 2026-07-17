@@ -1,0 +1,45 @@
+{
+  "_comment": "Cross-language test vector for the Langy authenticated frame contract (LANGY_WORKER_REDESIGN_PLAN.md §0a). The Go worker SIGNS frames; the TS Hono relay VERIFIES them. Both MUST reproduce these MACs byte-for-byte. Regenerate with langy-frame-auth.vectors.gen.mjs — the generator is an INDEPENDENT reference (raw node:crypto), not either implementation under test, so a passing suite proves Go ≡ TS ≡ oracle.",
+  "construction": "mac = hex( HMAC-SHA256( key = hexDecode(runToken), signingInput ) ) where signingInput = concat, over the fields [projectId, userId, conversationId, turnId, frameNonce, payload] in that fixed order, of uint32BE(utf8ByteLength(field)) followed by utf8(field). Length-prefixing makes the field concatenation injective: no byte can be shifted across a field boundary to forge a colliding tuple.",
+  "vectors": [
+    {
+      "name": "delta-frame",
+      "runToken": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      "projectId": "proj_test",
+      "userId": "user_test",
+      "conversationId": "conv_test",
+      "turnId": "turn_test",
+      "frameNonce": "0123456789abcdef0123456789abcdef",
+      "payload": "{\"type\":\"delta\",\"text\":\"hello\"}",
+      "mac": "b7b75ea928eb0b99b7c7aa90b1ce9448fe4f58903ad8b74b1428660f4ffb58bd"
+    },
+    {
+      "name": "heartbeat-minimal",
+      "runToken": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      "projectId": "p",
+      "userId": "u",
+      "conversationId": "c",
+      "turnId": "t",
+      "frameNonce": "ffffffffffffffffffffffffffffffff",
+      "payload": "{\"type\":\"heartbeat\"}",
+      "mac": "9948933b72cfd76790f5ee17b2886d04479595c8f299552a6ecf0ba8f1ac90b3"
+    },
+    {
+      "name": "unicode-card-payload",
+      "runToken": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      "projectId": "prj_ünîcode",
+      "userId": "usr_🔒",
+      "conversationId": "conv-1",
+      "turnId": "turn-9",
+      "frameNonce": "abad1deaabad1deaabad1deaabad1dea",
+      "payload": "{\"type\":\"card\",\"kind\":\"trace_download\",\"detail\":\"café ☕\"}",
+      "mac": "361ce300bc27569ddd9efda0580a30aeffff03e89c0a7b8881d5b4f47e5b9d47"
+    }
+  ],
+  "fieldShift": {
+    "runToken": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+    "a": { "projectId": "ab", "userId": "c", "conversationId": "", "turnId": "", "frameNonce": "", "payload": "", "mac": "590f0ea20ca2ced93c0531417d774ef8858a22f68073cf7049d00a8732ca8d52" },
+    "b": { "projectId": "a", "userId": "bc", "conversationId": "", "turnId": "", "frameNonce": "", "payload": "", "mac": "056fd5ade36b20c335eac1a2da8d285ea3276fe418606ce4a121238a3ec8afa2" },
+    "note": "Proves length-prefixing works: shifting one byte across the projectId/userId boundary yields a DIFFERENT mac. a.mac != b.mac."
+  }
+}

@@ -107,9 +107,6 @@ model User {
   ingestionSourcesCreated  IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated      AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   pinnedTraces             PinnedTrace[]
-  userGitHubCredentials    UserGitHubCredential[]
-  langyConversations       LangyConversation[]      @relation("LangyConversationUser")
-  sharedLangyConversations LangyConversation[]      @relation("LangyConversationSharedBy")
 }
 
 model VerificationToken {
@@ -282,7 +279,7 @@ model Organization {
   anomalyAlerts          AnomalyAlert[]
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
-  userGitHubCredentials  UserGitHubCredential[]
+  langyGithubInstallations LangyGithubInstallation[]
 
   @@index([ssoProvider])
 }
@@ -405,7 +402,6 @@ model Project {
   gatewayChangeEvents      GatewayChangeEvent[]
   pinnedTraces             PinnedTrace[]
   emailSuppressions        EmailSuppression[]
-  langyConversations       LangyConversation[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -429,6 +425,17 @@ model Project {
   /// Department assignment for spend attribution (the project / agent
   /// lens, used when a trace has no principal user). Accounting-only.
   departmentId String?
+
+  /// Per-project Langy egress allow-list (ADR-043). A nullable JSON array of
+  /// host patterns (`["registry.npmjs.org", "*.internal.acme.com"]`) that the
+  /// project's Langy workers may reach outbound. The *presence* of the list is
+  /// the enforcement mode: null/absent ⇒ monitor-only (watch, never block);
+  /// non-empty ⇒ the worker's egress adapter restricts outbound to
+  /// floor ∪ this list. Enforced in the agent pod's egress adapter — NOT the
+  /// gateway — so it lives on the project, not the VirtualKey. Resolved by
+  /// LangyCredentialService.getEgressAllowlist and threaded through the
+  /// per-request credentials envelope. See specs/langy/langy-egress-enforcement.feature.
+  langyEgressAllowlist Json?
 
   @@index([teamId])
   @@index([isPersonal])
@@ -1020,37 +1027,183 @@ model ModelDefaultConfigScope {
   @@index([configId])
 }
 
-/// Per-user GitHub App connection used by Langy to open pull requests
-/// attributed to the requesting user. Stores ONLY the encrypted refresh
-/// token (long-lived but rotating); access tokens (8h TTL) are minted on
-/// demand by langyGithubToken.ts and never persisted.
+/// A GitHub App installation mapped to a LangWatch organization. Langy mints
+/// short-lived (1h) installation access tokens against these rows to open
+/// bot-authored pull requests, scoped to the installation's repositories. No
+/// user token and no secret are stored here — the crown jewel is the App
+/// private key, held only in the control-plane env. Issue: #4747. Spec:
+/// specs/langy/langy-github-install.feature.
 ///
-/// Scoped (userId, organizationId): a user in two orgs connects twice so
-/// the installation context stays org-bounded. Issue: #4747. Spec:
-/// specs/assistant/langy-github-prs.feature.
-model UserGitHubCredential {
-  id                    String       @id @default(nanoid())
-  userId                String
-  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationId        String
-  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  /// GitHub login (e.g. "aryansharma28"). Surfaced in the "Acting as @login"
-  /// sidebar chip and used as the commit author name in the worker.
-  githubLogin           String
-  /// GitHub numeric user id. Stable across renames; used for the
-  /// noreply commit email (<id>+<login>@users.noreply.github.com).
-  githubUserId          String
-  /// AES-256-GCM encrypted refresh token. Encrypted via
-  /// langwatch/src/utils/encryption.ts (same scheme as ProjectSecret).
-  encryptedRefreshToken String
-  /// Space-separated OAuth scopes granted (informational; the App installation
-  /// is the real authority on what the token can do).
-  scopes                String?
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @default(now()) @updatedAt
+/// installationId is globally unique (one GitHub installation → one row); a
+/// single LangWatch organization may own MANY installations (different GitHub
+/// accounts), so the org↔installation relationship is one-to-many.
+model LangyGithubInstallation {
+  id                  String       @id @default(nanoid())
+  /// GitHub installation id (numeric; stored as string). Globally unique.
+  installationId      String       @unique
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// The GitHub account (organization or user) the App is installed on.
+  accountLogin        String
+  /// "Organization" or "User".
+  accountType         String
+  /// GitHub numeric account id (stable across renames).
+  accountId           String
+  /// "all" or "selected" — whether the App can see every repo on the account
+  /// or only a chosen subset.
+  repositorySelection String
+  /// Cached repository list [{ id, fullName }] when repositorySelection =
+  /// "selected". Null when "all" (the full set is resolved live at mint time).
+  repositories        Json?
+  /// Set when GitHub suspends the installation; cleared on unsuspend. A
+  /// suspended installation cannot mint tokens.
+  suspendedAt         DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @default(now()) @updatedAt
 
-  @@unique([userId, organizationId])
   @@index([organizationId])
+}
+
+/// Rebuildable operational state folded from Langy's canonical event stream.
+/// The source of truth remains the ClickHouse event log.
+model LangyConversationProjection {
+  id        String @id @default(nanoid())
+  projectId String
+
+  ConversationId       String                     @map("conversationId")
+  /// Owner; first-writer-wins from the first message's userId.
+  UserId               String                     @map("userId")
+  Title                String?                    @map("title")
+  /// derived | auto | user — governs auto-title precedence (user is sticky).
+  TitleSource          LangyProjectionTitleSource @map("titleSource")
+  Status               String                     @map("status")
+  IsShared             Boolean                    @default(false) @map("isShared")
+  SharedAt             Float?                     @map("sharedAt")
+  SharedById           String?                    @map("sharedById")
+  MessageCount         Int                        @default(0) @map("messageCount")
+  LastActivityAt       Float?                     @map("lastActivityAt")
+  /// The turn in flight, or null when idle (busy guard reads this).
+  CurrentTurnId        String?                    @map("currentTurnId")
+  LastError            String?                    @map("lastError")
+  /// ADR-048 shutdown-handoff resume token (opaque, worker-authored).
+  PendingHandoffToken  String?                    @map("pendingHandoffToken")
+  PendingHandoffTurnId String?                    @map("pendingHandoffTurnId")
+  /// Per-conversation HMAC key for worker stream frames; server-side only.
+  RunToken             String?                    @map("runToken")
+  ArchivedAt           Float?                     @map("archivedAt")
+  CreatedAt            Float                      @map("createdAt")
+  UpdatedAt            Float                      @map("updatedAt")
+  /// Business time of the latest applied event.
+  OccurredAt           Float                      @map("occurredAt")
+  /// Event-log acceptance time. Together with lastEventId this is the cursor.
+  AcceptedAt           Float                      @map("acceptedAt")
+  LastEventId          String                     @map("lastEventId")
+  ProjectionVersion    String                     @map("projectionVersion")
+
+  @@unique([projectId, ConversationId])
+  @@index([projectId, UserId, ConversationId])
+  @@index([projectId, UserId, LastActivityAt])
+}
+
+/// Durable idempotency receipt for one logical Langy send. A transport retry
+/// reuses the same requestId and receives the original conversation/turn ids
+/// instead of minting a second message or turn.
+model LangyTurnRequest {
+  id             String   @id @default(nanoid())
+  projectId      String
+  userId         String
+  requestId      String
+  conversationId String
+  turnId         String
+  status         String
+  leaseOwner     String
+  leaseExpiresAt DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([projectId, userId, requestId])
+  @@index([projectId, conversationId])
+}
+
+/// Postgres-authoritative one-turn admission for a conversation. PREPARING
+/// claims are leased so a crash before the durable start event can recover;
+/// COMMITTED claims are released only by the matching terminal event.
+model LangyActiveTurn {
+  id             String   @id @default(nanoid())
+  projectId      String
+  conversationId String
+  turnId         String
+  requestId      String
+  userId         String
+  status         String
+  leaseOwner     String
+  leaseExpiresAt DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([projectId, conversationId])
+  @@index([projectId, userId])
+}
+
+/// Rebuildable per-turn operational render document.
+model LangyConversationTurnProjection {
+  id                String                    @id @default(nanoid())
+  projectId         String
+  ConversationId    String                    @map("conversationId")
+  TurnId            String                    @map("turnId")
+  Status            LangyProjectionTurnStatus @map("status")
+  /// LangyMessagePart[] — the user question that opened the turn.
+  QuestionParts     Json                      @map("questionParts")
+  /// LangyMessagePart[] — the agent's whole final answer.
+  AnswerParts       Json                      @map("answerParts")
+  /// LangyTurnToolCall[] — tool-call lifecycle audit in initiation order.
+  ToolCalls         Json                      @map("toolCalls")
+  /// LangyPlanItemData[] | null — null means the turn never kept a plan.
+  Plan              Json?                     @map("plan")
+  Error             String?                   @map("error")
+  StartedAt         Float?                    @map("startedAt")
+  EndedAt           Float?                    @map("endedAt")
+  CreatedAt         Float                     @map("createdAt")
+  UpdatedAt         Float                     @map("updatedAt")
+  OccurredAt        Float                     @map("occurredAt")
+  AcceptedAt        Float                     @map("acceptedAt")
+  LastEventId       String                    @map("lastEventId")
+  ProjectionVersion String                    @map("projectionVersion")
+
+  @@unique([projectId, ConversationId, TurnId])
+  @@index([projectId, ConversationId, UpdatedAt])
+}
+
+/// Rebuildable operational message fact. One source event produces one row.
+model LangyMessageProjection {
+  id             String @id @default(nanoid())
+  projectId      String
+  ConversationId String @map("conversationId")
+  MessageId      String @map("messageId")
+  Role           String @map("role")
+  Parts          Json   @map("parts")
+  SourceEventId  String @map("sourceEventId")
+  OccurredAt     Float  @map("occurredAt")
+  AcceptedAt     Float  @map("acceptedAt")
+  CreatedAt      Float  @map("createdAt")
+  UpdatedAt      Float  @map("updatedAt")
+
+  @@unique([projectId, ConversationId, MessageId])
+  @@unique([projectId, SourceEventId])
+  @@index([projectId, ConversationId, CreatedAt])
+}
+
+enum LangyProjectionTitleSource {
+  derived
+  auto
+  user
+}
+
+enum LangyProjectionTurnStatus {
+  pending
+  running
+  completed
+  failed
 }
 
 model ProjectSecret {
@@ -2875,6 +3028,70 @@ model FeatureFlag {
   updatedAt    DateTime @default(now()) @updatedAt
 }
 
+/// Durable state for a long-running event-sourced process.
+model ProcessManagerInstance {
+  id          String   @id @default(nanoid())
+  processName String
+  projectId   String
+  processKey  String
+  tenantId    String
+  userId      String?
+  state       Json
+  revision    Int
+  nextWakeAt  DateTime? @db.Timestamptz(3)
+  updatedAt   DateTime  @db.Timestamptz(3)
+
+  @@unique([processName, projectId, processKey])
+  @@index([nextWakeAt])
+}
+
+/// Idempotency marker for a source event consumed by a process definition.
+model ProcessManagerInbox {
+  id            String   @id @default(nanoid())
+  processName   String
+  projectId     String
+  processKey    String
+  tenantId      String
+  sourceEventId String
+  consumedAt    DateTime @db.Timestamptz(3)
+
+  @@unique([processName, projectId, sourceEventId])
+  @@index([processName, projectId, processKey, consumedAt])
+}
+
+enum ProcessManagerOutboxStatus {
+  pending
+  dispatched
+  dead
+}
+
+/// Transactional intents emitted by a durable process transition.
+model ProcessManagerOutbox {
+  id            String                     @id @default(nanoid())
+  processName   String
+  projectId     String
+  processKey    String
+  tenantId      String
+  userId        String?
+  messageKey    String
+  intentType    String
+  payload       Json
+  traceCarrier  Json
+  sourceEventId String?
+  status        ProcessManagerOutboxStatus @default(pending)
+  attempts      Int                        @default(0)
+  nextAttemptAt DateTime                   @db.Timestamptz(3)
+  leasedUntil   DateTime?                  @db.Timestamptz(3)
+  leaseToken    String?                    @unique
+  dispatchedAt  DateTime?                  @db.Timestamptz(3)
+  createdAt     DateTime                   @db.Timestamptz(3)
+  updatedAt     DateTime                   @db.Timestamptz(3)
+
+  @@unique([processName, projectId, messageKey])
+  @@index([processName, projectId, processKey, createdAt])
+  @@index([status, nextAttemptAt, leasedUntil])
+}
+
 // Durable outbox for stake-sensitive reactor dispatch (ADR-025). Reactors
 // registered via `.withOutbox` enqueue rows here; a queue-side audit
 // adapter projects every queue lifecycle event into the row's status.
@@ -2949,48 +3166,13 @@ model ReactorOutbox {
     @@index([status, leasedUntil])
 }
 // ============================================================================
-// Langy assistant — see specs/assistant/memory-design.md §3
+// Langy assistant
 // ============================================================================
-
-model LangyConversation {
-  id              String    @id @default(cuid())
-  projectId       String
-  userId          String
-  title           String?
-  isShared        Boolean   @default(false)
-  sharedAt        DateTime?
-  sharedById      String?
-  lastActivityAt  DateTime?
-  messageCount    Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
-
-  // PII purge path: when a Project or User is deleted VIA THE PRISMA
-  // CLIENT, the conversation (and its messages via the LangyMessage
-  // cascade below) goes too. Postgres tables are outside the ClickHouse
-  // retention sweep, so without this the chat text would be retained
-  // indefinitely.
-  //
-  // IMPORTANT under relationMode="prisma": NO SQL FK constraint is
-  // emitted. The cascade runs at the Prisma-client layer ONLY — a raw
-  // `DELETE FROM "Project"` issued via psql or direct-SQL admin tooling
-  // will NOT cascade and will orphan chat content. For GDPR-correct
-  // purges, all Project/User deletes MUST route through the Prisma
-  // client (or a future SQL trigger we haven't built yet).
-  //
-  // The sharedBy relation uses SetNull so a shared conversation outlives
-  // the sharer's account (the recipient can still see it, attributed to
-  // no one).
-  project  Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user     User           @relation("LangyConversationUser", fields: [userId], references: [id], onDelete: Cascade)
-  sharedBy User?          @relation("LangyConversationSharedBy", fields: [sharedById], references: [id], onDelete: SetNull)
-  @@index([projectId, userId, lastActivityAt])
-  @@index([projectId, isShared, updatedAt])
-  @@index([deletedAt])
-  @@index([userId])
-  @@index([sharedById])
-}
+// The Langy conversation SPINE moved off Postgres onto the event-sourcing
+// framework (ADR-046). The conversation is now a projection of an event stream:
+// its spine lives in the ClickHouse `langy_conversations` fold table and its
+// messages in `langy_messages`. The old `LangyConversation` Postgres model was
+// deleted; see migration `..._drop_langy_conversation`.
 
 // ADR-042 Phase 1: the generic calendar-scheduling primitive. One row per
 // scheduled thing, `targetType`/`targetId` keep it consumer-agnostic (a
@@ -3046,4 +3228,3 @@ model ScheduledJob {
   // conditional update keyed on the target identity.
   @@unique([targetType, targetId])
 }
-
