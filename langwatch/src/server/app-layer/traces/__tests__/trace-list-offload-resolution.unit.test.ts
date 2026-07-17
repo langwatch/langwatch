@@ -405,7 +405,13 @@ describe("TraceListService read-time offload resolution (#5835)", () => {
         });
 
         expect(page.items).toHaveLength(rowCount);
-        // Every row's spans were read exactly once, in row order...
+        // Row order is preserved despite the unordered bounded execution (the
+        // index-based writes back into spansPerTrace) — assert the sequence,
+        // don't just claim it.
+        expect(page.items.map((item) => item.traceId)).toEqual(
+          rows.map((row) => row.traceId),
+        );
+        // Every row's spans were read exactly once...
         expect(spansReader.getNormalizedSpansByTraceId).toHaveBeenCalledTimes(
           rowCount,
         );
