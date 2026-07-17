@@ -837,6 +837,16 @@ export const DashboardLayout = ({
             height="full"
             background="bg.surface"
             borderTopLeftRadius="xl"
+            // The Langy panel's edge, on the card that holds the whole app —
+            // one notch quieter than the panel's own: the muted hairline on
+            // the two edges that meet the page chrome, and (dark) a fainter
+            // cut of the panel's inset lit top rim, so the surface reads as
+            // a raised card catching light rather than a flat cut-out.
+            borderTopWidth="1px"
+            borderLeftWidth="1px"
+            borderStyle="solid"
+            borderColor="border.muted"
+            _dark={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" }}
             overflow="auto"
             display="flex"
             minHeight="calc(100vh - 56px)"

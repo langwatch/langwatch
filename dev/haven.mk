@@ -29,13 +29,20 @@ HAVEN = $$(command -v haven || echo "go run $(HAVEN_PKG)")
 
 # `make haven <subcommand>` — forward the rest of the command line to the haven
 # CLI (same MAKECMDGOALS trick as `make quickstart` / `make worktree`). The extra
-# words are neutralised as no-op goals so make doesn't try to build them itself;
-# dev/haven.mk is included LAST in the Makefile so those no-ops win over any real
-# target of the same name (e.g. `down`, `install`).
+# words are neutralised as no-op goals so make doesn't try to build them itself.
+#
+# EXCEPT words that are already real targets with a recipe (`install`, `down`):
+# eval-ing `install:;@:` here would give `install` a SECOND recipe, which makes
+# `make` warn ("overriding commands for target 'install'"). Those two are
+# instead guarded at their own recipe in the Makefile — no-op when `haven` is the
+# first goal — so `make haven install` runs the go-install below (not pnpm
+# install / compose down) with no redefinition and no warning.
+HAVEN_REAL_TARGETS := install down
 ifeq (haven,$(firstword $(MAKECMDGOALS)))
   HAVEN_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-  ifneq ($(HAVEN_ARGS),)
-    $(eval $(HAVEN_ARGS):;@:)
+  HAVEN_NOOP_ARGS := $(filter-out $(HAVEN_REAL_TARGETS),$(HAVEN_ARGS))
+  ifneq ($(HAVEN_NOOP_ARGS),)
+    $(eval $(HAVEN_NOOP_ARGS):;@:)
   endif
 endif
 

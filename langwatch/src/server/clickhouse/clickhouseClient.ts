@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { prisma } from "../db";
 import { _getSharedClickHouseClient } from "./client";
+import { ClickHouseLogger } from "./clickhouseLogger";
 import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:routing");
@@ -193,6 +194,7 @@ function getOrCreateCustomClient(
     clickhouse_settings: {
       date_time_input_format: "best_effort",
     },
+    log: { LoggerClass: ClickHouseLogger },
   });
 
   const client = wrapWithDefaultSettings(

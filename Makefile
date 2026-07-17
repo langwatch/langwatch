@@ -161,7 +161,11 @@ test-scripts:
 
 # Stop all services
 down:
+ifneq (haven,$(firstword $(MAKECMDGOALS)))
 	$(COMPOSE) --profile full down
+else
+	@:
+endif
 
 # Tail logs
 logs:
@@ -179,8 +183,15 @@ clean:
 # LEGACY COMMANDS (run services locally, not in Docker)
 # =============================================================================
 
+# Guarded so `make haven install` (which go-installs the haven CLI via the
+# `haven` target in dev/haven.mk) doesn't ALSO run pnpm install: when `haven`
+# is the first goal this recipe is a no-op. Plain `make install` is unaffected.
 install:
+ifneq (haven,$(firstword $(MAKECMDGOALS)))
 	cd langwatch && pnpm install
+else
+	@:
+endif
 
 # Run the app (pnpm dev, which also auto-starts the Go aigateway) alongside
 # the Go nlpgo engine. nlpgo is the `nlpgo` subcommand of the cmd/service

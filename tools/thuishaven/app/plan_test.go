@@ -12,12 +12,13 @@ import (
 // other, never red.
 func TestNoLaneIsRed(t *testing.T) {
 	const red = "31"
-	o := &Orchestrator{cfg: Config{Home: t.TempDir()}}
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 
 	children := o.planChildren(
 		domain.Stack{Slug: "test"},
 		PlanOptions{ShouldStartWorkers: true},
 		t.TempDir(),
+		"", // langyDockerHost — not exercised here; the langy lane isn't under test
 	)
 
 	var sawWorkers bool
@@ -33,3 +34,15 @@ func TestNoLaneIsRed(t *testing.T) {
 		t.Fatal("expected a workers lane in the plan")
 	}
 }
+
+// stubProxy satisfies app.Proxy for planChildren, which reads only CACertPath().
+// "" means "no portless CA present", so no NODE_EXTRA_CA_CERTS is appended.
+type stubProxy struct{}
+
+func (stubProxy) Register(string, string, int) error { return nil }
+func (stubProxy) Remove(string, string)              {}
+func (stubProxy) Running() bool                      { return false }
+func (stubProxy) Installed() bool                    { return false }
+func (stubProxy) EnsureReady() error                 { return nil }
+func (stubProxy) Endpoint() (string, int)            { return "https", 443 }
+func (stubProxy) CACertPath() string                 { return "" }

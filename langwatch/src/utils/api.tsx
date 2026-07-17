@@ -293,6 +293,11 @@ function createQueryClientConfig() {
         networkMode: "always" as const,
       },
       queries: {
+        // Keep navigation/focus from replaying every active tRPC query. Pages
+        // opt into focus refresh explicitly when they show live operational
+        // state; ordinary project metadata and analytics stay warm for 30s.
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
         networkMode:
           process.env.NODE_ENV !== "production"
             ? ("always" as const)

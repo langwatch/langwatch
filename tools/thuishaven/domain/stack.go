@@ -61,8 +61,14 @@ type Stack struct {
 	LocalAPIKey string `json:"localApiKey"`
 	// IsBaseline marks this stack as the shared default other worktrees fall back to
 	// for services they do not run themselves (see Service.IsFallback).
-	IsBaseline bool      `json:"baseline,omitempty"`
-	Services   []Service `json:"services"`
+	IsBaseline bool `json:"baseline,omitempty"`
+	// LangyTier is the local isolation posture the langyagent worker runs under
+	// (see LangyTier). The zero value is LangyTierSandboxed — the safe, production-
+	// like default — so a stack persisted before this field existed reads back as
+	// sandboxed. It decides whether the worker runs in colima or on the host and
+	// which callback URLs the overlay hands the control plane.
+	LangyTier LangyTier `json:"langyTier,omitempty"`
+	Services  []Service `json:"services"`
 	// UpdatedAt is refreshed by the launcher's heartbeat; the daemon reaps a
 	// stack whose launcher has died or whose heartbeat has gone stale.
 	UpdatedAt time.Time `json:"updatedAt"`

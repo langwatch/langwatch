@@ -132,7 +132,7 @@ export function errorFormatterForTesting({
   error,
 }: {
   shape: any;
-  error: { cause?: unknown; message?: string };
+  error: { cause?: unknown; message?: string; code?: string };
 }) {
   const cause = error.cause as
     | { limitType?: string; current?: number; max?: number }
@@ -188,10 +188,31 @@ export function errorFormatterForTesting({
       ? error.cause.toResponseBody()
       : null;
 
+  // A 5xx is an implementation failure, not user-facing copy. tRPC defaults
+  // the response message to the thrown Error's message, which can contain
+  // Prisma models, SQL, hostnames, or other platform internals. HandledError is
+  // the only exception: its message is explicitly authored as safe domain
+  // copy. The original error remains on the TRPCError for loggerMiddleware,
+  // exception capture, and OTel span recording.
+  const isInternalServerError =
+    error.code === "INTERNAL_SERVER_ERROR" ||
+    shape?.data?.code === "INTERNAL_SERVER_ERROR";
+  const message =
+    isInternalServerError && !(error.cause instanceof HandledError)
+      ? HandledError.toUserMessage(error.cause)
+      : shape.message;
+  const shapeData = { ...shape.data };
+  if (isInternalServerError && !(error.cause instanceof HandledError)) {
+    // tRPC includes stacks in development error shapes. Local callers should
+    // exercise the same safe wire contract as production callers.
+    delete shapeData.stack;
+  }
+
   return {
     ...shape,
+    message,
     data: {
-      ...shape.data,
+      ...shapeData,
       zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
       cause:
         missingModelCause ??
@@ -395,11 +416,7 @@ function isAuditLogExempt(path: string): boolean {
 
 const auditLogMutations = t.middleware(
   async ({ ctx, next, type, path, input }) => {
-    if (
-      type !== "mutation" ||
-      !ctx.session?.user ||
-      isAuditLogExempt(path)
-    ) {
+    if (type !== "mutation" || !ctx.session?.user || isAuditLogExempt(path)) {
       return next();
     }
 
@@ -634,9 +651,8 @@ function isSilencedCall(path: string, type: string): boolean {
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
-    const { createContextFromTRPC, runWithContext } = await import(
-      "../context/asyncContext"
-    );
+    const { createContextFromTRPC, runWithContext } =
+      await import("../context/asyncContext");
 
     // Create context from tRPC context and input
     const requestContext = createContextFromTRPC(ctx, input as any);

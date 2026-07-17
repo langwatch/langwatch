@@ -11,7 +11,7 @@ import (
 
 // Watch is the TUI: a live, auto-refreshing terminal dashboard of every running
 // stack and its per-service health. In agent mode it degrades to a single plain
-// `list` snapshot — no alt-screen, no colour, no redraws, no token waste.
+// `list` snapshot — no alt-screen, no color, no redraws, no token waste.
 func (o *Orchestrator) Watch(ctx context.Context) error {
 	if o.cfg.IsAgent {
 		return o.List(false)

@@ -42,6 +42,29 @@ describe("StorageMeterService memory guard", () => {
         assertGuarded(arg);
       }
     });
+
+    it("meters Langy analytics into the traces category", async () => {
+      const query = vi.fn(async ({ query }: { query: string }) => ({
+        json: async () => [
+          { total: query.includes("FROM langy_analytics_events") ? "17" : "0" },
+        ],
+      }));
+      const service = new StorageMeterService({
+        resolveClickHouseClient: async () => ({ query }) as any,
+      });
+
+      const breakdown = await service.getStorageBreakdown({
+        tenantId: "project-langy",
+      });
+
+      expect(breakdown.byCategory.traces).toBe(17);
+      expect(breakdown.totalBytes).toBe(17);
+      expect(
+        query.mock.calls.some(([request]) =>
+          request.query.includes("FROM langy_analytics_events"),
+        ),
+      ).toBe(true);
+    });
   });
 
   describe("when computing the total storage bytes", () => {
