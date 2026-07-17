@@ -62,7 +62,7 @@ describe("MetricDataPointClickHouseRepository", () => {
       async () => client,
     );
 
-    await repository.ensureDataPoint(dataPoint(), 49);
+    await repository.ensureDataPoint({ point: dataPoint(), retentionDays: 49 });
 
     expect(insert.mock.calls.map((call) => call[0].table)).toEqual([
       "metric_data_points",
@@ -104,6 +104,58 @@ describe("MetricDataPointClickHouseRepository", () => {
     expect(shadow).not.toHaveProperty("WrittenAt");
   });
 
+  describe("when a replay chunk is written", () => {
+    it("sends one insert per table rather than one per point", async () => {
+      const insert = vi.fn<
+        (args: { table: string; values: unknown[] }) => Promise<void>
+      >(async () => {});
+      const client = { insert } as never;
+      const repository = new MetricDataPointClickHouseRepository(
+        async () => client,
+      );
+      const points = [
+        { ...dataPoint(), pointId: "a".repeat(64), timeUnixMs: 1 },
+        { ...dataPoint(), pointId: "b".repeat(64), timeUnixMs: 2 },
+        { ...dataPoint(), pointId: "c".repeat(64), timeUnixMs: 3 },
+      ];
+
+      await repository.ensureDataPoints({ points, retentionDays: 49 });
+
+      expect(insert).toHaveBeenCalledTimes(2);
+      expect(insert.mock.calls.map((call) => call[0].table)).toEqual([
+        "metric_data_points",
+        "metric_usage_estimates",
+      ]);
+      expect(insert.mock.calls[0]![0].values).toHaveLength(3);
+      expect(insert.mock.calls[1]![0].values).toHaveLength(3);
+    });
+
+    it("collapses a series to its newest point, which is the only one that can win", async () => {
+      const insert = vi.fn<
+        (args: { table: string; values: unknown[] }) => Promise<void>
+      >(async () => {});
+      const client = { insert } as never;
+      const repository = new MetricDataPointClickHouseRepository(
+        async () => client,
+      );
+      const base = dataPoint();
+      const points = [
+        { ...base, pointId: "a".repeat(64), timeUnixMs: 1_000 },
+        { ...base, pointId: "b".repeat(64), timeUnixMs: 3_000 },
+        { ...base, pointId: "c".repeat(64), timeUnixMs: 2_000 },
+      ];
+
+      await repository.upsertSeriesMany({ points, retentionDays: 49 });
+
+      expect(insert).toHaveBeenCalledOnce();
+      const values = insert.mock.calls[0]![0].values as Array<
+        Record<string, unknown>
+      >;
+      expect(values).toHaveLength(1);
+      expect(values[0]).toMatchObject({ LastSeenAt: new Date(3_000) });
+    });
+  });
+
   it("uses PointId-deduplicated analysis and organization-aware routing", async () => {
     const query = vi.fn<
       (args: { query: string }) => Promise<{ json: () => Promise<unknown[]> }>
@@ -141,6 +193,15 @@ describe("MetricDataPointClickHouseRepository", () => {
     );
     expect(query.mock.calls[0]![0].query).toContain(
       "uniqExact(tuple(SeriesId, AcceptedHour))",
+    );
+    // Pins the isolation carve-out in clickhouse-queries.md: the shadow ledger
+    // is organization-scoped, so OrganizationId leads the predicate and no
+    // TenantId filter is applied when no tenant was asked for.
+    expect(query.mock.calls[0]![0].query).toContain(
+      "WHERE OrganizationId = {organizationId:String}",
+    );
+    expect(query.mock.calls[0]![0].query).not.toContain(
+      "TenantId = {tenantId:String}",
     );
     expect(result).toEqual([
       {

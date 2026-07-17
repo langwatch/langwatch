@@ -3,10 +3,12 @@ import type { CanonicalMetricDataPoint } from "~/server/event-sourcing/pipelines
 import type { RecordMetricCorrelationCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { MetricRequestCollectionService } from "../metric-request-collection.service";
 
-function makeService() {
+function makeService(
+  recordDataPointImpl: (data: CanonicalMetricDataPoint) => Promise<void> = async () => {},
+) {
   const recordDataPoint = vi.fn<
     (data: CanonicalMetricDataPoint) => Promise<void>
-  >(async () => {});
+  >(recordDataPointImpl);
   const recordMetricCorrelation = vi.fn<
     (data: RecordMetricCorrelationCommandData) => Promise<void>
   >(async () => {});
@@ -191,6 +193,29 @@ describe("MetricRequestCollectionService", () => {
       traceId,
       spanId,
       exemplarValue: 2.5,
+    });
+  });
+
+  describe("when persisting a point throws", () => {
+    it("reports the failure without echoing internals to the caller", async () => {
+      const internals =
+        "connect ECONNREFUSED clickhouse-shard-3.internal:9440 while INSERT INTO metric_data_points";
+      const { service } = makeService(async () => {
+        throw new Error(internals);
+      });
+
+      const result = await service.handleOtlpMetricRequest({
+        ...requestContext,
+        metricRequest: gaugeRequest({ value: 1 }),
+      });
+
+      expect(result.acceptedDataPoints).toBe(0);
+      expect(result.rejectedDataPoints).toBe(1);
+      expect(result.errorMessage).toBe(
+        "requests.active: failed to record data point",
+      );
+      expect(result.errorMessage).not.toContain("clickhouse-shard-3");
+      expect(result.errorMessage).not.toContain("INSERT INTO");
     });
   });
 });

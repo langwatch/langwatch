@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./constants";
+import { metricCorrelationFields } from "./metricCorrelationFields";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
 export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
@@ -64,21 +65,7 @@ export type RecordLogCommandData = z.infer<typeof recordLogCommandDataSchema>;
 
 export const recordMetricCorrelationCommandDataSchema = z.object({
   tenantId: z.string(),
-  traceId: z.string(),
-  spanId: z.string(),
-  pointId: z.string().regex(/^[a-f0-9]{64}$/),
-  seriesId: z.string().regex(/^[a-f0-9]{64}$/),
-  metricName: z.string(),
-  metricUnit: z.string(),
-  metricKind: z.enum([
-    "gauge",
-    "sum",
-    "histogram",
-    "exponential_histogram",
-    "summary",
-  ]),
-  exemplarValue: z.number().nullable(),
-  exemplarTimeUnixMs: z.number().int().nonnegative(),
+  ...metricCorrelationFields,
   occurredAt: z.number(),
 });
 

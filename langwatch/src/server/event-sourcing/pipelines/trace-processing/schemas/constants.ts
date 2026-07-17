@@ -25,6 +25,16 @@ export const METRIC_DATA_POINT_CORRELATED_EVENT_TYPE =
 export const METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST =
   "2026-07-15" as const;
 
+/**
+ * How many metric exemplars correlate to a trace — NOT how many metric data
+ * points its metrics produced. Trace folds only ever see the trace-scoped
+ * correlation events; canonical data points are a separate pipeline. The
+ * legacy `metric_record_count` key it replaces counted folded metric records,
+ * which no longer exist.
+ */
+export const METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE =
+  "langwatch.reserved.metric_exemplar_correlation_count" as const;
+
 export const ORIGIN_RESOLVED_EVENT_TYPE =
   "lw.obs.trace.origin_resolved" as const;
 export const ORIGIN_RESOLVED_EVENT_VERSION_LATEST = "2026-03-13" as const;

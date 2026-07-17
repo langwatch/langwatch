@@ -31,6 +31,9 @@ export interface MetricRequestCollectionResult {
   errorMessage?: string;
 }
 
+/** Returned in place of a persistence exception, which may name internals. */
+const PERSISTENCE_ERROR_MESSAGE = "failed to record data point";
+
 /**
  * Converts an OTLP request into immutable canonical data-point events. A bad
  * point is isolated from its siblings so the caller can return OTLP partial
@@ -70,6 +73,11 @@ export class MetricRequestCollectionService {
         kind: ApiSpanKind.PRODUCER,
         attributes: {
           "tenant.id": tenantId,
+          // Intentional: both ids are opaque internal KSUIDs, and metric usage
+          // is metered per organization while ingestion for an ingestion-key
+          // source lands in a hidden governance project — without the
+          // organization id an operator cannot tie a metric span to the
+          // account it bills to. Neither id carries end-user data.
           "organization.id": organizationId,
           resource_metric_count: metricRequest.resourceMetrics?.length ?? 0,
         },
@@ -96,9 +104,13 @@ export class MetricRequestCollectionService {
             acceptedDataPoints++;
           } catch (error) {
             rejectedDataPoints++;
-            const message =
-              error instanceof Error ? error.message : String(error);
-            errors.push(`${prepared.dataPoint.metricName}: ${message}`);
+            // Preparation errors describe the caller's own payload and are
+            // safe to return. A persistence failure is ours: its message can
+            // name internal hosts, tables and queries, so the sender gets a
+            // stable string and the detail goes to the log only.
+            errors.push(
+              `${prepared.dataPoint.metricName}: ${PERSISTENCE_ERROR_MESSAGE}`,
+            );
             this.logger.error(
               {
                 error,
