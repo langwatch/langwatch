@@ -107,7 +107,7 @@ examples = [
     "langsmith>=0.8.0",  # security: CVE-2026-45134 (#1175)
     "pypdf>=6.8.0",  # security: CVE-2026-31826 (#543)
     "strands-agents[otel]>=1.14.0,<2.0.0",
-    "nltk>=3.9.4",
+    "nltk>=3.10.0",  # security: nltk advisory (#1495)
     "unstructured[pdf]>=0.18.18",
 ]
 tests = [
@@ -130,4 +130,5 @@ constraint-dependencies = [
     "python-socketio>=5.16.2",  # security: python-socketio advisory (#1547)
     "bleach>=6.4.0",  # security: bleach advisory (#1494)
     "onnx>=1.22.0",  # security: onnx advisory (#1560)
+    "mcp>=1.28.1",  # security: mcp advisories (#1601, #1603, #1607)
 ]
