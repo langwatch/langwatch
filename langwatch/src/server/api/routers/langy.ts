@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { AGENT_CHAT_TIMEOUT_MS } from "~/server/app-layer/langy/execution/langy-turn-errors";
+import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
 import type {
   ConversationDetail,
   ConversationListItem,
@@ -64,11 +65,22 @@ const LANGY_READ_PERMISSION = "evaluations:view" as const;
 const langyReadProcedure = protectedProcedure
   .input(z.object({ projectId: z.string() }))
   .use(checkProjectPermission(LANGY_READ_PERMISSION))
-  .use(async ({ input, next }) => {
+  .use(async ({ ctx, input, next }) => {
     if (isDemoProjectId(input.projectId)) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "Langy is not available on the demo project.",
+      });
+    }
+    if (
+      !(await hasLangyAccess({
+        user: ctx.session.user,
+        projectId: input.projectId,
+      }))
+    ) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Langy is not currently enabled for this account.",
       });
     }
     return next();

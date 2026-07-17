@@ -32,9 +32,9 @@ import {
   publicEndpoint,
 } from "~/server/api/security";
 import { getApp } from "~/server/app-layer";
+import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
-import { featureFlagService } from "~/server/featureFlag";
 import {
   consumeGithubInstallNonce,
   registerGithubInstallNonce,
@@ -49,7 +49,6 @@ import {
   signGithubOauthState,
   verifyGithubOauthState,
 } from "~/server/app-layer/langy/githubOauthState";
-import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 
 import type { NextRequestShim } from "./types";
 
@@ -184,19 +183,13 @@ secured
     if (!session?.user) {
       return c.json({ error: "Not authenticated" }, { status: 401 });
     }
-    // Gate by release_langy_enabled (staff bypass) so the install can't be
-    // started before the assistant is rolled out for the user.
-    if (!isLangwatchStaff(session.user)) {
-      const allowed = await featureFlagService.isEnabled(
-        "release_langy_enabled",
-        { distinctId: session.user.id },
+    // Same authoritative gate as Langy's tRPC surface so the GitHub install
+    // cannot become a rollout bypass.
+    if (!(await hasLangyAccess({ user: session.user }))) {
+      return c.json(
+        { error: "The GitHub integration is not enabled for this account." },
+        { status: 404 },
       );
-      if (!allowed) {
-        return c.json(
-          { error: "The GitHub integration is not enabled for this account." },
-          { status: 404 },
-        );
-      }
     }
     const organizationId = c.req.query("organizationId") ?? "";
     if (!organizationId) {
@@ -331,7 +324,10 @@ type WebhookAction =
   | "added"
   | "removed";
 
-function verifyWebhookSignature(rawBody: string, header: string | undefined): boolean {
+function verifyWebhookSignature(
+  rawBody: string,
+  header: string | undefined,
+): boolean {
   const secret = env.GITHUB_LANGY_WEBHOOK_SECRET;
   if (!secret || !header) return false;
   const expected =
@@ -349,9 +345,7 @@ secured
     }
     // Read the RAW body — the HMAC is over the exact bytes GitHub sent.
     const rawBody = await c.req.text();
-    if (
-      !verifyWebhookSignature(rawBody, c.req.header("x-hub-signature-256"))
-    ) {
+    if (!verifyWebhookSignature(rawBody, c.req.header("x-hub-signature-256"))) {
       return c.json({ error: "Invalid signature" }, { status: 401 });
     }
 
@@ -368,9 +362,7 @@ secured
     const eventType = c.req.header("x-github-event");
     const action = payload.action as WebhookAction | undefined;
     const installationId =
-      payload.installation?.id != null
-        ? String(payload.installation.id)
-        : null;
+      payload.installation?.id != null ? String(payload.installation.id) : null;
 
     if (
       (eventType !== "installation" &&
@@ -388,7 +380,10 @@ secured
         installationId,
       });
     } catch (err) {
-      logger.warn({ err, action, installationId }, "github webhook handling failed");
+      logger.warn(
+        { err, action, installationId },
+        "github webhook handling failed",
+      );
       // Still ack — retries won't help a persistent handling error, and the
       // next event (or the setup callback) reconciles.
     }
