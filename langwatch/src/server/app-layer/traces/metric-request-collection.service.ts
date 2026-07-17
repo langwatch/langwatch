@@ -4,8 +4,8 @@ import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transform
 import { getLangWatchTracer } from "langwatch";
 import type { DeepPartial } from "~/utils/types";
 import {
-  prepareMetricDataPoints,
   type MetricPreparationResult,
+  prepareMetricDataPoints,
 } from "../../event-sourcing/pipelines/metric-processing/canonicalMetric";
 import type { CanonicalMetricDataPoint } from "../../event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
 import {
@@ -15,9 +15,9 @@ import {
 import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 
 export interface MetricRequestCollectionDeps {
-  recordDataPoint: (data: CanonicalMetricDataPoint) => Promise<void>;
-  recordMetricCorrelation: (
-    data: RecordMetricCorrelationCommandData,
+  recordDataPoints: (data: CanonicalMetricDataPoint[]) => Promise<void>;
+  recordMetricCorrelations: (
+    data: RecordMetricCorrelationCommandData[],
   ) => Promise<void>;
   piiRedactionService?: Pick<
     OtlpSpanPiiRedactionService,
@@ -94,51 +94,58 @@ export class MetricRequestCollectionService {
             acceptedAt,
           });
 
-        let acceptedDataPoints = 0;
+        let acceptedDataPoints = preparation.accepted.length;
         let rejectedDataPoints = preparation.rejectedDataPoints;
         const errors = [...preparation.errors];
 
-        for (const prepared of preparation.accepted) {
+        if (preparation.accepted.length > 0) {
           try {
-            await this.deps.recordDataPoint(prepared.dataPoint);
-            acceptedDataPoints++;
+            await this.deps.recordDataPoints(
+              preparation.accepted.map(({ dataPoint }) => dataPoint),
+            );
           } catch (error) {
-            rejectedDataPoints++;
+            acceptedDataPoints = 0;
+            rejectedDataPoints += preparation.accepted.length;
             // Preparation errors describe the caller's own payload and are
             // safe to return. A persistence failure is ours: its message can
             // name internal hosts, tables and queries, so the sender gets a
             // stable string and the detail goes to the log only.
-            errors.push(
-              `${prepared.dataPoint.metricName}: ${PERSISTENCE_ERROR_MESSAGE}`,
-            );
+            errors.push(`canonical metric batch: ${PERSISTENCE_ERROR_MESSAGE}`);
             this.logger.error(
               {
                 error,
                 tenantId,
-                pointId: prepared.dataPoint.pointId,
-                metricName: prepared.dataPoint.metricName,
+                pointCount: preparation.accepted.length,
+                pointIds: preparation.accepted
+                  .slice(0, 10)
+                  .map(({ dataPoint }) => dataPoint.pointId),
               },
-              "Failed to enqueue canonical metric data point",
+              "Failed to enqueue canonical metric data point batch",
             );
-            continue;
           }
+        }
 
+        if (acceptedDataPoints > 0) {
           // Correlation is deliberately best-effort and separate from metric
           // acceptance. A valid metric remains accepted if a trace fold is
           // temporarily unavailable.
-          for (const correlation of prepared.correlations) {
+          const correlations = preparation.accepted.flatMap(
+            ({ correlations }) => correlations,
+          );
+          if (correlations.length > 0) {
             try {
-              await this.deps.recordMetricCorrelation(correlation);
+              await this.deps.recordMetricCorrelations(correlations);
             } catch (error) {
               this.logger.error(
                 {
                   error,
                   tenantId,
-                  pointId: prepared.dataPoint.pointId,
-                  traceId: correlation.traceId,
-                  spanId: correlation.spanId,
+                  correlationCount: correlations.length,
+                  pointIds: correlations
+                    .slice(0, 10)
+                    .map(({ pointId }) => pointId),
                 },
-                "Failed to enqueue metric exemplar correlation",
+                "Failed to enqueue metric exemplar correlation batch",
               );
             }
           }

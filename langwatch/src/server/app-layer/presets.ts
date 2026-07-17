@@ -1016,8 +1016,9 @@ export function initializeDefaultApp(options?: {
 
   const metricCollection = traced(
     new MetricRequestCollectionService({
-      recordDataPoint: commands.metrics.recordDataPoint,
-      recordMetricCorrelation: commands.traces.recordMetricCorrelation,
+      recordDataPoints: commands.metrics.recordDataPoint.sendBatch!,
+      recordMetricCorrelations:
+        commands.traces.recordMetricCorrelation.sendBatch!,
     }),
     "MetricRequestCollectionService",
   );
@@ -1254,8 +1255,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         ),
         metricCollection: traced(
           new MetricRequestCollectionService({
-            recordDataPoint: noop,
-            recordMetricCorrelation: noop,
+            recordDataPoints: noop,
+            recordMetricCorrelations: noop,
           }),
           "MetricRequestCollectionService",
         ),
