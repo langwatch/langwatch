@@ -544,6 +544,40 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     resolvedDefaultModel,
   ]);
 
+  // Backfill the model once resolvedDefaultModel arrives AFTER the init
+  // effect above already ran with an empty model — e.g. this drawer first
+  // opened on a project with zero providers (getResolvedDefault had
+  // nothing to resolve), and a provider was added in another tab since
+  // (#5827: the cache now refreshes cross-tab, but the init effect is a
+  // one-shot gated by isFormInitialized and never re-fires). Scoped to
+  // brand-new/not-found prompts only, and only while the model field is
+  // still the unresolved empty placeholder, so it can never clobber a
+  // real user edit or server value.
+  const isNewOrNotFoundPrompt =
+    !promptId || (!promptQuery.data && !promptQuery.isLoading);
+  useEffect(() => {
+    if (!isFormInitialized) return;
+    if (!isNewOrNotFoundPrompt) return;
+    if (!resolvedDefaultModel) return;
+    if (methods.getValues("version.configData.llm.model")) return;
+
+    methods.setValue("version.configData.llm.model", resolvedDefaultModel, {
+      shouldDirty: false,
+    });
+    const maxTokens = getMaxTokenLimit(modelMetadata?.[resolvedDefaultModel]);
+    if (maxTokens) {
+      methods.setValue("version.configData.llm.maxTokens", maxTokens, {
+        shouldDirty: false,
+      });
+    }
+  }, [
+    isFormInitialized,
+    isNewOrNotFoundPrompt,
+    resolvedDefaultModel,
+    modelMetadata,
+    methods,
+  ]);
+
   // Reset when drawer closes
   useEffect(() => {
     if (!isOpen) {

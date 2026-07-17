@@ -179,6 +179,7 @@ const mockPromptDataWithMessages = {
 };
 
 const mockGetByIdOrHandle = vi.fn();
+const mockGetResolvedDefault = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 
@@ -194,10 +195,7 @@ vi.mock("~/utils/api", () => ({
     },
     modelProvider: {
       getResolvedDefault: {
-        useQuery: () => ({
-          data: { model: "openai/gpt-4", source: "test", scope: "PROJECT" },
-          isLoading: false,
-        }),
+        useQuery: () => mockGetResolvedDefault(),
       },
     },
     prompts: {
@@ -350,6 +348,10 @@ describe("PromptEditorDrawer", () => {
     capturedInitialConfigValues.length = 0;
     capturedFormMethods.length = 0;
     mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
+    mockGetResolvedDefault.mockReturnValue({
+      data: { model: "openai/gpt-4", source: "test", scope: "PROJECT" },
+      isLoading: false,
+    });
     // Default: form values equal saved values (no changes)
     mockAreFormValuesEqual.mockReturnValue(true);
     // Reset drawer params
@@ -520,6 +522,100 @@ describe("PromptEditorDrawer", () => {
     it("Save button is disabled when no handle entered", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       expect(screen.getByTestId("save-prompt-button")).toBeDisabled();
+    });
+  });
+
+  describe("given a project with zero enabled providers when the drawer first opens (#5827 continuation)", () => {
+    /**
+     * @scenario The drawer's init effect runs once and locks in
+     * model: "" when getResolvedDefault has nothing to resolve yet. A
+     * provider gets added in another tab; the cross-tab BroadcastChannel
+     * fix (#5827) refreshes getResolvedDefault here too — but the init
+     * effect is one-shot and never re-fires, so without a dedicated
+     * backfill the form stayed stuck on a blank model forever, showing
+     * an empty selector even though isEmpty had already flipped false.
+     */
+    it("adopts the model once getResolvedDefault resolves after initial mount", async () => {
+      mockGetResolvedDefault.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+      });
+
+      const { rerender } = renderWithProviders(
+        <PromptEditorDrawer open={true} />,
+      );
+
+      await waitFor(() => {
+        expect(capturedFormMethods.length).toBeGreaterThan(0);
+      });
+      await waitFor(() => {
+        const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
+        expect(methods.getValues("version.configData.llm.model")).toBe("");
+      });
+
+      // A provider was added in another tab; getResolvedDefault now
+      // resolves on refetch (simulated here via a re-render with new
+      // mock data, since the query itself is mocked out).
+      mockGetResolvedDefault.mockReturnValue({
+        data: { model: "openai/gpt-4o", source: "provider", scope: "PROJECT" },
+        isLoading: false,
+      });
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <PromptEditorDrawer open={true} />
+        </ChakraProvider>,
+      );
+
+      await waitFor(() => {
+        const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
+        expect(methods.getValues("version.configData.llm.model")).toBe(
+          "openai/gpt-4o",
+        );
+      });
+    });
+
+    it("does not clobber a model the user already picked before resolution arrived", async () => {
+      mockGetResolvedDefault.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+      });
+
+      const { rerender } = renderWithProviders(
+        <PromptEditorDrawer open={true} />,
+      );
+
+      await waitFor(() => {
+        const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
+        expect(methods.getValues("version.configData.llm.model")).toBe("");
+      });
+
+      // User manually picks a model before any provider resolves.
+      const methodsBeforeBackfill =
+        capturedFormMethods[capturedFormMethods.length - 1]!;
+      methodsBeforeBackfill.setValue(
+        "version.configData.llm.model",
+        "anthropic/claude-3-5-sonnet",
+      );
+
+      mockGetResolvedDefault.mockReturnValue({
+        data: { model: "openai/gpt-4o", source: "provider", scope: "PROJECT" },
+        isLoading: false,
+      });
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <PromptEditorDrawer open={true} />
+        </ChakraProvider>,
+      );
+
+      // The backfill only fills a genuinely empty model — it must never
+      // overwrite a real (even if not yet saved) user selection.
+      await waitFor(() => {
+        expect(capturedFormMethods.length).toBeGreaterThan(0);
+      });
+      const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
+      expect(methods.getValues("version.configData.llm.model")).toBe(
+        "anthropic/claude-3-5-sonnet",
+      );
     });
   });
 
