@@ -57,9 +57,13 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: gate.flagEnabled }),
 }));
 
-vi.mock("~/utils/isLangwatchStaff", () => ({
-  isLangwatchStaff: () => gate.staff,
-}));
+vi.mock("~/utils/isLangwatchStaff", async (importOriginal) => {
+  // Keep the real LANGY_RELEASE_FLAG constant (useShowLangy reads it); only the
+  // staff predicate is driven by the test's gate.
+  const actual =
+    await importOriginal<typeof import("~/utils/isLangwatchStaff")>();
+  return { ...actual, isLangwatchStaff: () => gate.staff };
+});
 
 // Stub the heavy chat surface. Open state genuinely lives in the zustand
 // store nowadays, so the stub reads the REAL store and exposes a button that

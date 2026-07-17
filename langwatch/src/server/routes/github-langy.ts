@@ -32,9 +32,9 @@ import {
   publicEndpoint,
 } from "~/server/api/security";
 import { getApp } from "~/server/app-layer";
+import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
-import { featureFlagService } from "~/server/featureFlag";
 import {
   consumeGithubInstallNonce,
   registerGithubInstallNonce,
@@ -49,7 +49,6 @@ import {
   signGithubOauthState,
   verifyGithubOauthState,
 } from "~/server/app-layer/langy/githubOauthState";
-import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 
 import type { NextRequestShim } from "./types";
 
@@ -184,20 +183,6 @@ secured
     if (!session?.user) {
       return c.json({ error: "Not authenticated" }, { status: 401 });
     }
-    // Gate by release_langy_enabled (staff bypass) so the install can't be
-    // started before the assistant is rolled out for the user.
-    if (!isLangwatchStaff(session.user)) {
-      const allowed = await featureFlagService.isEnabled(
-        "release_langy_enabled",
-        { distinctId: session.user.id },
-      );
-      if (!allowed) {
-        return c.json(
-          { error: "The GitHub integration is not enabled for this account." },
-          { status: 404 },
-        );
-      }
-    }
     const organizationId = c.req.query("organizationId") ?? "";
     if (!organizationId) {
       return c.json(
@@ -205,7 +190,12 @@ secured
         { status: 400 },
       );
     }
-    // Cross-tenant guard: the user must be a member of the org they install for.
+    // Cross-tenant guard FIRST: the user must be a member of the org they
+    // install for. Membership is proven before the org-scoped Langy flag so a
+    // non-member's response can't reveal that org's rollout state (FORBIDDEN
+    // when enabled vs NOT_FOUND when disabled would be a cross-tenant probe).
+    // Same order as the tRPC surface: enforceOrganizationMembership then
+    // enforceLangyAccess.
     if (
       !(await getApp().langy.githubInstallations.isOrganizationMember({
         userId: session.user.id,
@@ -215,6 +205,15 @@ secured
       return c.json(
         { error: "Not a member of this organization." },
         { status: 403 },
+      );
+    }
+    // Same authoritative gate as Langy's tRPC surface so the GitHub install
+    // cannot become a rollout bypass. Forward organizationId so an org-scoped
+    // rollout rule resolves the same way it does on the tRPC surface.
+    if (!(await hasLangyAccess({ user: session.user, organizationId }))) {
+      return c.json(
+        { error: "The GitHub integration is not enabled for this account." },
+        { status: 404 },
       );
     }
 
@@ -282,6 +281,25 @@ secured
       return setupError(c, state, "Not a member of this organization", 403);
     }
 
+    // Re-check the Langy gate before persisting anything. The install may have
+    // begun while the flag was on; if the rollout was disabled (or the caller's
+    // access revoked) in between, the internal-only boundary must still hold, so
+    // the kill switch is immediate for this customer-facing path. The nonce was
+    // already burned above, so a denied caller can't retry the signed state.
+    if (
+      !(await hasLangyAccess({
+        user: session.user,
+        organizationId: state.organizationId,
+      }))
+    ) {
+      return setupError(
+        c,
+        state,
+        "The GitHub integration is not enabled for this account.",
+        404,
+      );
+    }
+
     const returnTo = safeReturnTo(state.returnTo);
 
     let accountLogin: string;
@@ -331,7 +349,10 @@ type WebhookAction =
   | "added"
   | "removed";
 
-function verifyWebhookSignature(rawBody: string, header: string | undefined): boolean {
+function verifyWebhookSignature(
+  rawBody: string,
+  header: string | undefined,
+): boolean {
   const secret = env.GITHUB_LANGY_WEBHOOK_SECRET;
   if (!secret || !header) return false;
   const expected =
@@ -349,9 +370,7 @@ secured
     }
     // Read the RAW body — the HMAC is over the exact bytes GitHub sent.
     const rawBody = await c.req.text();
-    if (
-      !verifyWebhookSignature(rawBody, c.req.header("x-hub-signature-256"))
-    ) {
+    if (!verifyWebhookSignature(rawBody, c.req.header("x-hub-signature-256"))) {
       return c.json({ error: "Invalid signature" }, { status: 401 });
     }
 
@@ -368,9 +387,7 @@ secured
     const eventType = c.req.header("x-github-event");
     const action = payload.action as WebhookAction | undefined;
     const installationId =
-      payload.installation?.id != null
-        ? String(payload.installation.id)
-        : null;
+      payload.installation?.id != null ? String(payload.installation.id) : null;
 
     if (
       (eventType !== "installation" &&
@@ -388,7 +405,10 @@ secured
         installationId,
       });
     } catch (err) {
-      logger.warn({ err, action, installationId }, "github webhook handling failed");
+      logger.warn(
+        { err, action, installationId },
+        "github webhook handling failed",
+      );
       // Still ack — retries won't help a persistent handling error, and the
       // next event (or the setup callback) reconciles.
     }

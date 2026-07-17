@@ -512,10 +512,12 @@ function LangyPanel({
   // projectId + context, killing the old "Try again" 400.
   const turnContextRef = useRef<LangyTurnRequestContext | null>(null);
 
-  // The custom transport (memoised once): POSTs the turn to /langy/chat, then
-  // bridges the `langy.onTurnStream` tRPC subscription into the UIMessageChunk
-  // stream useChat consumes. Conversation/turn adoption + status/progress
-  // signals are pushed straight into the store (getState), so no ref plumbing.
+  // The custom transport (memoised once): starts the turn via the
+  // `langy.createConversation` / `langy.continueConversation` tRPC mutations,
+  // then bridges the `langy.onTurnStream` tRPC subscription into the
+  // UIMessageChunk stream useChat consumes. Conversation/turn adoption +
+  // status/progress signals are pushed straight into the store (getState), so no
+  // ref plumbing.
   const transport = useMemo(
     () =>
       createLangyChatTransport({

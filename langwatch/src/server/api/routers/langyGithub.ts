@@ -9,18 +9,22 @@
  *                      deep link to GitHub's uninstall page; the webhook cleans up
  *                      the local row once GitHub confirms.
  *
- * Transport only: org-membership gate + audit, delegating every operation to the
- * app-layer service. The install flow itself is the public REST callback in
- * src/server/routes/github-langy.ts (GitHub's Setup URL can't live behind tRPC).
- * Issue #4747.
+ * Transport only: the authoritative Langy internal-only gate
+ * (`enforceLangyAccess`) + org-membership gate + audit, delegating every
+ * operation to the app-layer service. The gate matters here as much as on the
+ * install route — a non-staff org member must not read or manage Langy's GitHub
+ * App state while Langy is disabled for the account. The install flow itself is
+ * the public REST callback in src/server/routes/github-langy.ts (GitHub's Setup
+ * URL can't live behind tRPC). Issue #4747.
  */
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { authorizeInResolver } from "~/server/api/rbac";
+import { authorizeInResolver, type PermissionMiddleware } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
 import { auditLog } from "~/server/auditLog";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { enforceLangyAccess } from "./langyAccessMiddleware";
 
 async function ensureOrganizationMember(
   userId: string,
@@ -35,6 +39,23 @@ async function ensureOrganizationMember(
     throw new TRPCError({ code: "FORBIDDEN", message: "Forbidden" });
   }
 }
+
+/**
+ * Prove org membership BEFORE the Langy rollout gate runs. `authorizeInResolver`
+ * only defers the generic permission check to the resolver; it does not
+ * authorize the organization. If `enforceLangyAccess` ran first, a signed-in
+ * non-member could pass a guessed org id and tell that org's rollout state apart
+ * from the response — FORBIDDEN when the flag is on (gate passes, membership
+ * fails) vs NOT_FOUND when it is off (gate denies) — a cross-tenant probe of an
+ * arbitrary tenant's Langy rollout. Running membership first makes a
+ * non-member's response independent of the org's flag value.
+ */
+const enforceOrganizationMembership: PermissionMiddleware<{
+  organizationId: string;
+}> = async ({ ctx, input, next }) => {
+  await ensureOrganizationMember(ctx.session.user.id, input.organizationId);
+  return next();
+};
 
 // GitHub can only be uninstalled by a human on github.com. Deep-link to the
 // right settings page for the account type.
@@ -53,8 +74,9 @@ export const langyGithubRouter = createTRPCRouter({
   getInstallStatus: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(authorizeInResolver)
-    .query(async ({ ctx, input }) => {
-      await ensureOrganizationMember(ctx.session.user.id, input.organizationId);
+    .use(enforceOrganizationMembership)
+    .use(enforceLangyAccess)
+    .query(async ({ input }) => {
       const service = getApp().langy.githubInstallations;
       const installations = await service.getAllForOrganization(
         input.organizationId,
@@ -80,8 +102,9 @@ export const langyGithubRouter = createTRPCRouter({
   listRepos: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(authorizeInResolver)
-    .query(async ({ ctx, input }) => {
-      await ensureOrganizationMember(ctx.session.user.id, input.organizationId);
+    .use(enforceOrganizationMembership)
+    .use(enforceLangyAccess)
+    .query(async ({ input }) => {
       return getApp().langy.githubInstallations.listRepositoriesForOrganization(
         input.organizationId,
       );
@@ -92,8 +115,9 @@ export const langyGithubRouter = createTRPCRouter({
       z.object({ organizationId: z.string(), installationId: z.string() }),
     )
     .use(authorizeInResolver)
+    .use(enforceOrganizationMembership)
+    .use(enforceLangyAccess)
     .mutation(async ({ ctx, input }) => {
-      await ensureOrganizationMember(ctx.session.user.id, input.organizationId);
       const installation =
         await getApp().langy.githubInstallations.getByInstallationId(
           input.installationId,

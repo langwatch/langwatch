@@ -22,6 +22,7 @@ import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy
 import { trackServerEvent } from "~/server/posthog";
 import { connection } from "~/server/redis";
 import { checkProjectPermission, isDemoProjectId } from "../rbac";
+import { enforceLangyAccess } from "./langyAccessMiddleware";
 import {
   type LangyConversationDetailDto,
   type LangyConversationListCursorDto,
@@ -38,28 +39,37 @@ import {
 /**
  * Read-side tRPC router for Langy conversations (ADR-046 frontend).
  *
- * Mirrors `tracesV2` exactly: a SLIM `list` reading only the Postgres
+ * Mirrors `tracesV2` for reads: a SLIM `list` reading only the Postgres
  * conversation projection (no content), a separate on-demand `messages` read
  * for the heavy Postgres message history, a `newCount` the panel polls only
- * when the freshness SSE is
- * disconnected, and a single `onConversationUpdate` subscription that pushes a
- * lightweight per-conversation signal (never row data). All commands
- * (send/rename/share/delete) still flow through the Hono chat + REST surface;
- * this router is read + real-time only.
+ * when the freshness SSE is disconnected, and a single `onConversationUpdate`
+ * subscription that pushes a lightweight per-conversation signal (never row
+ * data). It also owns the turn-start mutations (`createConversation` /
+ * `continueConversation`) and the conversation commands (rename/fork/delete):
+ * the whole Langy surface is this tRPC router plus the live `onTurnStream`
+ * subscription — the old Hono `/api/langy/chat` fallback has been removed.
  *
- * Permission mirrors the Hono read gate (`evaluations:view`).
+ * Every procedure derives from `langyReadProcedure` (or `langyTurnProcedure`),
+ * so they all share the project read permission (`evaluations:view`), the demo
+ * refusal, and the authoritative internal-only gate (`enforceLangyAccess`).
  */
 
 const LANGY_READ_PERMISSION = "evaluations:view" as const;
 
 /**
- * Every Langy read/command procedure shares one gate: the caller can read the
- * project (`evaluations:view`) AND the project is not the public demo. The demo
- * grants `evaluations:view` to every authenticated user, so the permission check
- * alone would expose the per-user Langy chat that belongs to whoever used Langy
- * there — hence the explicit `isDemoProjectId` refusal, mirroring the Hono
- * `/langy/*` surface. `projectId` lives on the base so procedures declare only
- * their own inputs.
+ * Every Langy read/command procedure shares one base with three gates, in
+ * order:
+ *  1. `checkProjectPermission(evaluations:view)` — can the caller read the
+ *     project at all?
+ *  2. demo refusal — the demo project grants `evaluations:view` to every
+ *     authenticated user, so the permission check alone would expose the
+ *     per-user Langy chat that belongs to whoever used Langy there; refuse it
+ *     explicitly.
+ *  3. `enforceLangyAccess` — the authoritative internal-only rollout gate
+ *     (staff bypass, else `release_langy_enabled`), the SAME decision the
+ *     `langyGithub` / `langyEgress` routers and the GitHub install route use.
+ *
+ * `projectId` lives on the base so procedures declare only their own inputs.
  */
 const langyReadProcedure = protectedProcedure
   .input(z.object({ projectId: z.string() }))
@@ -72,7 +82,8 @@ const langyReadProcedure = protectedProcedure
       });
     }
     return next();
-  });
+  })
+  .use(enforceLangyAccess);
 
 /**
  * The turn-start procedure: the read gate PLUS the Phase-1 per-user message
