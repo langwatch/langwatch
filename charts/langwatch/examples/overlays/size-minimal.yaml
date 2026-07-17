@@ -1,6 +1,9 @@
-# size-minimal.yaml — Absolute minimum resources for CI smoke tests.
+# size-minimal.yaml - smallest footprint that still boots and serves.
+# For CI smoke tests and tiny demos, not real workloads.
 #
-# Everything runs but with tiny limits. Not suitable for real workloads.
+# The Node app and workers need ~2Gi to start: they cold-load the TS server
+# via tsx, and below that V8 can't size its heap and the pod OOMs at boot.
+# ClickHouse auto-tunes to its limit, so give it >=1Gi.
 #
 # Usage:
 #   helm install lw . \
@@ -13,11 +16,14 @@ app:
   features:
     skipEnvValidation: true
   resources:
-    requests: { cpu: 50m, memory: 256Mi }
-    limits:   { cpu: 250m, memory: 512Mi }
+    requests: { cpu: 250m, memory: 768Mi }
+    limits:   { cpu: 1, memory: 2Gi }
 
 workers:
-  enabled: false
+  replicaCount: 1
+  resources:
+    requests: { cpu: 250m, memory: 768Mi }
+    limits:   { cpu: 1, memory: 2Gi }
 
 langwatch_nlp:
   replicaCount: 1
@@ -28,8 +34,8 @@ langwatch_nlp:
 langevals:
   replicaCount: 1
   resources:
-    requests: { cpu: 50m, memory: 256Mi }
-    limits:   { cpu: 250m, memory: 512Mi }
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
   extraEnvs:
     - { name: DISABLE_EVALUATORS_PRELOAD, value: "true" }
     - { name: WEB_CONCURRENCY, value: "1" }
@@ -37,7 +43,10 @@ langevals:
 clickhouse:
   chartManaged: true
   replicas: 1
-  memory: 512Mi
+  # 1Gi covers smoke/light use only. ClickHouse memory scales with ingest
+  # burst size and background merges, so a real trace flood will OOM this -
+  # raise clickhouse.memory (and cpu) before pushing meaningful volume.
+  memory: 1Gi
   cpu: 1
   storage:
     size: 1Gi

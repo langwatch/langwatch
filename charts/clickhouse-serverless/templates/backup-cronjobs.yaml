@@ -25,11 +25,16 @@ spec:
             app.kubernetes.io/component: backup-full
         spec:
           restartPolicy: Never
+          # Backup jobs never call the Kubernetes API.
+          automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
           securityContext:
             runAsNonRoot: true
             fsGroup: 101
             seccompProfile:
               type: RuntimeDefault
+          volumes:
+            - name: tmp
+              emptyDir: {}
           containers:
             - name: full-backup
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -37,11 +42,16 @@ spec:
               command: ["/scripts/backup-data.sh"]
               securityContext:
                 runAsUser: 101
+                runAsNonRoot: true
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
                 capabilities:
                   drop: ["ALL"]
               resources:
                 {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
               env:
                 - name: CLICKHOUSE_HOST
                   value: "{{ $fullname }}-0.{{ $fullname }}-headless"
@@ -81,11 +91,16 @@ spec:
             app.kubernetes.io/component: backup-incremental
         spec:
           restartPolicy: Never
+          # Backup jobs never call the Kubernetes API.
+          automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
           securityContext:
             runAsNonRoot: true
             fsGroup: 101
             seccompProfile:
               type: RuntimeDefault
+          volumes:
+            - name: tmp
+              emptyDir: {}
           containers:
             - name: incremental-backup
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -93,11 +108,16 @@ spec:
               command: ["/scripts/backup-data.sh"]
               securityContext:
                 runAsUser: 101
+                runAsNonRoot: true
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
                 capabilities:
                   drop: ["ALL"]
               resources:
                 {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
               env:
                 - name: CLICKHOUSE_HOST
                   value: "{{ $fullname }}-0.{{ $fullname }}-headless"
@@ -135,11 +155,16 @@ spec:
             app.kubernetes.io/component: restore-data
         spec:
           restartPolicy: Never
+          # Backup jobs never call the Kubernetes API.
+          automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
           securityContext:
             runAsNonRoot: true
             fsGroup: 101
             seccompProfile:
               type: RuntimeDefault
+          volumes:
+            - name: tmp
+              emptyDir: {}
           containers:
             - name: restore-data
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -147,11 +172,16 @@ spec:
               command: ["/scripts/restore-data.sh"]
               securityContext:
                 runAsUser: 101
+                runAsNonRoot: true
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
                 capabilities:
                   drop: ["ALL"]
               resources:
                 {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
               env:
                 - name: CLICKHOUSE_HOST
                   value: "{{ $fullname }}-0.{{ $fullname }}-headless"

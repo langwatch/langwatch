@@ -25,6 +25,9 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: {{ include "clickhouse-serverless.serviceAccountName" . }}
+      # Set on the pod too (not just the SA) for policies that check the pod
+      # spec field. Keeper never calls the Kubernetes API.
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -125,8 +128,9 @@ spec:
           securityContext:
             runAsUser: 101  # clickhouse user
             runAsNonRoot: true
-            # Keeper needs a writable /var/lib/clickhouse-keeper outside the PVC.
-            readOnlyRootFilesystem: false
+            # Read-only root: keeper data is on the PVC and config is the
+            # keeper-config emptyDir; logs/pid/tmp are emptyDir-mounted below.
+            readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
@@ -157,9 +161,22 @@ spec:
               mountPath: /var/lib/clickhouse-keeper
             - name: keeper-config
               mountPath: /etc/clickhouse-keeper
+            # Writable scratch so keeper runs read-only root: logs, pid, /tmp.
+            - name: keeper-logs
+              mountPath: /var/log/clickhouse-keeper
+            - name: keeper-run
+              mountPath: /var/run/clickhouse-keeper
+            - name: tmp
+              mountPath: /tmp
 
       volumes:
         - name: keeper-config
+          emptyDir: {}
+        - name: keeper-logs
+          emptyDir: {}
+        - name: keeper-run
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
         - name: keeper-raft-template
           configMap:

@@ -68,6 +68,9 @@ All overlays live in `examples/overlays/`:
 | `postgres-external` | External PostgreSQL (RDS, Cloud SQL) |
 | `redis-external` | External Redis (ElastiCache, Memorystore) |
 | `cold-storage-s3` | S3 cold storage tiering + backups |
+| `strict-admission` | Toggles for Pod Security Admission `restricted` / Gatekeeper / Kyverno clusters |
+
+> **Sizing notes.** The Node app and workers need roughly **2Gi to boot** (they cold-load the TS server through tsx); the `size-minimal` and `size-dev` overlays account for this, so don't trim app/worker memory below ~2Gi or they OOM at startup. **ClickHouse memory scales with ingest volume** - the chart-managed defaults in `size-minimal`/`size-dev` (1-2Gi) are for light/local use; raise `clickhouse.memory` (and `cpu`) before pushing real trace throughput, or a large ingest burst will OOM it.
 
 ### All-in-one profiles
 
@@ -122,6 +125,17 @@ For development, set `autogen.enabled: true` to auto-generate all secrets.
 | **Prometheus** | `prometheus.chartManaged: true` | Optional — for metrics collection |
 
 For a complete installation guide, visit the [documentation](https://docs.langwatch.ai/self-hosting/kubernetes-helm).
+
+### Pod security
+
+Every pod (PostgreSQL, Redis, and ClickHouse included) runs read-only-root,
+non-root, with dropped capabilities, `RuntimeDefault` seccomp, no mounted SA
+token, and resource requests/limits on every container. That clears Pod
+Security Admission `restricted` and Gatekeeper / Kyverno policies as shipped.
+On clusters that enforce them, add `examples/overlays/strict-admission.yaml`,
+which turns off the three features that can't comply: the token-using preflight
+hook, the upstream Prometheus subchart, and the custom-metrics gateway HPA. Full
+details in [Security → Pod Security](https://docs.langwatch.ai/self-hosting/security#pod-security).
 
 ### Regenerate this table
 

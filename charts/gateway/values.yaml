@@ -160,6 +160,11 @@ guardrails:
   postTimeout: 2s
   streamChunkWindow: 50ms
 
+# The gateway does not call the Kubernetes API. Default to not mounting the
+# SA token; many clusters deny pods that automount it. Set true only if a
+# sidecar needs in-cluster API access.
+automountServiceAccountToken: false
+
 # Pod-level security.
 podSecurityContext:
   runAsNonRoot: true
@@ -170,6 +175,9 @@ podSecurityContext:
     type: RuntimeDefault
 
 containerSecurityContext:
+  # runAsNonRoot is also set on the pod above; some Gatekeeper constraints
+  # inspect the container-level field directly, so set it here too.
+  runAsNonRoot: true
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:

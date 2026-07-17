@@ -27,7 +27,13 @@ global:
     seccompProfile:
       type: RuntimeDefault
   ## @param global.containerSecurityContext [object] Default container security context (applied cluster-wide unless overridden).
+  # runAsNonRoot is also set at the pod level above; Kubernetes inherits it,
+  # but some Gatekeeper constraints (e.g. certain flavours of
+  # k8sreadonlyrootfilesystem) inspect the *container-level* field directly and
+  # deny pods that only carry it at pod level. Setting it on both keeps every
+  # policy variant happy without changing runtime behaviour.
   containerSecurityContext:
+    runAsNonRoot: true
     allowPrivilegeEscalation: false
     capabilities:
       drop:
