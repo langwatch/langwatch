@@ -17,12 +17,24 @@ Feature: Workflow agent as an experiment target
     Given the workflow agent is added as a target in the Experiments Workbench
     Then the target column shows a workflow icon, not a code icon
 
-  Scenario: Editing the target opens the underlying Studio workflow
+  Scenario: Editing the target opens a mapping drawer, not a dead end
     Given the workflow agent is added as a target in the Experiments Workbench
     When the user opens the target's edit menu and selects Edit Agent
-    Then the linked Studio workflow opens in a new tab
-    And the workbench keeps its own state, since a full graph editor
-      cannot be edited meaningfully inside a narrow sidebar drawer
+    Then a sidebar drawer opens showing the linked workflow's name
+    And an "Open Workflow" action in that drawer opens the Studio graph
+      editor in a new tab, since a full graph editor cannot be edited
+      meaningfully inside a narrow sidebar
+    And below it, the drawer shows the workflow's real input fields
+      with mapping controls, matching the mapping UI code and HTTP
+      agent targets already get
+
+  Scenario: Mapping a dataset column to a workflow input field
+    Given the workflow agent target's drawer is open
+    And the underlying workflow declares an input field named "question"
+    When the user maps "question" to a dataset column
+    Then the mapping is saved immediately, without a separate save step
+    And running the experiment passes that column's value into the
+      workflow's "question" input
 
   Scenario: Switching away from a workflow target
     Given the workflow agent is added as a target in the Experiments Workbench
