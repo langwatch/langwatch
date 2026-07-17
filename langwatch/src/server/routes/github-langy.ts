@@ -184,24 +184,18 @@ secured
       return c.json({ error: "Not authenticated" }, { status: 401 });
     }
     const organizationId = c.req.query("organizationId") ?? "";
-    // Same authoritative gate as Langy's tRPC surface so the GitHub install
-    // cannot become a rollout bypass. Forward organizationId so an org-scoped
-    // rollout rule resolves the same way it does on the tRPC surface (the gate
-    // drops an empty value). The 404 stays ahead of the 400 so a denied account
-    // can't probe the endpoint via param validation.
-    if (!(await hasLangyAccess({ user: session.user, organizationId }))) {
-      return c.json(
-        { error: "The GitHub integration is not enabled for this account." },
-        { status: 404 },
-      );
-    }
     if (!organizationId) {
       return c.json(
         { error: "organizationId query param is required" },
         { status: 400 },
       );
     }
-    // Cross-tenant guard: the user must be a member of the org they install for.
+    // Cross-tenant guard FIRST: the user must be a member of the org they
+    // install for. Membership is proven before the org-scoped Langy flag so a
+    // non-member's response can't reveal that org's rollout state (FORBIDDEN
+    // when enabled vs NOT_FOUND when disabled would be a cross-tenant probe).
+    // Same order as the tRPC surface: enforceOrganizationMembership then
+    // enforceLangyAccess.
     if (
       !(await getApp().langy.githubInstallations.isOrganizationMember({
         userId: session.user.id,
@@ -211,6 +205,15 @@ secured
       return c.json(
         { error: "Not a member of this organization." },
         { status: 403 },
+      );
+    }
+    // Same authoritative gate as Langy's tRPC surface so the GitHub install
+    // cannot become a rollout bypass. Forward organizationId so an org-scoped
+    // rollout rule resolves the same way it does on the tRPC surface.
+    if (!(await hasLangyAccess({ user: session.user, organizationId }))) {
+      return c.json(
+        { error: "The GitHub integration is not enabled for this account." },
+        { status: 404 },
       );
     }
 

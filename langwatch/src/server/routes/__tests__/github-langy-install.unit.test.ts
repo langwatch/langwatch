@@ -153,8 +153,8 @@ describe("GET /api/github-langy/install", () => {
     });
   });
 
-  describe("when the caller is non-staff and the rollout is disabled for the org", () => {
-    it("returns 404 ahead of the 400 org-required check", async () => {
+  describe("when a member is non-staff and the rollout is disabled for the org", () => {
+    it("denies with 404", async () => {
       isLangwatchStaff.mockReturnValue(false);
       isEnabled.mockResolvedValue(false);
 
@@ -163,6 +163,39 @@ describe("GET /api/github-langy/install", () => {
       );
 
       expect(res.status).toBe(404);
+    });
+  });
+
+  // Membership is proven before the org-scoped flag, so a non-member's response
+  // must not depend on that org's rollout state — otherwise it's a cross-tenant
+  // probe (FORBIDDEN when enabled vs NOT_FOUND when disabled).
+  describe("when a non-member probes an org with the rollout enabled", () => {
+    it("returns 403 without ever evaluating the flag", async () => {
+      isOrganizationMember.mockResolvedValue(false);
+      isLangwatchStaff.mockReturnValue(false);
+      isEnabled.mockResolvedValue(true);
+
+      const res = await request(
+        "http://localhost/api/github-langy/install?organizationId=victim-org",
+      );
+
+      expect(res.status).toBe(403);
+      expect(isEnabled).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a non-member probes an org with the rollout disabled", () => {
+    it("returns the same 403 (response independent of the org's flag)", async () => {
+      isOrganizationMember.mockResolvedValue(false);
+      isLangwatchStaff.mockReturnValue(false);
+      isEnabled.mockResolvedValue(false);
+
+      const res = await request(
+        "http://localhost/api/github-langy/install?organizationId=victim-org",
+      );
+
+      expect(res.status).toBe(403);
+      expect(isEnabled).not.toHaveBeenCalled();
     });
   });
 });
