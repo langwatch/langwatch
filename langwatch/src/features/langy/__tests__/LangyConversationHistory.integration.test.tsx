@@ -674,6 +674,16 @@ async function findRecentOption(pattern: RegExp): Promise<HTMLElement> {
   return option!;
 }
 
+async function deleteRecentOption(option: HTMLElement): Promise<void> {
+  await userEvent.hover(option);
+  await userEvent.click(
+    within(option).getByRole("button", { name: "Conversation actions" }),
+  );
+  await userEvent.click(
+    await screen.findByRole("menuitem", { name: /delete/i }),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Test suites
 // ---------------------------------------------------------------------------
@@ -870,12 +880,7 @@ describe("LangyPanel conversation history", () => {
         renderPanel();
         await openHistory();
         const olderItem = await findRecentOption(/Older chat/i);
-        await userEvent.hover(olderItem);
-        await userEvent.click(
-          within(olderItem).getByRole("button", {
-            name: /delete/i,
-          }),
-        );
+        await deleteRecentOption(olderItem);
         await waitFor(() => {
           expect(spies.deleteMutation).toHaveBeenCalledWith({
             projectId: "project-demo",
@@ -889,12 +894,7 @@ describe("LangyPanel conversation history", () => {
         renderPanel();
         await openHistory();
         const olderItem = await findRecentOption(/Older chat/i);
-        await userEvent.hover(olderItem);
-        await userEvent.click(
-          within(olderItem).getByRole("button", {
-            name: /delete/i,
-          }),
-        );
+        await deleteRecentOption(olderItem);
         await waitFor(() => {
           expect(recentOption(/Older chat/i)).toBeUndefined();
         });
@@ -912,13 +912,8 @@ describe("LangyPanel conversation history", () => {
         });
         await openHistory();
         const newestItem = await findRecentOption(/Newest chat/i);
-        await userEvent.hover(newestItem);
         chatRef.setMessages.mockClear();
-        await userEvent.click(
-          within(newestItem).getByRole("button", {
-            name: /delete/i,
-          }),
-        );
+        await deleteRecentOption(newestItem);
         await waitFor(() => {
           const lastCall =
             chatRef.setMessages.mock.calls[
@@ -941,13 +936,8 @@ describe("LangyPanel conversation history", () => {
         });
         await openHistory();
         const newestItem = await findRecentOption(/Newest chat/i);
-        await userEvent.hover(newestItem);
         chatRef.stop.mockClear();
-        await userEvent.click(
-          within(newestItem).getByRole("button", {
-            name: /delete/i,
-          }),
-        );
+        await deleteRecentOption(newestItem);
         await waitFor(() => {
           expect(chatRef.stop).toHaveBeenCalled();
         });
@@ -971,14 +961,9 @@ describe("LangyPanel conversation history", () => {
         await openHistory();
         // Delete the OLDER (non-active) chat.
         const olderItem = await findRecentOption(/Older chat/i);
-        await userEvent.hover(olderItem);
         chatRef.setMessages.mockClear();
         chatRef.stop.mockClear();
-        await userEvent.click(
-          within(olderItem).getByRole("button", {
-            name: /delete/i,
-          }),
-        );
+        await deleteRecentOption(olderItem);
         // Wait until the older chat is removed from the list — proves the
         // delete completed — before asserting we did NOT reset the active.
         await waitFor(() => {

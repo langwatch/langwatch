@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// @scenario "The seed enables the good dev feature flags"
 func TestFeatureFlagSeedSQL(t *testing.T) {
 	t.Run("given the seeded feature flag set", func(t *testing.T) {
 		sql := FeatureFlagSeedSQL()

@@ -124,6 +124,40 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         expect(store.store).toHaveBeenCalledOnce();
         expect(refoldMetric).toHaveBeenCalledWith("counter", "performed");
       });
+
+      /** @scenario "Evaluation folds keep re-folding because order is significant" */
+      it("replays an order-dependent fold from its occurred-at-sorted history", async () => {
+        interface OrderState {
+          sequence: number[];
+          LastEventOccurredAt: number;
+        }
+
+        const history = [eventAt(1_000), eventAt(2_000), eventAt(3_000)];
+        const store = createMockFoldProjectionStore<OrderState>();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          sequence: [5_000],
+          LastEventOccurredAt: CHECKPOINT_MS,
+        });
+        const fold = createMockFoldProjectionDefinition("evaluation", {
+          store,
+          init: () => ({ sequence: [], LastEventOccurredAt: 0 }),
+          apply: (state: OrderState, event: Event): OrderState => ({
+            sequence: [...state.sequence, event.occurredAt ?? 0],
+            LastEventOccurredAt: event.occurredAt ?? 0,
+          }),
+        }) as FoldProjectionDefinition<OrderState, Event>;
+        fold.eventLoader = vi.fn().mockResolvedValue(history);
+
+        const result = await executor.execute(
+          fold,
+          eventAt(1_000),
+          context,
+        );
+
+        expect(result.sequence).toEqual([1_000, 2_000, 3_000]);
+        expect(fold.eventLoader).toHaveBeenCalledOnce();
+        expect(refoldMetric).toHaveBeenCalledWith("evaluation", "performed");
+      });
     });
 
     describe("when the projection has opted out of re-folding", () => {

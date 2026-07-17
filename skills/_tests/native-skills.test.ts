@@ -2,17 +2,23 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { listPublishedSkills, renderSkill } from "../_compiler/native.js";
-import { FEATURE_SKILLS } from "../_lib/feature-skills.js";
+import {
+  listNativeSkills,
+  listPublishedSkills,
+  renderSkill,
+} from "../_compiler/native.js";
+import {
+  FEATURE_SKILLS,
+  NATIVE_ONLY_SKILLS,
+} from "../_lib/feature-skills.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillsRoot = path.resolve(__dirname, "..");
-const skills = listPublishedSkills(skillsRoot);
+const skills = listNativeSkills(skillsRoot);
+const publishedSkills = listPublishedSkills(skillsRoot);
 
-// Backs specs/langy/langy-native-skills.feature. Langy must load EXACTLY the
-// published skills — the curated feature skills plus every recipe — with their
-// content verbatim. Driving generation off listPublishedSkills (the same
-// selection the publisher uses) is what makes "what we publish, Langy has" true.
+// Backs specs/langy/langy-native-skills.feature. Langy loads every published
+// skill plus explicitly native-only skills, all from canonical root sources.
 
 describe("native skill generation", () => {
   describe("given the published skill set", () => {
@@ -30,6 +36,15 @@ describe("native skill generation", () => {
       const recipeSlugs = skills.filter((s) => s.isRecipe).map((s) => s.slug).sort();
       expect(recipeSlugs).toEqual(recipeDirs);
       expect(recipeSlugs.length, "expected recipes to be included").toBeGreaterThan(0);
+    });
+
+    it("includes native-only skills without adding them to the public set", () => {
+      const nativeSlugs = skills.map((skill) => skill.slug);
+      const publishedSlugs = publishedSkills.map((skill) => skill.slug);
+      for (const slug of NATIVE_ONLY_SKILLS) {
+        expect(nativeSlugs).toContain(slug);
+        expect(publishedSlugs).not.toContain(slug);
+      }
     });
 
     it("uses unique opencode-valid slugs (recipes flattened, no collisions)", () => {
@@ -74,7 +89,7 @@ describe("native skill generation", () => {
   describe("given the committed _compiled/native output", () => {
     const nativeDir = path.join(skillsRoot, "_compiled", "native");
 
-    it("carries exactly the published skill set — no extras, none missing", () => {
+    it("carries exactly the native skill set — no extras, none missing", () => {
       const committed = fs
         .readdirSync(nativeDir, { withFileTypes: true })
         .filter((e) => e.isDirectory())
@@ -90,18 +105,25 @@ describe("native skill generation", () => {
       }
     });
 
-    it("never contains the Langy-internal github skill — that one lives in the Go embed dir only", () => {
-      // services/langyagent/internal/assets/skills/github/ is provisioning-
-      // coupled (GH_TOKEN, bot identity) and must never reach this tree, from
-      // which skills are published externally.
-      expect(fs.existsSync(path.join(nativeDir, "github"))).toBe(false);
+    it("keeps the Go embed copy of github synchronized with its root source", () => {
+      const embedded = fs.readFileSync(
+        path.resolve(
+          skillsRoot,
+          "..",
+          "services/langyagent/internal/assets/skills/github/SKILL.md",
+        ),
+        "utf8",
+      );
+      expect(embedded).toBe(
+        fs.readFileSync(path.join(nativeDir, "github/SKILL.md"), "utf8"),
+      );
     });
   });
 
   // AGENTS.md tells Langy which skill to invoke per user intent. A row naming
   // a skill that isn't in the shipped image teaches the model to hallucinate.
-  // The image's skill set = this workspace's published set (Docker overlay of
-  // _compiled/native) + the Langy-internal skills checked into the Go embed dir.
+  // The image's skill set is the root-compiled native set Docker overlays into
+  // the Go embed directory.
   describe("given Langy's AGENTS.md routing table", () => {
     it("routes only to skills that exist in the shipped image", () => {
       const langyAssets = path.resolve(skillsRoot, "..", "services", "langyagent", "internal", "assets");
@@ -117,11 +139,7 @@ describe("native skill generation", () => {
       }
       expect(routed.size, "no skill rows found — did the routing table move?").toBeGreaterThan(0);
 
-      const embedded = fs
-        .readdirSync(path.join(langyAssets, "skills"), { withFileTypes: true })
-        .filter((e) => e.isDirectory())
-        .map((e) => e.name);
-      const shipped = new Set([...skills.map((s) => s.slug), ...embedded]);
+      const shipped = new Set(skills.map((s) => s.slug));
       for (const name of routed) {
         expect(shipped.has(name), `AGENTS.md routes to a skill that does not ship: ${name}`).toBe(true);
       }

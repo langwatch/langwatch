@@ -128,8 +128,23 @@ const refetchResolvedDefault = vi.fn(() => {
 vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
+      langy: {
+        list: { invalidate: () => Promise.resolve() },
+      },
       langyGithub: {
         getInstallStatus: { invalidate: () => Promise.resolve() },
+      },
+    }),
+    useContext: () => ({
+      langy: {
+        list: {
+          getInfiniteData: () => undefined,
+          setInfiniteData: () => undefined,
+          cancel: () => Promise.resolve(),
+          invalidate: () => Promise.resolve(),
+        },
+        messages: { invalidate: () => Promise.resolve() },
+        detail: { setData: () => undefined },
       },
     }),
     langyGithub: {
@@ -138,6 +153,45 @@ vi.mock("~/utils/api", () => ({
       },
       disconnect: {
         useMutation: () => ({ mutate: () => undefined, isPending: false }),
+      },
+    },
+    langy: {
+      messages: {
+        useQuery: () => ({
+          data: undefined,
+          isLoading: false,
+          isFetching: false,
+          isError: false,
+        }),
+      },
+      onConversationUpdate: {
+        useSubscription: () => undefined,
+      },
+      deleteConversation: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
+      renameConversation: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
+      forkConversation: {
+        useMutation: () => ({
+          mutateAsync: () => Promise.resolve({ id: "forked-conversation" }),
+        }),
+      },
+      list: {
+        useInfiniteQuery: () => ({
+          data: { pages: [{ items: [], nextCursor: null }] },
+          isInitialLoading: false,
+          isFetching: false,
+          isPreviousData: false,
+          isFetched: true,
+          isError: false,
+          error: null,
+          refetch: () => Promise.resolve(),
+          fetchNextPage: () => Promise.resolve(),
+          hasNextPage: false,
+          isFetchingNextPage: false,
+        }),
       },
     },
     modelProvider: {
@@ -159,10 +213,16 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
+    ops: {
+      getScope: {
+        useQuery: () => ({ data: { scope: { kind: "none" } }, isLoading: false }),
+      },
+    },
   },
 }));
 
 import { LangySidecar } from "../components/LangyPanel";
+import { LangyProvider } from "../LangyContext";
 import { useLangyStore } from "../stores/langyStore";
 
 // ---------------------------------------------------------------------------
@@ -170,7 +230,9 @@ import { useLangyStore } from "../stores/langyStore";
 // ---------------------------------------------------------------------------
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <ChakraProvider value={defaultSystem}>
+    <LangyProvider>{children}</LangyProvider>
+  </ChakraProvider>
 );
 
 function renderPanel() {
@@ -222,7 +284,9 @@ describe("Feature: Langy prompts for a model when the project has none configure
         expect(screen.getByLabelText("Provider API Key")).toBeInTheDocument();
 
         // It replaces — not supplements — the normal empty state.
-        expect(screen.queryByText("How can I help?")).not.toBeInTheDocument();
+        expect(
+          screen.queryByText("Ask in plain language, or start with one of these."),
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -238,7 +302,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
           isLoading: false,
         };
 
-        renderPanel();
+        const rendered = renderPanel();
         expect(
           await screen.findByText("Langy needs a model to get started"),
         ).toBeInTheDocument();
@@ -257,6 +321,9 @@ describe("Feature: Langy prompts for a model when the project has none configure
         // The panel re-resolved the model in place (no navigation / reload):
         // the refetch ran...
         expect(refetchResolvedDefault).toHaveBeenCalledTimes(1);
+        // The real React Query refetch notifies subscribers. This lightweight
+        // mutable query double needs an explicit rerender to model that update.
+        rendered.rerender(<LangySidecar />);
 
         // ...and Langy stops showing the setup prompt and becomes usable
         // (the resolver now returns a model, so the empty state renders).
@@ -265,7 +332,11 @@ describe("Feature: Langy prompts for a model when the project has none configure
             screen.queryByText("Langy needs a model to get started"),
           ).not.toBeInTheDocument();
         });
-        expect(await screen.findByText("How can I help?")).toBeInTheDocument();
+        expect(
+          await screen.findByText(
+            "Ask in plain language, or start with one of these.",
+          ),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -283,7 +354,11 @@ describe("Feature: Langy prompts for a model when the project has none configure
         renderPanel();
 
         // The panel shows its normal empty state.
-        expect(await screen.findByText("How can I help?")).toBeInTheDocument();
+        expect(
+          await screen.findByText(
+            "Ask in plain language, or start with one of these.",
+          ),
+        ).toBeInTheDocument();
 
         // No model setup prompt is shown.
         expect(

@@ -96,7 +96,7 @@ export function hasCapabilityCard(call: CapabilityToolCall): boolean {
   // This identity check is the important boundary: a trace-search may only
   // render the traces variant, never a structurally plausible result produced
   // by another command or a stale `{ value: ... }` transport payload.
-  if (result?.card === descriptor.render) return true;
+  if (result?.kind === "card" && result.card === descriptor.render) return true;
 
   // Older/live dataset list calls carried the collection directly as
   // `{datasets: [...]}` rather than the newer typed result envelope. Keep
@@ -122,7 +122,9 @@ export function LangyCapabilityRenderer({
 
   const projectSlug = project?.slug ?? null;
   const result = toolResultForCapability(call, descriptor);
-  if (!result) return null;
+  if (result?.kind !== "card" || result.card !== descriptor.render) {
+    return null;
+  }
   // The reference the card hydrates fresh data from — the recorded digest when
   // the part carries one (validated), recomputed from the call otherwise.
   const digest = digestOfToolCall({

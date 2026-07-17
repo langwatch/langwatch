@@ -11,25 +11,26 @@ the story is `skills/README.md` at the repo root.
 | Path | What it is |
 |---|---|
 | `AGENTS.md` | Langy's system-prompt rules doc, rendered into each worker's `$HOME/AGENTS.md`. Identical in dev and prod (no Docker overlay). |
-| `skills/github/` | The one **Langy-internal** skill: opening PRs with the provisioned `GH_TOKEN` as the LangWatch bot. Checked in here, never published. |
+| `skills/github/` | Local-build mirror of the Langy-only GitHub skill compiled from root `skills/github/SKILL.mdx`. |
 | `assets.go` / `assets_test.go` | The embed + materialization code and its pins. |
 
 ## Two kinds of skills, one directory at build time
 
-- **Public skills** (analytics, scenarios, tracing, …) are authored in the
+- **All production skills** (analytics, scenarios, tracing, GitHub, …) are authored in the
   repo-root `skills/` workspace and compiled to `skills/_compiled/native/`.
-  They are NOT checked in here. `Dockerfile.langyagent` COPYs
+  `Dockerfile.langyagent` COPYs
   `skills/_compiled/native/` into this package's `skills/` dir **before
   `go build`**, so the production binary embeds the full set. `go:embed`
   cannot reach above the package dir — that is why the overlay copies files
   in rather than the directive reaching out.
-- **Langy-internal skills** (`github/` today) are checked in here directly.
+- **Langy-only skills** (`github/` today) are selected with
+  `NATIVE_ONLY_SKILLS` rather than `FEATURE_SKILLS`.
   They assume the worker's provisioned environment (short-lived `GH_TOKEN`,
   bot git identity, platform-rendered activity cards), which makes them
   useless or misleading outside the product — so they must never reach the
   public [langwatch/skills](https://github.com/langwatch/skills) repo.
-  `skills/_tests/publish-sync.test.ts` and
-  `skills/_tests/native-skills.test.ts` pin that.
+  The checked-in copy here makes local Go builds valid and is pinned to the
+  root-compiled output by `skills/_tests/native-skills.test.ts`.
 
 The checked-in tree (github/ only) is the dev/test subset; it also keeps the
 `//go:embed skills` directive valid, which would fail on an empty directory.
@@ -85,7 +86,7 @@ go test ./services/langyagent/...
 - **Public** (customers get it too): author it in the repo-root `skills/`
   workspace — see `skills/README.md`. It flows into the Langy image through
   the compile + Docker overlay automatically.
-- **Langy-internal** (depends on the provisioned worker environment): add
-  `skills/<name>/SKILL.md` HERE, next to `github/`. Keep the name out of the
-  repo-root workspace so the publisher can never pick it up, and add a row to
-  the AGENTS.md routing table so the model routes to it.
+- **Langy-only** (depends on the provisioned worker environment): author it in
+  repo-root `skills/<name>/SKILL.mdx`, add it to `NATIVE_ONLY_SKILLS`, regenerate
+  the native output, and mirror it here for local Go builds. Add a row to the
+  AGENTS.md routing table so the model routes to it.

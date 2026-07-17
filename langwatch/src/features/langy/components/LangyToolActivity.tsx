@@ -243,7 +243,9 @@ function traceRowCount(output: unknown): number {
     input: {},
     output,
   });
-  return result?.card === "traces" ? result.payload.traces.length : 0;
+  return result?.kind === "card" && result.card === "traces"
+    ? result.payload.traces.length
+    : 0;
 }
 
 /**

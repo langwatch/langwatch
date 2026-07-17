@@ -18,7 +18,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LANGWATCH_API_KEY: sk-lw-1234567890
   LANGWATCH_ENDPOINT: http://localhost:5560
 
 jobs:
@@ -245,6 +244,7 @@ jobs:
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
         env:
+          LANGWATCH_API_KEY: sk-lw-1234567890
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           E2E_TIMEOUT: 120000
           E2E_POLL_TIMEOUT: 120000

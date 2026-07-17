@@ -54,6 +54,9 @@ export function verifyGithubOauthState(
   if (dot < 0) return null;
   const body = token.slice(0, dot);
   const sig = token.slice(dot + 1);
+  // This is a MAC verification key, not a password hash. HMAC-SHA256 is the
+  // protocol primitive and intentionally fast.
+  // lgtm[js/insufficient-password-hash]
   const expected = createHmac("sha256", signingKey)
     .update(body)
     .digest("base64url");

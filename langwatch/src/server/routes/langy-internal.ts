@@ -17,7 +17,10 @@
 import type { Context, Next } from "hono";
 import { timingSafeEqual } from "crypto";
 import { z } from "zod";
-import { cliToolResultSchema } from "@langwatch/cli-cards";
+import {
+  cliToolResultSchema,
+  type CliToolResult,
+} from "@langwatch/cli-cards";
 
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
@@ -81,7 +84,15 @@ const finalToolCallSchema = z.object({
   output: z.string().optional(),
   isError: z.boolean().optional(),
   /** Canonical typed result; optional only for older workers during rollout. */
-  result: cliToolResultSchema.optional(),
+  // cliToolResultSchema is intentionally built on the zod/v4 compatibility
+  // runtime shared by the CLI and app. Keep that runtime out of this zod/v3
+  // object graph and bridge it at the value boundary instead.
+  result: z
+    .custom<CliToolResult>(
+      (value) => cliToolResultSchema.safeParse(value).success,
+      "Invalid CLI tool result",
+    )
+    .optional(),
 });
 
 const turnResultSchema = z.object({

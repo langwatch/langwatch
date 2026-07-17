@@ -13,22 +13,22 @@
  *
  * Same root cause both times: the catalogue did not come from the thing the
  * worker actually runs. So this script derives it from the ONE artefact that
- * defines that — the Dockerfile's //go:embed skills tree and the COPYs that
- * overlay it:
+ * defines that — the root-compiled skills directory the Dockerfile COPYs into
+ * its //go:embed tree:
  *
  *     COPY skills/_compiled/native/ ./services/langyagent/internal/assets/skills/
  *
  * The worker embeds `services/langyagent/internal/assets/skills/` into its
- * binary. The checked-in tree carries only the dev/test subset (the langy-only
- * `github` skill); the Dockerfile overlays the FULL compiled public set on top
- * before `go build`. So the skills the worker gets = that checked-in base dir
- * PLUS every COPY the Dockerfile lands in it.
+ * binary, and the Dockerfile overlays the complete root-compiled native set
+ * before `go build`. Langy-only skills such as `github` also have their
+ * canonical source under root `skills/`, so the compiled overlay is the whole
+ * production skill set. The checked-in embed copy merely keeps local Go builds
+ * honest and is verified separately to match the root source.
  *
  * The overlay source directories are not hardcoded here. They are READ OUT of
  * `Dockerfile.langyagent` by matching every COPY whose destination is the embed
- * skills dir. Add a second overlay COPY and this picks it up with no edit; change
- * the destination and it stops matching, loudly, rather than quietly generating a
- * stale list that offers only the checked-in subset.
+ * skills dir. Add a second overlay COPY and this picks it up with no edit;
+ * change the destination and it stops matching loudly.
  *
  * The name and description come from each skill's own `SKILL.md` front-matter —
  * the same source behind the public skill directory, so the copy in the palette
@@ -53,9 +53,9 @@ const OUT = path.join(
 );
 
 /**
- * The //go:embed skills tree — the worker embeds this whole directory into its
- * binary, so it is both the checked-in base of the catalogue AND the destination
- * the Dockerfile overlays the compiled public skills into.
+ * The //go:embed skills tree destination. Catalogue inputs are the root sources
+ * copied here, not this service-internal destination, because the app image does
+ * not include the services tree when it generates its static files.
  */
 const EMBED_SKILLS_DIR = "services/langyagent/internal/assets/skills";
 
@@ -90,10 +90,7 @@ export function skillSourceDirs(dockerfile: string): string[] {
     if (normalizeDest(dest!) !== EMBED_SKILLS_DIR) continue;
     overlays.push(src!.replace(/\/$/, ""));
   }
-  // The checked-in embed dir is the base (the langy-only `github` skill); the
-  // overlays are copied on top, so they come LAST — last write wins on an id
-  // collision, exactly as the image's layers resolve it.
-  return [EMBED_SKILLS_DIR, ...overlays];
+  return overlays;
 }
 
 /**
@@ -159,11 +156,9 @@ export function deriveSkills(repoRoot: string): GeneratedSkill[] {
     "utf8",
   );
   const dirs = skillSourceDirs(dockerfile);
-  // dirs[0] is always the checked-in base; anything after it is a Dockerfile
-  // overlay. No overlay means the compiled-skills COPY vanished or its
-  // destination moved — fail loudly rather than silently offering only the
-  // checked-in `github` subset (the exact one-skill-out-of-fourteen regression).
-  if (dirs.length < 2) {
+  // No overlay means the compiled-skills COPY vanished or its destination
+  // moved. Fail loudly rather than generating an empty or partial catalogue.
+  if (dirs.length === 0) {
     throw new Error(
       `Dockerfile.langyagent: found no COPY overlaying compiled skills into ` +
         `${EMBED_SKILLS_DIR}/. Either the image stopped shipping the compiled skill ` +

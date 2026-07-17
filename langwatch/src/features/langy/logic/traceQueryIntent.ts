@@ -150,7 +150,7 @@ export function isEmptyIntent(intent: TraceQueryIntent): boolean {
 function liqeValue(value: string): string {
   return /^[A-Za-z0-9._@/:-]+$/.test(value)
     ? value
-    : `"${value.replace(/"/g, '\\"')}"`;
+    : `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 /** `field:a` for one value, `(field:a OR field:b)` for several. */

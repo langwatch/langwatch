@@ -36,12 +36,10 @@ describe("given the Langy skill catalogue", () => {
         "utf8",
       );
 
-      // The //go:embed skills tree the worker ships: the checked-in base dir
-      // (the langy-only `github` skill) FIRST, then every compiled-skill overlay
-      // the Dockerfile COPYs on top. Both, or the catalogue is only telling half
-      // the truth (which is how it came to list one skill out of fourteen).
+      // Every production skill, including Langy-only ones, is compiled from
+      // root skills/. The app image can therefore generate this catalogue
+      // without copying the service-internal Go embed directory.
       expect(skillSourceDirs(dockerfile)).toEqual([
-        "services/langyagent/internal/assets/skills",
         "skills/_compiled/native",
       ]);
     });

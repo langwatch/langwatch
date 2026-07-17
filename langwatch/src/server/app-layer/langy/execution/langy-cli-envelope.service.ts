@@ -33,7 +33,6 @@ import {
   parseCliJson,
   toCliTextResult,
   toCliToolResult,
-  cliToolResultPayload,
   type CliResultDigest,
   type CliToolResult,
 } from "@langwatch/cli-cards";
@@ -109,7 +108,7 @@ export class LangyCliEnvelopeService {
       return {
         ...frame,
         name,
-        output: JSON.stringify(cliToolResultPayload(supplied.data)),
+        output: JSON.stringify(supplied.data),
         digest,
         result: supplied.data,
       };
@@ -149,9 +148,9 @@ export class LangyCliEnvelopeService {
     return {
       ...frame,
       name,
-    // AI-SDK tool parts only carry `output`; serialising the union here keeps
+      // AI-SDK tool parts only carry `output`; serialising the union here keeps
       // live streaming and durable replay on the exact same contract.
-      output: JSON.stringify(cliToolResultPayload(result)),
+      output: JSON.stringify(result),
       digest,
       result,
     };

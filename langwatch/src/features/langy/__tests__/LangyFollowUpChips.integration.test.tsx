@@ -15,6 +15,7 @@
  * call alone.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -49,10 +50,15 @@ function renderCall(call: {
   input: unknown;
   output: unknown;
 }) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
-    <ChakraProvider value={defaultSystem}>
-      <LangyCapabilityRenderer call={call} />
-    </ChakraProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ChakraProvider value={defaultSystem}>
+        <LangyCapabilityRenderer call={call} />
+      </ChakraProvider>
+    </QueryClientProvider>,
   );
 }
 

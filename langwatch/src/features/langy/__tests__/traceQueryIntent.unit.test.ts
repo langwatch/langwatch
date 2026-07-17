@@ -129,6 +129,14 @@ describe("intentToTraceQuery", () => {
       );
     });
 
+    it("escapes backslashes before quotes inside a quoted value", () => {
+      expect(
+        intentToTraceQuery(
+          intent({ filters: { "metadata.user_id": ['team\\"red'] } }),
+        ),
+      ).toBe('user:"team\\\\\\"red"');
+    });
+
     it("leaves emails and dotted ids unquoted — the grammar accepts them bare", () => {
       expect(
         intentToTraceQuery(

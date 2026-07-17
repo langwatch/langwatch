@@ -6,12 +6,11 @@
 // mount or the seed step went wrong).
 //
 // What is checked in here is the DEV/TEST set: the real AGENTS.md plus a minimal
-// skills/ (the langy-only github skill). The production image overlays the full
-// compiled skill directory (skills/_compiled/native + services/langyagent/skills)
-// into this directory BEFORE `go build`, so the shipped binary embeds the
-// complete set — see Dockerfile.langyagent. `go:embed` can only reach files under
-// this package dir, which is why the overlay copies them in rather than the
-// directive reaching up to the repo-root skills tree.
+// mirror of the root-authored github skill. The production image overlays the
+// complete skills/_compiled/native directory BEFORE `go build` — see
+// Dockerfile.langyagent. `go:embed` can only reach files under this package dir,
+// which is why the overlay copies them in rather than the directive reaching up
+// to the repo-root skills tree.
 package assets
 
 import (

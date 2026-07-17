@@ -558,19 +558,39 @@ function ChatRow({
               // Ark commits a Combobox selection on pointerdown. Keep row
               // actions independent from opening the conversation.
               onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
             >
               <MoreHorizontal size={14} />
             </IconButton>
           </Menu.Trigger>
           <Menu.Content minWidth="152px">
-            <Menu.Item value="rename" onClick={onStartRename}>
+            <Menu.Item
+              value="rename"
+              onClick={(event) => {
+                event.stopPropagation();
+                onStartRename();
+              }}
+            >
               <Pencil size={14} /> Rename
             </Menu.Item>
-            <Menu.Item value="fork" onClick={onFork}>
+            <Menu.Item
+              value="fork"
+              onClick={(event) => {
+                event.stopPropagation();
+                onFork();
+              }}
+            >
               <CopyPlus size={14} /> Fork chat
             </Menu.Item>
             <Menu.Separator />
-            <Menu.Item value="delete" color="fg.error" onClick={onDelete}>
+            <Menu.Item
+              value="delete"
+              color="fg.error"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete();
+              }}
+            >
               <Trash2 size={14} /> Delete
             </Menu.Item>
           </Menu.Content>

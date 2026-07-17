@@ -47,6 +47,7 @@ async function postChat(body: unknown) {
 
 const VALID_BODY = {
   projectId: "p1",
+  requestId: "00000000-0000-4000-8000-000000000001",
   conversationId: null,
   messages: [{ role: "user", parts: [{ text: "hi" }] }],
 };

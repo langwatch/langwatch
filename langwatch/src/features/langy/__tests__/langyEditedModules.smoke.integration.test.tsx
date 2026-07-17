@@ -17,7 +17,8 @@ describe("given the edited Langy modules", () => {
     expect(typeof LangyGitHubConnectCard).toBe("function");
     expect(typeof useGitHubConnectPopup).toBe("function");
     expect(typeof LangySkillChipView).toBe("function");
-    expect(typeof MessageContent).toBe("function");
+    // React.memo returns a component object under React 19.
+    expect(MessageContent).toBeDefined();
     expect(typeof ProposalCard).toBe("function");
   });
 });

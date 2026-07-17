@@ -57,7 +57,7 @@ describe("sync publishes self-contained skills", () => {
   });
 
   it("never publishes the Langy-internal github skill", () => {
-    // The github skill (services/langyagent/internal/assets/skills/github/)
+    // The github skill (skills/github/SKILL.mdx)
     // documents Langy's provisioned GH_TOKEN + bot-author workflow — useless
     // and confusing outside the product. It must never land in the public
     // langwatch/skills repo.

@@ -1,6 +1,6 @@
 # LangWatch skills workspace
 
-This directory is the **single source of truth** for LangWatch's public agent
+This directory is the **single source of truth** for LangWatch's agent
 skills — the AgentSkills-style instruction sets that teach a coding agent
 (Claude Code, Cursor, opencode, …) how to use LangWatch. One canonical
 `SKILL.mdx` per skill feeds THREE consumers, and everything else in here is the
@@ -13,7 +13,7 @@ content. Read "The pipeline" below before editing anything.
 
 | Path | What it is |
 |---|---|
-| `<skill>/SKILL.mdx` (e.g. `tracing/`, `scenarios/`) | Canonical source for a **feature skill**. The published set is curated in `_lib/feature-skills.ts` (`FEATURE_SKILLS`) — a directory here is NOT published until it is listed there. |
+| `<skill>/SKILL.mdx` (e.g. `tracing/`, `github/`) | Canonical source for a **feature skill**. Public skills are curated in `FEATURE_SKILLS`; Langy-only skills are curated in `NATIVE_ONLY_SKILLS`. |
 | `recipes/<name>/SKILL.mdx` | **Recipe** skills (use-case cookbooks). Auto-discovered: every `recipes/*/SKILL.mdx` is published, no registration needed. |
 | `_shared/*.mdx` | Partials (`<CliSetup />`, `<PlanLimits />`, …) imported by skills and inlined at compile time. Published output never references `_shared/`. |
 | `_lib/` | Shared tooling: `feature-skills.ts` (the ONE definition of "our published skill set"), `mdx-inline.ts` (partial inliner), `frontmatter.ts`. |
@@ -30,7 +30,8 @@ content. Read "The pipeline" below before editing anything.
 ```
 skills/<name>/SKILL.mdx  +  skills/_shared/*.mdx
         │  (inlineMdx: partials inlined, frontmatter preserved)
-        │  selection = listPublishedSkills(): FEATURE_SKILLS + every recipe
+        │  public selection = listPublishedSkills(): FEATURE_SKILLS + recipes
+        │  Langy selection = listNativeSkills(): public + native-only skills
         │
         ├─ 1. PUBLIC SKILLS REPO
         │     _publish/sync.ts → checkout of langwatch/skills
@@ -54,16 +55,12 @@ skills/<name>/SKILL.mdx  +  skills/_shared/*.mdx
               → opencode discovers each <slug>/SKILL.md as an invokable skill.
 ```
 
-All three consumers read the same selection (`listPublishedSkills` in
-`_lib/feature-skills.ts`), so what we publish, the docs offer, and Langy
-carries can never be three different sets.
-
-The one skill Langy has that this workspace does NOT own is `github/` — it is
-Langy-internal (provisioned `GH_TOKEN`, bot-author PR workflow) and lives with
-the Go manager in `services/langyagent/internal/assets/skills/github/`. It is
-never published; `_tests/publish-sync.test.ts` and
-`_tests/native-skills.test.ts` pin that. See
-`services/langyagent/internal/assets/README.md` for that side of the split.
+Langy's native selection is a strict superset of the public selection, so what
+we publish always ships in Langy. The `github/` skill is Langy-only because it
+depends on provisioned `GH_TOKEN` and bot-authored PR behavior; its canonical
+source still lives here, while `listPublishedSkills()` keeps it out of the
+public repository. The copy under the Go embed directory supports local builds,
+and `_tests/native-skills.test.ts` pins it to the root-compiled output.
 
 ## Adding or changing a skill
 

@@ -106,6 +106,10 @@ export function resolveIdentity(
   // colliding with a developer's real daemon).
   const configPath = env.LANGWATCH_CLI_CONFIG ?? "";
 
+  // API keys are high-entropy identity material, not user passwords. This
+  // digest is a deterministic, non-reversible namespace key shared by the CLI
+  // and daemon; a password KDF would add latency without improving that model.
+  // lgtm[js/insufficient-password-hash]
   const fingerprint = crypto
     .createHash("sha256")
     .update(`${endpoint}\0${apiKey}\0${uid}\0${configPath}`)

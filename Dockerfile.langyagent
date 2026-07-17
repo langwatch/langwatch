@@ -43,12 +43,12 @@ COPY services ./services
 
 # Overlay the FULL compiled skill directory into the embed dir BEFORE `go build`,
 # so the shipped binary embeds the complete set via //go:embed
-# (services/langyagent/internal/assets). The checked-in tree carries only the
-# dev/test subset (the langy-only github skill) to keep local builds honest; this
-# adds the public compiled skills alongside it. AGENTS.md is already embedded from
-# the checked-in internal/assets/AGENTS.md (identical dev + prod), so no overlay
-# for it. These land next to internal/assets/skills/github/ — exactly what the
-# //go:embed skills directive reads.
+# (services/langyagent/internal/assets). The complete production set, including
+# Langy-only skills, is compiled from canonical sources under root skills/. The
+# checked-in service copy keeps local Go builds honest and is verified to match
+# that root output. AGENTS.md is already embedded from the checked-in
+# internal/assets/AGENTS.md (identical dev + prod), so no overlay is needed for
+# it.
 COPY skills/_compiled/native/ ./services/langyagent/internal/assets/skills/
 
 # CGO disabled so the produced binary is statically linked and runs on
