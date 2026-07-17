@@ -35,3 +35,20 @@ export function metricCommandGroupKey({
   const lane = BigInt(`0x${sha256(pointId).slice(0, 16)}`) % count;
   return `metric:${lane}`;
 }
+
+/**
+ * Routes map work across bounded lanes while keeping the same logical identity
+ * serialized. Point storage uses PointId; series catalog and rollups use
+ * SeriesId so concurrent points cannot race updates for one series.
+ */
+export function metricMapGroupKey({
+  identity,
+  shardCount,
+}: {
+  identity: string;
+  shardCount: number;
+}): string {
+  const count = BigInt(clampMetricCommandShardCount(shardCount));
+  const lane = BigInt(`0x${sha256(identity).slice(0, 16)}`) % count;
+  return `metric-map:${lane}`;
+}
