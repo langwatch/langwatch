@@ -23,16 +23,6 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
-vi.mock("~/utils/compat/next-link", () => ({
-  default: ({
-    href,
-    children,
-  }: {
-    href: string;
-    children: React.ReactNode;
-  }) => <a href={href}>{children}</a>,
-}));
-
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
@@ -131,8 +121,7 @@ describe("AgentWorkflowTargetEditorDrawer", () => {
         "fast resolution agent workflow",
       );
 
-      const link = screen.getByTestId("open-workflow-link");
-      expect(link.querySelector("a")).toHaveAttribute(
+      expect(screen.getByTestId("open-workflow-link")).toHaveAttribute(
         "href",
         "/test-project/studio/workflow-123",
       );

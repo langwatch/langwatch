@@ -29,7 +29,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
 import type { Field as DSLField, Workflow } from "~/optimization_studio/types/dsl";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import NextLink from "~/utils/compat/next-link";
 import { api } from "~/utils/api";
 
 export type AgentWorkflowTargetEditorDrawerProps = {
@@ -197,18 +196,24 @@ export function AgentWorkflowTargetEditorDrawer(
                       {workflowQuery.data?.name ?? "(workflow not found)"}
                     </Text>
                     {editorHref && (
+                      // A plain external anchor, not the app router's Link:
+                      // target="_blank" is always a hard navigation into a
+                      // new tab, so there's no client-side routing to gain
+                      // by composing through NextLink here — and doing so
+                      // previously swallowed data-testid, since Chakra's
+                      // asChild slot only forwards style-related props to
+                      // the composed child, not arbitrary data attributes.
                       <ChakraLink
-                        asChild
+                        href={editorHref}
+                        target="_blank"
                         fontSize="sm"
                         color="blue.fg"
                         data-testid="open-workflow-link"
                       >
-                        <NextLink href={editorHref} target="_blank">
-                          <HStack gap={1} align="center">
-                            <Text>Open Workflow</Text>
-                            <LuExternalLink size={14} />
-                          </HStack>
-                        </NextLink>
+                        <HStack gap={1} align="center">
+                          <Text>Open Workflow</Text>
+                          <LuExternalLink size={14} />
+                        </HStack>
                       </ChakraLink>
                     )}
                   </HStack>
