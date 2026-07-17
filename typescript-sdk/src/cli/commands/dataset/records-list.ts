@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { createDatasetService } from "./service-factory";
@@ -35,7 +35,7 @@ export const recordsListCommand = async (
   }
 
   const service = createDatasetService();
-  const spinner = ora(`Fetching records from "${slugOrId}"...`).start();
+  const spinner = createSpinner(`Fetching records from "${slugOrId}"...`).start();
 
   try {
     const result = await service.listRecords(slugOrId, { page, limit });

@@ -97,6 +97,40 @@ import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
+import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
+import { type LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
+import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
+import type { LangyMessageProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageOperational.mapProjection";
+import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
+import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
+import type { LangyWorkerPort } from "../app-layer/langy/langyWorker";
+import {
+  mintLangySessionApiKeyForUser,
+  revokeLangySessionApiKey,
+} from "../app-layer/langy/langyApiKey";
+import {
+  createLangyEffectPorts,
+  createLangyIntentHandlers,
+  LANGY_OUTBOX_LEASE_DURATION_MS,
+} from "../app-layer/langy/process-manager/langyEffectPorts";
+import {
+  createLangyProcessSubscriber,
+  langyConversationProcessDefinition,
+} from "../app-layer/langy/process-manager";
+import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
+import {
+  createAgentTurnLivenessSubscriber,
+  createLangyConversationUpdateBroadcastSubscriber,
+  createLangyTurnAdmissionLifecycleSubscriber,
+} from "../app-layer/langy/subscribers";
+import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
+import {
+  OutboxDispatcherService,
+  ProcessManagerService,
+  ProcessOutboxWorker,
+  type ProcessStore,
+} from "./process-manager";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -134,6 +168,8 @@ import type {
 } from "./pipelines/trace-processing/schemas/commands";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
+import type { StateProjectionStore } from "./projections/stateProjection.types";
+import { createTenantId } from "./domain/tenantId";
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 
@@ -207,6 +243,18 @@ export interface PipelineRepositories {
   /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
   evaluationAnalytics: EvaluationAnalyticsRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
+  /** Direct Postgres operational projection; deliberately bypasses Redis. */
+  langyConversationState: StateProjectionStore<LangyConversationStateData>;
+  /** Direct Postgres per-turn operational projection. */
+  langyConversationTurnState: StateProjectionStore<LangyConversationTurnData>;
+  /** Postgres per-message operational projection. */
+  langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
+  /** Content-free ClickHouse event-grain analytics. */
+  langyAnalyticsEventStorage: AppendStore<LangyAnalyticsEventProjectionRecord>;
+  /** Durable process inbox, state, and outbox persistence. */
+  langyProcessStore: ProcessStore;
+  /** Postgres-authoritative logical-send receipts and active-turn claims. */
+  langyTurnAdmission: LangyTurnAdmissionRepository;
 }
 
 export interface PipelineRegistryDeps {
@@ -214,6 +262,13 @@ export interface PipelineRegistryDeps {
   repositories: PipelineRepositories;
   redis: Redis | Cluster;
   broadcast: BroadcastService;
+  langy: {
+    buffer: Pick<LangyTokenBuffer, "liveness" | "appendStatus" | "markError">;
+    handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
+    worker: Pick<LangyWorkerPort, "dispatch">;
+    titleGenerator: LangyTitleGenerator;
+    runsWorkers: boolean;
+  };
   projects: ProjectService;
   monitors: MonitorService;
   triggers: TriggerService;
@@ -291,6 +346,8 @@ export class PipelineRegistry {
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
     });
+    const { pipeline: langyConversationPipeline, processOutboxWorker } =
+      this.registerLangyConversationPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -301,10 +358,163 @@ export class PipelineRegistry {
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
       suiteRuns: mapCommands(suiteRunPipeline.commands),
+      langy: mapCommands(langyConversationPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
       /** Late-bind the execution pool for scenario execution reactor. */
       scenarioExecutionHandle,
+      // Starting and notifying are private composition concerns so a web role
+      // cannot accidentally start the worker. App shutdown only needs stop().
+      processOutboxWorker: {
+        stop: () => processOutboxWorker.stop(),
+      },
     };
+  }
+
+  /** Langy writes its low-latency operational projections directly to Postgres. */
+  private registerLangyConversationPipeline() {
+    const conversationStore = this.deps.repositories.langyConversationState;
+    const failTurn = new Deferred<
+      (args: {
+        projectId: string;
+        conversationId: string;
+        turnId: string;
+        error: string;
+      }) => Promise<void>
+    >("langyFailTurn");
+    const saveTitle = new Deferred<
+      (args: {
+        projectId: string;
+        conversationId: string;
+        turnId: string;
+        title: string;
+        model: string;
+      }) => Promise<void>
+    >("langyGenerateTitle");
+
+    const processManager = new ProcessManagerService({
+      definition: langyConversationProcessDefinition,
+      store: this.deps.repositories.langyProcessStore,
+    });
+    const effectPorts = createLangyEffectPorts({
+      handoffStore: this.deps.langy.handoffStore,
+      worker: this.deps.langy.worker,
+      mintSessionKey: ({ userId, projectId, organizationId }) =>
+        mintLangySessionApiKeyForUser({
+          prisma: this.deps.prisma,
+          userId,
+          projectId,
+          organizationId,
+        }),
+      revokeSessionKey: ({ apiKeyId }) =>
+        revokeLangySessionApiKey({
+          prisma: this.deps.prisma,
+          apiKeyId,
+        }).then(() => undefined),
+      titleGenerator: this.deps.langy.titleGenerator,
+      saveTitle: (args) => saveTitle.fn(args),
+    });
+    const outboxDispatcher = new OutboxDispatcherService({
+      store: this.deps.repositories.langyProcessStore,
+      handlers: createLangyIntentHandlers({ ports: effectPorts }),
+      // The lease MUST outlive the slowest accepted dispatch, or a healthy
+      // long-running turn loses its lease mid-flight and a second instance
+      // re-delivers it concurrently (the completing handler is then fenced
+      // out and the message never retires). The generic 30s default is unsafe
+      // against the 60s dispatch budget.
+      leaseDurationMs: LANGY_OUTBOX_LEASE_DURATION_MS,
+    });
+    const processOutboxWorker = new ProcessOutboxWorker({
+      dispatcher: outboxDispatcher,
+      logger,
+    });
+
+    const conversationReader = {
+      read: async ({
+        projectId,
+        conversationId,
+      }: {
+        projectId: string;
+        conversationId: string;
+      }) => {
+        const projection = await conversationStore.load(conversationId, {
+          tenantId: createTenantId(projectId),
+          aggregateId: conversationId,
+        });
+        if (!projection) return null;
+        return {
+          cursor: projection.cursor,
+          status: projection.state.Status,
+          currentTurnId: projection.state.CurrentTurnId,
+          lastActivityAtMs: projection.state.LastActivityAt,
+          ownerUserId: projection.state.UserId,
+          isShared: projection.state.IsShared,
+        };
+      },
+    };
+
+    const processSubscriber = createLangyProcessSubscriber({
+      processManager,
+      notifyOutbox: () => processOutboxWorker.notify(),
+    });
+    const livenessSubscriber = createAgentTurnLivenessSubscriber({
+      buffer: this.deps.langy.buffer,
+      conversations: conversationReader,
+      failTurn: { failTurn: (args) => failTurn.fn(args) },
+      worker: this.deps.langy.worker,
+      handoffStore: this.deps.langy.handoffStore,
+    });
+    const broadcastSubscriber =
+      createLangyConversationUpdateBroadcastSubscriber({
+        broadcast: this.deps.broadcast,
+        conversations: conversationReader,
+      });
+    const admissionLifecycleSubscriber =
+      createLangyTurnAdmissionLifecycleSubscriber({
+        admissions: this.deps.repositories.langyTurnAdmission,
+      });
+
+    const pipeline = this.deps.eventSourcing.register(
+      createLangyConversationProcessingPipeline({
+        langyConversationProjectionStore: conversationStore,
+        langyConversationTurnProjectionStore:
+          this.deps.repositories.langyConversationTurnState,
+        langyMessageProjectionStore: this.deps.repositories.langyMessageStorage,
+        langyAnalyticsEventProjectionStore:
+          this.deps.repositories.langyAnalyticsEventStorage,
+        subscribers: [
+          processSubscriber,
+          livenessSubscriber,
+          broadcastSubscriber,
+          admissionLifecycleSubscriber,
+        ],
+      }),
+    );
+
+    const commands = mapCommands(pipeline.commands);
+    failTurn.resolve((args) =>
+      commands.failAgentResponse({
+        tenantId: args.projectId,
+        occurredAt: Date.now(),
+        conversationId: args.conversationId,
+        turnId: args.turnId,
+        error: args.error,
+      }),
+    );
+    saveTitle.resolve((args) =>
+      commands.generateConversationTitle({
+        tenantId: args.projectId,
+        occurredAt: Date.now(),
+        conversationId: args.conversationId,
+        turnId: args.turnId,
+        title: args.title,
+        source: "auto",
+        model: args.model,
+      }),
+    );
+    if (this.deps.langy.runsWorkers) {
+      processOutboxWorker.start();
+    }
+    return { pipeline, processOutboxWorker };
   }
 
   private registerEvaluationPipeline({

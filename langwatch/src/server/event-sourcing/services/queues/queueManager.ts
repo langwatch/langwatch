@@ -49,6 +49,21 @@ export interface JobRegistryEntry {
   coalesceMaxBatch?: number;
 }
 
+interface QueuedEventConsumerDefinition<E extends Event> {
+  name: string;
+  handler: { handle: (event: E) => Promise<void> };
+  options: {
+    eventTypes?: readonly string[];
+    delay?: number;
+    deduplication?: DeduplicationStrategy<E>;
+    concurrency?: number;
+    spanAttributes?: (event: E) => Record<string, string | number | boolean>;
+    disabled?: boolean;
+    killSwitch?: KillSwitchOptions;
+    groupKeyFn?: (event: E) => string;
+  };
+}
+
 /**
  * Manages queue facades for event handlers, projections, commands, and reactors.
  *
@@ -62,14 +77,15 @@ export class QueueManager<EventType extends Event = Event> {
   private readonly logger = createLogger(
     "langwatch:event-sourcing:queue-manager",
   );
-  private readonly globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
+  private readonly globalQueue?: EventSourcedQueueProcessor<
+    Record<string, unknown>
+  >;
   private readonly globalJobRegistry?: Map<string, JobRegistryEntry>;
   private readonly featureFlagService?: FeatureFlagServiceInterface;
-  private readonly queues = new Map<
-    string,
-    EventSourcedQueueProcessor<any>
-  >();
+  private readonly queues = new Map<string, EventSourcedQueueProcessor<any>>();
   private handlerCount = 0;
+  private subscriberCount = 0;
+  private stateProjectionCount = 0;
   private projectionCount = 0;
   private reactorCount = 0;
 
@@ -117,7 +133,14 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   private key(
-    type: "handler" | "projection" | "command" | "reactor" | "job",
+    type:
+      | "handler"
+      | "subscriber"
+      | "stateProjection"
+      | "projection"
+      | "command"
+      | "reactor"
+      | "job",
     name: string,
   ): string {
     return `${type}:${name}`;
@@ -156,12 +179,19 @@ export class QueueManager<EventType extends Event = Event> {
     const pipelineName = this.pipelineName;
 
     const stripInternal = (payload: any) => {
-      const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
+      const {
+        __pipelineName: _p,
+        __jobType: _t,
+        __jobName: _n,
+        ...clean
+      } = payload;
       return clean;
     };
 
     // Namespace dedup IDs to avoid cross-pipeline/cross-type collisions
-    const namespaceDedup = (dedup: DeduplicationConfig<any>): DeduplicationConfig<any> => ({
+    const namespaceDedup = (
+      dedup: DeduplicationConfig<any>,
+    ): DeduplicationConfig<any> => ({
       ...dedup,
       makeId: (payload: any) =>
         `${pipelineName}/${jobType}/${jobName}/${dedup.makeId(stripInternal(payload))}`,
@@ -177,7 +207,12 @@ export class QueueManager<EventType extends Event = Event> {
           : namespacedEntryDedup;
 
         await globalQueue.send(
-          { ...payload, __pipelineName: pipelineName, __jobType: jobType, __jobName: jobName },
+          {
+            ...payload,
+            __pipelineName: pipelineName,
+            __jobType: jobType,
+            __jobName: jobName,
+          },
           {
             delay: options?.delay ?? entry.delay,
             deduplication: effectiveDedup,
@@ -211,45 +246,72 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   initializeHandlerQueues(
-    mapProjections: Record<string, {
-      name: string;
-      handler: { handle: (event: EventType) => Promise<void> };
-      options: {
-        eventTypes?: readonly string[];
-        delay?: number;
-        deduplication?: DeduplicationStrategy<EventType>;
-        concurrency?: number;
-        spanAttributes?: (event: EventType) => Record<string, string | number | boolean>;
-        disabled?: boolean;
-        killSwitch?: KillSwitchOptions;
-        groupKeyFn?: (event: EventType) => string;
-      };
-    }>,
+    mapProjections: Record<string, QueuedEventConsumerDefinition<EventType>>,
     onEvent: (
       handlerName: string,
       event: EventType,
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
   ): void {
-    if (!this.globalQueue) {
-      return;
-    }
+    this.initializeEventConsumerQueues({
+      definitions: mapProjections,
+      onEvent,
+      jobType: "handler",
+      jobPath: "map",
+      incrementCount: () => this.handlerCount++,
+    });
+  }
 
-    const handlerNames = Object.keys(mapProjections);
+  initializeSubscriberQueues(
+    subscribers: Record<string, QueuedEventConsumerDefinition<EventType>>,
+    onEvent: (
+      subscriberName: string,
+      event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
+  ): void {
+    this.initializeEventConsumerQueues({
+      definitions: subscribers,
+      onEvent,
+      jobType: "subscriber",
+      jobPath: "subscriber",
+      incrementCount: () => this.subscriberCount++,
+    });
+  }
 
-    for (const handlerName of handlerNames) {
-      const handlerDef = mapProjections[handlerName];
+  private initializeEventConsumerQueues({
+    definitions,
+    onEvent,
+    jobType,
+    jobPath,
+    incrementCount,
+  }: {
+    definitions: Record<string, QueuedEventConsumerDefinition<EventType>>;
+    onEvent: (
+      consumerName: string,
+      event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    jobType: "handler" | "subscriber";
+    jobPath: "map" | "subscriber";
+    incrementCount: () => void;
+  }): void {
+    if (!this.globalQueue) return;
+
+    for (const handlerName of Object.keys(definitions)) {
+      const handlerDef = definitions[handlerName];
       if (!handlerDef) {
         continue;
       }
 
       const customGroupKeyFn = handlerDef.options.groupKeyFn;
       const groupKeyFn = this.buildGroupKey({
-        jobPath: `map/${handlerName}`,
+        jobPath: `${jobPath}/${handlerName}`,
         getTenantId: (event: any) => String(event.tenantId),
         domainKeyFn: customGroupKeyFn
           ? (event: any) => customGroupKeyFn(event)
-          : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
+          : (event: any) =>
+              `${event.aggregateType}:${String(event.aggregateId)}`,
       });
       const entry: JobRegistryEntry = {
         groupKeyFn,
@@ -263,31 +325,32 @@ export class QueueManager<EventType extends Event = Event> {
         deduplication: resolveDeduplicationStrategy(
           handlerDef.options.deduplication,
           customGroupKeyFn
-            ? (event: EventType) => `${String(event.tenantId)}:${customGroupKeyFn(event)}`
+            ? (event: EventType) =>
+                `${String(event.tenantId)}:${customGroupKeyFn(event)}`
             : this.createDefaultDeduplicationId.bind(this),
         ),
         spanAttributes: handlerDef.options.spanAttributes,
       };
 
-      const facade = this.createFacade<EventType>(
-        "handler",
-        handlerName,
-        entry,
-      );
-      this.queues.set(this.key("handler", handlerName), facade);
-      this.handlerCount++;
+      const facade = this.createFacade<EventType>(jobType, handlerName, entry);
+      this.queues.set(this.key(jobType, handlerName), facade);
+      incrementCount();
     }
   }
 
   initializeProjectionQueues(
-    projections: Record<string, {
-      name: string;
-      groupKeyFn?: (event: EventType) => string;
-      coalesceMaxBatch?: number;
-      options?: {
-        killSwitch?: KillSwitchOptions;
-      };
-    }>,
+    projections: Record<
+      string,
+      {
+        name: string;
+        groupKeyFn?: (event: EventType) => string;
+        scoreFn?: (event: EventType) => number;
+        coalesceMaxBatch?: number;
+        options?: {
+          killSwitch?: KillSwitchOptions;
+        };
+      }
+    >,
     onEvent: (
       projectionName: string,
       event: EventType,
@@ -298,6 +361,10 @@ export class QueueManager<EventType extends Event = Event> {
       events: EventType[],
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
+    lane: {
+      queueType: "projection" | "stateProjection";
+      jobPath: "fold" | "state";
+    } = { queueType: "projection", jobPath: "fold" },
   ): void {
     if (!this.globalQueue) {
       return;
@@ -311,16 +378,19 @@ export class QueueManager<EventType extends Event = Event> {
 
       const customGroupKeyFn = projectionDef.groupKeyFn;
       const groupKeyFn = this.buildGroupKey({
-        jobPath: `fold/${projectionName}`,
+        jobPath: `${lane.jobPath}/${projectionName}`,
         getTenantId: (event: any) => String(event.tenantId),
         domainKeyFn: customGroupKeyFn
           ? (event: any) => customGroupKeyFn(event)
-          : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
+          : (event: any) =>
+              `${event.aggregateType}:${String(event.aggregateId)}`,
       });
       const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
       const entry: JobRegistryEntry = {
         groupKeyFn,
-        scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
+        scoreFn:
+          projectionDef.scoreFn ??
+          ((event: any) => event.occurredAt ?? event.createdAt),
         process: async (event: any) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,
@@ -347,13 +417,34 @@ export class QueueManager<EventType extends Event = Event> {
       };
 
       const facade = this.createFacade<EventType>(
-        "projection",
+        lane.queueType,
         projectionName,
         entry,
       );
-      this.queues.set(this.key("projection", projectionName), facade);
-      this.projectionCount++;
+      this.queues.set(this.key(lane.queueType, projectionName), facade);
+      if (lane.queueType === "stateProjection") {
+        this.stateProjectionCount++;
+      } else {
+        this.projectionCount++;
+      }
     }
+  }
+
+  initializeStateProjectionQueues(
+    projections: Parameters<
+      QueueManager<EventType>["initializeProjectionQueues"]
+    >[0],
+    onEvent: Parameters<
+      QueueManager<EventType>["initializeProjectionQueues"]
+    >[1],
+    onEventBatch?: Parameters<
+      QueueManager<EventType>["initializeProjectionQueues"]
+    >[2],
+  ): void {
+    this.initializeProjectionQueues(projections, onEvent, onEventBatch, {
+      queueType: "stateProjection",
+      jobPath: "state",
+    });
   }
 
   initializeCommandQueues<Payload extends Record<string, unknown>>(
@@ -395,7 +486,8 @@ export class QueueManager<EventType extends Event = Event> {
       const handlerClass = registration.handlerClass;
       const schema = handlerClass.schema;
       const commandType = schema.type;
-      const handlerInstance = registration.handlerInstance ?? new handlerClass();
+      const handlerInstance =
+        registration.handlerInstance ?? new handlerClass();
 
       const getAggregateId =
         registration.options?.getAggregateId ??
@@ -441,22 +533,32 @@ export class QueueManager<EventType extends Event = Event> {
           | DeduplicationStrategy<any>
           | undefined,
         (payload: any) => {
-          const key = cmdEntry.getGroupKey ? cmdEntry.getGroupKey(payload) : cmdEntry.getAggregateId(payload);
+          const key = cmdEntry.getGroupKey
+            ? cmdEntry.getGroupKey(payload)
+            : cmdEntry.getAggregateId(payload);
           return `${String(payload.tenantId)}:${this.aggregateType}:${String(key)}`;
         },
       );
 
       const commandGroupKeyFn = this.buildGroupKey({
-        jobPath: `command/${cmdName}`,
+        jobPath: cmdEntry.options.serializeByAggregate
+          ? "command"
+          : `command/${cmdName}`,
         getTenantId: (payload: any) => String(payload.tenantId),
         domainKeyFn: (payload: any) => {
-          const key = cmdEntry.getGroupKey ? cmdEntry.getGroupKey(payload) : cmdEntry.getAggregateId(payload);
+          const key = cmdEntry.options.serializeByAggregate
+            ? cmdEntry.getAggregateId(payload)
+            : cmdEntry.getGroupKey
+              ? cmdEntry.getGroupKey(payload)
+              : cmdEntry.getAggregateId(payload);
           return `${this.aggregateType}:${String(key)}`;
         },
       });
       const jobEntry: JobRegistryEntry = {
         groupKeyFn: commandGroupKeyFn,
-        scoreFn: (payload: any) => payload.occurredAt as number,
+        scoreFn: cmdEntry.options.serializeByAggregate
+          ? () => Date.now()
+          : (payload: any) => payload.occurredAt as number,
         process: async (payload: any) => {
           await processCommand({
             payload,
@@ -495,9 +597,7 @@ export class QueueManager<EventType extends Event = Event> {
               undefined,
               {
                 commandType: cmdEntry.commandType,
-                zodIssues: mapZodIssuesToLogContext(
-                  validation.error.issues,
-                ),
+                zodIssues: mapZodIssuesToLogContext(validation.error.issues),
               },
             );
           }
@@ -513,9 +613,7 @@ export class QueueManager<EventType extends Event = Event> {
                 undefined,
                 {
                   commandType: cmdEntry.commandType,
-                  zodIssues: mapZodIssuesToLogContext(
-                    validation.error.issues,
-                  ),
+                  zodIssues: mapZodIssuesToLogContext(validation.error.issues),
                 },
               );
             }
@@ -531,19 +629,33 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   initializeReactorQueues(
-    reactors: Record<string, {
-      name: string;
-      parentProjection: string;
-      parentType: "fold" | "map";
-      handler: { handle: (payload: { event: EventType; foldState: unknown }) => Promise<void> };
-      groupKeyFn?: (payload: { event: EventType; foldState: unknown }) => string;
-      options?: {
-        killSwitch?: KillSwitchOptions;
-        disabled?: boolean;
-        delay?: number;
-        deduplication?: DeduplicationStrategy<{ event: EventType; foldState: unknown }>;
-      };
-    }>,
+    reactors: Record<
+      string,
+      {
+        name: string;
+        parentProjection: string;
+        parentType: "fold" | "map";
+        handler: {
+          handle: (payload: {
+            event: EventType;
+            foldState: unknown;
+          }) => Promise<void>;
+        };
+        groupKeyFn?: (payload: {
+          event: EventType;
+          foldState: unknown;
+        }) => string;
+        options?: {
+          killSwitch?: KillSwitchOptions;
+          disabled?: boolean;
+          delay?: number;
+          deduplication?: DeduplicationStrategy<{
+            event: EventType;
+            foldState: unknown;
+          }>;
+        };
+      }
+    >,
     onEvent: (
       reactorName: string,
       payload: { event: EventType; foldState: unknown },
@@ -561,7 +673,8 @@ export class QueueManager<EventType extends Event = Event> {
         getTenantId: (payload: any) => String(payload.event.tenantId),
         domainKeyFn: customGroupKeyFn
           ? (payload: any) => customGroupKeyFn(payload)
-          : (payload: any) => `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
+          : (payload: any) =>
+              `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
       });
       const entry: JobRegistryEntry = {
         groupKeyFn: reactorGroupKeyFn,
@@ -586,11 +699,10 @@ export class QueueManager<EventType extends Event = Event> {
         }),
       };
 
-      const facade = this.createFacade<{ event: EventType; foldState: unknown }>(
-        "reactor",
-        reactorName,
-        entry,
-      );
+      const facade = this.createFacade<{
+        event: EventType;
+        foldState: unknown;
+      }>("reactor", reactorName, entry);
       this.queues.set(this.key("reactor", reactorName), facade);
       this.reactorCount++;
     }
@@ -600,8 +712,16 @@ export class QueueManager<EventType extends Event = Event> {
     return this.handlerCount > 0;
   }
 
+  hasSubscriberQueues(): boolean {
+    return this.subscriberCount > 0;
+  }
+
   hasProjectionQueues(): boolean {
     return this.projectionCount > 0;
+  }
+
+  hasStateProjectionQueues(): boolean {
+    return this.stateProjectionCount > 0;
   }
 
   hasReactorQueues(): boolean {
@@ -616,6 +736,14 @@ export class QueueManager<EventType extends Event = Event> {
       | undefined;
   }
 
+  getSubscriberQueue(
+    subscriberName: string,
+  ): EventSourcedQueueProcessor<EventType> | undefined {
+    return this.queues.get(this.key("subscriber", subscriberName)) as
+      | EventSourcedQueueProcessor<EventType>
+      | undefined;
+  }
+
   getProjectionQueue(
     projectionName: string,
   ): EventSourcedQueueProcessor<EventType> | undefined {
@@ -624,9 +752,19 @@ export class QueueManager<EventType extends Event = Event> {
       | undefined;
   }
 
+  getStateProjectionQueue(
+    projectionName: string,
+  ): EventSourcedQueueProcessor<EventType> | undefined {
+    return this.queues.get(this.key("stateProjection", projectionName)) as
+      | EventSourcedQueueProcessor<EventType>
+      | undefined;
+  }
+
   getReactorQueue(
     reactorName: string,
-  ): EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }> | undefined {
+  ):
+    | EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
+    | undefined {
     return this.queues.get(this.key("reactor", reactorName)) as
       | EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
       | undefined;
@@ -661,9 +799,7 @@ export class QueueManager<EventType extends Event = Event> {
   async close(): Promise<void> {
     // Global queue lifecycle is owned by EventSourcing — facade close is a no-op.
     // We still call close on all facades for consistent behavior.
-    await Promise.allSettled(
-      [...this.queues.values()].map((q) => q.close()),
-    );
+    await Promise.allSettled([...this.queues.values()].map((q) => q.close()));
     this.logger.debug({ queueCount: this.queues.size }, "All queues closed");
   }
 

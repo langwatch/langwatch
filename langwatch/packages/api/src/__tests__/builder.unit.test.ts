@@ -397,7 +397,7 @@ describe("output validation", () => {
         code: "internal_error",
         // Deprecated back-compat alias of `code` (see ErrorResponseBody.kind).
         kind: "internal_error",
-        message: "Internal server error",
+        message: "An unknown error occurred",
       });
     });
   });

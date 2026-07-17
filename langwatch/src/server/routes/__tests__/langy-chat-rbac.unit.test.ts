@@ -1,14 +1,18 @@
 /**
  * @vitest-environment node
  *
- * RBAC gate on /api/langy/chat. The Langy worker carries a service API key
- * with WRITE on traces / evaluations / datasets / scenarios / annotations /
- * analytics / prompts / triggers / workflows. Before #4913 the route gated
- * on `evaluations:view`, so a user with a view-only custom role could ask
- * Langy to create or update any of those resources — a privilege
- * escalation. PR #4913 tightens the gate to require `{resource}:update` on
- * EVERY resource the service key exposes (the `:manage` hierarchy still
- * lets admins through). This file pins the new contract end-to-end.
+ * Coarse RBAC gate on /api/langy/chat.
+ *
+ * Under ADR-043 the fine-grained authorisation is the per-session API key
+ * minted in getOrProvision — scoped to exactly the permissions the CALLER
+ * holds, so a Langy tool call can never exceed the human. The route therefore
+ * NO LONGER runs an all-or-nothing gate requiring `{resource}:update` on all
+ * nine Langy families (the pre-ADR-043 behaviour, which 403'd a user who could
+ * edit prompts but not create triggers — "restrict all of Langy"). Instead it
+ * runs ONE baseline `evaluations:view` check: can the caller read this project
+ * at all? A user who can read but lacks some write permissions is admitted and
+ * simply gets a session key that omits the actions they can't perform. This
+ * file pins that contract.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -43,6 +47,7 @@ async function postChat(body: unknown) {
 
 const VALID_BODY = {
   projectId: "p1",
+  requestId: "00000000-0000-4000-8000-000000000001",
   conversationId: null,
   messages: [{ role: "user", parts: [{ text: "hi" }] }],
 };
@@ -64,55 +69,33 @@ beforeEach(() => {
   });
 });
 
-describe("/api/langy/chat RBAC", () => {
-  describe("when the caller holds every required Langy permission", () => {
-    it("passes the gate (returns past the 403 path)", async () => {
+describe("/api/langy/chat coarse RBAC gate", () => {
+  describe("when the caller can read the project", () => {
+    it("passes the gate with a single evaluations:view check", async () => {
       hasProjectPermission.mockResolvedValue(true);
 
       const res = await postChat(VALID_BODY);
 
-      // The handler proceeds past the perm gate. It likely 5xx/4xxs later
-      // because we mocked nothing downstream — but it must NOT 403 with
-      // the "do not have permission" body.
+      // The handler proceeds past the perm gate. It 5xx/4xxs later because
+      // nothing downstream is mocked — but it must NOT 403 with the
+      // permission-denied body.
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       expect(body.error).not.toBe(
         "You do not have permission to use Langy for this project.",
       );
-      // All 9 LANGY_REQUIRED_PERMISSIONS were checked (route loops the
-      // full list when each individual check returns true).
-      expect(hasProjectPermission).toHaveBeenCalledTimes(9);
-    });
-  });
-
-  describe("when the caller is missing one Langy write permission", () => {
-    it("403s and short-circuits the remaining checks", async () => {
-      // First two pass (traces:update, evaluations:update). Then datasets:
-      // update returns false → handler must 403 and not query the rest.
-      hasProjectPermission
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(false);
-
-      const res = await postChat(VALID_BODY);
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-
-      expect(res.status).toBe(403);
-      expect(body.error).toBe(
-        "You do not have permission to use Langy for this project.",
+      // Exactly ONE baseline check — proves the all-or-nothing 9-permission
+      // loop is gone; per-session key scoping (ADR-043) is the real gate.
+      expect(hasProjectPermission).toHaveBeenCalledTimes(1);
+      expect(hasProjectPermission).toHaveBeenCalledWith(
+        expect.anything(),
+        "p1",
+        "evaluations:view",
       );
-      // Short-circuit: only the three checks before the deny were made.
-      // Without this, a deny on a late-listed resource would leak the
-      // earlier checks' DB cost on every blocked request.
-      expect(hasProjectPermission).toHaveBeenCalledTimes(3);
     });
   });
 
-  describe("when the caller has only the legacy evaluations:view", () => {
-    it("403s — the old gate is no longer sufficient", async () => {
-      // Simulate a view-only custom role: evaluations:view would pass but
-      // any *:update would not. The route requires :update on every
-      // resource the service key writes, so the very first check (which
-      // requests traces:update, not evaluations:view) denies.
+  describe("when the caller cannot read the project", () => {
+    it("403s with the permission-denied body", async () => {
       hasProjectPermission.mockResolvedValue(false);
 
       const res = await postChat(VALID_BODY);
@@ -120,6 +103,26 @@ describe("/api/langy/chat RBAC", () => {
 
       expect(res.status).toBe(403);
       expect(body.error).toBe(
+        "You do not have permission to use Langy for this project.",
+      );
+      expect(hasProjectPermission).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the caller can read but lacks some Langy write permissions", () => {
+    it("is admitted, not blocked — Langy is scoped down, not switched off", async () => {
+      // A user who can view the project but (pre-ADR-043) lacked e.g.
+      // triggers:update was 403'd outright. Now the coarse gate only asks
+      // "can you read this project?" (evaluations:view → true), so they pass;
+      // the per-session key minted downstream simply won't carry the actions
+      // they can't perform. We prove the route no longer consults every write
+      // permission by asserting a single baseline check.
+      hasProjectPermission.mockResolvedValue(true);
+
+      const res = await postChat(VALID_BODY);
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+
+      expect(body.error).not.toBe(
         "You do not have permission to use Langy for this project.",
       );
       expect(hasProjectPermission).toHaveBeenCalledTimes(1);

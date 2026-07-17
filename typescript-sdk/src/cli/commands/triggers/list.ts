@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
@@ -13,7 +13,7 @@ export const listTriggersCommand = async (options?: { format?: string }): Promis
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = ora("Fetching triggers...").start();
+  const spinner = createSpinner("Fetching triggers...").start();
 
   try {
     const response = await fetch(`${endpoint}/api/triggers`, {
@@ -70,7 +70,7 @@ export const listTriggersCommand = async (options?: { format?: string }): Promis
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch triggers" });
+    failSpinner({ spinner, error, action: "fetch triggers", format: options?.format });
     process.exit(1);
   }
 };

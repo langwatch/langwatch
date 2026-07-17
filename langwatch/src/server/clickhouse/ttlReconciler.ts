@@ -69,6 +69,13 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 49,
   },
   {
+    table: "langy_analytics_events",
+    ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_LANGY_ANALYTICS_EVENTS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
     table: "experiment_run_items",
     ttlColumn: "OccurredAt",
     retentionTTLColumn: "OccurredAt",

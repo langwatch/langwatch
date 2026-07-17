@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -17,7 +17,7 @@ export const promptRestoreCommand = async (
   const endpoint =
     resolveControlPlaneUrl();
 
-  const spinner = ora(
+  const spinner = createSpinner(
     `Restoring "${handle}" to version ${versionId}...`
   ).start();
 
@@ -63,7 +63,7 @@ export const promptRestoreCommand = async (
     );
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "restore prompt" });
+    failSpinner({ spinner, error, action: "restore prompt", format: options?.format });
     process.exit(1);
   }
 };

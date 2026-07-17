@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../utils/spinner";
 import { checkApiKey } from "../utils/apiKey";
 import {
   createLangWatchApiClient,
@@ -14,7 +14,7 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
   const apiClient = createLangWatchApiClient();
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
-  const spinner = ora("Fetching project status...").start();
+  const spinner = createSpinner("Fetching project status...").start();
 
   const results: Record<string, { count: number; error?: string; status?: number }> = {};
 

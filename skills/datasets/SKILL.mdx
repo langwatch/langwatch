@@ -268,6 +268,13 @@ langwatch dataset create "<dataset-name>" --columns "input:string,expected_outpu
 langwatch dataset upload "<dataset-slug>" evaluation_dataset.csv
 ```
 
+The local file is not a completed dataset. After generating it, you MUST run
+both commands and inspect their exit status. Then verify the upload with
+`langwatch dataset get <slug> --format json` before claiming success. If
+`langwatch` is missing or either command fails, stop with a clearly labelled
+upload failure and the exact command error; never present the local path as if
+it were on LangWatch and never say "created" when only a file was written.
+
 If the upload fails (missing API key, network issue), let the user know and help them fix it — they can always upload later with `langwatch dataset upload`.
 
 ### Deliver results to the user

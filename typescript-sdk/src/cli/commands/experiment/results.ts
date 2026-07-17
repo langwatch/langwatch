@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   ExperimentsApiService,
   type ExperimentRunResultsResponse,
@@ -87,7 +87,7 @@ export const experimentResultsCommand = async ({
   const evaluatorFilter = options.evaluator?.trim();
 
   const service = new ExperimentsApiService();
-  const spinner = ora(`Fetching results for "${experimentSlug}"...`).start();
+  const spinner = createSpinner(`Fetching results for "${experimentSlug}"...`).start();
 
   try {
     const runId = await resolveRunId({
@@ -243,7 +243,7 @@ export const experimentResultsCommand = async ({
       );
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch experiment results" });
+    failSpinner({ spinner, error, action: "fetch experiment results", format: options?.format });
     process.exit(1);
   }
 };

@@ -77,6 +77,7 @@ import {
   hashSecret,
 } from "../src/server/api-key/api-key-token.utils";
 import { CUSTOM_ROLE_KIND } from "../src/server/role/repositories/role.repository";
+import { seedDemoPlatform } from "./seed-demo-platform";
 
 const prisma = new PrismaClient();
 
@@ -355,6 +356,14 @@ async function main() {
   });
 
   await seedModelProvidersFromEnv(organization.id);
+
+  if (process.env.HAVEN_SEED_PRESET === "demo") {
+    await seedDemoPlatform({
+      prisma,
+      projectId: project.id,
+      userId: user.id,
+    });
+  }
 
   console.log(`✅ Organization: ${organization.id} (${organization.slug})`);
   console.log(`✅ Team:         ${team.id} (${team.slug})`);

@@ -48,7 +48,8 @@ COMMANDS
                   already hot-reloads via Vite), -f/--force (tear the running
                   stack down first and take its place), -d/--detach (run in the
                   background, logs to a file — follow with "haven logs -f",
-                  stop with "haven down").
+                  stop with "haven down"). Foreground mode uses a compact live
+                  TUI with the stack and recent output pinned at the top.
     restart [svc] Bounce one supervised service (app, api, gateway, nlp,
                   langyagent, workers) — or all of them with no argument —
                   without tearing the stack down. Kills the service's process
@@ -126,6 +127,10 @@ COMMANDS
                   preset; HAVEN_SEED_TRACES=1), --first-message /
                   --no-first-message (force the project's "has received its
                   first trace" onboarding flag; HAVEN_SEED_FIRST_MESSAGE=1|0).
+                  The dev feature set (Langy, AI governance, the gateway menu,
+                  event-sourced analytics) is enabled by default on a managed
+                  database — disable with --skip-feature-flags
+                  (HAVEN_SEED_FEATURE_FLAGS=0).
     git [target]  Open the embedded git TUI (moron) for a worktree: no target
                   is this worktree; a stack slug, worktree name, or directory
                   opens that one — inspect branches, diffs, and worktrees
@@ -139,6 +144,11 @@ COMMANDS
                   connections are terminated; the standing lw_main database is
                   always kept). Dry-run without --yes. Also prunes orphaned git
                   worktree admin entries.
+    cleanup --force  Reap orphaned local dev runtimes (tsgo, node, pnpm, uv,
+                  Python, and OpenCode) belonging to this worktree. Refuses
+                  without --force.
+    upgrade       Reinstall the haven binary from this checkout with go install.
+                  Restart an active launcher after upgrading.
     typecheck     Run "pnpm typecheck" under a machine-wide slot so parallel tsgo
                   runs across worktrees don't exhaust RAM (args forwarded).
     hmr on|off    AI-gated HMR: "on [--ttl 30s]" defers Vite reloads while an
@@ -208,7 +218,7 @@ ENVIRONMENT
     LW_OBS_GRAFANA_PORT=3000     Grafana port (also LW_OBS_OTLP_HTTP_PORT=4318,
                                  LW_OBS_OTLP_GRPC_PORT=4317).
     PORTLESS=0                   Bypass portless entirely (legacy PORT scheme).
-    HAVEN_AGENT=1                Plain, colourless, redraw-free output (also on
+    HAVEN_AGENT=1                Plain, colorless, redraw-free output (also on
                                  with --agent, NO_COLOR, or a non-terminal stdout)
                                  — zero token waste when an AI agent drives haven.
 

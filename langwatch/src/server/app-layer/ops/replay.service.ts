@@ -146,8 +146,15 @@ export class ReplayService {
       const selectedMapProjections = runtime.mapProjections.filter((p) =>
         params.projectionNames.includes(p.projectionName),
       );
+      const selectedStateProjections = runtime.stateProjections.filter((p) =>
+        params.projectionNames.includes(p.projectionName),
+      );
 
-      if (selectedProjections.length === 0 && selectedMapProjections.length === 0) {
+      if (
+        selectedProjections.length === 0 &&
+        selectedMapProjections.length === 0 &&
+        selectedStateProjections.length === 0
+      ) {
         await this.finalizeWithError({
           runId: params.runId,
           errorMessage: "No matching projections found",
@@ -211,15 +218,15 @@ export class ReplayService {
 
       let result;
       try {
-        result = await runtime.service.replayOptimized(
-          {
-            projections: selectedProjections,
-            mapProjections: selectedMapProjections,
-            tenantIds: params.tenantIds,
-            since: params.since,
-            aggregateIds: params.aggregateIds,
-          },
-          {
+        const replayConfig = {
+          projections: selectedProjections,
+          mapProjections: selectedMapProjections,
+          stateProjections: selectedStateProjections,
+          tenantIds: params.tenantIds,
+          since: params.since,
+          aggregateIds: params.aggregateIds,
+        };
+        const replayCallbacks = {
             onProgress: (progress: ReplayProgress) => {
               this.updateProgress({ runId: params.runId, progress }).catch(
                 (err) => {
@@ -245,8 +252,14 @@ export class ReplayService {
                 throw new ReplayCancelledError();
               }
             },
-          },
-        );
+          };
+        result =
+          selectedStateProjections.length > 0
+            ? await runtime.service.replay(replayConfig, replayCallbacks)
+            : await runtime.service.replayOptimized(
+                replayConfig,
+                replayCallbacks,
+              );
       } finally {
         clearInterval(heartbeat);
       }

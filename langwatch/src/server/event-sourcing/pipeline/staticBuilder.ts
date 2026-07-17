@@ -23,7 +23,9 @@ import type {
   MapProjectionDefinition,
   MapProjectionOptions,
 } from "../projections/mapProjection.types";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import { ConfigurationError } from "../services/errorHandling";
 
 // Turns a union like {name:"a"; payload:A} | {name:"b"; payload:B}
@@ -115,6 +117,10 @@ export class StaticPipelineBuilderWithNameAndType<
       options?: MapProjectionOptions;
     }
   >();
+  private stateProjections = new Map<
+    string,
+    StateProjectionDefinition<any, EventType>
+  >();
   private commands: Array<{
     name: string;
     handlerClass: CommandHandlerClass<any, any, any>;
@@ -140,6 +146,10 @@ export class StaticPipelineBuilderWithNameAndType<
   private mapOutboxReactors = new Map<
     string,
     { projectionName: string; definition: OutboxReactorDefinition<EventType> }
+  >();
+  private eventSubscribers = new Map<
+    string,
+    EventSubscriberDefinition<EventType>
   >();
   private featureFlagService?: FeatureFlagServiceInterface;
 
@@ -213,6 +223,39 @@ export class StaticPipelineBuilderWithNameAndType<
   }
 
   /**
+   * Register the default operational state projection.
+   *
+   * It runs as one direct repository load/apply/store cycle under the queue's
+   * per-key lock. It is intentionally not a valid parent for `.withReactor()`
+   * or `.withOutbox()`.
+   */
+  withProjection(
+    name: string,
+    definition: StateProjectionDefinition<any, EventType>,
+  ): this {
+    if (name !== definition.name) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Projection name mismatch: arg "${name}" !== definition.name "${definition.name}"`,
+        { projectionName: name, definitionName: definition.name },
+      );
+    }
+    if (
+      this.stateProjections.has(name) ||
+      this.foldProjections.has(name) ||
+      this.mapProjections.has(name)
+    ) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Projection with name "${name}" already exists`,
+        { projectionName: name },
+      );
+    }
+    this.stateProjections.set(name, definition);
+    return this;
+  }
+
+  /**
    * Register a feature flag service for kill switches.
    * When provided, enables automatic feature flag-based kill switches for all components.
    *
@@ -223,6 +266,29 @@ export class StaticPipelineBuilderWithNameAndType<
     featureFlagService: FeatureFlagServiceInterface,
   ): this {
     this.featureFlagService = featureFlagService;
+    return this;
+  }
+
+  /** Register a live event consumer that receives no projection state. */
+  withEventSubscriber(
+    subscriberName: string,
+    definition: EventSubscriberDefinition<EventType>,
+  ): this {
+    if (subscriberName !== definition.name) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Event subscriber name mismatch: arg "${subscriberName}" !== definition.name "${definition.name}"`,
+        { subscriberName, definitionName: definition.name },
+      );
+    }
+    if (this.eventSubscribers.has(subscriberName)) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Event subscriber with name "${subscriberName}" already exists`,
+        { subscriberName },
+      );
+    }
+    this.eventSubscribers.set(subscriberName, definition);
     return this;
   }
 
@@ -455,6 +521,19 @@ export class StaticPipelineBuilderWithNameAndType<
           eventTypes: def.definition.eventTypes as string[],
         }),
       ),
+      stateProjections: Array.from(this.stateProjections.entries()).map(
+        ([name, definition]) => ({
+          name,
+          handlerClassName: `Projection(${definition.name})`,
+          eventTypes: [...definition.eventTypes],
+        }),
+      ),
+      subscribers: Array.from(this.eventSubscribers.values()).map(
+        (subscriber) => ({
+          name: subscriber.name,
+          eventTypes: [...subscriber.eventTypes],
+        }),
+      ),
       commands: this.commands.map((cmd) => ({
         name: cmd.name,
         handlerClassName: cmd.handlerClass.name,
@@ -464,12 +543,14 @@ export class StaticPipelineBuilderWithNameAndType<
     return {
       metadata,
       foldProjections: this.foldProjections,
+      stateProjections: this.stateProjections,
       mapProjections: this.mapProjections,
       commands: this.commands,
       foldReactors: this.foldReactors,
       mapReactors: this.mapReactors,
       foldOutboxReactors: this.foldOutboxReactors,
       mapOutboxReactors: this.mapOutboxReactors,
+      eventSubscribers: this.eventSubscribers,
       featureFlagService: this.featureFlagService,
 
       // Purely for typing: lets downstream code infer the command names + payloads

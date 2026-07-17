@@ -2,6 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type IORedis from "ioredis";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { Event } from "../domain/types";
 import type { DiscoveredAggregate } from "./replayEventLoader";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
@@ -38,7 +39,29 @@ export interface RegisteredMapProjection {
   targetTable?: string;
 }
 
-export type ProjectionKind = "fold" | "map";
+/**
+ * A `.withProjection()` operational state projection registered for a canonical
+ * rebuild. Unlike fold/map, replay of a state projection rebuilds its
+ * `StateProjectionStore` from `init()` (never `store.load`). The normal replay
+ * path pauses and drains the live projection queue before replacing rows;
+ * re-running is idempotent because the output is deterministic.
+ */
+export interface RegisteredStateProjection {
+  projectionName: string;
+  pipelineName: string;
+  aggregateType: string;
+  source: "pipeline" | "global";
+  definition: StateProjectionDefinition<any, Event>;
+  /**
+   * Pause-set entry for parity/introspection. State projections enqueue as
+   * `__jobType=stateProjection`, so this is `{pipeline}/stateProjection/{name}`.
+   * The normal rebuild path consumes it to pause live writes.
+   */
+  pauseKey: string;
+  kind: "state";
+}
+
+export type ProjectionKind = "fold" | "map" | "state";
 
 export type BatchPhase = "mark" | "pause" | "drain" | "cutoff" | "replay" | "write" | "unmark";
 
@@ -84,6 +107,12 @@ export interface BatchCompleteInfo {
 export interface ReplayConfig {
   projections: RegisteredFoldProjection[];
   mapProjections?: RegisteredMapProjection[];
+  /**
+   * Operational state projections to rebuild into their stores. Only
+   * the normal replay path supports these; `replayOptimized` rejects a config
+   * carrying them rather than silently skipping them.
+   */
+  stateProjections?: RegisteredStateProjection[];
   tenantIds: string[];
   since: string;
   aggregateIds?: string[];

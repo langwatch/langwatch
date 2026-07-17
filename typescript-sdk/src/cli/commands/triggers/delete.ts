@@ -1,4 +1,4 @@
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -14,7 +14,7 @@ export const deleteTriggerCommand = async (
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = ora(`Deleting trigger "${id}"...`).start();
+  const spinner = createSpinner(`Deleting trigger "${id}"...`).start();
 
   try {
     const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
@@ -35,7 +35,7 @@ export const deleteTriggerCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete trigger" });
+    failSpinner({ spinner, error, action: "delete trigger", format: options?.format });
     process.exit(1);
   }
 };

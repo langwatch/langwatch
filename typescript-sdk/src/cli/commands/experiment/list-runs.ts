@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   ExperimentsApiService,
   type ExperimentRunSummaryEntry,
@@ -75,7 +75,7 @@ export const experimentListRunsCommand = async (
   })();
 
   const service = new ExperimentsApiService();
-  const spinner = ora(
+  const spinner = createSpinner(
     `Fetching runs for "${experimentSlug}"...`,
   ).start();
 
@@ -138,7 +138,7 @@ export const experimentListRunsCommand = async (
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "list experiment runs" });
+    failSpinner({ spinner, error, action: "list experiment runs", format: options?.format });
     process.exit(1);
   }
 };

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { UpdateEvaluatorBody } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
@@ -13,7 +13,7 @@ export const updateEvaluatorCommand = async (
 
   const service = new EvaluatorsApiService();
 
-  const resolveSpinner = ora(`Finding evaluator "${idOrSlug}"...`).start();
+  const resolveSpinner = createSpinner(`Finding evaluator "${idOrSlug}"...`).start();
 
   let evaluatorId: string;
   try {
@@ -29,7 +29,7 @@ export const updateEvaluatorCommand = async (
     process.exit(1);
   }
 
-  const updateSpinner = ora(`Updating evaluator...`).start();
+  const updateSpinner = createSpinner(`Updating evaluator...`).start();
 
   try {
     const body: UpdateEvaluatorBody = {};
@@ -51,7 +51,7 @@ export const updateEvaluatorCommand = async (
     if (error instanceof SyntaxError) {
       updateSpinner.fail(chalk.red("--settings must be valid JSON"));
     } else {
-      failSpinner({ spinner: updateSpinner, error, action: "update evaluator" });
+      failSpinner({ spinner: updateSpinner, error, action: "update evaluator", format: options?.format });
     }
     process.exit(1);
   }

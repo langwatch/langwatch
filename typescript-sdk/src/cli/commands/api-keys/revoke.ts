@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const revokeApiKeyCommand = async (
   checkApiKey();
 
   const service = new ApiKeysApiService();
-  const spinner = ora(`Revoking API key "${id}"...`).start();
+  const spinner = createSpinner(`Revoking API key "${id}"...`).start();
 
   try {
     const result = await service.revoke(id);
@@ -27,7 +27,7 @@ export const revokeApiKeyCommand = async (
     console.log(chalk.gray("API key has been revoked and can no longer be used."));
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "revoke API key" });
+    failSpinner({ spinner, error, action: "revoke API key", format: options?.format });
     process.exit(1);
   }
 };

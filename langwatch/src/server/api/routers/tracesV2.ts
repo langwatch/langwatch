@@ -734,6 +734,12 @@ export const tracesV2Router = createTRPCRouter({
         sort: sortSchema,
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(1000).default(50),
+        cursor: z
+          .object({
+            sortValue: z.number().finite(),
+            traceId: z.string().min(1),
+          })
+          .optional(),
         query: z.string().nullish(),
       }),
     )
@@ -749,6 +755,7 @@ export const tracesV2Router = createTRPCRouter({
         sort: input.sort,
         page: input.page,
         pageSize: input.pageSize,
+        cursor: input.cursor,
         filterWhere: buildFilterWhere(input),
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,

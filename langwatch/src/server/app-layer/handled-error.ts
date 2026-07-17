@@ -47,6 +47,22 @@ export interface SerializedHandledError {
 }
 
 /**
+ * The Go pkg/herr wire envelope — herr and HandledError are the SAME model
+ * (type ⇄ code, meta, trace ids, recursive reasons), so a typed error crosses
+ * any Go→TS wire losslessly. herr guarantees the envelope only ever carries
+ * known handled codes with vetted copy; genuinely unknown causes arrive
+ * pre-collapsed to type "unknown".
+ */
+export interface HerrEnvelope {
+  type: string;
+  message: string;
+  meta?: Record<string, unknown>;
+  trace_id?: string;
+  span_id?: string;
+  reasons?: HerrEnvelope[];
+}
+
+/**
  * Base class for all handled errors — the TypeScript counterpart of Go's
  * `herr.E` (`pkg/herr`). Its shape matches `herr.E` field-for-field:
  * `code`↔`Code`, `meta`↔`Meta`, `traceId`↔`TraceID`, `spanId`↔`SpanID`,
@@ -169,6 +185,29 @@ export abstract class HandledError extends Error {
     log?.(error);
     return "An unknown error occurred";
   }
+}
+
+/**
+ * Deserialize a herr wire envelope into a HandledError chain. A `tree_zebra`
+ * herr from service A IS a `tree_zebra` HandledError here — same code, same
+ * meta, same reasons; nothing marks it as having crossed a wire. Cross-process
+ * identity is the `code` discriminant (see the class doc), exactly as if it
+ * had been raised locally. Belongs in boundary middleware (wire schemas):
+ * downstream code only ever receives the HandledError.
+ */
+export function handledErrorFromHerr(body: HerrEnvelope): HandledError {
+  return new (class extends HandledError {
+    constructor() {
+      super(body.type, body.message, {
+        meta: {
+          ...body.meta,
+          ...(body.trace_id ? { traceId: body.trace_id } : {}),
+        },
+        reasons: (body.reasons ?? []).map(handledErrorFromHerr),
+      });
+      this.name = body.type;
+    }
+  })();
 }
 
 function serializeReason(error: Error): SerializedReason {

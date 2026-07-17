@@ -230,15 +230,15 @@ spec:
 
             # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
             # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
-            # against the same Secret. Hyphenated values key → index, not dot.
-            {{- if (index .Values "langy-agent").chartManaged }}
+            # against the same Secret. Subchart values key read via index (aliased subchart).
+            {{- if (index .Values "langyagent").chartManaged }}
             - name: OPENCODE_AGENT_URL
-              value: {{ (index .Values "langy-agent").controlPlane.agentUrl | default (printf "http://%s-langy-agent:80" .Release.Name) | quote }}
+              value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ (index .Values "langy-agent").secrets.existingSecretName | default "langwatch-langy-agent-auth" }}
-                  key: {{ (index .Values "langy-agent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+                  name: {{ (index .Values "langyagent").secrets.existingSecretName | default "langwatch-langyagent-auth" }}
+                  key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
             {{- end }}
 
             # LW_GATEWAY_PUBLIC_URL — the externally-reachable AI Gateway URL

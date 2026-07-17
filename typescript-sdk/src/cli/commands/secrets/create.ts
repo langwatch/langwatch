@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -25,7 +25,7 @@ export const createSecretCommand = async (
   const endpoint =
     resolveControlPlaneUrl();
 
-  const spinner = ora(`Creating secret "${name}"...`).start();
+  const spinner = createSpinner(`Creating secret "${name}"...`).start();
 
   try {
     const response = await fetch(`${endpoint}/api/secrets`, {
@@ -60,7 +60,7 @@ export const createSecretCommand = async (
     console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(secret.name)}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "create secret" });
+    failSpinner({ spinner, error, action: "create secret", format: options?.format });
     process.exit(1);
   }
 };

@@ -10,7 +10,11 @@ import type {
 } from "./types";
 import { isAtOrBeforeCutoff } from "./replayConstants";
 import type { DiscoveredAggregate } from "./replayEventLoader";
-import { batchLoadAggregateEvents, getBoundedCutoffs } from "./replayEventLoader";
+import {
+  batchLoadAggregateEvents,
+  getBoundedCutoffs,
+  maxEventPosition,
+} from "./replayEventLoader";
 import {
   aggregateKey,
   markPendingBatch,
@@ -23,10 +27,17 @@ import {
   removeStaleMarker,
   cleanupAll,
 } from "./replayMarkers";
-import { pauseProjection, unpauseProjection, waitForActiveJobs } from "./replayDrain";
+import {
+  pauseProjection,
+  unpauseProjection,
+  waitForActiveJobs,
+} from "./replayDrain";
 import { FoldAccumulator } from "./replayExecutor";
 import type { ReplayLogWriter } from "./replayLog";
-import { discoverProjectionAggregates, filterDiscoveredByAggregateIds } from "./replayDiscovery";
+import {
+  discoverProjectionAggregates,
+  filterDiscoveredByAggregateIds,
+} from "./replayDiscovery";
 
 /**
  * Replays a single fold projection across discovered aggregates: discovery,
@@ -92,20 +103,40 @@ export async function replayFoldProjection({
   });
 
   if (allAggregates.length === 0) {
-    return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0, touchedTenants: [] };
+    return {
+      aggregatesReplayed: 0,
+      totalEvents: 0,
+      batchErrors: 0,
+      touchedTenants: [],
+    };
   }
 
   if (dryRun) {
-    return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0, touchedTenants: [] };
+    return {
+      aggregatesReplayed: 0,
+      totalEvents: 0,
+      batchErrors: 0,
+      touchedTenants: [],
+    };
   }
 
   // Get completed set for resume support
-  const completedSet = await getCompletedSet({ redis, projectionName: projection.projectionName });
+  const completedSet = await getCompletedSet({
+    redis,
+    projectionName: projection.projectionName,
+  });
 
   // Remove stale markers
-  const staleMarkers = await getCutoffMarkers({ redis, projectionName: projection.projectionName });
+  const staleMarkers = await getCutoffMarkers({
+    redis,
+    projectionName: projection.projectionName,
+  });
   for (const aggKey of staleMarkers.keys()) {
-    await removeStaleMarker({ redis, projectionName: projection.projectionName, aggKey });
+    await removeStaleMarker({
+      redis,
+      projectionName: projection.projectionName,
+      aggKey,
+    });
   }
 
   let aggregatesCompleted = 0;
@@ -177,7 +208,8 @@ export async function replayFoldProjection({
             progress.batchPhase = phase;
             if (eventsProcessed !== undefined) {
               progress.batchEventsProcessed = eventsProcessed;
-              progress.totalEventsReplayed = totalEventsReplayed + eventsProcessed;
+              progress.totalEventsReplayed =
+                totalEventsReplayed + eventsProcessed;
             }
             emit();
           },
@@ -226,7 +258,9 @@ export async function replayFoldProjection({
           log.write({
             step: "error",
             error: `unpause failed after batch error: ${
-              unpauseError instanceof Error ? unpauseError.message : String(unpauseError)
+              unpauseError instanceof Error
+                ? unpauseError.message
+                : String(unpauseError)
             }`,
           });
         });
@@ -299,8 +333,18 @@ async function replayBatch({
   // 3. DRAIN
   onBatchPhase("drain");
   const drainStart = Date.now();
-  await waitForActiveJobs({ redis, aggregates: batch, projectionName, kind: "fold" });
-  log.write({ step: "drain-batch", tenant: tenantId, count: batch.length, durationMs: Date.now() - drainStart });
+  await waitForActiveJobs({
+    redis,
+    aggregates: batch,
+    projectionName,
+    kind: "fold",
+  });
+  log.write({
+    step: "drain-batch",
+    tenant: tenantId,
+    count: batch.length,
+    durationMs: Date.now() - drainStart,
+  });
 
   // 4. CUTOFF — occurred-at bounds first (over all events of the batch's
   //    aggregates) so the cutoff + load queries prune event_log's weekly
@@ -326,7 +370,12 @@ async function replayBatch({
     }
   }
 
-  log.write({ step: "cutoff-batch", tenant: tenantId, count: batch.length, withEvents: withCutoffKeys.length });
+  log.write({
+    step: "cutoff-batch",
+    tenant: tenantId,
+    count: batch.length,
+    withEvents: withCutoffKeys.length,
+  });
 
   if (withoutCutoffKeys.length > 0) {
     await unmarkBatch({ redis, projectionName, aggKeys: withoutCutoffKeys });
@@ -343,15 +392,16 @@ async function replayBatch({
   // 5. REPLAY — stream events page-by-page through the fold accumulator.
   //    Only fold states (bounded by batch size) stay in memory.
   onBatchPhase("replay", 0);
-  const accumulator = new FoldAccumulator(projection.definition, accumulatorOpts);
-  const maxCutoffEventId = [...cutoffs.values()]
-    .map((c) => c.eventId)
-    .reduce((a, b) => (a > b ? a : b));
+  const accumulator = new FoldAccumulator(
+    projection.definition,
+    accumulatorOpts,
+  );
+  const maxCutoff = maxEventPosition(cutoffs.values());
   const aggregateIds = batch
     .filter((a) => cutoffs.has(aggregateKey(a)))
     .map((a) => a.aggregateId);
 
-  let cursorEventId = "";
+  let cursor: { timestamp: number; eventId: string } | undefined;
   const replayStart = Date.now();
 
   while (true) {
@@ -360,8 +410,8 @@ async function replayBatch({
       tenantId,
       aggregateIds,
       eventTypes: projection.definition.eventTypes,
-      maxCutoffEventId,
-      cursorEventId,
+      maxCutoff,
+      cursor,
       batchSize,
       occurredAtBounds,
     });
@@ -375,14 +425,19 @@ async function replayBatch({
         aggregateId: e.aggregateId,
       });
       const cutoff = cutoffs.get(key);
-      if (cutoff != null && isAtOrBeforeCutoff(e.timestamp, e.id, cutoff.timestamp, cutoff.eventId)) {
+      if (
+        cutoff != null &&
+        isAtOrBeforeCutoff(e.timestamp, e.id, cutoff.timestamp, cutoff.eventId)
+      ) {
         accumulator.apply(e);
         onBatchPhase("replay", accumulator.processed);
       }
     }
 
     const lastEvent = events[events.length - 1];
-    if (lastEvent) cursorEventId = lastEvent.id;
+    if (lastEvent) {
+      cursor = { timestamp: lastEvent.timestamp, eventId: lastEvent.id };
+    }
     if (events.length < batchSize) break;
   }
 
@@ -406,7 +461,11 @@ async function replayBatch({
   onBatchPhase("unmark", totalBatchEvents);
   await markCompletedBatch({ redis, projectionName, cutoffs });
   await unpauseProjection({ redis, pauseKey: projection.pauseKey });
-  log.write({ step: "unmark-batch", tenant: tenantId, count: withCutoffKeys.length });
+  log.write({
+    step: "unmark-batch",
+    tenant: tenantId,
+    count: withCutoffKeys.length,
+  });
 
   return { eventsReplayed: totalBatchEvents };
 }

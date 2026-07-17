@@ -26,6 +26,10 @@ import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
+import type { LangyConversationService } from "./langy/langy-conversation.service";
+import type { LangyTurnService } from "./langy/langy-turn.service";
+import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
+import type { LangyMessageService } from "./langy/langy-message.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
@@ -89,6 +93,13 @@ export interface AppDependencies {
   };
   suiteRuns: {
     runs: SuiteRunService;
+  };
+  /** ADR-046: Langy conversations as an event-sourced projection. */
+  langy: {
+    conversations: LangyConversationService;
+    turns: LangyTurnService;
+    messages: LangyMessageService;
+    githubInstallations: LangyGithubInstallationsService;
   };
   experiments: ExperimentService;
   triggers: TriggerService;

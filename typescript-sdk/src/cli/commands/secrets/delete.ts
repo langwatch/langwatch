@@ -1,4 +1,4 @@
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -15,7 +15,7 @@ export const deleteSecretCommand = async (
   const endpoint =
     resolveControlPlaneUrl();
 
-  const spinner = ora(`Deleting secret "${id}"...`).start();
+  const spinner = createSpinner(`Deleting secret "${id}"...`).start();
 
   try {
     const response = await fetch(`${endpoint}/api/secrets/${id}`, {
@@ -40,7 +40,7 @@ export const deleteSecretCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete secret" });
+    failSpinner({ spinner, error, action: "delete secret", format: options?.format });
     process.exit(1);
   }
 };

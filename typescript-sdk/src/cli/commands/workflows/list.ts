@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
@@ -9,7 +9,7 @@ export const listWorkflowsCommand = async (options?: { format?: string }): Promi
   checkApiKey();
 
   const service = new WorkflowsApiService();
-  const spinner = ora("Fetching workflows...").start();
+  const spinner = createSpinner("Fetching workflows...").start();
 
   try {
     const workflows = await service.getAll();
@@ -61,7 +61,7 @@ export const listWorkflowsCommand = async (options?: { format?: string }): Promi
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch workflows" });
+    failSpinner({ spinner, error, action: "fetch workflows", format: options?.format });
     process.exit(1);
   }
 };

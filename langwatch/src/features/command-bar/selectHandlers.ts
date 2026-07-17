@@ -107,6 +107,10 @@ export function handleCommandSelect(
       ctx.close();
       openDrawer("foundry");
       break;
+    case "action-invite-member":
+      ctx.close();
+      openDrawer("inviteMember");
+      break;
     case "action-feature-flags":
       ctx.close();
       openDrawer("featureFlags");

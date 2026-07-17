@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -15,7 +15,7 @@ export const updateWorkflowCommand = async (
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = ora(`Updating workflow "${id}"...`).start();
+  const spinner = createSpinner(`Updating workflow "${id}"...`).start();
 
   try {
     const body: Record<string, string> = {};
@@ -67,7 +67,7 @@ export const updateWorkflowCommand = async (
     console.log(`  ${chalk.gray("Description:")} ${workflow.description ?? chalk.gray("—")}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update workflow" });
+    failSpinner({ spinner, error, action: "update workflow", format: options?.format });
     process.exit(1);
   }
 };

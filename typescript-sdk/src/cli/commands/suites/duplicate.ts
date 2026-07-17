@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const duplicateSuiteCommand = async (
   checkApiKey();
 
   const service = new SuitesApiService();
-  const spinner = ora(`Duplicating suite "${id}"...`).start();
+  const spinner = createSpinner(`Duplicating suite "${id}"...`).start();
 
   try {
     const suite = await service.duplicate(id);
@@ -29,7 +29,7 @@ export const duplicateSuiteCommand = async (
     console.log(`  ${chalk.gray("Slug:")}     ${chalk.yellow(suite.slug)}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "duplicate suite" });
+    failSpinner({ spinner, error, action: "duplicate suite", format: options?.format });
     process.exit(1);
   }
 };

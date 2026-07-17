@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -34,7 +34,7 @@ export const createProjectCommand = async (options: CreateProjectOptions): Promi
   }
 
   const service = new ProjectsApiService();
-  const spinner = ora(`Creating project "${options.name}"...`).start();
+  const spinner = createSpinner(`Creating project "${options.name}"...`).start();
 
   try {
     const project = await service.create({
@@ -65,7 +65,7 @@ export const createProjectCommand = async (options: CreateProjectOptions): Promi
     console.log(chalk.gray("Service API key id: ") + project.serviceApiKeyId);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "create project" });
+    failSpinner({ spinner, error, action: "create project", format: options?.format });
     process.exit(1);
   }
 };

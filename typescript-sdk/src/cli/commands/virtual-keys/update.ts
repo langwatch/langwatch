@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import type * as NodeFs from "node:fs";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
@@ -84,7 +84,7 @@ export const updateVirtualKeyCommand = async (
   }
 
   const service = new VirtualKeysApiService();
-  const spinner = ora(`Updating virtual key "${id}"...`).start();
+  const spinner = createSpinner(`Updating virtual key "${id}"...`).start();
 
   try {
     const updated = await service.update(id, {
@@ -114,7 +114,7 @@ export const updateVirtualKeyCommand = async (
     console.log(JSON.stringify(updated.config, null, 2));
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update virtual key" });
+    failSpinner({ spinner, error, action: "update virtual key", format: options?.format });
     process.exit(1);
   }
 };

@@ -130,6 +130,15 @@ export interface FoldProjectionOptions {
   /** Kill switch configuration. When enabled, the projection is disabled. */
   killSwitch?: KillSwitchOptions;
   /**
+   * Order used when the executor coalesces or rebuilds fold state.
+   *
+   * `occurredAt` (default) follows business time. `acceptedAt` follows the
+   * canonical event-log cursor `(createdAt/EventTimestamp, EventId)` and is for
+   * lifecycle aggregates whose accepted transition order must win even when a
+   * producer submits a backdated business timestamp.
+   */
+  eventOrdering?: "occurredAt" | "acceptedAt";
+  /**
    * Maximum number of same-aggregate events to coalesce into a single
    * load/apply/store cycle when the group is backed up. 1 (the default)
    * disables coalescing. Higher values bound how much of a backed-up group

@@ -1,0 +1,74 @@
+import { useCallback } from "react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+
+/**
+ * Write commands for Langy conversations, through the defined tRPC API.
+ *
+ * The whole Langy conversation surface — the `langy.list` / `langy.messages`
+ * reads AND this delete — goes through one tRPC router (never an ad-hoc client
+ * `fetch`). `remove` calls `langy.deleteConversation`, which dispatches the
+ * event-sourced archive command server-side, then invalidates the React Query
+ * list cache so the recents list drops the row without a bespoke local edit.
+ */
+export function useLangyConversationCommands(): {
+  remove: (id: string) => Promise<void>;
+  rename: (id: string, title: string) => Promise<void>;
+  fork: (id: string) => Promise<string>;
+} {
+  const { project } = useOrganizationTeamProject();
+  const utils = api.useUtils();
+  const deleteConversation = api.langy.deleteConversation.useMutation({
+    onSuccess: (_result, variables) => {
+      void utils.langy.list.invalidate({ projectId: variables.projectId });
+    },
+  });
+  const renameConversation = api.langy.renameConversation.useMutation({
+    onSuccess: (_result, variables) => {
+      void utils.langy.list.invalidate({ projectId: variables.projectId });
+    },
+  });
+  const forkConversation = api.langy.forkConversation.useMutation({
+    onSuccess: (_result, variables) => {
+      void utils.langy.list.invalidate({ projectId: variables.projectId });
+    },
+  });
+
+  const remove = useCallback(
+    async (id: string) => {
+      const projectId = project?.id;
+      if (!projectId) return;
+      await deleteConversation.mutateAsync({ projectId, conversationId: id });
+    },
+    [project?.id, deleteConversation],
+  );
+
+  const rename = useCallback(
+    async (id: string, title: string) => {
+      const projectId = project?.id;
+      const trimmed = title.trim();
+      if (!projectId || !trimmed) return;
+      await renameConversation.mutateAsync({
+        projectId,
+        conversationId: id,
+        title: trimmed,
+      });
+    },
+    [project?.id, renameConversation],
+  );
+
+  const fork = useCallback(
+    async (id: string) => {
+      const projectId = project?.id;
+      if (!projectId) throw new Error("No project selected");
+      const conversation = await forkConversation.mutateAsync({
+        projectId,
+        conversationId: id,
+      });
+      return conversation.id;
+    },
+    [project?.id, forkConversation],
+  );
+
+  return { remove, rename, fork };
+}

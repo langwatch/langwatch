@@ -67,6 +67,7 @@ async function loadDevHttpsCredentials(
 }
 
 import { createLogger } from "@langwatch/observability";
+import { getRequestListener } from "@hono/node-server";
 // Hono — unified API router
 import type { Hono } from "hono";
 import { register } from "prom-client";
@@ -182,6 +183,13 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
   const mcpHandler = createMcpHandler();
   const honoApp = createApiRouter();
+  // The Node→Hono bridge. `getRequestListener` streams request bodies through
+  // (no buffering — the Langy ndjson relay depends on this) and streams the
+  // response back. `overrideGlobalObjects: false`: never patch the process's
+  // global Request/Response for the rest of the app.
+  const apiListener = getRequestListener(honoFetchForNode(honoApp), {
+    overrideGlobalObjects: false,
+  });
 
   // In production, resolve the built client assets directory
   const clientDistDir = dev ? null : path.join(dir, "dist/client");
@@ -290,12 +298,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
       // ---- API Routes (all go through Hono) ----
       if (pathname.startsWith("/api/")) {
-        const handled = await routeThroughHono(honoApp, req, res, hostname, port);
-        if (handled) return;
-
-        res.statusCode = 404;
-        res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify({ error: "Not Found" }));
+        await apiListener(req, res);
         return;
       }
 
@@ -449,98 +452,66 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   }
 };
 
-// Exported for the langwatch#5219 regression test, which drives the
-// null-body branch directly to prove it never writes a 0-byte body.
-export async function routeThroughHono(
-  honoApp: Hono,
-  req: IncomingMessage,
-  res: ServerResponse,
-  hostname: string,
-  port: number
-): Promise<boolean> {
-  const body =
-    req.method !== "GET" && req.method !== "HEAD"
-      ? await readBody(req)
-      : undefined;
+/**
+ * The Hono app's fetch, adjusted for the Node server entry. This is the ONLY
+ * bridge logic we own — the Node↔fetch conversion itself is
+ * `@hono/node-server`'s `getRequestListener`, which passes request bodies
+ * through as live streams (`Readable.toWeb`) instead of buffering them. That
+ * property is load-bearing: the Langy frame relay
+ * (`POST /api/internal/langy/relay/frames`) is a long-lived ndjson connection
+ * whose route reads line by line while the turn runs; the previous hand-rolled
+ * bridge `await`ed the ENTIRE body before Hono ran, so every frame of a turn
+ * arrived in one burst after the turn ended.
+ *
+ * Two response adjustments survive from the old bridge:
+ *
+ *  1. Hono's default not-found sentinel ("404 Not Found" text) becomes the
+ *     uniform JSON 404 the /api surface has always returned. A route's own
+ *     404 (different body) passes through untouched.
+ *  2. langwatch#5219: a null-body response on a status that SHOULD carry a
+ *     body must never reach the wire as 0 bytes — a tRPC client then throws
+ *     `Unexpected end of JSON input` on `response.json()`. It becomes a
+ *     parseable JSON error instead. 204/205/304 and HEAD legitimately carry
+ *     no body and are left alone (a 304 revision-poll or 204 long-poll no-diff
+ *     must stay empty).
+ *
+ * Exported for the langwatch#5219 + streaming-bridge regression tests.
+ */
+export function honoFetchForNode(
+  honoApp: Pick<Hono, "fetch">,
+): (request: Request) => Promise<Response> {
+  return async (request) => {
+    const response = await honoApp.fetch(request);
 
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (value === undefined) continue;
-    if (Array.isArray(value)) {
-      for (const v of value) headers.append(key, v);
-    } else {
-      headers.set(key, value);
-    }
-  }
-
-  const honoReq = new Request(`http://${hostname}:${port}${req.url}`, {
-    method: req.method,
-    headers,
-    body: body as BodyInit | undefined,
-    // @ts-ignore - duplex needed for streaming bodies
-    duplex: "half",
-  });
-
-  const honoRes = await honoApp.fetch(honoReq);
-
-  if (honoRes.status === 404) {
-    const text = await honoRes.text();
-    if (text === "404 Not Found") return false;
-    res.statusCode = 404;
-    honoRes.headers.forEach((v, k) => res.setHeader(k, v));
-    res.end(text);
-    return true;
-  }
-
-  res.statusCode = honoRes.status;
-  honoRes.headers.forEach((v, k) => res.setHeader(k, v));
-
-  if (honoRes.body) {
-    const reader = honoRes.body.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      res.write(value);
-    }
-    res.end();
-  } else if (
-    ![204, 205, 304].includes(honoRes.status) &&
-    req.method !== "HEAD"
-  ) {
-    // Null-body responses on a status that SHOULD carry a body (e.g. an error
-    // that slipped past a handler's own serialization) would otherwise
-    // `res.end("")` — a 0-byte body. A tRPC client then throws `Unexpected end
-    // of JSON input` on `response.json()` (langwatch#5219). Never emit an empty
-    // body here: fall back to a parseable JSON error so the client gets
-    // something it can decode.
-    const text = await honoRes.text();
-    if (text.length > 0) {
-      res.end(text);
-    } else {
-      if (!res.getHeader("Content-Type")) {
-        res.setHeader("Content-Type", "application/json");
+    if (response.status === 404) {
+      const text = await response.clone().text();
+      if (text === "404 Not Found") {
+        return new Response(JSON.stringify({ error: "Not Found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
       }
-      res.end(
+      return response;
+    }
+
+    if (
+      !response.body &&
+      ![204, 205, 304].includes(response.status) &&
+      request.method !== "HEAD"
+    ) {
+      const headers = new Headers(response.headers);
+      if (!headers.get("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+      }
+      return new Response(
         JSON.stringify({
           error: "Internal server error",
           message: "The server returned an empty response.",
         }),
+        { status: response.status, headers },
       );
     }
-  } else {
-    // 204/205/304 and HEAD legitimately carry no body — write nothing. Injecting
-    // a JSON error here would corrupt valid no-content paths (e.g. a 304
-    // revision-poll or a 204 long-poll no-diff).
-    res.end();
-  }
-  return true;
-}
 
-function readBody(req: IncomingMessage): Promise<Uint8Array> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (chunk: Buffer) => chunks.push(chunk));
-    req.on("end", () => resolve(new Uint8Array(Buffer.concat(chunks))));
-    req.on("error", reject);
-  });
+    return response;
+  };
 }
