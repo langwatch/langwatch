@@ -39,9 +39,17 @@ type ErrorKind = "not-found" | "load-failed" | "no-selection";
 function classifyError(error: unknown, traceId: string | undefined): ErrorKind {
   if (!traceId) return "no-selection";
   const data = (
-    error as { data?: { code?: string; domainError?: { kind?: string } } }
+    error as {
+      data?: {
+        code?: string;
+        // `kind` is the deprecated pre-`HandledError` discriminant, read as a
+        // fallback so this resolves across the transition.
+        domainError?: { code?: string; kind?: string };
+      };
+    }
   )?.data;
-  if (data?.domainError?.kind === "trace_not_found") return "not-found";
+  const domainCode = data?.domainError?.code ?? data?.domainError?.kind;
+  if (domainCode === "trace_not_found") return "not-found";
   if (data?.code === "NOT_FOUND") return "not-found";
   return "load-failed";
 }

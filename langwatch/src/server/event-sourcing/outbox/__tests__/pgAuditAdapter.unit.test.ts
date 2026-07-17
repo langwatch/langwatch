@@ -7,7 +7,7 @@ import {
 } from "../payload";
 import { PgOutboxAuditAdapter } from "../pgAuditAdapter";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -34,7 +34,7 @@ function makeCadencePayload(
     triggerId: TRIGGER_ID,
     reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
     auditDedupKey: DEDUP_KEY,
-    match: { traceId: TRACE_ID, input: "in", output: "out" },
+    match: { traceId: TRACE_ID },
     ...overrides,
   };
 }

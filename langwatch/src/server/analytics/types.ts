@@ -3,7 +3,6 @@ import { z } from "zod";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { DeepRequired, Unpacked } from "../../utils/types";
 import { type FilterField, filterFieldsEnum } from "../filters/types";
-import type { TimeseriesInputType } from "./registry";
 
 export type AnalyticsMetric = {
   label: string;
@@ -173,14 +172,15 @@ export interface FeedbacksResult {
 }
 
 /**
- * Analytics backend interface for dependency injection. The legacy
- * `trace_summaries`-only backend. ADR-034 Phase 3 routing to
- * trace_analytics / trace_analytics_rollup is owned by the app-layer
- * service (`~/server/app-layer/analytics`) — this interface stays the
- * trace_summaries-only contract for the legacy facade + its tests.
+ * Analytics backend interface for dependency injection. Covers the legacy
+ * non-timeseries reads (filter options, feedbacks, top documents).
+ * Timeseries reads are owned end-to-end by the app-layer service
+ * (`~/server/app-layer/analytics`) — routing, query building, and the
+ * shared row parser — so this interface deliberately has no
+ * `getTimeseries`: a second implementation would be a place for bucket
+ * semantics to drift.
  */
 export interface AnalyticsBackend {
-  getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult>;
   getDataForFilter(
     projectId: string,
     field: FilterField,

@@ -12,7 +12,7 @@ import {
 } from "../payload";
 import type { OutboxRuntime } from "../setup";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -40,7 +40,6 @@ function settlePayload(
     traceId: TRACE_ID,
     reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
     auditDedupKey: `${PROJECT_ID}/${TRIGGER_ID}:trace:${TRACE_ID}`,
-    foldSnapshotAtEnqueue: { computedInput: "in", computedOutput: "out" },
     ...overrides,
   };
 }

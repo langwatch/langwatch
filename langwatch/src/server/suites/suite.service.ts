@@ -5,18 +5,19 @@
  * Handles CRUD, duplication, and run scheduling.
  */
 
+
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type {
   PrismaClient,
   SimulationSuite,
 } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import {
-  SuiteRepository,
-  type CreateSuiteInput,
-  type UpdateSuiteInput,
-} from "./suite.repository";
-import { isSuiteAgentTargetType, parseSuiteTargets, type SuiteTarget } from "./types";
+import type { SuiteRunResult, SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
+import { slugify } from "~/utils/slugify";
+import { AgentRepository } from "../agents/agent.repository";
+import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
+import { ScenarioRepository } from "../scenarios/scenario.repository";
 import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,
@@ -24,20 +25,19 @@ import {
   InvalidTargetReferencesError,
   SuiteDomainError,
 } from "./errors";
-
-import { createLogger } from "~/utils/logger/server";
-import { slugify } from "~/utils/slugify";
-import { ScenarioRepository } from "../scenarios/scenario.repository";
-import { AgentRepository } from "../agents/agent.repository";
-import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
-import type { SuiteRunResult, SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
+import {
+  type CreateSuiteInput,
+  SuiteRepository,
+  type UpdateSuiteInput,
+} from "./suite.repository";
+import { isSuiteAgentTargetType, parseSuiteTargets, type SuiteTarget } from "./types";
 
 const tracer = getLangWatchTracer("langwatch.suites.service");
 const logger = createLogger("langwatch:suites:service");
 
+export type { SuiteRunResult } from "~/server/app-layer/suites/suite-run.service";
 // Re-export for consumers that need the type
 export type { SuiteTarget } from "./types";
-export type { SuiteRunResult } from "~/server/app-layer/suites/suite-run.service";
 
 /** Result of resolving scenario references against the database */
 type ResolvedScenarioReferences = {

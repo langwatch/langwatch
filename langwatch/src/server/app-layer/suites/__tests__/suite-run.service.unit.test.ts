@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { SuiteRunService } from "../suite-run.service";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NullSuiteRunReadRepository } from "../repositories/suite-run.repository";
+import { SuiteRunService } from "../suite-run.service";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

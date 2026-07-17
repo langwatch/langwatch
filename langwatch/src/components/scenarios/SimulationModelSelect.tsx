@@ -7,6 +7,7 @@ import {
   INHERIT_SENTINEL,
   ProviderModelSelector,
 } from "../settings/ProviderModelSelector";
+import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
 import { LATEST_ALIAS_PROVIDERS } from "../../server/modelProviders/latestAliases";
 
 /**
@@ -79,6 +80,12 @@ export function SimulationModelSelect({
     return Array.from(new Set([...aliases, ...custom, ...registry]));
   }, [projectProviders.data]);
 
+  // Configured custom-model display names, keyed by `<provider>/<modelId>`.
+  const displayNames = useMemo(
+    () => buildCustomModelDisplayNames(projectProviders.data?.providers ?? []),
+    [projectProviders.data],
+  );
+
   const inheritModel = resolvedDefault.data?.model ?? "";
 
   return (
@@ -98,6 +105,7 @@ export function SimulationModelSelect({
             ? { model: inheritModel, label: "Default model" }
             : undefined
         }
+        displayNames={displayNames}
       />
     </VStack>
   );

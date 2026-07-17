@@ -6,6 +6,14 @@
  * e2e job and charts/langwatch/tests/e2e-full-stack.sh run it against a fresh
  * database per CI run.
  *
+ * Optional extras (all env-gated, all idempotent):
+ *   - Model providers from the environment (HAVEN_SEED_MODEL_PROVIDERS=0
+ *     disables): every registry provider whose API-key variable is set in the
+ *     process env / langwatch/.env / repo-root .env gets an enabled,
+ *     org-scoped ModelProvider row with those keys.
+ *   - HAVEN_SEED_FIRST_MESSAGE=1|0 forces the project's firstMessage/
+ *     integrated flags on or off, independent of HAVEN_SEED_PRESET=demo.
+ *
  * Every identity value below is a fixed, hardcoded constant — nothing here is
  * randomly generated. The same admin login and the same organization/team/
  * project/user IDs and keys/tokens exist on every worktree and every
@@ -54,9 +62,15 @@
  * must stay useless without it). Verification always succeeds locally
  * because hashing and verifying both read that same local pepper.
  */
+import fs from "fs";
+import path from "path";
+
 import { PrismaClient, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { hash as hashPassword } from "bcrypt";
+import { parse as parseDotenv } from "dotenv";
 import { ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
+import { modelProviders } from "../src/server/modelProviders/registry";
+import { encrypt } from "../src/utils/encryption";
 import {
   API_KEY_PREFIX,
   INGEST_KEY_PREFIX,
@@ -110,6 +124,18 @@ async function main() {
     `🌱 Seeding static local dev identity (ingestion key: ${apiKey.slice(0, 8)}…)`,
   );
 
+  // HAVEN_SEED_PRESET=demo seeds the project as already past onboarding
+  // (firstMessage/integrated set), so the UI opens on the real product instead
+  // of the "waiting for your first message" journey. `haven seed --preset demo`
+  // sets this and then ingests sample traces through the collector.
+  // HAVEN_SEED_FIRST_MESSAGE=1|0 overrides that flag independently of the
+  // preset (`haven seed --first-message` sets it).
+  const firstMessageOverride = process.env.HAVEN_SEED_FIRST_MESSAGE;
+  const hasFirstMessageOverride = firstMessageOverride !== undefined;
+  const isPastOnboarding = hasFirstMessageOverride
+    ? firstMessageOverride === "1" || firstMessageOverride === "true"
+    : process.env.HAVEN_SEED_PRESET === "demo";
+
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },
     create: {
@@ -142,10 +168,15 @@ async function main() {
       teamId: team.id,
       language: "en",
       framework: "langchain",
-      firstMessage: false,
-      integrated: false,
+      firstMessage: isPastOnboarding,
+      integrated: isPastOnboarding,
     },
-    update: { apiKey },
+    // An explicit override must also be able to CLEAR the flags
+    // (`haven seed --no-first-message`); without one, an existing true is kept.
+    update:
+      hasFirstMessageOverride || isPastOnboarding
+        ? { apiKey, firstMessage: isPastOnboarding, integrated: isPastOnboarding }
+        : { apiKey },
   });
 
   // Admin user + BetterAuth credential (email/password) login.
@@ -323,13 +354,138 @@ async function main() {
     update: {},
   });
 
+  await seedModelProvidersFromEnv(organization.id);
+
   console.log(`✅ Organization: ${organization.id} (${organization.slug})`);
   console.log(`✅ Team:         ${team.id} (${team.slug})`);
   console.log(`✅ Project:      ${project.id} (${project.slug})`);
   console.log(`✅ Admin login:  ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
-  console.log(`✅ Ingestion key:        ${project.apiKey}`);
+  // Only echo the key in full when it's the non-secret default; otherwise redact
+  // (same rationale as the seeding log above — real credentials must not hit shipped logs).
+  const displayApiKey =
+    project.apiKey === DEFAULT_INGESTION_KEY
+      ? project.apiKey
+      : `${project.apiKey.slice(0, 8)}…`;
+  console.log(`✅ Ingestion key:        ${displayApiKey}`);
   console.log(`✅ Private access token: ${PRIVATE_ACCESS_TOKEN}`);
   console.log(`✅ Public access token:  ${PUBLIC_ACCESS_TOKEN}`);
+}
+
+// ---------------------------------------------------------------------------
+// Model providers from the environment.
+//
+// For every provider in the registry whose primary API-key variable is set —
+// in the process env, langwatch/.env, or the repo-root .env — upsert an
+// enabled, ORGANIZATION-scoped ModelProvider carrying those keys (encrypted
+// exactly as modelProvider.repository does), so a fresh local stack can talk
+// to the providers the developer already has credentials for without pasting
+// them into the settings UI. Fixed per-provider row IDs keep re-runs
+// idempotent. HAVEN_SEED_MODEL_PROVIDERS=0 disables the whole block
+// (`haven seed --skip-model-providers`).
+// ---------------------------------------------------------------------------
+
+const MODEL_PROVIDER_ID_PREFIX = "local-dev-model-provider-";
+
+// loadSeedEnv merges the dotenv layers under the child's real precedence:
+// process env wins over langwatch/.env, which wins over the repo-root .env.
+// The seed always runs with cwd=langwatch/ (haven, CI, and the pnpm script
+// all invoke it there).
+function loadSeedEnv(): Record<string, string> {
+  const merged: Record<string, string> = {};
+  for (const file of [path.join("..", ".env"), ".env"]) {
+    try {
+      Object.assign(merged, parseDotenv(fs.readFileSync(file)));
+    } catch {
+      // missing file — fine, the layer just doesn't exist
+    }
+  }
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v !== undefined) merged[k] = v;
+  }
+  return merged;
+}
+
+// schemaKeyNames lists a provider's credential variable names from its zod
+// keysSchema, unwrapping ZodEffects (superRefine) to reach the object shape.
+function schemaKeyNames(schema: unknown): string[] {
+  let inner = schema as { _def?: { schema?: unknown }; shape?: object };
+  while (inner?._def?.schema) {
+    inner = inner._def.schema as typeof inner;
+  }
+  return inner?.shape ? Object.keys(inner.shape) : [];
+}
+
+async function seedModelProvidersFromEnv(organizationId: string) {
+  const flag = process.env.HAVEN_SEED_MODEL_PROVIDERS;
+  if (flag === "0" || flag === "false") {
+    console.log("⏭️  Model providers: seeding disabled (HAVEN_SEED_MODEL_PROVIDERS=0)");
+    return;
+  }
+  const envMap = loadSeedEnv();
+  for (const [provider, def] of Object.entries(modelProviders)) {
+    // "custom" has no inferable identity from the environment; skip it.
+    if (provider === "custom") continue;
+    if (!envMap[def.apiKey]) continue;
+
+    const keyNames = schemaKeyNames(def.keysSchema);
+    const names = keyNames.length > 0 ? keyNames : [def.apiKey, def.endpointKey];
+    const keys: Record<string, string> = {};
+    for (const name of names) {
+      if (name && envMap[name]) keys[name] = envMap[name];
+    }
+    // The registry schemas mark every key `.nullable().optional()` (to allow
+    // env-var fallback in inbound payloads), so safeParse alone would happily
+    // seed an enabled-but-unusable provider (e.g. Bedrock with only the access
+    // key). Require every non-optional key; Azure needs its API key plus
+    // either mode's endpoint, not both.
+    const optionalKeys = new Set(
+      "optionalKeys" in def ? (def.optionalKeys ?? []) : [],
+    );
+    let missing = names.filter(
+      (name): name is string =>
+        Boolean(name) && !optionalKeys.has(name!) && !keys[name!],
+    );
+    if (provider === "azure") {
+      const endpointNames = ["AZURE_OPENAI_ENDPOINT", "AZURE_API_GATEWAY_BASE_URL"];
+      missing = missing.filter((name) => !endpointNames.includes(name));
+      if (!endpointNames.some((name) => keys[name])) {
+        missing.push(endpointNames.join(" or "));
+      }
+    }
+    const parsed = def.keysSchema.safeParse(keys);
+    if (!parsed.success || missing.length > 0) {
+      console.log(
+        `⏭️  Model provider ${provider}: ${def.apiKey} is set but the key set is incomplete${
+          missing.length > 0 ? ` (missing ${missing.join(", ")})` : ""
+        } — skipped`,
+      );
+      continue;
+    }
+
+    const id = MODEL_PROVIDER_ID_PREFIX + provider;
+    const customKeys = encrypt(JSON.stringify(keys));
+    const row = await prisma.modelProvider.upsert({
+      where: { id },
+      create: { id, name: def.name, provider, enabled: true, customKeys, organizationId },
+      update: { customKeys, enabled: true, disabledAt: null },
+    });
+    await prisma.modelProviderScope.upsert({
+      where: {
+        modelProviderId_scopeType_scopeId: {
+          modelProviderId: row.id,
+          scopeType: "ORGANIZATION",
+          scopeId: organizationId,
+        },
+      },
+      create: {
+        modelProviderId: row.id,
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+      },
+      update: {},
+    });
+    console.log(`✅ Model provider: ${provider} (keys from environment)`);
+  }
 }
 
 main()

@@ -11,6 +11,7 @@
  */
 
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type {
   ComparisonEvaluatorConfig,
@@ -45,7 +46,6 @@ import {
 } from "~/server/tracer/collector/cost";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
 import { type LoadedWorkflow, workflowLoadKey } from "./dataLoader";

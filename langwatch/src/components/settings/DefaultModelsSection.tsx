@@ -98,6 +98,11 @@ interface DefaultModelsSectionProps {
    *  children of the picked scope). When omitted, falls back to the
    *  org returned from the tRPC payload — fine for standalone mounts. */
   hierarchy?: ScopeHierarchy;
+  /** Configured custom-model display names, keyed by `<provider>/<modelId>`,
+   *  forwarded to each row's `ModelChip`. The section doesn't fetch
+   *  provider data itself; the page passes this down from the same
+   *  provider list it uses for `enabledProviderKeys`. */
+  displayNames?: Record<string, string>;
 }
 
 export function DefaultModelsSection({
@@ -106,6 +111,7 @@ export function DefaultModelsSection({
   enabledProviderKeys,
   noProvidersConfigured = false,
   hierarchy,
+  displayNames,
 }: DefaultModelsSectionProps = {}) {
   const { project, team, organization } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
@@ -276,6 +282,7 @@ export function DefaultModelsSection({
             onDelete={handleDelete}
             onAdd={openAdd}
             enabledProviderKeys={enabledProviderKeys ?? null}
+            displayNames={displayNames}
           />
         </Card.Body>
       </Card.Root>
@@ -294,6 +301,7 @@ function AllConfigsView({
   onDelete,
   onAdd,
   enabledProviderKeys,
+  displayNames,
 }: {
   configs: ConfigRow[];
   /** Full cascade input. `configs` is filter-narrowed for display, but
@@ -306,6 +314,7 @@ function AllConfigsView({
   onDelete: (c: ConfigRow) => void;
   onAdd: () => void;
   enabledProviderKeys: Set<string> | null;
+  displayNames?: Record<string, string>;
 }) {
   if (configs.length === 0) {
     return (
@@ -366,6 +375,7 @@ function AllConfigsView({
                   anchorScope={mostSpecificScope(c.scopes)}
                   onEdit={() => onEdit(c)}
                   enabledProviderKeys={enabledProviderKeys}
+                  displayNames={displayNames}
                 />
               </Table.Cell>
             ))}
@@ -430,6 +440,7 @@ function ConfigCell({
   anchorScope,
   onEdit,
   enabledProviderKeys,
+  displayNames,
 }: {
   role: ModelRoleKey;
   config: Record<string, string>;
@@ -442,6 +453,7 @@ function ConfigCell({
    *  menu. Edits the whole policy, not just the cell. */
   onEdit: () => void;
   enabledProviderKeys: Set<string> | null;
+  displayNames?: Record<string, string>;
 }) {
   const isInvalid = (model: string) =>
     !!enabledProviderKeys &&
@@ -476,6 +488,7 @@ function ConfigCell({
             model={resolvedRoleModel}
             size="sm"
             invalid={isInvalid(resolvedRoleModel)}
+            displayNames={displayNames}
           />
         ) : (
           <Badge colorPalette="orange" variant="subtle">
@@ -492,6 +505,7 @@ function ConfigCell({
             model={config[f.key]!}
             size="sm"
             invalid={isInvalid(config[f.key]!)}
+            displayNames={displayNames}
           />
         </ChipWithEdit>
       ))}

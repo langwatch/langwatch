@@ -1,6 +1,8 @@
 /**
  * Hono routes for cron jobs.
  */
+
+import { createLogger } from "@langwatch/observability";
 import type { Project, Trigger } from "@prisma/client";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
@@ -11,7 +13,6 @@ import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { scheduleTopicClustering } from "~/server/topicClustering/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   reportHasFailures,

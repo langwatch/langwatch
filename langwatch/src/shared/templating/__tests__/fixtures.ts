@@ -8,7 +8,7 @@ export function makeMatch(
       id: "trace_1",
       input: "what is the weather",
       output: "it is sunny",
-      url: "https://app.langwatch.ai/acme/messages/trace_1",
+      url: "https://app.langwatch.ai/acme/traces/trace_1",
       metadata: {},
     },
     evaluation: null,

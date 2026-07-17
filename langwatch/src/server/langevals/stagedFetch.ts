@@ -1,8 +1,8 @@
+import { createLogger } from "@langwatch/observability";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger/server";
 import {
-  STAGED_PAYLOAD_HEADER,
   deleteStagedObject,
+  STAGED_PAYLOAD_HEADER,
   safeUrlHost,
   stagePayloadToS3,
 } from "../s3/stagePayload";

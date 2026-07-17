@@ -7,8 +7,9 @@
  * background, and hands back the run id plus a shareable results URL the
  * caller can poll or open in the browser.
  */
+
+import { createLogger } from "@langwatch/observability";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { type OrchestratorInput, runOrchestrator } from "./orchestrator";
 import { runStateManager } from "./runStateManager";

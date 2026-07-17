@@ -10,9 +10,13 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
   # Supersedes the earlier split into "Pairwise Compare" and "N-way Compare"
   # cards. Backed by langevals/select_best_compare, which handles N=2.
   #
-  # The legacy langevals/pairwise_compare evaluator remains runnable so that
-  # experiments and monitors created before the merge keep working, but it is
-  # no longer offered when creating something new.
+  # The legacy langevals/pairwise_compare evaluator type is never offered when
+  # creating something new, and its own langevals endpoint is never called by
+  # the app again. Execution for a row whose saved evaluator config still
+  # carries the legacy type is transparently rerouted to select_best_compare,
+  # with its two-slot config translated into the N-way shape first — so
+  # existing experiments and monitors keep working, and the app only ever
+  # talks to one judge.
 
   Background:
     Given an EvaluationsV3 experiment with target variants "variant_1", "variant_2", "variant_3"
@@ -264,7 +268,22 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     When I view the Comparison column for that row
     Then the first variant is named as the winner
 
+  # #5528 postmortem: an earlier attempt changed the dispatched judge type in
+  # one place (the orchestrator) while the payload shape was decided in
+  # another, so a 2-slot payload could reach the N-way judge. The fix here is
+  # to leave every upstream caller (the orchestrator, a monitor's scheduled
+  # run) emitting the exact 2-slot shape it always has, and do BOTH the
+  # reroute and the payload translation at ONE interception point — the
+  # legacy evaluations route. Type and payload move together at a single
+  # site, so they cannot drift apart again.
   Scenario: Existing pairwise monitors keep running
     Given a monitor configured with the legacy "langevals/pairwise_compare" evaluator
     When the monitor runs
-    Then it evaluates successfully against the pairwise judge
+    Then it is dispatched to select_best_compare with the config translated to the N-way shape
+    And it evaluates successfully
+    And the result carries the winning candidate's identifier, not a slot letter
+
+  Scenario: A legacy pairwise experiment's structured-output field selection survives translation
+    Given a saved pairwise experiment where "variantA" is narrowed to output field "answer"
+    When a row is re-run
+    Then the judge sees only the "answer" field for that variant, not its whole structured output

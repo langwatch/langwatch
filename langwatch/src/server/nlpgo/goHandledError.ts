@@ -1,6 +1,6 @@
 import { APICallError, RetryError } from "ai";
 import { z } from "zod";
-import { DomainError } from "../app-layer/domain-error";
+import { HandledError } from "../app-layer/handled-error";
 
 /**
  * nlpgo's handled-error envelope (services/nlpgo herr package). Every
@@ -22,17 +22,17 @@ const goErrorEnvelopeSchema = z.object({
 
 /**
  * A handled error the Go side (nlpgo / AI Gateway) returned as a typed
- * envelope. `kind` is the most specific discriminant available —
+ * envelope. `code` is the most specific discriminant available —
  * `meta.reason` when present (e.g. "missing_provider"), the envelope
  * `type` otherwise (e.g. "bad_request").
  */
-export class NlpgoHandledError extends DomainError {
+export class NlpgoHandledError extends HandledError {
   constructor(
-    kind: string,
+    code: string,
     message: string,
     options: { httpStatus: number; meta?: Record<string, unknown> },
   ) {
-    super(kind, message, options);
+    super(code, message, options);
     this.name = "NlpgoHandledError";
   }
 }
@@ -88,9 +88,9 @@ export function nlpgoHandledErrorFrom(error: unknown): NlpgoHandledError | null 
 
   const envelope = parsed.data.error;
   const reason = envelope.meta?.reason;
-  const kind = typeof reason === "string" ? reason : envelope.type;
+  const code = typeof reason === "string" ? reason : envelope.type;
 
-  return new NlpgoHandledError(kind, envelope.message ?? envelope.type, {
+  return new NlpgoHandledError(code, envelope.message ?? envelope.type, {
     httpStatus: cause.statusCode ?? 500,
     meta: envelope.meta,
   });

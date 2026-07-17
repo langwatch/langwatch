@@ -1,7 +1,7 @@
 import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
-import { createLogger } from "~/utils/logger/server";
 import type { SimulationTarget } from "../api/routers/scenarios";
 import { getVercelAIModel } from "../modelProviders/utils";
 import { PromptService } from "../prompt-config/prompt.service";

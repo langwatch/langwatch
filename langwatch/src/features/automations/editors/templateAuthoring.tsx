@@ -1,6 +1,14 @@
-import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { Monaco, OnMount } from "@monaco-editor/react";
-import { ExternalLink, Link2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Link2 } from "lucide-react";
 import * as React from "react";
 import { useEffect, useMemo, useRef } from "react";
 import { FaSlack } from "react-icons/fa";
@@ -80,6 +88,62 @@ export function FieldHeader({
         </Button>
       )}
     </HStack>
+  );
+}
+
+/**
+ * Opt-in expander for the layered template authoring flow. The default
+ * authoring surface stays simple (a preset gallery and a preview); the
+ * deeper editing surfaces (plain text, then the raw code editor) sit behind
+ * these expanders so most authors never see a brace. Children mount only
+ * while open, so a collapsed tier adds nothing to the page.
+ */
+export function TemplateDisclosure({
+  triggerLabel,
+  hint,
+  open,
+  onToggle,
+  children,
+}: {
+  triggerLabel: string;
+  /** One-line, plain-language note shown once the tier is open. */
+  hint?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <VStack align="stretch" gap={0}>
+      <chakra.button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        display="inline-flex"
+        alignItems="center"
+        gap={1}
+        width="fit-content"
+        bg="transparent"
+        border="none"
+        cursor="pointer"
+        color="fg.muted"
+        _hover={{ color: "fg" }}
+      >
+        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <Text textStyle="sm" fontWeight="medium">
+          {triggerLabel}
+        </Text>
+      </chakra.button>
+      {open ? (
+        <VStack align="stretch" gap={2} pt={2}>
+          {hint ? (
+            <Text textStyle="xs" color="fg.muted">
+              {hint}
+            </Text>
+          ) : null}
+          {children}
+        </VStack>
+      ) : null}
+    </VStack>
   );
 }
 

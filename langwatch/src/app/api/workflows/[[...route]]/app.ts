@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { Workflow } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
@@ -13,7 +14,6 @@ import {
   WorkflowNotFoundError,
 } from "~/server/workflows/workflowEvaluation.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 

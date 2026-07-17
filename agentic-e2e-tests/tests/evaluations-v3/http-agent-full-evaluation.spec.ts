@@ -27,7 +27,9 @@ import {
  * So that I can evaluate external APIs that expose my agent via HTTP endpoints
  */
 test.describe("Full Evaluation Run with HTTP Agent Target", () => {
-  // fixme(#1811): flaky — Lambda warmup failures in CI cause timeouts
+  // fixme: blocked on missing testids — spreadsheet-cell, cell-play-button, save-agent-button
+  // are not yet present in the app source. Re-enable when testids are added to the evaluations
+  // workbench spreadsheet component. Tracked in #1811.
   test.fixme();
   /**
    * Scenario: Full evaluation run with HTTP agent target

@@ -11,36 +11,6 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 const DAYS_PER_WEEK = 7;
 const DAYS_PER_MONTH = 31;
 
-/** Maximum number of timeseries buckets before auto-adjusting to daily granularity. */
-const MAX_TIMESERIES_BUCKETS = 1000;
-const MS_PER_MINUTE = 1000 * 60;
-
-/**
- * Bucket-count safety net (same rule as the legacy CH service): too many
- * estimated buckets → daily granularity; undefined → the legacy daily
- * default. Shared by the routed dispatch and the legacy shim — the two paths
- * MUST bucket identically or the divergence tripwire reports false positives.
- */
-export function adjustTimeScaleForBucketCount({
-  startDate,
-  endDate,
-  timeScale,
-}: {
-  startDate: Date;
-  endDate: Date;
-  timeScale: number | "full" | undefined;
-}): number | "full" {
-  if (typeof timeScale === "number") {
-    const totalMinutes =
-      (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE;
-    const estimatedBuckets = totalMinutes / timeScale;
-    return estimatedBuckets > MAX_TIMESERIES_BUCKETS
-      ? MINUTES_PER_DAY
-      : timeScale;
-  }
-  return timeScale ?? MINUTES_PER_DAY;
-}
-
 export function validateTimeZone(tz: string): string {
   try {
     Intl.DateTimeFormat(undefined, { timeZone: tz });
@@ -120,4 +90,62 @@ export function collectStringValues(
     }
   }
   return out;
+}
+
+/**
+ * Percentile aggregations recognised by both slim + eval-slim builders.
+ * ClickHouse's `quantileExact(<level>)` takes a fraction in [0, 1].
+ */
+export function isPercentile(
+  agg: "median" | "p90" | "p95" | "p99" | (string & {}),
+): boolean {
+  return agg === "median" || agg === "p90" || agg === "p95" || agg === "p99";
+}
+
+/**
+ * Timeseries safety-net: when the (endDate - startDate) / timeScale bucket
+ * count would exceed MAX_TIMESERIES_BUCKETS, or when `timeScale` is
+ * undefined, coerce the query to a daily bucket so the response stays
+ * bounded. Extracted from the analytics service + both legacy shims
+ * (simp5012-003 — they were triplicated verbatim; drift would surface as
+ * a false tripwire alarm).
+ */
+export const MAX_TIMESERIES_BUCKETS = 1000;
+const MS_PER_MINUTE = 1000 * 60;
+
+export function adjustTimeScaleForBucketCap(params: {
+  timeScale: number | "full" | undefined;
+  startDate: Date;
+  endDate: Date;
+}): number | "full" | undefined {
+  const { timeScale, startDate, endDate } = params;
+  if (typeof timeScale === "number") {
+    const totalMinutes =
+      (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE;
+    const estimatedBuckets = totalMinutes / timeScale;
+    if (estimatedBuckets > MAX_TIMESERIES_BUCKETS) {
+      return MINUTES_PER_DAY;
+    }
+    return timeScale;
+  }
+  if (timeScale === undefined) {
+    // Match the legacy default (daily granularity ⇔ ES 1d interval).
+    return MINUTES_PER_DAY;
+  }
+  return timeScale;
+}
+
+export function percentileFor(agg: string): number {
+  switch (agg) {
+    case "median":
+      return 0.5;
+    case "p90":
+      return 0.9;
+    case "p95":
+      return 0.95;
+    case "p99":
+      return 0.99;
+    default:
+      throw new Error(`Not a percentile aggregation: ${agg}`);
+  }
 }

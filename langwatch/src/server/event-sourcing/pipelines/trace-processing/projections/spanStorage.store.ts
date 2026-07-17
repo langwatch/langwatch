@@ -1,7 +1,10 @@
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { SpanInsertData } from "~/server/app-layer/traces/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { AppendStore } from "../../../projections/mapProjection.types";
+import type {
+  AppendStore,
+  BulkAppendContext,
+} from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { NormalizedSpan } from "../schemas/spans";
 
@@ -75,7 +78,7 @@ export class SpanAppendStore implements AppendStore<NormalizedSpan> {
 
   async bulkAppend(
     records: NormalizedSpan[],
-    context: ProjectionStoreContext,
+    context: BulkAppendContext,
   ): Promise<void> {
     if (records.length === 0) return;
     const retentionDays =

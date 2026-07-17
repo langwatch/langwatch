@@ -27,13 +27,19 @@ type Stack struct {
 	// of its own: it is a backend of `app`, reached same-origin at
 	// app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort). One app URL, not
 	// two confusable ones — the frontend and its API share a single origin.
-	APIPort            int    `json:"apiPort"`
-	WorkerMetricsPort  int    `json:"workerMetricsPort"`
-	ClickHouseHTTPPort int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
-	ClickHouseDatabase string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
-	PostgresPort       int    `json:"postgresPort"`       // shared managed Postgres's port (0 = unmanaged)
-	PostgresDatabase   string `json:"postgresDatabase"`   // this stack's isolated PG database (lw_<slug>)
-	RedisPort          int    `json:"redisPort"`          // shared managed Redis's port (0 = unmanaged)
+	APIPort           int `json:"apiPort"`
+	WorkerMetricsPort int `json:"workerMetricsPort"`
+	// HasStandaloneWorkers is true only when this stack runs a separate `workers`
+	// lane (WorkerMetricsPort is that lane's own port). In the default in-process
+	// mode the app/api child hosts the workers and holds WorkerMetricsPort itself,
+	// so there is no separate group to bounce — `haven restart workers` must not
+	// target it (it would kill the API's group). See planChildren.
+	HasStandaloneWorkers bool   `json:"hasStandaloneWorkers,omitempty"`
+	ClickHouseHTTPPort   int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
+	ClickHouseDatabase   string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
+	PostgresPort         int    `json:"postgresPort"`       // shared managed Postgres's port (0 = unmanaged)
+	PostgresDatabase     string `json:"postgresDatabase"`   // this stack's isolated PG database (lw_<slug>)
+	RedisPort            int    `json:"redisPort"`          // shared managed Redis's port (0 = unmanaged)
 	// ObservabilityOTLPPort is the shared LGTM collector's OTLP/HTTP port when the
 	// stack is up, and 0 when it is not. Non-zero is what makes OverlayEnv emit the
 	// OTel wiring, so a worktree exports its logs/traces/metrics the moment the

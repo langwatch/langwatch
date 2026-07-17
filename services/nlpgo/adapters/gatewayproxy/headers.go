@@ -35,6 +35,7 @@ const (
 	headerAPIBase      = "x-litellm-api_base"
 	headerOrganization = "x-litellm-organization"
 	headerAPIVersion   = "x-litellm-api_version"
+	headerDeployment   = "x-litellm-deployment"
 
 	headerAWSAccessKeyID     = "x-litellm-aws_access_key_id"
 	headerAWSSecretAccessKey = "x-litellm-aws_secret_access_key"
@@ -88,9 +89,12 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		}
 	case domain.ProviderAzure:
 		cred.APIKey = h.Get(headerAPIKey)
-		// api_base + api_version are required for Azure routing; we
-		// don't validate at this layer — let the provider adapter
-		// surface a typed error if the customer has misconfigured.
+		// api_base carries the Azure resource endpoint and is required for
+		// routing; api_version is optional — when the provider has none
+		// configured we leave the key unset so the adapter can fall back to
+		// Bifrost's own default (an empty value here would defeat it). We
+		// don't validate at this layer — let the provider adapter surface a
+		// typed error if the customer has misconfigured.
 		if base := h.Get(headerAPIBase); base != "" {
 			cred.Extra["api_base"] = base
 		}
@@ -102,6 +106,12 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		}
 		if v := h.Get(headerUseAzureGW); v != "" {
 			cred.Extra["use_azure_gateway"] = v
+		}
+		// The control plane forwards an explicit Azure deployment name (when
+		// the deployment differs from the model id) as x-litellm-deployment.
+		// WithDeploymentSelfMap below honors it; default is deployment == model.
+		if dep := h.Get(headerDeployment); dep != "" {
+			cred.Extra["deployment"] = dep
 		}
 	case domain.ProviderBedrock:
 		// Bedrock uses AWS access keys, not api_key.
@@ -129,6 +139,13 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 			cred.Extra["vertex_location"] = v
 		}
 	}
+
+	// Populate the Azure / Bedrock / Vertex deployment map from the requested
+	// model so Bifrost resolves a deployment on this path too. The sibling
+	// dispatcheradapter path already does this; /go/proxy did not, so Azure
+	// calls that cleared the endpoint check then failed deployment resolution
+	// ("deployment not found for model X") (#5760).
+	cred = domain.WithDeploymentSelfMap(cred, BareModel(model))
 
 	return cred, nil
 }

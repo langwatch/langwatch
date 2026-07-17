@@ -58,6 +58,33 @@ func (System) Terminate(pid int) {
 	}
 }
 
+// TerminateGroup SIGTERMs pid's whole process group — the shape every
+// supervised child has (Setpgid), so one signal takes the child and its tree.
+// Falls back to signalling just the pid when the group can't be resolved.
+func (System) TerminateGroup(pid int) {
+	if pgid, err := syscall.Getpgid(pid); err == nil && pgid > 1 {
+		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+		return
+	}
+	System{}.Terminate(pid)
+}
+
+// PIDsOnPort lists the pids LISTENing on a TCP port, via lsof (macOS has no
+// /proc; lsof is the same "ask the OS's own tool" approach used elsewhere).
+func (System) PIDsOnPort(port int) []int {
+	out, err := exec.Command("lsof", "-nP", "-ti", fmt.Sprintf("tcp:%d", port), "-sTCP:LISTEN").Output()
+	if err != nil {
+		return nil
+	}
+	var pids []int
+	for _, f := range strings.Fields(string(out)) {
+		if pid, err := strconv.Atoi(f); err == nil {
+			pids = append(pids, pid)
+		}
+	}
+	return pids
+}
+
 // SpawnDetached starts a process in its own session so it outlives the caller —
 // used to bring the singleton daemon up from `up`.
 func (System) SpawnDetached(argv []string, dir, logPath string) error {
@@ -88,6 +115,36 @@ func (System) SpawnDetached(argv []string, dir, logPath string) error {
 // Now returns the current time. Getpid returns this process's pid.
 func (System) Now() time.Time { return time.Now() }
 func (System) Getpid() int    { return os.Getpid() }
+
+// GroupRSS sums the resident set of every process in pid's process group —
+// the closest cheap approximation of what a supervised stack costs in RAM
+// (the launcher spawns its children with Setpgid, so the group is the stack).
+// Returns 0 when the group can't be read.
+func (System) GroupRSS(pid int) uint64 {
+	out, err := exec.Command("ps", "-o", "pgid=", "-p", strconv.Itoa(pid)).Output()
+	if err != nil {
+		return 0
+	}
+	pgid := strings.TrimSpace(string(out))
+	if pgid == "" {
+		return 0
+	}
+	all, err := exec.Command("ps", "-ax", "-o", "pgid=,rss=").Output()
+	if err != nil {
+		return 0
+	}
+	var kb uint64
+	for _, line := range strings.Split(string(all), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 || fields[0] != pgid {
+			continue
+		}
+		if n, err := strconv.ParseUint(fields[1], 10, 64); err == nil {
+			kb += n
+		}
+	}
+	return kb * 1024
+}
 
 // TotalMemory returns the machine's physical RAM in bytes (0 if undetectable).
 // darwin: sysctl hw.memsize; linux: /proc/meminfo MemTotal.

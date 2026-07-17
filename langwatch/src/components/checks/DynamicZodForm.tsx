@@ -390,7 +390,7 @@ const DynamicZodForm = ({
                 <Switch
                   id={fullPath}
                   checked={value}
-                  onChange={onChange}
+                  onCheckedChange={({ checked }) => onChange(checked)}
                   onBlur={onBlur}
                   name={name}
                   ref={ref}

@@ -22,7 +22,7 @@ vi.mock("../../../src/server/mailer/usageLimitEmail", () => ({
   sendUsageLimitEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../../src/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     error: vi.fn(),
     warn: vi.fn(),

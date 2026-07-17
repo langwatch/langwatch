@@ -43,6 +43,12 @@ type Store interface {
 	WriteHMRGate(lwDir string, expiryUnixMs int64) error
 	ReadHMRGate(lwDir string) (int64, bool)
 	ClearHMRGate(lwDir string)
+	// TouchDBActivity records "slug's databases were in use now" — the clock the
+	// daemon's idle-database pruning reads. Touched on every `up` and refreshed
+	// by the daemon while a stack stays registered.
+	TouchDBActivity(slug string) error
+	DBActivity() map[string]time.Time
+	RemoveDBActivity(slug string)
 	// ClaimDaemon atomically records this process as the singleton daemon, but
 	// only if no record exists yet (O_EXCL). It returns false without overwriting
 	// when one already does, so two daemons racing to start can never both win.
@@ -88,11 +94,18 @@ type System interface {
 	PortInUse(port int) bool
 	ProcessAlive(pid int) bool
 	Terminate(pid int)
+	// TerminateGroup SIGTERMs pid's whole process group — how `haven restart`
+	// bounces one supervised child (its supervisor restarts it on exit).
+	TerminateGroup(pid int)
+	PIDsOnPort(port int) []int
 	SpawnDetached(argv []string, dir, logPath string) error
 	Now() time.Time
 	Getpid() int
 	// TotalMemory is the machine's physical RAM in bytes (0 if undetectable).
 	TotalMemory() uint64
+	// GroupRSS is the resident set of a process group (keyed by any member pid),
+	// in bytes — a stack's real memory footprint (0 if undetectable).
+	GroupRSS(pid int) uint64
 }
 
 // ClickHouse manages one shared, memory-capped Altinity ClickHouse container (on
@@ -201,11 +214,14 @@ type Semaphore interface {
 // checking for uncommitted work, sizing reclaimable artefacts, removing them, and
 // pruning orphaned git worktree admin entries.
 type Hygiene interface {
-	Worktrees(repoRoot string) ([]Worktree, error)
+	Worktrees(gitDir string) ([]Worktree, error)
 	Dirty(worktreeDir string) bool
 	DirSize(path string) (bytes int64, exists bool)
 	Remove(path string) error
 	PruneGitWorktrees(repoRoot string)
+	// RemoveWorktree deletes a linked worktree (directory + git admin entry),
+	// forcing past uncommitted changes — the app layer owns the confirmation.
+	RemoveWorktree(gitDir, dir string) error
 }
 
 // Worktree is one entry from `git worktree list`.

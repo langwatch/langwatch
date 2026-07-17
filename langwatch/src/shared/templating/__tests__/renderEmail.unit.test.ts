@@ -22,7 +22,7 @@ describe("renderTriggerEmail", () => {
         context: makeContext(),
       });
       expect(email.html).toContain(
-        'href="https://app.langwatch.ai/acme/messages/trace_1"',
+        'href="https://app.langwatch.ai/acme/traces/trace_1"',
       );
     });
 
@@ -73,7 +73,7 @@ describe("renderTriggerEmail", () => {
       });
       expect(email.html).toContain("<h2>High latency</h2>");
       expect(email.html).toContain(
-        'href="https://app.langwatch.ai/acme/messages/trace_1"',
+        'href="https://app.langwatch.ai/acme/traces/trace_1"',
       );
     });
   });

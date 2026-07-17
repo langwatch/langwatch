@@ -46,7 +46,11 @@ func New(ctx context.Context, cfg Config) *zap.Logger {
 	var logger *zap.Logger
 
 	if cfg.Format == "pretty" {
-		logger = prettyconsole.NewLogger(cfg.zapLevel())
+		logger = zap.New(zapcore.NewCore(
+			prettyconsole.NewEncoder(prettyEncoderConfig()),
+			zapcore.Lock(os.Stdout),
+			cfg.zapLevel(),
+		))
 	} else {
 		zapCfg := zap.NewProductionConfig()
 		zapCfg.Level = zap.NewAtomicLevelAt(cfg.zapLevel())
@@ -116,9 +120,21 @@ func WithCollector(ctx context.Context, cfg Config, base *zap.Logger, lp *sdklog
 func buildConsoleCore(format string, level zapcore.Level) zapcore.Core {
 	out := zapcore.Lock(os.Stdout)
 	if format == "pretty" {
-		return zapcore.NewCore(prettyconsole.NewEncoder(prettyconsole.NewEncoderConfig()), out, level)
+		return zapcore.NewCore(prettyconsole.NewEncoder(prettyEncoderConfig()), out, level)
 	}
 	return zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), out, level)
+}
+
+// prettyEncoderConfig aligns the Go pretty console with the TS app's
+// pino-pretty lane, so a terminal interleaving Go and JS services reads as one
+// format: a 24h HH:MM:SS.mmm timestamp (prettyconsole's default is 12h with no
+// seconds) and a full-word capital level (INFO, not INF) — matching
+// pino-pretty's "[12:19:00.616] INFO (name): msg".
+func prettyEncoderConfig() zapcore.EncoderConfig {
+	cfg := prettyconsole.NewEncoderConfig()
+	cfg.EncodeTime = prettyconsole.DefaultTimeEncoder("15:04:05.000")
+	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	return cfg
 }
 
 // leveledCore gates an inner core to a minimum level. Used to hold the otelzap

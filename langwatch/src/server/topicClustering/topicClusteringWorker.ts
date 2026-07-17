@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import { type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import { withJobContext } from "~/server/queues/withJobContext";
-import { createLogger } from "../../utils/logger/server";
 import { captureException, withScope } from "../../utils/posthogErrorCapture";
 import {
   getJobProcessingCounter,

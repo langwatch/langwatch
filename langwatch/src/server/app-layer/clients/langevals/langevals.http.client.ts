@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type {
   BatchEvaluationResult,
   SingleEvaluationResult,
@@ -7,7 +8,6 @@ import {
   getEvaluationStatusCounter,
 } from "~/server/metrics";
 import { tryAndConvertTo } from "~/server/tracer/tracesMapping";
-import { createLogger } from "~/utils/logger/server";
 import { EvaluatorExecutionError } from "../../evaluations/errors";
 import type {
   LangEvalsClient,

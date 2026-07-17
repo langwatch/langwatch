@@ -230,8 +230,6 @@ The queue emits a full set of Prometheus metrics (see [`metrics.ts`](./metrics.t
 
 OpenTelemetry spans wrap dispatch and processing. `__context` carries OTel trace context through the envelope so a span dispatched on the web tier continues on the worker.
 
-For ad-hoc inspection during development, the `bullboard` service in the dev stack (`make quickstart full-local`) shows queue state via Redis directly — it doesn't depend on BullMQ.
-
 ---
 
 ## Common Pitfalls

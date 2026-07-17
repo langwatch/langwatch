@@ -1,7 +1,12 @@
+import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import { createHash } from "crypto";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import {
+  evaluateQueryInMemory,
+  queryNeeds,
+} from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
@@ -18,17 +23,19 @@ import {
   sendTriggerEmail,
 } from "~/server/mailer/triggerEmail";
 import type { Trace } from "~/server/tracer/types";
+import { slackDeliveryMethodOf } from "~/automations/providers/definitions/slack/shared";
+import { decryptSlackBotToken } from "~/automations/providers/definitions/slack/secret";
 import {
   sendRenderedSlackMessage,
   sendSlackWebhook,
 } from "~/server/triggers/sendSlackWebhook";
+import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import { renderTriggerSlack } from "~/shared/templating/renderSlack";
 import {
   buildTemplateContext,
   type TemplateMatchInput,
 } from "~/shared/templating/templateContext";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { createTenantId } from "../domain/tenantId";
 import {
@@ -54,6 +61,11 @@ const logger = createLogger("langwatch:outbox:dispatcher");
 interface ActionParams {
   members?: string[] | null;
   slackWebhook?: string | null;
+  /** ADR-041 Slack bot delivery. Absent `slackDelivery` = legacy webhook. */
+  slackDelivery?: "webhook" | "bot";
+  /** Encrypted bot token (ciphertext) — decrypted just before dispatch. */
+  slackBotToken?: string;
+  slackChannelId?: string;
 }
 
 export interface OutboxDispatcherDeps {
@@ -300,33 +312,69 @@ async function handleSettle(
     return;
   }
 
-  const { traceFilters, evaluationFilters, hasEvaluationFilters } =
-    classifyTriggerFilters(trigger.filters);
-
-  const events = triggerFiltersReferenceEvents(traceFilters)
-    ? await deps.deriveEvents({
-        tenantId: projectId,
-        traceId,
-        occurredAtMs: foldState.occurredAt,
-        foldVersion: foldState.spanCount,
+  // ADR-043: a trace-subject automation carries a liqe `filterQuery` and is
+  // matched in-memory against the settled fold state — never a per-trace
+  // ClickHouse round-trip. Only the auxiliary collections the query references
+  // (queryNeeds) are loaded, and anything unevaluable at dispatch fails the
+  // query closed. A legacy trigger (filterQuery == null) keeps the structured
+  // `filters` path below.
+  if (trigger.filterQuery != null) {
+    const needs = queryNeeds(trigger.filterQuery);
+    const evaluations = needs.has("evaluations")
+      ? await deps.evaluationRuns.findByTraceId(projectId, traceId)
+      : null;
+    const events = needs.has("events")
+      ? await deps.deriveEvents({
+          tenantId: projectId,
+          traceId,
+          occurredAtMs: foldState.occurredAt,
+          foldVersion: foldState.spanCount,
+        })
+      : null;
+    // Spans aren't derived at dispatch time yet; the evaluator fails span-scoped
+    // fields closed on its own, so `spans` stays null.
+    if (
+      !evaluateQueryInMemory(trigger.filterQuery, {
+        summary: foldState,
+        evaluations,
+        events,
+        spans: null,
       })
-    : null;
-  const traceData = buildPreconditionTraceDataFromFoldState(foldState, events);
-
-  if (
-    Object.keys(traceFilters).length > 0 &&
-    !matchesTriggerFilters(traceData, traceFilters)
-  ) {
-    return;
-  }
-
-  if (hasEvaluationFilters) {
-    const allEvaluations = await deps.evaluationRuns.findByTraceId(
-      projectId,
-      traceId,
-    );
-    if (!matchesEvaluationFilters(allEvaluations, evaluationFilters)) {
+    ) {
       return;
+    }
+  } else {
+    const { traceFilters, evaluationFilters, hasEvaluationFilters } =
+      classifyTriggerFilters(trigger.filters);
+
+    const events = triggerFiltersReferenceEvents(traceFilters)
+      ? await deps.deriveEvents({
+          tenantId: projectId,
+          traceId,
+          occurredAtMs: foldState.occurredAt,
+          foldVersion: foldState.spanCount,
+        })
+      : null;
+    const traceData = buildPreconditionTraceDataFromFoldState(
+      foldState,
+      events,
+    );
+
+    if (
+      Object.keys(traceFilters).length > 0 &&
+      !matchesTriggerFilters(traceData, traceFilters)
+    ) {
+      return;
+    }
+
+    if (hasEvaluationFilters) {
+      const allEvaluations = await deps.evaluationRuns.findByTraceId(
+        projectId,
+        traceId,
+      );
+      if (!matchesEvaluationFilters(allEvaluations, evaluationFilters)) {
+        return;
+      }
     }
   }
 
@@ -348,11 +396,8 @@ async function handleSettle(
     reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
     actionClass,
     auditDedupKey: payload.auditDedupKey,
-    match: {
-      traceId,
-      input: foldState.computedInput ?? "",
-      output: foldState.computedOutput ?? "",
-    },
+    // Identity only — the cadence handler re-reads this fold at dispatch.
+    match: { traceId },
   };
 
   const now = new Date();
@@ -464,17 +509,35 @@ async function handleCadenceBatch(
     return;
   }
 
+  // Content is read HERE, not carried on the payload. The payload is an
+  // identity (ADR-044's tiny-trigger discipline): a copy of the trace's input
+  // and output on it would be customer text sitting in Redis and — via the
+  // audit projection — at rest in Postgres, duplicated from ClickHouse and
+  // outliving the trace it came from. The dispatcher already re-fetches the
+  // trace on the next line, and the fold is the very projection the settle
+  // stage read to build this payload, so reading it here costs one store hit
+  // and yields the SAME bytes — fresher, if anything.
+  const brandedTenantId = createTenantId(projectId);
   const triggerData = await Promise.all(
     candidatePayloads.map(async (p) => {
-      const fullTrace =
-        (await deps.traceById(projectId, p.match.traceId)) ??
-        ({ trace_id: p.match.traceId } as Trace);
+      const traceId = p.match.traceId;
+      const [trace, fold] = await Promise.all([
+        deps.traceById(projectId, traceId),
+        deps.traceSummaryStore.get(traceId, {
+          tenantId: brandedTenantId,
+          aggregateId: traceId,
+        }),
+      ]);
       return {
-        traceId: p.match.traceId,
-        input: p.match.input,
-        output: p.match.output,
+        traceId,
+        // The fold, not the protections-filtered trace: this is the same
+        // source the payload copy was taken from, so swapping to it changes no
+        // bytes. (`traceById` applies capture protections, which would quietly
+        // change what a notification contains.)
+        input: fold?.computedInput ?? "",
+        output: fold?.computedOutput ?? "",
         projectId,
-        fullTrace,
+        fullTrace: trace ?? ({ trace_id: traceId } as Trace),
       };
     }),
   );
@@ -688,7 +751,43 @@ async function handleCadenceBatch(
         didSend = true;
         break;
       }
-      case TriggerAction.SEND_SLACK_MESSAGE:
+      case TriggerAction.SEND_SLACK_MESSAGE: {
+        // ADR-041: a bot connection posts via the Web API, which renders the
+        // gated chart/table/alert blocks — so bot mode always goes through the
+        // Block Kit render path (custom template or framework default) with the
+        // gate open, never the legacy plain-text webhook builder.
+        if (slackDeliveryMethodOf(params) === "bot") {
+          const token = decryptSlackBotToken(params);
+          const channel = params.slackChannelId?.trim();
+          if (!token || !channel) {
+            throw new DispatchError({
+              message: `Slack bot connection for trigger "${trigger.name}" is missing its token or channel`,
+              retryable: false,
+            });
+          }
+          const rendered = await renderTriggerSlack({
+            templateType:
+              t.slackTemplateType === "block_kit" ? "block_kit" : "string",
+            template: t.slackTemplate,
+            context: buildContext(),
+            allowGatedBlocks: true,
+          });
+          for (const v of rendered.missingVariables) missingVariables.add(v);
+          if (rendered.errors.length > 0) {
+            logger.warn(
+              { projectId, triggerId, errors: rendered.errors },
+              "Custom Slack template render errors — fell back to default",
+            );
+          }
+          await postSlackChatMessage({
+            token,
+            channel,
+            payload: rendered.payload,
+            triggerName: trigger.name,
+          });
+          didSend = true;
+          break;
+        }
         if (hasCustomSlack) {
           const rendered = await renderTriggerSlack({
             templateType:
@@ -721,6 +820,7 @@ async function handleCadenceBatch(
         });
         didSend = true;
         break;
+      }
       default:
         throw new DispatchError({
           message: `cadence stage cannot dispatch action ${trigger.action} — settle stage misrouted`,

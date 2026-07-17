@@ -46,7 +46,7 @@ function AnalyticsContent() {
               </Text>
               <Link
                 textDecoration="underline"
-                href={`/${project.slug}/messages`}
+                href={`/${project.slug}/traces`}
               >
                 setup
               </Link>

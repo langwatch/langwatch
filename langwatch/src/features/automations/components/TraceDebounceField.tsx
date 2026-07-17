@@ -79,9 +79,8 @@ export function TraceDebounceField() {
         </Text>
       </HStack>
       <Text textStyle="xs" color="fg.muted" mt={1}>
-        Wait this long after the last span before re-evaluating filters. Higher
-        values absorb late spans on slow traces; lower values cut notification
-        latency.
+        How long to wait for late spans before evaluating a trace. Higher
+        absorbs late spans, lower cuts latency.
       </Text>
     </Field.Root>
   );

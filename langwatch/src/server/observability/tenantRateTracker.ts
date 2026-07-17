@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { createLogger } from "../../utils/logger/server";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../featureFlag/types";
 

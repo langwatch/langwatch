@@ -28,6 +28,7 @@ import { Menu } from "../../components/ui/menu";
 import { TriggerAnchor } from "../../components/ui/TriggerAnchor";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
 import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
@@ -81,6 +82,14 @@ export default function ModelsPage() {
   const enabledProviderKeys = useMemo(
     () => new Set(allEnabledProviders.map((p) => p.provider)),
     [allEnabledProviders],
+  );
+
+  // Display names for the Default Models table's chips. Built from the ALL
+  // set (not the scope-filtered one) for the same reason as
+  // `enabledProviderKeys` above.
+  const defaultModelsDisplayNames = useMemo(
+    () => buildCustomModelDisplayNames(allProvidersList),
+    [allProvidersList],
   );
 
   // Client-side filter for the scope dropdown at the top of the page.
@@ -396,6 +405,7 @@ export default function ModelsPage() {
           enabledProviderKeys={enabledProviderKeys}
           noProvidersConfigured={!isLoading && enabledProviders.length === 0}
           hierarchy={hierarchy}
+          displayNames={defaultModelsDisplayNames}
         />
 
         <Dialog.Root

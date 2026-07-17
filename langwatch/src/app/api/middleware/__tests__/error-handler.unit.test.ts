@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
-import { handleError } from "../error-handler";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { handleError } from "../error-handler";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -57,7 +57,7 @@ describe("handleError()", () => {
   }
 
   describe("when error is a LimitExceededError", () => {
-    it("returns 403 with DomainError shape", async () => {
+    it("returns 403 with HandledError shape", async () => {
       const error = new LimitExceededError("prompts", 5, 5);
       const app = createTestApp(error);
 

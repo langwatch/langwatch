@@ -1,14 +1,14 @@
+import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "~/server/app-layer/handled-error";
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
 import { grafanaConfigFromEnv, grafanaLinksForTrace } from "~/utils/grafanaLinks";
 
 import { HttpError, NotFoundError } from "../shared/errors";
 import { errorSchema } from "../shared/schemas";
 
-const INVALID_TRACE_ID = "0".repeat(32);
 const INVALID_SPAN_ID = "0".repeat(16);
 
 /**
@@ -67,16 +67,16 @@ function determineErrorResponse(
     name?: string;
   },
 ): { statusCode: ContentfulStatusCode; response: object } {
-  // DomainErrors are handled first — normalize to client-safe shape.
-  // Use kind + httpStatus check instead of instanceof to handle
+  // HandledErrors are handled first — normalize to client-safe shape.
+  // Use code + httpStatus check instead of instanceof to handle
   // module-boundary class identity mismatches in Next.js/turbopack.
-  // See domain-error.ts: "use kind instead of instanceof in cross-process cases"
-  if (DomainError.is(error) || ("kind" in error && "httpStatus" in error)) {
-    const { kind, message, httpStatus, meta } = error as DomainError;
+  // See handled-error.ts: "use code instead of instanceof in cross-process cases"
+  if (HandledError.is(error) || ("code" in error && "httpStatus" in error)) {
+    const { code, message, httpStatus, meta } = error as HandledError;
     return {
       statusCode: (httpStatus ?? 500) as ContentfulStatusCode,
       response: {
-        ...errorSchema.parse({ error: kind, message }),
+        ...errorSchema.parse({ error: code, message }),
         ...(meta ?? {}),
       },
     };

@@ -384,7 +384,7 @@ func TestFromLiteLLMParams_Azure_PreservesNestedExtraHeaders(t *testing.T) {
 func TestFromLiteLLMParams_Azure_ForwardsDeployment(t *testing.T) {
 	// prepareLitellmParams sets `deployment` when the provider defines an
 	// explicit deploymentMapping (model id != Azure deployment name). It must
-	// survive into the inline credentials so withDeploymentMap can use it.
+	// survive into the inline credentials so domain.WithDeploymentSelfMap can use it.
 	ic, err := FromLiteLLMParams("azure", map[string]any{
 		"api_key":     "azk",
 		"api_base":    "https://acme.openai.azure.com",

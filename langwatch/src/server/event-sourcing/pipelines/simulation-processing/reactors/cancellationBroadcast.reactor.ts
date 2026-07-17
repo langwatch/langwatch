@@ -1,4 +1,4 @@
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "@langwatch/observability";
 import type { CancellationPublisher } from "../../../../scenarios/cancellation-channel";
 import { publishCancellation } from "../../../../scenarios/cancellation-channel";
 import type {

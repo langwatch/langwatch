@@ -1,10 +1,10 @@
-import { DomainError, NotFoundError } from "../app-layer/domain-error";
+import { HandledError, NotFoundError } from "../app-layer/handled-error";
 
 /**
  * Thrown when an API key cannot be located by id.
  */
 export class ApiKeyNotFoundError extends NotFoundError {
-  declare readonly kind: "api_key_not_found";
+  declare readonly code: "api_key_not_found";
 
   constructor(apiKeyId: string, options: { reasons?: readonly Error[] } = {}) {
     super("api_key_not_found", "API Key", apiKeyId, {
@@ -18,8 +18,8 @@ export class ApiKeyNotFoundError extends NotFoundError {
 /**
  * Thrown when a user attempts to modify an API key they do not own.
  */
-export class ApiKeyNotOwnedError extends DomainError {
-  declare readonly kind: "api_key_not_owned";
+export class ApiKeyNotOwnedError extends HandledError {
+  declare readonly code: "api_key_not_owned";
 
   constructor(
     apiKeyId: string,
@@ -37,8 +37,8 @@ export class ApiKeyNotOwnedError extends DomainError {
 /**
  * Thrown when an API key is already revoked and cannot be revoked again.
  */
-export class ApiKeyAlreadyRevokedError extends DomainError {
-  declare readonly kind: "api_key_already_revoked";
+export class ApiKeyAlreadyRevokedError extends HandledError {
+  declare readonly code: "api_key_already_revoked";
 
   constructor(
     apiKeyId: string,
@@ -59,8 +59,8 @@ export class ApiKeyAlreadyRevokedError extends DomainError {
  * permission set (intersection of requested scopes ∩ user's current role)
  * does not grant the action.
  */
-export class ApiKeyPermissionDeniedError extends DomainError {
-  declare readonly kind: "api_key_permission_denied";
+export class ApiKeyPermissionDeniedError extends HandledError {
+  declare readonly code: "api_key_permission_denied";
 
   constructor(
     permission: string,
@@ -87,8 +87,8 @@ export class ApiKeyPermissionDeniedError extends DomainError {
  * creator's ceiling — e.g., binding a role the creator does not hold on the
  * target scope. Surfaced to the user before the token is persisted.
  */
-export class ApiKeyScopeViolationError extends DomainError {
-  declare readonly kind: "api_key_scope_violation";
+export class ApiKeyScopeViolationError extends HandledError {
+  declare readonly code: "api_key_scope_violation";
 
   constructor(
     message: string,

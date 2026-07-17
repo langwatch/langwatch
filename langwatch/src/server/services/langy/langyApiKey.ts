@@ -1,9 +1,9 @@
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { decrypt, encrypt } from "~/utils/encryption";
-import { createLogger } from "~/utils/logger/server";
 import { resolveAttributionUserId } from "./langyAttribution";
 
 const logger = createLogger("langwatch:langy:api-key");

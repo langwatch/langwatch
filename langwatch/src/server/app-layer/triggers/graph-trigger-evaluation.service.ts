@@ -1,6 +1,6 @@
 /**
  * Shared evaluation handler for custom-graph threshold alerts
- * (ADR-034 Phase 5).
+ * (ADR-034 Phase 5 + 8.1).
  *
  * Single canonical handler called by BOTH:
  *
@@ -11,52 +11,48 @@
  *     no-data / firing-resolve absence cases the event-driven path
  *     structurally cannot reach.
  *
- * Mirrors the cron's `processCustomGraphTrigger` exactly:
- *
- *   - Fetch trigger, custom graph, build TimeseriesInput, call
- *     `analyticsService.getTimeseries(...)` (which routes to slim /
- *     rollup / legacy via ADR-034 Phase 3 automatically).
- *   - Compute current value via the same aggregation rules
- *     (`sum/average/cardinality/...`).
- *   - Apply `evaluateCustomGraphThreshold` (the extracted pure
- *     function the cron also calls).
- *   - Apply `isNoDataPredicate` to recognise the "fire when zero" shape.
- *   - On breach: insert a `TriggerSent` row (cron's EXACT dedup pattern
- *     — `triggerId/projectId/customGraphId, resolvedAt:null`) and
- *     dispatch via existing `handleSendEmail` / `handleSendSlackMessage`,
- *     which render exactly as the cron does today. Routing graph alerts
- *     through the Liquid alert-default templates (`ALERT_TRIGGER_DEFAULTS`,
- *     added here but not yet consumed) lands with the graph-alert dispatcher
- *     in the follow-up PR.
- *   - On no-longer-breach: resolve any open `TriggerSent` for the
- *     trigger.
+ * Mirrors the cron's `processCustomGraphTrigger` for the evaluation
+ * side (fetch trigger + graph, build TimeseriesInput, call
+ * `analyticsService.getTimeseries(...)`, compute current value via
+ * the same aggregation rules, apply `evaluateCustomGraphThreshold` /
+ * `isNoDataPredicate`, insert / resolve `TriggerSent` with the same
+ * dedup pattern). Phase 8.1 replaces the cron's hardcoded
+ * `handleSendEmail` / `handleSendSlackMessage` notify hop with the
+ * Liquid pipeline — `buildGraphAlertTemplateContext` +
+ * `dispatchGraphAlertAction` — so per-trigger custom templates and
+ * the alert-default Liquid templates both apply.
  *
  * Idempotent: a second call inside the debounce window sees the
  * already-open `TriggerSent` and skips the side-effect (only updates
  * `lastRunAt`).
  */
 
-import type {
-  CustomGraph,
-  Project,
-  Trigger,
-  TriggerAction as TriggerActionEnum,
-} from "@prisma/client";
+import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
-import { sumMetricAcrossGroups } from "~/pages/api/cron/triggers/customGraphTrigger";
-import type {
-  ActionParams,
-  TriggerData,
-} from "~/pages/api/cron/triggers/types";
+import type { ActionParams } from "~/pages/api/cron/triggers/types";
+import { decryptSlackBotToken } from "~/automations/providers/definitions/slack/secret";
+import {
+  type SlackActionParams,
+  slackDeliveryMethodOf,
+} from "~/automations/providers/definitions/slack/shared";
+import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
+import {
+  aggregateSeriesValues,
+  extractSeriesPoints,
+} from "~/server/app-layer/analytics/series-points";
 import type {
   SeriesInputType,
   TimeseriesInputType,
 } from "~/server/analytics/registry";
-import type {
-  TimeseriesBucket,
-  TimeseriesResult,
-} from "~/server/analytics/types";
-import type { Trace } from "~/server/tracer/types";
+import type { TimeseriesResult } from "~/server/analytics/types";
+import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import {
+  graphAlertFireDigest,
+  type GraphAlertDispatchInput,
+  type GraphAlertDispatchResult,
+} from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
+import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
+import { createLogger } from "@langwatch/observability";
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,
@@ -66,6 +62,8 @@ import type {
   OpenGraphTriggerSent,
 } from "./repositories/trigger.repository";
 import { parseSeriesIndex } from "./seriesName";
+
+const logger = createLogger("langwatch:graph-trigger-evaluation");
 
 /**
  * What woke the evaluator up. Carried into logs + telemetry so operators can
@@ -83,7 +81,11 @@ export type GraphTriggerEvaluationStatus =
   | "already_firing"
   | "resolved"
   | "not_breached"
-  | "skipped";
+  | "skipped"
+  /** The threshold was crossed but the notification reached nobody (no
+   *  recipients, all unsubscribed, no Slack webhook). No incident is opened —
+   *  see the `didSend` gate in `evaluateGraphTrigger`. */
+  | "not_delivered";
 
 export interface EvaluateGraphTriggerResult {
   triggerId: string;
@@ -94,6 +96,13 @@ export interface EvaluateGraphTriggerResult {
   detail?: string;
   /** Current metric value; null when there were no buckets at all. */
   value?: number;
+  /** Whether a provider call actually carried the alert to a customer. Only
+   *  set on a breach that dispatched. */
+  didSend?: boolean;
+  /** Render errors a custom template hit and fell back from (ADR-036/037). */
+  renderErrors?: string[];
+  /** Variables a custom template referenced that the context did not supply. */
+  missingVariables?: string[];
 }
 
 export type StoredGraphConfig = Pick<
@@ -102,25 +111,14 @@ export type StoredGraphConfig = Pick<
 >;
 
 /**
- * Notification dispatcher contract. Implemented in the wiring layer by
- * the EXISTING `handleSendEmail` / `handleSendSlackMessage` from
- * `~/pages/api/cron/triggers/actions/` — the same handlers the cron uses.
- * Kept as injected hooks here so this service stays free of mailer /
- * Slack dependencies and easy to unit-test.
+ * Notification dispatcher hook (ADR-034 Phase 8.1). Implemented in the
+ * wiring layer by `dispatchGraphAlertAction` — which routes through the
+ * Liquid pipeline + per-trigger custom templates + alert defaults.
+ * Kept as an injected hook here so this service stays free of mailer /
+ * Slack / templating dependencies and trivially unit-testable.
  */
 export interface GraphTriggerNotifier {
-  sendEmail(params: {
-    trigger: Trigger;
-    projects: Project[];
-    triggerData: TriggerData[];
-    projectSlug: string;
-  }): Promise<void>;
-  sendSlack(params: {
-    trigger: Trigger;
-    projects: Project[];
-    triggerData: TriggerData[];
-    projectSlug: string;
-  }): Promise<void>;
+  dispatch(input: GraphAlertDispatchInput): Promise<GraphAlertDispatchResult>;
 }
 
 export interface GraphTriggerEvaluationDeps {
@@ -140,6 +138,10 @@ export interface GraphTriggerEvaluationDeps {
     projectId: string;
   }): Promise<void>;
   notifier: GraphTriggerNotifier;
+  /** Base host for building deep links inside rendered templates
+   *  (ADR-034 Phase 8.1). Injected, not read from env, so this service
+   *  stays pure and testable. */
+  baseHost: string;
   now(): Date;
 }
 
@@ -275,12 +277,38 @@ export async function evaluateGraphTrigger({
   };
 
   const timeseriesResult = await deps.getTimeseries(timeseriesInput);
-  const currentValue = calculateCurrentValue(
-    timeseriesResult,
-    series,
-    seriesName,
+  // The stored `seriesName` identifies WHICH series the trigger watches
+  // (`{index}/{key|metric}/{aggregation}` — parsed above via
+  // `parseSeriesIndex`). Result buckets use a DIFFERENT encoding —
+  // `buildSeriesName`: `{queryIndex}/{metric}/{agg}[/{key}]` with terms→
+  // cardinality — and we query a single-series input, so the bucket key is
+  // always derived from `seriesInput` at index 0. Passing the stored
+  // identifier straight through only matched for a first-position, keyless,
+  // non-terms series; everything else silently read 0.
+  const bucketKey = buildSeriesName(seriesInput, 0);
+  const currentPoints = extractSeriesPoints(
+    timeseriesResult.currentPeriod,
+    bucketKey,
     graphData.groupBy,
   );
+  const previousPoints = extractSeriesPoints(
+    timeseriesResult.previousPeriod,
+    bucketKey,
+    graphData.groupBy,
+  );
+  const currentValue = aggregateSeriesValues(
+    currentPoints.map((point) => point.value),
+    series.aggregation as string,
+    timeseriesResult.currentPeriod.length,
+  );
+  const previousValue =
+    timeseriesResult.previousPeriod.length === 0
+      ? null
+      : aggregateSeriesValues(
+          previousPoints.map((point) => point.value),
+          series.aggregation as string,
+          timeseriesResult.previousPeriod.length,
+        );
 
   const { breached } = evaluateCustomGraphThreshold({
     value: currentValue,
@@ -299,8 +327,10 @@ export async function evaluateGraphTrigger({
 
   if (breached) {
     if (openTriggerSent) {
-      // Already firing — only update lastRunAt, do not notify again.
-      // Mirrors cron's `already_firing` branch.
+      // Already firing — cheap pre-check only. Update lastRunAt, do not notify
+      // again. Mirrors cron's `already_firing` branch. This avoids a doomed
+      // INSERT on the common already-firing path; the claim's unique violation
+      // below is the real guarantee.
       await deps.updateLastRunAt({ triggerId, projectId });
       return {
         triggerId,
@@ -321,50 +351,167 @@ export async function evaluateGraphTrigger({
       });
     }
 
-    const triggerData: TriggerData[] = [
-      {
-        input: `Graph: ${customGraph.name}`,
-        output: `Current value: ${currentValue.toFixed(
-          2,
-        )} (threshold: ${operator} ${threshold})`,
-        graphId: customGraphId,
-        projectId,
-        fullTrace: {} as Trace,
+    // ADR-034 Phase 8.1: build the alert template context and dispatch
+    // through the Liquid pipeline. Per-trigger custom templates (the
+    // four Trigger columns) override the alert defaults inside the
+    // renderer; this layer only assembles the variable surface.
+    const metricLabel = series.name ?? seriesName;
+    const context = buildGraphAlertTemplateContext({
+      trigger: {
+        id: trigger.id,
+        name: trigger.name,
+        alertType: trigger.alertType,
       },
-    ];
+      graph: { id: customGraphId, name: customGraph.name },
+      metric: { label: metricLabel, seriesName },
+      condition: {
+        operator,
+        threshold,
+        timePeriodMinutes: timePeriod,
+      },
+      currentValue,
+      previousValue,
+      // Chronological metric history (previous window + alert window) so
+      // templates can render the trend — the prebuilt `sparkline` or the
+      // raw `history` points. Same buckets the threshold read; no extra
+      // query.
+      history: [...previousPoints, ...currentPoints],
+      window: { start: startDate, end: endDate },
+      occurredAt: now,
+      reason,
+      project: { id: project.id, name: project.name, slug: project.slug },
+      baseHost: deps.baseHost,
+    });
 
-    const dispatchedTrigger: Trigger = {
-      ...trigger,
-      message:
-        trigger.message ??
-        `Graph "${customGraph.name}" alert: Value ${currentValue.toFixed(
-          2,
-        )} ${operator} ${threshold}`,
-    };
-
-    if (isSendEmail(trigger.action)) {
-      await deps.notifier.sendEmail({
-        trigger: dispatchedTrigger,
-        projects: [project],
-        triggerData,
-        projectSlug: project.slug,
-      });
-    } else if (isSendSlack(trigger.action)) {
-      await deps.notifier.sendSlack({
-        trigger: dispatchedTrigger,
-        projects: [project],
-        triggerData,
-        projectSlug: project.slug,
-      });
+    // ADR-041: a bot connection posts via the Web API (gated blocks render);
+    // extract + decrypt the token here so the dispatch helper stays crypto-free.
+    //
+    // An unresolvable bot connection FAILS LOUD. Falling through to the webhook
+    // branch would be worse than useless: bot params carry no `slackWebhook`, so
+    // the dispatcher would log "no Slack webhook configured", report didSend
+    // false, and the customer would never learn their alert is broken. A
+    // non-retryable DispatchError dead-letters the row with an actionable signal.
+    let botDestination: { token: string; channel: string } | null = null;
+    if (trigger.action === "SEND_SLACK_MESSAGE") {
+      const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
+      if (slackDeliveryMethodOf(slackParams) === "bot") {
+        const token = decryptSlackBotToken(slackParams);
+        const channel = slackParams.slackChannelId?.trim();
+        if (!token || !channel) {
+          throw new DispatchError({
+            message: `Slack bot connection for alert "${trigger.name}" is missing its token or channel — the alert cannot be delivered.`,
+            retryable: false,
+          });
+        }
+        botDestination = { token, channel };
+      }
     }
 
-    // Record the fire BEFORE updateLastRunAt — same order as the cron
-    // (`addTriggersSent` then `updateAlert`).
-    await deps.triggerSent.createOpenForGraphAlert({
+    // The alert's most recent incident (open or resolved) is its fire
+    // generation — it keys the per-recipient idempotency ledger so an outbox
+    // retry of THIS fire doesn't re-notify anyone the previous attempt reached.
+    // There is no open incident on this branch, so this reads the last resolved
+    // one (null on the alert's very first fire). Read BEFORE the claim so it
+    // reflects the PREVIOUS incident, not the row we are about to open.
+    const previousFire = await deps.triggerSent.findLatestForGraphAlert({
       triggerId,
       projectId,
       customGraphId,
     });
+
+    // ADR-034 P1: atomically claim the open incident BEFORE any provider side
+    // effect. `findOpenForGraphAlert` above is only a pre-check — two evaluators
+    // can both pass it before either writes a row (traceId is NULL for graph
+    // alerts, so `@@unique([triggerId, traceId])` can't guard them). The
+    // single-column unique on `openIncidentKey` arbitrates the INSERT: the loser
+    // gets null here and backs off WITHOUT dispatching, so a breach fans out at
+    // most one notification. Bot-destination resolution above may throw, but it
+    // is pure-local (no provider call) and runs before the claim, so an
+    // unresolvable connection dead-letters without orphaning an open row.
+    const claim = await deps.triggerSent.claimOpenForGraphAlert({
+      triggerId,
+      projectId,
+      customGraphId,
+    });
+    if (!claim) {
+      logger.debug(
+        { triggerId, projectId, customGraphId },
+        "Another evaluator already claimed this graph-alert fire — backing off without dispatching",
+      );
+      await deps.updateLastRunAt({ triggerId, projectId });
+      return {
+        triggerId,
+        projectId,
+        reason,
+        status: "already_firing",
+        value: currentValue,
+      };
+    }
+
+    // A THROWN dispatch (provider/network failure, as opposed to a clean
+    // `didSend: false`) must also roll the claim back before propagating:
+    // the outbox retries the evaluation, and the retry's open pre-check
+    // would see the orphaned claim and back off as `already_firing` —
+    // silently dropping the notification forever (the same no-op-on-retry
+    // trap the cadence path documents in `dispatcher.ts`). The per-recipient
+    // ledger is keyed on the PREVIOUS fire's id, unaffected by this delete,
+    // so a retry after a partial send still skips recipients already reached.
+    let dispatchResult: GraphAlertDispatchResult;
+    try {
+      dispatchResult = await deps.notifier.dispatch({
+        trigger,
+        project,
+        context,
+        recipients: params.members ?? [],
+        slackWebhook: params.slackWebhook ?? null,
+        botDestination,
+        fireDigest: graphAlertFireDigest({
+          triggerId,
+          customGraphId,
+          previousFireId: previousFire?.id ?? null,
+        }),
+      });
+    } catch (dispatchError) {
+      try {
+        await deps.triggerSent.deleteOpenClaim({ id: claim.id, projectId });
+      } catch (cleanupError) {
+        // Best-effort: the dispatch failure is the actionable signal; a
+        // failed rollback must not mask it. The orphaned claim self-heals
+        // when the metric recovers (markResolved frees the identity).
+        logger.error(
+          { triggerId, projectId, customGraphId, error: cleanupError },
+          "Failed to roll back the open graph-alert claim after a dispatch failure — the alert may stay suppressed until the metric recovers",
+        );
+      }
+      throw dispatchError;
+    }
+
+    // An alert that told nobody is not "currently firing". Leaving the claim
+    // open would light the alert up in the UI, stamp a last-fired time, and —
+    // worst of all — suppress every future notification until the metric
+    // recovers, because `findOpenForGraphAlert` would keep returning this row.
+    // Roll the claim back so the next evaluation can re-claim and re-dispatch.
+    // The scheduled-report path gates `recordFire` on delivery for the same
+    // reason (see `report-dispatch.ts`).
+    if (!dispatchResult.didSend) {
+      await deps.triggerSent.deleteOpenClaim({ id: claim.id, projectId });
+      await deps.updateLastRunAt({ triggerId, projectId });
+      return {
+        triggerId,
+        projectId,
+        reason,
+        status: "not_delivered",
+        value: currentValue,
+        detail: `threshold crossed but nothing was delivered on the ${dispatchResult.channel} channel`,
+        didSend: false,
+        renderErrors: dispatchResult.renderErrors,
+        missingVariables: dispatchResult.missingVariables,
+      };
+    }
+
+    // Delivered — the claim row IS the open incident (written before the send),
+    // so there is nothing more to record. Just stamp lastRunAt, same order as
+    // the cron (`addTriggersSent` then `updateAlert`).
     await deps.updateLastRunAt({ triggerId, projectId });
 
     return {
@@ -374,6 +521,9 @@ export async function evaluateGraphTrigger({
       status: "fired",
       value: currentValue,
       detail: noteIfNoData(operator, threshold),
+      didSend: true,
+      renderErrors: dispatchResult.renderErrors,
+      missingVariables: dispatchResult.missingVariables,
     };
   }
 
@@ -440,57 +590,4 @@ function noteIfNoData(operator: string, threshold: number): string | undefined {
   return isNoDataPredicate({ operator, threshold })
     ? "no-data predicate"
     : undefined;
-}
-
-function isSendEmail(action: TriggerActionEnum): boolean {
-  return action === "SEND_EMAIL";
-}
-
-function isSendSlack(action: TriggerActionEnum): boolean {
-  return action === "SEND_SLACK_MESSAGE";
-}
-
-/**
- * Mirror of cron's `calculateCurrentValue`
- * (src/pages/api/cron/triggers/customGraphTrigger.ts:340-382).
- * Kept here, NOT re-exported from the cron file, because the cron file
- * is a Next.js page module and the spec asks for the eval logic to
- * live in the app layer. Pure-function form for unit testing.
- */
-function calculateCurrentValue(
-  timeseriesResult: TimeseriesResult,
-  series: CustomGraphInput["series"][number],
-  seriesKey: string,
-  groupBy?: string,
-): number {
-  const dataPoints = timeseriesResult.currentPeriod;
-  if (dataPoints.length === 0) return 0;
-
-  const values: number[] = [];
-  for (const entry of dataPoints as TimeseriesBucket[]) {
-    const direct = entry[seriesKey];
-    if (typeof direct === "number") {
-      values.push(direct);
-      continue;
-    }
-    if (groupBy) {
-      const grouped = sumMetricAcrossGroups(entry, groupBy, seriesKey);
-      if (typeof grouped === "number") {
-        values.push(grouped);
-        continue;
-      }
-    }
-    values.push(0);
-  }
-  if (values.length === 0) return 0;
-
-  const aggregation = series.aggregation as string;
-  if (
-    aggregation === "cardinality" ||
-    aggregation === "terms" ||
-    aggregation === "count"
-  ) {
-    return values.reduce((a, b) => a + b, 0);
-  }
-  return values.reduce((a, b) => a + b, 0) / values.length;
 }

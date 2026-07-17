@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { createLogger } from "@langwatch/observability";
 import {
   context as otelContext,
   SpanKind,
@@ -9,7 +10,6 @@ import fastq from "fastq";
 import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
-import { createLogger } from "~/utils/logger/server";
 import {
   createContextFromJobData,
   getJobContextMetadata,
@@ -23,8 +23,8 @@ import {
 } from "../../../observability/tenantRateTracker";
 import { connection } from "../../../redis";
 import {
-  redactStorageUrisInText,
   type ProjectStorageDestination,
+  redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
 import { isDispatchError } from "../../outbox/dispatchError";
 import type {
@@ -44,10 +44,13 @@ import { getBackoffMs, JOB_RETRY_CONFIG } from "../shared";
 import { GroupQueueDispatcher } from "./dispatcher";
 import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle";
 import {
+  DecodeFailureError,
+  type DecodeFailureReason,
   decodeJobEnvelope,
   encodeJobEnvelope,
   PayloadTooLargeError,
-  readEnvelopeBlobId,
+  readEnvelopeDescriptor,
+  readJobRoutingMeta,
 } from "./jobEnvelope";
 import {
   gqGroupsBlockedTotal,
@@ -57,6 +60,7 @@ import {
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
+  gqJobsDroppedTotal,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
@@ -152,6 +156,31 @@ const INTERNAL_FIELDS = [
   "__dispatchScore",
   "__attempt",
 ] as const;
+
+/**
+ * Why a staged job was discarded. Extends {@link DecodeFailureReason} (what went
+ * wrong inside the decoder) with this module's own terminal reasons.
+ *
+ * `unknown` is a safety valve, not a shrug: an unclassified throw reaching a drop
+ * site means a failure mode exists that this enum does not name. A non-zero
+ * `reason="unknown"` on `gq_jobs_dropped_total` is a bug to chase, not noise.
+ */
+type DropReason =
+  | DecodeFailureReason
+  | "transient_exhausted"
+  | "sibling_restage_failed"
+  | "retry_encode_failed"
+  | "unknown";
+
+/**
+ * Classify a caught decode failure by its TYPE.
+ *
+ * Deliberately not a message-text match: zlib's wording is Node-version-dependent
+ * and not ours to own, so an alert built on substrings breaks under a runtime
+ * upgrade.
+ */
+const dropReasonOf = (err: unknown): DecodeFailureReason | "unknown" =>
+  err instanceof DecodeFailureError ? err.reason : "unknown";
 
 /**
  * Group Queue Processor that provides per-group FIFO with cross-group parallelism.
@@ -787,22 +816,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         });
         return;
       }
-      this.logger.error(
-        {
-          queueName: this.queueName,
-          projectId: tenantIdFromGroupId(groupId),
-          stagedJobId,
-          groupId,
-          err: redactStorageUrisInText(
-            err instanceof Error ? err.message : String(err),
-          ),
-        },
-        "Failed to parse staged job data",
-      );
-      // Missing blob or unparseable value: complete the slot so it's not stuck;
-      // recover via event replay.
-      await this.scripts.complete({ groupId, stagedJobId });
-      await this.blobLifecycle.release({ values: [jobDataJson], groupId });
+      // Not transient (retry) and not oversized (park): we cannot process this
+      // job, now or ever, on this worker. Complete the slot so the group stays
+      // live, but name and count the loss — see dropStagedJob.
+      await this.dropStagedJob({
+        groupId,
+        stagedJobId,
+        jobDataJson,
+        err,
+        reason: dropReasonOf(err),
+        message: "Failed to parse staged job data",
+      });
       return;
     }
 
@@ -1064,11 +1088,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;
                 // If the retry re-encode fails (transient blob-store down,
                 // payload-too-large from a state-bloat regression), the retry
-                // can't proceed. Release the OLD hold explicitly and fall
-                // through to the non-retryable fail-safe (complete the slot,
-                // recover via event replay) — otherwise the old hold token
-                // stays in the holder set until the 4-day TTL backstop reclaims
-                // it, leaking the blob for that whole window.
+                // can't proceed and the job is DISCARDED. Release the OLD hold
+                // explicitly — otherwise the old hold token stays in the holder
+                // set until the 4-day TTL backstop reclaims it, leaking the blob
+                // for that whole window. Releasing is right here (unlike the
+                // decode drops): the body was already read, so keeping it buys a
+                // later worker nothing — what failed is the re-ENCODE.
                 let retryJobData: string;
                 try {
                   retryJobData = await this.blobLifecycle.encode({
@@ -1080,19 +1105,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     groupId,
                   });
                 } catch (encodeErr) {
-                  this.logger.error(
-                    {
-                      queueName: this.queueName,
-                      groupId,
-                      stagedJobId,
-                      attempt,
-                      err:
-                        encodeErr instanceof Error
-                          ? encodeErr.message
-                          : String(encodeErr),
-                    },
-                    "Retry re-encode failed; releasing old hold and falling through to fail-safe",
-                  );
+                  this.recordDrop({
+                    groupId,
+                    stagedJobId,
+                    jobDataJson,
+                    err: encodeErr,
+                    reason: "retry_encode_failed",
+                    message:
+                      "Retry re-encode failed; releasing old hold and discarding job",
+                    // Released below, deliberately: the body was already read, so
+                    // keeping it buys a later worker nothing.
+                    bodyPreserved: false,
+                  });
                   await this.blobLifecycle.release({
                     values: [jobDataJson],
                     groupId,
@@ -1101,8 +1125,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     groupId,
                     stagedJobId,
                     jobName,
+                    dropped: true,
                   });
-                  // Distinct counter — this is a retry-encode blip, not a
+                  // Kept alongside gq_jobs_dropped_total: this counter is the
+                  // specific "a retry-encode blip lost it" diagnostic, not a
                   // genuine non-retryable process() error. Oncall triaging a
                   // gq_jobs_non_retryable_total spike shouldn't have to grep
                   // logs to figure out which class of failure they're seeing.
@@ -1254,10 +1280,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Parses a drained sibling's stored JSON into a clean payload. Returns null
-   * on parse failure (the job was already removed from staging; it is dropped
-   * here and recoverable via event replay, mirroring the dispatched job's own
-   * parse-failure handling).
+   * Parses a drained sibling's stored JSON into a clean payload. Returns null on
+   * parse failure — the job was already removed from staging, so it is DISCARDED
+   * here, mirroring the dispatched job's own parse-failure handling.
+   *
+   * This used to say "recoverable via event replay". It is not, for a reactor
+   * job: replay never invokes reactors (see {@link dropStagedJob}). The loss is
+   * counted instead of asserted away.
    */
   private async parseDrainedPayload({
     sibling,
@@ -1290,15 +1319,21 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       if (err instanceof PayloadTooLargeError) {
         throw err;
       }
-      this.logger.error(
-        {
-          queueName: this.queueName,
-          groupId,
-          stagedJobId: sibling.stagedJobId,
-          err: err instanceof Error ? err.message : String(err),
-        },
-        "Failed to parse drained sibling job data — dropping (recoverable via replay)",
-      );
+      // Already out of staging, so there is no slot to complete — but the loss is
+      // real and is counted like any other (#5538).
+      this.recordDrop({
+        groupId,
+        stagedJobId: sibling.stagedJobId,
+        jobDataJson: sibling.jobDataJson,
+        err,
+        reason: dropReasonOf(err),
+        message: "Failed to parse drained sibling job data — dropping",
+        // We do not release a sibling's value, so the body outlives the drop
+        // unless it was already gone.
+        bodyPreserved: !(err instanceof DecodeFailureError
+          ? err.reason === "missing_blob"
+          : false),
+      });
       return null;
     }
   }
@@ -1327,15 +1362,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         // the drain, and its value — hence token — is unchanged).
         await this.blobLifecycle.acquire(sibling.jobDataJson);
       } catch (err) {
-        this.logger.error(
-          {
-            queueName: this.queueName,
-            groupId,
-            stagedJobId: sibling.stagedJobId,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          "Failed to re-stage drained sibling after batch failure (recoverable via replay)",
-        );
+        // The sibling never made it back into staging, so nothing will dispatch
+        // it again — that is a discard, whatever the re-stage intended (#5538).
+        this.recordDrop({
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+          jobDataJson: sibling.jobDataJson,
+          err,
+          reason: "sibling_restage_failed",
+          message: "Failed to re-stage drained sibling after batch failure",
+          // Not released — the value is intact, it simply never got re-staged.
+          bodyPreserved: true,
+        });
       }
     }
   }
@@ -1440,6 +1478,172 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
+   * Give up on a staged job we cannot process — and say so out loud (#5538).
+   *
+   * The code this replaced justified itself with "recover via event replay". It
+   * does not — and the proof is structural, not another comment: `ReplayExecutor`
+   * calls the fold's pure `projection.apply()` and writes straight to the store
+   * via `store.store()`, never constructing a `ProjectionRouter` — which is the
+   * only thing that calls `dispatchToReactors`. Reactors are unreachable from
+   * replay BY CONSTRUCTION. (`replay/` contains no reference to a reactor at all,
+   * except two that exist to *suppress* re-fires.)
+   *
+   * `governanceOcsfEventsSync` (OCSF audit) and `gatewayBudgetSync` (billing) are
+   * reactors on the `traceSummary` fold — so for them this method IS the terminal
+   * event, and the counter below is the only evidence it ever happened. Scoped
+   * honestly: fold/map drops genuinely ARE replay-covered (`ReplayService.replay`
+   * drives `config.projections` + `config.mapProjections`). The false part is
+   * reactor-specific.
+   *
+   * **Why `complete()`** — there are THREE options here, not two, and an earlier
+   * draft of this comment argued a false binary:
+   * - `parkPoisonGroup()` blocks the whole group. Right for an oversized payload
+   *   (value intact; a raised cap could process it later); wrong here, because a
+   *   missing blob never comes back, so parking would freeze that aggregate
+   *   forever on a job that can never succeed.
+   * - `retryRestage` (the ladder `handleTransientDecode` rides, 40 lines below) is
+   *   the third option, and for `body_unreadable` it is arguably the RIGHT one:
+   *   `JOB_RETRY_CONFIG`'s own doc says the budget exists to "ride out a rolling
+   *   restart… without parking the group", which is precisely the codec-skew case.
+   *   Retrying would hand the job to a newer worker that can read it, instead of
+   *   leaving bytes nobody re-reads. **Deliberately deferred (#5823), not
+   *   overlooked** — it changes delivery behaviour for every unreadable body and
+   *   deserves its own change; this one only stops the loss being silent.
+   *   Preserving without retrying is admittedly a half-measure: it keeps the body
+   *   alive to its TTL backstop and names it, but nothing re-delivers it.
+   * - `complete()` — chosen. Liveness is the one thing the old drop got right.
+   *
+   * **Why `release()` is conditional** — release reclaims the blob and deletes
+   * the s3 object out-of-band: this module's retire-forever signal. Only
+   * `missing_blob` has nothing left to lose (the body is already gone; releasing
+   * merely drops the stale holder). Every other reason means the body is PRESENT
+   * and unreadable *to this worker* — a rolling-deploy codec skew is exactly that,
+   * and the next worker could read it fine — so retiring it would destroy
+   * recoverable data. `handleTransientDecode` already refuses to release for the
+   * same reason. A preserved body lives to its TTL backstop, and the descriptor
+   * logged here is how an operator finds it.
+   */
+  private async dropStagedJob({
+    groupId,
+    stagedJobId,
+    jobDataJson,
+    err,
+    reason,
+    message,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    jobDataJson: string;
+    err: unknown;
+    /**
+     * Narrower than {@link DropReason} on purpose. The release rule below is only
+     * sound for reasons where "was the body still there?" is the right question —
+     * `sibling_restage_failed` and `retry_encode_failed` are discards for reasons
+     * unrelated to the body, and they handle their own values. Narrowing makes
+     * that a compile error rather than a silent behaviour question.
+     */
+    reason: DecodeFailureReason | "transient_exhausted" | "unknown";
+    message: string;
+  }): Promise<void> {
+    // The release rule, named once. Everything below reads off this predicate so
+    // the log cannot claim one thing while the code does another.
+    const bodyIsGone = reason === "missing_blob";
+
+    this.recordDrop({
+      groupId,
+      stagedJobId,
+      jobDataJson,
+      err,
+      reason,
+      message,
+      bodyPreserved: !bodyIsGone,
+    });
+
+    // `dropped: true` keeps the group advancing WITHOUT counting a thrown-away
+    // job as a completion or clearing the group's stored error (#5538).
+    await this.scripts.complete({ groupId, stagedJobId, dropped: true });
+
+    if (bodyIsGone) {
+      // Nothing left to preserve — releasing just drops the stale holder.
+      await this.blobLifecycle.release({ values: [jobDataJson], groupId });
+    }
+  }
+
+  /**
+   * Name and count a job we are throwing away, without deciding its slot.
+   *
+   * Split from {@link dropStagedJob} because not every discard owns a slot to
+   * complete: a drained sibling is already out of staging, so its loss needs the
+   * counter and the log but no `complete()`. Every path in this module that
+   * discards a job routes through here, so `gq_jobs_dropped_total` is the whole
+   * truth about what this queue throws away.
+   */
+  private recordDrop({
+    groupId,
+    stagedJobId,
+    jobDataJson,
+    err,
+    reason,
+    message,
+    bodyPreserved,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    jobDataJson: string;
+    err: unknown;
+    reason: DropReason;
+    message: string;
+    /**
+     * Whether the staged value's body is still retrievable after this drop.
+     *
+     * The CALLER states it; this method must not derive it. Only the caller knows
+     * whether it released — and `retry_encode_failed` releases deliberately (the
+     * body was already read; what failed is the re-encode), so deriving it from
+     * `reason` made the log assert `bodyPreserved: true` one line before
+     * destroying the body. That is the same defect this whole change exists to
+     * remove — a claim that isn't true — so it does not get to live in the
+     * structured field oncall filters on.
+     */
+    bodyPreserved: boolean;
+  }): void {
+    const { pipelineName, jobType, jobName } = readJobRoutingMeta(jobDataJson);
+    const descriptor = readEnvelopeDescriptor(jobDataJson);
+
+    gqJobsDroppedTotal.inc({
+      queue_name: this.queueName,
+      pipeline_name: pipelineName ?? "unknown",
+      job_type: jobType ?? "unknown",
+      job_name: jobName ?? "unknown",
+      reason,
+    });
+
+    this.logger.error(
+      {
+        queueName: this.queueName,
+        projectId: tenantIdFromGroupId(groupId),
+        stagedJobId,
+        groupId,
+        reason,
+        pipelineName,
+        jobType,
+        jobName,
+        // Shape only — format, version, blob id. Never the body: it may carry
+        // tenant PII, and the whole point is that we could not read it anyway.
+        // The header survives what the body does not, so a value we could not
+        // decode can still say what it WAS.
+        envelopeFormat: descriptor.format,
+        envelopeVersion: descriptor.version,
+        blobId: descriptor.blobId,
+        bodyPreserved,
+        err: redactStorageUrisInText(
+          err instanceof Error ? err.message : String(err),
+        ),
+      },
+      message,
+    );
+  }
+
+  /**
    * Claim-side poison park (specs/event-sourcing/poison-group-park-guard.feature):
    * re-stage the SAME staged value (no decode, no re-encode, hold token
    * unchanged - the transient-decode rationale applies) and move the group to
@@ -1508,19 +1712,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }): Promise<void> {
     const attempt = (stagedJobId.match(/\/r\//g)?.length ?? 0) + 1;
     if (attempt >= JOB_RETRY_CONFIG.maxAttempts) {
-      this.logger.error(
-        {
-          queueName: this.queueName,
-          projectId: tenantIdFromGroupId(groupId),
-          groupId,
-          stagedJobId,
-          attempt,
-          error: err.message,
-        },
-        "Blob store unreachable after retries; completing slot to recover via replay",
-      );
-      await this.scripts.complete({ groupId, stagedJobId });
-      await this.blobLifecycle.release({ values: [jobDataJson], groupId });
+      // The retry ladder is out of rungs. This is a discard like any other, and
+      // it used to claim replay would recover it — it does not (#5538).
+      //
+      // It also used to release() the value. Reaching here means every one of
+      // `JOB_RETRY_CONFIG.maxAttempts` READS failed — ~2h27m of sustained
+      // unreachability (`queues/shared.ts`) — which says the STORE is down, not
+      // that the blob is gone. It is most likely still there, so retiring it
+      // would delete a body that exists; this drop preserves like every other
+      // non-missing_blob reason.
+      await this.dropStagedJob({
+        groupId,
+        stagedJobId,
+        jobDataJson,
+        err,
+        reason: "transient_exhausted",
+        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover reactor jobs)`,
+      });
       return;
     }
     const backoffMs = getBackoffMs(attempt);
