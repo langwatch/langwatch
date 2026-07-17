@@ -136,8 +136,8 @@ export function HomePage() {
               </>
             ) : (
               <>
-                <HomePageBanners />
-                <TracesOverview />
+                <HomePageBanners variant="legacy" />
+                <TracesOverview showInvestigateSignal={showLangy} />
                 <RecentItemsSection />
                 <OnboardingProgress />
               </>

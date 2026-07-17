@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   chakra,
   Heading,
   HStack,
@@ -14,13 +15,7 @@ import { motion, useAnimationFrame, useMotionValue } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { IconType } from "react-icons";
-import {
-  LuArrowLeft,
-  LuArrowRight,
-  LuMic,
-  LuX,
-  LuZap,
-} from "react-icons/lu";
+import { LuArrowLeft, LuArrowRight, LuMic, LuX, LuZap } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";
@@ -90,6 +85,8 @@ interface Slide {
   ctaLabel: string;
   /** Show the Langy toggle shortcut as a kbd chip inside the CTA button. */
   showCtaKbd?: boolean;
+  /** Text colour of the CTA in the legacy full-colour banner. */
+  legacyCtaColor: string;
   /** Shader speed while this slide is active (default 0.45). */
   speed?: number;
   posthogEvent: string;
@@ -120,7 +117,8 @@ const SLIDES: Slide[] = [
         Delivered to Slack or email, on the schedule you choose.
       </>
     ),
-    ctaLabel: "Make it someone else's job",
+    ctaLabel: "Explore automations",
+    legacyCtaColor: "orange.700",
     posthogEvent: "automations_banner_click",
     navigate: ({ router, projectSlug }) =>
       void router.push(`/${projectSlug}/automations`),
@@ -148,6 +146,7 @@ const SLIDES: Slide[] = [
       </>
     ),
     ctaLabel: "Try voice agent testing",
+    legacyCtaColor: "teal.700",
     posthogEvent: "voice_agents_banner_click",
     navigate: () =>
       window.open(
@@ -270,7 +269,11 @@ function lerpMesh(a: Mesh, b: Mesh, t: number): Mesh {
  * the pointer; leaving eases it back up. Reduced-motion holds on one slide
  * with the dots still available. Renders nothing when every slide is snoozed.
  */
-export function HomePageBanners() {
+export function HomePageBanners({
+  variant = "briefing",
+}: {
+  variant?: "briefing" | "legacy";
+}) {
   const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
@@ -482,6 +485,250 @@ export function HomePageBanners() {
     ? { duration: 0 }
     : { duration: TRANSITION_S, ease: TRANSITION_EASE };
 
+  if (variant === "legacy") {
+    return (
+      <Box
+        position="relative"
+        width="full"
+        borderRadius="xl"
+        overflow="hidden"
+        color="white"
+        boxShadow="0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.18)"
+        minHeight={{ base: "160px", md: "172px" }}
+        onMouseEnter={() => (hoveredRef.current = true)}
+        onMouseLeave={() => (hoveredRef.current = false)}
+        data-banner-variant="legacy"
+      >
+        <Box
+          position="absolute"
+          inset={0}
+          pointerEvents="none"
+          style={{
+            background: `linear-gradient(120deg, ${colors[0] ?? "#333"}, ${
+              colors[1] ?? colors[0] ?? "#333"
+            } 45%, ${colors[2] ?? colors[0] ?? "#333"})`,
+          }}
+        />
+        {!lowPerf ? (
+          <Box position="absolute" inset={0} pointerEvents="none">
+            <MeshGradient
+              colors={colors}
+              distortion={displayMesh.distortion}
+              swirl={displayMesh.swirl}
+              offsetX={displayMesh.offsetX}
+              offsetY={displayMesh.offsetY}
+              rotation={displayMesh.rotation}
+              grainMixer={0.15}
+              grainOverlay={0.18}
+              speed={reduceMotion ? 0 : 0.45}
+              scale={displayMesh.scale}
+              style={{ width: "100%", height: "100%" }}
+            />
+          </Box>
+        ) : null}
+        <Box
+          position="absolute"
+          inset={0}
+          pointerEvents="none"
+          backgroundImage="linear-gradient(120deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 55%, rgba(0,0,0,0) 100%)"
+        />
+
+        <Box display="grid" position="relative" zIndex={1} width="full">
+          {eligible.map((s) => {
+            const isActive = s.id === slide.id;
+            return (
+              <motion.div
+                key={s.id}
+                inert={!isActive}
+                initial={false}
+                animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 8 }}
+                transition={slideTransition}
+                style={{
+                  gridArea: "1 / 1",
+                  zIndex: isActive ? 1 : 0,
+                  pointerEvents: isActive ? "auto" : "none",
+                  willChange: "opacity, transform",
+                }}
+              >
+                <HStack
+                  align="center"
+                  gap={{ base: 4, md: 6 }}
+                  paddingLeft={{ base: 5, md: 7 }}
+                  paddingRight={{ base: 5, md: 7 }}
+                  paddingY={{ base: 5, md: 6 }}
+                  width="full"
+                  height="full"
+                >
+                  <Box
+                    flexShrink={0}
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    boxSize="44px"
+                    borderRadius="full"
+                    bg="white/20"
+                    boxShadow="inset 0 0 0 1px rgba(255,255,255,0.35)"
+                  >
+                    {s.Icon ? (
+                      <Icon as={s.Icon} boxSize={5} color="white" />
+                    ) : (
+                      s.iconNode
+                    )}
+                  </Box>
+
+                  <VStack align="start" gap={1.5} flex={1} minWidth={0}>
+                    <HStack gap={2} minWidth={0}>
+                      <Heading
+                        as="h2"
+                        size="md"
+                        fontWeight="600"
+                        color="white/95"
+                        letterSpacing="-0.01em"
+                        lineHeight={1.25}
+                      >
+                        {s.heading}
+                      </Heading>
+                      {s.badge ? (
+                        <Box
+                          paddingX={2}
+                          paddingY="2px"
+                          borderRadius="full"
+                          bg="white/30"
+                          flexShrink={0}
+                        >
+                          <Text
+                            textStyle="2xs"
+                            fontWeight="700"
+                            color="white"
+                            letterSpacing="0.08em"
+                            textTransform="uppercase"
+                            lineHeight={1.2}
+                          >
+                            {s.badge}
+                          </Text>
+                        </Box>
+                      ) : null}
+                    </HStack>
+                    <Text
+                      textStyle="sm"
+                      color="white/80"
+                      lineHeight={1.6}
+                      maxWidth={{ base: "full", md: "560px" }}
+                    >
+                      {s.subtitle}
+                    </Text>
+                    <HStack gap={2} marginTop={1.5}>
+                      <Button
+                        size="sm"
+                        bg="white"
+                        color={s.legacyCtaColor}
+                        fontWeight="600"
+                        paddingX={4}
+                        boxShadow="0 1px 2px rgba(0,0,0,0.12)"
+                        _hover={{
+                          bg: "white/90",
+                          transform: "translateY(-1px)",
+                        }}
+                        _active={{
+                          bg: "white/80",
+                          transform: "translateY(0)",
+                        }}
+                        transition="background-color 0.12s ease, transform 0.12s ease"
+                        onClick={() => handleCta(s)}
+                        aria-label={s.ctaLabel}
+                      >
+                        {s.ctaLabel}
+                        <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
+                      </Button>
+                    </HStack>
+                  </VStack>
+                </HStack>
+              </motion.div>
+            );
+          })}
+        </Box>
+
+        {multi ? (
+          <Box position="absolute" bottom={2.5} right={3} zIndex={2}>
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                fill="none"
+                stroke="rgba(255,255,255,0.28)"
+                strokeWidth="2.5"
+              />
+              <g transform="rotate(-90 12 12)">
+                <motion.circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  style={{ pathLength: progress }}
+                />
+              </g>
+            </svg>
+          </Box>
+        ) : null}
+
+        {multi ? (
+          <HStack
+            gap={2}
+            justify="center"
+            position="absolute"
+            bottom={3}
+            left={0}
+            right={0}
+            zIndex={2}
+          >
+            {eligible.map((s, i) => (
+              <Box
+                as="button"
+                key={s.id}
+                aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
+                onClick={() => setIndex(i)}
+                width={i === active ? "18px" : "7px"}
+                height="7px"
+                borderRadius="full"
+                bg={i === active ? "white" : "whiteAlpha.500"}
+                transition="width 0.2s ease, background-color 0.2s ease"
+                cursor="pointer"
+                _hover={{
+                  bg: i === active ? "white" : "whiteAlpha.700",
+                }}
+              />
+            ))}
+          </HStack>
+        ) : null}
+
+        <Tooltip
+          content={`Hide for ${SNOOZE_DAYS} days`}
+          positioning={{ placement: "top" }}
+        >
+          <IconButton
+            size="sm"
+            variant="ghost"
+            color="white/80"
+            position="absolute"
+            top={2}
+            right={2}
+            zIndex={2}
+            _hover={{ bg: "white/20", color: "white" }}
+            _active={{ bg: "white/30" }}
+            onClick={() => dismiss(slide)}
+            aria-label="Dismiss"
+          >
+            <LuX />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    );
+  }
+
   return (
     <Box position="relative" width="full" isolation="isolate">
       <Box
@@ -634,51 +881,51 @@ export function HomePageBanners() {
                   }}
                 >
                   <VStack align="start" gap={1} width="full" minWidth={0}>
-                      <HStack gap={2} minWidth={0}>
-                        <Heading
-                          as="h2"
-                          // The announcement speaks in the page's serif display
-                          // voice, so it reads as the same publication as the
-                          // briefing above it.
-                          fontFamily={SERIF}
-                          fontWeight="500"
-                          fontSize="15px"
-                          letterSpacing="-0.01em"
-                          lineHeight={1.3}
-                          color="fg"
+                    <HStack gap={2} minWidth={0}>
+                      <Heading
+                        as="h2"
+                        // The announcement speaks in the page's serif display
+                        // voice, so it reads as the same publication as the
+                        // briefing above it.
+                        fontFamily={SERIF}
+                        fontWeight="500"
+                        fontSize="15px"
+                        letterSpacing="-0.01em"
+                        lineHeight={1.3}
+                        color="fg"
+                      >
+                        {s.heading}
+                      </Heading>
+                      {s.badge ? (
+                        <Box
+                          paddingX="7px"
+                          borderRadius="full"
+                          borderWidth="1px"
+                          borderColor="orange.emphasized"
+                          flexShrink={0}
                         >
-                          {s.heading}
-                        </Heading>
-                        {s.badge ? (
-                          <Box
-                            paddingX="7px"
-                            borderRadius="full"
-                            borderWidth="1px"
-                            borderColor="orange.emphasized"
-                            flexShrink={0}
+                          <Text
+                            fontFamily="mono"
+                            fontSize="9.5px"
+                            fontWeight="600"
+                            color="orange.fg"
+                            letterSpacing="0.08em"
+                            textTransform="uppercase"
+                            lineHeight={1.6}
                           >
-                            <Text
-                              fontFamily="mono"
-                              fontSize="9.5px"
-                              fontWeight="600"
-                              color="orange.fg"
-                              letterSpacing="0.08em"
-                              textTransform="uppercase"
-                              lineHeight={1.6}
-                            >
-                              {s.badge}
-                            </Text>
-                          </Box>
-                        ) : null}
-                      </HStack>
-                      <Text fontSize="12.5px" color="fg.muted" lineHeight={1.5}>
-                        {s.subtitle}
-                      </Text>
-                      {s.extra ? (
-                        <Box width="full" minWidth={0}>
-                          {s.extra}
+                            {s.badge}
+                          </Text>
                         </Box>
                       ) : null}
+                    </HStack>
+                    <Text fontSize="12.5px" color="fg.muted" lineHeight={1.5}>
+                      {s.subtitle}
+                    </Text>
+                    {s.extra ? (
+                      <Box width="full" minWidth={0}>
+                        {s.extra}
+                      </Box>
+                    ) : null}
                     <chakra.button
                       type="button"
                       onClick={() => handleCta(s)}

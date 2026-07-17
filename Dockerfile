@@ -70,6 +70,7 @@ WORKDIR /app
 COPY --from=builder /app/langwatch ./langwatch
 COPY --from=builder /app/mcp-server ./mcp-server
 COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
 EXPOSE 5560

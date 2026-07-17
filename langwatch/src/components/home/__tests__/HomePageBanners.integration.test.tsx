@@ -2,12 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -87,6 +82,19 @@ describe("<HomePageBanners />", () => {
     expect(
       screen.getByRole("button", { name: "Show announcement 2 of 2" }),
     ).toBeDefined();
+  });
+
+  it("keeps the full-colour banner for users outside the Langy rollout", () => {
+    const { container } = renderWithProviders(
+      <HomePageBanners variant="legacy" />,
+    );
+
+    expect(
+      container.querySelector('[data-banner-variant="legacy"]'),
+    ).not.toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Previous announcement" }),
+    ).toBeNull();
   });
 
   it("shows the last remaining banner with no dots when only one is eligible", () => {
