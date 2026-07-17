@@ -45,6 +45,10 @@ const GLOBAL_MODELS = [
   // Cluster-wide kill switches; one row per flag key, no tenant column. Keeps
   // system-scoped flags off PostHog (see /ops/feature-flags).
   "FeatureFlag",
+  // Platform-wide singleton cursor for the storage-billing sweep (ADR-039):
+  // one row, no tenant column — it records the last sealed hour swept for the
+  // whole platform, not for any org.
+  "StorageSweepCursor",
 ] as const;
 
 /**
