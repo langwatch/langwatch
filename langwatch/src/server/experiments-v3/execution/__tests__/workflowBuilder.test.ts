@@ -13,6 +13,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { ExecutionCell } from "../types";
 import {
+  buildCellWorkflow,
   buildCodeNodeFromAgent,
   buildEvaluatorNode,
   buildEvaluatorTargetNode,
@@ -917,6 +918,57 @@ describe("buildSignatureNodeFromLocalConfig", () => {
         expect(data.configId).toBeUndefined();
         expect(data.promptDraft).toBeUndefined();
       });
+    });
+  });
+});
+
+describe("buildCellWorkflow", () => {
+  describe("given an agent target whose agent wraps a Studio workflow", () => {
+    it("throws instead of silently building an empty code node", () => {
+      // A workflow-type agent (created via Agent -> New Agent -> Workflow)
+      // has no code/parameters of its own — just a pointer to a Studio
+      // workflow. The orchestrator must resolve and run that linked workflow
+      // via executeWorkflowCell *before* ever reaching buildCellWorkflow. If
+      // it isn't resolved, buildCellWorkflow must fail loudly rather than
+      // silently build an empty "code" node (the empty-code node is what
+      // produced the confusing downstream DSPy "user code must define one
+      // of..." error for every row).
+      const workflowAgent: TypedAgent = {
+        id: "workflow-agent-1",
+        projectId: "project-1",
+        name: "fast resolution agent",
+        type: "workflow",
+        config: { name: "Custom", workflow_id: "wf_123" },
+        workflowId: "wf_123",
+        copiedFromAgentId: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const targetConfig: TargetConfig = {
+        id: "target-1",
+        type: "agent",
+        dbAgentId: workflowAgent.id,
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        mappings: {},
+      };
+
+      const cell: ExecutionCell = {
+        rowIndex: 0,
+        targetId: "target-1",
+        targetConfig,
+        evaluatorConfigs: [],
+        datasetEntry: { _datasetId: "dataset-1", input: "test input" },
+      };
+
+      expect(() =>
+        buildCellWorkflow(
+          { projectId: "project-1", cell, datasetColumns: [] },
+          { agent: workflowAgent },
+        ),
+      ).toThrow(/must be dispatched to executeWorkflowCell/);
     });
   });
 });

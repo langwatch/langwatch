@@ -208,9 +208,14 @@ export const useOpenTargetEditor = () => {
           });
 
           if (agent?.type === "workflow") {
-            // Open workflow in new tab
+            // A workflow-type agent has no code or mapping settings of its
+            // own to edit inline — it's just a pointer to a Studio graph, so
+            // "Edit" opens that graph. `agent.workflowId` (top-level, set by
+            // WorkflowSelectorDrawer) is authoritative; `config.workflow_id`
+            // is the fallback for older agents that predate that column.
             const config = agent.config as Record<string, unknown>;
-            const workflowId = config.workflowId as string | undefined;
+            const workflowId =
+              agent.workflowId ?? (config.workflow_id as string | undefined);
             if (workflowId) {
               const workflowUrl = `/${project?.slug}/studio/${workflowId}`;
               window.open(workflowUrl, "_blank");

@@ -2018,26 +2018,32 @@ export async function* runOrchestrator(
             // Create abort checker bound to this run
             const checkAbort = () => abortManager.isAborted(runId);
 
-            // Pick the executor: a workflow target runs the full studio workflow
-            // once per row via execute_flow; every other target runs a single
-            // component. Both yield the same target_result / evaluator_result
-            // events.
-            const cellEvents =
-              cell.targetConfig.type === "workflow" && loadedData.workflow
-                ? executeWorkflowCell(
-                    cell,
-                    projectId,
-                    loadedData.workflow.dsl,
-                    checkAbort,
-                  )
-                : executeCell(
-                    cell,
-                    projectId,
-                    datasetColumns,
-                    loadedData,
-                    resultMapperConfig,
-                    checkAbort,
-                  );
+            // Pick the executor: a workflow target — or an agent target that
+            // wraps a Studio workflow (agent.type === "workflow") — runs the
+            // full studio workflow once per row via execute_flow; every other
+            // target runs a single component. Both yield the same
+            // target_result / evaluator_result events.
+            const runsAsWorkflow =
+              (cell.targetConfig.type === "workflow" ||
+                (cell.targetConfig.type === "agent" &&
+                  loadedData.agent?.type === "workflow")) &&
+              !!loadedData.workflow;
+
+            const cellEvents = runsAsWorkflow
+              ? executeWorkflowCell(
+                  cell,
+                  projectId,
+                  loadedData.workflow!.dsl,
+                  checkAbort,
+                )
+              : executeCell(
+                  cell,
+                  projectId,
+                  datasetColumns,
+                  loadedData,
+                  resultMapperConfig,
+                  checkAbort,
+                );
 
             // Execute cell and collect events
             let cellFailed = false;
@@ -2357,6 +2363,18 @@ const getLoadedDataForTarget = (
   if (targetConfig.type === "agent" && targetConfig.dbAgentId) {
     const agent = loadedAgents.get(targetConfig.dbAgentId);
     if (agent) {
+      // A workflow-type agent has no code of its own — it wraps a Studio
+      // workflow, resolved by dataLoader and cached under the linked
+      // workflow's own id (see loadPublishedWorkflow in dataLoader.ts).
+      if (agent.type === "workflow") {
+        const linkedWorkflowId =
+          agent.workflowId ??
+          (agent.config as { workflow_id?: string }).workflow_id;
+        const workflow = linkedWorkflowId
+          ? loadedWorkflows?.get(workflowLoadKey({ workflowId: linkedWorkflowId }))
+          : undefined;
+        return { agent, workflow };
+      }
       return { agent };
     }
   }

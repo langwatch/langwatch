@@ -24,6 +24,7 @@ import {
   LuPlay,
   LuSquare,
   LuTrash2,
+  LuWorkflow,
 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -328,7 +329,21 @@ export const TargetHeader = memo(function TargetHeader({
         </span>
       );
     }
-    // Other agents (code, workflow, signature) get Code icon
+    // A workflow-type agent (built in Studio, saved as an agent) or a
+    // directly-attached workflow target both run a whole Studio workflow, not
+    // a single code/signature node — give them their own icon so they don't
+    // read as raw code.
+    if (
+      target.type === "workflow" ||
+      (target.type === "agent" && target.agentType === "workflow")
+    ) {
+      return (
+        <span data-testid="icon-workflow">
+          <LuWorkflow size={12} />
+        </span>
+      );
+    }
+    // Other agents (code, signature) get Code icon
     return (
       <span data-testid="icon-code">
         <LuCode size={12} />
