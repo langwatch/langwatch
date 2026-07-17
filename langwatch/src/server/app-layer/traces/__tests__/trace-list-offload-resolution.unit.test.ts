@@ -363,7 +363,9 @@ describe("TraceListService read-time offload resolution (#5835)", () => {
 
   describe("given resolveFullIO is true over a page far larger than the span-read concurrency bound", () => {
     describe("when getList fans out the per-row span reads", () => {
-      /** @scenario A large conversation page bounds its concurrent ClickHouse span reads */
+      // Implementation-level guard (no bound BDD scenario): the read-cost
+      // contract is covered by the Track 3 "Read cost is bounded by offloaded
+      // span/field count" scenario; this pins the concurrency ceiling.
       it("never exceeds SPAN_READ_CONCURRENCY span reads in flight at once", async () => {
         const rowCount = SPAN_READ_CONCURRENCY * 3;
         const rows = Array.from({ length: rowCount }, (_, i) =>

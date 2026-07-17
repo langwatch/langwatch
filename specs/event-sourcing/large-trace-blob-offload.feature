@@ -391,7 +391,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     Given a span attribute's eventref points at a missing or retention-
         expired event_log row, or the blob-store fetch throws
     When the Attributes pane reads the span
-    Then the response carries an explicit incomplete marker for that attribute
+    Then the response flags the span as having incomplete attributes
     And the Attributes pane renders an incomplete-content indicator
 
   # ===========================================================================
