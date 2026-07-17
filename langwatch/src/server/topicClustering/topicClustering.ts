@@ -15,7 +15,6 @@ import { getProjectEmbeddingsModel } from "../embeddings";
 import { stagedLangevalsFetch } from "../langevals/stagedFetch";
 import { getPayloadSizeHistogram } from "../metrics";
 import { resolveModelForFeature } from "../modelProviders/resolveModelForFeature";
-import { scheduleTopicClusteringNextPage } from "./topicClusteringQueue";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -56,11 +55,25 @@ const CLUSTERING_MODE_WINDOW_DAYS = 365;
  */
 const CLUSTERING_FETCH_WINDOW_DAYS = 49;
 
+/**
+ * What one clustering page did (ADR-051). `nextSearchAfter` present means
+ * the backlog has more pages — the caller owns continuing the walk (the
+ * process manager via a continuation intent, or the CLI task via a loop);
+ * this function never schedules its own next page.
+ */
+export interface ClusteringPageOutcome {
+  mode: "batch" | "incremental";
+  tracesProcessed: number;
+  topicsCount: number;
+  subtopicsCount: number;
+  skippedReason?: "recently_clustered" | "not_enough_traces" | "not_configured";
+  nextSearchAfter?: [number, string];
+}
+
 export const clusterTopicsForProject = async (
   projectId: string,
   searchAfter?: [number, string],
-  scheduleNextPage = true,
-): Promise<void> => {
+): Promise<ClusteringPageOutcome> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -118,7 +131,13 @@ export const clusterTopicsForProject = async (
       { projectId },
       `skipping clustering for project as last topic from batch processing was created less than ${daysFrequency} days ago`,
     );
-    return;
+    return {
+      mode: "batch",
+      tracesProcessed: 0,
+      topicsCount: 0,
+      subtopicsCount: 0,
+      skippedReason: "recently_clustered",
+    };
   }
 
   logger.info(
@@ -154,46 +173,56 @@ export const clusterTopicsForProject = async (
     "Final trace count for clustering",
   );
 
+  const mode = isIncrementalProcessing ? "incremental" : "batch";
+
   // Keep paging while the page was full, even if this batch had too few
   // usable traces to cluster. Progress is driven by the page boundary
   // (returnedCount / lastSort from the page CTE), not the post-filter usable
   // count — older eligible traces can sit beyond a full page of empty-input
   // (or already-clustered) traces, and stopping here would strand them.
-  const maybeScheduleNextPage = async () => {
-    if (!(returnedCount > 10 && lastSort)) return;
-    if (!scheduleNextPage) {
-      logger.info(
-        { projectId, lastTraceSort: lastSort },
-        "skipping scheduling next page for project",
-      );
-      return;
-    }
-    logger.info(
-      { projectId, lastTraceSort: lastSort },
-      "scheduling the next page for clustering",
-    );
-    await scheduleTopicClusteringNextPage(projectId, lastSort);
-  };
+  const nextSearchAfter =
+    returnedCount > 10 && lastSort ? lastSort : undefined;
 
   if (traces.length < minimumTraces) {
     logger.info(
       { projectId },
       `less than ${minimumTraces} usable traces on this page, skipping clustering but still paging`,
     );
-    await maybeScheduleNextPage();
-    logger.info({ projectId }, "done! project");
-    return;
+    return {
+      mode,
+      tracesProcessed: 0,
+      topicsCount: 0,
+      subtopicsCount: 0,
+      skippedReason: "not_enough_traces",
+      ...(nextSearchAfter ? { nextSearchAfter } : {}),
+    };
   }
 
-  if (isIncrementalProcessing) {
-    await incrementalClustering(project, traces);
-  } else {
-    await batchClusterTraces(project, traces);
-  }
-
-  await maybeScheduleNextPage();
+  const summary = isIncrementalProcessing
+    ? await incrementalClustering(project, traces)
+    : await batchClusterTraces(project, traces);
 
   logger.info({ projectId }, "done! project");
+
+  if (!summary) {
+    // No topic model configured for this project/deployment — paging
+    // further would keep hitting the same wall, so stop the walk here.
+    return {
+      mode,
+      tracesProcessed: 0,
+      topicsCount: 0,
+      subtopicsCount: 0,
+      skippedReason: "not_configured",
+    };
+  }
+
+  return {
+    mode,
+    tracesProcessed: traces.length,
+    topicsCount: summary.topicsCount,
+    subtopicsCount: summary.subtopicsCount,
+    ...(nextSearchAfter ? { nextSearchAfter } : {}),
+  };
 };
 
 // --- ClickHouse read helpers ---
@@ -518,10 +547,16 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
   return { model: topicClusteringModel, modelProvider };
 };
 
+export interface ClusteringStoreSummary {
+  topicsCount: number;
+  subtopicsCount: number;
+  tracesAssigned: number;
+}
+
 export const batchClusterTraces = async (
   project: Project,
   traces: TopicClusteringTrace[],
-) => {
+): Promise<ClusteringStoreSummary | null> => {
   logger.info(
     { tracesLength: traces.length, projectId: project.id },
     "batch clustering topics",
@@ -529,7 +564,7 @@ export const batchClusterTraces = async (
 
   const topicModel = await getProjectTopicClusteringModelProvider(project);
   if (!topicModel) {
-    return;
+    return null;
   }
   const embeddingsModel = await getProjectEmbeddingsModel(project.id);
   const clusteringResult = await fetchTopicsBatchClustering(project.id, {
@@ -550,13 +585,13 @@ export const batchClusterTraces = async (
     traces,
   });
 
-  await storeResults(project.id, clusteringResult, false);
+  return await storeResults(project.id, clusteringResult, false);
 };
 
 export const incrementalClustering = async (
   project: Project,
   traces: TopicClusteringTrace[],
-) => {
+): Promise<ClusteringStoreSummary | null> => {
   logger.info(
     { tracesLength: traces.length, projectId: project.id },
     "incremental topic clustering",
@@ -595,7 +630,7 @@ export const incrementalClustering = async (
 
   const topicModel = await getProjectTopicClusteringModelProvider(project);
   if (!topicModel) {
-    return;
+    return null;
   }
   const embeddingsModel = await getProjectEmbeddingsModel(project.id);
   const clusteringResult = await fetchTopicsIncrementalClustering(project.id, {
@@ -618,14 +653,14 @@ export const incrementalClustering = async (
     subtopics,
   });
 
-  await storeResults(project.id, clusteringResult, true);
+  return await storeResults(project.id, clusteringResult, true);
 };
 
 export const storeResults = async (
   projectId: string,
   clusteringResult: TopicClusteringResponse | undefined,
   isIncremental: boolean,
-) => {
+): Promise<ClusteringStoreSummary> => {
   const {
     topics,
     subtopics,
@@ -745,6 +780,12 @@ export const storeResults = async (
       },
     });
   }
+
+  return {
+    topicsCount: topics.length,
+    subtopicsCount: subtopics.length,
+    tracesAssigned: tracesToAssign.length,
+  };
 };
 
 /**

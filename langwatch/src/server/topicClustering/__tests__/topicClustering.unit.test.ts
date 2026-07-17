@@ -18,10 +18,6 @@ vi.mock("../../env.mjs", () => ({
   env: { LANGEVALS_ENDPOINT: "http://localhost:1234" },
 }));
 
-vi.mock("~/server/topicClustering/topicClusteringQueue", () => ({
-  scheduleTopicClusteringNextPage: vi.fn(),
-}));
-
 vi.mock("~/server/embeddings", () => ({
   getProjectEmbeddingsModel: vi.fn().mockResolvedValue({
     model: "text-embedding-3-small",
@@ -61,7 +57,6 @@ vi.mock("../../langevals/stagedFetch", () => ({
 
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { scheduleTopicClusteringNextPage } from "~/server/topicClustering/topicClusteringQueue";
 import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
 import {
   clusterTopicsForProject,
@@ -104,12 +99,14 @@ describe("clusterTopicsForProject", () => {
         json: () => Promise.resolve([]),
       });
 
-      await clusterTopicsForProject("proj-1", undefined, false);
+      const outcome = await clusterTopicsForProject("proj-1");
 
       expect(mockClickHouseQuery).toHaveBeenCalledTimes(2); // counts + search
+      expect(outcome.skippedReason).toBe("not_enough_traces");
+      expect(outcome.nextSearchAfter).toBeUndefined();
     });
 
-    it("schedules the next page when a full page yields zero usable traces", async () => {
+    it("returns the next-page cursor when a full page yields zero usable traces", async () => {
       // Regression: a full page of empty-input traces clusters nothing, but
       // the cursor must still advance or older eligible traces are stranded.
       // The fetch returns rows (so returnedCount > 10 and lastSort is set)
@@ -140,13 +137,10 @@ describe("clusterTopicsForProject", () => {
         json: () => Promise.resolve(emptyPage),
       });
 
-      // scheduleNextPage = true (default) so the queue call is exercised.
-      await clusterTopicsForProject("proj-1");
+      const outcome = await clusterTopicsForProject("proj-1");
 
-      expect(scheduleTopicClusteringNextPage).toHaveBeenCalledWith("proj-1", [
-        now - 14 * 1000,
-        "trace-14",
-      ]);
+      expect(outcome.skippedReason).toBe("not_enough_traces");
+      expect(outcome.nextSearchAfter).toEqual([now - 14 * 1000, "trace-14"]);
     });
 
     // Skipped: batchClusterTraces now calls getProjectTopicClusteringModelProvider
