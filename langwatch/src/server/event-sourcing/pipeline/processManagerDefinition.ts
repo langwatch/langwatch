@@ -62,6 +62,12 @@ export interface TriggerOptions<E extends Event = Event> {
   ttl?: number;
   /** Dedup/debounce config for `events` triggers. */
   dedup?: DeduplicationStrategy<E>;
+  /**
+   * Custom collapse identity for `fold`/`map` triggers (default: per
+   * aggregate). E.g. projectMetadata collapses per PROJECT with a long
+   * ttl so one burst costs one database hit.
+   */
+  dedupId?: (event: E) => string;
   /** Pure pre-enqueue guard — rejects before the queue pays serialization. */
   when?: (event: E) => boolean;
 }

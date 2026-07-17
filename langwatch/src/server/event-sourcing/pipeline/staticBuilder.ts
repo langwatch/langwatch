@@ -352,7 +352,9 @@ export class StaticPipelineBuilderWithNameAndType<
         name: subscriberName,
         options: {
           makeJobId: (payload: { event: Event; foldState: unknown }) =>
-            `subscriber:${subscriberName}:${payload.event.tenantId}:${String(payload.event.aggregateId)}`,
+            spec.dedupId
+              ? `subscriber:${subscriberName}:${spec.dedupId(payload.event as EventType)}`
+              : `subscriber:${subscriberName}:${payload.event.tenantId}:${String(payload.event.aggregateId)}`,
           ttl: spec.ttl ?? 30_000,
           delay: spec.delay ?? 0,
         },
