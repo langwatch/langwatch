@@ -124,7 +124,6 @@ describe("createLangyChatTransport", () => {
         conversationId: null,
         modelOverride: "openai/gpt-5-mini",
         pageContext: [{ kind: "trace", id: "t-1" }] as never,
-        skills: [],
       });
       await transport.sendMessages(options({ trigger: "submit-message" }));
 
@@ -134,8 +133,6 @@ describe("createLangyChatTransport", () => {
         trigger: "submit-message",
         pageContext: [{ kind: "trace", id: "t-1" }],
       });
-      // An empty skills array is omitted, not sent as [].
-      expect(input).not.toHaveProperty("skills");
     });
   });
 

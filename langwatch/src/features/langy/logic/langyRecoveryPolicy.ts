@@ -219,7 +219,9 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   // the agent reached for. Deterministic — the identical request 404s
   // identically — so no auto-retry: the explainer's card points the user at
   // granting the app access, and they resend once it's granted.
-  langy_github_repo_not_accessible: terminal("langy_github_repo_not_accessible"),
+  langy_github_repo_not_accessible: terminal(
+    "langy_github_repo_not_accessible",
+  ),
 
   // Turn-START rejections from the control plane (LangyTurnService), not worker
   // failures: they reach the browser as coded TRPCErrors from the create/continue
@@ -282,7 +284,7 @@ export function canAutoRecover({
 /**
  * Tool names that CHANGE something. Langy's catalog splits cleanly: reads are
  * `search_*` / `get_*` / `list_*`, writes are `create_*` / `update_*` /
- * `delete_*` / `run_*` (see the system block in `routes/langy.ts`), plus the
+ * `delete_*` / `run_*` (see the agent system prompt), plus the
  * GitHub PR path and the raw file/shell tools opencode exposes.
  */
 const MUTATING_TOOL_PREFIXES = [

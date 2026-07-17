@@ -54,10 +54,9 @@ const SUGGESTIONS: { icon: SuggestionIcon; label: string; prompt: string }[] = [
     // app-layer/langyagent/skills/github/SKILL.md: clone → branch → edit →
     // commit → push → `gh pr create`). It stops there, and so does this copy.
     // Opening an ISSUE and VALIDATING a fix are NOT capabilities today — there
-    // is no `gh issue create` anywhere in the skill, `githubPrLinks` extracts
-    // pull-request URLs only (and has a test asserting it ignores issue URLs),
-    // the progress vocabulary ends at `opened`, and the rate limiter is scoped
-    // to PR permits. Offering either would be a suggestion that reliably fails.
+    // is no `gh issue create` anywhere in the skill, the progress vocabulary
+    // ends at `opened`, and the rate limiter is scoped to PR permits. Offering
+    // either would be a suggestion that reliably fails.
     icon: GitHub,
     label: "Investigate an issue and open a PR",
     prompt:

@@ -134,7 +134,6 @@ const input = (
   isRetry: false,
   turnContext: {
     pageContext: undefined,
-    skills: undefined,
   } as StartConversationTurnInput["turnContext"],
   ...over,
 });

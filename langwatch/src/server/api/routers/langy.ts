@@ -43,11 +43,10 @@ import {
  * for the heavy Postgres message history, a `newCount` the panel polls only
  * when the freshness SSE is
  * disconnected, and a single `onConversationUpdate` subscription that pushes a
- * lightweight per-conversation signal (never row data). All commands
- * (send/rename/share/delete) still flow through the Hono chat + REST surface;
- * this router is read + real-time only.
+ * lightweight per-conversation signal (never row data). Commands and live
+ * streaming also use this router.
  *
- * Permission mirrors the Hono read gate (`evaluations:view`).
+ * Every procedure requires `evaluations:view`.
  */
 
 const LANGY_READ_PERMISSION = "evaluations:view" as const;
@@ -57,9 +56,8 @@ const LANGY_READ_PERMISSION = "evaluations:view" as const;
  * project (`evaluations:view`) AND the project is not the public demo. The demo
  * grants `evaluations:view` to every authenticated user, so the permission check
  * alone would expose the per-user Langy chat that belongs to whoever used Langy
- * there — hence the explicit `isDemoProjectId` refusal, mirroring the Hono
- * `/langy/*` surface. `projectId` lives on the base so procedures declare only
- * their own inputs.
+ * there — hence the explicit `isDemoProjectId` refusal. `projectId` lives on
+ * the base so procedures declare only their own inputs.
  */
 const langyReadProcedure = protectedProcedure
   .input(z.object({ projectId: z.string() }))
@@ -76,7 +74,7 @@ const langyReadProcedure = protectedProcedure
 
 /**
  * The turn-start procedure: the read gate PLUS the Phase-1 per-user message
- * rate limit that used to live in the Hono `/langy/chat` handler. Redis-backed;
+ * rate limit that previously lived in the removed Hono handler. Redis-backed;
  * fails open when Redis is down (dev/test stay usable). A limited caller is
  * refused BEFORE reaching the app layer, so it never mints keys or dispatches a
  * turn — exactly the precedence the route enforced.
@@ -127,7 +125,7 @@ const langyTurnInputShape = {
   trigger: z
     .enum(["submit-message", "regenerate-message", "resume-stream"])
     .optional(),
-  // Composer context chips (page context + skills) — bounded + sanitised in
+  // Composer page-context chips — bounded and sanitised in
   // renderLangyTurnContext; refs are never resolved by the control plane.
   ...langyTurnContextSchema.shape,
 } as const;
@@ -207,7 +205,6 @@ async function acceptTurn({
     modelOverride?: string;
     trigger?: "submit-message" | "regenerate-message" | "resume-stream";
     pageContext?: LangyTurnContext["pageContext"];
-    skills?: LangyTurnContext["skills"];
   };
   session: Session;
 }): Promise<{ conversationId: string; turnId: string }> {
@@ -219,7 +216,7 @@ async function acceptTurn({
     messages: input.messages,
     ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
     isRetry: input.trigger === "regenerate-message",
-    turnContext: { pageContext: input.pageContext, skills: input.skills },
+    turnContext: { pageContext: input.pageContext },
   });
 }
 
@@ -419,7 +416,7 @@ export const langyRouter = createTRPCRouter({
    * emits the semantically-first `conversation_started`, then dispatches the
    * turn. Returns the ids the client subscribes to `onTurnStream` with.
    *
-   * This is the tRPC replacement for `POST /api/langy/chat` on the create path.
+   * This is the tRPC turn-start entry point for the create path.
    * The Phase-1 gate (session + demo refusal + `evaluations:view` + rate limit)
    * is the `langyTurnProcedure`; the turn service throws DomainErrors that the
    * shared middleware maps to coded TRPCErrors.

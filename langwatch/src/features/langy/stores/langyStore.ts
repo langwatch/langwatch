@@ -57,28 +57,6 @@ export interface LangyContextChip {
   ref?: string;
 }
 
-/**
- * A capability the user has explicitly asked Langy to use on the next turn.
- *
- * `targetChipId` is the ASSOCIATION: the id of a `LangyContextChip` this skill
- * is aimed at, expressing "use the GitHub skill, on this trace" as one thought
- * rather than two chips sitting next to each other hoping the agent guesses.
- * Null means the skill has no specific target — a perfectly good state, and the
- * default until the user says otherwise.
- *
- * It stores the chip's ID, not its label: labels change (a title reactor lands,
- * a filter is edited) and a binding that silently pointed at a stale string
- * would be worse than no binding. The label is resolved at send time, from the
- * chip that is actually present — and if that chip has since been removed, the
- * binding resolves to nothing rather than to a lie.
- */
-export interface LangySkillChip {
-  /** Feature-map feature id, or agent skill name. See ~/shared/langy/langySkills.ts. */
-  id: string;
-  label: string;
-  targetChipId: string | null;
-}
-
 /** The "Open in <surface>" affordance a page-scoped proposal handler returns. */
 export interface LangyAppliedOutcome {
   href?: string;
@@ -215,21 +193,6 @@ interface LangyState {
   detachContext: (id: string) => void;
   clearAttachedContext: () => void;
 
-  /**
-   * Skill chips the user has attached to the next turn.
-   *
-   * A resource chip says "look at this"; a skill chip says "DO this". They are
-   * separate state because they are separate grammar — nouns and verbs — and
-   * because a skill is chosen deliberately, where page context arrives on its
-   * own from the route.
-   */
-  skillChips: LangySkillChip[];
-  addSkillChip: (skill: { id: string; label: string }) => void;
-  removeSkillChip: (id: string) => void;
-  /** Bind a skill to one of the turn's resource chips, or clear the binding. */
-  setSkillTarget: (skillId: string, targetChipId: string | null) => void;
-  clearSkillChips: () => void;
-
   // Proposal lifecycle (keyed by proposal id)
   appliedOutcomes: Record<string, LangyAppliedOutcome>;
   discardedProposalIds: Set<string>;
@@ -301,9 +264,6 @@ interface LangyState {
 }
 
 const emptyConversationState = () => ({
-  // Skills steer ONE turn. Carrying "use GitHub" silently into the next
-  // conversation would be the panel making decisions on the user's behalf.
-  skillChips: [] as LangySkillChip[],
   appliedOutcomes: {} as Record<string, LangyAppliedOutcome>,
   discardedProposalIds: new Set<string>(),
   applyingProposalIds: new Set<string>(),
@@ -424,33 +384,6 @@ export const useLangyStore = create<LangyState>()(
         set((state) =>
           state.attachedContext.length === 0 ? state : { attachedContext: [] },
         ),
-
-      skillChips: [],
-      addSkillChip: (skill) =>
-        set((state) => {
-          // Idempotent: summoning the same skill twice is a no-op, not a
-          // duplicate chip. `/gh` then `/github` is one intent.
-          if (state.skillChips.some((chip) => chip.id === skill.id)) {
-            return state;
-          }
-          return {
-            skillChips: [
-              ...state.skillChips,
-              { id: skill.id, label: skill.label, targetChipId: null },
-            ],
-          };
-        }),
-      removeSkillChip: (id) =>
-        set((state) => ({
-          skillChips: state.skillChips.filter((chip) => chip.id !== id),
-        })),
-      setSkillTarget: (skillId, targetChipId) =>
-        set((state) => ({
-          skillChips: state.skillChips.map((chip) =>
-            chip.id === skillId ? { ...chip, targetChipId } : chip,
-          ),
-        })),
-      clearSkillChips: () => set({ skillChips: [] }),
 
       appliedOutcomes: {},
       discardedProposalIds: new Set<string>(),

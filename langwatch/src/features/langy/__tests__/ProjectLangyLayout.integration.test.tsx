@@ -170,8 +170,8 @@ describe("ProjectLangyLayout", () => {
     });
   });
 
-  // Visibility gate (re-instated for PR #4913, mirrors the server-side gate in
-  // routes/langy.ts). Staff bypass the rollout flag; for everyone else the
+  // Visibility gate (re-instated for PR #4913, mirrors the server-side tRPC
+  // gate). Staff bypass the rollout flag; for everyone else the
   // flag must resolve true. The registry default is off, so non-staff are
   // dark by default and the panel must not render.
   describe("given the staff + rollout-flag visibility gate", () => {

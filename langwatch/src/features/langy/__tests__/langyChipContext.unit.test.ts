@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { SELECT_ALL_MATCHING_CAP } from "../../traces-v2/stores/selectionStore";
 import { selectionContextChip } from "../hooks/useLangySelectionContext";
 import { describeChipContext } from "../logic/langyChipContext";
-import { filterContextChip } from "../hooks/useLangyFilterContext";
 import type { LangyContextChip } from "../stores/langyStore";
 
 /** Every kind the chip vocabulary has, so none can be added without copy. */
@@ -27,9 +26,12 @@ describe("describeChipContext", () => {
         // the query: Langy can run it, so it gets the rows too, plus the ability
         // to widen or narrow it. Handing over rows alone would keep only the
         // part it could have derived for itself.
-        const explanation = describeChipContext(
-          filterContextChip('status:"error"')!,
-        );
+        const explanation = describeChipContext({
+          id: "filter:error",
+          kind: "filter",
+          label: "filtered: errors",
+          ref: 'status:"error"',
+        });
 
         expect(explanation.action).toBe(
           "Langy gets the search itself, so it can run it, narrow it, or count what it matches.",
@@ -38,7 +40,12 @@ describe("describeChipContext", () => {
 
       it("shows the search that will be handed over", () => {
         expect(
-          describeChipContext(filterContextChip('status:"error"')!).payload,
+          describeChipContext({
+            id: "filter:error",
+            kind: "filter",
+            label: "filtered: errors",
+            ref: 'status:"error"',
+          }).payload,
         ).toBe('status:"error"');
       });
     });
@@ -158,7 +165,6 @@ describe("describeChipContext", () => {
     });
   });
 });
-
 describe("selectionContextChip, for 'select all matching'", () => {
   describe("given there is no row list to send", () => {
     describe("when the chip is built", () => {

@@ -23,18 +23,18 @@ import {
 import type { LangyContextChip } from "../stores/langyStore";
 
 /**
- * The composer's command palette — `/` for skills, `#` for context.
+ * The composer's `#` command palette for context.
  *
  * ── WHY THE COMPOSER BECOMES A COMMAND BAR ─────────────────────────────────
- * A `/` menu inside a textarea is the classic trap: Ark's Combobox owns an
+ * A `#` menu inside a textarea is the classic trap: Ark's Combobox owns an
  * `<input>`, a textarea is not one, and driving the machine from the outside
  * means re-implementing highlight navigation, `aria-activedescendant` and roving
  * focus by hand — the exact hand-rolled popup we are trying not to build.
  *
- * So the `/` does not open a popup NEXT TO the text. It turns the top of the
+ * So the `#` does not open a popup NEXT TO the text. It turns the top of the
  * composer INTO a real combobox: a genuine `Combobox.Input` with a genuine
  * listbox anchored to it. Focus moves there, Ark provides every keyboard
- * behaviour (type to filter, ↑/↓, Enter, Escape) for free, and the `/` token is
+ * behaviour (type to filter, ↑/↓, Enter, Escape) for free, and the `#` token is
  * never inserted into the message in the first place — so there is nothing to
  * strip afterwards, and no way for a half-typed command to survive into a
  * prompt.
@@ -44,7 +44,7 @@ import type { LangyContextChip } from "../stores/langyStore";
 
 export type PaletteMode = "context";
 
-/** One row of the palette. A skill, a chip, a page target, or a command. */
+/** One row of the palette: a chip, a page target, or a command. */
 interface PaletteItem {
   value: string;
   label: string;
@@ -148,9 +148,7 @@ export function LangyComposerPalette({
     // reveal intent per kind.
     if (mode === "context" && rows.length === 0) {
       rows = allKindIntents(
-        new Set(
-          Object.values(registeredTargets).map((target) => target.kind),
-        ),
+        new Set(Object.values(registeredTargets).map((target) => target.kind)),
       ).map(intentItem);
     }
     return createListCollection({
@@ -231,7 +229,7 @@ export function LangyComposerPalette({
             _focusVisible={{ outline: "none" }}
             onKeyDown={(event) => {
               // Backspacing past the empty query dismisses the palette — the
-              // same gesture that deletes the `/` you just typed.
+              // same gesture that deletes the `#` you just typed.
               if (event.key === "Backspace" && query.length === 0) {
                 event.preventDefault();
                 onClose();
@@ -295,8 +293,8 @@ export function LangyComposerPalette({
                         {item.label}
                       </Text>
                     </Combobox.ItemText>
-                    {/* The detail line is the honest one: for a CLI skill it is
-                        the verbs the feature map actually declares. */}
+                    {/* The detail line says what kind of context or command
+                        this row represents. */}
                     <Text
                       textStyle="2xs"
                       color="fg.subtle"

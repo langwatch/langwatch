@@ -1,10 +1,10 @@
 /**
- * LangyTurnService — durable turn admission and dispatch orchestration, lifted out of
- * `routes/langy.ts` (ADR-046 / LANGY_REWORK_PLAN.md S2 increment C).
+ * LangyTurnService — durable turn admission and dispatch orchestration
+ * (ADR-046 / LANGY_REWORK_PLAN.md S2 increment C).
  *
- * The Hono route now keeps only Phase 1 (session auth, demo gate, rate limit,
- * body validation, project-permission gate) and maps DomainErrors to HTTP. This
- * service owns everything after the gate: resolve the conversation, model,
+ * The tRPC router owns Phase 1 (session auth, rollout/demo gates, rate limit,
+ * body validation, project-permission gate) and maps DomainErrors. This service
+ * owns everything after the gate: resolve the conversation, model,
  * credentials and egress list; probe-then-mint the per-turn session key; reserve
  * the PR permit; guard against a concurrent turn; stash the
  * live-access grant + the worker handoff; and atomically accept the turn. Once

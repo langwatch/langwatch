@@ -36,12 +36,10 @@ const { mintLangySessionApiKey, LangySessionKeyScopeError } = vi.hoisted(() => {
     }
   }
   return {
-    mintLangySessionApiKey: vi
-      .fn()
-      .mockResolvedValue({
-        token: "sk-lw-test-langy-token",
-        apiKeyId: "key-1",
-      }),
+    mintLangySessionApiKey: vi.fn().mockResolvedValue({
+      token: "sk-lw-test-langy-token",
+      apiKeyId: "key-1",
+    }),
     LangySessionKeyScopeError,
   };
 });
@@ -143,7 +141,8 @@ describe("LangyCredentialService", () => {
         // is a raw, haven-assigned loopback port the worker process cannot reach,
         // so the stable LANGWATCH_ENDPOINT hostname must win — otherwise the relay
         // is silently disabled and the turn stalls with no live edge and no error.
-        process.env.LANGWATCH_ENDPOINT = "https://app.stack.langwatch.localhost";
+        process.env.LANGWATCH_ENDPOINT =
+          "https://app.stack.langwatch.localhost";
         const prisma = makePrisma({
           projectSecret: {
             findFirst: vi
@@ -358,7 +357,7 @@ describe("LangyCredentialService", () => {
     });
   });
 
-  // Server-side allowlist read used by /langy/chat to reject tampered
+  // Server-side allowlist read used by turn-start to reject tampered
   // `modelOverride` values before they reach the OpenCode pod. The picker
   // UI also narrows by this list — the server check is defense in depth.
   // The query happens at the DB layer (organizationId + purpose +
@@ -472,7 +471,7 @@ describe("LangyCredentialService", () => {
     });
   });
 
-  // Per-project Langy egress allow-list (ADR-043). Read by /langy/chat and
+  // Per-project Langy egress allow-list (ADR-043). Read by turn-start and
   // threaded into the credentials envelope; the agent's egress adapter is
   // constructed with it at spawn. null/empty = monitor-only (watch, never
   // block); a set list = the enforced set (floor ∪ list). Parsed through Zod so
@@ -645,7 +644,9 @@ describe("resolveWorkerCallbackUrl", () => {
 
     it("falls back to LANGWATCH_API_URL when the endpoint is absent", () => {
       expect(
-        resolveWorkerCallbackUrl({ LANGWATCH_API_URL: "http://127.0.0.1:41001" }),
+        resolveWorkerCallbackUrl({
+          LANGWATCH_API_URL: "http://127.0.0.1:41001",
+        }),
       ).toBe("http://127.0.0.1:41001");
     });
 
@@ -676,7 +677,9 @@ describe("resolveWorkerGatewayBaseUrl", () => {
         }),
       ).toBe("https://gateway.slug.langwatch.localhost");
       expect(
-        resolveWorkerGatewayBaseUrl({ LW_GATEWAY_BASE_URL: "http://127.0.0.1:45000" }),
+        resolveWorkerGatewayBaseUrl({
+          LW_GATEWAY_BASE_URL: "http://127.0.0.1:45000",
+        }),
       ).toBe("http://127.0.0.1:45000");
     });
 

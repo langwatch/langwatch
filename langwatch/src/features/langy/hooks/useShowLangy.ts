@@ -16,7 +16,7 @@ import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
  * 2. Rollout — staff bypass (LangWatch staff always have Langy). For
  *    everyone else, the `release_langy_enabled` flag must be on for this
  *    user. Defaults off in the registry, so non-staff are dark by default.
- *    This mirrors the server-side gate in `routes/langy.ts` so the panel
+ *    This mirrors the server-side gate in `api/routers/langy.ts` so the panel
  *    can't render against an endpoint that would 404 anyway.
  *
  * Consumed by ProjectLangyLayout (mounts the panel) and HomePageBanners

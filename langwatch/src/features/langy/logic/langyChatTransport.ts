@@ -3,10 +3,7 @@ import type { Unsubscribable } from "@trpc/server/observable";
 
 import { trpcClient } from "~/utils/api";
 import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
-import type {
-  LangyResourceContext,
-  LangySkillContext,
-} from "~/server/app-layer/langy/langyTurnContext.schema";
+import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 
 /**
  * The per-turn request inputs the transport owns. Sourcing them HERE (from the
@@ -19,7 +16,6 @@ export interface LangyTurnRequestContext {
   conversationId: string | null;
   modelOverride?: string;
   pageContext?: LangyResourceContext[];
-  skills?: LangySkillContext[];
 }
 
 /**
@@ -85,7 +81,6 @@ export function createLangyChatTransport(
         projectId: ctx.projectId,
         ...(ctx.modelOverride ? { modelOverride: ctx.modelOverride } : {}),
         ...(ctx.pageContext?.length ? { pageContext: ctx.pageContext } : {}),
-        ...(ctx.skills?.length ? { skills: ctx.skills } : {}),
       };
 
       // The vanilla client's proxy inference collapses on this router (see
@@ -194,7 +189,11 @@ function subscribeTurnStream({
         switch (entry.type) {
           case "delta":
             clearColdStartStatus();
-            controller.enqueue({ type: "text-delta", id: textId, delta: entry.text });
+            controller.enqueue({
+              type: "text-delta",
+              id: textId,
+              delta: entry.text,
+            });
             return;
           case "tool":
             clearColdStartStatus();
@@ -247,7 +246,8 @@ function subscribeTurnStream({
             if (closed) return;
             controller.enqueue({
               type: "error",
-              errorText: err instanceof Error ? err.message : "Langy stream error",
+              errorText:
+                err instanceof Error ? err.message : "Langy stream error",
             });
             finish();
           },

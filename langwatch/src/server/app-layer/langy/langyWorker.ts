@@ -5,8 +5,8 @@
  * opencode spawn overlaps the rest of the turn-start instead of preceding the
  * first token).
  *
- * Extracted from routes/langy.ts so the turn-start orchestration lives in the
- * app layer. Both fail OPEN in the safe direction: a broken probe means "mint as
+ * The turn-start orchestration lives in the app layer. Both fail OPEN in the
+ * safe direction: a broken probe means "mint as
  * if cold" (the pre-optimisation cost, never a broken turn); a failed warm means
  * a cold start (the status quo). Neither can start or duplicate a turn.
  */
