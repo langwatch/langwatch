@@ -49,10 +49,10 @@ import {
   computeScheduledFor,
   dispatchTriggerAction,
   NOTIFY_TRIGGER_ACTIONS,
-} from "../pipelines/shared/triggerActionDispatch";
+} from "../../app-layer/triggers/dispatch/triggerActionDispatch";
 import type { DerivedTraceEvent } from "../pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
-import { DispatchError, isDispatchError } from "./dispatchError";
+import { DispatchError, isDispatchError } from "../../triggers/dispatchError";
 import {
   type CadenceStagePayload,
   type GraphEvalStagePayload,

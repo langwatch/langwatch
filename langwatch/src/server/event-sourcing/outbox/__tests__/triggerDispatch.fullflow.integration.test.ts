@@ -47,12 +47,12 @@ import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { getTestProject, getTestUser } from "~/utils/testUtils";
-import { dispatchTriggerAction } from "../../pipelines/shared/triggerActionDispatch";
+import { dispatchTriggerAction } from "../../../app-layer/triggers/dispatch/triggerActionDispatch";
 import { createOutboxDispatcher } from "../dispatcher";
 import {
   _resetMemoryEmailCapStore,
   consumeEmailCapSlot,
-} from "../emailHourlyCap";
+} from "../../../app-layer/triggers/dispatch/emailCaps";
 import {
   auditDedupKey,
   type CadenceStagePayload,

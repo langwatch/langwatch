@@ -18,7 +18,7 @@ import type { ReactorContext } from "../../../reactors/reactor.types";
 import {
   NOTIFY_TRIGGER_ACTIONS,
   triggerReadsEvaluations,
-} from "../../shared/triggerActionDispatch";
+} from "../../../../app-layer/triggers/dispatch/triggerActionDispatch";
 import type { EvaluationProcessingEvent } from "../schemas/events";
 import {
   isEvaluationCompletedEvent,

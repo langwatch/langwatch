@@ -10,7 +10,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { DispatchError } from "~/server/triggers/dispatchError";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {
   mapTraceToDatasetEntry,

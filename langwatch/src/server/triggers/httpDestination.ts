@@ -1,7 +1,7 @@
 import {
   DispatchError,
   parseRetryAfterMs,
-} from "~/server/event-sourcing/outbox/dispatchError";
+} from "~/server/triggers/dispatchError";
 import {
   fetchWithResolvedIp,
   ssrfSafeFetch,

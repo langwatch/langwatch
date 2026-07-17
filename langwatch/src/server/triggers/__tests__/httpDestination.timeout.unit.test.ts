@@ -1,7 +1,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { DispatchError } from "~/server/triggers/dispatchError";
 import { sendHttpDestination } from "../httpDestination";
 
 /**

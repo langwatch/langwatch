@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { DispatchError } from "~/server/triggers/dispatchError";
 import { createSSRFValidator } from "~/utils/ssrfProtection";
 import { sendHttpDestination } from "../httpDestination";
 

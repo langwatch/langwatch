@@ -6,7 +6,7 @@ import {
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
 } from "~/automations/providers/definitions/webhook/shared";
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { DispatchError } from "~/server/triggers/dispatchError";
 import { rateLimit } from "~/server/rateLimit";
 import {
   createSSRFValidator,

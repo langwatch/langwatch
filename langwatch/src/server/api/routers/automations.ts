@@ -21,7 +21,7 @@ import {
   NotificationDeliveryError,
   ProjectNotFoundError,
 } from "~/server/app-layer/triggers/errors";
-import { isDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { isDispatchError } from "~/server/triggers/dispatchError";
 import {
   decryptSlackBotToken,
   persistSlackActionParams,
@@ -57,7 +57,7 @@ import {
   type DraftProject,
   validateTemplateDraft,
 } from "~/server/app-layer/triggers/trigger-template.service";
-import { NOTIFY_TRIGGER_ACTIONS } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/triggers/dispatch/triggerActionDispatch";
 import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
 import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";

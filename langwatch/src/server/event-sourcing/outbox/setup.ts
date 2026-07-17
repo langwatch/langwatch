@@ -18,7 +18,7 @@ import {
 } from "~/server/app-layer/triggers/graph-trigger-evaluation.service";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/triggers/repositories/trigger.prisma.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
-import { dispatchGraphAlertAction } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
+import { dispatchGraphAlertAction } from "~/server/app-layer/triggers/dispatch/graphAlertActionDispatch";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
@@ -33,7 +33,7 @@ import { createOutboxDispatcher } from "./dispatcher";
 import {
   consumeEmailCapSlot,
   consumeTenantEmailCapSlot,
-} from "./emailHourlyCap";
+} from "../../app-layer/triggers/dispatch/emailCaps";
 import {
   type CadenceStagePayload,
   type GraphEvalStagePayload,

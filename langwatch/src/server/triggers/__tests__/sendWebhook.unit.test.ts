@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { DispatchError } from "~/server/triggers/dispatchError";
 import { assertWebhookDelivered, sendWebhook } from "../sendWebhook";
 
 async function captureDispatchError(

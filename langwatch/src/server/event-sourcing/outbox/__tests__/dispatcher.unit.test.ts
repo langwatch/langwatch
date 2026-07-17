@@ -9,7 +9,7 @@ import {
   sendRenderedSlackMessage,
   sendSlackWebhook,
 } from "~/server/triggers/sendSlackWebhook";
-import { DispatchError } from "../dispatchError";
+import { DispatchError } from "../../../triggers/dispatchError";
 import { createOutboxDispatcher } from "../dispatcher";
 import {
   type CadenceStagePayload,

@@ -9,7 +9,7 @@ import { render } from "@react-email/render";
 import { createHash } from "crypto";
 import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
 import type { TriggerData } from "~/server/app-layer/triggers/trigger.types";
-import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { toDispatchError } from "~/server/triggers/dispatchError";
 import { env } from "../../env.mjs";
 import { computeDefaultFrom, sendEmail } from "./emailSender";
 import {

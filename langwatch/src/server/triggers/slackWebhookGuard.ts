@@ -1,4 +1,4 @@
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { DispatchError } from "~/server/triggers/dispatchError";
 
 /**
  * Single source of truth for the Slack incoming-webhook SSRF guard. Both the

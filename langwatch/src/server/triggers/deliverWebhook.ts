@@ -3,7 +3,7 @@ import {
   redactHeadersForLog,
   type WebhookMethod,
 } from "~/automations/providers/definitions/webhook/shared";
-import { isDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { isDispatchError } from "~/server/triggers/dispatchError";
 import type { WebhookDeliveryInput } from "~/server/app-layer/triggers/repositories/webhook-delivery.repository";
 import {
   assertWebhookDelivered,

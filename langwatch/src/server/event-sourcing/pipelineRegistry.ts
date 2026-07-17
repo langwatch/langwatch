@@ -81,7 +81,7 @@ import type { ExperimentRunStateData } from "./pipelines/experiment-run-processi
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
-import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
+import type { TriggerActionDispatchDeps } from "../app-layer/triggers/dispatch/triggerActionDispatch";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,

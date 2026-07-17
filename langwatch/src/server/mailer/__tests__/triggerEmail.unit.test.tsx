@@ -1,7 +1,7 @@
 import { AlertType } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerData } from "~/server/app-layer/triggers/trigger.types";
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { DispatchError } from "~/server/triggers/dispatchError";
 import type { Trace } from "~/server/tracer/types";
 
 const { sendEmailMock, computeDefaultFromMock } = vi.hoisted(() => ({

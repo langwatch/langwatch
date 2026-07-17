@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { DispatchError } from "~/server/triggers/dispatchError";
 import type { WebhookDeliveryInput } from "~/server/app-layer/triggers/repositories/webhook-delivery.repository";
 import { deliverWebhook } from "../deliverWebhook";
 import type { WebhookSendResult } from "../sendWebhook";

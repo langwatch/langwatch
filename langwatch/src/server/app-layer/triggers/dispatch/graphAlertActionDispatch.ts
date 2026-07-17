@@ -1,6 +1,6 @@
 import type { Project, Trigger } from "@prisma/client";
 import { createHash } from "crypto";
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { DispatchError } from "~/server/triggers/dispatchError";
 import {
   decryptWebhookHeaders,
   type WebhookStoredActionParams,

@@ -3,7 +3,7 @@ import {
   _resetMemoryEmailCapStore,
   consumeEmailCapSlot,
   consumeTenantEmailCapSlot,
-} from "../emailHourlyCap";
+} from "../emailCaps";
 
 // `connection` is a mutable module-level binding; the mock lets each test
 // drive it (undefined = in-memory path, an object = Redis path).

@@ -12,7 +12,7 @@ import {
   type SettleStagePayload,
   TRIGGER_NOTIFY_REACTOR_NAME,
 } from "~/server/event-sourcing/outbox/payload";
-import { NOTIFY_TRIGGER_ACTIONS } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/triggers/dispatch/triggerActionDispatch";
 import { defineOriginGuardedTraceOutboxReactor } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";

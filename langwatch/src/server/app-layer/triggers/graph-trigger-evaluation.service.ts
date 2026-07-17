@@ -43,12 +43,12 @@ import type {
   TimeseriesInputType,
 } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { DispatchError } from "~/server/triggers/dispatchError";
 import {
   graphAlertFireDigest,
   type GraphAlertDispatchInput,
   type GraphAlertDispatchResult,
-} from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
+} from "~/server/app-layer/triggers/dispatch/graphAlertActionDispatch";
 import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
 import {
