@@ -37,6 +37,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [043](./043-automation-facet-model.md) | Automations as orthogonal facets (name / type / subject / cadence / severity / delivery) | Proposed |
 | [044](./044-scheduled-reports-automation-kind.md) | Scheduled reports — a schedule-triggered automation kind + generic event-sourcing scheduler | Proposed |
 | [045](./045-domain-errors-handled-boundary.md) | Handled errors as the handled-error boundary (TS `HandledError` ⇔ Go `herr`) | Accepted |
+| [046](./046-unified-authorization-engine.md) | Unified authorization engine — one registry, one resolver, every principal | Proposed |
 
 ## When to Write an ADR
 
