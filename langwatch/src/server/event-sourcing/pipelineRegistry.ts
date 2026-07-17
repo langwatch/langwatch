@@ -129,11 +129,24 @@ import {
 } from "../app-layer/langy/subscribers";
 import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
 import {
+  createTopicClusteringIntentHandlers,
+  createTopicClusteringProcessSubscriber,
+  TOPIC_CLUSTERING_OUTBOX_BATCH_SIZE,
+  TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
+  TOPIC_CLUSTERING_MAX_ATTEMPTS,
+  TOPIC_CLUSTERING_PROCESS_NAME,
+  topicClusteringProcessDefinition,
+  type TopicClusteringRunPort,
+} from "../app-layer/topic-clustering/process-manager";
+import {
   OutboxDispatcherService,
   ProcessManagerService,
   ProcessOutboxWorker,
+  ProcessWakeWorker,
   type ProcessStore,
 } from "./process-manager";
+import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
+import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -259,8 +272,14 @@ export interface PipelineRepositories {
   langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free ClickHouse event-grain analytics. */
   langyAnalyticsEventStorage: AppendStore<LangyAnalyticsEventProjectionRecord>;
-  /** Durable process inbox, state, and outbox persistence. */
-  langyProcessStore: ProcessStore;
+  /**
+   * Durable process inbox, state, and outbox persistence — SHARED across
+   * every process manager (the ProcessManager* tables are generic; each
+   * domain's dispatcher scopes its leases via `processNames`).
+   */
+  processStore: ProcessStore;
+  /** Per-project topic clustering run status (ADR-051, Postgres). */
+  topicClusteringRunStatus: StateProjectionStore<TopicClusteringRunStatusData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
 }
@@ -275,6 +294,11 @@ export interface PipelineRegistryDeps {
     handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
     worker: Pick<LangyWorkerPort, "dispatch">;
     titleGenerator: LangyTitleGenerator;
+    runsWorkers: boolean;
+  };
+  topicClustering: {
+    /** Runs one clustering page (the ADR-051 effect's domain function). */
+    runPort: TopicClusteringRunPort;
     runsWorkers: boolean;
   };
   projects: ProjectService;
@@ -316,6 +340,16 @@ export interface PipelineRegistryDeps {
  */
 export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
+
+  /**
+   * ADR-051: the trace pipeline's projectMetadata reactor bootstraps a
+   * project's clustering schedule on its first real trace, but the topic
+   * clustering pipeline (whose command it dispatches) registers later —
+   * late-bound like the other cross-pipeline dispatchers.
+   */
+  private readonly bootstrapTopicClustering = new Deferred<
+    (projectId: string) => Promise<void>
+  >("bootstrapTopicClustering");
 
   private cached<State>(
     inner: FoldProjectionStore<State>,
@@ -409,6 +443,11 @@ export class PipelineRegistry {
     });
     const { pipeline: langyConversationPipeline, processOutboxWorker } =
       this.registerLangyConversationPipeline();
+    const {
+      pipeline: topicClusteringPipeline,
+      processOutboxWorker: topicClusteringOutboxWorker,
+      processWakeWorker,
+    } = this.registerTopicClusteringPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -420,6 +459,7 @@ export class PipelineRegistry {
       simulations: mapCommands(simulationPipeline.commands),
       suiteRuns: mapCommands(suiteRunPipeline.commands),
       langy: mapCommands(langyConversationPipeline.commands),
+      topicClustering: mapCommands(topicClusteringPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
       /** Late-bind the execution pool for scenario execution reactor. */
@@ -427,8 +467,109 @@ export class PipelineRegistry {
       // Starting and notifying are private composition concerns so a web role
       // cannot accidentally start the worker. App shutdown only needs stop().
       processOutboxWorker: {
-        stop: () => processOutboxWorker.stop(),
+        stop: async () => {
+          await Promise.all([
+            processOutboxWorker.stop(),
+            topicClusteringOutboxWorker.stop(),
+            processWakeWorker.stop(),
+          ]);
+        },
       },
+    };
+  }
+
+  /**
+   * ADR-051: topic clustering scheduling as the second process-manager
+   * domain. The pipeline carries requested/run_completed/run_failed events
+   * and the Postgres run-status projection; the process manager owns the
+   * daily wake, run lifecycle, and pagination continuation; the outbox
+   * effect runs the clustering pages.
+   */
+  private registerTopicClusteringPipeline() {
+    const processManager = new ProcessManagerService({
+      definition: topicClusteringProcessDefinition,
+      store: this.deps.repositories.processStore,
+    });
+
+    // Outcome commands are late-bound: the intent handlers exist before the
+    // pipeline (and its command dispatchers) are registered.
+    const recordCompleted = new Deferred<
+      (args: Record<string, unknown>) => Promise<void>
+    >("topicClusteringRecordCompleted");
+    const recordFailed = new Deferred<
+      (args: Record<string, unknown>) => Promise<void>
+    >("topicClusteringRecordFailed");
+
+    const outboxDispatcher = new OutboxDispatcherService({
+      store: this.deps.repositories.processStore,
+      handlers: createTopicClusteringIntentHandlers({
+        runPort: this.deps.topicClustering.runPort,
+        commands: {
+          recordClusteringRunCompleted: (args) => recordCompleted.fn(args),
+          recordClusteringRunFailed: (args) => recordFailed.fn(args),
+        },
+      }),
+      // Parity with the BullMQ worker this replaces: 3 attempts, then the
+      // failure is recorded durably (the handler owns the final-attempt
+      // record; the cap here is the backstop for handler-crash paths).
+      maxAttempts: TOPIC_CLUSTERING_MAX_ATTEMPTS,
+      leaseDurationMs: TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
+      processNames: [TOPIC_CLUSTERING_PROCESS_NAME],
+    });
+    const topicClusteringOutboxWorker = new ProcessOutboxWorker({
+      dispatcher: outboxDispatcher,
+      logger,
+      batchSize: TOPIC_CLUSTERING_OUTBOX_BATCH_SIZE,
+    });
+
+    // First production consumer of durable wakes (ADR-051 §5). Routing is by
+    // processName, so a future domain adds itself to `managers` instead of
+    // spinning a second scan loop.
+    const processWakeWorker = new ProcessWakeWorker({
+      store: this.deps.repositories.processStore,
+      managers: {
+        [TOPIC_CLUSTERING_PROCESS_NAME]: processManager,
+      },
+      logger,
+      notifyOutbox: () => topicClusteringOutboxWorker.notify(),
+    });
+
+    const processSubscriber = createTopicClusteringProcessSubscriber({
+      processManager,
+      notifyOutbox: () => topicClusteringOutboxWorker.notify(),
+    });
+
+    const pipeline = this.deps.eventSourcing.register(
+      createTopicClusteringProcessingPipeline({
+        topicClusteringRunStatusStore:
+          this.deps.repositories.topicClusteringRunStatus,
+        subscribers: [processSubscriber],
+      }),
+    );
+
+    const commands = mapCommands(pipeline.commands);
+    recordCompleted.resolve((args) =>
+      commands.recordClusteringRunCompleted(args as never),
+    );
+    recordFailed.resolve((args) =>
+      commands.recordClusteringRunFailed(args as never),
+    );
+    this.bootstrapTopicClustering.resolve((projectId) =>
+      commands.requestClustering({
+        tenantId: projectId,
+        occurredAt: Date.now(),
+        trigger: "bootstrap",
+      }),
+    );
+
+    if (this.deps.topicClustering.runsWorkers) {
+      topicClusteringOutboxWorker.start();
+      processWakeWorker.start();
+    }
+    return {
+      pipeline,
+      processOutboxWorker: topicClusteringOutboxWorker,
+      processWakeWorker,
     };
   }
 
@@ -455,7 +596,7 @@ export class PipelineRegistry {
 
     const processManager = new ProcessManagerService({
       definition: langyConversationProcessDefinition,
-      store: this.deps.repositories.langyProcessStore,
+      store: this.deps.repositories.processStore,
     });
     const effectPorts = createLangyEffectPorts({
       handoffStore: this.deps.langy.handoffStore,
@@ -476,9 +617,12 @@ export class PipelineRegistry {
       saveTitle: (args) => saveTitle.fn(args),
     });
     const outboxDispatcher = new OutboxDispatcherService({
-      store: this.deps.repositories.langyProcessStore,
+      store: this.deps.repositories.processStore,
       handlers: createLangyIntentHandlers({ ports: effectPorts }),
       logger,
+      // The outbox table is shared across process managers (ADR-051); an
+      // unscoped dispatcher would lease other domains' intents and
+      // retry-churn them for lack of a handler.
       processNames: [LANGY_CONVERSATION_PROCESS_NAME],
       // The lease MUST outlive the slowest accepted dispatch, or a healthy
       // long-running turn loses its lease mid-flight and a second instance
@@ -739,6 +883,8 @@ export class PipelineRegistry {
 
     const projectMetadataReactor = createProjectMetadataReactor({
       projects: this.deps.projects,
+      bootstrapTopicClustering: (projectId) =>
+        this.bootstrapTopicClustering.fn(projectId),
     });
 
     const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({

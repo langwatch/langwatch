@@ -10,6 +10,12 @@ const logger = createLogger(
 
 export interface ProjectMetadataReactorDeps {
   projects: ProjectService;
+  /**
+   * ADR-051: a project's first real trace also bootstraps its topic
+   * clustering process (creates the process row and schedules the first
+   * daily wake). Best-effort — the backfill task is the reconciliation path.
+   */
+  bootstrapTopicClustering?: (projectId: string) => Promise<void>;
 }
 
 /**
@@ -89,6 +95,10 @@ export function createProjectMetadataReactor(
             language,
           },
         });
+
+        if (!project.firstMessage) {
+          await deps.bootstrapTopicClustering?.(tenantId);
+        }
 
       } catch (error) {
         logger.error(

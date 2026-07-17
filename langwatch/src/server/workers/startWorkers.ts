@@ -56,18 +56,6 @@ async function bootIngestionPuller(
   logger.info("ingestion puller worker ready");
 }
 
-async function bootTopicClustering(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
-  const { startTopicClusteringWorker } =
-    await import("~/server/topicClustering/topicClusteringWorker");
-  const topicClusteringWorker = startTopicClusteringWorker();
-  if (topicClusteringWorker) {
-    shutdownHandles.push(() => topicClusteringWorker.close());
-  }
-  logger.info("topic clustering worker ready");
-}
-
 // ClickHouse storage-stats collection (feeds the Ops storage metrics).
 async function bootStorageStatsCollection(
   shutdownHandles: ShutdownHandles,
@@ -242,7 +230,9 @@ export async function startWorkers(
 
   try {
     await bootIngestionPuller(shutdownHandles);
-    await bootTopicClustering(shutdownHandles);
+    // Topic clustering self-drives (ADR-051): the process wake worker and
+    // process outbox in the event-sourcing runtime own scheduling and
+    // execution; there is no BullMQ worker to boot.
     await bootStorageStatsCollection(shutdownHandles);
     await bootScenarioProcessor(shutdownHandles);
     // Langy turns self-drive: the process outbox dispatches to the Go manager,

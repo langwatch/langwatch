@@ -507,10 +507,6 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `cronjobs.resources.limits.cpu`          | CPU limit.                                         | `100m`                                |
 | `cronjobs.resources.limits.memory`       | Memory limit.                                      | `64Mi`                                |
 | `cronjobs.jobs`                          | Individual cron job endpoints and schedules.       |                                       |
-| `cronjobs.jobs.topicClustering`          | Topic clustering job.                              |                                       |
-| `cronjobs.jobs.topicClustering.enabled`  | Enable topic clustering job.                       | `true`                                |
-| `cronjobs.jobs.topicClustering.schedule` | Cron schedule.                                     | `0 0 * * *`                           |
-| `cronjobs.jobs.topicClustering.endpoint` | Endpoint path.                                     | `/api/cron/schedule_topic_clustering` |
 | `cronjobs.podSecurityContext`            | Pod security context overrides.                    | `{}`                                  |
 | `cronjobs.containerSecurityContext`      | Container security context overrides.              | `{}`                                  |
 | `cronjobs.nodeSelector`                  | Node selector overrides.                           | `{}`                                  |

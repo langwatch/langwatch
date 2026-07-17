@@ -114,6 +114,8 @@ import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/la
 import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
 import { PrismaProcessStore } from "../event-sourcing/process-manager";
+import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
+import { clusterTopicsForProject } from "../topicClustering/topicClustering";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,
@@ -669,7 +671,10 @@ export function initializeDefaultApp(options?: {
         ? new ClickHouseLangyAnalyticsEventRepository(resolveClickHouseClient)
         : new NullLangyAnalyticsEventRepository(),
     ),
-    langyProcessStore: new PrismaProcessStore(prisma),
+    processStore: new PrismaProcessStore(prisma),
+    topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
+      prisma,
+    ),
     langyTurnAdmission,
   };
 
@@ -884,6 +889,13 @@ export function initializeDefaultApp(options?: {
     },
     automations: {
       ports: automationPorts,
+    },
+    topicClustering: {
+      runPort: {
+        runClusteringPage: ({ projectId, searchAfter }) =>
+          clusterTopicsForProject(projectId, searchAfter ?? undefined),
+      },
+      runsWorkers: roleRunsWorkers(config.processRole),
     },
     projects,
     monitors,
@@ -1455,6 +1467,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         consumeTurnHandoff: noop,
         generateConversationTitle: noop,
       } as AppCommands["langy"],
+      topicClustering: {
+        requestClustering: noop,
+        recordClusteringRunCompleted: noop,
+        recordClusteringRunFailed: noop,
+      } as AppCommands["topicClustering"],
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
