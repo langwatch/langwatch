@@ -358,6 +358,7 @@ export const useOpenTargetEditor = () => {
               initialComparison: targetComparison,
               targets: variantOptions,
               datasetColumns,
+              datasetName: activeDataset?.name,
             },
             urlParams: { targetId: target.id },
           });

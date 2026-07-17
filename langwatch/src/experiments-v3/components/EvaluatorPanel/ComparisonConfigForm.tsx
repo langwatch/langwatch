@@ -14,6 +14,11 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
+import {
+  type AvailableSource,
+  type FieldMapping,
+  VariableMappingInput,
+} from "~/components/variables";
 
 import { useTargetName, useTargetNames } from "../../hooks/useTargetName";
 import { useTargetOutputs } from "../../hooks/useTargetOutputs";
@@ -642,13 +647,25 @@ function GoldenAnswerSection({
     // once draft.hasGoldenAnswer matches the form).
   }, [watchedHasGoldenAnswer, draft.hasGoldenAnswer]);
 
-  // Trigger label: the chosen column, else "None — judge on merits" once
-  // golden has been explicitly turned off, else the unselected placeholder.
-  const goldenTriggerLabel = draft.goldenField
-    ? qualifyFieldLabel(datasetName, draft.goldenField)
-    : hasGoldenAnswer === false
-      ? "None — judge on merits"
-      : "Select a dataset column…";
+  // Mirrors the same dataset-column picker prompt variable mappings use, so
+  // "Golden field" reads and behaves like every other source.field selector
+  // in the app instead of a one-off Select. The chip already renders
+  // "Source.field" (qualifyFieldLabel's exact shape), so a single dataset
+  // AvailableSource covers labeling without a separate trigger-label helper.
+  const datasetSources: AvailableSource[] = useMemo(
+    () => [
+      {
+        id: "dataset",
+        name: datasetName ?? "Dataset",
+        type: "dataset",
+        fields: datasetColumns.map((c) => ({ name: c.name, type: "str" })),
+      },
+    ],
+    [datasetColumns, datasetName],
+  );
+  const goldenMapping: FieldMapping | undefined = draft.goldenField
+    ? { type: "source", sourceId: "dataset", path: [draft.goldenField] }
+    : undefined;
 
   return (
     <Box>
@@ -661,57 +678,25 @@ function GoldenAnswerSection({
             description="The dataset column holding the reference answer the judge compares each candidate against — usually expected_output. Pick None to judge on merits alone."
           />
         </Field.Label>
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <Button
-              variant="outline"
-              colorPalette="gray"
-              size="sm"
-              fontWeight="normal"
-              justifyContent="space-between"
-              width="full"
-              data-testid="comparison-golden-field"
-            >
-              <Text
-                fontSize="13px"
-                color={draft.goldenField ? "fg" : "fg.subtle"}
-                truncate
-              >
-                {goldenTriggerLabel}
-              </Text>
-              <ChevronDown size={14} color="var(--chakra-colors-fg-muted)" />
-            </Button>
-          </Menu.Trigger>
-          <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
-            <Menu.Item
-              value="__none__"
-              onClick={() => {
+        <Box data-testid="comparison-golden-field">
+          <VariableMappingInput
+            mapping={goldenMapping}
+            availableSources={datasetSources}
+            placeholder="None — judge on merits"
+            inputTestId="comparison-golden-field-input"
+            onMappingChange={(next) => {
+              if (!next) {
                 setHasGoldenAnswer(false);
                 update({ goldenField: "" });
-              }}
-              data-testid="comparison-golden-field-option-none"
-            >
-              <Text fontSize="13px" color="fg.subtle">
-                None — judge on merits
-              </Text>
-            </Menu.Item>
-            {datasetColumns.map((c) => (
-              <Menu.Item
-                key={c.id}
-                value={c.name}
-                onClick={() => {
-                  setHasGoldenAnswer(true);
-                  update({ goldenField: c.name });
-                }}
-                data-testid={`comparison-golden-field-option-${c.name}`}
-              >
-                <Text fontSize="13px" fontFamily="mono">
-                  {qualifyFieldLabel(datasetName, c.name)}
-                </Text>
-              </Menu.Item>
-            ))}
-          </Menu.Content>
-        </Menu.Root>
+                return;
+              }
+              const field =
+                next.type === "source" ? next.path.at(-1) : next.value;
+              setHasGoldenAnswer(true);
+              update({ goldenField: field ?? "" });
+            }}
+          />
+        </Box>
       </Field.Root>
     </Box>
   );
@@ -728,6 +713,21 @@ function InputContextSection({
   datasetColumns: DatasetColumn[];
   datasetName?: string;
 }) {
+  const datasetSources: AvailableSource[] = useMemo(
+    () => [
+      {
+        id: "dataset",
+        name: datasetName ?? "Dataset",
+        type: "dataset",
+        fields: datasetColumns.map((c) => ({ name: c.name, type: "str" })),
+      },
+    ],
+    [datasetColumns, datasetName],
+  );
+  const inputMapping: FieldMapping | undefined = draft.inputField
+    ? { type: "source", sourceId: "dataset", path: [draft.inputField] }
+    : undefined;
+
   return (
     <Box>
       <Field.Root flex="1">
@@ -739,53 +739,23 @@ function InputContextSection({
             description="The dataset column that gives the judge task context. Leave on auto to use an input column when one exists."
           />
         </Field.Label>
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <Button
-              variant="outline"
-              colorPalette="gray"
-              size="sm"
-              fontWeight="normal"
-              justifyContent="space-between"
-              width="full"
-              data-testid="comparison-input-field"
-            >
-              <Text
-                fontSize="13px"
-                color={draft.inputField ? "fg" : "fg.subtle"}
-                truncate
-              >
-                {draft.inputField
-                  ? qualifyFieldLabel(datasetName, draft.inputField)
-                  : "Auto-detect input context"}
-              </Text>
-              <ChevronDown size={14} color="var(--chakra-colors-fg-muted)" />
-            </Button>
-          </Menu.Trigger>
-          <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
-            <Menu.Item
-              value="__auto__"
-              onClick={() => update({ inputField: undefined })}
-              data-testid="comparison-input-field-option-auto"
-            >
-              <Text fontSize="13px" color="fg.subtle">
-                Auto-detect input context
-              </Text>
-            </Menu.Item>
-            {datasetColumns.map((c) => (
-              <Menu.Item
-                key={c.id}
-                value={c.name}
-                onClick={() => update({ inputField: c.name })}
-                data-testid={`comparison-input-field-option-${c.name}`}
-              >
-                <Text fontSize="13px" fontFamily="mono">
-                  {qualifyFieldLabel(datasetName, c.name)}
-                </Text>
-              </Menu.Item>
-            ))}
-          </Menu.Content>
-        </Menu.Root>
+        <Box data-testid="comparison-input-field">
+          <VariableMappingInput
+            mapping={inputMapping}
+            availableSources={datasetSources}
+            placeholder="Auto-detect input context"
+            inputTestId="comparison-input-field-input"
+            onMappingChange={(next) => {
+              if (!next) {
+                update({ inputField: undefined });
+                return;
+              }
+              const field =
+                next.type === "source" ? next.path.at(-1) : next.value;
+              update({ inputField: field ?? undefined });
+            }}
+          />
+        </Box>
       </Field.Root>
     </Box>
   );

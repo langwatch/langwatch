@@ -220,10 +220,8 @@ describe("ComparisonConfigForm", () => {
       const onChange = vi.fn();
       renderForm({ value: baseConfig({ hasGoldenAnswer: false }), onChange });
 
-      await user.click(screen.getByTestId("comparison-golden-field"));
-      await user.click(
-        screen.getByTestId("comparison-golden-field-option-expected_output"),
-      );
+      await user.click(screen.getByTestId("comparison-golden-field-input"));
+      await user.click(screen.getByTestId("field-option-expected_output"));
 
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({ goldenField: "expected_output" }),
@@ -234,7 +232,7 @@ describe("ComparisonConfigForm", () => {
     });
   });
 
-  describe("when the user picks None from the field picker", () => {
+  describe("when the user clears the golden field picker", () => {
     it("clears goldenField and turns golden answer off", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
@@ -246,9 +244,10 @@ describe("ComparisonConfigForm", () => {
         onChange,
       });
 
-      await user.click(screen.getByTestId("comparison-golden-field"));
       await user.click(
-        screen.getByTestId("comparison-golden-field-option-none"),
+        within(screen.getByTestId("comparison-golden-field")).getByTestId(
+          "clear-mapping-button",
+        ),
       );
 
       expect(onChange).toHaveBeenCalledWith(
@@ -275,9 +274,9 @@ describe("ComparisonConfigForm", () => {
     it("labels the golden trigger None once golden answer is off", () => {
       renderForm({ value: baseConfig({ hasGoldenAnswer: false }) });
 
-      expect(screen.getByTestId("comparison-golden-field")).toHaveTextContent(
-        "None — judge on merits",
-      );
+      expect(
+        screen.getByTestId("comparison-golden-field-input"),
+      ).toHaveAttribute("placeholder", "None — judge on merits");
     });
   });
 
@@ -340,9 +339,10 @@ describe("ComparisonConfigForm", () => {
         }),
       });
 
-      await user.click(screen.getByTestId("comparison-golden-field"));
       await user.click(
-        screen.getByTestId("comparison-golden-field-option-none"),
+        within(screen.getByTestId("comparison-golden-field")).getByTestId(
+          "clear-mapping-button",
+        ),
       );
 
       await waitFor(() =>
@@ -359,10 +359,8 @@ describe("ComparisonConfigForm", () => {
         value: baseConfig({ hasGoldenAnswer: false, variants: ["t1", "t2"] }),
       });
 
-      await user.click(screen.getByTestId("comparison-golden-field"));
-      await user.click(
-        screen.getByTestId("comparison-golden-field-option-expected_output"),
-      );
+      await user.click(screen.getByTestId("comparison-golden-field-input"));
+      await user.click(screen.getByTestId("field-option-expected_output"));
 
       await waitFor(() =>
         expect(screen.getByTestId("prompt-probe").textContent).toBe(
@@ -426,9 +424,9 @@ describe("ComparisonConfigForm", () => {
       // The picker is always visible now; once golden is corrected to off it
       // reads "None — judge on merits" rather than a stale column.
       await waitFor(() =>
-        expect(screen.getByTestId("comparison-golden-field")).toHaveTextContent(
-          "None — judge on merits",
-        ),
+        expect(
+          screen.getByTestId("comparison-golden-field-input"),
+        ).toHaveAttribute("placeholder", "None — judge on merits"),
       );
     });
 
@@ -653,10 +651,8 @@ describe("ComparisonConfigForm", () => {
         onChange,
       });
 
-      await user.click(screen.getByTestId("comparison-input-field"));
-      await user.click(
-        screen.getByTestId("comparison-input-field-option-question"),
-      );
+      await user.click(screen.getByTestId("comparison-input-field-input"));
+      await user.click(screen.getByTestId("field-option-question"));
 
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({ inputField: "question" }),
@@ -786,11 +782,13 @@ describe("ComparisonConfigForm", () => {
         ],
       });
 
-      await user.click(screen.getByTestId("comparison-golden-field"));
+      await user.click(screen.getByTestId("comparison-golden-field-input"));
 
-      await waitFor(() =>
-        expect(screen.getByText("Test Data.expected_output")).toBeVisible(),
-      );
+      // The source header names the dataset; each field option below it
+      // shows the bare column name — selecting one is what produces the
+      // qualified "Dataset.column" chip (covered by the next test).
+      await waitFor(() => expect(screen.getByText("Test Data")).toBeVisible());
+      expect(screen.getByTestId("field-option-expected_output")).toBeVisible();
     });
 
     it("qualifies the chosen golden column on the trigger too", () => {
@@ -816,23 +814,37 @@ describe("ComparisonConfigForm", () => {
         datasetColumns: [{ id: "col-2", name: "input" }],
       });
 
-      await user.click(screen.getByTestId("comparison-input-field"));
+      await user.click(screen.getByTestId("comparison-input-field-input"));
 
-      await waitFor(() =>
-        expect(screen.getByText("Test Data.input")).toBeVisible(),
-      );
+      await waitFor(() => expect(screen.getByText("Test Data")).toBeVisible());
+      expect(screen.getByTestId("field-option-input")).toBeVisible();
     });
 
-    // The dataset name is absent until the store hydrates; a bare column name is
-    // the correct fallback rather than a stray leading dot.
-    it("falls back to the bare column when the dataset name is unknown", async () => {
+    it("qualifies the chosen input column on the trigger too", () => {
+      renderForm({
+        datasetName: "Test Data",
+        value: baseConfig({ inputField: "input" }),
+      });
+
+      expect(
+        within(screen.getByTestId("comparison-input-field")).getByText(
+          "Test Data.input",
+        ),
+      ).toBeVisible();
+    });
+
+    // The dataset name is absent until the store hydrates; the picker still
+    // shows every available column, unqualified, rather than hiding them.
+    it("falls back to an unqualified source name when the dataset name is unknown", async () => {
       const user = userEvent.setup();
       renderForm({ datasetColumns: [{ id: "col-1", name: "expected_output" }] });
 
-      await user.click(screen.getByTestId("comparison-golden-field"));
+      await user.click(screen.getByTestId("comparison-golden-field-input"));
 
       await waitFor(() =>
-        expect(screen.getByText("expected_output")).toBeVisible(),
+        expect(
+          screen.getByTestId("field-option-expected_output"),
+        ).toBeVisible(),
       );
     });
   });
