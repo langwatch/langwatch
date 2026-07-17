@@ -30,6 +30,7 @@ export const PLATFORM_TOOL_SLUGS = [
   "gemini",
   "opencode",
   "cursor",
+  "copilot",
 ] as const;
 
 export type PlatformToolSlug = (typeof PLATFORM_TOOL_SLUGS)[number];
@@ -55,6 +56,9 @@ export const PLATFORM_TOOL_POLICY_DEFAULTS: Record<
   gemini: { allowVk: true, allowOtelDirect: true },
   opencode: { allowVk: true, allowOtelDirect: true },
   cursor: { allowVk: true, allowOtelDirect: false },
+  // GitHub Copilot CLI (>= 1.0.41): native OTel export + BYOK gateway
+  // env vars, so both paths are real. ADR-039.
+  copilot: { allowVk: true, allowOtelDirect: true },
 };
 
 export function isPlatformToolSlug(slug: string): slug is PlatformToolSlug {

@@ -38,7 +38,7 @@ import prompts from "prompts";
 import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
-import type { WrapperMode } from "./wrapper-mode";
+import { copilotSeatBypassSuffix, type WrapperMode } from "./wrapper-mode";
 import {
   resolvePlatformToolPolicy,
   type PlatformToolPolicyMap,
@@ -46,6 +46,23 @@ import {
 
 /** Wrapper-only flag name. */
 const TOOL_MODE_FLAG = "--tool-mode";
+
+/**
+ * The silent default when both paths are allowed and nothing is pinned.
+ *
+ * Every tool except copilot defaults to the gateway. Copilot inverts it
+ * (ADR-039 Decision 3): its gateway path rides COPILOT_PROVIDER_* BYOK
+ * env vars, which switch spend off the user's already-paid Copilot seat
+ * onto the org's provider API keys — NOT billing-neutral the way the
+ * claude/codex base-URL swap is (same API key either way there). A
+ * silent default must never shift who pays, so copilot's three silent
+ * gateway defaults (non-TTY fallback, prompt pre-selection, prompt
+ * abort) all resolve to ingestion instead. Explicit choices — flag,
+ * env, pinned mode, org policy — are honored unchanged.
+ */
+function silentDefaultMode(tool: string): WrapperMode {
+  return tool === "copilot" ? "ingestion" : "gateway";
+}
 
 /**
  * Map a user-facing path token (`gateway` / `otlp`) to the internal
@@ -236,6 +253,15 @@ export async function resolveWrapperPath(
   // enforces this (downgrade / throw), but resolving it here keeps the
   // prompt logic honest: we only ever prompt for a real either-or.
   if (allowGateway && !allowOtlp) {
+    // Copilot lands on the gateway by admin policy here, BEFORE
+    // resolveWrapperMode's downgrade branch can attach its notice — so
+    // the who-pays shift must be named at this seam too (ADR-039 D3).
+    const suffix = copilotSeatBypassSuffix(tool);
+    if (suffix) {
+      writeImpl(
+        `${lwTag()} direct OTLP is disabled for ${tool} by your org admin; using the gateway.${suffix}\n`,
+      );
+    }
     return { mode: "gateway", prompted: false };
   }
   if (!allowGateway && allowOtlp) {
@@ -251,32 +277,33 @@ export async function resolveWrapperPath(
   // 4 / 5. Both paths allowed.
   const canPrompt = isTTY && !isForcedAutoLogin(env);
   if (!canPrompt) {
-    // Non-TTY / CI / forced-auto-login - default to the gateway, no prompt.
-    return { mode: "gateway", prompted: false };
+    // Non-TTY / CI / forced-auto-login - silent default, no prompt.
+    return { mode: silentDefaultMode(tool), prompted: false };
   }
 
+  const choices = [
+    {
+      title: gatewayChoiceTitle(),
+      value: "gateway",
+    },
+    {
+      title: otlpChoiceTitle(tool),
+      value: "ingestion",
+    },
+  ];
   const res = await promptImpl({
     type: "select",
     name: "path",
     message: pathChoiceMessage(tool),
-    choices: [
-      {
-        title: gatewayChoiceTitle(),
-        value: "gateway",
-      },
-      {
-        title: otlpChoiceTitle(tool),
-        value: "ingestion",
-      },
-    ],
-    initial: 0,
+    choices,
+    initial: choices.findIndex((c) => c.value === silentDefaultMode(tool)),
   });
 
   const chosen = tokenToMode(res?.path as string | undefined);
   if (!chosen) {
-    // User aborted the prompt (Ctrl-C / empty). Default to the gateway
-    // for this run without persisting, so the next run asks again.
-    return { mode: "gateway", prompted: false };
+    // User aborted the prompt (Ctrl-C / empty). Fall back to the silent
+    // default for this run without persisting, so the next run asks again.
+    return { mode: silentDefaultMode(tool), prompted: false };
   }
 
   // Remember the choice so subsequent runs don't prompt.

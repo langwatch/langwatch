@@ -45,6 +45,19 @@ import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 
 export type WrapperMode = "gateway" | "ingestion";
 
+/**
+ * Copilot is the one tool where landing on the gateway changes WHO PAYS:
+ * BYOK routing bills the org's provider keys while the user's Copilot
+ * seat sits idle (ADR-039 Decision 3). Every mid-run fallback ONTO the
+ * gateway (policy downgrade here, mint-failure fallback in wrapper.ts)
+ * appends this so the shift is named, never silent. Empty for every
+ * other tool — their gateway swap is billing-neutral.
+ */
+export function copilotSeatBypassSuffix(tool: string): string {
+  if (tool !== "copilot") return "";
+  return " NOTE: gateway usage bills your org's provider keys, not your Copilot seat.";
+}
+
 export interface WrapperModeResult {
   mode: WrapperMode;
   /** Env additions to merge into the child process.env. */
@@ -97,11 +110,29 @@ export interface WrapperModeResult {
   notice?: string;
 }
 
+/**
+ * Whether an env value expresses an explicit content-capture opt-out.
+ * OTel booleans are parsed case-insensitively, and this repo's sibling
+ * parsers also honour "0"/"no"/"off", so `FALSE`, `False`, `0`, `no`,
+ * `off` must all count — otherwise a user who disabled capture is
+ * silently overridden into exporting full prompt/response content
+ * (privacy regression). Unset means "not opted out" (default-on).
+ */
+function isCaptureOptOut(raw: string | undefined): boolean {
+  if (raw === undefined) return false;
+  return ["false", "0", "no", "off"].includes(raw.trim().toLowerCase());
+}
+
 const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
   claude: "claude_code",
   codex: "codex",
   gemini: "gemini",
   opencode: "opencode",
+  // `copilot_cli`, NOT `copilot` — `copilot_studio` (the Microsoft
+  // Copilot Studio audit feed) already exists as a sourceType and a bare
+  // `copilot` would be confusable with it in the API-keys page and
+  // analytics filters. ADR-039 Decision 2.
+  copilot: "copilot_cli",
 };
 
 /**
@@ -187,7 +218,7 @@ export async function resolveWrapperMode(
   }
   if (mode === "ingestion" && !policy.allowOtelDirect) {
     mode = "gateway";
-    notice = `${lwTag()} direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.`;
+    notice = `${lwTag()} direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.${copilotSeatBypassSuffix(tool)}`;
   }
 
   if (mode === "gateway") {
@@ -298,6 +329,23 @@ export async function resolveWrapperMode(
 
   const vars = buildOtelEnvBlock(tool, endpoint, token);
 
+  // Copilot content-capture opt-out: the capture flag is a STANDARD OTel
+  // GenAI env var, so a user (or enterprise policy) that exported it as
+  // "false" expressed explicit intent — never override it (same semantics
+  // as the opencode experimental-flag respect below). Dropping our "true"
+  // lets the inherited "false" win in the spawn merge; the notice makes
+  // the tokens-only consequence visible instead of silent (ADR-039 D5).
+  if (
+    tool === "copilot" &&
+    isCaptureOptOut(
+      process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+    )
+  ) {
+    delete vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
+    const optOutNotice = `${lwTag()} content capture is disabled in your environment (OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false); copilot traces will carry tokens only.`;
+    notice = notice ? `${notice}\n${optOutNotice}` : optOutNotice;
+  }
+
   let codexConfigPath: string | undefined;
   if (tool === "codex") {
     // codex's OTLP/HTTP exporter sends every signal to the configured
@@ -323,23 +371,31 @@ export async function resolveWrapperMode(
     setOpencodeOpenTelemetryFlag();
   }
 
-  // Persist mode + (when freshly minted) the ingest key so the next
-  // invocation skips re-deriving the mode and reuses the cached key
-  // instead of minting again.
-  const next: GovernanceConfig = {
-    ...cfg,
-    tool_mode: { ...(cfg.tool_mode ?? {}), [tool]: "ingestion" },
-  };
+  // Persist (when freshly minted) the ingest key so the next invocation
+  // reuses the cached key instead of minting again. The tool_mode PIN is
+  // written only on the legacy state-only derivation (no forcedMode):
+  // when the path-selection UX upstream forced the mode, IT owns
+  // persistence — the interactive prompt saves an explicit answer, and
+  // silent defaults (non-TTY, prompt abort, copilot ingestion-first)
+  // deliberately do NOT persist so the user is asked again next run.
+  // Pinning here unconditionally turned one aborted prompt / CI run
+  // into a permanent silent pin that suppressed the prompt forever.
+  const next: GovernanceConfig = { ...cfg };
+  if (forcedMode === undefined) {
+    next.tool_mode = { ...(cfg.tool_mode ?? {}), [tool]: "ingestion" };
+  }
   if (minted) {
     next.default_personal_ingest_keys = {
       ...(cfg.default_personal_ingest_keys ?? {}),
       [sourceType]: { secret: token, prefix },
     };
   }
-  try {
-    saveConfig(next);
-  } catch {
-    // Best-effort cache - failure to persist doesn't block this run.
+  if (forcedMode === undefined || minted) {
+    try {
+      saveConfig(next);
+    } catch {
+      // Best-effort cache - failure to persist doesn't block this run.
+    }
   }
 
   return {
@@ -475,6 +531,36 @@ function buildOtelEnvBlock(
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=opencode",
+      };
+    case "copilot":
+      // GitHub Copilot CLI (>= 1.0.41) native OTel, verified against the
+      // 1.0.69 bundle string sweep:
+      //   COPILOT_OTEL_ENABLED=1 unlocks export (setting the OTLP
+      //     endpoint alone also enables it; both set for explicitness).
+      //   COPILOT_OTEL_EXPORTER_TYPE accepts "otlp-http" (default) or
+      //     "file". Pinned here because a user who previously wired the
+      //     file exporter (the ccusage setup) has =file exported in their
+      //     shell — inherited, it silently redirects ALL telemetry to a
+      //     local JSONL file and Path B captures nothing (ADR-039 D5).
+      //   OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true puts
+      //     full prompt/response content on gen_ai.input.messages /
+      //     gen_ai.output.messages span attributes — the ONLY surface
+      //     carrying content (hook payloads and the stats footer are
+      //     metadata-only). Capture-everything default per ADR-039; an
+      //     explicit user "false" in the parent env is respected by the
+      //     resolver (never overridden), with a tokens-only notice.
+      //   Copilot emits spans + metrics only (no standalone log records),
+      //   so no OTEL_LOGS_EXPORTER. Transport is otlp-http only; a grpc
+      //   protocol value silently falls back, so http/json is pinned.
+      return {
+        COPILOT_OTEL_ENABLED: "true",
+        COPILOT_OTEL_EXPORTER_TYPE: "otlp-http",
+        OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true",
+        OTEL_TRACES_EXPORTER: "otlp",
+        OTEL_METRICS_EXPORTER: "otlp",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+        ...base,
+        OTEL_RESOURCE_ATTRIBUTES: "service.name=copilot-cli",
       };
     default:
       return base;

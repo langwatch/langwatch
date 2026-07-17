@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildShellReapply,
   envForTool,
   preflightWrapper,
   shouldForgetGatewayPin,
@@ -150,6 +151,35 @@ describe("envForTool", () => {
     );
   });
 
+  /** @scenario Gateway mode points copilot's BYOK provider at the LangWatch gateway */
+  it("copilot → COPILOT_PROVIDER_TYPE=openai + /v1 base + VK as API key", () => {
+    const env = envForTool(cfg, "copilot").vars;
+    expect(env.COPILOT_PROVIDER_TYPE).toBe("openai");
+    expect(env.COPILOT_PROVIDER_BASE_URL).toBe("http://gw.example.com/v1");
+    expect(env.COPILOT_PROVIDER_API_KEY).toBe("lw_vk_test_x");
+  });
+
+  /** @scenario Gateway mode does not enable copilot's own OTel export */
+  it("copilot → gateway env never enables copilot's own OTel export (no-double-trace)", () => {
+    const env = envForTool(cfg, "copilot").vars;
+    expect(env.COPILOT_OTEL_ENABLED).toBeUndefined();
+    expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+  });
+
+  it("copilot → gateway clears every Path B telemetry var inherited from the shell", () => {
+    // A hand-exported OTel block (pre-persist manual setup) would
+    // double-trace in gateway mode; the clears list is derived from the
+    // same builder that installs the Path B block so they cannot drift.
+    const clears = envForTool(cfg, "copilot").clears ?? [];
+    expect(clears).toContain("COPILOT_OTEL_ENABLED");
+    expect(clears).toContain("COPILOT_OTEL_EXPORTER_TYPE");
+    expect(clears).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
+    expect(clears).toContain("OTEL_EXPORTER_OTLP_HEADERS");
+    expect(clears).toContain(
+      "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT",
+    );
+  });
+
   it("unknown tool → empty env", () => {
     const env = envForTool(cfg, "nonsense").vars;
     expect(env).toEqual({});
@@ -171,7 +201,7 @@ describe("envForTool", () => {
         opencode: { id: "ik_o", secret: "sk-lw-w", prefix: "sk-lw-" },
       },
     };
-    for (const tool of ["claude", "codex", "gemini", "cursor", "opencode"]) {
+    for (const tool of ["claude", "codex", "gemini", "cursor", "opencode", "copilot"]) {
       const env = envForTool(cfgWithIk, tool).vars;
       expect(env.OTEL_TRACES_EXPORTER).toBeUndefined();
       expect(env.OTEL_LOGS_EXPORTER).toBeUndefined();
@@ -186,6 +216,106 @@ describe("envForTool", () => {
     const trailing: GovernanceConfig = { ...cfg, gateway_url: "http://gw.example.com/" };
     const env = envForTool(trailing, "claude").vars;
     expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+  });
+});
+
+describe("buildShellReapply", () => {
+  // Gateway spawns go through `$SHELL -i -c`, which sources the rc. A
+  // previously persisted Path-B function (`copilot() { OTEL… command
+  // copilot }`) re-injects the exporter env AT INVOCATION — after these
+  // exports — so without `unset -f` the gateway captures server-side AND
+  // the tool emits OTel for the same calls.
+  describe("when a scoped-function tool runs in gateway mode", () => {
+    /** @scenario A gateway copilot run with a persisted rc function emits no OTLP */
+    it("prepends unset -f for copilot so the rc function cannot re-inject OTel", () => {
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        mode: "gateway",
+        clears: [],
+        vars: { COPILOT_PROVIDER_TYPE: "openai" },
+      });
+      expect(reapply.startsWith("unset -f copilot 2>/dev/null; ")).toBe(true);
+    });
+
+    /** @scenario A gateway opencode run with a persisted rc function emits no OTLP */
+    it("prepends unset -f for opencode (pre-existing double-trace hole, fixed generically)", () => {
+      const reapply = buildShellReapply({
+        tool: "opencode",
+        mode: "gateway",
+        clears: [],
+        vars: {},
+      });
+      expect(reapply).toContain("unset -f opencode");
+    });
+
+    /** @scenario A gateway gemini run with a persisted rc function emits no OTLP */
+    it("prepends unset -f for gemini", () => {
+      const reapply = buildShellReapply({
+        tool: "gemini",
+        mode: "gateway",
+        clears: [],
+        vars: {},
+      });
+      expect(reapply).toContain("unset -f gemini");
+    });
+
+    /** @scenario Gateway runs still honor the user's alias for the tool */
+    it("removes only the function, never aliases (no unalias in the prefix)", () => {
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        mode: "gateway",
+        clears: [],
+        vars: {},
+      });
+      expect(reapply).not.toContain("unalias");
+    });
+  });
+
+  describe("when the tool runs in ingestion mode", () => {
+    /** @scenario Ingestion runs leave the persisted function in place */
+    it("neutralizes the stale function for this run without touching the rc file", () => {
+      // The persisted function froze an OLD run's env (stale token,
+      // possibly capture-on when the user has since opted out) and its
+      // env-prefix would win over this run's exports at invocation time.
+      // Unset it in the session; the rc block itself stays for bare runs.
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        mode: "ingestion",
+        clears: [],
+        vars: { COPILOT_OTEL_ENABLED: "true" },
+      });
+      expect(reapply).toContain("unset -f copilot");
+      // buildShellReapply produces a shell prefix only — it never writes
+      // or removes rc content (no file I/O in this module path).
+      expect(reapply).not.toContain(">>");
+    });
+
+    it("lets this run's freshly-resolved env win over a stale persisted function", () => {
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        mode: "ingestion",
+        clears: [],
+        vars: { OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer fresh" },
+      });
+      // unset -f comes FIRST, exports after — the fresh token wins.
+      expect(
+        reapply.indexOf("unset -f copilot"),
+      ).toBeLessThan(reapply.indexOf("export OTEL_EXPORTER_OTLP_HEADERS"));
+    });
+  });
+
+  describe("when the tool has no scoped shell function (claude)", () => {
+    it("emits only clears + exports", () => {
+      const reapply = buildShellReapply({
+        tool: "claude",
+        mode: "gateway",
+        clears: ["ANTHROPIC_API_KEY"],
+        vars: { ANTHROPIC_BASE_URL: "http://gw" },
+      });
+      expect(reapply).toBe(
+        "unset ANTHROPIC_API_KEY; export ANTHROPIC_BASE_URL='http://gw'",
+      );
+    });
   });
 });
 
@@ -275,6 +405,19 @@ describe("preflightWrapper", () => {
       const r = await preflightWrapper(cfg, "gemini", {
         fetchImpl: okFetch,
         bootstrapImpl: bootstrapWith(["google"]),
+      });
+      expect(r.ok).toBe(true);
+    });
+
+    /** @scenario Copilot's provider families accept either an OpenAI or Anthropic upstream */
+    it("passes copilot when either anthropic OR openai is present", async () => {
+      const r = await preflightWrapper(cfg, "copilot", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(
+          ["anthropic"],
+          "admin@acme.test",
+          ["claude", "codex", "gemini", "cursor", "opencode", "copilot"],
+        ),
       });
       expect(r.ok).toBe(true);
     });

@@ -36,7 +36,7 @@ describe("formatLoginCeremony", () => {
           ],
         });
         const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
+          (l) => l.startsWith("  $ langwatch") && !/langwatch open\b/.test(l),
         );
         expect(toolLines).toHaveLength(2);
         expect(toolLines[0]).toBe("  $ langwatch claude  # Claude Code");
@@ -45,23 +45,30 @@ describe("formatLoginCeremony", () => {
     });
 
     describe("when the org publishes no tools", () => {
-      it("falls back to the built-in default wrappers", () => {
+      it("falls back to every built-in wrapper (all six tools)", () => {
         const lines = formatLoginCeremony(baseInput);
         const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
+          (l) => l.startsWith("  $ langwatch") && !/langwatch open\b/.test(l),
         );
-        expect(toolLines).toHaveLength(3);
-        expect(toolLines.find((l) => l.includes("claude"))).toBeDefined();
-        expect(toolLines.find((l) => l.includes("codex"))).toBeDefined();
-        expect(toolLines.find((l) => l.includes("cursor"))).toBeDefined();
+        expect(toolLines).toHaveLength(6);
+        for (const slug of [
+          "claude",
+          "codex",
+          "copilot",
+          "cursor",
+          "gemini",
+          "opencode",
+        ]) {
+          expect(toolLines.find((l) => l.includes(slug))).toBeDefined();
+        }
       });
 
       it("falls back when an empty tools array is supplied", () => {
         const lines = formatLoginCeremony({ ...baseInput, tools: [] });
         const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
+          (l) => l.startsWith("  $ langwatch") && !/langwatch open\b/.test(l),
         );
-        expect(toolLines).toHaveLength(3);
+        expect(toolLines).toHaveLength(6);
       });
     });
   });

@@ -78,7 +78,10 @@ export interface LoginCeremonyInput {
 const DEFAULT_TOOLS: LoginCeremonyTool[] = [
   { slug: "claude", displayName: "Claude Code" },
   { slug: "codex", displayName: "Codex" },
+  { slug: "copilot", displayName: "GitHub Copilot CLI" },
   { slug: "cursor", displayName: "Cursor" },
+  { slug: "gemini", displayName: "Gemini CLI" },
+  { slug: "opencode", displayName: "opencode" },
 ];
 
 function padRight(s: string, width: number): string {

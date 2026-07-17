@@ -130,6 +130,20 @@ describe("buildScopedToolFunction", () => {
     });
   });
 
+  describe("given the copilot tool-specific telemetry vars", () => {
+    /** @scenario The copilot wrapper function carries the tool-specific telemetry vars */
+    it("carries COPILOT_OTEL_ENABLED alongside the OTEL_EXPORTER_* env", () => {
+      const block = buildScopedToolFunction(
+        "copilot",
+        { ...otelVars, COPILOT_OTEL_ENABLED: "true" },
+        "zsh",
+      );
+      expect(block).toContain("copilot() {");
+      expect(block).toContain("COPILOT_OTEL_ENABLED=true");
+      expect(block).toContain('command copilot "$@"');
+    });
+  });
+
   describe("given a fish shell", () => {
     it("uses `function <tool>` with block-local set -lx and `command <tool>`", () => {
       const block = buildScopedToolFunction("opencode", otelVars, "fish");

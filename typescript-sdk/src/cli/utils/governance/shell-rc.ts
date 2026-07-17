@@ -46,8 +46,28 @@ import {
 import { type GovernanceConfig, saveConfig } from "./config";
 import { envForTool, type ToolEnv } from "./wrapper";
 
-/** Wrapped tools included in the union'd export block. */
+/**
+ * Wrapped tools included in the union'd export block. copilot is
+ * deliberately ABSENT: its gateway env is COPILOT_PROVIDER_* BYOK vars,
+ * and a global export would force every bare `copilot` run into gateway
+ * billing (off the user's Copilot seat) — ADR-039 Decision 7.
+ */
 const TOOLS = ["claude", "codex", "cursor", "gemini", "opencode"] as const;
+
+/**
+ * Tools whose Path B telemetry persists as a scoped shell function (no
+ * config-file env target). Drives BOTH the logout target scan
+ * (telemetry-targets.ts) and the gateway spawn's `unset -f`
+ * (wrapper.ts) — a persisted rc function re-injects the OTel env at
+ * invocation time, AFTER the wrapper's exports, so gateway runs must
+ * remove the function from the shell session (never from the rc file)
+ * or the same calls get captured twice.
+ */
+export const SHELL_FUNCTION_TOOLS: readonly string[] = [
+  "gemini",
+  "opencode",
+  "copilot",
+] as const;
 
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
 const BLOCK_END = "# <<< langwatch end <<<";
