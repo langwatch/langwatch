@@ -16,13 +16,14 @@ import { LuPlay, LuSquare } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import { useDrawer } from "~/hooks/useDrawer";
+import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import { useOpenComparisonEditor } from "../hooks/useOpenEvaluatorEditor";
 import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
 import { useResolveTargetName } from "../hooks/useResolveTargetName";
 import { isComparisonEvaluator } from "../types";
+import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
 import {
   convertFromUIMapping,
   convertToUIMapping,
@@ -143,42 +144,46 @@ export const RunEvaluationButton = ({
           initialMappings[key] = convertToUIMapping(mapping);
         }
 
-        const mappingsConfig = {
-          availableSources,
-          initialMappings,
-          onMappingChange: (
-            identifier: string,
-            mapping: UIFieldMapping | undefined,
-          ) => {
-            if (mapping) {
-              const storeMapping = convertFromUIMapping(
-                mapping,
-                isDatasetSource,
-              );
-              setEvaluatorMapping(
-                evaluator.id,
-                activeDatasetId,
-                targetId,
-                identifier,
-                storeMapping,
-              );
-            } else {
-              removeEvaluatorMapping(
-                evaluator.id,
-                activeDatasetId,
-                targetId,
-                identifier,
-              );
-            }
-          },
+        const onMappingChange = (
+          identifier: string,
+          mapping: UIFieldMapping | undefined,
+        ) => {
+          if (mapping) {
+            setEvaluatorMapping(
+              evaluator.id,
+              activeDatasetId,
+              targetId,
+              identifier,
+              convertFromUIMapping(mapping, isDatasetSource),
+            );
+          } else {
+            removeEvaluatorMapping(
+              evaluator.id,
+              activeDatasetId,
+              targetId,
+              identifier,
+            );
+          }
         };
 
-        // Open the evaluator editor drawer
-        // mappingsConfig is an object so it goes to complexProps automatically
+        // onMappingChange must be registered via setFlowCallbacks (durable),
+        // NOT embedded in mappingsConfig (ephemeral complexProps). The evaluator
+        // editor drawer sources onMappingChange from flowCallbacks and renders
+        // the field-mapping section only when it is present — see issue #3441.
+        // Embedding it in mappingsConfig instead left "Run" opening a drawer
+        // with no mapping controls, so the user could not map the evaluator's
+        // required fields (issue #950). Mirrors useOpenEvaluatorEditor.
+        setFlowCallbacks(
+          "evaluatorEditor",
+          createEvaluatorEditorCallbacks({ onMappingChange }),
+        );
+
+        // Open the evaluator editor drawer. mappingsConfig is an object so it
+        // rides complexProps; the durable onMappingChange lives in flowCallbacks.
         openDrawer("evaluatorEditor", {
           evaluatorId: evaluator.dbEvaluatorId,
           evaluatorType: evaluator.evaluatorType,
-          mappingsConfig,
+          mappingsConfig: { availableSources, initialMappings },
         });
       }
       return;
