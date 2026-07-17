@@ -1,0 +1,294 @@
+# Prompt playground tab switcher — reach any open prompt without scrolling
+#
+# Implementation:
+#   langwatch/src/prompts/prompt-playground/components/prompt-browser/PromptPlaygroundBrowser.tsx  (switcher placement in the tab strip)
+#   langwatch/src/prompts/prompt-playground/components/prompt-browser/ui/DraggableTabsBrowser.tsx  (tab strip compound component)
+#   langwatch/src/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore.ts   (windows -> tabs state)
+#
+# Related specs:
+#   specs/traces-v2/lens-preset-groups.feature — the lens strip that hit the same
+#     "strip ran out of room" problem, and solved it by hiding the tabs that overflow.
+#     This switcher deliberately does not hide tabs (see Decisions), so it shares the
+#     menu primitives rather than that overflow machinery.
+#
+# Motivation: opening several prompts fills the tab strip. Each tab claimed its
+# full natural width and refused to shrink, so only about three fit; the rest
+# scrolled off the right edge behind a fade gradient. Nothing told the user those
+# tabs existed, and the only way to reach one was to scroll the strip blindly.
+#
+# Decisions:
+#   - Tabs share the strip. They shrink from a maximum toward a floor as more
+#     open, so many more stay on screen at once. Only once they hit the floor
+#     does the strip scroll. This is the primary fix: it shows more tabs.
+#   - Tabs are never hidden, only narrowed. A hidden element has a zero-size
+#     rect, which corrupts @dnd-kit's drop-index maths, so hiding overflowed
+#     tabs — the way the traces-v2 lens strip does — would break drag-to-reorder.
+#   - A crowded tab gives up its close button rather than its name. Narrowing
+#     alone bought tabs the user could see but not tell apart. The close button
+#     comes back under the pointer, and the active tab always keeps it.
+#   - The switcher is the fallback, not the fix. It appears only once the strip
+#     really has run out of room, and lists every open prompt in that pane. While
+#     every tab fits, a dropdown would only list what is already on screen.
+#   - The switcher is per pane. Comparing two prompts side by side gives each
+#     pane its own strip, so each pane gets its own switcher over its own tabs.
+#   - Rows are a plain list. Filtering is deliberately deferred until the
+#     unfiltered list is shown to hurt.
+#   - A row mirrors what its tab shows: title, unsaved indicator, and the
+#     version number when the tab is behind. A row never offers to upgrade or
+#     close — those stay on the tab itself, so the switcher is purely navigation.
+
+Feature: Prompt playground tab switcher
+
+Rule: Tabs shrink to share the strip before it ever scrolls
+
+  Background:
+    Given I am logged into project "my-project"
+    And the prompt playground is open
+
+  # Layout, so jsdom cannot judge it. Measured by hand against the running app:
+  # at ~500px of strip, three full-width tabs became nine narrowed ones.
+  @e2e @unimplemented
+  Scenario: Opening more prompts narrows the tabs rather than pushing them off
+    Given I have opened the prompt "summarizer"
+    When I open five more prompts
+    Then all six tabs are still visible in the strip
+    And each tab is narrower than before
+
+  @e2e @unimplemented
+  Scenario: A tab never narrows past the point of being unreadable
+    When I open enough prompts to exhaust the strip
+    Then no tab is narrower than its floor
+    And the strip scrolls to reach the rest
+
+Rule: The switcher appears only once the strip runs out of room
+
+  Background:
+    Given I am logged into project "my-project"
+    And the prompt playground is open
+
+  @integration
+  Scenario: The switcher appears once the tabs no longer fit
+    Given I have opened the prompts "summarizer" and "classifier"
+    And the strip has run out of room
+    Then the tab switcher is shown
+    And it reports that 2 prompts are open
+
+  @integration
+  Scenario: The switcher stays hidden while every tab still fits
+    Given I have opened the prompts "summarizer" and "classifier"
+    And every tab still fits in the strip
+    Then the tab switcher is not shown
+
+  @integration
+  Scenario: The switcher stays out of the way for a single prompt
+    Given I have opened only the prompt "summarizer"
+    Then the tab switcher is not shown
+
+  @integration
+  Scenario: The switcher is not shown when no prompt is open
+    Given I have not opened any prompt
+    Then the tab switcher is not shown
+
+Rule: The switcher reports how many prompts are open
+
+  Background:
+    Given I am logged into project "my-project"
+    And the prompt playground is open
+    And the strip has run out of room
+
+  @integration
+  Scenario: Opening another prompt raises the count
+    Given I have opened the prompts "summarizer" and "classifier"
+    When I open the prompt "eval-judge"
+    Then the tab switcher reports that 3 prompts are open
+
+  @integration
+  Scenario: Closing a prompt lowers the count
+    Given I have opened the prompts "summarizer", "classifier", and "eval-judge"
+    When I close the "classifier" tab
+    Then the tab switcher reports that 2 prompts are open
+    And the switcher no longer offers "classifier"
+
+Rule: Selecting a prompt from the switcher activates and reveals it
+
+  Background:
+    Given I am logged into project "my-project"
+    And I have opened more prompts than fit across the tab strip
+    And "eval-judge" has scrolled out of view
+
+  @integration
+  Scenario: Choosing a prompt that has scrolled out of view
+    When I open the tab switcher
+    And I choose "eval-judge"
+    Then "eval-judge" becomes the active prompt
+    And its tab is scrolled into view in the strip
+
+  @integration
+  Scenario: The switcher marks which prompt is active
+    Given "summarizer" is the active prompt
+    When I open the tab switcher
+    Then "summarizer" is shown as the active entry
+
+  @integration
+  Scenario: Choosing the already-active prompt changes nothing
+    Given "summarizer" is the active prompt
+    When I open the tab switcher
+    And I choose "summarizer"
+    Then "summarizer" remains the active prompt
+
+Rule: A switcher row shows the same state as its tab
+
+  Background:
+    Given I am logged into project "my-project"
+    And I have opened the prompts "summarizer" and "classifier"
+    And the strip has run out of room
+
+  @integration
+  Scenario: A row shows the prompt's title
+    When I open the tab switcher
+    Then a row is shown for "summarizer"
+    And a row is shown for "classifier"
+
+  @integration
+  Scenario: A prompt that has never been saved shows a placeholder title
+    Given I have created a new prompt that has not been saved
+    When I open the tab switcher
+    Then that row reads "New Prompt"
+
+  @integration
+  Scenario: A row marks a prompt with unsaved changes
+    Given I have edited "summarizer" without saving
+    When I open the tab switcher
+    Then the "summarizer" row is marked as having unsaved changes
+    And the "classifier" row is not
+
+  @integration
+  Scenario: Saving clears the unsaved marker from the row
+    Given I have edited "summarizer" without saving
+    When I save "summarizer"
+    And I open the tab switcher
+    Then the "summarizer" row is no longer marked as having unsaved changes
+
+  @integration
+  Scenario: A row shows the version only when the prompt is behind
+    Given "summarizer" is open at a version older than the latest
+    And "classifier" is open at the latest version
+    When I open the tab switcher
+    Then the "summarizer" row shows its version number
+    And the "classifier" row shows no version number
+
+  @integration
+  Scenario: A row does not offer to close or upgrade the prompt
+    Given "summarizer" is open at a version older than the latest
+    When I open the tab switcher
+    Then the "summarizer" row offers no upgrade action
+    And the "summarizer" row offers no close action
+
+Rule: A prompt in a folder shows its own name, not its folder
+
+  # A prompt has no folder column. Its folder is a prefix on its handle, so
+  # "onboarding/welcome" is the prompt "welcome" in the folder "onboarding".
+  # A shrunk tab has room for one of the two, and the useful one is the name.
+
+  Background:
+    Given I am logged into project "my-project"
+    And I have opened the prompt "onboarding/welcome"
+
+  @integration
+  Scenario: A tab shows the prompt's name without its folder
+    Then the "onboarding/welcome" tab reads "welcome"
+    And hovering the tab reveals the full "onboarding/welcome"
+
+  @integration
+  Scenario: A switcher row shows the folder alongside the name
+    Given I have also opened the prompt "support/welcome"
+    And the strip has run out of room
+    When I open the tab switcher
+    Then one row reads "onboarding/welcome"
+    And another row reads "support/welcome"
+
+  @integration
+  Scenario: A prompt outside any folder shows no folder
+    Given I have opened the prompt "classifier"
+    And the strip has run out of room
+    When I open the tab switcher
+    Then the "classifier" row shows no folder
+
+Rule: A crowded strip spends its width on names, not close buttons
+
+  # At its floor a tab has room for roughly three characters once the padding,
+  # the unsaved dot and the close button have taken their share, so two
+  # different prompts both read "str...". The close button is the part worth
+  # giving up: it comes back under the pointer, and the tab the user is closing
+  # is usually the one they are looking at.
+  #
+  # Nothing is lost to a keyboard user: the close control has never carried a
+  # tabindex, so it was never in the tab order to begin with. Tapping a tab on
+  # a touch device activates it, and the active tab always keeps its button.
+
+  Background:
+    Given I am logged into project "my-project"
+    And I have opened the prompts "summarizer" and "classifier"
+
+  @integration
+  Scenario: An inactive tab drops its close button once the strip is crowded
+    Given the strip has run out of room
+    And "summarizer" is the active prompt
+    Then the "classifier" tab offers no close action
+    And the "summarizer" tab still offers a close action
+
+  @integration
+  Scenario: Pointing at a crowded tab brings its close button back
+    Given the strip has run out of room
+    And "summarizer" is the active prompt
+    When I hover the "classifier" tab
+    Then the "classifier" tab offers a close action
+
+  @integration
+  Scenario: With room to spare every tab keeps its close button
+    Given every tab still fits in the strip
+    And "summarizer" is the active prompt
+    Then the "classifier" tab offers a close action
+
+Rule: Comparing prompts gives each pane its own switcher
+
+  Background:
+    Given I am logged into project "my-project"
+    And I have opened the prompts "summarizer", "classifier", and "eval-judge"
+    And the strip has run out of room
+
+  @integration
+  Scenario: Splitting a prompt into a second pane splits the switchers
+    When I compare "eval-judge" in a second pane
+    Then the first pane's switcher reports that 2 prompts are open
+    And the second pane's switcher is not shown, because a single prompt is there
+
+  @integration
+  Scenario: Each pane's switcher lists only that pane's prompts
+    Given "eval-judge" has been compared into a second pane
+    When I open "regression-check" and "tone-check" in the second pane
+    Then the second pane's switcher reports that 3 prompts are open
+    And the second pane's switcher offers "eval-judge", "regression-check", and "tone-check"
+    And the second pane's switcher does not offer "summarizer"
+
+Rule: The tab strip keeps its existing behaviour
+
+  Background:
+    Given I am logged into project "my-project"
+    And I have opened more prompts than fit across the tab strip
+
+  # Both scenarios below turn on layout that jsdom does not compute: overflow
+  # scrolling needs real scroll metrics, and @dnd-kit's sensors need real
+  # layout rects. Asserting them against a mounted component would produce a
+  # green test that proves nothing. They are verified by hand against the
+  # running app, and tracked here so the invariants are not silently lost.
+
+  @e2e @unimplemented
+  Scenario: Tabs still scroll rather than disappear
+    Then every open prompt still has a tab in the strip
+    And the strip scrolls horizontally to reach them
+
+  @e2e @unimplemented
+  Scenario: Every open prompt can still be dragged to reorder
+    When I drag the "eval-judge" tab before the "summarizer" tab
+    Then "eval-judge" is ordered before "summarizer"

@@ -10,7 +10,6 @@ const COLORS: Record<string, (s: string) => string> = {
   postgres: chalk.dim,
   redis: chalk.dim,
   clickhouse: chalk.dim,
-  bullboard: chalk.gray,
   "prepare:app": chalk.blue,
   "prepare:langwatch": chalk.green,
   "prepare:langevals": chalk.magenta,

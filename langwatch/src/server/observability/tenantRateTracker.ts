@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { createLogger } from "../../utils/logger/server";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../featureFlag/types";
 
@@ -38,8 +38,8 @@ export const GLOBAL_KILL_SWITCH_DISTINCT_ID = "global";
  *  - The active-tenants index `obs:tenant_rate:active` is a SET — fast
  *    SMEMBERS for the periodic anomaly sweep, no key SCAN required.
  *  - `obs:tenant_rate:baseline:<tenantId>` caches the computed p95
- *    baseline for ~1h so the worker tick does not redo a 10080-field
- *    HMGET for every tenant every minute.
+ *    baseline for ~1h so the worker tick does not redo the full-series
+ *    HGETALL for every tenant every minute.
  *
  * Why minute-bucketed (not per-event ZSET):
  *  - O(1) write per enqueue (HINCRBY) vs O(log N) for ZADD with random nonce
@@ -53,10 +53,25 @@ export class TenantRateTracker {
   private static readonly BASELINE_PREFIX = "obs:tenant_rate:baseline:";
   private static readonly TTL_SECONDS = 8 * 24 * 3600; // 8 days
   /**
+   * Retention window in minutes (== the key TTL). A minute field older than
+   * this is past the point any reader looks at and only inflates the HGETALL
+   * reply, so it is trimmed both on write (the field aging out this tick) and
+   * on read (any orphan older than the window — including hashes that grew
+   * unbounded before trimming existed). Bounds the hash at ~one field per
+   * active minute over the window.
+   */
+  private static readonly RETENTION_MINUTES = TenantRateTracker.TTL_SECONDS / 60;
+  /**
+   * Batch size for the on-read orphan trim. A hash that predates trimming can
+   * hold hundreds of thousands of fields; delete them in chunks so a single
+   * HDEL command never carries a pathological arg list.
+   */
+  private static readonly TRIM_BATCH = 500;
+  /**
    * Baseline cache TTL. The p95 of a 7-day window does not move
    * meaningfully in an hour — caching this is the single biggest
    * tick-cost reduction available, dropping per-tenant tick cost from
-   * one 10080-field HMGET to one HGET.
+   * one full-series HGETALL to one HGET.
    */
   public static readonly BASELINE_TTL_SECONDS = 60 * 60; // 1h
 
@@ -107,6 +122,11 @@ export class TenantRateTracker {
       // ioredis pipelines auto-batch for both standalone and cluster modes
       const pipe = this.redis.pipeline();
       pipe.hincrby(key, String(minute), count);
+      // Drop the field aging out of the window this tick. The key TTL is
+      // refreshed below on every write, so an active tenant's key never
+      // expires — without this trim the hash would accumulate one field per
+      // active minute forever and HGETALL would grow without bound.
+      pipe.hdel(key, String(minute - TenantRateTracker.RETENTION_MINUTES));
       pipe.expire(key, TenantRateTracker.TTL_SECONDS);
       pipe.sadd(TenantRateTracker.ACTIVE_SET, tenantId);
       pipe.expire(TenantRateTracker.ACTIVE_SET, TenantRateTracker.TTL_SECONDS);
@@ -145,9 +165,19 @@ export class TenantRateTracker {
   }
 
   /**
-   * Per-minute rates across the last `lookbackSeconds`. Sorted oldest-first.
-   * Used by the anomaly detector to compute rolling p95 baselines without
-   * fetching unbounded data.
+   * Per-minute rates across the last `lookbackSeconds`. Sorted oldest-first,
+   * zero-padded for silent minutes. Used by the anomaly detector to compute
+   * rolling p95 baselines without fetching unbounded data.
+   *
+   * Reads via HGETALL, not an HMGET enumerating every minute of the window:
+   * the hash only holds minutes with activity, so HGETALL's cost scales with
+   * the tenant's actual traffic, while a 7-day window HMGET forced Redis to
+   * look up 10,080 requested fields (~1.8 ms of engine CPU each) regardless
+   * of how sparse the hash was — measured as the single largest engine-CPU
+   * consumer on prod (2026-07-09). The hash is trimmed to the retention
+   * window on both write and read (see {@link RETENTION_MINUTES}), so it
+   * holds at most one field per active minute over that window and the reply
+   * can never exceed ~11.5k fields however long the tenant stays active.
    */
   async perMinuteSeries(
     tenantId: string,
@@ -155,13 +185,49 @@ export class TenantRateTracker {
   ): Promise<number[]> {
     const minuteNow = Math.floor(this.nowFn() / 60_000);
     const minutesBack = Math.max(1, Math.ceil(lookbackSeconds / 60));
-    const fields: string[] = [];
-    for (let i = minutesBack - 1; i >= 0; i--) {
-      fields.push(String(minuteNow - i));
-    }
+    const oldestMinute = minuteNow - (minutesBack - 1);
+    const retentionCutoff = minuteNow - TenantRateTracker.RETENTION_MINUTES;
     const key = `${TenantRateTracker.KEY_PREFIX}${tenantId}`;
-    const values = await this.redis.hmget(key, ...fields);
-    return values.map((v) => (v ? Number.parseInt(v, 10) || 0 : 0));
+    const entries = await this.redis.hgetall(key);
+    const series = new Array<number>(minutesBack).fill(0);
+    const staleFields: string[] = [];
+    for (const [field, value] of Object.entries(entries)) {
+      const minute = Number.parseInt(field, 10);
+      if (!Number.isFinite(minute)) continue;
+      if (minute < retentionCutoff) {
+        staleFields.push(field);
+        continue;
+      }
+      const index = minute - oldestMinute;
+      if (index < 0 || index >= minutesBack) continue;
+      series[index] = Number.parseInt(value, 10) || 0;
+    }
+    await this.trimStaleFields(key, staleFields);
+    return series;
+  }
+
+  /**
+   * Best-effort removal of minute fields that have aged past the retention
+   * window. Trim-on-write keeps a steadily-active tenant bounded, but a hash
+   * that grew before trimming existed (or a tenant with silent gaps) can
+   * still carry orphans older than the window; the anomaly tick already reads
+   * the whole hash, so it cleans them up here. Batched so a single HDEL never
+   * carries a pathological arg list, and swallowed on error so a cleanup
+   * hiccup never fails the baseline read.
+   */
+  private async trimStaleFields(key: string, fields: string[]): Promise<void> {
+    if (fields.length === 0) return;
+    try {
+      for (let i = 0; i < fields.length; i += TenantRateTracker.TRIM_BATCH) {
+        const batch = fields.slice(i, i + TenantRateTracker.TRIM_BATCH);
+        await this.redis.hdel(key, ...batch);
+      }
+    } catch (err) {
+      logger.debug(
+        { key, err: err instanceof Error ? err.message : String(err) },
+        "TenantRateTracker.perMinuteSeries trim failed (non-fatal)",
+      );
+    }
   }
 
   /**
@@ -194,16 +260,26 @@ export class TenantRateTracker {
   }
 
   /**
-   * Persist a fresh baseline with the standard 1h TTL. Called once per
-   * tenant per tick at most when the cache is cold or stale.
+   * Persist a fresh baseline with the standard 1h TTL (or a caller-chosen
+   * shorter one — the detector caches its "not enough data yet" verdict
+   * briefly so quiet tenants don't re-pay the full-series read every tick).
+   * Called once per tenant per tick at most when the cache is cold or stale.
    */
-  async setCachedBaseline(tenantId: string, baseline: number): Promise<void> {
+  async setCachedBaseline({
+    tenantId,
+    baseline,
+    ttlSeconds = TenantRateTracker.BASELINE_TTL_SECONDS,
+  }: {
+    tenantId: string;
+    baseline: number;
+    ttlSeconds?: number;
+  }): Promise<void> {
     try {
       await this.redis.set(
         `${TenantRateTracker.BASELINE_PREFIX}${tenantId}`,
         baseline.toString(),
         "EX",
-        TenantRateTracker.BASELINE_TTL_SECONDS,
+        ttlSeconds,
       );
     } catch (err) {
       logger.debug(

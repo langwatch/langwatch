@@ -26,14 +26,20 @@ import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translato
 import type { AggregationTypes } from "~/server/analytics/types";
 import type { FilterField } from "~/server/filters/types";
 import {
-  isSlimEligibleMetricKey,
-  type SlimEligibleMetricKey,
+  isSlimEligibleTraceMetricKey,
+  type SlimTraceMetricKey,
 } from "../routing/route-table";
 import type {
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "../types";
-import { collectStringValues, dateTrunc, hasFilterValues } from "./_shared";
+import {
+  collectStringValues,
+  dateTrunc,
+  hasFilterValues,
+  isPercentile,
+  percentileFor,
+} from "./_shared";
 
 const SLIM_TABLE = "trace_analytics" as const;
 const ta = "ta";
@@ -52,11 +58,11 @@ export type SlimGroupByKey =
  * Slim column / Attributes-map read for a registry metric (Phase 2 hoisted
  * columns; `Attributes['…']` for legacy reads kept by the trim service).
  *
- * Narrowed to `SlimEligibleMetricKey` so the exhaustive switch is enforced
+ * Narrowed to `SlimTraceMetricKey` so the exhaustive switch is enforced
  * at compile time; `buildSlimTimeseriesQuery` validates each metric via
- * `isSlimEligibleMetricKey` before dispatch.
+ * `isSlimEligibleTraceMetricKey` before dispatch.
  */
-function slimColumnFor(metric: SlimEligibleMetricKey): string {
+function slimColumnFor(metric: SlimTraceMetricKey): string {
   switch (metric) {
     case "metadata.trace_id":
       return `${ta}.TraceId`;
@@ -161,24 +167,8 @@ function slimGroupByHandlesUnknown(groupBy?: string): boolean {
   return groupBy === "metadata.model" || groupBy === "traces.trace_name";
 }
 
-function isPercentile(agg: AggregationTypes): boolean {
-  return agg === "median" || agg === "p90" || agg === "p95" || agg === "p99";
-}
-
-function percentileFor(agg: AggregationTypes): number {
-  switch (agg) {
-    case "median":
-      return 0.5;
-    case "p90":
-      return 0.9;
-    case "p95":
-      return 0.95;
-    case "p99":
-      return 0.99;
-    default:
-      throw new Error(`Not a percentile aggregation: ${agg}`);
-  }
-}
+// isPercentile + percentileFor are shared with eval-slim-timeseries-query.ts
+// via ~/analytics/query-builders/_shared.
 
 /**
  * Slim aggregation expression. Slim has typed columns, so percentiles use
@@ -403,7 +393,7 @@ export function buildSlimTimeseriesQuery(
 
   for (let i = 0; i < input.series.length; i++) {
     const s = input.series[i]!;
-    if (!isSlimEligibleMetricKey(s.metric)) {
+    if (!isSlimEligibleTraceMetricKey(s.metric)) {
       throw new Error(
         `Slim builder cannot serve metric "${s.metric}". The router should have routed this to trace_summaries.`,
       );

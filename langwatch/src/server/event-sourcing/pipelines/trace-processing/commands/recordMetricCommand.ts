@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
@@ -9,17 +10,16 @@ import {
   EventUtils,
   type TenantId,
 } from "../../../";
-import { createLogger } from "../../../../../utils/logger/server";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   type PIIRedactionLevel,
-  recordMetricCommandDataSchema,
   type RecordMetricCommandData,
+  recordMetricCommandDataSchema,
 } from "../schemas/commands";
 import {
-  RECORD_METRIC_COMMAND_TYPE,
   METRIC_RECORD_RECEIVED_EVENT_TYPE,
   METRIC_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+  RECORD_METRIC_COMMAND_TYPE,
 } from "../schemas/constants";
 import type { MetricRecordReceivedEvent } from "../schemas/events";
 

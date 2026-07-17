@@ -1,13 +1,13 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
-import type { ProcessRole } from "~/server/app-layer/config";
+import { type ProcessRole, roleRunsWorkers } from "~/server/app-layer/config";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/queues/makeQueueName";
-import { createLogger } from "~/utils/logger/server";
 import { resolveProjectStorageDestination } from "../stored-objects/project-storage-destination";
 import { createStorageRegistry } from "../stored-objects/stored-objects-factory";
 import { DisabledPipeline } from "./disabledPipeline";
@@ -16,7 +16,9 @@ import type { OutboxReactorDefinition } from "./outbox/outboxReactor.types";
 import { adaptOutboxReactor } from "./outbox/outboxReactorAdapter";
 import {
   cadenceGroupKey,
+  graphEvalGroupKey,
   isCadence,
+  isGraphEval,
   isSettle,
   type OutboxJob,
   settleGroupKey,
@@ -34,7 +36,6 @@ import type {
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
-import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
 import type {
@@ -43,9 +44,7 @@ import type {
 } from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
-import type { ReactorDefinition } from "./reactors/reactor.types";
 import { EventSourcingPipeline } from "./runtimePipeline";
-import { ConfigurationError } from "./services/errorHandling";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
 import type { EventStore } from "./stores/eventStore.types";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
@@ -140,9 +139,6 @@ export class EventSourcing {
     // Create projection registry and register SaaS-only projections
     this.projectionRegistry = new ProjectionRegistry<Event>();
     if (options.isSaas) {
-      this.projectionRegistry.registerFoldProjection(
-        projectDailySdkUsageProjection,
-      );
       this.projectionRegistry.registerMapProjection(
         orgBillableEventsMeterProjection,
       );
@@ -175,37 +171,6 @@ export class EventSourcing {
    */
   get isOutboxWired(): boolean {
     return !!this._outbox;
-  }
-
-  /**
-   * Register a reactor on a global fold projection.
-   *
-   * Must be called before the projection registry is initialized
-   * (i.e., before the first pipeline is registered).
-   *
-   * Silently skips registration when the fold projection does not exist
-   * (e.g. `projectDailySdkUsage` is only registered in SaaS mode).
-   */
-  registerGlobalFoldReactor(
-    foldName: string,
-    reactor: ReactorDefinition<Event>,
-  ): void {
-    try {
-      this.projectionRegistry.registerReactor(foldName, reactor);
-    } catch (error) {
-      // Only suppress "fold not registered" errors — let wiring bugs (duplicates, etc.) fail fast
-      if (
-        error instanceof ConfigurationError &&
-        error.message.includes("fold not registered")
-      ) {
-        logger.debug(
-          { foldName, reactorName: reactor.name },
-          "Skipping global fold reactor — fold not registered",
-        );
-        return;
-      }
-      throw error;
-    }
   }
 
   get eventStore(): EventStore | undefined {
@@ -484,15 +449,16 @@ export class EventSourcing {
     const outbox = this._outbox;
     const isOutboxPayload = (
       payload: Record<string, unknown>,
-    ): payload is OutboxJob => isSettle(payload) || isCadence(payload);
+    ): payload is OutboxJob =>
+      isSettle(payload) || isCadence(payload) || isGraphEval(payload);
 
     const definition = {
       name: queueName,
       groupKey: (payload: Record<string, unknown>) => {
         if (isOutboxPayload(payload)) {
-          return isSettle(payload)
-            ? settleGroupKey(payload)
-            : cadenceGroupKey(payload);
+          if (isSettle(payload)) return settleGroupKey(payload);
+          if (isCadence(payload)) return cadenceGroupKey(payload);
+          return graphEvalGroupKey(payload);
         }
         const result = this.lookupEntry(payload);
         if (!result) return "__unknown__";
@@ -548,11 +514,12 @@ export class EventSourcing {
       },
       coalesceMaxBatch: (payload: Record<string, unknown>) => {
         if (isOutboxPayload(payload)) {
-          // Settle is per-(trigger, trace) so coalescing makes no sense
-          // — its dedup mode is already the collapsing primitive.
+          // Settle / graphEval are per-(trigger, ...) so coalescing makes
+          // no sense — their dedup mode is the collapsing primitive.
           // Cadence digest batches up to 100 same-window jobs into one
           // render+dispatch.
-          return isSettle(payload) ? 1 : 100;
+          if (isSettle(payload) || isGraphEval(payload)) return 1;
+          return 100;
         }
         const result = this.lookupEntry(payload);
         return result?.entry.coalesceMaxBatch ?? 1;
@@ -658,7 +625,7 @@ export class EventSourcing {
     const effectiveRedis = this._redis;
     if (effectiveRedis) {
       this._globalQueue = new GroupQueueProcessor(definition, effectiveRedis, {
-        consumerEnabled: this._processRole === "worker",
+        consumerEnabled: roleRunsWorkers(this._processRole),
         objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
         resolveStorageDestination: resolveProjectStorageDestination,
       });

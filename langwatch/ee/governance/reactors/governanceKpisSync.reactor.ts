@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GovernanceKpisClickHouseRepository,
-  type GovernanceKpiContribution,
-} from "@ee/governance/services/governanceKpis.clickhouse.repository";
-import {
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,
 } from "@ee/governance/services/governanceAttributeKeys";
-import { createLogger } from "~/utils/logger/server";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
+import {
+  type GovernanceKpiContribution,
+  GovernanceKpisClickHouseRepository,
+} from "@ee/governance/services/governanceKpis.clickhouse.repository";
+import { createLogger } from "@langwatch/observability";
+import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type {
   ReactorContext,
   ReactorDefinition,
 } from "~/server/event-sourcing/reactors/reactor.types";
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger(
   "langwatch:trace-processing:governance-kpis-sync-reactor",

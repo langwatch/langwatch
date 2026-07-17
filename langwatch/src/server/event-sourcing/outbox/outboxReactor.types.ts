@@ -75,7 +75,7 @@ export interface OutboxEnqueueRequest {
  * the side effect inline. It only decides — by returning enqueue
  * requests — what to dispatch later. The actual dispatch logic
  * lives in an `OutboxDispatcher` registered against the same
- * `reactorName` on the OutboxDrainer.
+ * `reactorName` on the dispatcher.
  */
 export interface OutboxReactorDefinition<
   E extends Event = Event,

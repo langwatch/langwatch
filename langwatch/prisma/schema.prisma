@@ -740,6 +740,16 @@ enum TriggerAction {
   SEND_SLACK_MESSAGE
 }
 
+// The three automation kinds, distinguished by WHAT FIRES them (ADR-042):
+// AUTOMATION = an event (a trace matches filters); ALERT = a condition (a
+// custom-graph metric crosses a threshold); REPORT = a schedule (a calendar
+// cron). Backfilled from the legacy `customGraphId != null` heuristic.
+enum TriggerKind {
+  AUTOMATION
+  ALERT
+  REPORT
+}
+
 enum AlertType {
   CRITICAL
   WARNING
@@ -752,8 +762,19 @@ model Trigger {
   projectId     String
   project       Project       @relation(fields: [projectId], references: [id])
   action        TriggerAction
+  // ADR-042: the automation kind. Backfilled AUTOMATION/ALERT from
+  // customGraphId; REPORT is set by the scheduled-report upsert path.
+  triggerKind   TriggerKind   @default(AUTOMATION)
   actionParams  Json
+  // Legacy structured filter object (FilterField -> values). Retained for
+  // back-compat; new trace-subject automations author `filterQuery` instead
+  // and persist `filters` as an empty `{}`.
   filters       Json
+  // ADR-043 Subject facet: the Traces-V2 liqe query string that defines which
+  // traces this automation is about. NULL = legacy `filters`-driven trigger.
+  // Evaluated in-memory against fold state at dispatch (never per-trace CH),
+  // fail-closed on any unevaluable field.
+  filterQuery   String?
   lastRunAt     Float         @default(0)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
@@ -1059,6 +1080,14 @@ model TriggerSent {
   project       Project      @relation(fields: [projectId], references: [id])
   trigger       Trigger      @relation(fields: [triggerId], references: [id])
   resolvedAt    DateTime? // For custom graph alerts: null = still firing, set = resolved
+  // Identity of the open incident this row represents, set while firing and
+  // cleared (NULL) on resolve. A single-column unique on it means at most one
+  // OPEN incident can exist per identity — Postgres treats NULLs as distinct,
+  // so any number of resolved rows coexist. This is the atomic claim for a
+  // graph alert: `@@unique([triggerId, traceId])` can't guard it because
+  // `traceId` is NULL for graph alerts, so without this two evaluators could
+  // both open an incident and both dispatch.
+  openIncidentKey String? @unique
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @default(now()) @updatedAt
 
@@ -1672,21 +1701,6 @@ model SimulationSuite {
 
   @@unique([projectId, slug])
   @@index([projectId])
-}
-
-model ProjectDailySdkUsage {
-  id                 String   @id
-  projectId          String
-  date               String // UTC date "YYYY-MM-DD"
-  sdkName            String   @default("")
-  sdkVersion         String   @default("")
-  sdkLanguage        String   @default("")
-  count              Int      @default(0)
-  lastEventTimestamp BigInt? // Unix ms from event.timestamp
-  updatedAt          DateTime @default(now()) @updatedAt
-
-  @@unique([projectId, date, sdkName, sdkVersion, sdkLanguage])
-  @@index([projectId, date])
 }
 
 model Subscription {
@@ -3060,5 +3074,60 @@ model LangyConversation {
   @@index([deletedAt])
   @@index([userId])
   @@index([sharedById])
+}
+
+// ADR-042 Phase 1: the generic calendar-scheduling primitive. One row per
+// scheduled thing, `targetType`/`targetId` keep it consumer-agnostic (a
+// scheduled report writes `("reportTrigger", trigger.id)`; a future weekly
+// rollup writes its own type). The durable Postgres row is the SOURCE OF
+// TRUTH AND the only coordination layer — NO Redis. The in-process
+// SchedulerService loop (worker-only) reads `nextRunAt` to sleep until the
+// soonest due job, scans due rows, and atomically CLAIMS each via a
+// conditional `UPDATE ... WHERE id = <id> AND nextRunAt = <expected>` before
+// firing its registered handler. That conditional claim is the SOLE
+// exactly-once mechanism: exactly one of N racing workers wins each slot, so
+// every worker can run the loop and share firing load (no leader-lock). See
+// src/server/app-layer/scheduler/ and dev/docs/adr/044-scheduled-reports-automation-kind.md.
+model ScheduledJob {
+  id         String    @id @default(nanoid())
+  projectId  String // multitenancy + per-tenant fairness
+  targetType String // the consumer key, e.g. "reportTrigger"
+  targetId   String // what to fire, e.g. the Trigger.id
+  cron       String // e.g. "0 9 * * 1"
+  timezone   String // IANA, e.g. "America/New_York"
+  // Forward marker: the resolved UTC instant of the next fire. Indexed so
+  // the loop's due-scan and MIN(nextRunAt) sleep target are cheap.
+  nextRunAt  DateTime
+  // Last calendar instant fired (the "slot"). NULL until the first fire.
+  // Only advanced once a fire is DELIVERED, so a failed slot is retried, not
+  // silently skipped.
+  lastSlot   DateTime?
+  // The calendar instant of the slot currently in flight (claimed, retrying,
+  // or crash-recovering). Stamped by the FIRST claim of a slot and preserved
+  // across retry/lease re-claims, because `nextRunAt` mutates into a backoff
+  // or lease instant the moment a slot is worked — without this column a
+  // retried daily report would compute its window from the backoff instant
+  // (minutes) instead of the cron slot (a day). NULL when no slot is in
+  // flight (delivered / abandoned / released).
+  currentSlot DateTime?
+  // Retry bookkeeping. On claim the loop leases the slot by pushing
+  // `nextRunAt` a lease-window into the future without advancing to the next
+  // cron slot; a handler failure re-arms `nextRunAt` at a bounded backoff and
+  // bumps `attempts`, so the slot is retried instead of lost. Once `attempts`
+  // reaches the cap the slot is abandoned to the next cron instant with
+  // `lastError` kept for the operator. Reset to (0, NULL) on a delivered fire.
+  attempts   Int       @default(0)
+  lastError  String?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+
+  // The due-scan: `WHERE active AND nextRunAt <= now` and MIN(nextRunAt).
+  @@index([active, nextRunAt])
+  // Per-project lookup.
+  @@index([projectId])
+  // One schedule per target — makes upsertForTarget / claim a clean
+  // conditional update keyed on the target identity.
+  @@unique([targetType, targetId])
 }
 

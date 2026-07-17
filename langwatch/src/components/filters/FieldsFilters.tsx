@@ -603,7 +603,7 @@ function ListSelection({
 		overscan: 5,
 	});
 
-	const isEmpty = options && options.length === 0 && !showCustomValue;
+	const isEmpty = options && options.length === 0;
 
 	// Handle selecting custom value
 	const handleCustomValueSelect = useCallback(() => {
@@ -839,7 +839,7 @@ function ListSelection({
 
 				{isEmpty && (
 					<Text fontSize="sm" paddingX={1} paddingY={2}>
-						No options found
+						No values yet — filters fill in as traces arrive.
 					</Text>
 				)}
 				{filterData.isLoading &&

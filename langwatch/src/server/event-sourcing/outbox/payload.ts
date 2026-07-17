@@ -84,26 +84,30 @@ export interface SettleStagePayload
     Record<string, unknown> {
   stage: "settle";
   traceId: string;
-  /**
-   * Fold snapshot at enqueue time. The settle process callback
-   * **re-reads** the fold from the projection store at fire time so a
-   * 30-second-old snapshot doesn't drive the filter check — the
-   * snapshot here is only a debugging breadcrumb.
-   */
-  foldSnapshotAtEnqueue: {
-    computedInput: string;
-    computedOutput: string;
-  };
+  // A settle payload carries an IDENTITY, never trace content. It used to also
+  // carry a `foldSnapshotAtEnqueue` copy of the trace's computed input/output
+  // — but the settle callback re-reads the fold at fire time (a stale snapshot
+  // must not drive the filter check), so the copy was never read. It was
+  // customer prompt/response text sitting in Redis and, via the audit
+  // projection, at rest in Postgres, for nothing.
 }
 
 export interface CadenceStagePayload
   extends CommonStagePayload,
     Record<string, unknown> {
   stage: "cadence";
+  /**
+   * The matched trace — an IDENTITY, not its content. The trace's input and
+   * output used to ride along here so the dispatcher could render without a
+   * second read; but the dispatcher already re-fetches the trace at dispatch,
+   * and it reads the fold (the same projection settle took the copy from), so
+   * the copy bought nothing and cost a duplicate of customer prompt/response
+   * text in Redis and — via the audit projection — at rest in Postgres,
+   * outliving the trace and surviving its deletion. Keeping the payload to an
+   * identity also keeps it small enough to never need a queue blob.
+   */
   match: {
     traceId: string;
-    input: string;
-    output: string;
   };
   /**
    * Set by the dispatcher when a cadence dispatch resolves to a no-op
@@ -127,7 +131,34 @@ export interface CadenceStagePayload
   renderDiagnostics?: { missingVariables: string[] } | null;
 }
 
-export type OutboxJob = SettleStagePayload | CadenceStagePayload;
+/**
+ * Custom-graph threshold evaluation request (ADR-034 Phase 5).
+ *
+ * Single-stage outbox payload — graph evaluations do not have a settle
+ * → cadence shape because they have no `traceId` to debounce per-trace
+ * and no per-trigger digest to coalesce: each call drives the cron-
+ * mirror handler `evaluateGraphTrigger` which itself owns dedup via
+ * `TriggerSent`. The Debounce Mode TTL on the outer queue collapses
+ * repeated `(triggerId, projectId)` enqueues into a single fire — see
+ * `release_es_graph_triggers_firing` (ADR-034 Phase 5).
+ */
+export const GRAPH_TRIGGER_EVAL_REACTOR_NAME =
+  "graphTriggerEvaluation" as const;
+
+export interface GraphEvalStagePayload extends Record<string, unknown> {
+  stage: "graphEval";
+  projectId: string;
+  triggerId: string;
+  reactorName: typeof GRAPH_TRIGGER_EVAL_REACTOR_NAME;
+  /** What woke the evaluator up — for telemetry only. The handler
+   *  re-derives breach/no-breach from analytics regardless. */
+  reason: "real-time" | "heartbeat-absence" | "heartbeat-resolve";
+}
+
+export type OutboxJob =
+  | SettleStagePayload
+  | CadenceStagePayload
+  | GraphEvalStagePayload;
 
 // Widened to accept any unknown payload — these are the discriminators
 // the main event-sourcing queue uses to pick off outbox jobs from
@@ -143,6 +174,45 @@ export function isCadence(
   job: Record<string, unknown>,
 ): job is CadenceStagePayload {
   return (job as { stage?: unknown }).stage === "cadence";
+}
+
+export function isGraphEval(
+  job: Record<string, unknown>,
+): job is GraphEvalStagePayload {
+  return (job as { stage?: unknown }).stage === "graphEval";
+}
+
+/**
+ * Per-(trigger, project) dedup key for the graphEval stage. Identity
+ * for the GroupQueue Debounce Mode entry — repeat sends within the TTL
+ * collapse onto the existing pending job. The handler `evaluateGraphTrigger`
+ * is idempotent and owns its own `TriggerSent` dedup; the debounce
+ * here just bounds the rate at which we re-run the threshold check.
+ *
+ * Convention mirrors `settleDedupId` shape, with a `:graph:` discriminator
+ * + suffix indicating the source (`real-time` reactor vs `hb` heartbeat)
+ * so the two sources don't collapse together — locked by the Phase 5
+ * spec.
+ */
+export function graphEvalDedupId(params: {
+  projectId: string;
+  triggerId: string;
+  suffix?: string;
+}): string {
+  const tail = params.suffix ? `:${params.suffix}` : "";
+  return `${params.projectId}/${params.triggerId}:graph${tail}`;
+}
+
+/**
+ * Per-trigger group key for the graphEval stage. Per-trigger FIFO so a
+ * noisy trigger doesn't head-of-line-block other triggers' evaluation
+ * windows.
+ */
+export function graphEvalGroupKey(params: {
+  projectId: string;
+  triggerId: string;
+}): string {
+  return `${params.projectId}/${GRAPH_TRIGGER_EVAL_REACTOR_NAME}:${params.triggerId}`;
 }
 
 /**

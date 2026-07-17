@@ -88,7 +88,6 @@ function fakeCtx(): RuntimeContext {
       redis: 6561,
       clickhouseHttp: 6562,
       clickhouseNative: 6563,
-      bullboard: 6564,
     },
     paths: {
       root: "/tmp/.langwatch-test",
@@ -107,7 +106,6 @@ function fakeCtx(): RuntimeContext {
     predeps: {},
     envFile: "/tmp/.langwatch-test/.env",
     version: "test",
-    bullboard: false,
     userEnv: {},
   };
 }

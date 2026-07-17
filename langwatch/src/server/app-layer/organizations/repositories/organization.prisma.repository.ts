@@ -10,7 +10,7 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { generate } from "@langwatch/ksuid";
-import { NotFoundError, ValidationError } from "~/server/app-layer/domain-error";
+import { NotFoundError, ValidationError } from "~/server/app-layer/handled-error";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { encrypt } from "~/utils/encryption";
 import { KSUID_RESOURCES } from "~/utils/constants";

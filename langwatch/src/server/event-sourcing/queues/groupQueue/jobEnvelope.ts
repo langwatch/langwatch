@@ -1,25 +1,179 @@
 import { randomUUID } from "node:crypto";
-import { promisify } from "node:util";
-import { gunzip, gzip } from "node:zlib";
 
-import type { Logger } from "pino";
+import type { Logger } from "@langwatch/observability";
 
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 
 import { MAX_BLOB_BYTES } from "./blobConstants";
+import {
+  compress,
+  compressionMediaType,
+  type CompressionCodec,
+  contentHashSource,
+  decodePayload,
+  decompress,
+  encodePayload,
+} from "./bodyCodec";
 import { gqEnvelopeGQ2DowngradeTotal, gqPayloadTooLargeTotal } from "./metrics";
 import type { BlobRef, TieredBlobStore } from "./tieredBlobStore";
 
-const gzipAsync = promisify(gzip);
-const gunzipAsync = promisify(gunzip);
+/**
+ * Compression and payload codec are chosen at WRITE time behind flags, but READ
+ * always sniffs the bytes and accepts every format we have ever written. That
+ * asymmetry is the whole rollout story: ship readers that understand zstd and
+ * msgpack with writes still off, let the fleet cycle, then flip the flags.
+ *
+ * Writing first is NOT safe here. `decodeJobEnvelope` throwing a plain Error
+ * (unknown codec, failed parse) does not retry — `GroupQueue` only re-stages on
+ * `TransientBlobStoreError`, so everything else terminates at the non-retryable
+ * fail-safe, which completes the slot and drops the job to replay. An old worker
+ * meeting a new body during a rolling deploy would silently discard it.
+ */
+function zstdWritesEnabled(): boolean {
+  return process.env.GROUP_QUEUE_ZSTD_WRITES_ENABLED === "true";
+}
+
+function msgpackWritesEnabled(): boolean {
+  return process.env.GROUP_QUEUE_MSGPACK_WRITES_ENABLED === "true";
+}
+
+function writeCompression(): CompressionCodec {
+  return zstdWritesEnabled() ? "zstd" : "gzip";
+}
 
 /**
- * Cap decompression output at the same ceiling encode enforces (ADR-030 §1), so
- * a tampered or corrupt blob (e.g. a tenant zip-bombing their own BYOC object)
- * can't OOM the worker. zlib throws past the limit; decode lets that propagate to
- * the missing-blob fail-safe (complete the slot, recover via replay).
+ * Decompression with the over-limit error converted to a park signal. bodyCodec
+ * already caps both codecs' output at the encode ceiling (ADR-030 §1) so a
+ * tampered or corrupt blob (e.g. a tenant zip-bombing their own BYOC object)
+ * can't OOM the worker; zlib reports the over-limit result as
+ * ERR_BUFFER_TOO_LARGE (or an "output length" RangeError depending on version).
+ * Both mean the same thing here: the staged value would materialize past the
+ * decode ceiling, so throw {@link PayloadTooLargeError} and let the caller park
+ * the group for inspection instead of dropping the job to replay (which would
+ * re-materialize the same value).
  */
-const DECODE_GUNZIP_OPTS = { maxOutputLength: MAX_BLOB_BYTES };
+async function boundedDecompress(data: Buffer): Promise<Buffer> {
+  try {
+    return await decompress(data);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (
+      code === "ERR_BUFFER_TOO_LARGE" ||
+      (err instanceof RangeError && /output length/i.test(err.message))
+    ) {
+      throw new PayloadTooLargeError(MAX_BLOB_BYTES + 1);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Inflate + parse a body, naming the failure if it will not read.
+ *
+ * Named `decode*`, not `read*`: every `read*` in this file contractually never
+ * throws (`readJobRoutingMeta`, `readEnvelopeDescriptor`, `readEnvelopeHold`…),
+ * and this throws the `DecodeFailureError`s the drop path dispatches on.
+ *
+ * A body that is present but unreadable — bad compression frame, a codec this
+ * worker does not know, a parse that fails — is NOT the same event as a blob that
+ * is gone, and this is the exact rolling-deploy vector described at the top of
+ * this file: an old worker meeting a body written by a new one. Naming it
+ * `body_unreadable` is what lets the caller keep the value instead of retiring
+ * it, so the next worker can read what this one could not.
+ *
+ * {@link PayloadTooLargeError} passes through untouched — that is the park signal,
+ * and an oversized body must keep parking rather than be recast as corrupt.
+ */
+async function decodeBody(data: Buffer): Promise<Record<string, unknown>> {
+  let inflated: Buffer;
+  try {
+    inflated = await boundedDecompress(data);
+  } catch (err) {
+    if (err instanceof PayloadTooLargeError) throw err;
+    throw new DecodeFailureError({
+      message: `Job envelope body failed to decompress: ${errText(err)}`,
+      reason: "body_unreadable",
+    });
+  }
+  try {
+    return decodePayload(inflated);
+  } catch (err) {
+    throw new DecodeFailureError({
+      message: `Job envelope body failed to parse: ${safeParseErrText(err)}`,
+      reason: "body_unreadable",
+    });
+  }
+}
+
+/** Inline uncompressed body — named the same way {@link decodeBody} names a blob body. */
+function parseInlineBody(body: string): Record<string, unknown> {
+  try {
+    return JSON.parse(body) as Record<string, unknown>;
+  } catch (err) {
+    throw new DecodeFailureError({
+      message: `Job envelope inline body failed to parse: ${safeParseErrText(err)}`,
+      reason: "body_unreadable",
+    });
+  }
+}
+
+const errText = (err: unknown): string =>
+  err instanceof Error ? err.message : String(err);
+
+/**
+ * A parse failure's message, with any echoed source text removed.
+ *
+ * **This is a PII guard, not tidiness.** V8 quotes the offending input back at
+ * you: `JSON.parse("patient@hospital.example …")` throws
+ * `Unexpected token 'p', "patient@ho"... is not valid JSON` — ten characters of
+ * raw body. That message reaches the drop log (`GroupQueue.recordDrop` →
+ * `err:`), and `redactStorageUrisInText` only strips storage URIs, so the
+ * fragment would land in prod logs verbatim. The body is exactly the thing we
+ * promised never to log (a staged payload can carry tenant PII), and it is the
+ * thing we could not read anyway.
+ *
+ * Pre-dates this fix: the bare-JSON path already threw a raw `SyntaxError` that
+ * #5736 then started logging. Fixed here rather than inherited (#5538).
+ *
+ * Keeps the diagnosis (`Unexpected token 'p'`, `Unterminated string`, position)
+ * and drops only the quoted echo. zlib messages ("incorrect header check")
+ * never echo input, so they pass through untouched.
+ */
+const safeParseErrText = (err: unknown): string => {
+  const raw = errText(err);
+  // ALLOWLIST, not blocklist: keep the leading diagnosis and drop everything from
+  // the first delimiter a parser uses to hand input back — `"` (V8's echo, quoted
+  // or truncated) or `[`/`{` (msgpackr's `{"type":"Buffer","data":[83,69]}`, whose
+  // byte array decodes straight back to the plaintext).
+  //
+  // Matching V8's exact wording instead was the first attempt and it leaked: V8
+  // only appends `"..."` at ~21+ chars and echoes the WHOLE string below that, so
+  // a 9-digit SSN or a 6-digit OTP sailed through untouched. A blocklist over one
+  // library's message shapes re-opens on every runtime upgrade — the same
+  // fragility `DecodeFailureReason` exists to avoid for classification.
+  //
+  // What survives the cut is vocabulary, not payload: "Unexpected token 'x'",
+  // "Unterminated string in JSON at position 30", "incorrect header check". The
+  // single-quoted token is one character — kept because it is the most useful
+  // byte in the message and one character is not a secret.
+  const cut = raw.search(/["[{]/);
+  const head = (cut === -1 ? raw : raw.slice(0, cut)).trim().replace(/[,\s]+$/, "");
+  const name = err instanceof Error ? err.name : "Error";
+  return head ? `${name}: ${head}` : name;
+};
+
+/**
+ * Decode-side twin of {@link assertPayloadWithinCap}: values staged before the
+ * encode cap existed (or via the bare-JSON path when envelope writes are off)
+ * must not reach JSON.parse unbounded - a synchronous parse of a runaway value
+ * seizes the worker event loop, which the liveness probe converts into a
+ * process-wide crash loop.
+ */
+function assertDecodeWithinCap(byteLength: number): void {
+  if (byteLength > MAX_BLOB_BYTES) {
+    throw new PayloadTooLargeError(byteLength);
+  }
+}
 
 /**
  * Versioned envelope for staged job values: `GQ<v>|<headerLen>|<headerJson><body>`.
@@ -75,9 +229,10 @@ function envelopeWritesEnabled(): boolean {
  * job was squashed by dedup or lost in a crash must eventually expire.
  */
 export interface JobBlobStore {
-  put(params: { id: string; data: Buffer }): Promise<void>;
+  /** `ttlSeconds` overrides the GQ1 default backstop (see {@link RedisJobBlobStore}). */
+  put(params: { id: string; data: Buffer; ttlSeconds?: number }): Promise<void>;
   /** Read the blob AND refresh its backstop TTL. Worker hot path only. */
-  get(params: { id: string }): Promise<Buffer | null>;
+  get(params: { id: string; ttlSeconds?: number }): Promise<Buffer | null>;
   /** Read the blob WITHOUT refreshing its TTL. Non-worker / ops-dashboard inspection path. */
   peek(params: { id: string }): Promise<Buffer | null>;
   delete(params: { id: string }): Promise<void>;
@@ -188,7 +343,13 @@ function finalize(
 
 /**
  * Picks the inline encoding for a body that stays in the envelope: raw JSON, or
- * gzip+base64 when compression actually wins (mutates `header.e` to `"gz"`).
+ * compressed+base64 when compression actually wins (mutates `header.e` to
+ * `"gz"`).
+ *
+ * `"gz"` means "compressed"; the codec itself is sniffed from the magic bytes on
+ * decode rather than named in the header, so a zstd body and a gzip body are
+ * both `"gz"` and a reader never has to trust a header that could disagree with
+ * the bytes it actually got.
  */
 async function inlineBody(
   json: string,
@@ -196,10 +357,12 @@ async function inlineBody(
   header: EnvelopeHeader,
 ): Promise<string> {
   if (jsonBytes > COMPRESSION_THRESHOLD_BYTES) {
-    const compressed = (await gzipAsync(json)).toString("base64");
+    const compressed = (await compress(json, writeCompression())).toString(
+      "base64",
+    );
     // High-entropy payloads (inline base64-ish data) can come out LARGER after
-    // gzip+base64; keep raw JSON unless compression actually wins. `"gz"` costs
-    // one more header byte than `"j"`.
+    // compress+base64; keep raw JSON unless compression actually wins. `"gz"`
+    // costs one more header byte than `"j"`.
     if (Buffer.byteLength(compressed) + 1 < jsonBytes) {
       header.e = "gz";
       return compressed;
@@ -220,6 +383,114 @@ export class PayloadTooLargeError extends Error {
     );
     this.name = "PayloadTooLargeError";
     this.byteLength = byteLength;
+  }
+}
+
+/**
+ * Why a decode failed, as a closed set derived from the failure TYPE.
+ *
+ * Message text is not a classifier: zlib's wording is Node-version-dependent and
+ * not ours to own, so an alert built on substring matching breaks under a runtime
+ * upgrade. `GroupQueue` labels its drop counter with these, so oncall can separate
+ * "the body is gone" from "we cannot read the body we have" without grepping.
+ *
+ * - `missing_blob` — the envelope's blob resolved to nothing. The body is GONE:
+ *   no retry, park, or replay resurrects it. Irreducible loss at this layer.
+ * - `malformed_envelope` — the envelope's own structure is unreadable, so we
+ *   cannot even find the body.
+ * - `body_unreadable` — we found the body and could not turn it back into an
+ *   object: a bad compression frame, a codec this worker does not know, or a
+ *   parse that failed. One name for all three because they are one event
+ *   operationally (these bytes are unreadable *to this worker*) with one fix
+ *   (do not retire them). Named for the CONDITION, not one of its mechanisms —
+ *   it also fires on an inline, never-compressed body, where nothing was
+ *   decompressed at all.
+ *
+ * `malformed_envelope` and `body_unreadable` are body-PRESENT: the value is
+ * intact and a later worker may decode it fine (a rolling-deploy format skew is
+ * exactly this — see the codec note at the top of this file). Callers must not
+ * retire such a value; see `GroupQueue`'s drop branch.
+ */
+export type DecodeFailureReason =
+  | "missing_blob"
+  | "malformed_envelope"
+  | "body_unreadable";
+
+/**
+ * A decode failure we can name. Distinct from {@link PayloadTooLargeError} (park,
+ * do not parse) and `TransientBlobStoreError` (retry — the body is temporarily
+ * unreachable, not gone).
+ *
+ * Carries only `reason`; the envelope descriptor is read from the value itself by
+ * {@link readEnvelopeDescriptor}, so throw sites don't thread it and a plain
+ * `Error` from anywhere still gets a descriptor.
+ */
+export class DecodeFailureError extends Error {
+  readonly reason: DecodeFailureReason;
+  constructor({
+    message,
+    reason,
+  }: {
+    message: string;
+    reason: DecodeFailureReason;
+  }) {
+    super(message);
+    this.name = "DecodeFailureError";
+    this.reason = reason;
+  }
+}
+
+/** A drop-log-safe description of an envelope: shape only, never body or PII. */
+export interface EnvelopeDescriptor {
+  /** Body encoding — "redis" | "s3" | "ref" | "gz" | "j" (wire: `header.e`). */
+  format: string | null;
+  /** Envelope version (wire: `header.v`). */
+  version: number | null;
+  /** GQ1 blob id or GQ2 tiered blob hash, whichever the envelope carries. */
+  blobId: string | null;
+}
+
+/**
+ * Describes an envelope for a drop log — format, version, blob id. Never throws;
+ * unreadable values yield nulls. Sibling of {@link readJobRoutingMeta}, and the
+ * same trick: the header survives what the body does not, so a value we could not
+ * decode can still say what it WAS. All-nulls is itself a signal — it means the
+ * envelope would not even split.
+ *
+ * Deliberately shape-only. The body may hold tenant PII; the header holds routing
+ * and storage machinery, and blob ids are content hashes / UUIDs.
+ */
+/**
+ * A blob id only if it LOOKS like one. This reader runs on envelopes we already
+ * know are malformed, so `header.r` / `header.ref.hash` are attacker-shaped
+ * strings by that point and the value goes straight to a log. Anything off-shape
+ * becomes null rather than a free-text field in the drop record (#5538, review).
+ *
+ * One alphabet covers both id shapes, because GQ1's is a subset of GQ2's:
+ * - **GQ1** — `randomUUID()`: 36 chars of `[0-9a-f-]`.
+ * - **GQ2** — `sha256(bytes).subarray(0,16).toString("base64url")`
+ *   (`tieredBlobStore.ts`): 22 chars of `[A-Za-z0-9_-]`. **Not hex** — an earlier
+ *   hex-only guard here nulled every legitimate GQ2 id and broke the AC1
+ *   descriptor. The unit tests caught it; do not narrow this to hex.
+ */
+const safeBlobId = (id: string | null): string | null =>
+  id && /^[A-Za-z0-9_-]{8,128}$/.test(id) ? id : null;
+
+export function readEnvelopeDescriptor(value: string): EnvelopeDescriptor {
+  try {
+    if (!isEnvelope(value)) {
+      return { format: null, version: null, blobId: null };
+    }
+    const { header } = splitEnvelope(value);
+    return {
+      format: typeof header.e === "string" ? header.e : null,
+      version: typeof header.v === "number" ? header.v : null,
+      blobId: safeBlobId(
+        readEnvelopeBlobIdFromHeader(header) ?? header.ref?.hash ?? null,
+      ),
+    };
+  } catch {
+    return { format: null, version: null, blobId: null };
   }
 }
 
@@ -272,19 +543,13 @@ export async function encodeJobEnvelope({
   /** Optional logger for tenant-attributed warn on cap / downgrade. */
   logger?: Logger;
 }): Promise<string> {
-  const json = JSON.stringify(jobData);
   const enabled = writesEnabled ?? envelopeWritesEnabled();
-  if (!enabled) {
-    return json;
-  }
-  const jsonBytes = Buffer.byteLength(json);
-  assertPayloadWithinCap(jsonBytes, { projectId, queueName, logger });
 
   // GQ2: content-addressed, tenant-namespaced, tiered offload. Active only once
   // the composition root supplies a tiered store and the job's tenant. If
   // either is missing we fall back to GQ1 — noisy so a regression in the
   // composition root can't ship a silently-downgraded pipeline.
-  if (tieredBlobs && projectId) {
+  if (enabled && tieredBlobs && projectId) {
     const header = routingHeader(jobData, 2);
     // Lift queue machinery into the header so it doesn't perturb the content
     // hash. Without this, N reactors fanning out the same event produce N
@@ -300,17 +565,28 @@ export async function encodeJobEnvelope({
     if (Object.keys(machinery).length > 0) {
       header.m = machinery;
     }
-    const payloadJson = JSON.stringify(payload);
-    const payloadBytes = Buffer.byteLength(payloadJson);
+
+    // GQ2 never serializes `jobData` as a whole — only the payload. The old
+    // `JSON.stringify(jobData)` above this branch was a second full pass whose
+    // result this path then threw away.
+    const { bytes, codec, json: payloadJson } = encodePayload(payload, {
+      msgpackEnabled: msgpackWritesEnabled(),
+    });
+    const payloadBytes = bytes.length;
+    assertPayloadWithinCap(payloadBytes, { projectId, queueName, logger });
+
     if (payloadBytes > INLINE_CEILING_BYTES) {
+      const compression = writeCompression();
       const ref = await tieredBlobs.put({
         projectId,
-        data: await gzipAsync(payloadJson),
-        // Hash the RAW payload json string directly, not the gzip output — the
-        // dedup key is independent of gzip determinism (zlib version/level;
-        // ADR-030 §1). `contentHash` accepts strings and lets crypto handle the
-        // UTF-8 conversion internally so we don't allocate a full-payload Buffer.
-        hashSource: payloadJson,
+        data: await compress(bytes, compression),
+        // Hash the RAW payload, never the compressed output — the dedup key must
+        // not depend on gzip/zstd determinism (library version/level; ADR-030
+        // §1). The codec is folded in so a JSON-encoded and a msgpack-encoded
+        // copy of the same payload can't collide on one key with different bytes
+        // mid-rollout.
+        hashSource: contentHashSource({ codec, json: payloadJson, bytes }),
+        mediaType: compressionMediaType(compression),
       });
       header.e = ref.tier;
       header.ref = ref;
@@ -320,12 +596,22 @@ export async function encodeJobEnvelope({
       header.h = randomUUID();
       return finalize(ENVELOPE_PREFIX_V2, header, "");
     }
+
+    // Inline bodies are under INLINE_CEILING_BYTES (4KB) and msgpack only
+    // engages above MSGPACK_MIN_BYTES (100KB), so an inline body is always JSON.
     return finalize(
       ENVELOPE_PREFIX_V2,
       header,
-      await inlineBody(payloadJson, payloadBytes, header),
+      await inlineBody(payloadJson ?? bytes.toString("utf-8"), payloadBytes, header),
     );
   }
+
+  const json = JSON.stringify(jobData);
+  if (!enabled) {
+    return json;
+  }
+  const jsonBytes = Buffer.byteLength(json);
+  assertPayloadWithinCap(jsonBytes, { projectId, queueName, logger });
 
   // GQ1 fallback path: reached when the caller opted into writes but didn't
   // supply BOTH a tiered store and a projectId. Loud so a composition-root
@@ -346,7 +632,7 @@ export async function encodeJobEnvelope({
   const header = routingHeader(jobData, 1);
   if (blobs && jsonBytes > BLOB_OFFLOAD_THRESHOLD_BYTES) {
     const id = randomUUID();
-    await blobs.put({ id, data: await gzipAsync(json) });
+    await blobs.put({ id, data: await compress(json, writeCompression()) });
     header.e = "ref";
     header.r = id;
     return finalize(ENVELOPE_PREFIX_V1, header, "");
@@ -380,7 +666,11 @@ export async function decodeJobEnvelope({
   parsed?: { header: EnvelopeHeader; body: string };
 }): Promise<Record<string, unknown>> {
   if (!isEnvelope(value)) {
-    return JSON.parse(value) as Record<string, unknown>;
+    assertDecodeWithinCap(Buffer.byteLength(value, "utf8"));
+    // Legacy bare JSON. An unparseable one is still a body we HAVE and cannot
+    // read, so it earns a name like any other — otherwise it lands in `unknown`
+    // and looks like a gap in the enum rather than the thing it is.
+    return parseInlineBody(value);
   }
 
   const { header, body } = parsed ?? splitEnvelope(value);
@@ -388,7 +678,10 @@ export async function decodeJobEnvelope({
   // GQ2: content-addressed tiered blob.
   if (header.e === "redis" || header.e === "s3") {
     if (!header.ref) {
-      throw new Error("Malformed job envelope: tiered body without a blob ref");
+      throw new DecodeFailureError({
+      message: "Malformed job envelope: tiered body without a blob ref",
+      reason: "malformed_envelope",
+    });
     }
     if (!tieredBlobs) {
       throw new Error(
@@ -400,20 +693,22 @@ export async function decodeJobEnvelope({
         ? await tieredBlobs.peek(header.ref)
         : await tieredBlobs.get(header.ref);
     if (!data) {
-      throw new Error(
-        "Job envelope tiered blob is missing (deleted or expired)",
-      );
+      throw new DecodeFailureError({
+      message: "Job envelope tiered blob is missing (deleted or expired)",
+      reason: "missing_blob",
+    });
     }
-    const parsedBody = JSON.parse(
-      (await gunzipAsync(data, DECODE_GUNZIP_OPTS)).toString("utf8"),
-    ) as Record<string, unknown>;
+    const parsedBody = await decodeBody(data);
     return mergeMachinery(parsedBody, header);
   }
 
   // GQ1: randomUUID offloaded blob.
   if (header.e === "ref") {
     if (typeof header.r !== "string" || header.r.length === 0) {
-      throw new Error("Malformed job envelope: ref body without a blob id");
+      throw new DecodeFailureError({
+      message: "Malformed job envelope: ref body without a blob id",
+      reason: "malformed_envelope",
+    });
     }
     if (!blobs) {
       throw new Error(
@@ -425,22 +720,24 @@ export async function decodeJobEnvelope({
         ? await blobs.peek({ id: header.r })
         : await blobs.get({ id: header.r });
     if (!data) {
-      throw new Error(
-        `Job envelope blob ${header.r} is missing (deleted or expired)`,
-      );
+      throw new DecodeFailureError({
+      message: `Job envelope blob ${header.r} is missing (deleted or expired)`,
+      reason: "missing_blob",
+    });
     }
-    return JSON.parse(
-      (await gunzipAsync(data, DECODE_GUNZIP_OPTS)).toString("utf8"),
-    ) as Record<string, unknown>;
+    return await decodeBody(data);
   }
 
-  const json =
+  // Raw inline bodies never went through the bounded decompressor, so cap them
+  // before the synchronous parse; compressed bodies are bounded by
+  // boundedDecompress itself.
+  if (header.e !== "gz") {
+    assertDecodeWithinCap(Buffer.byteLength(body, "utf8"));
+  }
+  const parsedBody =
     header.e === "gz"
-      ? (
-          await gunzipAsync(Buffer.from(body, "base64"), DECODE_GUNZIP_OPTS)
-        ).toString("utf8")
-      : body;
-  const parsedBody = JSON.parse(json) as Record<string, unknown>;
+      ? await decodeBody(Buffer.from(body, "base64"))
+      : parseInlineBody(body);
   // GQ2 inline lifted machinery into header.m too; GQ1 (v=1) never did.
   return header.v === 2 ? mergeMachinery(parsedBody, header) : parsedBody;
 }
@@ -567,15 +864,24 @@ export function splitEnvelope(value: string): {
 } {
   const lenEnd = value.indexOf("|", ENVELOPE_PREFIX_LEN);
   if (lenEnd === -1) {
-    throw new Error("Malformed job envelope: missing header length delimiter");
+    throw new DecodeFailureError({
+      message: "Malformed job envelope: missing header length delimiter",
+      reason: "malformed_envelope",
+    });
   }
   const lenDigits = value.slice(ENVELOPE_PREFIX_LEN, lenEnd);
   if (!/^\d+$/.test(lenDigits)) {
-    throw new Error("Malformed job envelope: invalid header length");
+    throw new DecodeFailureError({
+      message: "Malformed job envelope: invalid header length",
+      reason: "malformed_envelope",
+    });
   }
   const headerLen = Number(lenDigits);
   if (headerLen <= 0) {
-    throw new Error("Malformed job envelope: invalid header length");
+    throw new DecodeFailureError({
+      message: "Malformed job envelope: invalid header length",
+      reason: "malformed_envelope",
+    });
   }
   // Prefix and length digits are ASCII, so lenEnd is the same offset in bytes
   // and code units; the header itself must be sliced as bytes to match Lua.
@@ -583,7 +889,21 @@ export function splitEnvelope(value: string): {
   const headerJson = buf
     .subarray(lenEnd + 1, lenEnd + 1 + headerLen)
     .toString("utf8");
-  const header = JSON.parse(headerJson) as EnvelopeHeader;
+  // Guarded for the same reason the body parses are: a corrupt header segment
+  // makes V8 echo it back ("Unexpected token 's', \"serId\":\"us\"..."), and the
+  // header carries `m.__context` (traceId / userId / projectId). That message
+  // would otherwise reach the drop log via the raw-Error path, which only strips
+  // storage URIs. Naming it also makes a corrupt header a `malformed_envelope`
+  // rather than an `unknown` (#5538).
+  let header: EnvelopeHeader;
+  try {
+    header = JSON.parse(headerJson) as EnvelopeHeader;
+  } catch (err) {
+    throw new DecodeFailureError({
+      message: `Malformed job envelope: header failed to parse: ${safeParseErrText(err)}`,
+      reason: "malformed_envelope",
+    });
+  }
   return {
     header,
     body: buf.subarray(lenEnd + 1 + headerLen).toString("utf8"),

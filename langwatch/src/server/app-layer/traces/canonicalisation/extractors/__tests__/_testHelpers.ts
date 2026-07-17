@@ -19,14 +19,17 @@ export { parseJsonStringAttrs };
  * and `setAttrIfAbsent` are wrapped in vi.fn() for easy assertion.
  *
  * JSON-looking string values in attrs are auto-parsed to match the production
- * pipeline's `parseJsonStringValues()` step.
+ * pipeline's `parseJsonStringValues()` step — pass `skipJsonParsing` to feed
+ * raw string values instead, exercising an extractor's own defensive
+ * safeJsonParse path.
  */
 export function createExtractorContext(
   attrs: Record<string, unknown>,
   spanOverrides?: Partial<ExtractorContext["span"]>,
   events?: NormalizedEvent[],
+  options?: { skipJsonParsing?: boolean },
 ): ExtractorContext {
-  const parsed = parseJsonStringAttrs(attrs);
+  const parsed = options?.skipJsonParsing ? attrs : parseJsonStringAttrs(attrs);
   const bag = new SpanDataBag(parsed as NormalizedAttributes, events ?? []);
   const out: NormalizedAttributes = {};
 

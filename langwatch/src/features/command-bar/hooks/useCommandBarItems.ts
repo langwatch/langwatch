@@ -59,7 +59,7 @@ export function useCommandBarItems(
         label: `Search "${query.trim()}" in traces`,
         icon: Search,
         category: "navigation",
-        path: `/${projectSlug}/messages?query=${encodeURIComponent(query.trim())}`,
+        path: `/${projectSlug}/traces#all-traces?q=${encodeURIComponent(query.trim())}`,
       } as Command,
     };
   }, [query, projectSlug]);

@@ -70,7 +70,7 @@ export function EditableTraceName({
       setIsEditing(false);
     },
     onError: (error) => {
-      // The server attaches the serialised DomainError to error.data so
+      // The server attaches the serialised HandledError to error.data so
       // we can show the rich message + meta — falls back to error.message
       // for unhandled cases.
       const dErr = error.data?.domainError;

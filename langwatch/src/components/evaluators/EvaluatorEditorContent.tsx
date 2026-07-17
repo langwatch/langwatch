@@ -101,7 +101,7 @@ export function EvaluatorEditorContent({
             For pairwise_compare, the `prompt` field is a golden-answer-aware
             template. When "Has golden answer" is turned OFF, editing that
             template is meaningless (the {golden} slot is stubbed out and the
-            PairwiseConfigForm auto-swaps to a golden-free default), so hide
+            ComparisonConfigForm auto-swaps to a golden-free default), so hide
             the field entirely — no reason to show an editor whose changes
             are always ignored (dogfood: "if golden is off, don't show the
             prompt"). */}

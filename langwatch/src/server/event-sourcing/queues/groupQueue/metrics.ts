@@ -27,7 +27,10 @@ const metricNames = [
   "gq_blob_decode_cap_exceeded_total",
   "gq_envelope_gq2_downgrade_total",
   "gq_payload_too_large_total",
+  "gq_groups_poison_parked_total",
   "gq_retry_encode_failures_total",
+  // #5538
+  "gq_jobs_dropped_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -196,6 +199,18 @@ export const gqPayloadTooLargeTotal = new Counter({
 });
 
 /**
+ * Claim-side poison guard parked a group into the blocked set
+ * (specs/event-sourcing/poison-group-park-guard.feature). reason:
+ * "claim_strikes" = consecutive worker deaths while the group was in flight;
+ * "oversized_payload" = staged value over the decode cap.
+ */
+export const gqGroupsPoisonParkedTotal = new Counter({
+  name: "gq_groups_poison_parked_total",
+  help: "Groups parked into the blocked set by the claim-side poison guard",
+  labelNames: ["queue_name", "reason"] as const,
+});
+
+/**
  * Retry re-encode failed (transient blob-store 5xx, payload-too-large from a
  * state-bloat regression) — the retry never re-staged and the slot dropped to
  * the fail-safe. Distinct from `gqJobsNonRetryableTotal` (which is for genuine
@@ -204,6 +219,54 @@ export const gqPayloadTooLargeTotal = new Counter({
  */
 export const gqRetryEncodeFailuresTotal = new Counter({
   name: "gq_retry_encode_failures_total",
-  help: "Retry re-encode failed — dispatched job completed via fail-safe, work recovers via event replay",
+  help: "Retry re-encode failed — dispatched job completed via fail-safe and the job was DISCARDED (replay does not recover reactor jobs; see gq_jobs_dropped_total)",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
+});
+
+/**
+ * A staged job we could not decode and therefore discarded (#5538).
+ *
+ * Why this exists at all: the drop path used to be silent. It called
+ * `scripts.complete()`, whose Lua INCRs the same `stats:completed` counter a
+ * genuine success takes — so a discarded job did not merely go unnoticed, it was
+ * counted as a WIN and cleared the group's stored error on the way out. Nothing
+ * else in this module distinguishes "processed it" from "threw it away".
+ *
+ * Why the full label set and not just `{queue_name, reason}`: a bare queue label
+ * pages oncall with "event-sourcing/jobs dropped 100" and cannot say WHICH
+ * pipeline lost WHAT. The difference between a dropped UI broadcast and a dropped
+ * `governanceOcsfEventsSync` (OCSF audit) or `gatewayBudgetSync` (billing) event
+ * is the difference between a shrug and a compliance incident. Labels are read
+ * off the envelope header via `readJobRoutingMeta`, which survives a body we
+ * cannot decode.
+ *
+ * `reason` (see `DecodeFailureReason`, plus this module's terminal reasons):
+ * - `missing_blob` — the body is GONE. Irreducible loss: no retry, park, or
+ *   replay resurrects it.
+ * - `malformed_envelope` / `body_unreadable` — the body is PRESENT but
+ *   unreadable to this worker. Its value is deliberately NOT released, so a
+ *   later worker (post-rollout) can still read it.
+ * - `transient_exhausted` — the blob store stayed unreachable for every retry.
+ * - `sibling_restage_failed` — a coalesced sibling could not be re-staged.
+ * - `retry_encode_failed` — a retry's re-encode failed, so the retry never went
+ *   back. Also counted by `gq_retry_encode_failures_total`, which stays as the
+ *   specific diagnostic; this counter is the complete ledger of discards.
+ * - `unknown` — an unclassified throw. Non-zero here means a decode failure mode
+ *   exists that we have not named; that is a bug in the enum, not a shrug.
+ *
+ * ⚠️ A non-zero rate on a reactor pipeline is PERMANENT DATA LOSS, not a blip.
+ * Replay rebuilds fold projections and never invokes reactors
+ * (`projections/projectionRouter.ts:61-71`), so nothing re-fires a dropped
+ * reactor job. This counter is the ONLY signal that it happened.
+ */
+export const gqJobsDroppedTotal = new Counter({
+  name: "gq_jobs_dropped_total",
+  help: "Staged jobs discarded because they could not be decoded — for reactor pipelines this is permanent data loss (replay does not re-invoke reactors)",
+  labelNames: [
+    "queue_name",
+    "pipeline_name",
+    "job_type",
+    "job_name",
+    "reason",
+  ] as const,
 });

@@ -1,7 +1,7 @@
 /**
  * Integration tests for the `trace_analytics_rollup` AggregatingMergeTree
  * (ADR-034 Phase 1), exercised against a real ClickHouse testcontainer on the
- * production schema (migration 00037 auto-applies through goose in
+ * production schema (migration 00038 auto-applies through goose in
  * `startTestContainers`).
  *
  * Phase 1 removed the materialized view (an interim materialized-view migration that was never deployed) and

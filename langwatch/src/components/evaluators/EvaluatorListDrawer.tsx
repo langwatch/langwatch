@@ -18,6 +18,10 @@ import {
   getFlowCallbacks,
   useDrawer,
 } from "~/hooks/useDrawer";
+import {
+  COMPARISON_EVALUATOR_TYPE,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
+} from "~/experiments-v3/types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -35,6 +39,16 @@ export type EvaluatorListDrawerProps = {
   onClose?: () => void;
   onSelect?: (evaluator: EvaluatorWithFields) => void;
   onCreateNew?: () => void;
+  /**
+   * Narrow the list to one evaluator type. Serializable, so the filtered list
+   * survives a URL paste. Used by the Comparison flow, which is a list of
+   * comparison evaluators and nothing else.
+   */
+  filterEvaluatorType?: string;
+  /** Drawer heading. Defaults to "Choose Evaluator". */
+  title?: string;
+  /** Label on the create button. Defaults to "New Evaluator". */
+  createLabel?: string;
 };
 
 /**
@@ -44,6 +58,7 @@ export type EvaluatorListDrawerProps = {
  * - Empty state with create CTA
  * - "New Evaluator" button at top
  * - Reusable across the app via useDrawer
+ * - Optionally narrowed to a single evaluator type via `filterEvaluatorType`
  */
 export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const { project } = useOrganizationTeamProject();
@@ -62,13 +77,37 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const onCreateNew =
     props.onCreateNew ??
     flowCallbacks?.onCreateNew ??
+    (complexProps.onCreateNew as EvaluatorListDrawerProps["onCreateNew"]) ??
     (() => openDrawer("evaluatorCategorySelector"));
   const isOpen = props.open !== false && props.open !== undefined;
+  const title = props.title ?? "Choose Evaluator";
+  const createLabel = props.createLabel ?? "New Evaluator";
 
   const evaluatorsQuery = api.evaluators.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id && isOpen },
   );
+
+  const evaluators = props.filterEvaluatorType
+    ? evaluatorsQuery.data?.filter(
+        (evaluator) =>
+          (evaluator.config as { evaluatorType?: string } | null)
+            ?.evaluatorType === props.filterEvaluatorType,
+      )
+    : // Comparison evaluators (current + legacy pairwise) judge target
+      // columns against each other and only make sense wired through the
+      // Comparison card in TargetTypeSelectorDrawer, which sets their
+      // `variants`/`goldenField`. Attached here as a per-target chip
+      // instead, they'd have no variants configured and nothing to judge.
+      evaluatorsQuery.data?.filter((evaluator) => {
+        const evaluatorType = (
+          evaluator.config as { evaluatorType?: string } | null
+        )?.evaluatorType;
+        return (
+          evaluatorType !== COMPARISON_EVALUATOR_TYPE &&
+          evaluatorType !== LEGACY_PAIRWISE_EVALUATOR_TYPE
+        );
+      });
 
   const deleteMutation = api.evaluators.delete.useMutation({
     onSuccess: () => {
@@ -124,7 +163,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2} justify="space-between" width="full">
-            <Heading>Choose Evaluator</Heading>
+            <Heading>{title}</Heading>
             <Button
               size="sm"
               colorScheme="blue"
@@ -132,7 +171,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
               data-testid="new-evaluator-button"
             >
               <Plus size={16} />
-              New Evaluator
+              {createLabel}
             </Button>
           </HStack>
         </Drawer.Header>
@@ -156,10 +195,10 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
                 <HStack justify="center" paddingY={8}>
                   <Spinner size="md" />
                 </HStack>
-              ) : evaluatorsQuery.data?.length === 0 ? (
+              ) : evaluators?.length === 0 ? (
                 <EmptyState onCreateNew={onCreateNew} />
               ) : (
-                evaluatorsQuery.data?.map((evaluator) => (
+                evaluators?.map((evaluator) => (
                   <EvaluatorCard
                     key={evaluator.id}
                     evaluator={evaluator}

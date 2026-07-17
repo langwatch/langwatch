@@ -1,101 +1,79 @@
-import { Text, VStack } from "@chakra-ui/react";
-import { CLIENT_PROVIDERS } from "~/automations/providers/client";
+import { VStack } from "@chakra-ui/react";
+import { useState } from "react";
 import { useAutomationStore } from "../state/automationStore";
-import {
-  useCadenceConfirmed,
-  useCadenceSummary,
-  useConditionsSet,
-  useConfigComplete,
-  useConfigurationSummary,
-  useDraft,
-  useIsNotifyAction,
-  useSummariseConditions,
-} from "../state/selectors";
-import { IdentityFields } from "./IdentityFields";
-import { SectionRow } from "./SectionRow";
-import { TestFireSection } from "./TestFireSection";
-import { TypePicker } from "./TypePicker";
+import { useDraft } from "../state/selectors";
+import { AutomationTypePicker } from "./AutomationTypePicker";
+import { CadenceSection } from "./CadenceSection";
+import { DeliveryPicker } from "./DeliveryPicker";
+import { NameField } from "./NameField";
+import { SeveritySection } from "./SeveritySection";
+import { SubjectSection } from "./SubjectSection";
+
+/** The collapsible facets, in ADR-043 order. Name sits above as a plain field;
+ *  Severity self-hides for non-alerts. */
+type FacetKey = "type" | "subject" | "cadence" | "severity" | "delivery";
 
 /**
- * Composes the rows the user sees on the main drawer. The top of the
- * pane is the name + alert-type row (always visible), then the
- * `When → Then` pair of section rows with the type picker between
- * them, and finally the test-fire row (notify providers only).
+ * The main pane, rendered top-to-bottom in ADR-043 facet order:
+ * Name → Type → Subject → Cadence → Severity (alerts) → Delivery.
  *
- * Lifting name + alert type to the main pane mirrors how every modern
- * automation builder (Linear, Notion, Sentry, Datadog, PagerDuty,
- * Zapier, n8n) treats the rule name — it's the primary identity, so
- * it sits at the top, not buried in a secondary drawer.
+ * Each facet below the name is independently collapsible: everything starts
+ * open (so nothing is hidden), and the author can fold a section they're done
+ * with down to a one-line summary. Collapses are independent — folding one
+ * never moves another, so the page doesn't jump around. Picking the Type first
+ * fixes which later facets show and drives every label. Delivery's guided
+ * template authoring is the one piece kept behind a secondary drawer so its
+ * live preview effect can gate on `section === "configuration"`; picking a
+ * channel opens it straight away.
  */
 export function MainSectionList({
-  onTestFire,
-  testFireLoading,
+  isEdit,
+  sourceLocked,
+  prefilledGraphId,
 }: {
-  onTestFire: () => void;
-  testFireLoading: boolean;
+  isEdit: boolean;
+  /** The Type facet can't change (editing a saved alert, or opened from a
+   *  specific chart). */
+  sourceLocked: boolean;
+  prefilledGraphId?: string;
 }) {
   const draft = useDraft();
-  const conditionsSet = useConditionsSet();
-  const configComplete = useConfigComplete();
-  const conditionsSummary = useSummariseConditions();
-  const configSummary = useConfigurationSummary();
-  const cadenceSummary = useCadenceSummary();
-  const cadenceConfirmed = useCadenceConfirmed();
-  const isNotifyAction = useIsNotifyAction();
-  const setSection = useAutomationStore((s) => s.setSection);
   const dispatch = useAutomationStore((s) => s.dispatch);
 
-  const providerLabel = draft.action
-    ? CLIENT_PROVIDERS[draft.action].shared.label
-    : null;
-  const configTitle = providerLabel ? `${providerLabel} setup` : "Setup";
-  const isFresh = !draft.name && !draft.action && !conditionsSet;
+  // Everything starts open; the author folds away what they've finished. Track
+  // only the collapsed set so a fresh drawer shows the whole form. Independent
+  // toggles — folding one never reflows another.
+  const [collapsed, setCollapsed] = useState<Set<FacetKey>>(() => new Set());
+  const facetProps = (key: FacetKey) => ({
+    open: !collapsed.has(key),
+    onToggle: () =>
+      setCollapsed((cur) => {
+        const next = new Set(cur);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      }),
+  });
 
   return (
-    <VStack align="stretch" gap={4}>
-      {isFresh ? (
-        <Text textStyle="sm" color="fg.muted">
-          Send Slack messages, emails, or other actions when traces match
-          conditions you define.
-        </Text>
-      ) : null}
-
-      <IdentityFields />
-
-      <SectionRow
-        title="When"
-        summary={
-          conditionsSet
-            ? conditionsSummary
-            : "Pick the trace filters or custom graph that should trigger this."
-        }
-        complete={conditionsSet}
-        onClick={() => setSection("filters")}
+    <VStack align="stretch" gap={3}>
+      <NameField isEdit={isEdit} />
+      <AutomationTypePicker
+        sourceLocked={sourceLocked}
+        accordion={facetProps("type")}
       />
-      <TypePicker
+      <SubjectSection
+        prefilledGraphId={prefilledGraphId}
+        accordion={facetProps("subject")}
+      />
+      <CadenceSection isEdit={isEdit} accordion={facetProps("cadence")} />
+      <SeveritySection accordion={facetProps("severity")} />
+      <DeliveryPicker
         value={draft.action}
         onChange={(value) => dispatch({ type: "SET_ACTION", value })}
+        source={draft.source}
+        accordion={facetProps("delivery")}
       />
-      <SectionRow
-        title={configTitle}
-        summary={configSummary}
-        complete={configComplete}
-        disabled={!draft.action}
-        onClick={() => setSection("configuration")}
-      />
-      {isNotifyAction ? (
-        <SectionRow
-          title="Cadence"
-          summary={
-            cadenceConfirmed
-              ? cadenceSummary
-              : `Choose when to deliver — currently ${cadenceSummary}.`
-          }
-          complete={cadenceConfirmed}
-          onClick={() => setSection("cadence")}
-        />
-      ) : null}
-      <TestFireSection loading={testFireLoading} onFire={onTestFire} />
     </VStack>
   );
 }

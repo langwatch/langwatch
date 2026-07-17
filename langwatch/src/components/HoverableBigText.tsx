@@ -35,7 +35,7 @@ export function ExpandedTextDialog({
             <Switch
               size="sm"
               checked={isFormatted}
-              onChange={() => setIsFormatted(!isFormatted)}
+              onCheckedChange={() => setIsFormatted(!isFormatted)}
             />
             <Text>Formatted</Text>
           </HStack>

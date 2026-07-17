@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
 import {
@@ -21,7 +22,6 @@ import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-
 import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
-import { createLogger } from "~/utils/logger/server";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
@@ -46,7 +46,25 @@ import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRete
 import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
+import {
+  NullScheduledJobRepository,
+  PrismaScheduledJobRepository,
+} from "./scheduler/scheduled-job.repository";
+import { schedulerRegistry } from "./scheduler/scheduler.registry";
+import { SchedulerService } from "./scheduler/scheduler.service";
+import { getAnalyticsService } from "./analytics";
+import { loadReportCharts } from "./reports/report-chart.service";
+import { dispatchScheduledReport } from "./reports/report-dispatch";
+import { toReportTraceRow } from "./reports/trace-report-row";
+import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
+import { REPORT_SCHEDULER_TARGET_TYPE } from "./triggers/report.builder";
+import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
+import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
 import { EventSourcing } from "../event-sourcing";
+import { dispatchOutboxEnqueues } from "../event-sourcing/outbox/dispatchOutboxEnqueues";
+import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
+import { OutboxHeartbeatScheduler } from "../event-sourcing/outbox/heartbeat/heartbeat.scheduler";
 import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
@@ -88,6 +106,7 @@ import {
   type AppConfig,
   createAppConfigFromEnv,
   type ProcessRole,
+  roleRunsWorkers,
 } from "./config";
 import type {
   AppDependencies,
@@ -100,6 +119,10 @@ import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.reco
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
 import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import { EvaluationRunService } from "./evaluations/evaluation-run.service";
+import { EvaluationAnalyticsClickHouseRepository } from "./evaluations/repositories/evaluation-analytics.clickhouse.repository";
+import { NullEvaluationAnalyticsRepository } from "./evaluations/repositories/evaluation-analytics.repository";
+import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
+import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorService } from "./monitors/monitor.service";
@@ -107,6 +130,7 @@ import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.
 import { EventExplorerService } from "./ops/event-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
+import { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import { ReplayService } from "./ops/replay.service";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
@@ -144,6 +168,10 @@ import { MetricRecordStorageClickHouseRepository } from "./traces/repositories/m
 import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-record-storage.repository";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
+import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
+import { NullTraceAnalyticsRepository } from "./traces/repositories/trace-analytics.repository";
+import { TraceAnalyticsRollupClickHouseRepository } from "./traces/repositories/trace-analytics-rollup.clickhouse.repository";
+import { NullTraceAnalyticsRollupRepository } from "./traces/repositories/trace-analytics-rollup.repository";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
@@ -160,6 +188,10 @@ import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
 import { EmailSuppressionService } from "./triggers/emailSuppression.service";
 import {
+  defaultGraphTriggerHeartbeatDeps,
+  registerGraphTriggerHeartbeat,
+} from "./triggers/graph-trigger-heartbeat";
+import {
   PrismaEmailSuppressionNameLookupRepository,
   PrismaEmailSuppressionRepository,
 } from "./triggers/repositories/emailSuppression.prisma.repository";
@@ -170,7 +202,7 @@ import {
 import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
 import { TriggerService } from "./triggers/trigger.service";
-import { TriggerTemplateService } from "./triggers/trigger-template.service";
+import { testFireTrigger } from "./triggers/trigger-template.service";
 import { UsageService } from "./usage/usage.service";
 
 /**
@@ -187,6 +219,17 @@ export function initializeWebApp(): App {
 
 export function initializeWorkerApp(): App {
   return initializeDefaultApp({ processRole: "worker" });
+}
+
+/**
+ * Dev-only single-process mode: the web server also hosts the worker stack
+ * in-process (opt-in via WORKERS_IN_PROCESS=1). Boots the App with the "all"
+ * role so the outbox consumer, drainer, and heartbeat scheduler wire up
+ * exactly as they do on a dedicated worker. Prod never calls this — it runs
+ * web and worker as separate deployments.
+ */
+export function initializeInProcessApp(): App {
+  return initializeDefaultApp({ processRole: "all" });
 }
 
 export function initializeDefaultApp(options?: {
@@ -450,15 +493,23 @@ export function initializeDefaultApp(options?: {
     new MonitorService(new PrismaMonitorRepository(prisma)),
     "MonitorService",
   );
-  const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
+  const triggers = new TriggerService(
+    new PrismaTriggerRepository(prisma),
+    new PrismaScheduledJobRepository(prisma),
+    redis,
+  );
   const emailSuppressions = new EmailSuppressionService(
     new PrismaEmailSuppressionRepository(prisma),
     new PrismaEmailSuppressionNameLookupRepository(prisma),
   );
-  const triggerTemplates = new TriggerTemplateService({
+  const triggerTemplateDeps = {
     baseHost: config.baseHost ?? env.BASE_HOST,
     notifier: liveTriggerNotifier,
-  });
+  };
+  const triggerTemplates = {
+    testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
+      testFireTrigger(triggerTemplateDeps, input),
+  };
   const tokenizer = new TokenizerService(
     config.disableTokenization
       ? new NullTokenizerClient()
@@ -533,6 +584,20 @@ export function initializeDefaultApp(options?: {
     metricRecordStorage: clickhouseEnabled
       ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient)
       : new NullMetricRecordStorageRepository(),
+    traceAnalyticsRollup: clickhouseEnabled
+      ? new TraceAnalyticsRollupClickHouseRepository(resolveClickHouseClient)
+      : new NullTraceAnalyticsRollupRepository(),
+    traceAnalytics: clickhouseEnabled
+      ? new TraceAnalyticsClickHouseRepository(resolveClickHouseClient)
+      : new NullTraceAnalyticsRepository(),
+    evaluationAnalyticsRollup: clickhouseEnabled
+      ? new EvaluationAnalyticsRollupClickHouseRepository(
+          resolveClickHouseClient,
+        )
+      : new NullEvaluationAnalyticsRollupRepository(),
+    evaluationAnalytics: clickhouseEnabled
+      ? new EvaluationAnalyticsClickHouseRepository(resolveClickHouseClient)
+      : new NullEvaluationAnalyticsRepository(),
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
@@ -563,12 +628,14 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
-  // Outbox stack: worker-only consumer loop. The send-side handle is wired
-  // into the EventSourcing runtime below (passed to `new EventSourcing`), so
-  // its `.withOutbox` reactors can enqueue settle payloads. Web processes
-  // don't build this (no settle traffic; no consumer to drain).
+  // Outbox stack: the consumer loop for roles where roleRunsWorkers() is true
+  // ("worker" and the in-process dev "all" role). The send-side handle is
+  // wired into the EventSourcing runtime below (passed to `new
+  // EventSourcing`), so its `.withOutbox` reactors can enqueue settle
+  // payloads. Web processes don't build this (no settle traffic; no consumer
+  // to drain).
   const outbox =
-    config.processRole === "worker"
+    roleRunsWorkers(config.processRole)
       ? buildOutboxRuntime({
           prisma,
           redis: redis ?? null,
@@ -586,7 +653,8 @@ export function initializeDefaultApp(options?: {
   // settle/cadence routing + audit adapter all read `this._outbox`, set once at
   // construction. Passing `outbox` anywhere else (e.g. only to the registry)
   // leaves every outbox reactor on the silent drop path — the trigger dispatch
-  // regression fixed here. See presets.outboxWiring.integration.test.ts.
+  // regression fixed here (also found by /review-pr reg5014-001 +
+  // dispatch5015-001). See presets.outboxWiring.integration.test.ts.
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
@@ -596,6 +664,192 @@ export function initializeDefaultApp(options?: {
     retentionPolicyResolver: retentionPolicyCache,
     outbox,
   });
+
+  // Heartbeat scheduler (ADR-034 Phase 4): for roles where roleRunsWorkers()
+  // is true, a periodic source of outbox enqueues for the cases the
+  // event-driven outbox path STRUCTURALLY cannot reach (no-data detection,
+  // resolve-when-traffic-stops).
+  // Registrations live in `outboxHeartbeatRegistry` (process-singleton);
+  // the scheduler routes every tick's `decide` result through the same
+  // `dispatchOutboxEnqueues` helper `adaptOutboxReactor` uses, so one
+  // dispatch path serves both event-sourced and tick-sourced enqueues.
+  // Constructed only when both a worker role AND an outbox runtime AND a
+  // Redis client are present — the lock is the leader-election primitive
+  // so a missing Redis means no scheduler.
+  const outboxHeartbeatScheduler =
+    roleRunsWorkers(config.processRole) && outbox && redis
+      ? new OutboxHeartbeatScheduler({
+          registry: outboxHeartbeatRegistry,
+          redis,
+          dispatchOutboxEnqueues: ({ requests, sourceName }) =>
+            dispatchOutboxEnqueues({
+              requests,
+              outbox,
+              sourceName,
+              logger: createLogger("langwatch:event-sourcing:outbox-heartbeat"),
+            }),
+          processRole: config.processRole,
+          logger: createLogger("langwatch:event-sourcing:outbox-heartbeat"),
+        })
+      : undefined;
+  // ADR-034 Phase 5: register the graph-trigger heartbeat BEFORE the
+  // scheduler starts. Registration is passive data (the registry is a
+  // process-singleton) so this is safe on every role; the scheduler
+  // itself is worker-only and ignores non-worker processes. We only
+  // register when an outbox runtime is present — without it there's no
+  // dispatch target.
+  if (outbox) {
+    registerGraphTriggerHeartbeat(
+      defaultGraphTriggerHeartbeatDeps({ triggers, prisma }),
+    );
+  }
+  outboxHeartbeatScheduler?.start();
+
+  // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
+  // worker-only in-process loop that sleeps until the soonest due
+  // `ScheduledJob`, atomically claims each due row (a conditional nextRunAt
+  // update — the DB-level exactly-once guarantee), and fires it into a handler
+  // registered on `schedulerRegistry`. There is no leader-lock: because the
+  // claim guarantees exactly-once, every worker runs the loop and races the
+  // claim, sharing firing load across the fleet. Postgres is the sole
+  // correctness/locking layer; `redis` is passed only for the BEST-EFFORT
+  // cross-pod wake (a job created on one pod fires everywhere now instead of
+  // within one poll backstop) — a missing/flaky Redis just falls back to the
+  // poll, never affecting correctness. Kept dormant this phase — no consumers
+  // register yet (the report handler lands in a later phase), so the loop runs
+  // and log-and-skips any orphan targetType.
+  const scheduler =
+    roleRunsWorkers(config.processRole)
+      ? new SchedulerService({
+          repo: new PrismaScheduledJobRepository(prisma),
+          registry: schedulerRegistry,
+          processRole: config.processRole,
+          logger: createLogger("langwatch:app-layer:scheduler"),
+          redis,
+        })
+      : undefined;
+  scheduler?.start();
+
+  // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
+  // renders + dispatches on schedule (worker-only, same notify pipeline as
+  // alerts). The scheduler registry is a process singleton.
+  if (roleRunsWorkers(config.processRole)) {
+    schedulerRegistry.register({
+      targetType: REPORT_SCHEDULER_TARGET_TYPE,
+      handler: (fire) =>
+        dispatchScheduledReport({
+          deps: {
+            loadTrigger: ({ projectId, triggerId }) =>
+              prisma.trigger.findFirst({
+                where: { id: triggerId, projectId },
+              }),
+            loadProject: (projectId) =>
+              prisma.project.findUnique({ where: { id: projectId } }),
+            sendEmail: sendRenderedTriggerEmail,
+            sendSlack: sendRenderedSlackMessage,
+            sendSlackBot: postSlackChatMessage,
+            filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
+              emailSuppressions.filterSuppressed({
+                projectId,
+                triggerId,
+                emails,
+              }),
+            // The top-N traces matching the report's Subject query over its
+            // window, via the shared TraceListService. The ADR-043 filter DSL
+            // compiles the author's query straight into the bare-column
+            // `filterWhere` getList takes, so a "top matching traces" report
+            // finally matches on what the author asked for. (The older
+            // filters-OBJECT builder could not: it emits `ts.`-aliased
+            // conditions for a JOIN context, invalid here.)
+            listReportTraces: async ({
+              projectId,
+              projectSlug,
+              query,
+              from,
+              to,
+              limit,
+            }) => {
+              const page = await traceList.getList({
+                tenantId: projectId,
+                timeRange: { from, to },
+                sort: { columnId: "time", direction: "desc" },
+                page: 1,
+                pageSize: limit,
+                visibilityCutoffMs: null,
+                filterWhere:
+                  translateFilterToClickHouse(query, projectId, { from, to }) ??
+                  undefined,
+              });
+              const projectUrl = `${config.baseHost ?? env.BASE_HOST}/${projectSlug}`;
+              return page.items.map((item) =>
+                toReportTraceRow({ item, projectUrl }),
+              );
+            },
+            // A report's fire is a completed EVENT, not an open incident, so
+            // `resolvedAt` is stamped at write time. The list's "currently
+            // firing" read looks for `customGraphId != null AND resolvedAt IS
+            // NULL`, so a report row can never masquerade as a live alert.
+            recordFire: async ({ projectId, triggerId, firedAt }) => {
+              await prisma.triggerSent.create({
+                data: {
+                  projectId,
+                  triggerId,
+                  traceId: null,
+                  customGraphId: null,
+                  createdAt: firedAt,
+                  resolvedAt: firedAt,
+                },
+              });
+            },
+            loadReportCharts: ({ projectId, source, from, to }) =>
+              loadReportCharts({
+                deps: {
+                  loadCustomGraph: ({ projectId, customGraphId }) =>
+                    prisma.customGraph.findFirst({
+                      where: { id: customGraphId, projectId },
+                    }),
+                  loadDashboardGraphs: ({ projectId, dashboardId }) =>
+                    prisma.customGraph.findMany({
+                      where: { dashboardId, projectId },
+                      orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
+                    }),
+                  getTimeseries: (input) =>
+                    getAnalyticsService().getTimeseries(input),
+                },
+                source,
+                projectId,
+                from,
+                to,
+              }),
+            baseHost: config.baseHost ?? env.BASE_HOST,
+          },
+          fire,
+        }),
+    });
+
+    // ADR-044 durable self-heal: the report upsert route writes the Trigger row
+    // and its ScheduledJob in two non-atomic steps, so a crash between them can
+    // leave an active report with no schedule. Repair any such gaps at boot
+    // (create-if-missing, race-safe on every worker). Fire-and-forget so boot is
+    // never blocked; a failure is logged, not fatal (the next boot retries).
+    const reconcileLogger = createLogger("langwatch:app-layer:scheduler");
+    void triggers
+      .reconcileReportSchedules()
+      .then(({ repaired }) => {
+        if (repaired > 0) {
+          reconcileLogger.info(
+            { repaired },
+            "Reconciled report schedules missing a ScheduledJob at boot",
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        reconcileLogger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Report-schedule reconciliation failed at boot (will retry next boot)",
+        );
+      });
+  }
 
   const registry = new PipelineRegistry({
     eventSourcing: es,
@@ -734,6 +988,20 @@ export function initializeDefaultApp(options?: {
   // The outbox runtime piggy-backs on the main event-sourcing queue
   // (ADR-030 revision 3), so there's nothing outbox-specific to close —
   // the event-sourcing queue's own close registration covers it.
+  if (outboxHeartbeatScheduler) {
+    gracefulCloseables.push({
+      name: "outbox-heartbeat-scheduler",
+      close: async () => {
+        await outboxHeartbeatScheduler.stop();
+      },
+    });
+  }
+  if (scheduler) {
+    gracefulCloseables.push({
+      name: "scheduler",
+      close: () => scheduler.stop(),
+    });
+  }
   gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),
@@ -772,6 +1040,7 @@ export function initializeDefaultApp(options?: {
 
   const ops = {
     queues: new QueueService(queueRepo),
+    scheduler: new SchedulerOpsService(new PrismaScheduledJobRepository(prisma)),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
     replay: new ReplayService(replayRepo),
     metricsCollector: redis
@@ -934,17 +1203,26 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       new NullEmailSuppressionRepository(),
       new NullEmailSuppressionNameLookupRepository(),
     ),
-    triggerTemplates: new TriggerTemplateService({
-      baseHost: config.baseHost ?? env.BASE_HOST,
-      notifier: {
-        sendEmail: async () => {
-          /* test no-op */
+    triggerTemplates: (() => {
+      const testDeps = {
+        baseHost: config.baseHost ?? env.BASE_HOST,
+        notifier: {
+          sendEmail: async () => {
+            /* test no-op */
+          },
+          sendSlack: async () => {
+            /* test no-op */
+          },
+          sendSlackBot: async () => {
+            /* test no-op */
+          },
         },
-        sendSlack: async () => {
-          /* test no-op */
-        },
-      },
-    }),
+      };
+      return {
+        testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
+          testFireTrigger(testDeps, input),
+      };
+    })(),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: {
       runs: SuiteRunService.create({
@@ -973,6 +1251,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     usageLimits: UsageLimitService.createNull(),
     ops: {
       queues: new QueueService(new NullQueueRepository()),
+      scheduler: new SchedulerOpsService(new NullScheduledJobRepository()),
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),

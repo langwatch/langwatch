@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockQueryLogger, mockLogger } = vi.hoisted(() => ({
   mockQueryLogger: {
@@ -16,7 +16,7 @@ const { mockQueryLogger, mockLogger } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: (name: string) =>
     name.includes("query") ? mockQueryLogger : mockLogger,
 }));

@@ -15,7 +15,6 @@ Feature: Customer.io nurturing integration
   #   langwatch/src/hooks/__tests__/useAttributionCapture.unit.test.ts
   #   langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/__tests__/customerIoTraceSync.reactor.unit.test.ts
   #   langwatch/src/server/event-sourcing/pipelines/evaluation-processing/reactors/__tests__/customerIoEvaluationSync.reactor.unit.test.ts
-  #   langwatch/src/server/event-sourcing/projections/global/__tests__/customerIoDailyUsageSync.reactor.unit.test.ts
   #   langwatch/src/server/event-sourcing/pipelines/simulation-processing/reactors/__tests__/customerIoSimulationSync.reactor.unit.test.ts
   # Six scenarios were rewritten to match shipped implementation (was UPDATE-class):
   #   - "Null service resolves..." dropped (impl uses `undefined`, not null pattern)
@@ -244,23 +243,6 @@ Feature: Customer.io nurturing integration
     Given the customerIoEvaluationSync reactor
     When makeJobId is called for an evaluation event
     Then the returned ID is "cio-eval-sync-{projectId}-{evaluationId}"
-
-  # ---------------------------------------------------------------------------
-  # R5: Daily usage sync reactor — customerIoDailyUsageSync
-  # ---------------------------------------------------------------------------
-
-  @integration
-  Scenario: Daily usage fold pushes aggregated metrics to Customer.io
-    Given the projectDailySdkUsage fold has completed for a project
-    When the daily usage sync reactor runs
-    Then the user is identified in Customer.io with trace_count, daily_trace_count, and trace_count_updated_at
-
-  @unit
-  Scenario: Daily usage sync sends cumulative totals not reset counters
-    Given accumulated usage data for a project
-    When the daily usage sync reactor builds the trait payload
-    Then trace_count is the cumulative total
-    And trace_count_updated_at is an ISO 8601 timestamp of the fold completion
 
   # ---------------------------------------------------------------------------
   # R6: Team and feature adoption hooks

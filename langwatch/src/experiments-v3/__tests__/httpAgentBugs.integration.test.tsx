@@ -215,6 +215,7 @@ vi.mock("~/utils/api", () => ({
         getById: { invalidate: vi.fn() },
       },
     })),
+    useQueries: () => [],
   },
 }));
 

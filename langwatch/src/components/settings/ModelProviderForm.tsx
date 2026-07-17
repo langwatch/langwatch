@@ -1,6 +1,19 @@
-import { Box, Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import {
+  findModelProviderById,
+  isResolvableProviderId,
+  useAllModelProvidersList,
+} from "../../hooks/useAllModelProvidersList";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
@@ -49,6 +62,13 @@ export const EditModelProviderForm = ({
   const { providers } = useModelProvidersSettings({
     projectId: projectId,
   });
+  // Flat, uncollapsed list — see useAllModelProvidersList for why the
+  // lookup below can't use the collapsed `providers` Record above.
+  // `isAllProvidersReady` is the hook's "the list definitively arrived"
+  // signal (react-query isSuccess), used below to tell a real stale miss
+  // apart from a list that simply hasn't loaded.
+  const { providers: allProviders, isReady: isAllProvidersReady } =
+    useAllModelProvidersList();
   const { closeDrawer } = useDrawer();
   const { project, team, organization, hasPermission } =
     useOrganizationTeamProject();
@@ -95,32 +115,58 @@ export const EditModelProviderForm = ({
   //     an existing row. The Add Model Provider menu sets this so the
   //     user can stand up a second instance of an already-configured
   //     provider type without colliding with the first.
-  //   - `modelProviderId === "<cuid>"` → edit that specific row. With
-  //     multi-instance enabled the providers Record dedupes by provider
-  //     string and may not contain this row, so we don't fall back on
-  //     `providers[providerKey]` if the id lookup misses (that fallback
-  //     used to silently swap the user's intended row for whichever
-  //     same-type row happened to win the dedupe).
+  //   - `modelProviderId === "<cuid>"` → edit that specific row, resolved
+  //     via the shared `findModelProviderById` against the flat list —
+  //     see useAllModelProvidersList for why the collapsed `providers`
+  //     Record above is the wrong source for this lookup (#5380).
   //   - `modelProviderId` undefined → no specific target, fresh blank
   //     (deep-link from evaluator selector or similar).
-  const provider: MaybeStoredModelProvider = useMemo(() => {
-    if (providers && modelProviderId && modelProviderId !== "new") {
-      const existing = Object.values(providers).find(
-        (p) => p.id === modelProviderId,
-      );
-      if (existing) return existing;
-    }
-    return {
-      provider: providerKey,
-      enabled: false,
-      customKeys: null,
-      models: null,
-      embeddingsModels: null,
-      disabledByDefault: true,
-      deploymentMapping: null,
-      extraHeaders: [],
-    };
-  }, [modelProviderId, providerKey, providers]);
+  const isTargetingSpecificRow = isResolvableProviderId(modelProviderId);
+  const existingRow = useMemo(
+    () =>
+      isTargetingSpecificRow
+        ? findModelProviderById({ providers: allProviders, modelProviderId })
+        : undefined,
+    [isTargetingSpecificRow, allProviders, modelProviderId],
+  );
+
+  // Two DISTINCT concerns, deliberately not collapsed into one flag:
+  //   - Whether we can SUBMIT. An id-targeted edit that didn't resolve to a
+  //     real row must never submit, in EVERY load state (loading, disabled,
+  //     errored, or genuinely empty), so this gates purely on "targeting a
+  //     row we couldn't resolve". Otherwise Save ships `id: undefined`, the
+  //     server treats it as a create, and a phantom duplicate row is written
+  //     (#5380 P2).
+  const cannotResolveTarget = isTargetingSpecificRow && !existingRow;
+  //   - Whether to show the "no longer exists" copy. This is the subset of
+  //     `cannotResolveTarget` where the flat list has DEFINITIVELY arrived, so
+  //     the row is known absent rather than merely unresolved. Gating on
+  //     readiness stops the copy flashing mid-load and stops it lying when the
+  //     list simply failed to load. (An `allProviders.length > 0` proxy
+  //     mis-reads a legitimately empty org as "not loaded" and never fires —
+  //     the original #5380 stale-miss hole.)
+  const isStaleMiss = cannotResolveTarget && isAllProvidersReady;
+
+  // Memoized so the blank template keeps a stable identity across renders:
+  // useModelProviderForm's reset effect lists `provider.extraHeaders` in its
+  // deps, so a fresh `{ ..., extraHeaders: [] }` literal on every render would
+  // refire that effect each render → setState → re-render → "Maximum update
+  // depth exceeded" and a wiped-out Add form. Keyed on the resolved row (or
+  // its absence) and the provider key only.
+  const provider: MaybeStoredModelProvider = useMemo(
+    () =>
+      existingRow ?? {
+        provider: providerKey,
+        enabled: false,
+        customKeys: null,
+        models: null,
+        embeddingsModels: null,
+        disabledByDefault: true,
+        deploymentMapping: null,
+        extraHeaders: [],
+      },
+    [existingRow, providerKey],
+  );
 
   // Detect if provider is using environment variables (enabled but no stored customKeys)
   // Must be computed before the hook call so we can pass it to the hook
@@ -309,6 +355,12 @@ export const EditModelProviderForm = ({
 
   return (
     <VStack gap={4} align="start" width="full">
+      {isStaleMiss && (
+        <Text color="red.500" fontSize="sm">
+          This provider configuration no longer exists. It may have been deleted
+          from another session.
+        </Text>
+      )}
       <VStack align="start" width="full" gap={4}>
         <Field.Root width="full" required>
           <SmallLabel>
@@ -428,7 +480,9 @@ export const EditModelProviderForm = ({
             size="sm"
             colorPalette="orange"
             loading={state.isSaving || isValidatingApiKey}
-            disabled={!state.isDirty && !isAdvancedDirty}
+            disabled={
+              cannotResolveTarget || (!state.isDirty && !isAdvancedDirty)
+            }
             onClick={handleSave}
           >
             Save

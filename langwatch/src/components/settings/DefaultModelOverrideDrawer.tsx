@@ -36,6 +36,7 @@ import { api, type RouterOutputs } from "~/utils/api";
 
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { buildCustomModelDisplayNames } from "~/server/modelProviders/customModelDisplayNames";
 import { LATEST_ALIAS_PROVIDERS } from "~/server/modelProviders/latestAliases";
 import { INHERIT_SENTINEL, ProviderModelSelector } from "./ProviderModelSelector";
 import {
@@ -269,6 +270,13 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     } satisfies Record<ModelRoleKey, string[]>;
   }, [projectProviders.data]);
 
+  // Configured custom-model display names for every provider row this
+  // project can see, keyed by `<provider>/<modelId>`.
+  const displayNames = useMemo(
+    () => buildCustomModelDisplayNames(projectProviders.data?.providers ?? []),
+    [projectProviders.data],
+  );
+
   const setOverride = useCallback((key: string, model: string | null) => {
     setConfig((prev) => {
       const next = { ...prev };
@@ -368,6 +376,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
                   }
                   modelOptions={modelOptionsByRole[role]}
                   onSetOverride={setOverride}
+                  displayNames={displayNames}
                 />
               ))}
             </VStack>
@@ -412,6 +421,7 @@ function RoleRow({
   onToggleExpand,
   modelOptions,
   onSetOverride,
+  displayNames,
 }: {
   role: ModelRoleKey;
   config: Record<string, string>;
@@ -426,6 +436,8 @@ function RoleRow({
   onToggleExpand: () => void;
   modelOptions: string[];
   onSetOverride: (key: string, model: string | null) => void;
+  /** Configured custom-model display names, keyed by `<provider>/<modelId>`. */
+  displayNames: Record<string, string>;
 }) {
   const current = config[role] ?? "";
   // Prefer the picked-scope cascade answer; fall back to the
@@ -477,6 +489,7 @@ function RoleRow({
             onChange={(m) => onSetOverride(role, m)}
             inheritOption={inheritOption}
             disabled={unsupportedAtScope}
+            displayNames={displayNames}
           />
         </Box>
         {canExpand ? (
@@ -527,6 +540,7 @@ function RoleRow({
               inheritedRoleModel={inheritedModel}
               modelOptions={modelOptions}
               onSetOverride={onSetOverride}
+              displayNames={displayNames}
             />
           ))}
         </VStack>
@@ -544,6 +558,7 @@ function FeatureRow({
   inheritedRoleModel,
   modelOptions,
   onSetOverride,
+  displayNames,
 }: {
   feature: FeatureProjection;
   override: string;
@@ -558,6 +573,8 @@ function FeatureRow({
   inheritedRoleModel?: string;
   modelOptions: string[];
   onSetOverride: (key: string, model: string | null) => void;
+  /** Configured custom-model display names, keyed by `<provider>/<modelId>`. */
+  displayNames: Record<string, string>;
 }) {
   // The feature's "would inherit" placeholder follows the same cascade
   // the resolver does: a role-level pick in THIS config (in-progress)
@@ -608,6 +625,7 @@ function FeatureRow({
           options={modelOptions}
           onChange={(m) => onSetOverride(feature.key, m)}
           inheritOption={inheritOption ?? undefined}
+          displayNames={displayNames}
         />
       </Box>
       <Box width="24px" flexShrink={0} />

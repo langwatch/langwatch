@@ -13,7 +13,7 @@ import type { TimeseriesResult } from "~/server/analytics/types";
 import { compareForTripwire } from "../divergence-compare";
 
 const warn = vi.fn();
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     warn: (...args: unknown[]) => warn(...args),
     info: vi.fn(),

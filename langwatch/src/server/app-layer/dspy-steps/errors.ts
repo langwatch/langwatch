@@ -1,7 +1,7 @@
-import { NotFoundError } from "../domain-error";
+import { NotFoundError } from "../handled-error";
 
 export class DspyStepNotFoundError extends NotFoundError {
-  declare readonly kind: "dspy_step_not_found";
+  declare readonly code: "dspy_step_not_found";
 
   constructor(
     stepId: string,

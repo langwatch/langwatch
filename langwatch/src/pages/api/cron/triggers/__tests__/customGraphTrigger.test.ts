@@ -1,10 +1,8 @@
 import { type Project, type Trigger, TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimeseriesBucket } from "~/server/analytics/types";
-import {
-  processCustomGraphTrigger,
-  sumMetricAcrossGroups,
-} from "../customGraphTrigger";
+import { sumMetricAcrossGroups } from "~/server/app-layer/analytics/series-points";
+import { processCustomGraphTrigger } from "../customGraphTrigger";
 
 const { mockGetTimeseries } = vi.hoisted(() => ({
   mockGetTimeseries: vi.fn(),
@@ -50,17 +48,52 @@ import { prisma } from "~/server/db";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { handleSendEmail } from "../actions/sendEmail";
 import { handleSendSlackMessage } from "../actions/sendSlackMessage";
-import { checkThreshold, updateAlert } from "../utils";
+import { addTriggersSent, checkThreshold, updateAlert } from "../utils";
 
 describe("processCustomGraphTrigger", () => {
   const mockProjects: Project[] = [
     { id: "project-1", slug: "test-project" } as Project,
   ];
 
+  const makeFiringTrigger = (action: TriggerAction) =>
+    ({
+      id: "trigger-1",
+      name: "Test Alert",
+      projectId: "project-1",
+      customGraphId: "graph-1",
+      action,
+      actionParams: {
+        threshold: 10,
+        operator: "gt",
+        timePeriod: 60,
+        members: [],
+        seriesName: "0/count/count",
+      },
+    }) as unknown as Trigger;
+
+  const mockFiringGraph = () => {
+    vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
+      id: "graph-1",
+      name: "Test Graph",
+      graph: {
+        series: [{ name: "metric1", metric: "count", aggregation: "count" }],
+      },
+      filters: {},
+    } as any);
+    mockGetTimeseries.mockResolvedValue({
+      currentPeriod: [{ "0/count/count": 15 }],
+      previousPeriod: [],
+    } as any);
+    vi.mocked(checkThreshold).mockReturnValue(true);
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Default mock: no unresolved trigger (new alert will be sent)
     vi.mocked(prisma.triggerSent.findFirst).mockResolvedValue(null);
+    // Default: dispatch succeeds — the handlers report the fire as consumed.
+    vi.mocked(handleSendEmail).mockResolvedValue({ didSend: true });
+    vi.mocked(handleSendSlackMessage).mockResolvedValue({ didSend: true });
   });
 
   describe("when trigger has no customGraphId", () => {
@@ -238,8 +271,13 @@ describe("processCustomGraphTrigger", () => {
 
       vi.mocked(prisma.triggerSent.findFirst).mockResolvedValue(null);
 
+      // seriesName "1/errors/count" selects series INDEX 1 (the "errors"
+      // series); the evaluator queries it as a single-series input, so the
+      // analytics result bucket is keyed "0/errors/count" (query index 0) —
+      // NOT the stored "1/errors/count". The evaluator derives that lookup
+      // key via buildSeriesName, matching what the analytics service returns.
       mockGetTimeseries.mockResolvedValue({
-        currentPeriod: [{ "1/errors/count": 60 }, { "1/errors/count": 70 }],
+        currentPeriod: [{ "0/errors/count": 60 }, { "0/errors/count": 70 }],
         previousPeriod: [],
       } as any);
       vi.mocked(checkThreshold).mockReturnValue(true);
@@ -403,6 +441,74 @@ describe("processCustomGraphTrigger", () => {
       await processCustomGraphTrigger(trigger, mockProjects);
 
       expect(handleSendSlackMessage).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the dispatch reports the fire as consumed (didSend true)", () => {
+    it("records the incident via addTriggersSent", async () => {
+      const trigger = makeFiringTrigger(TriggerAction.SEND_EMAIL);
+      mockFiringGraph();
+
+      await processCustomGraphTrigger(trigger, mockProjects);
+
+      expect(addTriggersSent).toHaveBeenCalledWith(
+        "trigger-1",
+        expect.any(Array),
+      );
+    });
+  });
+
+  // Regression: the handlers used to swallow every dispatch error into void,
+  // and the caller recorded the incident unconditionally — an undelivered
+  // alert read as "currently firing" and suppressed all future notifications.
+  describe("when the email dispatch fails (didSend false)", () => {
+    it("does not record the incident, so the next tick retries", async () => {
+      vi.mocked(handleSendEmail).mockResolvedValue({ didSend: false });
+      const trigger = makeFiringTrigger(TriggerAction.SEND_EMAIL);
+      mockFiringGraph();
+
+      await processCustomGraphTrigger(trigger, mockProjects);
+
+      expect(handleSendEmail).toHaveBeenCalled();
+      expect(addTriggersSent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the Slack dispatch fails (didSend false)", () => {
+    it("does not record the incident, so the next tick retries", async () => {
+      vi.mocked(handleSendSlackMessage).mockResolvedValue({ didSend: false });
+      const trigger = makeFiringTrigger(TriggerAction.SEND_SLACK_MESSAGE);
+      mockFiringGraph();
+
+      await processCustomGraphTrigger(trigger, mockProjects);
+
+      expect(handleSendSlackMessage).toHaveBeenCalled();
+      expect(addTriggersSent).not.toHaveBeenCalled();
+    });
+  });
+
+  // Regression: the resolve used to write only `resolvedAt`, leaving
+  // `openIncidentKey` held — so the event-sourced path's next
+  // `claimOpenForGraphAlert` INSERT hit the unique key (P2002) forever and the
+  // alert could never fire again. Mirrors `markResolvedById` in the trigger
+  // prisma repository.
+  describe("when a firing alert resolves", () => {
+    it("clears openIncidentKey alongside resolvedAt", async () => {
+      vi.mocked(prisma.triggerSent.findFirst).mockResolvedValue({
+        id: "sent-1",
+      } as any);
+      const trigger = makeFiringTrigger(TriggerAction.SEND_EMAIL);
+      mockFiringGraph();
+      // Condition no longer met: the open incident must resolve.
+      vi.mocked(checkThreshold).mockReturnValue(false);
+
+      const result = await processCustomGraphTrigger(trigger, mockProjects);
+
+      expect(result.status).toBe("not_triggered");
+      expect(prisma.triggerSent.update).toHaveBeenCalledWith({
+        where: { id: "sent-1", projectId: "project-1" },
+        data: { resolvedAt: expect.any(Date), openIncidentKey: null },
+      });
     });
   });
 

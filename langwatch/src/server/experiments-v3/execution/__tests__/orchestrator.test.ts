@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
-import { generateCells, generatePairwiseCells } from "../orchestrator";
+import {
+  buildEvaluatorInputs,
+  generateCells,
+  generateComparisonCells,
+} from "../orchestrator";
 import type { ExecutionScope } from "../types";
 
 describe("orchestrator", () => {
@@ -274,9 +278,76 @@ describe("orchestrator", () => {
         "target-2",
       ]);
     });
+
+    it("skips column-style n-way evaluator targets during phase 1", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "select-best-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-select-best-evaluator",
+        inputs: [
+          { identifier: "input", type: "str" },
+          { identifier: "golden", type: "str" },
+        ],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        comparison: {
+          variants: ["target-1", "target-2"],
+          hasGoldenAnswer: true,
+          goldenField: "expected",
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      });
+      const datasetRows = createTestDataset(1);
+      const scope: ExecutionScope = { type: "full" };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells.map((cell) => cell.targetId)).toEqual([
+        "target-1",
+        "target-2",
+      ]);
+    });
+
+    describe("when an n-way evaluator is attached as a chip evaluator", () => {
+      // Regression (#5101): phase 1 excluded `e.pairwise` but not
+      // `e.selectBest`, so the n-way evaluator was attached to every
+      // per-target cell. Those cells have no `cell.selectBest`, so
+      // buildEvaluatorInputs fell through to the generic mapping branch,
+      // produced an empty input object, and nlpgo rejected the request
+      // with "evaluatorblock: Data required".
+      it("does not attach it to per-target phase 1 cells", () => {
+        const state = createTestState(2, 0);
+        state.evaluators.push({
+          id: "eval-select-best",
+          evaluatorType: "langevals/select_best_compare",
+          inputs: [],
+          mappings: {},
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        } as EvaluationsV3State["evaluators"][0]);
+        const datasetRows = createTestDataset(1);
+        const scope: ExecutionScope = { type: "full" };
+
+        const cells = generateCells(state, datasetRows, scope);
+
+        expect(cells.length).toBeGreaterThan(0);
+        for (const cell of cells) {
+          expect(cell.evaluatorConfigs.map((e) => e.id)).not.toContain(
+            "eval-select-best",
+          );
+        }
+      });
+    });
   });
 
-  describe("generatePairwiseCells", () => {
+  describe("generateComparisonCells", () => {
     it("creates a column-target pairwise cell with both candidate outputs", () => {
       const state = createTestState(2, 0);
       state.targets.push({
@@ -309,7 +380,7 @@ describe("orchestrator", () => {
         ],
       ]);
 
-      const { cells } = generatePairwiseCells(
+      const { cells } = generateComparisonCells(
         state,
         createTestDataset(1),
         completedTargetOutputs,
@@ -318,15 +389,515 @@ describe("orchestrator", () => {
       expect(cells).toHaveLength(1);
       expect(cells[0]?.targetId).toBe("pairwise-target");
       expect(cells[0]?.skipTarget).toBe(true);
-      expect(cells[0]?.pairwise?.candidateA.output).toEqual({
-        output: "answer from A",
-      });
-      expect(cells[0]?.pairwise?.candidateB.output).toEqual({
-        output: "answer from B",
-      });
-      expect(cells[0]?.evaluatorConfigs[0]?.pairwise?.goldenField).toBe(
+      // Serialized, not the raw dict: langevals types CandidateInput.output
+      // as `str` and pydantic refuses to coerce an object, so passing the
+      // dict through 422s the whole evaluation.
+      expect(cells[0]?.comparison?.candidates[0]?.output).toBe(
+        '{"output":"answer from A"}',
+      );
+      expect(cells[0]?.comparison?.candidates[1]?.output).toBe(
+        '{"output":"answer from B"}',
+      );
+      expect(cells[0]?.evaluatorConfigs[0]?.comparison?.goldenField).toBe(
         "expected",
       );
+    });
+
+    // Regression (#5528 follow-up): an experiment saved BEFORE the
+    // pairwise/N-way merge still has an Evaluator DB row whose persisted
+    // config.evaluatorType is literally "langevals/pairwise_compare" — the
+    // merge never migrates existing rows. workflowBuilder's
+    // buildEvaluatorNode always dispatches column-targets via
+    // `evaluators/{dbEvaluatorId}`, and evaluations-legacy.ts resolves the
+    // judge that actually runs from THAT row's real evaluatorType, ignoring
+    // whatever type the orchestrator hands it. Forcing
+    // COMPARISON_EVALUATOR_TYPE onto the synthetic evaluator and always
+    // building the `candidates` payload therefore sent the N-way shape to a
+    // judge that still expects the legacy `candidate_a_id/output` +
+    // `candidate_b_id/output` shape — a bare Load -> Run of an untouched
+    // legacy pairwise experiment 400s ("missing required field:
+    // candidate_a_id") instead of re-running successfully.
+    describe("given a column-target whose backing DB evaluator is still the legacy pairwise_compare judge", () => {
+      const legacyPairwiseState = () => {
+        const state = createTestState(2, 0);
+        state.targets.push({
+          id: "pairwise-target",
+          type: "evaluator",
+          targetEvaluatorId: "db-pairwise-evaluator",
+          inputs: [
+            { identifier: "candidate_a_output", type: "str" },
+            { identifier: "candidate_b_output", type: "str" },
+            { identifier: "golden", type: "str" },
+          ],
+          outputs: [{ identifier: "label", type: "str" }],
+          mappings: {},
+          pairwise: {
+            variantA: "target-1",
+            variantB: "target-2",
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+          },
+        });
+        return state;
+      };
+
+      const legacyCompletedTargetOutputs = new Map([
+        [
+          "0:target-1",
+          { output: "answer from A", cost: 0.01, duration: 120 },
+        ],
+        [
+          "0:target-2",
+          { output: "answer from B", cost: 0.02, duration: 150 },
+        ],
+      ]);
+
+      // The realistic DB state for any comparison column created before this
+      // PR: the row's persisted config still says pairwise_compare.
+      const loadedEvaluators = new Map([
+        [
+          "db-pairwise-evaluator",
+          {
+            id: "db-pairwise-evaluator",
+            name: "Pairwise Compare",
+            config: { evaluatorType: "langevals/pairwise_compare" },
+          },
+        ],
+      ]);
+
+      it("resolves the synthetic evaluator's type from the DB row instead of forcing select_best_compare", () => {
+        const { cells } = generateComparisonCells(
+          legacyPairwiseState(),
+          createTestDataset(1),
+          legacyCompletedTargetOutputs,
+          undefined,
+          undefined,
+          loadedEvaluators,
+        );
+
+        expect(cells).toHaveLength(1);
+        expect(cells[0]?.evaluatorConfigs[0]?.evaluatorType).toBe(
+          "langevals/pairwise_compare",
+        );
+      });
+
+      it("bakes the legacy 2-slot mapping shape instead of `candidates`", () => {
+        const { cells } = generateComparisonCells(
+          legacyPairwiseState(),
+          createTestDataset(1),
+          legacyCompletedTargetOutputs,
+          undefined,
+          undefined,
+          loadedEvaluators,
+        );
+
+        const mappings = cells[0]?.evaluatorConfigs[0]?.mappings[
+          "dataset-1"
+        ]?.["pairwise-target"] as Record<string, { value: unknown }>;
+
+        expect(mappings.candidate_a_id?.value).toBe("target-1");
+        expect(mappings.candidate_a_output?.value).toBe("answer from A");
+        expect(mappings.candidate_b_id?.value).toBe("target-2");
+        expect(mappings.candidate_b_output?.value).toBe("answer from B");
+        expect(mappings.candidates).toBeUndefined();
+        expect(mappings.row_index).toBeUndefined();
+      });
+
+      // The end-to-end check: what actually gets dispatched at runtime via
+      // buildEvaluatorInputs (executeCell's payload assembler), not just the
+      // static mapping snapshot above.
+      it("dispatches the fields a pairwise_compare judge requires, not the N-way `candidates` shape", () => {
+        const { cells } = generateComparisonCells(
+          legacyPairwiseState(),
+          createTestDataset(1),
+          legacyCompletedTargetOutputs,
+          undefined,
+          undefined,
+          loadedEvaluators,
+        );
+        const cell = cells[0]!;
+        const evaluatorId = cell.evaluatorConfigs[0]!.id;
+
+        const dispatchedInputs = buildEvaluatorInputs(cell, evaluatorId, {});
+
+        // Matches "langevals/pairwise_compare".requiredFields in
+        // evaluators.generated.ts: candidate_a_id, candidate_a_output,
+        // candidate_b_id, candidate_b_output.
+        expect(dispatchedInputs.candidate_a_id).toBe("target-1");
+        expect(dispatchedInputs.candidate_a_output).toBe("answer from A");
+        expect(dispatchedInputs.candidate_b_id).toBe("target-2");
+        expect(dispatchedInputs.candidate_b_output).toBe("answer from B");
+        expect(dispatchedInputs.candidates).toBeUndefined();
+        expect(dispatchedInputs.row_index).toBeUndefined();
+      });
+
+      // Control: the SAME shape of column-target, but the backing DB row has
+      // already self-healed to select_best_compare (e.g. the user re-saved
+      // the column once) — must keep building the N-way payload, not regress
+      // to the legacy shape for every pairwise-originated column forever.
+      it("still builds the `candidates` payload once the DB row has self-healed to select_best_compare", () => {
+        const healedLoadedEvaluators = new Map([
+          [
+            "db-pairwise-evaluator",
+            {
+              id: "db-pairwise-evaluator",
+              name: "Comparison",
+              config: { evaluatorType: "langevals/select_best_compare" },
+            },
+          ],
+        ]);
+
+        const { cells } = generateComparisonCells(
+          legacyPairwiseState(),
+          createTestDataset(1),
+          legacyCompletedTargetOutputs,
+          undefined,
+          undefined,
+          healedLoadedEvaluators,
+        );
+
+        expect(cells[0]?.evaluatorConfigs[0]?.evaluatorType).toBe(
+          "langevals/select_best_compare",
+        );
+        const cell = cells[0]!;
+        const dispatchedInputs = buildEvaluatorInputs(
+          cell,
+          cell.evaluatorConfigs[0]!.id,
+          {},
+        );
+        expect(dispatchedInputs.candidates).toEqual([
+          { id: "target-1", output: "answer from A", cost: 0.01, duration: 120 },
+          { id: "target-2", output: "answer from B", cost: 0.02, duration: 150 },
+        ]);
+        expect(dispatchedInputs.candidate_a_id).toBeUndefined();
+      });
+    });
+
+    // #5101 is specifically about N-way (3+) comparisons, not just the
+    // 2-slot pairwise case every other test in this suite exercises —
+    // every candidate must reach the judge, not just the first two.
+    describe("given three or more variants", () => {
+      it("includes every variant's output as a candidate", () => {
+        const state = createTestState(3, 0);
+        state.targets.push({
+          id: "comparison-target",
+          type: "evaluator",
+          targetEvaluatorId: "db-select-best-evaluator",
+          inputs: [],
+          outputs: [{ identifier: "label", type: "str" }],
+          mappings: {},
+          comparison: {
+            variants: ["target-1", "target-2", "target-3"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        });
+
+        const completedTargetOutputs = new Map([
+          [
+            "0:target-1",
+            { output: { output: "answer from 1" }, cost: 0.01, duration: 100 },
+          ],
+          [
+            "0:target-2",
+            { output: { output: "answer from 2" }, cost: 0.02, duration: 110 },
+          ],
+          [
+            "0:target-3",
+            { output: { output: "answer from 3" }, cost: 0.03, duration: 120 },
+          ],
+        ]);
+
+        const { cells } = generateComparisonCells(
+          state,
+          createTestDataset(1),
+          completedTargetOutputs,
+        );
+
+        expect(cells).toHaveLength(1);
+        expect(cells[0]?.comparison?.candidates).toHaveLength(3);
+        expect(cells[0]?.comparison?.candidates.map((c) => c.id)).toEqual([
+          "target-1",
+          "target-2",
+          "target-3",
+        ]);
+        expect(cells[0]?.comparison?.candidates[2]?.output).toBe(
+          '{"output":"answer from 3"}',
+        );
+      });
+    });
+
+    // langevals types CandidateInput.output as `str`. Pydantic will not coerce
+    // a dict / list / number, so anything non-string reaching the judge 422s
+    // the run. A target emitting a structured output must therefore be either
+    // narrowed to a field by variantOutputPaths, or serialized.
+    describe("given a variant whose output is structured", () => {
+      const structuredState = (
+        variantOutputPaths?: Record<string, string[]>,
+      ) => {
+        const state = createTestState(2, 0);
+        state.targets.push({
+          id: "comparison-target",
+          type: "evaluator",
+          targetEvaluatorId: "db-select-best-evaluator",
+          inputs: [],
+          outputs: [{ identifier: "label", type: "str" }],
+          mappings: {},
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+            ...(variantOutputPaths && { variantOutputPaths }),
+          },
+        });
+        return state;
+      };
+
+      const structuredOutputs = new Map([
+        [
+          "0:target-1",
+          { output: { answer: "from A", confidence: 0.9 }, cost: 0, duration: 1 },
+        ],
+        [
+          "0:target-2",
+          { output: { answer: "from B", confidence: 0.4 }, cost: 0, duration: 1 },
+        ],
+      ]);
+
+      describe("when an output path narrows it to a field", () => {
+        it("sends that field's value as the candidate text", () => {
+          const { cells } = generateComparisonCells(
+            structuredState({
+              "target-1": ["answer"],
+              "target-2": ["answer"],
+            }),
+            createTestDataset(1),
+            structuredOutputs,
+          );
+
+          expect(cells[0]?.comparison?.candidates[0]?.output).toBe("from A");
+          expect(cells[0]?.comparison?.candidates[1]?.output).toBe("from B");
+        });
+      });
+
+      describe("when no output path was picked", () => {
+        it("serializes the whole object rather than failing the run", () => {
+          const { cells } = generateComparisonCells(
+            structuredState(),
+            createTestDataset(1),
+            structuredOutputs,
+          );
+
+          const [first, second] = cells[0]?.comparison?.candidates ?? [];
+          expect(typeof first?.output).toBe("string");
+          expect(typeof second?.output).toBe("string");
+          expect(JSON.parse(first!.output as string)).toEqual({
+            answer: "from A",
+            confidence: 0.9,
+          });
+        });
+      });
+
+      // A null output still counts as "the target ran", so it passes the
+      // missing-output check. But null has no text to compare, and judging the
+      // four characters "null" against real answers is worse than skipping. The
+      // row is skipped with an empty-output reason rather than judged.
+      describe("when the output is null", () => {
+        it("skips the row instead of judging the text 'null'", () => {
+          const { cells, skipReasons } = generateComparisonCells(
+            structuredState(),
+            createTestDataset(1),
+            new Map([
+              ["0:target-1", { output: null, cost: 0, duration: 1 }],
+              ["0:target-2", { output: { answer: "B" }, cost: 0, duration: 1 }],
+            ]) as never,
+          );
+
+          expect(cells).toHaveLength(0);
+          expect(skipReasons[0]?.kind).toBe("empty-output");
+          expect(skipReasons[0]?.variantNames).toEqual(["target-1"]);
+        });
+      });
+    });
+
+    // A variant column can carry its own grading evaluators. Those scores are
+    // appended to the candidate's text so the judge can weigh them, rather than
+    // re-deriving quality it has already been told.
+    describe("given a variant column has its own evaluator scores", () => {
+      const scoredState = () => {
+        const state = createTestState(2, 0);
+        state.targets.push({
+          id: "comparison-target",
+          type: "evaluator",
+          targetEvaluatorId: "db-select-best-evaluator",
+          inputs: [],
+          outputs: [{ identifier: "label", type: "str" }],
+          mappings: {},
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        });
+        return state;
+      };
+
+      const plainOutputs = new Map([
+        ["0:target-1", { output: "answer from A", cost: 0, duration: 1 }],
+        ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
+      ]);
+
+      it("appends each score to that candidate's output", () => {
+        const { cells } = generateComparisonCells(
+          scoredState(),
+          createTestDataset(1),
+          plainOutputs,
+          new Map([
+            [
+              "0:target-1",
+              [
+                { name: "Faithfulness", score: 0.91 },
+                { name: "Toxicity", passed: true },
+              ],
+            ],
+          ]),
+        );
+
+        const output = cells[0]?.comparison?.candidates[0]?.output as string;
+        expect(output).toContain("answer from A");
+        expect(output).toContain("--- Existing evaluator scores ---");
+        expect(output).toContain("- Faithfulness: score=0.91");
+        expect(output).toContain("- Toxicity: passed=true");
+      });
+
+      it("leaves a candidate with no scores untouched", () => {
+        const { cells } = generateComparisonCells(
+          scoredState(),
+          createTestDataset(1),
+          plainOutputs,
+          new Map([["0:target-1", [{ name: "Faithfulness", score: 0.91 }]]]),
+        );
+
+        expect(cells[0]?.comparison?.candidates[1]?.output).toBe(
+          "answer from B",
+        );
+      });
+
+      // The scores map is optional — nothing appends when it is absent.
+      it("judges the bare outputs when no scores were collected", () => {
+        const { cells } = generateComparisonCells(
+          scoredState(),
+          createTestDataset(1),
+          plainOutputs,
+        );
+
+        expect(cells[0]?.comparison?.candidates[0]?.output).toBe(
+          "answer from A",
+        );
+      });
+
+      // The output is narrowed to its field BEFORE the scores are appended, so
+      // the judge reads the answer and its scores, not the whole blob.
+      describe("when the variant's output is structured", () => {
+        const structuredState = () => {
+          const state = scoredState();
+          const comparisonTarget = state.targets.at(-1)!;
+          comparisonTarget.comparison!.variantOutputPaths = {
+            "target-1": ["answer"],
+          };
+          return state;
+        };
+
+        const structured = new Map([
+          [
+            "0:target-1",
+            {
+              output: { answer: "from A", confidence: 0.9 },
+              cost: 0,
+              duration: 1,
+            },
+          ],
+          ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
+        ]);
+
+        const scores = new Map([
+          ["0:target-1", [{ name: "Faithfulness", score: 0.91 }]],
+        ]);
+
+        it("appends the scores to the picked field, not the whole object", () => {
+          const { cells } = generateComparisonCells(
+            structuredState(),
+            createTestDataset(1),
+            structured,
+            scores,
+          );
+
+          expect(cells[0]?.comparison?.candidates[0]?.output).toBe(
+            "from A\n\n--- Existing evaluator scores ---\n- Faithfulness: score=0.91",
+          );
+        });
+
+        it("appends the scores to the serialized object when no field is picked", () => {
+          const { cells } = generateComparisonCells(
+            scoredState(),
+            createTestDataset(1),
+            structured,
+            scores,
+          );
+
+          const output = cells[0]?.comparison?.candidates[0]?.output as string;
+          expect(output).toContain('{"answer":"from A","confidence":0.9}');
+          expect(output).toContain("- Faithfulness: score=0.91");
+        });
+
+        // A variant that produced no output must not have its score block
+        // appended — that would leave a candidate that was scores and nothing
+        // else, which langevals won't drop, so the judge would score a variant
+        // that had said nothing. The row is skipped with an empty-output reason
+        // instead.
+        it("skips the row rather than sending a scores-only candidate", () => {
+          const { cells, skipReasons } = generateComparisonCells(
+            scoredState(),
+            createTestDataset(1),
+            new Map([
+              ["0:target-1", { output: "", cost: 0, duration: 1 }],
+              ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
+            ]),
+            scores,
+          );
+
+          expect(cells).toHaveLength(0);
+          expect(skipReasons[0]?.kind).toBe("empty-output");
+          expect(skipReasons[0]?.variantNames).toEqual(["target-1"]);
+        });
+
+        // An unserializable output (circular refs, BigInt) has no text to
+        // carry, so the row is skipped for the same reason.
+        it("skips the row when an output cannot be serialized", () => {
+          const circular: Record<string, unknown> = { answer: "from A" };
+          circular.self = circular;
+
+          const { cells, skipReasons } = generateComparisonCells(
+            scoredState(),
+            createTestDataset(1),
+            new Map([
+              ["0:target-1", { output: circular, cost: 0, duration: 1 }],
+              ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
+            ]),
+            scores,
+          );
+
+          expect(cells).toHaveLength(0);
+          expect(skipReasons[0]?.kind).toBe("empty-output");
+        });
+      });
     });
 
     it("uses the prompt handle as candidate id when loadedPrompts has it", () => {
@@ -361,7 +932,7 @@ describe("orchestrator", () => {
         ["prompt_A", { handle: "say-hi" } as never],
         ["prompt_B", { handle: "be-formal" } as never],
       ]);
-      const { cells } = generatePairwiseCells(
+      const { cells } = generateComparisonCells(
         state,
         createTestDataset(1),
         new Map([
@@ -372,8 +943,59 @@ describe("orchestrator", () => {
         loadedPrompts as never,
       );
       expect(cells).toHaveLength(1);
-      expect(cells[0]?.pairwise?.candidateA.id).toBe("say-hi");
-      expect(cells[0]?.pairwise?.candidateB.id).toBe("be-formal");
+      expect(cells[0]?.comparison?.candidates[0]?.id).toBe("say-hi");
+      expect(cells[0]?.comparison?.candidates[1]?.id).toBe("be-formal");
+    });
+
+    // Two variants pointing at the SAME prompt (compare v1 vs v2, the case
+    // comparison.feature adds "same-name variants" for) resolve to the same
+    // handle. Using the handle as candidate id would make the winning label
+    // name two candidates at once, so the winner is unattributable. The
+    // colliding entries must fall back to their unique target ids instead.
+    it("falls back to target ids when two variants share the same prompt handle", () => {
+      const state = createTestState(2, 0);
+      const variantA = state.targets[0]!;
+      const variantB = state.targets[1]!;
+      // Both point at the SAME prompt → same handle.
+      (variantA as { type: string; promptId?: string }).type = "prompt";
+      (variantA as { type: string; promptId?: string }).promptId = "prompt_X";
+      (variantB as { type: string; promptId?: string }).type = "prompt";
+      (variantB as { type: string; promptId?: string }).promptId = "prompt_X";
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        pairwise: {
+          variantA: variantA.id,
+          variantB: variantB.id,
+          hasGoldenAnswer: true,
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const loadedPrompts = new Map<
+        string,
+        { handle: string } & Record<string, unknown>
+      >([["prompt_X", { handle: "shared-handle" } as never]]);
+
+      const { cells } = generateComparisonCells(
+        state,
+        createTestDataset(1),
+        new Map([
+          ["0:" + variantA.id, { output: "a" }],
+          ["0:" + variantB.id, { output: "b" }],
+        ]),
+        undefined,
+        loadedPrompts as never,
+      );
+
+      const ids = cells[0]?.comparison?.candidates.map((c) => c.id) ?? [];
+      // Distinct — the winner is attributable to exactly one variant.
+      expect(new Set(ids).size).toBe(2);
+      expect(ids).toEqual([variantA.id, variantB.id]);
     });
 
     it("falls back to target id (not promptId) when handle is unavailable", () => {
@@ -401,7 +1023,7 @@ describe("orchestrator", () => {
           includeMetrics: [],
         },
       });
-      const { cells } = generatePairwiseCells(
+      const { cells } = generateComparisonCells(
         state,
         createTestDataset(1),
         new Map([
@@ -413,12 +1035,12 @@ describe("orchestrator", () => {
       );
       // Must be the internal target id (which the aggregator can normalize),
       // never the raw promptId KSUID which would silently drop the verdict.
-      expect(cells[0]?.pairwise?.candidateA.id).toBe(variantA.id);
-      expect(cells[0]?.pairwise?.candidateB.id).toBe(variantB.id);
-      expect(cells[0]?.pairwise?.candidateA.id).not.toBe("prompt_A");
+      expect(cells[0]?.comparison?.candidates[0]?.id).toBe(variantA.id);
+      expect(cells[0]?.comparison?.candidates[1]?.id).toBe(variantB.id);
+      expect(cells[0]?.comparison?.candidates[0]?.id).not.toBe("prompt_A");
     });
 
-    it("does not create pairwise cells until both variants have output", () => {
+    it("does not create comparison cells until every variant has output", () => {
       const state = createTestState(2, 0);
       state.targets.push({
         id: "pairwise-target",
@@ -436,7 +1058,7 @@ describe("orchestrator", () => {
         },
       });
 
-      const { cells, skipReasons } = generatePairwiseCells(
+      const { cells, skipReasons } = generateComparisonCells(
         state,
         createTestDataset(1),
         new Map([["0:target-1", { output: { output: "answer from A" } }]]),
@@ -444,7 +1066,65 @@ describe("orchestrator", () => {
 
       expect(cells).toHaveLength(0);
       expect(skipReasons).toHaveLength(1);
-      expect(skipReasons[0]?.missing).toBe("B");
+      expect(skipReasons[0]?.kind).toBe("missing-output");
+      expect(skipReasons[0]?.variantNames).toEqual(["target-2"]);
+    });
+
+    // A saved comparison can point at an output field the target no longer
+    // emits — someone renamed it on the prompt. The target still runs, so the
+    // missing-output check passes it, but the picked field resolves to nothing.
+    // The row is skipped with a distinct reason, not judged one candidate short.
+    describe("when a picked output field no longer exists", () => {
+      const stateWithPath = (path: string[]) => {
+        const state = createTestState(2, 0);
+        state.targets.push({
+          id: "comparison-target",
+          type: "evaluator",
+          targetEvaluatorId: "db-select-best-evaluator",
+          inputs: [],
+          outputs: [{ identifier: "label", type: "str" }],
+          mappings: {},
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+            variantOutputPaths: { "target-1": path },
+          },
+        });
+        return state;
+      };
+
+      const structuredOutputs = new Map([
+        ["0:target-1", { output: { answer: "from A" }, cost: 0, duration: 1 }],
+        ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
+      ]);
+
+      it("skips the row with an empty-output reason naming the variant", () => {
+        const { cells, skipReasons } = generateComparisonCells(
+          stateWithPath(["renamed"]),
+          createTestDataset(1),
+          structuredOutputs,
+        );
+
+        expect(cells).toHaveLength(0);
+        expect(skipReasons).toHaveLength(1);
+        expect(skipReasons[0]?.kind).toBe("empty-output");
+        expect(skipReasons[0]?.variantNames).toEqual(["target-1"]);
+      });
+
+      it("judges the row when the picked field does exist", () => {
+        const { cells, skipReasons } = generateComparisonCells(
+          stateWithPath(["answer"]),
+          createTestDataset(1),
+          structuredOutputs,
+        );
+
+        expect(skipReasons).toHaveLength(0);
+        expect(cells).toHaveLength(1);
+        expect(cells[0]?.comparison?.candidates[0]?.output).toBe("from A");
+      });
     });
 
     // #5378: golden field is only required when the user hasn't opted out
@@ -479,7 +1159,7 @@ describe("orchestrator", () => {
         ],
       ]);
 
-      const { cells, skipReasons } = generatePairwiseCells(
+      const { cells, skipReasons } = generateComparisonCells(
         state,
         createTestDataset(1),
         completedTargetOutputs,
@@ -488,7 +1168,7 @@ describe("orchestrator", () => {
       expect(skipReasons).toHaveLength(0);
       expect(cells).toHaveLength(1);
       expect(cells[0]?.targetId).toBe("pairwise-target");
-      expect(cells[0]?.evaluatorConfigs[0]?.pairwise?.goldenField).toBe("");
+      expect(cells[0]?.evaluatorConfigs[0]?.comparison?.goldenField).toBe("");
     });
 
     it("still skips when hasGoldenAnswer is true and goldenField is empty", () => {
@@ -513,13 +1193,92 @@ describe("orchestrator", () => {
         ["0:target-2", { output: { output: "answer from B" } }],
       ]);
 
-      const { cells } = generatePairwiseCells(
+      const { cells } = generateComparisonCells(
         state,
         createTestDataset(1),
         completedTargetOutputs,
       );
 
       expect(cells).toHaveLength(0);
+    });
+
+    // Regression: resolveVariants (shared by both comparison carriers) used
+    // to only check variant count. The column-target loop (above) additionally
+    // guarded with isGoldenFieldSatisfied before calling it, but the
+    // chip-style loop (evaluator.comparison) did not — a chip comparison
+    // with hasGoldenAnswer:true and no goldenField ran anyway, feeding the
+    // judge an empty `golden` while its own settings claimed golden-aware.
+    it("also skips a chip-style comparison when hasGoldenAnswer is true and goldenField is empty", () => {
+      const state = createTestState(2, 0);
+      state.evaluators.push({
+        id: "eval-chip-comparison",
+        evaluatorType: "langevals/select_best_compare",
+        inputs: [],
+        mappings: {},
+        comparison: {
+          variants: ["target-1", "target-2"],
+          hasGoldenAnswer: true,
+          goldenField: "",
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      } as EvaluationsV3State["evaluators"][0]);
+      const completedTargetOutputs = new Map([
+        ["0:target-1", { output: { output: "answer from A" } }],
+        ["0:target-2", { output: { output: "answer from B" } }],
+      ]);
+
+      const { cells } = generateComparisonCells(
+        state,
+        createTestDataset(1),
+        completedTargetOutputs,
+      );
+
+      expect(cells).toHaveLength(0);
+    });
+
+    // Regression: a legacy pairwise config folded in by fromPairwise copies
+    // goldenField verbatim, so hasGoldenAnswer:false can coexist with a
+    // stale non-empty goldenField. buildEvaluatorInputs (the runtime path)
+    // already gates on `hasGoldenAnswer !== false && goldenField`; the
+    // column-target synthetic's static value-mapping must agree, or the
+    // judge gets a golden reference the runtime path deliberately omitted.
+    it("omits golden from the synthetic mapping when hasGoldenAnswer is false, even with a stale goldenField", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          hasGoldenAnswer: false,
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const completedTargetOutputs = new Map([
+        ["0:target-1", { output: { output: "answer from A" } }],
+        ["0:target-2", { output: { output: "answer from B" } }],
+      ]);
+
+      const { cells } = generateComparisonCells(
+        state,
+        createTestDataset(1),
+        completedTargetOutputs,
+      );
+
+      expect(cells).toHaveLength(1);
+      const mappings = cells[0]?.evaluatorConfigs[0]?.mappings as Record<
+        string,
+        Record<string, Record<string, { value: unknown }>>
+      >;
+      expect(mappings["dataset-1"]?.["pairwise-target"]?.golden?.value).toBe(
+        undefined,
+      );
     });
   });
 
@@ -649,6 +1408,78 @@ describe("orchestrator", () => {
           0: { output: "result-0" },
         },
         traceIds: {},
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(0);
+    });
+
+    // A comparison evaluator needs every variant's output, not one target's —
+    // attaching it here would silently produce an empty input object (see the
+    // matching Phase-1 skip a few tests up) rather than a real comparison run.
+    it("skips a comparison evaluator instead of attaching it to a single-target cell", () => {
+      const state = createTestState(1, 0);
+      state.evaluators.push({
+        id: "cmp-eval",
+        evaluatorType: "langevals/select_best_compare",
+        name: "Comparison",
+        settings: {},
+        inputs: [],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        comparison: {
+          variants: ["target-1"],
+          hasGoldenAnswer: false,
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      } as EvaluationsV3State["evaluators"][number]);
+      const datasetRows = createTestDataset(2);
+      const scope: ExecutionScope = {
+        type: "evaluator-all-rows",
+        targetId: "target-1",
+        evaluatorId: "cmp-eval",
+        precomputedTargetOutputs: {
+          0: { output: "result-0" },
+          1: { output: "result-1" },
+        },
+        traceIds: {},
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(0);
+    });
+  });
+
+  describe("generateCells with evaluator scope", () => {
+    // Same reasoning as the evaluator-all-rows guard above — a comparison
+    // evaluator can't run against one target's precomputed output.
+    it("skips a comparison evaluator instead of attaching it to a single-target cell", () => {
+      const state = createTestState(1, 0);
+      state.evaluators.push({
+        id: "cmp-eval",
+        evaluatorType: "langevals/select_best_compare",
+        name: "Comparison",
+        settings: {},
+        inputs: [],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        comparison: {
+          variants: ["target-1"],
+          hasGoldenAnswer: false,
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      } as EvaluationsV3State["evaluators"][number]);
+      const datasetRows = createTestDataset(1);
+      const scope: ExecutionScope = {
+        type: "evaluator",
+        targetId: "target-1",
+        rowIndex: 0,
+        evaluatorId: "cmp-eval",
+        targetOutput: { output: "result-0" },
       };
 
       const cells = generateCells(state, datasetRows, scope);

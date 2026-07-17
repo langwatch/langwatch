@@ -13,6 +13,7 @@ import { SimulationCard } from "~/components/simulations/SimulationCard";
 import { MessagePreview } from "./MessagePreview";
 import { buildDisplayTitle } from "./run-history-transforms";
 import { isCancellableStatus } from "./useCancelScenarioRun";
+import { usePrefetchRunState } from "./usePrefetchRunState";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioGridCardProps = {
@@ -34,12 +35,16 @@ export function ScenarioGridCard({
 }: ScenarioGridCardProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
   const title = buildDisplayTitle({ scenarioName, targetName, iteration });
+  const prefetchRunState = usePrefetchRunState();
+  const handlePrefetch = () => prefetchRunState(scenarioRun.scenarioRunId);
 
   return (
     <Box position="relative">
       <Box
         as="button"
         onClick={onClick}
+        onMouseEnter={handlePrefetch}
+        onFocus={handlePrefetch}
         cursor="pointer"
         height="200px"
         textAlign="left"

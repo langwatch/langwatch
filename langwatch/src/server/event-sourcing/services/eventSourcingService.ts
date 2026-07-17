@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
@@ -7,7 +8,6 @@ import {
   eventSourcingStoreDurationHistogram,
   getEventSourcingEventsStoredCounter,
 } from "~/server/metrics";
-import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../domain/aggregateType";
 import { createTenantId } from "../domain/tenantId";
 import type { Event, Projection } from "../domain/types";
@@ -164,6 +164,36 @@ export class EventSourcingService<
             );
           };
         }
+        // Paginated companion loader for the store-miss re-fold streaming path.
+        // Returns one (timestamp, eventId)-ordered page — the executor pages
+        // through it so a huge aggregate's history never lands in memory whole.
+        // No occurredAt re-sort: the streaming path is used only for
+        // order-insensitive folds, where page order is immaterial.
+        if (
+          !fold.eventLoaderUpToPaged &&
+          eventStore &&
+          eventStore.getEventsUpToPaged
+        ) {
+          const capturedAggregateType = aggregateType;
+          const capturedEventStore = eventStore;
+          fold.eventLoaderUpToPaged = async (ctx: {
+            tenantId: string;
+            aggregateId: string;
+            upToEvent: Event;
+            after: { timestamp: number; eventId: string } | undefined;
+            limit: number;
+          }) => {
+            const events = await capturedEventStore.getEventsUpToPaged!({
+              aggregateId: ctx.aggregateId,
+              context: { tenantId: createTenantId(ctx.tenantId) },
+              aggregateType: capturedAggregateType,
+              upToEvent: ctx.upToEvent as EventType,
+              after: ctx.after,
+              limit: ctx.limit,
+            });
+            return [...events];
+          };
+        }
         this.router.registerFoldProjection(fold);
       }
     }
@@ -171,6 +201,28 @@ export class EventSourcingService<
     // Register map projections
     if (mapProjections) {
       for (const mapProj of mapProjections) {
+        // Auto-wire the log-ordered history loader for
+        // `options.dedupeByIdempotencyKey` — same shape as the fold
+        // projections' eventLoaderUpTo.
+        if (!mapProj.eventLoaderUpTo && eventStore) {
+          const capturedAggregateType = aggregateType;
+          const capturedEventStore = eventStore;
+          mapProj.eventLoaderUpTo = async (ctx: {
+            tenantId: string;
+            aggregateId: string;
+            upToEvent: Event;
+          }) => {
+            const events = await capturedEventStore.getEventsUpTo(
+              ctx.aggregateId,
+              { tenantId: createTenantId(ctx.tenantId) },
+              capturedAggregateType,
+              ctx.upToEvent as EventType,
+            );
+            return [...events].sort(
+              (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
+            );
+          };
+        }
         this.router.registerMapProjection(mapProj);
       }
     }
