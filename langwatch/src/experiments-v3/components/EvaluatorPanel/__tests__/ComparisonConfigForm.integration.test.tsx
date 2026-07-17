@@ -513,8 +513,8 @@ describe("ComparisonConfigForm", () => {
         });
 
         expect(
-          screen.getByTestId("comparison-variant-output-t1"),
-        ).toHaveTextContent("Whole output");
+          screen.getByTestId("comparison-variant-output-t1-input"),
+        ).toHaveAttribute("placeholder", "Whole output");
       });
 
       describe("when the user picks a field", () => {
@@ -527,10 +527,10 @@ describe("ComparisonConfigForm", () => {
             onChange,
           });
 
-          await user.click(screen.getByTestId("comparison-variant-output-t1"));
           await user.click(
-            screen.getByTestId("comparison-variant-output-t1-option-answer"),
+            screen.getByTestId("comparison-variant-output-t1-input"),
           );
+          await user.click(screen.getByTestId("field-option-answer"));
 
           expect(onChange).toHaveBeenCalledWith(
             expect.objectContaining({ variantOutputPaths: { t1: ["answer"] } }),
@@ -549,10 +549,10 @@ describe("ComparisonConfigForm", () => {
             onChange,
           });
 
-          await user.click(screen.getByTestId("comparison-variant-output-t1"));
           await user.click(
-            screen.getByTestId("comparison-variant-output-t1-option-answer"),
+            screen.getByTestId("comparison-variant-output-t1-input"),
           );
+          await user.click(screen.getByTestId("field-option-answer"));
 
           expect(onChange).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -575,9 +575,10 @@ describe("ComparisonConfigForm", () => {
             onChange,
           });
 
-          await user.click(screen.getByTestId("comparison-variant-output-t1"));
           await user.click(
-            screen.getByTestId("comparison-variant-output-t1-option-whole"),
+            within(
+              screen.getByTestId("comparison-variant-output-t1"),
+            ).getByTestId("clear-mapping-button"),
           );
 
           expect(onChange).toHaveBeenCalledWith(
@@ -597,12 +598,10 @@ describe("ComparisonConfigForm", () => {
           onChange,
         });
 
-        await user.click(screen.getByTestId("comparison-variant-output-t1"));
         await user.click(
-          screen.getByTestId(
-            "comparison-variant-output-t1-option-document_type",
-          ),
+          screen.getByTestId("comparison-variant-output-t1-input"),
         );
+        await user.click(screen.getByTestId("field-option-output.document_type"));
 
         expect(onChange).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -850,7 +849,7 @@ describe("ComparisonConfigForm", () => {
   });
 
   describe("given a variant with a json_schema output", () => {
-    it("qualifies each field option as Variant.field", async () => {
+    it("qualifies the source header with the variant name, options with the field path", async () => {
       const user = userEvent.setup();
       useTargetNameMock.mockImplementation((t: { id: string }) =>
         t.id === "t1" ? "support-detailed" : "support-concise",
@@ -860,18 +859,25 @@ describe("ComparisonConfigForm", () => {
         value: baseConfig({ variants: ["t1", "t2"] }),
       });
 
-      await user.click(screen.getByTestId("comparison-variant-output-t1"));
+      await user.click(
+        screen.getByTestId("comparison-variant-output-t1-input"),
+      );
 
+      // The dropdown's source header names the variant once (alongside the
+      // card's own title, hence getAllByText); each field option below it
+      // shows the bare "output.field" path — selecting one is what produces
+      // the qualified "support-detailed.output.field" chip.
       await waitFor(() =>
-        expect(
-          screen.getByText("support-detailed.output.document_type"),
-        ).toBeVisible(),
+        expect(screen.getAllByText("support-detailed")).toHaveLength(2),
       );
       expect(
-        screen.getByText("support-detailed.output.confidence"),
+        screen.getByTestId("field-option-output.document_type"),
       ).toBeVisible();
       expect(
-        screen.getByText("support-detailed.output.reasoning"),
+        screen.getByTestId("field-option-output.confidence"),
+      ).toBeVisible();
+      expect(
+        screen.getByTestId("field-option-output.reasoning"),
       ).toBeVisible();
     });
 
@@ -892,28 +898,33 @@ describe("ComparisonConfigForm", () => {
         onChange,
       });
 
-      await user.click(screen.getByTestId("comparison-variant-output-t1"));
-      // The option reads "support-detailed.output.document_type"…
-      expect(
-        screen.getByText("support-detailed.output.document_type"),
-      ).toBeVisible();
       await user.click(
-        screen.getByTestId("comparison-variant-output-t1-option-document_type"),
+        screen.getByTestId("comparison-variant-output-t1-input"),
       );
+      await user.click(screen.getByTestId("field-option-output.document_type"));
 
-      // …but what gets stored is the unwrapped path the backend expects.
+      // What gets stored is the unwrapped path the backend expects, not the
+      // "output.document_type" the option was labelled with.
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({
           variantOutputPaths: { t1: ["document_type"] },
         }),
       );
+
+      // …and the chip now reads the qualified label built from that same
+      // stored selection.
+      expect(
+        within(screen.getByTestId("comparison-variant-output-t1")).getByText(
+          "support-detailed.output.document_type",
+        ),
+      ).toBeVisible();
     });
 
     // CodeRabbit (PR #5789): an explicitly-chosen "Whole output" stores path [],
-    // which matches no option, so the label fell through to `path.join(".")` —
-    // an empty string. `??` only falls through on null/undefined, never "", so
-    // the "Whole output" fallback never fired and the button rendered BLANK.
-    it("labels an explicitly empty path as Whole output, not blank", () => {
+    // which matches no option. The placeholder must still read the unqualified
+    // "Whole output" — "Whole output" is a mode, not a field, so unlike a real
+    // selection it never carries the variant name prefix.
+    it("labels an explicitly empty path as Whole output, not blank or qualified", () => {
       useTargetNameMock.mockImplementation(() => "support-detailed");
       renderForm({
         targets: [jsonSchemaTarget("t1"), target("t2")],
@@ -924,30 +935,8 @@ describe("ComparisonConfigForm", () => {
       });
 
       expect(
-        within(screen.getByTestId("comparison-variant-output-t1")).getByText(
-          "Whole output",
-        ),
-      ).toBeVisible();
-    });
-
-    // "Whole output" is a mode, not a field, so it stays unqualified.
-    it("leaves the whole-output option unqualified", async () => {
-      const user = userEvent.setup();
-      useTargetNameMock.mockImplementation((t: { id: string }) =>
-        t.id === "t1" ? "support-detailed" : "support-concise",
-      );
-      renderForm({
-        targets: [jsonSchemaTarget("t1"), target("t2")],
-        value: baseConfig({ variants: ["t1", "t2"] }),
-      });
-
-      await user.click(screen.getByTestId("comparison-variant-output-t1"));
-
-      await waitFor(() =>
-        expect(
-          screen.getByTestId("comparison-variant-output-t1-option-whole"),
-        ).toHaveTextContent(/^Whole output$/),
-      );
+        screen.getByTestId("comparison-variant-output-t1-input"),
+      ).toHaveAttribute("placeholder", "Whole output");
     });
   });
 });

@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
@@ -109,20 +109,6 @@ export type ComparisonConfigFormProps = {
   /** Active dataset's name, used only to qualify column labels. */
   datasetName?: string;
 };
-
-/**
- * Qualify a field with the source it comes from, e.g. "Test Data.expected_output"
- * or "support-detailed.answer" — the same `Source.field` shape the prompt
- * variable mapping chips use, so a name on its own is never ambiguous about
- * which dataset or variant it belongs to.
- *
- * Display only: the stored value stays the bare field/path the backend reads.
- * Falls back to the bare field when the source is unknown (still loading).
- */
-export const qualifyFieldLabel = (
-  source: string | undefined,
-  field: string,
-): string => (source ? `${source}.${field}` : field);
 
 export function ComparisonConfigForm({
   value,
@@ -323,9 +309,6 @@ function VariantsMultiSelect({
   );
 }
 
-/** Storage for "compare the whole output" — no field narrowing. */
-const WHOLE_OUTPUT = "__whole_output__";
-
 /**
  * One cell of the variants grid: which column, and — when the target emits
  * more than one output field — which of those fields feeds the judge.
@@ -364,14 +347,33 @@ function VariantCard({
 }) {
   const label = name || target.id;
   const outputOptions = getVariantOutputOptions(outputs ?? []);
-  // Qualify each field with the variant it belongs to ("support-detailed.answer"),
-  // the same Source.field shape the dataset pickers and mapping chips use.
-  const qualify = (optionLabel: string) => qualifyFieldLabel(label, optionLabel);
-  const selectedLabel =
-    outputOptions.find((option) => pathsEqual(option.path, path ?? []))
-      ?.label ??
-    path?.join(".") ??
-    null;
+
+  // Mirrors the Golden/Input field pickers: one AvailableSource per variant.
+  // Each option's already-qualified label ("output.answer") doubles as the
+  // field's unique path segment, so selecting stays a single click (no
+  // drill-down) and the chip renders "support-detailed.output.answer" for
+  // free — the same Source.field shape the dataset pickers use. The real
+  // stored path (which may be the deliberately-unwrapped single segment from
+  // getVariantOutputOptions, see its own comment) is looked up by that label
+  // on selection rather than trusted from the mapping's path directly.
+  const outputSource: AvailableSource = useMemo(
+    () => ({
+      id: target.id,
+      name: label,
+      type: target.type === "agent" ? "agent" : "signature",
+      fields: outputOptions.map((option) => ({
+        name: option.label,
+        type: "str",
+      })),
+    }),
+    [target.id, target.type, label, outputOptions],
+  );
+  const selectedOption = outputOptions.find((option) =>
+    pathsEqual(option.path, path ?? []),
+  );
+  const outputMapping: FieldMapping | undefined = selectedOption
+    ? { type: "source", sourceId: target.id, path: [selectedOption.label] }
+    : undefined;
 
   return (
     <VStack
@@ -403,57 +405,25 @@ function VariantCard({
       </HStack>
 
       {outputOptions.length > 1 && (
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <Button
-              variant="outline"
-              colorPalette="gray"
-              size="xs"
-              fontWeight="normal"
-              justifyContent="space-between"
-              width="full"
-              data-testid={`comparison-variant-output-${target.id}`}
-            >
-              <Text
-                fontSize="12px"
-                fontFamily="mono"
-                color={path?.length ? "fg" : "fg.subtle"}
-                truncate
-                title={selectedLabel ? qualify(selectedLabel) : "Whole output"}
-              >
-                {selectedLabel ? qualify(selectedLabel) : "Whole output"}
-              </Text>
-              <ChevronDown size={12} color="var(--chakra-colors-fg-muted)" />
-            </Button>
-          </Menu.Trigger>
-          <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
-            <Menu.Item
-              value={WHOLE_OUTPUT}
-              onClick={() => onPathChange([])}
-              data-testid={`comparison-variant-output-${target.id}-option-whole`}
-            >
-              <Text fontSize="12px" color="fg.subtle">
-                Whole output
-              </Text>
-            </Menu.Item>
-            {outputOptions.map((option) => (
-              // Keyed on the PATH, not the label: the path is this option's
-              // stable identity, while the label is display copy that has
-              // already been reworded once — and a test id that moves when copy
-              // changes is a test id that breaks for no reason.
-              <Menu.Item
-                key={option.path.join(".")}
-                value={option.path.join(".")}
-                onClick={() => onPathChange(option.path)}
-                data-testid={`comparison-variant-output-${target.id}-option-${option.path.join(".")}`}
-              >
-                <Text fontSize="12px" fontFamily="mono" title={qualify(option.label)}>
-                  {qualify(option.label)}
-                </Text>
-              </Menu.Item>
-            ))}
-          </Menu.Content>
-        </Menu.Root>
+        <Box data-testid={`comparison-variant-output-${target.id}`}>
+          <VariableMappingInput
+            mapping={outputMapping}
+            availableSources={[outputSource]}
+            placeholder="Whole output"
+            inputTestId={`comparison-variant-output-${target.id}-input`}
+            onMappingChange={(next) => {
+              if (!next) {
+                onPathChange([]);
+                return;
+              }
+              const key = next.type === "source" ? next.path.at(-1) : next.value;
+              const matched = outputOptions.find(
+                (option) => option.label === key,
+              );
+              onPathChange(matched?.path ?? []);
+            }}
+          />
+        </Box>
       )}
     </VStack>
   );
