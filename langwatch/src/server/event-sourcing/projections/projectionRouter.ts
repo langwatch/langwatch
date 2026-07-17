@@ -576,7 +576,10 @@ export class ProjectionRouter<
       string,
       {
         name: string;
-        handler: { handle: (event: EventType) => Promise<void> };
+        handler: {
+          handle: (event: EventType) => Promise<void>;
+          handleBatch: (events: EventType[]) => Promise<void>;
+        };
         options: any;
       }
     > = {};
@@ -636,6 +639,62 @@ export class ProjectionRouter<
               });
             }
           },
+          handleBatch: async (events: EventType[]) => {
+            const toApply: EventType[] = [];
+            for (const event of events) {
+              if (this.replayMarkerChecker) {
+                const decision = await this.replayMarkerChecker.check(
+                  name,
+                  event,
+                );
+                if (decision === "skip") continue;
+              }
+              toApply.push(event);
+            }
+            if (toApply.length === 0) return;
+
+            const firstContext = await this.buildStoreContext(toApply[0]!);
+            const contexts = toApply.map((event) => ({
+              ...firstContext,
+              aggregateId: String(event.aggregateId),
+            }));
+            const mapped = await withMetrics({
+              fn: () =>
+                this.mapExecutor.executeBatch(mapProj, toApply, contexts),
+              onComplete: (ms) => {
+                for (const _event of toApply) {
+                  incrementEsMapProjectionTotal(
+                    this.pipelineName,
+                    name,
+                    "completed",
+                  );
+                }
+                observeEsMapProjectionDuration(this.pipelineName, name, ms);
+              },
+              onFail: (ms) => {
+                for (const _event of toApply) {
+                  incrementEsMapProjectionTotal(
+                    this.pipelineName,
+                    name,
+                    "failed",
+                  );
+                }
+                observeEsMapProjectionDuration(this.pipelineName, name, ms);
+              },
+            });
+
+            const mapReactors = this.reactorsForMap.get(name);
+            if (mapReactors && mapReactors.length > 0) {
+              for (const { event, record } of mapped) {
+                await this.dispatchToReactors({
+                  foldName: name,
+                  reactors: mapReactors,
+                  events: [event],
+                  foldState: record,
+                });
+              }
+            }
+          },
         },
         options: {
           eventTypes: mapProj.eventTypes as readonly string[],
@@ -643,6 +702,7 @@ export class ProjectionRouter<
           concurrency: mapProj.options?.concurrency,
           disabled: mapProj.options?.disabled,
           groupKeyFn: mapProj.options?.groupKeyFn,
+          coalesceMaxBatch: mapProj.options?.coalesceMaxBatch,
         },
       };
     }
@@ -659,6 +719,17 @@ export class ProjectionRouter<
           );
         }
         await handlerDef.handler.handle(event);
+      },
+      async (handlerName, events, _context) => {
+        const handlerDef = handlerDefs[handlerName];
+        if (!handlerDef) {
+          throw new ConfigurationError(
+            "ProjectionRouter",
+            `Map projection handler "${handlerName}" not found`,
+            { handlerName },
+          );
+        }
+        await handlerDef.handler.handleBatch(events);
       },
     );
   }
@@ -1591,7 +1662,6 @@ export class ProjectionRouter<
         reactor.name,
         events.length - survivors.length,
       );
-      // biome-ignore lint/style/noNonNullAssertion: every index came from `events`.
       return survivors.map((index) => events[index]!);
     } catch (error) {
       // Fail open, like `shouldReact`: a throwing job-id function must never
